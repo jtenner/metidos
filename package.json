@@ -12,6 +12,7 @@
     "format": "bunx biome format src --write"
   },
   "dependencies": {
+    "@openai/codex-sdk": "^0.117.0",
     "electrobun": "latest"
   },
   "devDependencies": {
