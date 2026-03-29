@@ -91,6 +91,12 @@ type AppProps = {
 	procedures: ProjectProcedures;
 };
 
+declare global {
+	interface Window {
+		__jtIdeAppMountedAt?: number;
+	}
+}
+
 export default function App({ procedures }: AppProps): JSX.Element {
 	const [projects, setProjects] = useState<RpcProject[]>([]);
 	const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
@@ -609,6 +615,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	useEffect(() => {
 		void initialize();
 	}, [initialize]);
+
+	useEffect(() => {
+		window.__jtIdeAppMountedAt = Date.now();
+		console.log("App.tsx mounted", window.__jtIdeAppMountedAt);
+	}, []);
 
 	return (
 		<div className="min-h-screen bg-[#0e0e0e] text-[#ffffff]">

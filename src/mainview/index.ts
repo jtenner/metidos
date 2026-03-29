@@ -1,4 +1,5 @@
 import { Electroview } from "electrobun/view";
+import * as React from "react";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -19,6 +20,7 @@ const procedures: ProjectProcedures = rpc.request;
 declare global {
 	interface Window {
 		jtIdeProcedures: ProjectProcedures;
+		__jtIdeAppMountedAt?: number;
 	}
 }
 
@@ -26,8 +28,19 @@ window.jtIdeProcedures = procedures;
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
-	throw new Error("Mainview root not found");
+	console.error("Mainview root not found");
+	document.body.innerHTML =
+		'<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Mainview root missing (id="app").</main>';
+} else {
+	console.log("React version:", React.version);
+	console.log("Mounting React app (App.tsx)");
+	const root = createRoot(appRoot);
+	try {
+		root.render(createElement(App, { procedures }));
+	} catch (error) {
+		console.error("Failed to mount App.tsx", error);
+		window.__jtIdeAppMountedAt = Number.NaN;
+		appRoot.innerHTML =
+			'<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Failed to initialize App UI. Check console for details.</main>';
+	}
 }
-
-const root = createRoot(appRoot);
-root.render(createElement(App, { procedures }));
