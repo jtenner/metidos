@@ -305,29 +305,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 
 		let cancelled = false;
-		const timeoutId = window.setTimeout(() => {
-			void (async () => {
-				setDirectorySuggestionsLoading(true);
-				try {
-					const result = await procedures.listDirectorySuggestions({ query });
-					if (!cancelled) {
-						setDirectorySuggestions(result.directories);
-					}
-				} catch {
-					if (!cancelled) {
-						setDirectorySuggestions([]);
-					}
-				} finally {
-					if (!cancelled) {
-						setDirectorySuggestionsLoading(false);
-					}
+		setDirectorySuggestions([]);
+		setDirectorySuggestionsLoading(true);
+		void (async () => {
+			try {
+				const result = await procedures.listDirectorySuggestions({ query });
+				if (!cancelled) {
+					setDirectorySuggestions(result.directories);
 				}
-			})();
-		}, 120);
+			} catch {
+				if (!cancelled) {
+					setDirectorySuggestions([]);
+				}
+			} finally {
+				if (!cancelled) {
+					setDirectorySuggestionsLoading(false);
+				}
+			}
+		})();
 
 		return () => {
 			cancelled = true;
-			window.clearTimeout(timeoutId);
 		};
 	}, [addProjectOpen, addProjectPath, procedures]);
 

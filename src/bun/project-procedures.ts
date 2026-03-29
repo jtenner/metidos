@@ -86,8 +86,8 @@ function parseDirectorySuggestionQuery(query: string): {
 		};
 	}
 
+	const hasTrailingSeparator = /[\\/]$/.test(query);
 	const expandedQuery = expandHomeShorthandPath(query);
-	const hasTrailingSeparator = /[\\/]$/.test(expandedQuery);
 	if (hasTrailingSeparator) {
 		return {
 			searchDirectory: resolve(expandedQuery),
@@ -135,6 +135,9 @@ export async function listDirectorySuggestionsProcedure(
 		const normalizedPrefix = namePrefix.toLocaleLowerCase();
 		const directories = sortDirectoryNames(
 			readdirSync(searchDirectory).filter((entry) => {
+				if (entry.startsWith(".")) {
+					return false;
+				}
 				if (
 					normalizedPrefix &&
 					!entry.toLocaleLowerCase().startsWith(normalizedPrefix)
