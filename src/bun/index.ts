@@ -12,7 +12,7 @@ import {
 } from "./project-procedures";
 import type { AppRPCSchema } from "./rpc-schema";
 
-const SERVER_PORT = 7599;
+const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
 const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jt-ide-build");
@@ -46,6 +46,54 @@ type RpcRequestHandlerMap = {
 		params: RpcRequestMap[K]["params"],
 	) => Promise<RpcRequestMap[K]["response"]>;
 };
+
+function isStringInteger(value: string): boolean {
+	return /^\d+$/.test(value);
+}
+
+function readCliPort(args: string[]): string | null {
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if (arg === "--port" || arg === "-p") {
+			const nextArg = args[index + 1];
+			if (!nextArg) {
+				throw new Error(`Missing value for ${arg}`);
+			}
+			return nextArg;
+		}
+		if (arg.startsWith("--port=")) {
+			return arg.slice("--port=".length);
+		}
+		if (arg.startsWith("-p=")) {
+			return arg.slice("-p=".length);
+		}
+	}
+
+	return null;
+}
+
+function resolveServerPort(args: string[], envPort?: string): number {
+	const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
+	if (!isStringInteger(configuredPort)) {
+		throw new Error(
+			`Invalid port "${configuredPort}". Expected an integer string from --port, -p, or JT_IDE_PORT.`,
+		);
+	}
+
+	const parsedPort = Number.parseInt(configuredPort, 10);
+	if (parsedPort < 1 || parsedPort > 65_535) {
+		throw new Error(
+			`Invalid port "${configuredPort}". Expected an integer string between 1 and 65535.`,
+		);
+	}
+
+	return parsedPort;
+}
+
+const SERVER_PORT = resolveServerPort(
+	Bun.argv.slice(2),
+	process.env.JT_IDE_PORT,
+);
 
 const rpcHandlers: RpcRequestHandlerMap = {
 	listProjects: (params) => listProjectsProcedure(params),
