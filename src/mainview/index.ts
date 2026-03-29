@@ -26,6 +26,19 @@ declare global {
 
 window.jtIdeProcedures = procedures;
 
+const windowControlBindings: Array<[string, () => void]> = [
+	["minimize-window", () => rpc.send.minimizeWindow()],
+	["maximize-window", () => rpc.send.toggleMaximizeWindow()],
+	["close-window", () => rpc.send.closeWindow()],
+];
+
+for (const [id, handler] of windowControlBindings) {
+	document.getElementById(id)?.addEventListener("click", (event) => {
+		event.preventDefault();
+		handler();
+	});
+}
+
 const appRoot = document.getElementById("app");
 if (!appRoot) {
 	console.error("Mainview root not found");

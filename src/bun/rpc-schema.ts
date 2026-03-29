@@ -68,7 +68,11 @@ export type AppRPCSchema = {
 				};
 			};
 		};
-		messages: EmptyProtocolMap;
+		messages: {
+			closeWindow: undefined;
+			minimizeWindow: undefined;
+			toggleMaximizeWindow: undefined;
+		};
 	};
 	webview: {
 		requests: EmptyProtocolMap;

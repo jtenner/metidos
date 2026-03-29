@@ -13,9 +13,102 @@
 			href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
 			rel="stylesheet"
 		/>
+		<style>
+			html,
+			body {
+				margin: 0;
+				min-height: 100vh;
+				background: #020617;
+				color: #e2e8f0;
+				overflow: hidden;
+			}
+
+			.window-titlebar {
+				position: fixed;
+				top: 0;
+				right: 0;
+				left: 0;
+				z-index: 1000;
+				display: flex;
+				height: 44px;
+				align-items: center;
+				justify-content: space-between;
+				padding: 0 10px 0 16px;
+				border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+				background: rgba(2, 6, 23, 0.92);
+				backdrop-filter: blur(18px);
+				-webkit-backdrop-filter: blur(18px);
+				user-select: none;
+			}
+
+			.window-titlebar__title {
+				font-family: "Space Grotesk", sans-serif;
+				font-size: 12px;
+				font-weight: 700;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: #cbd5e1;
+			}
+
+			.window-titlebar__controls {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+
+			.window-titlebar__button {
+				height: 28px;
+				padding: 0 12px;
+				border: 1px solid rgba(148, 163, 184, 0.2);
+				border-radius: 999px;
+				background: rgba(15, 23, 42, 0.9);
+				color: #f8fafc;
+				font-family: Inter, sans-serif;
+				font-size: 11px;
+				font-weight: 600;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				cursor: default;
+			}
+
+			.window-titlebar__button:hover {
+				background: rgba(30, 41, 59, 0.96);
+			}
+
+			.window-titlebar__button--danger {
+				border-color: rgba(248, 113, 113, 0.3);
+				background: rgba(127, 29, 29, 0.72);
+			}
+
+			.window-titlebar__button--danger:hover {
+				background: rgba(153, 27, 27, 0.9);
+			}
+		</style>
 		<script defer src="views://mainview/index.js"></script>
 	</head>
-	<body class="min-h-screen">
-		<div id="app" class="min-h-screen bg-slate-950 text-slate-100"></div>
+	<body>
+		<header class="window-titlebar electrobun-webkit-app-region-drag">
+			<div class="window-titlebar__title">jt-ide</div>
+			<div class="window-titlebar__controls electrobun-webkit-app-region-no-drag">
+				<button class="window-titlebar__button" id="minimize-window" type="button">
+					Min
+				</button>
+				<button class="window-titlebar__button" id="maximize-window" type="button">
+					Max
+				</button>
+				<button
+					class="window-titlebar__button window-titlebar__button--danger"
+					id="close-window"
+					type="button"
+				>
+					Close
+				</button>
+			</div>
+		</header>
+		<div
+			id="app"
+			class="bg-slate-950 text-slate-100"
+			style="box-sizing: border-box; min-height: 100vh; padding-top: 44px;"
+		></div>
 	</body>
 </html>

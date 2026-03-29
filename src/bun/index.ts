@@ -13,6 +13,8 @@ import type { AppRPCSchema } from "./rpc-schema";
 // Initialize persistent Bun-side app state store on startup.
 initAppDatabase();
 
+let mainWindow: BrowserWindow | null = null;
+
 const rpc = BrowserView.defineRPC<AppRPCSchema>({
 	handlers: {
 		requests: {
@@ -23,10 +25,28 @@ const rpc = BrowserView.defineRPC<AppRPCSchema>({
 			openWorktree: (params) => openWorktreeProcedure(params),
 			closeWorktree: (params) => closeWorktreeProcedure(params),
 		},
+		messages: {
+			closeWindow: () => {
+				mainWindow?.close();
+			},
+			minimizeWindow: () => {
+				mainWindow?.minimize();
+			},
+			toggleMaximizeWindow: () => {
+				if (!mainWindow) {
+					return;
+				}
+				if (mainWindow.isMaximized()) {
+					mainWindow.unmaximize();
+					return;
+				}
+				mainWindow.maximize();
+			},
+		},
 	},
 });
 
-new BrowserWindow({
+mainWindow = new BrowserWindow({
 	title: "jt-ide",
 	frame: {
 		width: 960,
@@ -34,7 +54,7 @@ new BrowserWindow({
 		x: 100,
 		y: 100,
 	},
-	titleBarStyle: "default",
+	titleBarStyle: "hidden",
 	rpc,
 	url: "views://mainview/index.html",
 });
