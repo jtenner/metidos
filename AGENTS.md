@@ -48,10 +48,11 @@
 │  │  ├─ index.ts
 │  │  ├─ project-procedures.ts
 │  │  └─ rpc-schema.ts
-│  └─ mainview/
-│     ├─ index.css
-│     ├─ index.html
-│     ├─ index.ts
-│     └─ input.css
+ │  └─ mainview/
+ │     ├─ App.tsx
+ │     ├─ index.css
+ │     ├─ index.html
+ │     ├─ index.ts
+ │     └─ input.css
 └─ stitch.zip
 ```
