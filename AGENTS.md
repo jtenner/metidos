@@ -1,6 +1,7 @@
 # AGENTS
 
 - Follow the repository commit process documented in `.tasks/commit.md`.
+- Always add generated files to `.gitignore` and keep them out of version control.
 
 - Current repository file tree:
 
@@ -43,14 +44,13 @@
 ├─ electrobun.config.ts
 ├─ package.json
 ├─ src/
-│  ├─ bun/
-│  │  ├─ db.ts
-│  │  ├─ index.ts
-│  │  ├─ project-procedures.ts
-│  │  └─ rpc-schema.ts
+ │  ├─ bun/
+ │  │  ├─ db.ts
+ │  │  ├─ index.ts
+ │  │  ├─ project-procedures.ts
+ │  │  └─ rpc-schema.ts
  │  └─ mainview/
  │     ├─ App.tsx
- │     ├─ index.css
  │     ├─ index.html
  │     ├─ index.ts
  │     └─ input.css
