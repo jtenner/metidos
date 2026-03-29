@@ -1,4 +1,8 @@
 import { BrowserWindow } from "electrobun/bun";
+import { initAppDatabase } from "./db";
+
+// Initialize persistent Bun-side app state store on startup.
+initAppDatabase();
 
 new BrowserWindow({
 	title: "jt-ide",
