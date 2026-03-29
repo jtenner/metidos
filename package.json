@@ -8,12 +8,15 @@
     "start": "bun run dev",
     "dev": "bun run tailwind:build && electrobun dev",
     "dev:watch": "bun run tailwind:watch & electrobun dev --watch",
+    "validate": "bunx biome check src/bun src/mainview/index.ts src/mainview/input.css",
     "build:dev": "bun install && bun run tailwind:build && electrobun build",
     "format": "bunx biome format src --write"
   },
   "dependencies": {
     "@openai/codex-sdk": "^0.117.0",
-    "electrobun": "latest"
+    "electrobun": "latest",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
