@@ -27,8 +27,14 @@ const APP_DATA_DIR =
 	process.platform === "darwin"
 		? join(homedir(), "Library", "Application Support", APP_NAME)
 		: process.platform === "win32"
-			? join(process.env.APPDATA || join(homedir(), "AppData", "Roaming"), APP_NAME)
-			: join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), APP_NAME);
+			? join(
+					process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
+					APP_NAME,
+				)
+			: join(
+					process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
+					APP_NAME,
+				);
 
 function ensureAppDirectory(appDataPath: string): void {
 	if (!existsSync(appDataPath)) {
@@ -71,7 +77,10 @@ export function initAppDatabase(): Database {
 	return db;
 }
 
-export function getProject(database: Database, projectPath: string): ProjectRecord | null {
+export function getProject(
+	database: Database,
+	projectPath: string,
+): ProjectRecord | null {
 	return database
 		.query<ProjectRecord, [string]>(
 			`
@@ -91,7 +100,33 @@ export function getProject(database: Database, projectPath: string): ProjectReco
 		.get(projectPath);
 }
 
-export function upsertProject(database: Database, input: ProjectInput): ProjectRecord {
+export function getProjectById(
+	database: Database,
+	projectId: number,
+): ProjectRecord | null {
+	return database
+		.query<ProjectRecord, [number]>(
+			`
+			SELECT
+				id,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			WHERE id = ?
+		`,
+		)
+		.get(projectId);
+}
+
+export function upsertProject(
+	database: Database,
+	input: ProjectInput,
+): ProjectRecord {
 	database.run(
 		`
 			INSERT INTO projects (path, name, is_open, last_opened_at, updated_at)
@@ -104,7 +139,12 @@ export function upsertProject(database: Database, input: ProjectInput): ProjectR
 		input.projectPath,
 		input.name ?? "",
 	);
-	return getProject(database, input.projectPath)!;
+	const project = getProject(database, input.projectPath);
+	if (!project) {
+		throw new Error(`Failed to upsert project at ${input.projectPath}`);
+	}
+
+	return project;
 }
 
 export function listOpenProjects(database: Database): ProjectRecord[] {

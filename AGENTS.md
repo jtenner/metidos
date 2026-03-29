@@ -10,25 +10,44 @@
 │  └─ commit.md
 ├─ .git
 ├─ .gitignore
-├─ .gitignore
 ├─ AGENTS.md
 ├─ biome.json
 ├─ bun.lock
 ├─ docs/
+│  ├─ codex.md
 │  └─ references/
 │     ├─ ai_chat_mobile/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ compact_diff_view_desktop/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ compact_diff_view_mobile/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ codex_view/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ file_editor_mobile/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ file_tree_view/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ task_list_mobile/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     └─ updated_tasks_view/
+│        ├─ code.html
+│        └─ screen.png
 ├─ electrobun.config.ts
 ├─ package.json
 ├─ src/
 │  ├─ bun/
-│  │  └─ index.ts
+│  │  ├─ db.ts
+│  │  ├─ index.ts
+│  │  ├─ project-procedures.ts
+│  │  └─ rpc-schema.ts
 │  └─ mainview/
 │     ├─ index.css
 │     ├─ index.html
