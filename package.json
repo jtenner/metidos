@@ -1,0 +1,26 @@
+{
+  "name": "jt-ide",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
+    "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
+    "start": "bun run dev",
+    "dev": "bun run tailwind:build && electrobun dev",
+    "dev:watch": "bun run tailwind:watch & electrobun dev --watch",
+    "build:dev": "bun install && bun run tailwind:build && electrobun build",
+    "format": "bunx biome format src --write"
+  },
+  "dependencies": {
+    "electrobun": "latest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@tailwindcss/cli": "^4.2.2",
+    "@types/bun": "latest",
+    "tailwindcss": "^4.2.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

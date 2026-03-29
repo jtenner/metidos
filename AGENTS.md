@@ -8,7 +8,31 @@
 .
 ├─ .tasks/
 │  └─ commit.md
+├─ .git
+├─ .gitignore
 ├─ .gitignore
 ├─ AGENTS.md
-└─ agents.md
+├─ biome.json
+├─ bun.lock
+├─ docs/
+│  └─ references/
+│     ├─ ai_chat_mobile/
+│     ├─ compact_diff_view_desktop/
+│     ├─ compact_diff_view_mobile/
+│     ├─ codex_view/
+│     ├─ file_editor_mobile/
+│     ├─ file_tree_view/
+│     ├─ task_list_mobile/
+│     └─ updated_tasks_view/
+├─ electrobun.config.ts
+├─ package.json
+├─ src/
+│  ├─ bun/
+│  │  └─ index.ts
+│  └─ mainview/
+│     ├─ index.css
+│     ├─ index.html
+│     ├─ index.ts
+│     └─ input.css
+└─ stitch.zip
 ```
