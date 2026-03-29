@@ -102,6 +102,8 @@ async function sendRequest<K extends RpcMethodName>(
 
 const procedures: ProjectProcedures = {
 	getHomeDirectory: (params) => sendRequest("getHomeDirectory", params),
+	listDirectorySuggestions: (params) =>
+		sendRequest("listDirectorySuggestions", params),
 	listProjects: (params) => sendRequest("listProjects", params),
 	openProject: (params) => sendRequest("openProject", params),
 	closeProject: (params) => sendRequest("closeProject", params),

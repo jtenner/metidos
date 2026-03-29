@@ -1,5 +1,6 @@
-import { existsSync, statSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, resolve } from "node:path";
 
 import type { ProjectRecord } from "./db";
 import {
@@ -29,6 +30,7 @@ export async function listProjectsProcedure(
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
+const DIRECTORY_SUGGESTION_LIMIT = 10;
 
 type WorktreePollState = {
 	diff: string[];
@@ -49,8 +51,21 @@ type ProjectPollState = {
 
 const projectPollMap = new Map<number, ProjectPollState>();
 
+function expandHomeShorthandPath(value: string): string {
+	if (process.platform === "win32") {
+		return value;
+	}
+	if (value === "~") {
+		return homedir();
+	}
+	if (value.startsWith("~/")) {
+		return resolve(homedir(), value.slice(2));
+	}
+	return value;
+}
+
 function normalizePath(value: string): string {
-	return resolve(value);
+	return resolve(expandHomeShorthandPath(value));
 }
 
 function normalizeWorktreePath(
@@ -58,6 +73,84 @@ function normalizeWorktreePath(
 	worktreePath: string,
 ): string {
 	return resolve(projectPath, worktreePath);
+}
+
+function parseDirectorySuggestionQuery(query: string): {
+	searchDirectory: string;
+	namePrefix: string;
+} {
+	if (process.platform !== "win32" && (query === "~" || query === "~/")) {
+		return {
+			searchDirectory: homedir(),
+			namePrefix: "",
+		};
+	}
+
+	const expandedQuery = expandHomeShorthandPath(query);
+	const hasTrailingSeparator = /[\\/]$/.test(expandedQuery);
+	if (hasTrailingSeparator) {
+		return {
+			searchDirectory: resolve(expandedQuery),
+			namePrefix: "",
+		};
+	}
+
+	return {
+		searchDirectory: resolve(dirname(expandedQuery)),
+		namePrefix: basename(expandedQuery),
+	};
+}
+
+function sortDirectoryNames(values: string[]): string[] {
+	return [...values].sort((left, right) =>
+		left.localeCompare(right, undefined, {
+			numeric: true,
+			sensitivity: "base",
+		}),
+	);
+}
+
+function safeIsDirectory(path: string): boolean {
+	try {
+		return statSync(path).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+export async function listDirectorySuggestionsProcedure(
+	params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
+): Promise<AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]> {
+	const query = params.query.trim();
+	if (!query) {
+		return { directories: [] };
+	}
+
+	const { searchDirectory, namePrefix } = parseDirectorySuggestionQuery(query);
+	if (!safeIsDirectory(searchDirectory)) {
+		return { directories: [] };
+	}
+
+	try {
+		const normalizedPrefix = namePrefix.toLocaleLowerCase();
+		const directories = sortDirectoryNames(
+			readdirSync(searchDirectory).filter((entry) => {
+				if (
+					normalizedPrefix &&
+					!entry.toLocaleLowerCase().startsWith(normalizedPrefix)
+				) {
+					return false;
+				}
+				return safeIsDirectory(resolve(searchDirectory, entry));
+			}),
+		)
+			.slice(0, DIRECTORY_SUGGESTION_LIMIT)
+			.map((entry) => resolve(searchDirectory, entry));
+
+		return { directories };
+	} catch {
+		return { directories: [] };
+	}
 }
 
 function assertProjectDirectory(projectPath: string): void {

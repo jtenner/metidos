@@ -34,6 +34,11 @@ export type RpcOpenWorktreeResult = {
 
 export type RpcHomeDirectoryResult = {
 	homeDirectory: string;
+	supportsTildePath: boolean;
+};
+
+export type RpcDirectorySuggestionsResult = {
+	directories: string[];
 };
 
 export type AppRPCSchema = {
@@ -41,6 +46,10 @@ export type AppRPCSchema = {
 		getHomeDirectory: {
 			params: undefined;
 			response: RpcHomeDirectoryResult;
+		};
+		listDirectorySuggestions: {
+			params: { query: string };
+			response: RpcDirectorySuggestionsResult;
 		};
 		listProjects: {
 			params:
@@ -81,6 +90,11 @@ export interface ProjectProcedures {
 	getHomeDirectory: (
 		params?: AppRPCSchema["requests"]["getHomeDirectory"]["params"],
 	) => Promise<AppRPCSchema["requests"]["getHomeDirectory"]["response"]>;
+	listDirectorySuggestions: (
+		params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
+	) => Promise<
+		AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]
+	>;
 	listProjects: (
 		params?: AppRPCSchema["requests"]["listProjects"]["params"],
 	) => Promise<AppRPCSchema["requests"]["listProjects"]["response"]>;

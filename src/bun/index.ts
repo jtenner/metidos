@@ -5,6 +5,7 @@ import { initAppDatabase } from "./db";
 import {
 	closeProjectProcedure,
 	closeWorktreeProcedure,
+	listDirectorySuggestionsProcedure,
 	listProjectWorktreesProcedure,
 	listProjectsProcedure,
 	openProjectProcedure,
@@ -97,7 +98,13 @@ const SERVER_PORT = resolveServerPort(
 );
 
 const rpcHandlers: RpcRequestHandlerMap = {
-	getHomeDirectory: async () => ({ homeDirectory: homedir() }),
+	getHomeDirectory: async () => ({
+		homeDirectory: homedir(),
+		supportsTildePath:
+			process.platform === "darwin" || process.platform === "linux",
+	}),
+	listDirectorySuggestions: (params) =>
+		listDirectorySuggestionsProcedure(params),
 	listProjects: (params) => listProjectsProcedure(params),
 	openProject: (params) => openProjectProcedure(params),
 	closeProject: (params) => closeProjectProcedure(params),

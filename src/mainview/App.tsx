@@ -87,6 +87,45 @@ function materialSymbol(name: string, className = ""): JSX.Element {
 	);
 }
 
+function formatPathForDisplay(
+	value: string,
+	homeDirectory: string,
+	supportsTildePath: boolean,
+): string {
+	if (!supportsTildePath || !homeDirectory) {
+		return value;
+	}
+	if (value === homeDirectory) {
+		return "~";
+	}
+	const homeDirectoryPrefix = `${homeDirectory}/`;
+	if (value.startsWith(homeDirectoryPrefix)) {
+		return `~/${value.slice(homeDirectoryPrefix.length)}`;
+	}
+	return value;
+}
+
+function pathSeparator(value: string): string {
+	return value.includes("\\") ? "\\" : "/";
+}
+
+function ensureTrailingSeparator(value: string): string {
+	if (!value || /[\\/]$/.test(value)) {
+		return value;
+	}
+	return `${value}${pathSeparator(value)}`;
+}
+
+function formatDirectoryPathForInput(
+	value: string,
+	homeDirectory: string,
+	supportsTildePath: boolean,
+): string {
+	return ensureTrailingSeparator(
+		formatPathForDisplay(value, homeDirectory, supportsTildePath),
+	);
+}
+
 type AppProps = {
 	procedures: ProjectProcedures;
 };
@@ -102,9 +141,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
 	const [worktreeStates, setWorktreeStates] = useState<WorktreeStateMap>({});
 	const [homeDirectory, setHomeDirectory] = useState("");
+	const [supportsTildePath, setSupportsTildePath] = useState(false);
 	const [addProjectOpen, setAddProjectOpen] = useState(false);
 	const [addProjectPath, setAddProjectPath] = useState("");
 	const [addProjectError, setAddProjectError] = useState("");
+	const [directorySuggestions, setDirectorySuggestions] = useState<string[]>(
+		[],
+	);
+	const [directorySuggestionsLoading, setDirectorySuggestionsLoading] =
+		useState(false);
 	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
@@ -190,9 +235,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const resetAddProjectPath = useCallback(
 		(nextPath?: string) => {
-			setAddProjectPath(nextPath ?? homeDirectory);
+			setAddProjectPath(
+				formatDirectoryPathForInput(
+					nextPath ?? homeDirectory,
+					homeDirectory,
+					supportsTildePath,
+				),
+			);
 		},
-		[homeDirectory],
+		[homeDirectory, supportsTildePath],
 	);
 
 	const initialize = useCallback(async () => {
@@ -203,8 +254,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setProjects(loaded);
 		hydrateProjectRows(loaded);
 		setHomeDirectory(homeDirectoryResult.homeDirectory);
+		setSupportsTildePath(homeDirectoryResult.supportsTildePath);
 		setAddProjectPath(
-			(current) => current || homeDirectoryResult.homeDirectory,
+			(current) =>
+				current ||
+				formatDirectoryPathForInput(
+					homeDirectoryResult.homeDirectory,
+					homeDirectoryResult.homeDirectory,
+					homeDirectoryResult.supportsTildePath,
+				),
 		);
 		setSelectedProjectId((current) => current ?? loaded[0]?.id ?? null);
 	}, [hydrateProjectRows, procedures]);
@@ -220,11 +278,72 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setAddProjectOpen((current) => {
 			const nextOpen = !current;
 			if (nextOpen && !addProjectPath && homeDirectory) {
-				setAddProjectPath(homeDirectory);
+				setAddProjectPath(
+					formatDirectoryPathForInput(
+						homeDirectory,
+						homeDirectory,
+						supportsTildePath,
+					),
+				);
 			}
 			return nextOpen;
 		});
-	}, [addProjectPath, homeDirectory]);
+	}, [addProjectPath, homeDirectory, supportsTildePath]);
+
+	useEffect(() => {
+		if (!addProjectOpen) {
+			setDirectorySuggestions([]);
+			setDirectorySuggestionsLoading(false);
+			return;
+		}
+
+		const query = addProjectPath.trim();
+		if (!query) {
+			setDirectorySuggestions([]);
+			setDirectorySuggestionsLoading(false);
+			return;
+		}
+
+		let cancelled = false;
+		const timeoutId = window.setTimeout(() => {
+			void (async () => {
+				setDirectorySuggestionsLoading(true);
+				try {
+					const result = await procedures.listDirectorySuggestions({ query });
+					if (!cancelled) {
+						setDirectorySuggestions(result.directories);
+					}
+				} catch {
+					if (!cancelled) {
+						setDirectorySuggestions([]);
+					}
+				} finally {
+					if (!cancelled) {
+						setDirectorySuggestionsLoading(false);
+					}
+				}
+			})();
+		}, 120);
+
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timeoutId);
+		};
+	}, [addProjectOpen, addProjectPath, procedures]);
+
+	const selectDirectorySuggestion = useCallback(
+		(directory: string) => {
+			setAddProjectError("");
+			setAddProjectPath(
+				formatDirectoryPathForInput(
+					directory,
+					homeDirectory,
+					supportsTildePath,
+				),
+			);
+		},
+		[homeDirectory, supportsTildePath],
+	);
 
 	const submitAddProject = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
@@ -598,23 +717,76 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		>
 			<label className="block text-[10px] font-label uppercase tracking-widest text-[#aaa4ff]">
 				Project Folder
-				<div className="mt-2 flex items-center gap-2">
-					<input
-						className="min-w-0 flex-1 rounded-sm border border-[#3b3b3b] bg-[#101010] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f6f] focus:border-[#7d73ff]"
-						placeholder="/path/to/project"
-						value={addProjectPath}
-						onChange={(event) => setAddProjectPath(event.currentTarget.value)}
-						autoCapitalize="none"
-						autoCorrect="off"
-						spellCheck={false}
-					/>
-					<button
-						type="submit"
-						className="rounded-sm bg-[#aaa4ff] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#281d7c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-						disabled={isAddingProject}
-					>
-						{isAddingProject ? "Adding" : "Add"}
-					</button>
+				<div className="relative mt-2 space-y-2">
+					<div className="flex items-start gap-2">
+						<input
+							className="min-w-0 flex-1 rounded-sm border border-[#3b3b3b] bg-[#101010] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f6f] focus:border-[#7d73ff]"
+							placeholder={supportsTildePath ? "~/project" : "/path/to/project"}
+							value={addProjectPath}
+							onChange={(event) => {
+								setAddProjectError("");
+								setAddProjectPath(event.currentTarget.value);
+							}}
+							autoCapitalize="none"
+							autoCorrect="off"
+							spellCheck={false}
+						/>
+						<button
+							type="submit"
+							className="rounded-sm bg-[#aaa4ff] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#281d7c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={isAddingProject}
+						>
+							{isAddingProject ? "Adding" : "Add"}
+						</button>
+					</div>
+					{addProjectPath.trim() ? (
+						<div className="overflow-hidden rounded-sm border border-[#2b2753] bg-[#0f1016]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+							<div className="flex items-center justify-between border-b border-[#24263a] px-3 py-2">
+								<span className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+									Folders
+								</span>
+								{directorySuggestionsLoading ? (
+									<span className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
+										Scanning
+									</span>
+								) : null}
+							</div>
+							{directorySuggestions.length === 0 &&
+							!directorySuggestionsLoading ? (
+								<div className="px-3 py-3 text-xs text-[#7d7d8d]">
+									No matching folders.
+								</div>
+							) : null}
+							{directorySuggestions.map((directory) => {
+								const formattedDirectory = formatDirectoryPathForInput(
+									directory,
+									homeDirectory,
+									supportsTildePath,
+								);
+								return (
+									<button
+										type="button"
+										key={directory}
+										className="flex w-full items-center gap-3 border-t border-[#1b1d2a] px-3 py-2 text-left transition-colors hover:bg-[#191b29]"
+										onMouseDown={(event) => event.preventDefault()}
+										onClick={() => selectDirectorySuggestion(directory)}
+									>
+										<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#1a1730] text-[#aaa4ff]">
+											{materialSymbol("folder", "text-[18px]")}
+										</div>
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-sm font-medium normal-case text-[#f2f0ef]">
+												{shortName(directory)}
+											</div>
+											<div className="truncate text-[11px] normal-case text-[#8e8aa7]">
+												{formattedDirectory}
+											</div>
+										</div>
+									</button>
+								);
+							})}
+						</div>
+					) : null}
 				</div>
 			</label>
 			<div className="flex items-center justify-between gap-3">
