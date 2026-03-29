@@ -6,18 +6,26 @@ import {
 	getAppDatabasePath,
 	getProjectById,
 	initAppDatabase,
+	listProjects,
 	setProjectClosed,
 	upsertProject,
 } from "./db";
 import type {
 	AppRPCSchema,
 	RpcOpenWorktreeResult,
+	RpcProject,
 	RpcProjectWorktreesResult,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
 
 const db = initAppDatabase();
+
+export async function listProjectsProcedure(_params?: {
+	includeClosed?: boolean;
+}): Promise<RpcProject[]> {
+	return listProjects(db);
+}
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;

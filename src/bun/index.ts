@@ -4,6 +4,7 @@ import {
 	closeProjectProcedure,
 	closeWorktreeProcedure,
 	listProjectWorktreesProcedure,
+	listProjectsProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
 } from "./project-procedures";
@@ -15,6 +16,7 @@ initAppDatabase();
 const rpc = BrowserView.defineRPC<AppRPCSchema>({
 	handlers: {
 		requests: {
+			listProjects: (params) => listProjectsProcedure(params),
 			openProject: (params) => openProjectProcedure(params),
 			closeProject: (params) => closeProjectProcedure(params),
 			listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),

@@ -37,6 +37,12 @@ type EmptyProtocolMap = Record<string, never>;
 export type AppRPCSchema = {
 	bun: {
 		requests: {
+			listProjects: {
+				params: {
+					includeClosed?: boolean;
+				};
+				response: RpcProject[];
+			};
 			openProject: {
 				params: { projectPath: string; name?: string | null };
 				response: RpcProjectWorktreesResult;
@@ -71,6 +77,9 @@ export type AppRPCSchema = {
 };
 
 export interface ProjectProcedures {
+	listProjects: (
+		params?: AppRPCSchema["bun"]["requests"]["listProjects"]["params"],
+	) => Promise<AppRPCSchema["bun"]["requests"]["listProjects"]["response"]>;
 	openProject: (
 		params: AppRPCSchema["bun"]["requests"]["openProject"]["params"],
 	) => Promise<RpcProjectWorktreesResult>;

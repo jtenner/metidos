@@ -123,6 +123,26 @@ export function getProjectById(
 		.get(projectId);
 }
 
+export function listProjects(database: Database): ProjectRecord[] {
+	return database
+		.query<ProjectRecord>(
+			`
+			SELECT
+				id,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			ORDER BY last_opened_at DESC, name ASC
+		`,
+		)
+		.all();
+}
+
 export function upsertProject(
 	database: Database,
 	input: ProjectInput,
