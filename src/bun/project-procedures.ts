@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 
 import type { ProjectRecord } from "./db";
@@ -58,6 +58,15 @@ function normalizeWorktreePath(
 	worktreePath: string,
 ): string {
 	return resolve(projectPath, worktreePath);
+}
+
+function assertProjectDirectory(projectPath: string): void {
+	if (!existsSync(projectPath)) {
+		throw new Error(`Project path does not exist: ${projectPath}`);
+	}
+	if (!statSync(projectPath).isDirectory()) {
+		throw new Error(`Project path must be a directory: ${projectPath}`);
+	}
 }
 
 async function runGitCommand(cwd: string, args: string[]): Promise<string> {
@@ -287,8 +296,16 @@ export async function openProjectProcedure(
 	params: AppRPCSchema["requests"]["openProject"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
 	const projectPath = normalizePath(params.projectPath);
-	if (!existsSync(projectPath)) {
-		throw new Error(`Project path does not exist: ${projectPath}`);
+	assertProjectDirectory(projectPath);
+
+	let worktrees: RpcWorktree[];
+	try {
+		worktrees = await listWorktreesForProjectPath(projectPath);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			`Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
+		);
 	}
 
 	const project = upsertProject(db, {
@@ -296,7 +313,7 @@ export async function openProjectProcedure(
 		name: params.name ?? basename(projectPath),
 	});
 	const state = ensureProjectPoller(project);
-	await refreshProjectPoll(project.id);
+	state.worktrees = worktrees;
 
 	return {
 		project,

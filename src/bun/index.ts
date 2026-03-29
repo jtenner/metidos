@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 import { initAppDatabase } from "./db";
@@ -96,6 +97,7 @@ const SERVER_PORT = resolveServerPort(
 );
 
 const rpcHandlers: RpcRequestHandlerMap = {
+	getHomeDirectory: async () => ({ homeDirectory: homedir() }),
 	listProjects: (params) => listProjectsProcedure(params),
 	openProject: (params) => openProjectProcedure(params),
 	closeProject: (params) => closeProjectProcedure(params),

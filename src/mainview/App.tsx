@@ -1,6 +1,6 @@
 import {
-	FormEvent,
-	KeyboardEvent,
+	type FormEvent,
+	type KeyboardEvent,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -101,6 +101,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [projects, setProjects] = useState<RpcProject[]>([]);
 	const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
 	const [worktreeStates, setWorktreeStates] = useState<WorktreeStateMap>({});
+	const [homeDirectory, setHomeDirectory] = useState("");
+	const [addProjectOpen, setAddProjectOpen] = useState(false);
+	const [addProjectPath, setAddProjectPath] = useState("");
+	const [addProjectError, setAddProjectError] = useState("");
+	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -183,14 +188,95 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		});
 	}, []);
 
+	const resetAddProjectPath = useCallback(
+		(nextPath?: string) => {
+			setAddProjectPath(nextPath ?? homeDirectory);
+		},
+		[homeDirectory],
+	);
+
 	const initialize = useCallback(async () => {
-		const loaded = await procedures.listProjects({ includeClosed: true });
+		const [loaded, homeDirectoryResult] = await Promise.all([
+			procedures.listProjects({ includeClosed: true }),
+			procedures.getHomeDirectory(),
+		]);
 		setProjects(loaded);
 		hydrateProjectRows(loaded);
-		if (!selectedProjectId && loaded[0]) {
-			setSelectedProjectId(loaded[0].id);
-		}
-	}, [hydrateProjectRows, procedures, selectedProjectId]);
+		setHomeDirectory(homeDirectoryResult.homeDirectory);
+		setAddProjectPath(
+			(current) => current || homeDirectoryResult.homeDirectory,
+		);
+		setSelectedProjectId((current) => current ?? loaded[0]?.id ?? null);
+	}, [hydrateProjectRows, procedures]);
+
+	const closeAddProjectForm = useCallback(() => {
+		setAddProjectOpen(false);
+		setAddProjectError("");
+		resetAddProjectPath();
+	}, [resetAddProjectPath]);
+
+	const toggleAddProjectForm = useCallback(() => {
+		setAddProjectError("");
+		setAddProjectOpen((current) => {
+			const nextOpen = !current;
+			if (nextOpen && !addProjectPath && homeDirectory) {
+				setAddProjectPath(homeDirectory);
+			}
+			return nextOpen;
+		});
+	}, [addProjectPath, homeDirectory]);
+
+	const submitAddProject = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault();
+			if (isAddingProject) {
+				return;
+			}
+
+			const projectPath = addProjectPath.trim();
+			if (!projectPath) {
+				setAddProjectError("Enter the project folder path.");
+				return;
+			}
+
+			setIsAddingProject(true);
+			setAddProjectError("");
+			try {
+				const result = await procedures.openProject({ projectPath });
+				const loaded = await procedures.listProjects({ includeClosed: true });
+				const existingState = getProjectState(result.project.id);
+				setProjects(loaded);
+				hydrateProjectRows(loaded);
+				setProjectState(result.project.id, {
+					expanded: true,
+					loadingWorktrees: false,
+					error: "",
+					worktrees: result.worktrees,
+					openWorktrees: existingState.openWorktrees,
+				});
+				setSelectedProjectId(result.project.id);
+				setSelectedWorktreePath(null);
+				resetAddProjectPath();
+				setAddProjectOpen(false);
+				setMobileProjectListOpen(false);
+			} catch (error) {
+				setAddProjectError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setIsAddingProject(false);
+			}
+		},
+		[
+			addProjectPath,
+			getProjectState,
+			hydrateProjectRows,
+			isAddingProject,
+			procedures,
+			resetAddProjectPath,
+			setProjectState,
+		],
+	);
 
 	const refreshProject = useCallback(
 		async (project: RpcProject) => {
@@ -263,7 +349,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[
 			getProjectState,
-			selectedProjectId,
 			setProjectState,
 			procedures,
 			selectedWorktreePath,
@@ -506,11 +591,55 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	});
 
+	const addProjectForm = (
+		<form
+			className="space-y-2 border-b border-[#262626] bg-[#151515] px-3 py-3"
+			onSubmit={submitAddProject}
+		>
+			<label className="block text-[10px] font-label uppercase tracking-widest text-[#aaa4ff]">
+				Project Folder
+				<div className="mt-2 flex items-center gap-2">
+					<input
+						className="min-w-0 flex-1 rounded-sm border border-[#3b3b3b] bg-[#101010] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f6f] focus:border-[#7d73ff]"
+						placeholder="/path/to/project"
+						value={addProjectPath}
+						onChange={(event) => setAddProjectPath(event.currentTarget.value)}
+						autoCapitalize="none"
+						autoCorrect="off"
+						spellCheck={false}
+					/>
+					<button
+						type="submit"
+						className="rounded-sm bg-[#aaa4ff] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#281d7c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+						disabled={isAddingProject}
+					>
+						{isAddingProject ? "Adding" : "Add"}
+					</button>
+				</div>
+			</label>
+			<div className="flex items-center justify-between gap-3">
+				<p className="text-xs text-[#8f8d8b]">
+					Add a repo by its root folder path.
+				</p>
+				<button
+					type="button"
+					className="font-label text-[10px] uppercase tracking-widest text-[#adabaa] transition-colors hover:text-[#f2f0ef]"
+					onClick={closeAddProjectForm}
+				>
+					Cancel
+				</button>
+			</div>
+			{addProjectError ? (
+				<div className="text-xs text-[#ff6e84]">{addProjectError}</div>
+			) : null}
+		</form>
+	);
+
 	const projectTree = (
 		<div className="space-y-2">
 			{projects.length === 0 ? (
 				<div className="px-3 text-sm text-[#a7a7a7]">
-					No projects in database.
+					No projects in database. Use + to add a project folder.
 				</div>
 			) : (
 				projects.map((project) => {
@@ -693,11 +822,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						}`}
 					>
 						<div className="flex items-center justify-between px-3 py-3 border-b border-[#262626]">
-							{!sidebarCollapsed ? (
-								<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
-									Projects
-								</div>
-							) : null}
+							<div className="flex items-center gap-2">
+								{!sidebarCollapsed ? (
+									<>
+										<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
+											Projects
+										</div>
+										<button
+											type="button"
+											className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
+											onClick={toggleAddProjectForm}
+											aria-label={
+												addProjectOpen ? "Close add project" : "Add project"
+											}
+										>
+											+
+										</button>
+									</>
+								) : null}
+							</div>
 							<button
 								type="button"
 								className="px-2 py-1 rounded-sm text-[#aaa4ff] hover:bg-[#202020]"
@@ -706,6 +849,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{sidebarCollapsed ? "☰" : "⟨"}
 							</button>
 						</div>
+						{!sidebarCollapsed && addProjectOpen ? addProjectForm : null}
 						<div className="h-full overflow-y-auto py-2">{projectTree}</div>
 					</aside>
 
@@ -795,6 +939,24 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 				{mobileProjectListOpen ? (
 					<aside className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] p-3">
+						<div className="mb-3 flex items-center justify-between border-b border-[#303030] pb-3">
+							<div className="flex items-center gap-2">
+								<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
+									Projects
+								</div>
+								<button
+									type="button"
+									className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
+									onClick={toggleAddProjectForm}
+									aria-label={
+										addProjectOpen ? "Close add project" : "Add project"
+									}
+								>
+									+
+								</button>
+							</div>
+						</div>
+						{addProjectOpen ? addProjectForm : null}
 						{projectTree}
 					</aside>
 				) : null}
