@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -38,7 +38,7 @@ const APP_DATA_DIR =
 
 function ensureAppDirectory(appDataPath: string): void {
 	if (!existsSync(appDataPath)) {
-		Bun.mkdirSync(appDataPath, { recursive: true });
+		mkdirSync(appDataPath, { recursive: true });
 	}
 }
 
