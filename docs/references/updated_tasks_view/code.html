@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-dim": "#cbd6db",
+              "on-tertiary-container": "#59002e",
+              "primary-fixed-dim": "#948def",
+              "tertiary-container": "#fb81ae",
+              "tertiary": "#ff96bb",
+              "secondary-container": "#3e484c",
+              "surface-tint": "#aaa4ff",
+              "on-secondary-fixed": "#364145",
+              "secondary": "#d9e4e9",
+              "surface-container-high": "#1f2020",
+              "surface-dim": "#0e0e0e",
+              "error-container": "#a70138",
+              "primary": "#aaa4ff",
+              "on-tertiary-fixed-variant": "#70103e",
+              "inverse-surface": "#fcf9f8",
+              "surface-container-low": "#131313",
+              "on-secondary-container": "#c7d2d7",
+              "on-primary": "#281d7c",
+              "inverse-on-surface": "#565555",
+              "surface-bright": "#2c2c2c",
+              "primary-fixed": "#a19afd",
+              "surface-container": "#191a1a",
+              "primary-container": "#9c95f8",
+              "outline": "#767575",
+              "surface-container-lowest": "#000000",
+              "tertiary-fixed": "#ff8db6",
+              "background": "#0e0e0e",
+              "inverse-primary": "#5a53b0",
+              "secondary-fixed": "#d9e4e9",
+              "on-primary-fixed-variant": "#2a207f",
+              "on-secondary": "#495357",
+              "on-primary-container": "#1b0a71",
+              "outline-variant": "#484848",
+              "secondary-fixed-dim": "#cbd6db",
+              "surface-container-highest": "#262626",
+              "on-tertiary-fixed": "#37001a",
+              "error": "#ff6e84",
+              "surface": "#0e0e0e",
+              "on-surface": "#ffffff",
+              "on-primary-fixed": "#040029",
+              "tertiary-dim": "#ee77a3",
+              "error-dim": "#d73357",
+              "on-background": "#ffffff",
+              "surface-variant": "#262626",
+              "on-surface-variant": "#adabaa",
+              "on-secondary-fixed-variant": "#525d61",
+              "on-tertiary": "#690939",
+              "on-error-container": "#ffb2b9",
+              "on-error": "#490013",
+              "tertiary-fixed-dim": "#f57ca9",
+              "primary-dim": "#9992f5"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            background-color: #0e0e0e;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.7);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 h-14 bg-[#131313] docked full-width top-0 z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-tighter text-[#aaa4ff] dark:text-[#aaa4ff]">The Monolithic Intelligence</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">File Tree</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">Codex</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">Diff</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#aaa4ff] border-b-2 border-[#7c4dff] pb-1" href="#">Tasks</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-[#262626] transition-all duration-300 rounded-sm active:opacity-80 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-[#262626] transition-all duration-300 rounded-sm active:opacity-80 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto px-6 py-10 md:px-12 lg:px-24 bg-surface">
+<div class="max-w-6xl mx-auto">
+<!-- Header Section -->
+<div class="mb-12">
+<h1 class="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">Intelligence Task Repository</h1>
+<p class="font-body text-on-surface-variant max-w-2xl">A system-wide registry of active intelligence directives and architectural tasks.</p>
+</div>
+<!-- Bento-Style Task Grid -->
+<div class="flex flex-col gap-4">
+<!-- Task File 1 -->
+<div class="bg-surface-container-low border border-outline-variant/30 p-6 rounded-DEFAULT group hover:bg-surface-container transition-all relative">
+<div class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity opacity-30 hover:opacity-100">
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary mt-1">terminal</span>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-headline text-lg font-bold text-on-surface">Neural Architecture Refactoring.task</h3>
+<span class="text-[10px] font-label uppercase tracking-widest text-tertiary bg-tertiary/10 px-2 py-0.5">Critical</span>
+</div>
+<p class="text-on-surface-variant text-sm max-w-3xl leading-relaxed">
+                    Optimize the core inference engine to utilize latent space compression. Deep auditing of data-flow pipelines to reduce memory fragmentation by 40%.
+                </p>
+<div class="mt-4 flex items-center gap-4 text-[10px] font-label text-outline uppercase tracking-wider">
+<span>ID: TS-902</span>
+<span>•</span>
+<span>Last modified: 2h ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Task File 2 -->
+<div class="bg-surface-container-low border border-outline-variant/30 p-6 rounded-DEFAULT group hover:bg-surface-container transition-all relative">
+<div class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity opacity-30 hover:opacity-100">
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-on-surface-variant mt-1">code</span>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-headline text-lg font-bold text-on-surface">CSS Variable Sanitization.task</h3>
+</div>
+<p class="text-on-surface-variant text-sm max-w-3xl leading-relaxed">
+                    Purge unused tokens from the design system to ensure strict compliance with Digital Obsidian standards.
+                </p>
+<div class="mt-4 flex items-center gap-4 text-[10px] font-label text-outline uppercase tracking-wider">
+<span>ID: TS-884</span>
+<span>•</span>
+<span class="text-primary">Active: 3h remaining</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Task File 3 -->
+<div class="bg-surface-container-low border border-outline-variant/30 p-6 rounded-DEFAULT group hover:bg-surface-container transition-all relative">
+<div class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity opacity-30 hover:opacity-100">
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-tertiary mt-1">bug_report</span>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-headline text-lg font-bold text-on-surface">Race Condition in Diff.task</h3>
+<span class="text-[10px] font-label uppercase tracking-widest text-error bg-error/10 px-2 py-0.5">Blocked</span>
+</div>
+<p class="text-on-surface-variant text-sm max-w-3xl leading-relaxed">
+                    The syntax highlighter crashes when comparing files over 10k lines. Awaiting core engine fix for concurrent line processing.
+                </p>
+<div class="mt-4 flex items-center gap-4 text-[10px] font-label text-outline uppercase tracking-wider">
+<span>ID: TS-761</span>
+<span>•</span>
+<span>Last modified: 1d ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Task File 4 -->
+<div class="bg-surface-container-low border border-outline-variant/30 p-6 rounded-DEFAULT group hover:bg-surface-container transition-all relative">
+<div class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity opacity-30 hover:opacity-100">
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="p-1 rounded-sm hover:bg-surface-variant text-on-surface-variant transition-colors flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-secondary mt-1">integration_instructions</span>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-1">
+<h3 class="font-headline text-lg font-bold text-on-surface">CLI Tooling Update.task</h3>
+</div>
+<p class="text-on-surface-variant text-sm max-w-3xl leading-relaxed">
+                    Update the monolithic command line tool to support concurrent workspace deployments and enhanced telemetry.
+                </p>
+<div class="mt-4 flex items-center gap-4 text-[10px] font-label text-outline uppercase tracking-wider">
+<span>ID: TS-910</span>
+<span>•</span>
+<span>Status: Pending review</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile only as per shell pivot rule) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-center gap-8 py-2 px-4 bg-[#131313] shadow-[0_-4px_24px_rgba(0,0,0,0.4)] z-50">
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="font-space-grotesk text-[10px] uppercase mt-1">Terminal</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="bug_report">bug_report</span>
+<span class="font-space-grotesk text-[10px] uppercase mt-1">Debug</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+<span class="font-space-grotesk text-[10px] uppercase mt-1">Output</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#262626] text-[#aaa4ff] rounded-sm p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-space-grotesk text-[10px] uppercase mt-1">AI Chat</span>
+</div>
+</nav>
+<!-- Empty Spacer for Mobile Nav -->
+<div class="h-16 md:hidden"></div>
+</body></html>

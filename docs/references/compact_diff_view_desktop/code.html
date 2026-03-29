@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Monolithic Intelligence - Git Diff</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-dim": "#cbd6db",
+              "on-tertiary-container": "#59002e",
+              "primary-fixed-dim": "#948def",
+              "tertiary-container": "#fb81ae",
+              "tertiary": "#ff96bb",
+              "secondary-container": "#3e484c",
+              "surface-tint": "#aaa4ff",
+              "on-secondary-fixed": "#364145",
+              "secondary": "#d9e4e9",
+              "surface-container-high": "#1f2020",
+              "surface-dim": "#0e0e0e",
+              "error-container": "#a70138",
+              "primary": "#aaa4ff",
+              "on-tertiary-fixed-variant": "#70103e",
+              "inverse-surface": "#fcf9f8",
+              "surface-container-low": "#131313",
+              "on-secondary-container": "#c7d2d7",
+              "on-primary": "#281d7c",
+              "inverse-on-surface": "#565555",
+              "surface-bright": "#2c2c2c",
+              "primary-fixed": "#a19afd",
+              "surface-container": "#191a1a",
+              "primary-container": "#9c95f8",
+              "outline": "#767575",
+              "surface-container-lowest": "#000000",
+              "tertiary-fixed": "#ff8db6",
+              "background": "#0e0e0e",
+              "inverse-primary": "#5a53b0",
+              "secondary-fixed": "#d9e4e9",
+              "on-primary-fixed-variant": "#2a207f",
+              "on-secondary": "#495357",
+              "on-primary-container": "#1b0a71",
+              "outline-variant": "#484848",
+              "secondary-fixed-dim": "#cbd6db",
+              "surface-container-highest": "#262626",
+              "on-tertiary-fixed": "#37001a",
+              "error": "#ff6e84",
+              "surface": "#0e0e0e",
+              "on-surface": "#ffffff",
+              "on-primary-fixed": "#040029",
+              "tertiary-dim": "#ee77a3",
+              "error-dim": "#d73357",
+              "on-background": "#ffffff",
+              "surface-variant": "#262626",
+              "on-surface-variant": "#adabaa",
+              "on-secondary-fixed-variant": "#525d61",
+              "on-tertiary": "#690939",
+              "on-error-container": "#ffb2b9",
+              "on-error": "#490013",
+              "tertiary-fixed-dim": "#f57ca9",
+              "primary-dim": "#9992f5"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #0e0e0e;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+        .diff-added {
+            background-color: rgba(46, 160, 67, 0.2); /* Clear Green Background */
+            border-left: 3px solid #3fb950;
+        }
+        .diff-removed {
+            background-color: rgba(248, 81, 73, 0.2); /* Clear Red Background */
+            border-left: 3px solid #f85149;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 h-14 bg-[#131313] fixed top-0 z-50 border-b border-outline-variant/10">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-tighter text-[#aaa4ff] dark:text-[#aaa4ff]">The Monolithic Intelligence</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">File Tree</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">Codex</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#aaa4ff] border-b-2 border-[#7c4dff] pb-1" href="#">Diff</a>
+<a class="font-manrope uppercase tracking-widest text-xs font-bold text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200" href="#">Tasks</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-sm hover:bg-[#262626] transition-all duration-300 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+<button class="p-2 rounded-sm hover:bg-[#262626] transition-all duration-300 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<main class="pt-14 h-screen flex flex-col bg-surface">
+<!-- Sub-header/Status Bar -->
+<div class="h-10 bg-surface-container-low flex items-center px-6 justify-between text-on-surface-variant border-b border-outline-variant/10">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+<span class="font-label text-xs tracking-tight">SRC / CORE / COMPILER.PY</span>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-primary">Working Tree</span>
+</div>
+<div class="flex items-center gap-4 text-xs font-label">
+<span class="text-secondary font-medium">+124 additions</span>
+<span class="text-error-dim font-medium">-42 deletions</span>
+</div>
+</div>
+<!-- Diff Workspace -->
+<div class="flex-1 overflow-hidden">
+<!-- Diff Container -->
+<div class="h-full bg-surface-container overflow-y-auto no-scrollbar">
+<div class="min-w-full font-mono text-sm leading-none py-2">
+<!-- Unchanged -->
+<div class="flex hover:bg-surface-container-high transition-colors group">
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 py-0.5">142</div>
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 border-r border-outline-variant/10 py-0.5">142</div>
+<div class="pl-4 whitespace-pre text-on-surface-variant py-0.5">import torch.nn as nn</div>
+</div>
+<div class="flex hover:bg-surface-container-high transition-colors group">
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 py-0.5">143</div>
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 border-r border-outline-variant/10 py-0.5">143</div>
+<div class="pl-4 whitespace-pre text-on-surface-variant py-0.5">from .attention import MultiHeadAttention</div>
+</div>
+<!-- Removed -->
+<div class="flex diff-removed group">
+<div class="w-12 text-right pr-4 select-none text-error-dim font-label text-[11px] py-0.5">144</div>
+<div class="w-12 text-right pr-4 select-none text-transparent border-r border-outline-variant/10 py-0.5">—</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-error-dim">-</span> class TransformerBlock(nn.Module):</div>
+</div>
+<div class="flex diff-removed group">
+<div class="w-12 text-right pr-4 select-none text-error-dim font-label text-[11px] py-0.5">145</div>
+<div class="w-12 text-right pr-4 select-none text-transparent border-r border-outline-variant/10 py-0.5">—</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-error-dim">-</span>     def __init__(self, embed_dim, num_heads):</div>
+</div>
+<!-- Added -->
+<div class="flex diff-added group">
+<div class="w-12 text-right pr-4 select-none text-transparent py-0.5">++</div>
+<div class="w-12 text-right pr-4 select-none text-secondary font-label text-[11px] border-r border-outline-variant/10 py-0.5">144</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-primary">+</span> class MonolithicTransformer(nn.Module):</div>
+</div>
+<div class="flex diff-added group">
+<div class="w-12 text-right pr-4 select-none text-transparent py-0.5">++</div>
+<div class="w-12 text-right pr-4 select-none text-secondary font-label text-[11px] border-r border-outline-variant/10 py-0.5">145</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-primary">+</span>     """Optimized core engine for high-density AI logic."""</div>
+</div>
+<div class="flex diff-added group">
+<div class="w-12 text-right pr-4 select-none text-transparent py-0.5">++</div>
+<div class="w-12 text-right pr-4 select-none text-secondary font-label text-[11px] border-r border-outline-variant/10 py-0.5">146</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-primary">+</span>     def __init__(self, embed_dim, num_heads, context_window=4096):</div>
+</div>
+<!-- Unchanged -->
+<div class="flex hover:bg-surface-container-high transition-colors group">
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 py-0.5">146</div>
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 border-r border-outline-variant/10 py-0.5">147</div>
+<div class="pl-4 whitespace-pre text-on-surface-variant py-0.5">        super().__init__()</div>
+</div>
+<div class="flex hover:bg-surface-container-high transition-colors group">
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 py-0.5">147</div>
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 border-r border-outline-variant/10 py-0.5">148</div>
+<div class="pl-4 whitespace-pre text-on-surface-variant py-0.5">        self.ln1 = nn.LayerNorm(embed_dim)</div>
+</div>
+<!-- Added -->
+<div class="flex diff-added group">
+<div class="w-12 text-right pr-4 select-none text-transparent py-0.5">++</div>
+<div class="w-12 text-right pr-4 select-none text-secondary font-label text-[11px] border-r border-outline-variant/10 py-0.5">149</div>
+<div class="pl-4 whitespace-pre text-on-surface py-0.5 font-medium"><span class="text-primary">+</span>        self.kv_cache = CacheManager(capacity=context_window)</div>
+</div>
+<!-- Rest of file filler -->
+<div class="flex hover:bg-surface-container-high transition-colors group">
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 py-0.5">148</div>
+<div class="w-12 text-right pr-4 select-none text-outline-variant font-label text-[11px] opacity-50 border-r border-outline-variant/10 py-0.5">150</div>
+<div class="pl-4 whitespace-pre text-on-surface-variant py-0.5">        self.attn = MultiHeadAttention(embed_dim, num_heads)</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Visible on mobile, hides in MD) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-center gap-8 py-2 px-4 bg-[#131313] shadow-[0_-4px_24px_rgba(0,0,0,0.4)] md:hidden z-50 border-t border-outline-variant/10">
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="font-space-grotesk text-[10px] uppercase">Terminal</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="bug_report">bug_report</span>
+<span class="font-space-grotesk text-[10px] uppercase">Debug</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#adabaa] p-2 hover:text-[#f2f0ef]">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+<span class="font-space-grotesk text-[10px] uppercase">Output</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#262626] text-[#aaa4ff] rounded-sm p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="psychology" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<span class="font-space-grotesk text-[10px] uppercase">AI Chat</span>
+</div>
+</nav>
+<!-- Floating Diff Summary Card (Bento Style) -->
+<div class="fixed bottom-6 right-6 z-40 bg-surface-container-highest/90 backdrop-blur-xl p-4 rounded-lg shadow-2xl border border-outline-variant/20 max-w-xs">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle">check_circle</span>
+</div>
+<h4 class="text-xs font-bold font-headline uppercase tracking-tighter">Review Actions</h4>
+</div>
+<div class="flex flex-col gap-2">
+<button class="w-full py-2.5 bg-primary text-on-primary text-[10px] font-bold font-label uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+                    Accept (Commit Task)
+                </button>
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 bg-surface-container-highest border border-outline-variant/30 text-on-surface text-[10px] font-bold font-label uppercase tracking-widest rounded-sm hover:bg-[#333] transition-colors">
+                        Discard
+                    </button>
+<button class="py-2 bg-surface-container-highest border border-outline-variant/30 text-on-surface text-[10px] font-bold font-label uppercase tracking-widest rounded-sm hover:bg-[#333] transition-colors">
+                        Accept (Custom)
+                    </button>
+</div>
+</div>
+</div>
+</div>
+</body></html>
