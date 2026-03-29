@@ -1,0 +1,51 @@
+# Generated build and dependency outputs
+node_modules/
+dist/
+build/
+out/
+coverage/
+.cache/
+.next/
+.nuxt/
+.svelte-kit/
+.docusaurus/
+.turbo/
+.vercel/
+parcel-cache/
+.vite/
+.eslintcache
+.parcel-cache/
+
+# Package and compiler artifacts
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.pid
+*.seed
+*.pid.lock
+*.out
+*.err
+*.stackdump
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Bundler / TypeScript / Bun outputs
+bun.lockb
+*.tsbuildinfo
+*.d.ts
+
+# Test and tool caches
+coverage/
+.nyc_output/
+playwright-report/
+playwright/.cache/
+
+# OS and editor artifacts
+automation/
+.DS_Store
+Thumbs.db
