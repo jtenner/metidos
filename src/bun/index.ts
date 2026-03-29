@@ -1,4 +1,5 @@
-import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
+import { resolve } from "node:path";
+
 import { initAppDatabase } from "./db";
 import {
 	closeProjectProcedure,
@@ -7,146 +8,216 @@ import {
 	listProjectsProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
+	shutdownProjectPolling,
 } from "./project-procedures";
 import type { AppRPCSchema } from "./rpc-schema";
 
-// Initialize persistent Bun-side app state store on startup.
-initAppDatabase();
+const SERVER_PORT = 7599;
+const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
+const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
+const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jt-ide-build");
 
-type WindowFrame = {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
+type RpcRequestMap = AppRPCSchema["requests"];
+type RpcMethodName = keyof RpcRequestMap;
+
+type RpcRequestMessage = {
+	type: "request";
+	id: number;
+	method: RpcMethodName;
+	params: RpcRequestMap[RpcMethodName]["params"];
 };
 
-let mainWindow: BrowserWindow | null = null;
-let restoredWindowFrame: WindowFrame | null = null;
-let maximizedWindowFrame: WindowFrame | null = null;
+type RpcResponseMessage =
+	| {
+			type: "response";
+			id: number;
+			ok: true;
+			result: unknown;
+	  }
+	| {
+			type: "response";
+			id: number;
+			ok: false;
+			error: string;
+	  };
 
-const FRAME_TOLERANCE = 1;
+type RpcRequestHandlerMap = {
+	[K in keyof RpcRequestMap]: (
+		params: RpcRequestMap[K]["params"],
+	) => Promise<RpcRequestMap[K]["response"]>;
+};
 
-function framesMatch(a: WindowFrame, b: WindowFrame): boolean {
-	return (
-		Math.abs(a.x - b.x) <= FRAME_TOLERANCE &&
-		Math.abs(a.y - b.y) <= FRAME_TOLERANCE &&
-		Math.abs(a.width - b.width) <= FRAME_TOLERANCE &&
-		Math.abs(a.height - b.height) <= FRAME_TOLERANCE
-	);
+const rpcHandlers: RpcRequestHandlerMap = {
+	listProjects: (params) => listProjectsProcedure(params),
+	openProject: (params) => openProjectProcedure(params),
+	closeProject: (params) => closeProjectProcedure(params),
+	listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),
+	openWorktree: (params) => openWorktreeProcedure(params),
+	closeWorktree: (params) => closeWorktreeProcedure(params),
+};
+
+function jsonResponse(body: string, contentType: string): Response {
+	return new Response(body, {
+		headers: {
+			"content-type": contentType,
+			"cache-control": "no-store",
+		},
+	});
 }
 
-function getDisplayWorkArea(frame: WindowFrame): WindowFrame {
-	const displays = Screen.getAllDisplays();
-	const centerX = frame.x + frame.width / 2;
-	const centerY = frame.y + frame.height / 2;
-
-	const display =
-		displays.find((entry) => {
-			const withinX =
-				centerX >= entry.bounds.x &&
-				centerX <= entry.bounds.x + entry.bounds.width;
-			const withinY =
-				centerY >= entry.bounds.y &&
-				centerY <= entry.bounds.y + entry.bounds.height;
-			return withinX && withinY;
-		}) ??
-		displays.find((entry) => entry.isPrimary) ??
-		Screen.getPrimaryDisplay();
-
-	return display.workArea;
+function fileResponse(path: string, contentType: string): Response {
+	return new Response(Bun.file(path), {
+		headers: {
+			"content-type": contentType,
+			"cache-control": "no-store",
+		},
+	});
 }
 
-function clearManualMaximizeState(): void {
-	maximizedWindowFrame = null;
-}
-
-function syncManualMaximizeState(frame: WindowFrame): void {
-	if (!maximizedWindowFrame) {
-		return;
+function parseRpcRequestMessage(raw: string): RpcRequestMessage {
+	const parsed = JSON.parse(raw) as Partial<RpcRequestMessage>;
+	if (
+		parsed.type !== "request" ||
+		typeof parsed.id !== "number" ||
+		typeof parsed.method !== "string" ||
+		!(parsed.method in rpcHandlers)
+	) {
+		throw new Error("Invalid RPC request payload");
 	}
 
-	if (!framesMatch(frame, maximizedWindowFrame)) {
-		clearManualMaximizeState();
-	}
+	return parsed as RpcRequestMessage;
 }
 
-function toggleMainWindowMaximize(): void {
-	if (!mainWindow) {
-		return;
+function toErrorMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
 	}
+	return String(error);
+}
 
-	const currentFrame = mainWindow.getFrame();
+async function buildMainviewBundle(): Promise<string> {
+	const buildResult = await Bun.build({
+		entrypoints: [resolve(process.cwd(), "src/mainview/index.ts")],
+		format: "esm",
+		minify: false,
+		outdir: MAINVIEW_BUILD_DIR,
+		sourcemap: "external",
+		target: "browser",
+	});
 
-	if (maximizedWindowFrame && framesMatch(currentFrame, maximizedWindowFrame)) {
-		if (!restoredWindowFrame) {
-			clearManualMaximizeState();
-			return;
+	if (!buildResult.success) {
+		for (const log of buildResult.logs) {
+			console.error(log);
 		}
-		const frameToRestore = restoredWindowFrame;
-		restoredWindowFrame = null;
-		clearManualMaximizeState();
-		mainWindow.setFrame(
-			frameToRestore.x,
-			frameToRestore.y,
-			frameToRestore.width,
-			frameToRestore.height,
-		);
-		return;
+		throw new Error("Failed to build browser bundle");
 	}
 
-	const workArea = getDisplayWorkArea(currentFrame);
-	restoredWindowFrame = currentFrame;
-	maximizedWindowFrame = workArea;
-	mainWindow.setFrame(workArea.x, workArea.y, workArea.width, workArea.height);
+	const mainviewBundle = buildResult.outputs.find((output) =>
+		output.path.endsWith("index.js"),
+	);
+	if (!mainviewBundle) {
+		throw new Error("Mainview JavaScript bundle was not emitted");
+	}
+
+	return mainviewBundle.path;
 }
 
-const rpc = BrowserView.defineRPC<AppRPCSchema>({
-	handlers: {
-		requests: {
-			listProjects: (params) => listProjectsProcedure(params),
-			openProject: (params) => openProjectProcedure(params),
-			closeProject: (params) => closeProjectProcedure(params),
-			listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),
-			openWorktree: (params) => openWorktreeProcedure(params),
-			closeWorktree: (params) => closeWorktreeProcedure(params),
+async function bootstrap(): Promise<void> {
+	initAppDatabase();
+	const mainviewBundlePath = await buildMainviewBundle();
+
+	const server = Bun.serve({
+		port: SERVER_PORT,
+		fetch(request, serverInstance) {
+			const { pathname } = new URL(request.url);
+
+			if (pathname === "/rpc") {
+				if (serverInstance.upgrade(request)) {
+					return;
+				}
+				return new Response("WebSocket upgrade failed", { status: 400 });
+			}
+
+			if (pathname === "/" || pathname === "/index.html") {
+				return fileResponse(MAINVIEW_HTML_PATH, "text/html; charset=utf-8");
+			}
+
+			if (pathname === "/index.css") {
+				return fileResponse(MAINVIEW_CSS_PATH, "text/css; charset=utf-8");
+			}
+
+			if (pathname === "/index.js") {
+				return fileResponse(
+					mainviewBundlePath,
+					"application/javascript; charset=utf-8",
+				);
+			}
+
+			if (pathname === "/health") {
+				return jsonResponse(
+					JSON.stringify({ ok: true, port: SERVER_PORT }),
+					"application/json; charset=utf-8",
+				);
+			}
+
+			return new Response("Not found", { status: 404 });
 		},
-		messages: {
-			closeWindow: () => {
-				mainWindow?.close();
-			},
-			minimizeWindow: () => {
-				mainWindow?.minimize();
-			},
-			toggleMaximizeWindow: () => {
-				toggleMainWindowMaximize();
+		websocket: {
+			message(ws, rawMessage) {
+				void (async () => {
+					try {
+						const payload =
+							typeof rawMessage === "string"
+								? rawMessage
+								: Buffer.from(rawMessage).toString("utf8");
+						const request = parseRpcRequestMessage(payload);
+						const handler = rpcHandlers[request.method] as (
+							params: RpcRequestMap[RpcMethodName]["params"],
+						) => Promise<RpcRequestMap[RpcMethodName]["response"]>;
+						const result = await handler(request.params);
+						const response: RpcResponseMessage = {
+							id: request.id,
+							ok: true,
+							result,
+							type: "response",
+						};
+						ws.send(JSON.stringify(response));
+					} catch (error) {
+						let requestId = -1;
+						try {
+							const parsed = JSON.parse(
+								typeof rawMessage === "string"
+									? rawMessage
+									: Buffer.from(rawMessage).toString("utf8"),
+							) as { id?: number };
+							requestId = typeof parsed.id === "number" ? parsed.id : -1;
+						} catch {
+							requestId = -1;
+						}
+						const response: RpcResponseMessage = {
+							id: requestId,
+							ok: false,
+							error: toErrorMessage(error),
+							type: "response",
+						};
+						ws.send(JSON.stringify(response));
+					}
+				})();
 			},
 		},
-	},
+	});
+
+	console.log(`jt-ide web app listening on http://localhost:${server.port}`);
+}
+
+process.on("SIGINT", () => {
+	shutdownProjectPolling();
+	process.exit(0);
 });
 
-mainWindow = new BrowserWindow({
-	title: "jt-ide",
-	frame: {
-		width: 960,
-		height: 640,
-		x: 100,
-		y: 100,
-	},
-	titleBarStyle: "hidden",
-	rpc,
-	url: "views://mainview/index.html",
+process.on("SIGTERM", () => {
+	shutdownProjectPolling();
+	process.exit(0);
 });
 
-mainWindow.on("move", () => {
-	if (!mainWindow) {
-		return;
-	}
-	syncManualMaximizeState(mainWindow.getFrame());
-});
-
-mainWindow.on("resize", () => {
-	if (!mainWindow) {
-		return;
-	}
-	syncManualMaximizeState(mainWindow.getFrame());
-});
+await bootstrap();

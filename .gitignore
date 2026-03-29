@@ -38,6 +38,7 @@ pnpm-debug.log*
 bun.lockb
 *.tsbuildinfo
 *.d.ts
+.jt-ide-build/
 src/mainview/index.css
 
 # Test and tool caches

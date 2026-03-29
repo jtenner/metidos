@@ -3,7 +3,6 @@ import { basename, resolve } from "node:path";
 
 import type { ProjectRecord } from "./db";
 import {
-	getAppDatabasePath,
 	getProjectById,
 	initAppDatabase,
 	listProjects,
@@ -21,9 +20,9 @@ import type {
 
 const db = initAppDatabase();
 
-export async function listProjectsProcedure(_params?: {
-	includeClosed?: boolean;
-}): Promise<RpcProject[]> {
+export async function listProjectsProcedure(
+	_params?: AppRPCSchema["requests"]["listProjects"]["params"],
+): Promise<RpcProject[]> {
 	return listProjects(db);
 }
 
@@ -285,7 +284,7 @@ function projectByIdForPath(projectId: number): ProjectRecord {
 }
 
 export async function openProjectProcedure(
-	params: AppRPCSchema["bun"]["requests"]["openProject"]["params"],
+	params: AppRPCSchema["requests"]["openProject"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
 	const projectPath = normalizePath(params.projectPath);
 	if (!existsSync(projectPath)) {
@@ -306,7 +305,7 @@ export async function openProjectProcedure(
 }
 
 export async function listProjectWorktreesProcedure(
-	params: AppRPCSchema["bun"]["requests"]["listProjectWorktrees"]["params"],
+	params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
 	const project = projectByIdForPath(params.projectId);
 	if (!projectPollMap.has(project.id)) {
@@ -324,80 +323,90 @@ export async function listProjectWorktreesProcedure(
 	};
 }
 
-export async function closeProjectProcedure(
-	params: AppRPCSchema["bun"]["requests"]["closeProject"]["params"],
-): Promise<{ success: boolean; projectId: number; message?: string }> {
-	const project = projectByIdForPath(params.projectId);
-	setProjectClosed(db, project.id);
-	stopProjectPoller(project.id);
-	return {
-		success: true,
-		projectId: project.id,
-		message: "Project closed",
-	};
-}
-
 export async function openWorktreeProcedure(
-	params: AppRPCSchema["bun"]["requests"]["openWorktree"]["params"],
+	params: AppRPCSchema["requests"]["openWorktree"]["params"],
 ): Promise<RpcOpenWorktreeResult> {
 	const project = projectByIdForPath(params.projectId);
-	const state = projectPollMap.get(project.id);
-	if (!state) {
-		throw new Error(`Project ${project.id} is not open`);
+	const state = ensureProjectPoller(project);
+	if (!state.worktrees.length) {
+		await refreshProjectPoll(project.id);
 	}
 
-	const normalized = normalizePath(params.worktreePath);
-	const match = state.worktrees.find((w) => w.path === normalized);
-	if (!match) {
+	const worktreePath = normalizePath(params.worktreePath);
+	const target = state.worktrees.find((entry) => entry.path === worktreePath);
+	if (!target) {
 		throw new Error(
-			`Worktree is not part of project ${project.path}: ${normalized}`,
+			`Worktree not found for project ${project.path}: ${worktreePath}`,
 		);
 	}
 
-	const pollState = startWorktreePolling(state, normalized);
-	const snapshot: RpcWorktreeSnapshot = {
-		path: normalized,
-		diff: pollState.diff,
-		files: pollState.files,
-		lastUpdatedAt: pollState.lastUpdatedAt,
-	};
+	const worktreeState = startWorktreePolling(state, worktreePath);
+	await Promise.all([readDiff(worktreePath), readFiles(worktreePath)]).then(
+		([diff, files]) => {
+			worktreeState.diff = diff;
+			worktreeState.files = files;
+			worktreeState.lastUpdatedAt = getNow();
+		},
+	);
 
 	return {
 		project,
-		worktree: snapshot,
+		worktree: {
+			path: worktreePath,
+			diff: worktreeState.diff,
+			files: worktreeState.files,
+			lastUpdatedAt: worktreeState.lastUpdatedAt,
+		},
 	};
 }
 
 export async function closeWorktreeProcedure(
-	params: AppRPCSchema["bun"]["requests"]["closeWorktree"]["params"],
-): Promise<{ success: boolean; projectId: number; worktreePath: string }> {
-	const project = projectByIdForPath(params.projectId);
-	const state = projectPollMap.get(project.id);
-	const normalized = normalizePath(params.worktreePath);
-	if (!state) {
-		return {
-			success: false,
-			projectId: project.id,
-			worktreePath: normalized,
-		};
+	params: AppRPCSchema["requests"]["closeWorktree"]["params"],
+): Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]> {
+	const state = projectPollMap.get(params.projectId);
+	if (state) {
+		stopWorktreePolling(state, normalizePath(params.worktreePath));
 	}
 
-	stopWorktreePolling(state, normalized);
 	return {
 		success: true,
-		projectId: project.id,
-		worktreePath: normalized,
+		projectId: params.projectId,
+		worktreePath: normalizePath(params.worktreePath),
 	};
 }
 
-export function getOpenProjectsInMemory(): number[] {
-	return [...projectPollMap.keys()];
+export async function closeProjectProcedure(
+	params: AppRPCSchema["requests"]["closeProject"]["params"],
+): Promise<AppRPCSchema["requests"]["closeProject"]["response"]> {
+	const project = projectByIdForPath(params.projectId);
+	stopProjectPoller(project.id);
+	setProjectClosed(db, project.id);
+	return {
+		success: true,
+		projectId: project.id,
+		message: `Closed project ${project.name}`,
+	};
 }
 
-export function getProjectPath(projectId: number): string | undefined {
-	return projectPollMap.get(projectId)?.projectPath;
+export function getOpenWorktreeSnapshot(
+	projectId: number,
+	worktreePath: string,
+): RpcWorktreeSnapshot | null {
+	const state = projectPollMap.get(projectId);
+	if (!state) return null;
+	const normalized = normalizePath(worktreePath);
+	const worktreeState = state.openWorktrees.get(normalized);
+	if (!worktreeState) return null;
+	return {
+		path: normalized,
+		diff: worktreeState.diff,
+		files: worktreeState.files,
+		lastUpdatedAt: worktreeState.lastUpdatedAt,
+	};
 }
 
-export function getAppDbPathForDebugging(): string {
-	return getAppDatabasePath();
+export function shutdownProjectPolling(): void {
+	for (const projectId of projectPollMap.keys()) {
+		stopProjectPoller(projectId);
+	}
 }

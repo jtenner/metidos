@@ -6,15 +6,14 @@
     "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
     "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
     "start": "bun run dev",
-    "dev": "bun run tailwind:build && electrobun dev",
-    "dev:watch": "bun run tailwind:watch & electrobun dev --watch",
+    "dev": "bun run tailwind:build && bun run src/bun/index.ts",
+    "dev:watch": "bun run tailwind:watch & bun --watch src/bun/index.ts",
     "validate": "bunx biome check src/bun src/mainview/index.ts src/mainview/input.css",
-    "build:dev": "bun install && bun run tailwind:build && electrobun build",
+    "build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jt-ide-build --target browser",
     "format": "bunx biome format src --write"
   },
   "dependencies": {
     "@openai/codex-sdk": "^0.117.0",
-    "electrobun": "latest",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

@@ -41,7 +41,6 @@
 │     └─ updated_tasks_view/
 │        ├─ code.html
 │        └─ screen.png
-├─ electrobun.config.ts
 ├─ package.json
 ├─ src/
  │  ├─ bun/

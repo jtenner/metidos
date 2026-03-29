@@ -1,4 +1,3 @@
-import { Electroview } from "electrobun/view";
 import * as React from "react";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -6,16 +5,21 @@ import { createRoot } from "react-dom/client";
 import type { AppRPCSchema, ProjectProcedures } from "../bun/rpc-schema";
 import App from "./App";
 
-const rpc = Electroview.defineRPC<AppRPCSchema>({
-	handlers: {
-		requests: {},
-		messages: {},
-	},
-});
+type RpcRequestMap = AppRPCSchema["requests"];
+type RpcMethodName = keyof RpcRequestMap;
 
-new Electroview({ rpc });
+type PendingRequest = {
+	reject: (reason?: unknown) => void;
+	resolve: (value: unknown) => void;
+};
 
-const procedures: ProjectProcedures = rpc.request;
+type RpcResponseMessage = {
+	type: "response";
+	id: number;
+	ok: boolean;
+	result?: unknown;
+	error?: string;
+};
 
 declare global {
 	interface Window {
@@ -24,20 +28,88 @@ declare global {
 	}
 }
 
-window.jtIdeProcedures = procedures;
+const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const socket = new WebSocket(`${socketProtocol}//${window.location.host}/rpc`);
+const pendingRequests = new Map<number, PendingRequest>();
+let nextRequestId = 1;
+let resolveConnection!: () => void;
+let rejectConnection!: (reason?: unknown) => void;
+const connectionReady = new Promise<void>((resolve, reject) => {
+	resolveConnection = resolve;
+	rejectConnection = reject;
+});
 
-const windowControlBindings: Array<[string, () => void]> = [
-	["minimize-window", () => rpc.send.minimizeWindow()],
-	["maximize-window", () => rpc.send.toggleMaximizeWindow()],
-	["close-window", () => rpc.send.closeWindow()],
-];
+socket.addEventListener("open", () => {
+	resolveConnection();
+});
 
-for (const [id, handler] of windowControlBindings) {
-	document.getElementById(id)?.addEventListener("click", (event) => {
-		event.preventDefault();
-		handler();
-	});
+socket.addEventListener("message", (event) => {
+	const payload = JSON.parse(String(event.data)) as RpcResponseMessage;
+	if (payload.type !== "response") {
+		return;
+	}
+	const pending = pendingRequests.get(payload.id);
+	if (!pending) {
+		return;
+	}
+	pendingRequests.delete(payload.id);
+	if (payload.ok) {
+		pending.resolve(payload.result);
+		return;
+	}
+	pending.reject(new Error(payload.error || "RPC request failed"));
+});
+
+socket.addEventListener("close", () => {
+	const error = new Error("RPC connection closed");
+	rejectConnection(error);
+	for (const pending of pendingRequests.values()) {
+		pending.reject(error);
+	}
+	pendingRequests.clear();
+});
+
+socket.addEventListener("error", () => {
+	console.error("jt-ide RPC socket encountered an error");
+});
+
+async function sendRequest<K extends RpcMethodName>(
+	method: K,
+	params: RpcRequestMap[K]["params"],
+): Promise<RpcRequestMap[K]["response"]> {
+	await connectionReady;
+	const id = nextRequestId++;
+	const response = new Promise<RpcRequestMap[K]["response"]>(
+		(resolve, reject) => {
+			pendingRequests.set(id, {
+				reject,
+				resolve: (value) => resolve(value as RpcRequestMap[K]["response"]),
+			});
+		},
+	);
+
+	socket.send(
+		JSON.stringify({
+			id,
+			method,
+			params,
+			type: "request",
+		}),
+	);
+
+	return response;
 }
+
+const procedures: ProjectProcedures = {
+	listProjects: (params) => sendRequest("listProjects", params),
+	openProject: (params) => sendRequest("openProject", params),
+	closeProject: (params) => sendRequest("closeProject", params),
+	listProjectWorktrees: (params) => sendRequest("listProjectWorktrees", params),
+	openWorktree: (params) => sendRequest("openWorktree", params),
+	closeWorktree: (params) => sendRequest("closeWorktree", params),
+};
+
+window.jtIdeProcedures = procedures;
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
@@ -50,6 +122,7 @@ if (!appRoot) {
 	const root = createRoot(appRoot);
 	try {
 		root.render(createElement(App, { procedures }));
+		window.__jtIdeAppMountedAt = Date.now();
 	} catch (error) {
 		console.error("Failed to mount App.tsx", error);
 		window.__jtIdeAppMountedAt = Number.NaN;

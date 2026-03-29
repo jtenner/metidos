@@ -32,71 +32,60 @@ export type RpcOpenWorktreeResult = {
 	worktree: RpcWorktreeSnapshot;
 };
 
-type EmptyProtocolMap = Record<string, never>;
-
 export type AppRPCSchema = {
-	bun: {
-		requests: {
-			listProjects: {
-				params: {
-					includeClosed?: boolean;
-				};
-				response: RpcProject[];
-			};
-			openProject: {
-				params: { projectPath: string; name?: string | null };
-				response: RpcProjectWorktreesResult;
-			};
-			closeProject: {
-				params: { projectId: number };
-				response: { success: boolean; projectId: number; message?: string };
-			};
-			listProjectWorktrees: {
-				params: { projectId: number };
-				response: RpcProjectWorktreesResult;
-			};
-			openWorktree: {
-				params: { projectId: number; worktreePath: string };
-				response: RpcOpenWorktreeResult;
-			};
-			closeWorktree: {
-				params: { projectId: number; worktreePath: string };
-				response: {
-					success: boolean;
-					projectId: number;
-					worktreePath: string;
-				};
+	requests: {
+		listProjects: {
+			params:
+				| {
+						includeClosed?: boolean;
+				  }
+				| undefined;
+			response: RpcProject[];
+		};
+		openProject: {
+			params: { projectPath: string; name?: string | null };
+			response: RpcProjectWorktreesResult;
+		};
+		closeProject: {
+			params: { projectId: number };
+			response: { success: boolean; projectId: number; message?: string };
+		};
+		listProjectWorktrees: {
+			params: { projectId: number };
+			response: RpcProjectWorktreesResult;
+		};
+		openWorktree: {
+			params: { projectId: number; worktreePath: string };
+			response: RpcOpenWorktreeResult;
+		};
+		closeWorktree: {
+			params: { projectId: number; worktreePath: string };
+			response: {
+				success: boolean;
+				projectId: number;
+				worktreePath: string;
 			};
 		};
-		messages: {
-			closeWindow: undefined;
-			minimizeWindow: undefined;
-			toggleMaximizeWindow: undefined;
-		};
-	};
-	webview: {
-		requests: EmptyProtocolMap;
-		messages: EmptyProtocolMap;
 	};
 };
 
 export interface ProjectProcedures {
 	listProjects: (
-		params?: AppRPCSchema["bun"]["requests"]["listProjects"]["params"],
-	) => Promise<AppRPCSchema["bun"]["requests"]["listProjects"]["response"]>;
+		params?: AppRPCSchema["requests"]["listProjects"]["params"],
+	) => Promise<AppRPCSchema["requests"]["listProjects"]["response"]>;
 	openProject: (
-		params: AppRPCSchema["bun"]["requests"]["openProject"]["params"],
+		params: AppRPCSchema["requests"]["openProject"]["params"],
 	) => Promise<RpcProjectWorktreesResult>;
 	closeProject: (
-		params: AppRPCSchema["bun"]["requests"]["closeProject"]["params"],
-	) => Promise<AppRPCSchema["bun"]["requests"]["closeProject"]["response"]>;
+		params: AppRPCSchema["requests"]["closeProject"]["params"],
+	) => Promise<AppRPCSchema["requests"]["closeProject"]["response"]>;
 	listProjectWorktrees: (
-		params: AppRPCSchema["bun"]["requests"]["listProjectWorktrees"]["params"],
+		params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
 	) => Promise<RpcProjectWorktreesResult>;
 	openWorktree: (
-		params: AppRPCSchema["bun"]["requests"]["openWorktree"]["params"],
+		params: AppRPCSchema["requests"]["openWorktree"]["params"],
 	) => Promise<RpcOpenWorktreeResult>;
 	closeWorktree: (
-		params: AppRPCSchema["bun"]["requests"]["closeWorktree"]["params"],
-	) => Promise<AppRPCSchema["bun"]["requests"]["closeWorktree"]["response"]>;
+		params: AppRPCSchema["requests"]["closeWorktree"]["params"],
+	) => Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]>;
 }
