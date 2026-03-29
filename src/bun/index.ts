@@ -22,6 +22,7 @@ type WindowFrame = {
 
 let mainWindow: BrowserWindow | null = null;
 let restoredWindowFrame: WindowFrame | null = null;
+let maximizedWindowFrame: WindowFrame | null = null;
 
 const FRAME_TOLERANCE = 1;
 
@@ -55,29 +56,47 @@ function getDisplayWorkArea(frame: WindowFrame): WindowFrame {
 	return display.workArea;
 }
 
+function clearManualMaximizeState(): void {
+	maximizedWindowFrame = null;
+}
+
+function syncManualMaximizeState(frame: WindowFrame): void {
+	if (!maximizedWindowFrame) {
+		return;
+	}
+
+	if (!framesMatch(frame, maximizedWindowFrame)) {
+		clearManualMaximizeState();
+	}
+}
+
 function toggleMainWindowMaximize(): void {
 	if (!mainWindow) {
 		return;
 	}
 
 	const currentFrame = mainWindow.getFrame();
-	const workArea = getDisplayWorkArea(currentFrame);
 
-	if (framesMatch(currentFrame, workArea)) {
+	if (maximizedWindowFrame && framesMatch(currentFrame, maximizedWindowFrame)) {
 		if (!restoredWindowFrame) {
+			clearManualMaximizeState();
 			return;
 		}
-		mainWindow.setFrame(
-			restoredWindowFrame.x,
-			restoredWindowFrame.y,
-			restoredWindowFrame.width,
-			restoredWindowFrame.height,
-		);
+		const frameToRestore = restoredWindowFrame;
 		restoredWindowFrame = null;
+		clearManualMaximizeState();
+		mainWindow.setFrame(
+			frameToRestore.x,
+			frameToRestore.y,
+			frameToRestore.width,
+			frameToRestore.height,
+		);
 		return;
 	}
 
+	const workArea = getDisplayWorkArea(currentFrame);
 	restoredWindowFrame = currentFrame;
+	maximizedWindowFrame = workArea;
 	mainWindow.setFrame(workArea.x, workArea.y, workArea.width, workArea.height);
 }
 
@@ -116,4 +135,18 @@ mainWindow = new BrowserWindow({
 	titleBarStyle: "hidden",
 	rpc,
 	url: "views://mainview/index.html",
+});
+
+mainWindow.on("move", () => {
+	if (!mainWindow) {
+		return;
+	}
+	syncManualMaximizeState(mainWindow.getFrame());
+});
+
+mainWindow.on("resize", () => {
+	if (!mainWindow) {
+		return;
+	}
+	syncManualMaximizeState(mainWindow.getFrame());
 });
