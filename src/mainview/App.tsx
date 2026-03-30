@@ -1926,6 +1926,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return worktreeDisplayName(activeSelectedWorktree);
 	}, [activeSelectedWorktree, selectedProject, selectedThread]);
 
+	const activeScreenTitle = selectedThread?.title ?? "No thread selected";
+	const activeScreenSubtitlePrimary = selectedProject
+		? activeSelectedWorktreeFolder
+		: "No project selected";
+	const activeScreenSubtitleSecondary =
+		activeSelectedWorktreePath ?? "No worktree selected";
+
 	const taskSelectorDisabled =
 		!selectedProject ||
 		!activeSelectedWorktreePath ||
@@ -4979,11 +4986,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
 						<div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar">
 							<div className="max-w-4xl mx-auto mb-12">
-								<h1 className="font-headline text-4xl font-extrabold tracking-tight text-[#ffffff] mb-2">
-									Codex Intelligence
+								<h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
+									{activeScreenTitle}
 								</h1>
-								<p className="font-body text-[#adabaa] max-w-xl">
-									Deep contextual reasoning active. Project indexing complete.
+								<p className="max-w-2xl font-body text-sm text-[#b3afad]">
+									<span className="text-[#ddd8d5]">
+										{activeScreenSubtitlePrimary}
+									</span>
+									<span className="text-[#7f7c79]">
+										{" "}
+										~ {activeScreenSubtitleSecondary}
+									</span>
 								</p>
 							</div>
 							<div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-10">
@@ -5120,21 +5133,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 				<main className="mx-auto flex w-full max-w-2xl flex-1 min-h-0 flex-col gap-6 px-4 pt-14 pb-16">
 					<div className="mt-6 shrink-0">
-						<div className="flex items-center gap-2 mb-1">
-							<span className="text-[10px] font-label uppercase tracking-widest text-[#aaa4ff]">
-								Active Session
-							</span>
-							<div className="h-[1px] flex-grow bg-[#262626]" />
-						</div>
-						<h2 className="text-2xl font-headline font-extrabold tracking-tight">
-							{selectedThread?.title ??
-								selectedProject?.name ??
-								"No project selected"}
+						<h2 className="font-headline text-[1.85rem] font-extrabold tracking-tight text-[#ffffff] leading-tight">
+							{activeScreenTitle}
 						</h2>
-						<p className="text-xs text-[#adabaa] mt-1">
-							{selectedProject
-								? `${selectedProject.name} | ${activeSelectedWorktreeFolder} · ${activeSelectedWorktreeName}`
-								: "No worktree selected"}
+						<p className="mt-2 text-xs text-[#b3afad]">
+							<span className="text-[#ddd8d5]">
+								{activeScreenSubtitlePrimary}
+							</span>
+							<span className="text-[#7f7c79]">
+								{" "}
+								~ {activeScreenSubtitleSecondary}
+							</span>
 						</p>
 					</div>
 					<div className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar">
