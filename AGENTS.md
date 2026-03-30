@@ -8,7 +8,8 @@
 ```text
 .
 ├─ .tasks/
-│  └─ commit.md
+│  ├─ commit.md
+│  └─ research.md
 ├─ .git
 ├─ .gitignore
 ├─ AGENTS.md
