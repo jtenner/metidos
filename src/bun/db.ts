@@ -372,6 +372,18 @@ export function markThreadRan(database: Database, threadId: number): void {
 	);
 }
 
+export function touchThread(database: Database, threadId: number): void {
+	database.run(
+		`
+			UPDATE threads
+			SET
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+		threadId,
+	);
+}
+
 export function listThreadMessages(
 	database: Database,
 	threadId: number,

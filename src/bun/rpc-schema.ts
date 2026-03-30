@@ -47,6 +47,13 @@ export type RpcCreateWorktreeResult = {
 	worktreePath: string;
 };
 
+export type RpcThreadRunStatus = {
+	state: "idle" | "working" | "failed";
+	startedAt: string | null;
+	updatedAt: string | null;
+	error: string | null;
+};
+
 export type RpcThread = {
 	id: number;
 	projectId: number;
@@ -56,6 +63,7 @@ export type RpcThread = {
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
+	runStatus: RpcThreadRunStatus;
 };
 
 export type RpcThreadMessage = {

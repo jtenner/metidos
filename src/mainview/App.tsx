@@ -10,6 +10,7 @@ import {
 	useState,
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { BeatLoader } from "react-spinners";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
@@ -18,6 +19,7 @@ import type {
 	RpcProject,
 	RpcThread,
 	RpcThreadMessage,
+	RpcThreadRunStatus,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "../bun/rpc-schema";
@@ -25,6 +27,7 @@ import type {
 type Message = {
 	speaker: "assistant" | "user";
 	text: string;
+	state?: "complete" | "working";
 };
 
 type ProjectNodeState = {
@@ -52,6 +55,7 @@ type ProjectActionMenuState = {
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 
 const codeBlockStyle = {
 	margin: 0,
@@ -204,6 +208,28 @@ function MarkdownMessage({ text }: { text: string }): JSX.Element {
 	);
 }
 
+function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
+	return (
+		thread?.runStatus ?? {
+			state: "idle",
+			startedAt: null,
+			updatedAt: null,
+			error: null,
+		}
+	);
+}
+
+function ProcessingMessage(): JSX.Element {
+	return (
+		<div className="flex items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
+			<BeatLoader color="#aaa4ff" margin={2} size={6} speedMultiplier={0.85} />
+			<span className="font-label text-[11px] uppercase tracking-[0.16em] text-[#c3beff]">
+				Processing
+			</span>
+		</div>
+	);
+}
+
 function formatPathForDisplay(
 	value: string,
 	homeDirectory: string,
@@ -320,6 +346,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isSending, setIsSending] = useState(false);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
+	const selectedThreadIdRef = useRef<number | null>(null);
+	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
 
 	const selectedProject = useMemo(() => {
 		if (!selectedProjectId) {
@@ -334,6 +362,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		return threads.find((entry) => entry.id === selectedThreadId) ?? null;
 	}, [selectedThreadId, threads]);
+
+	const selectedThreadRunStatus = useMemo(
+		() => threadRunStatus(selectedThread),
+		[selectedThread],
+	);
+
+	const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
+
+	const selectedThreadRunError =
+		selectedThreadRunStatus.state === "failed"
+			? (selectedThreadRunStatus.error ?? "")
+			: "";
+
+	const activeChatError = chatError || selectedThreadRunError;
 
 	const projectActionMenuProject = useMemo(() => {
 		if (!projectActionMenu) {
@@ -505,6 +547,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setSelectedThreadId(null);
 		setThreadMessages([]);
 		setChatError("");
+		selectedThreadIdRef.current = null;
+		selectedThreadRunStateRef.current = "idle";
 	}, []);
 
 	const syncThreadContext = useCallback((thread: RpcThread) => {
@@ -524,6 +568,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[procedures, setProjectState],
 	);
 
+	const refreshThreadStatuses = useCallback(async () => {
+		const loadedThreads = sortThreads(await procedures.listThreads());
+		const selectedSummary =
+			selectedThreadId === null
+				? null
+				: (loadedThreads.find((thread) => thread.id === selectedThreadId) ??
+					null);
+
+		if (!selectedSummary) {
+			selectedThreadRunStateRef.current = "idle";
+			setThreads(loadedThreads);
+			return;
+		}
+
+		const shouldRefreshSelectedDetail =
+			selectedSummary.runStatus.state === "working" ||
+			selectedThreadRunStateRef.current === "working" ||
+			(selectedSummary.runStatus.state === "failed" &&
+				selectedThreadRunStateRef.current !== "failed");
+
+		if (!shouldRefreshSelectedDetail) {
+			selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
+			setThreads(loadedThreads);
+			return;
+		}
+
+		const detail = await procedures.getThread({
+			threadId: selectedSummary.id,
+		});
+		if (selectedThreadIdRef.current !== selectedSummary.id) {
+			setThreads(loadedThreads);
+			return;
+		}
+		selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+		setThreads(upsertThreadList(loadedThreads, detail.thread));
+		setThreadMessages(detail.messages);
+	}, [procedures, selectedThreadId]);
+
 	const openThread = useCallback(
 		async (threadId: number) => {
 			setIsThreadLoading(true);
@@ -533,6 +615,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				const detail = await procedures.getThread({ threadId });
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
+				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 				setThreadMessages(detail.messages);
 				syncThreadContext(detail.thread);
 				try {
@@ -590,6 +673,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				});
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
+				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 				setThreadMessages(detail.messages);
 				setSelectedProjectId(detail.thread.projectId);
 				setSelectedWorktreePath(detail.thread.worktreePath);
@@ -804,6 +888,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [closeProjectActionMenu, projectActionMenu, projectActionMenuProject]);
 
 	useEffect(() => {
+		selectedThreadIdRef.current = selectedThreadId;
+	}, [selectedThreadId]);
+
+	useEffect(() => {
 		if (!selectedThreadId || selectedThread) {
 			return;
 		}
@@ -819,6 +907,34 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadId,
 		threads,
 	]);
+
+	useEffect(() => {
+		if (threads.length === 0) {
+			selectedThreadRunStateRef.current = "idle";
+			return;
+		}
+
+		let cancelled = false;
+		const poll = async () => {
+			try {
+				await refreshThreadStatuses();
+			} catch (error) {
+				if (!cancelled) {
+					console.error("Failed to poll thread statuses", error);
+				}
+			}
+		};
+
+		void poll();
+		const timer = window.setInterval(() => {
+			void poll();
+		}, THREAD_STATUS_POLL_INTERVAL_MS);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(timer);
+		};
+	}, [refreshThreadStatuses, threads.length]);
 
 	useEffect(() => {
 		if (!addProjectOpen) {
@@ -892,6 +1008,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			});
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);
+			selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 			setThreadMessages(detail.messages);
 			syncThreadContext(detail.thread);
 			setMobileProjectListOpen(false);
@@ -1118,7 +1235,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const postMessage = useCallback(() => {
 		const text = chatInput.trim();
-		if (!text || isSending) {
+		if (!text || isSending || selectedThreadIsWorking) {
 			return;
 		}
 		if (!selectedThreadId) {
@@ -1137,6 +1254,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					input: pendingInput,
 				});
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 				setThreadMessages(detail.messages);
 			} catch (error) {
 				setChatError(error instanceof Error ? error.message : String(error));
@@ -1145,7 +1263,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setIsSending(false);
 			}
 		})();
-	}, [chatInput, isSending, procedures, selectedThreadId]);
+	}, [
+		chatInput,
+		isSending,
+		procedures,
+		selectedThreadId,
+		selectedThreadIsWorking,
+	]);
 
 	const onSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -1170,6 +1294,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return [
 				{
 					speaker: "assistant",
+					state: "complete",
 					text: "Loading thread history...",
 				},
 			];
@@ -1178,6 +1303,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return [
 				{
 					speaker: "assistant",
+					state: "complete",
 					text: selectedProject
 						? "Create a thread from the Threads section to start a Codex conversation for the selected worktree."
 						: "Add a project, choose a worktree, and create a thread to begin.",
@@ -1188,14 +1314,24 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return [
 				{
 					speaker: "assistant",
+					state: "complete",
 					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask Codex to inspect, refactor, or debug this worktree.`,
 				},
 			];
 		}
-		return threadMessages.map((message) => ({
+		const messages = threadMessages.map((message) => ({
 			speaker: message.role,
+			state: "complete" as const,
 			text: message.text,
 		}));
+		if (selectedThread.runStatus.state === "working") {
+			messages.push({
+				speaker: "assistant",
+				state: "working",
+				text: "Processing",
+			});
+		}
+		return messages;
 	}, [
 		activeSelectedWorktreeFolder,
 		isThreadLoading,
@@ -1221,7 +1357,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							Codex • Assistant
 						</div>
 						<div className="text-[#ffffff] leading-relaxed text-sm">
-							<MarkdownMessage text={message.text} />
+							{message.state === "working" ? (
+								<ProcessingMessage />
+							) : (
+								<MarkdownMessage text={message.text} />
+							)}
 						</div>
 					</div>
 				</div>
@@ -1268,7 +1408,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 					<div className="glass-panel p-5 rounded-lg border border-[#aaa4ff]/10 w-full flex flex-col gap-4">
 						<div className="text-sm leading-relaxed text-[#ffffff]">
-							<MarkdownMessage text={message.text} />
+							{message.state === "working" ? (
+								<ProcessingMessage />
+							) : (
+								<MarkdownMessage text={message.text} />
+							)}
 						</div>
 					</div>
 				</div>
@@ -1781,6 +1925,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							projects.find((project) => project.id === thread.projectId) ??
 							null;
 						const isActive = selectedThreadId === thread.id;
+						const isWorking = thread.runStatus.state === "working";
+						const hasRunError = thread.runStatus.state === "failed";
 						return (
 							<button
 								type="button"
@@ -1794,18 +1940,32 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									void openThread(thread.id);
 								}}
 							>
-								<div className="flex items-center gap-2">
-									<span
-										className={`h-2 w-2 shrink-0 rounded-full ${
-											isActive ? "bg-[#aaa4ff]" : "bg-[#4f5269]"
-										}`}
-									/>
-									<div
-										className="min-w-0 truncate text-sm font-medium"
-										title={thread.title}
-									>
-										{thread.title}
+								<div className="flex items-center justify-between gap-3">
+									<div className="flex min-w-0 items-center gap-2">
+										<span
+											className={`h-2 w-2 shrink-0 rounded-full ${
+												hasRunError
+													? "bg-[#ff6e84]"
+													: isActive
+														? "bg-[#aaa4ff]"
+														: "bg-[#4f5269]"
+											}`}
+										/>
+										<div
+											className="min-w-0 truncate text-sm font-medium"
+											title={thread.title}
+										>
+											{thread.title}
+										</div>
 									</div>
+									{isWorking ? (
+										<BeatLoader
+											color="#aaa4ff"
+											margin={1}
+											size={5}
+											speedMultiplier={0.85}
+										/>
+									) : null}
 								</div>
 								<div
 									className="mt-1 truncate text-[11px] text-[#8e8aa7]"
@@ -1970,9 +2130,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										842 Tokens
 									</span>
 								</div>
-								{chatError ? (
+								{activeChatError ? (
 									<div className="mt-3 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
-										{chatError}
+										{activeChatError}
 									</div>
 								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
@@ -1989,12 +2149,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											setChatInput(event.currentTarget.value)
 										}
 										onKeyDown={onEnter}
-										disabled={!selectedThread || isSending || isThreadLoading}
+										disabled={
+											!selectedThread ||
+											isSending ||
+											selectedThreadIsWorking ||
+											isThreadLoading
+										}
 									/>
 									<button
 										type="submit"
 										className="w-10 h-10 flex items-center justify-center bg-[#aaa4ff] rounded-sm text-[#281d7c] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-										disabled={!selectedThread || isSending || isThreadLoading}
+										disabled={
+											!selectedThread ||
+											isSending ||
+											selectedThreadIsWorking ||
+											isThreadLoading
+										}
 									>
 										<span
 											className="material-symbols-outlined"
@@ -2083,9 +2253,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						className="max-w-2xl mx-auto flex flex-col gap-3"
 						onSubmit={onSubmit}
 					>
-						{chatError ? (
+						{activeChatError ? (
 							<div className="rounded-lg border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
-								{chatError}
+								{activeChatError}
 							</div>
 						) : null}
 						<div className="flex items-center gap-2">
@@ -2120,12 +2290,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								value={chatInput}
 								onChange={(event) => setChatInput(event.currentTarget.value)}
 								onKeyDown={onEnter}
-								disabled={!selectedThread || isSending || isThreadLoading}
+								disabled={
+									!selectedThread ||
+									isSending ||
+									selectedThreadIsWorking ||
+									isThreadLoading
+								}
 							/>
 							<button
 								className="bg-gradient-to-tr from-[#aaa4ff] to-[#9c95f8] text-[#1b0a71] p-2 rounded-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center"
 								type="submit"
-								disabled={!selectedThread || isSending || isThreadLoading}
+								disabled={
+									!selectedThread ||
+									isSending ||
+									selectedThreadIsWorking ||
+									isThreadLoading
+								}
 							>
 								{materialSymbol("arrow_upward")}
 							</button>

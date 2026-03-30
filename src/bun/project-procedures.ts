@@ -16,6 +16,7 @@ import {
 	listThreads,
 	markThreadRan,
 	setProjectClosed,
+	touchThread,
 	updateThreadCodexId,
 	upsertProject,
 } from "./db";
@@ -28,6 +29,7 @@ import type {
 	RpcThread,
 	RpcThreadDetail,
 	RpcThreadMessage,
+	RpcThreadRunStatus,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
@@ -71,6 +73,7 @@ type ProjectPollState = {
 
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
+const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 
 const THREAD_INIT_SCHEMA = {
 	type: "object",
@@ -156,8 +159,29 @@ function shortName(value: string): string {
 	return parts.at(-1) ?? value;
 }
 
+function getThreadRunStatus(threadId: number): RpcThreadRunStatus {
+	return (
+		threadRunStatusMap.get(threadId) ?? {
+			state: "idle",
+			startedAt: null,
+			updatedAt: null,
+			error: null,
+		}
+	);
+}
+
+function setThreadRunStatus(
+	threadId: number,
+	status: RpcThreadRunStatus,
+): void {
+	threadRunStatusMap.set(threadId, status);
+}
+
 function toRpcThread(thread: ThreadRecord): RpcThread {
-	return thread;
+	return {
+		...thread,
+		runStatus: getThreadRunStatus(thread.id),
+	};
 }
 
 function toRpcThreadMessages(messages: RpcThreadMessage[]): RpcThreadMessage[] {
@@ -234,6 +258,44 @@ async function buildThreadDetail(threadId: number): Promise<RpcThreadDetail> {
 		thread: toRpcThread(thread),
 		messages: toRpcThreadMessages(listThreadMessages(db, thread.id)),
 	};
+}
+
+async function runThreadMessageInBackground(
+	threadId: number,
+	input: string,
+	startedAt: string,
+): Promise<void> {
+	try {
+		const thread = threadById(threadId);
+		const codexThread = await ensureCodexThread(thread);
+		const turn = await codexThread.run(input);
+		const assistantText = turn.finalResponse.trim() || "No response returned.";
+		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
+			updateThreadCodexId(db, thread.id, codexThread.id);
+		}
+		createThreadMessage(db, {
+			threadId,
+			role: "assistant",
+			text: assistantText,
+		});
+		markThreadRan(db, threadId);
+		setThreadRunStatus(threadId, {
+			state: "idle",
+			startedAt,
+			updatedAt: getNow(),
+			error: null,
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		touchThread(db, threadId);
+		setThreadRunStatus(threadId, {
+			state: "failed",
+			startedAt,
+			updatedAt: getNow(),
+			error: `Codex turn failed: ${message}`,
+		});
+		console.error(`Codex turn failed for thread ${threadId}`, error);
+	}
 }
 
 function worktreePathFromName(
@@ -665,29 +727,28 @@ export async function sendThreadMessageProcedure(
 		throw new Error("Thread input is required.");
 	}
 
-	const codexThread = await ensureCodexThread(thread);
-	try {
-		const turn = await codexThread.run(input);
-		const assistantText = turn.finalResponse.trim() || "No response returned.";
-		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
-			updateThreadCodexId(db, thread.id, codexThread.id);
-		}
-		createThreadMessage(db, {
-			threadId: thread.id,
-			role: "user",
-			text: input,
-		});
-		createThreadMessage(db, {
-			threadId: thread.id,
-			role: "assistant",
-			text: assistantText,
-		});
-		markThreadRan(db, thread.id);
-		return buildThreadDetail(thread.id);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Codex turn failed: ${message}`);
+	if (getThreadRunStatus(thread.id).state === "working") {
+		throw new Error("Thread is already processing a message.");
 	}
+
+	createThreadMessage(db, {
+		threadId: thread.id,
+		role: "user",
+		text: input,
+	});
+	touchThread(db, thread.id);
+
+	const startedAt = getNow();
+	setThreadRunStatus(thread.id, {
+		state: "working",
+		startedAt,
+		updatedAt: startedAt,
+		error: null,
+	});
+
+	void runThreadMessageInBackground(thread.id, input, startedAt);
+
+	return buildThreadDetail(thread.id);
 }
 
 export async function openWorktreeProcedure(
