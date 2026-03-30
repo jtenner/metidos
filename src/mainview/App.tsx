@@ -25,10 +25,37 @@ import type {
 	RpcWorktreeSnapshot,
 } from "../bun/rpc-schema";
 
-type Message = {
-	speaker: "assistant" | "user";
+type VisibleMessage =
+	| {
+			kind: "chat";
+			speaker: "assistant" | "user";
+			text: string;
+			tone?: "normal" | "working" | "error";
+	  }
+	| {
+			kind: "reasoning";
+			text: string;
+			state: "in_progress" | "completed";
+	  }
+	| {
+			kind: "command";
+			command: string;
+			output: string;
+			state: "in_progress" | "completed" | "failed";
+			exitCode: number | null;
+	  }
+	| {
+			kind: "file_change";
+			path: string;
+			diffText: string;
+			changeKind: "add" | "delete" | "update";
+			state: "completed" | "failed";
+	  };
+
+type DiffLine = {
+	kind: "meta" | "hunk" | "context" | "add" | "remove";
+	key: string;
 	text: string;
-	state?: "complete" | "working" | "error";
 };
 
 type ProjectNodeState = {
@@ -312,6 +339,209 @@ function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 	return (
 		<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
 			<MarkdownMessage text={text} />
+		</div>
+	);
+}
+
+function parseUnifiedDiff(diffText: string): DiffLine[] {
+	const trimmed = diffText.trim();
+	if (!trimmed) {
+		return [
+			{
+				kind: "meta",
+				key: "meta:no-diff",
+				text: "No diff preview available.",
+			},
+		];
+	}
+
+	const keyCounts = new Map<string, number>();
+	return trimmed
+		.split(/\r?\n/)
+		.filter(
+			(line) => !line.startsWith("diff --git ") && !line.startsWith("index "),
+		)
+		.filter((line) => !line.startsWith("--- ") && !line.startsWith("+++ "))
+		.map((line): DiffLine => {
+			const count = (keyCounts.get(line) ?? 0) + 1;
+			keyCounts.set(line, count);
+			if (line.startsWith("@@")) {
+				return {
+					kind: "hunk",
+					key: `hunk:${line}:${count}`,
+					text: line,
+				};
+			}
+			if (line.startsWith("+")) {
+				return {
+					kind: "add",
+					key: `add:${line}:${count}`,
+					text: line,
+				};
+			}
+			if (line.startsWith("-")) {
+				return {
+					kind: "remove",
+					key: `remove:${line}:${count}`,
+					text: line,
+				};
+			}
+			if (line.startsWith("\\")) {
+				return {
+					kind: "meta",
+					key: `meta:${line}:${count}`,
+					text: line,
+				};
+			}
+			return {
+				kind: "context",
+				key: `context:${line}:${count}`,
+				text: line,
+			};
+		});
+}
+
+function commandStateLabel(
+	state: "in_progress" | "completed" | "failed",
+	exitCode: number | null,
+): string {
+	if (state === "failed") {
+		return exitCode === null ? "Failed" : `Failed (${exitCode})`;
+	}
+	if (state === "completed") {
+		return exitCode === null ? "Completed" : `Completed (${exitCode})`;
+	}
+	return "Running";
+}
+
+function CommandExecutionMessage({
+	command,
+	exitCode,
+	output,
+	state,
+}: {
+	command: string;
+	exitCode: number | null;
+	output: string;
+	state: "in_progress" | "completed" | "failed";
+}): JSX.Element {
+	return (
+		<details className="overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
+				<div className="min-w-0">
+					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+						Command
+					</div>
+					<div className="truncate font-mono text-[12px] text-[#f2f0ef]">
+						{command}
+					</div>
+				</div>
+				<span
+					className={`shrink-0 rounded-full px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${
+						state === "failed"
+							? "border border-[#7a2030] bg-[#381018] text-[#ff8698]"
+							: state === "completed"
+								? "border border-[#284240] bg-[#102522] text-[#74f0c0]"
+								: "border border-[#3b4162] bg-[#1c2135] text-[#c8c4ff]"
+					}`}
+				>
+					{commandStateLabel(state, exitCode)}
+				</span>
+			</summary>
+			<div className="border-t border-[#262b40] bg-[#0d1018] px-3 py-3">
+				<pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-[#1c2236] bg-[#090c13] px-3 py-3 font-mono text-[12px] leading-5 text-[#d6d3ec]">
+					{output || "(No output yet.)"}
+				</pre>
+			</div>
+		</details>
+	);
+}
+
+function ReasoningMessage({
+	state,
+	text,
+}: {
+	state: "in_progress" | "completed";
+	text: string;
+}): JSX.Element {
+	return (
+		<div className="rounded-sm border border-[#2a2f48] bg-[#111521] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+			<div className="mb-2 flex items-center justify-between gap-3">
+				<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+					Reasoning
+				</div>
+				<span className="rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
+					{state === "completed" ? "Ready" : "Thinking"}
+				</span>
+			</div>
+			<div className="text-sm leading-relaxed text-[#d9d7ef]">
+				<MarkdownMessage text={text} />
+			</div>
+		</div>
+	);
+}
+
+function FileChangeMessage({
+	changeKind,
+	diffText,
+	path,
+	state,
+}: {
+	changeKind: "add" | "delete" | "update";
+	diffText: string;
+	path: string;
+	state: "completed" | "failed";
+}): JSX.Element {
+	const lines = parseUnifiedDiff(diffText);
+	return (
+		<div className="overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+			<div className="flex items-center justify-between gap-3 border-b border-[#262b40] px-3 py-3">
+				<div className="min-w-0">
+					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+						File Change
+					</div>
+					<div
+						className="truncate font-mono text-[12px] text-[#b8b2ff] underline decoration-[#6f66d8] underline-offset-2"
+						title={path}
+					>
+						{path}
+					</div>
+				</div>
+				<div className="flex shrink-0 items-center gap-2">
+					<span className="rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
+						{changeKind}
+					</span>
+					<span
+						className={`rounded-full px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${
+							state === "failed"
+								? "border border-[#7a2030] bg-[#381018] text-[#ff8698]"
+								: "border border-[#284240] bg-[#102522] text-[#74f0c0]"
+						}`}
+					>
+						{state === "failed" ? "Failed" : "Ready"}
+					</span>
+				</div>
+			</div>
+			<div className="max-h-[28rem] overflow-auto bg-[#0c1018] font-mono text-[12px] leading-5">
+				{lines.map((line) => (
+					<div
+						key={`${path}:${line.key}`}
+						className={`whitespace-pre-wrap break-all px-3 py-0.5 ${
+							line.kind === "add"
+								? "bg-[#10261d] text-[#80f2c5]"
+								: line.kind === "remove"
+									? "bg-[#31141b] text-[#ff9bb0]"
+									: line.kind === "hunk"
+										? "bg-[#181f33] text-[#aeb7e8]"
+										: line.kind === "meta"
+											? "bg-[#10141d] text-[#7f88ad]"
+											: "text-[#d7d8e0]"
+						}`}
+					>
+						{line.text || " "}
+					</div>
+				))}
+			</div>
 		</div>
 	);
 }
@@ -1547,21 +1777,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[postMessage],
 	);
 
-	const visibleMessages = useMemo<Message[]>(() => {
-		let messages: Message[];
+	const visibleMessages = useMemo<VisibleMessage[]>(() => {
+		let messages: VisibleMessage[];
 		if (isThreadLoading) {
 			messages = [
 				{
+					kind: "chat",
 					speaker: "assistant",
-					state: "complete",
+					tone: "normal",
 					text: "Loading thread history...",
 				},
 			];
 		} else if (!selectedThread) {
 			messages = [
 				{
+					kind: "chat",
 					speaker: "assistant",
-					state: "complete",
+					tone: "normal",
 					text: selectedProject
 						? "Create a thread from the Threads section to start a Codex conversation for the selected worktree."
 						: "Add a project, choose a worktree, and create a thread to begin.",
@@ -1570,29 +1802,60 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		} else if (threadMessages.length === 0) {
 			messages = [
 				{
+					kind: "chat",
 					speaker: "assistant",
-					state: "complete",
+					tone: "normal",
 					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask Codex to inspect, refactor, or debug this worktree.`,
 				},
 			];
 		} else {
-			messages = threadMessages.map((message) => ({
-				speaker: message.role,
-				state: "complete" as const,
-				text: message.text,
-			}));
+			messages = threadMessages.map((message) => {
+				if (message.kind === "reasoning") {
+					return {
+						kind: "reasoning",
+						text: message.text,
+						state: message.state,
+					};
+				}
+				if (message.kind === "command") {
+					return {
+						kind: "command",
+						command: message.command,
+						output: message.output,
+						state: message.state,
+						exitCode: message.exitCode,
+					};
+				}
+				if (message.kind === "file_change") {
+					return {
+						kind: "file_change",
+						path: message.path,
+						diffText: message.diffText,
+						changeKind: message.changeKind,
+						state: message.state,
+					};
+				}
+				return {
+					kind: "chat",
+					speaker: message.role,
+					tone: "normal",
+					text: message.text,
+				};
+			});
 		}
 		if (selectedThread?.runStatus.state === "working") {
 			messages.push({
+				kind: "chat",
 				speaker: "assistant",
-				state: "working",
+				tone: "working",
 				text: "Processing",
 			});
 		}
 		if (activeChatError) {
 			messages.push({
+				kind: "chat",
 				speaker: "assistant",
-				state: "error",
+				tone: "error",
 				text: activeChatError,
 			});
 		}
@@ -1606,10 +1869,65 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		threadMessages,
 	]);
 
-	const renderDesktopMessages = visibleMessages.map((message, index) => {
-		if (message.speaker === "assistant") {
+	const assistantMessageLabel = useCallback(
+		(message: VisibleMessage): string => {
+			if (message.kind === "chat") {
+				if (message.tone === "error") {
+					return "Codex • Error";
+				}
+				return "Codex • Assistant";
+			}
+			if (message.kind === "reasoning") {
+				return "Codex • Reasoning";
+			}
+			if (message.kind === "command") {
+				return "Codex • Command";
+			}
+			return "Codex • File Change";
+		},
+		[],
+	);
+
+	const renderAssistantMessageContent = useCallback(
+		(message: VisibleMessage): JSX.Element => {
+			if (message.kind === "chat") {
+				if (message.tone === "working") {
+					return <ProcessingMessage />;
+				}
+				if (message.tone === "error") {
+					return <ChatErrorMessage text={message.text} />;
+				}
+				return <MarkdownMessage text={message.text} />;
+			}
+			if (message.kind === "reasoning") {
+				return <ReasoningMessage state={message.state} text={message.text} />;
+			}
+			if (message.kind === "command") {
+				return (
+					<CommandExecutionMessage
+						command={message.command}
+						exitCode={message.exitCode}
+						output={message.output}
+						state={message.state}
+					/>
+				);
+			}
 			return (
-				<div className="flex gap-6 group" key={`${message.speaker}-${index}`}>
+				<FileChangeMessage
+					changeKind={message.changeKind}
+					diffText={message.diffText}
+					path={message.path}
+					state={message.state}
+				/>
+			);
+		},
+		[],
+	);
+
+	const renderDesktopMessages = visibleMessages.map((message, index) => {
+		if (message.kind !== "chat" || message.speaker === "assistant") {
+			return (
+				<div className="flex gap-6 group" key={`${message.kind}-${index}`}>
 					<div className="w-8 h-8 rounded-sm bg-[#9c95f8] flex items-center justify-center shrink-0">
 						<span
 							className="material-symbols-outlined text-[#1b0a71] text-sm"
@@ -1621,21 +1939,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="flex-1 space-y-4">
 						<div
 							className={`font-label text-[10px] uppercase tracking-widest font-bold ${
-								message.state === "error" ? "text-[#ff8ca0]" : "text-[#aaa4ff]"
+								message.kind === "chat" && message.tone === "error"
+									? "text-[#ff8ca0]"
+									: message.kind === "reasoning"
+										? "text-[#bfc5ff]"
+										: message.kind === "command"
+											? "text-[#93d8ff]"
+											: message.kind === "file_change"
+												? "text-[#8ce7c5]"
+												: "text-[#aaa4ff]"
 							}`}
 						>
-							{message.state === "error"
-								? "Codex • Error"
-								: "Codex • Assistant"}
+							{assistantMessageLabel(message)}
 						</div>
 						<div className="text-[#ffffff] leading-relaxed text-sm">
-							{message.state === "working" ? (
-								<ProcessingMessage />
-							) : message.state === "error" ? (
-								<ChatErrorMessage text={message.text} />
-							) : (
-								<MarkdownMessage text={message.text} />
-							)}
+							{renderAssistantMessageContent(message)}
 						</div>
 					</div>
 				</div>
@@ -1663,11 +1981,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	});
 
 	const renderMobileMessages = visibleMessages.map((message, index) => {
-		if (message.speaker === "assistant") {
+		if (message.kind !== "chat" || message.speaker === "assistant") {
 			return (
 				<div
 					className="flex flex-col items-start gap-3 max-w-full"
-					key={`${message.speaker}-${index}`}
+					key={`${message.kind}-${index}`}
 				>
 					<div className="flex items-center gap-2 text-[#aaa4ff] px-1">
 						<span
@@ -1677,18 +1995,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							hub
 						</span>
 						<span className="text-[10px] font-label uppercase tracking-wider font-bold">
-							Intelligence
+							{message.kind === "reasoning"
+								? "Reasoning"
+								: message.kind === "command"
+									? "Command"
+									: message.kind === "file_change"
+										? "File Change"
+										: message.kind === "chat" && message.tone === "error"
+											? "Error"
+											: "Intelligence"}
 						</span>
 					</div>
 					<div className="glass-panel p-5 rounded-lg border border-[#aaa4ff]/10 w-full flex flex-col gap-4">
 						<div className="text-sm leading-relaxed text-[#ffffff]">
-							{message.state === "working" ? (
-								<ProcessingMessage />
-							) : message.state === "error" ? (
-								<ChatErrorMessage text={message.text} />
-							) : (
-								<MarkdownMessage text={message.text} />
-							)}
+							{renderAssistantMessageContent(message)}
 						</div>
 					</div>
 				</div>

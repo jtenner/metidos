@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, resolve } from "node:path";
-import { Codex } from "@openai/codex-sdk";
+import { basename, dirname, relative, resolve } from "node:path";
+import { Codex, type ThreadItem } from "@openai/codex-sdk";
 
-import type { ProjectRecord, ThreadRecord } from "./db";
+import type { ProjectRecord, ThreadMessageRecord, ThreadRecord } from "./db";
 import {
 	createThread,
 	createThreadMessage,
@@ -21,6 +21,7 @@ import {
 	touchThread,
 	updateThreadCodexId,
 	upsertProject,
+	upsertThreadActivity,
 } from "./db";
 import type {
 	AppRPCSchema,
@@ -214,8 +215,102 @@ function toRpcThread(thread: ThreadRecord): RpcThread {
 	};
 }
 
-function toRpcThreadMessages(messages: RpcThreadMessage[]): RpcThreadMessage[] {
-	return messages;
+type CommandActivityPayload = {
+	command: string;
+	output: string;
+	exitCode: number | null;
+};
+
+type FileChangeActivityPayload = {
+	path: string;
+	changeKind: "add" | "delete" | "update";
+	diffText: string;
+};
+
+function parseActivityPayload<T>(value: string | null): T | null {
+	if (!value) {
+		return null;
+	}
+	try {
+		return JSON.parse(value) as T;
+	} catch {
+		return null;
+	}
+}
+
+function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
+	if (message.kind === "command" && message.itemId) {
+		const payload = parseActivityPayload<CommandActivityPayload>(
+			message.payloadJson,
+		);
+		return {
+			id: message.id,
+			threadId: message.threadId,
+			role: "assistant",
+			kind: "command",
+			itemId: message.itemId,
+			text: message.text,
+			state:
+				message.state === "completed" || message.state === "failed"
+					? message.state
+					: "in_progress",
+			command: payload?.command ?? message.text,
+			output: payload?.output ?? "",
+			exitCode: typeof payload?.exitCode === "number" ? payload.exitCode : null,
+			createdAt: message.createdAt,
+			updatedAt: message.updatedAt,
+		};
+	}
+
+	if (message.kind === "file_change" && message.itemId) {
+		const payload = parseActivityPayload<FileChangeActivityPayload>(
+			message.payloadJson,
+		);
+		return {
+			id: message.id,
+			threadId: message.threadId,
+			role: "assistant",
+			kind: "file_change",
+			itemId: message.itemId,
+			text: message.text,
+			state: message.state === "failed" ? "failed" : "completed",
+			path: payload?.path ?? message.text,
+			changeKind: payload?.changeKind ?? "update",
+			diffText: payload?.diffText ?? "",
+			createdAt: message.createdAt,
+			updatedAt: message.updatedAt,
+		};
+	}
+
+	if (message.kind === "reasoning" && message.itemId) {
+		return {
+			id: message.id,
+			threadId: message.threadId,
+			role: "assistant",
+			kind: "reasoning",
+			itemId: message.itemId,
+			text: message.text,
+			state: message.state === "completed" ? "completed" : "in_progress",
+			createdAt: message.createdAt,
+			updatedAt: message.updatedAt,
+		};
+	}
+
+	return {
+		id: message.id,
+		threadId: message.threadId,
+		role: message.role,
+		kind: "chat",
+		text: message.text,
+		createdAt: message.createdAt,
+		updatedAt: message.updatedAt,
+	};
+}
+
+function toRpcThreadMessages(
+	messages: ThreadMessageRecord[],
+): RpcThreadMessage[] {
+	return messages.map(toRpcThreadMessage);
 }
 
 function codexThreadOptions(worktreePath: string) {
@@ -298,15 +393,73 @@ async function runThreadMessageInBackground(
 	try {
 		const thread = threadById(threadId);
 		const codexThread = await ensureCodexThread(thread);
-		const turn = await codexThread.run(input);
-		const assistantText = turn.finalResponse.trim() || "No response returned.";
+		const { events } = await codexThread.runStreamed(input);
+		let assistantText = "";
+		let terminalError: string | null = null;
+
+		for await (const event of events) {
+			if (event.type === "thread.started") {
+				if (event.thread_id && event.thread_id !== thread.codexThreadId) {
+					updateThreadCodexId(db, thread.id, event.thread_id);
+				}
+				continue;
+			}
+
+			if (event.type === "turn.failed") {
+				terminalError = event.error.message || "Codex turn failed.";
+				continue;
+			}
+
+			if (event.type === "error") {
+				terminalError = event.message || "Codex event stream failed.";
+				continue;
+			}
+
+			if (
+				event.type !== "item.started" &&
+				event.type !== "item.updated" &&
+				event.type !== "item.completed"
+			) {
+				continue;
+			}
+
+			const item = event.item;
+			if (item.type === "agent_message") {
+				assistantText = item.text.trim() || assistantText;
+				continue;
+			}
+
+			if (item.type === "reasoning") {
+				await upsertReasoningActivity(
+					threadId,
+					item,
+					event.type === "item.completed" ? "completed" : "in_progress",
+				);
+				continue;
+			}
+
+			if (item.type === "command_execution") {
+				await upsertCommandActivity(threadId, item);
+				continue;
+			}
+
+			if (item.type === "file_change") {
+				await upsertFileChangeActivity(threadId, thread.worktreePath, item);
+			}
+		}
+
+		if (terminalError) {
+			throw new Error(terminalError);
+		}
+
+		const finalAssistantText = assistantText.trim() || "No response returned.";
 		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
 			updateThreadCodexId(db, thread.id, codexThread.id);
 		}
 		createThreadMessage(db, {
 			threadId,
 			role: "assistant",
-			text: assistantText,
+			text: finalAssistantText,
 		});
 		markThreadRan(db, threadId);
 		setThreadRunStatus(threadId, {
@@ -425,6 +578,156 @@ async function runGitCommand(cwd: string, args: string[]): Promise<string> {
 	}
 
 	return stdout.trim();
+}
+
+function normalizeGitPath(worktreePath: string, value: string): string {
+	const resolvedPath = resolve(worktreePath, value);
+	return relative(worktreePath, resolvedPath).replace(/\\/g, "/");
+}
+
+function splitLines(value: string): string[] {
+	if (!value) {
+		return [];
+	}
+	return value.replace(/\r\n/g, "\n").split("\n");
+}
+
+function buildSyntheticAddDiff(path: string, content: string): string {
+	const lines = splitLines(content);
+	const header = ["--- /dev/null", `+++ b/${path}`];
+	if (lines.length === 0) {
+		return [...header, "@@ -0,0 +1,0 @@"].join("\n");
+	}
+	return [
+		...header,
+		`@@ -0,0 +1,${lines.length} @@`,
+		...lines.map((line) => `+${line}`),
+	].join("\n");
+}
+
+function buildSyntheticDeleteDiff(path: string, content: string): string {
+	const lines = splitLines(content);
+	const header = [`--- a/${path}`, "+++ /dev/null"];
+	if (lines.length === 0) {
+		return [...header, "@@ -1,0 +0,0 @@"].join("\n");
+	}
+	return [
+		...header,
+		`@@ -1,${lines.length} +0,0 @@`,
+		...lines.map((line) => `-${line}`),
+	].join("\n");
+}
+
+async function readTextFile(path: string): Promise<string> {
+	return Bun.file(path).text();
+}
+
+async function readFileChangeDiff(
+	worktreePath: string,
+	changePath: string,
+	changeKind: "add" | "delete" | "update",
+): Promise<string> {
+	const gitPath = normalizeGitPath(worktreePath, changePath);
+	const fullPath = resolve(worktreePath, gitPath);
+
+	if (changeKind !== "add") {
+		try {
+			const diff = await runGitCommand(worktreePath, [
+				"diff",
+				"--no-ext-diff",
+				"--unified=3",
+				"--",
+				gitPath,
+			]);
+			if (diff.trim()) {
+				return diff;
+			}
+		} catch {
+			// Fall through to synthetic diff handling below.
+		}
+	}
+
+	if (changeKind === "add" && existsSync(fullPath)) {
+		try {
+			return buildSyntheticAddDiff(gitPath, await readTextFile(fullPath));
+		} catch {
+			return `+++ b/${gitPath}\n+[binary or unreadable file added]`;
+		}
+	}
+
+	if (changeKind === "delete") {
+		try {
+			const previous = await runGitCommand(worktreePath, [
+				"show",
+				`HEAD:${gitPath}`,
+			]);
+			return buildSyntheticDeleteDiff(gitPath, previous);
+		} catch {
+			return `--- a/${gitPath}\n-[file deleted]`;
+		}
+	}
+
+	return "";
+}
+
+async function upsertReasoningActivity(
+	threadId: number,
+	item: Extract<ThreadItem, { type: "reasoning" }>,
+	state: "in_progress" | "completed",
+): Promise<void> {
+	upsertThreadActivity(db, {
+		threadId,
+		itemId: item.id,
+		kind: "reasoning",
+		text: item.text.trim() || "Reasoning",
+		state,
+	});
+}
+
+async function upsertCommandActivity(
+	threadId: number,
+	item: Extract<ThreadItem, { type: "command_execution" }>,
+): Promise<void> {
+	upsertThreadActivity(db, {
+		threadId,
+		itemId: item.id,
+		kind: "command",
+		text: item.command,
+		state: item.status,
+		payloadJson: JSON.stringify({
+			command: item.command,
+			output: item.aggregated_output,
+			exitCode: item.exit_code ?? null,
+		} satisfies CommandActivityPayload),
+	});
+}
+
+async function upsertFileChangeActivity(
+	threadId: number,
+	worktreePath: string,
+	item: Extract<ThreadItem, { type: "file_change" }>,
+): Promise<void> {
+	await Promise.all(
+		item.changes.map(async (change) => {
+			const diffText =
+				item.status === "completed"
+					? await readFileChangeDiff(worktreePath, change.path, change.kind)
+					: "";
+			const gitPath = normalizeGitPath(worktreePath, change.path);
+			upsertThreadActivity(db, {
+				threadId,
+				itemId: `${item.id}:${gitPath}`,
+				kind: "file_change",
+				text: gitPath,
+				state: item.status,
+				payloadJson: JSON.stringify({
+					path: gitPath,
+					changeKind: change.kind,
+					diffText,
+				} satisfies FileChangeActivityPayload),
+			});
+		}),
+	);
 }
 
 function parseWorktreeList(raw: string): RpcWorktree[] {

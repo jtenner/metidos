@@ -67,13 +67,63 @@ export type RpcThread = {
 	runStatus: RpcThreadRunStatus;
 };
 
-export type RpcThreadMessage = {
+export type RpcChatThreadMessage = {
 	id: number;
 	threadId: number;
 	role: "assistant" | "user";
+	kind: "chat";
 	text: string;
 	createdAt: string;
+	updatedAt: string;
 };
+
+export type RpcReasoningThreadMessage = {
+	id: number;
+	threadId: number;
+	role: "assistant";
+	kind: "reasoning";
+	itemId: string;
+	text: string;
+	state: "in_progress" | "completed";
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type RpcCommandThreadMessage = {
+	id: number;
+	threadId: number;
+	role: "assistant";
+	kind: "command";
+	itemId: string;
+	text: string;
+	state: "in_progress" | "completed" | "failed";
+	command: string;
+	output: string;
+	exitCode: number | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type RpcFileChangeThreadMessage = {
+	id: number;
+	threadId: number;
+	role: "assistant";
+	kind: "file_change";
+	itemId: string;
+	text: string;
+	state: "completed" | "failed";
+	path: string;
+	changeKind: "add" | "delete" | "update";
+	diffText: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type RpcThreadMessage =
+	| RpcChatThreadMessage
+	| RpcReasoningThreadMessage
+	| RpcCommandThreadMessage
+	| RpcFileChangeThreadMessage;
 
 export type RpcThreadDetail = {
 	thread: RpcThread;

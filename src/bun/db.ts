@@ -25,6 +25,18 @@ type ThreadMessageInput = {
 	text: string;
 };
 
+type ThreadActivityKind = "chat" | "reasoning" | "command" | "file_change";
+
+type ThreadActivityInput = {
+	threadId: number;
+	itemId: string;
+	role?: "assistant" | "user";
+	kind: Exclude<ThreadActivityKind, "chat">;
+	text: string;
+	state: string | null;
+	payloadJson?: string | null;
+};
+
 export type ProjectRecord = {
 	id: number;
 	path: string;
@@ -54,8 +66,13 @@ export type ThreadMessageRecord = {
 	id: number;
 	threadId: number;
 	role: "assistant" | "user";
+	kind: ThreadActivityKind;
+	itemId: string | null;
 	text: string;
+	state: string | null;
+	payloadJson: string | null;
 	createdAt: string;
+	updatedAt: string;
 };
 
 const APP_DATA_DIR =
@@ -98,6 +115,16 @@ function ensureThreadColumn(
 	}
 }
 
+function ensureThreadMessageColumn(
+	db: Database,
+	columnName: string,
+	columnDefinition: string,
+): void {
+	if (!tableHasColumn(db, "thread_messages", columnName)) {
+		db.run(`ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`);
+	}
+}
+
 function migrate(db: Database): void {
 	db.run(`
 			CREATE TABLE IF NOT EXISTS projects (
@@ -134,10 +161,20 @@ function migrate(db: Database): void {
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				thread_id INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
 				role TEXT NOT NULL CHECK(role IN ('assistant', 'user')),
+				kind TEXT NOT NULL DEFAULT 'chat',
+				item_id TEXT,
 				text TEXT NOT NULL,
-				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+				state TEXT,
+				payload_json TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
 		`);
+	ensureThreadMessageColumn(db, "kind", "kind TEXT NOT NULL DEFAULT 'chat'");
+	ensureThreadMessageColumn(db, "item_id", "item_id TEXT");
+	ensureThreadMessageColumn(db, "state", "state TEXT");
+	ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
+	ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
 	db.run(`
 			CREATE INDEX IF NOT EXISTS idx_threads_updated_at
 			ON threads(updated_at DESC, id DESC);
@@ -149,6 +186,10 @@ function migrate(db: Database): void {
 	db.run(`
 			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id
 			ON thread_messages(thread_id, id);
+		`);
+	db.run(`
+			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_item_id
+			ON thread_messages(thread_id, item_id);
 		`);
 }
 
@@ -472,8 +513,13 @@ export function listThreadMessages(
 					id,
 					thread_id AS threadId,
 					role,
+					kind,
+					item_id AS itemId,
 					text,
-					created_at AS createdAt
+					state,
+					payload_json AS payloadJson,
+					created_at AS createdAt,
+					COALESCE(updated_at, created_at) AS updatedAt
 				FROM thread_messages
 				WHERE thread_id = ?
 				ORDER BY id ASC
@@ -488,8 +534,17 @@ export function createThreadMessage(
 ): ThreadMessageRecord {
 	const result = database.run(
 		`
-			INSERT INTO thread_messages (thread_id, role, text)
-			VALUES (?, ?, ?)
+			INSERT INTO thread_messages (
+				thread_id,
+				role,
+				kind,
+				item_id,
+				text,
+				state,
+				payload_json,
+				updated_at
+			)
+			VALUES (?, ?, 'chat', NULL, ?, NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		`,
 		input.threadId,
 		input.role,
@@ -503,8 +558,13 @@ export function createThreadMessage(
 					id,
 					thread_id AS threadId,
 					role,
+					kind,
+					item_id AS itemId,
 					text,
-					created_at AS createdAt
+					state,
+					payload_json AS payloadJson,
+					created_at AS createdAt,
+					COALESCE(updated_at, created_at) AS updatedAt
 				FROM thread_messages
 				WHERE id = ?
 			`,
@@ -515,5 +575,97 @@ export function createThreadMessage(
 			`Failed to create thread message for thread ${input.threadId}`,
 		);
 	}
+	return message;
+}
+
+export function upsertThreadActivity(
+	database: Database,
+	input: ThreadActivityInput,
+): ThreadMessageRecord {
+	const existing = database
+		.query<{ id: number }, [number, string]>(
+			`
+				SELECT id
+				FROM thread_messages
+				WHERE thread_id = ? AND item_id = ?
+				ORDER BY id DESC
+				LIMIT 1
+			`,
+		)
+		.get(input.threadId, input.itemId);
+
+	if (existing) {
+		database.run(
+			`
+				UPDATE thread_messages
+				SET
+					role = ?,
+					kind = ?,
+					text = ?,
+					state = ?,
+					payload_json = ?,
+					updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				WHERE id = ?
+			`,
+			input.role ?? "assistant",
+			input.kind,
+			input.text,
+			input.state,
+			input.payloadJson ?? null,
+			existing.id,
+		);
+	} else {
+		database.run(
+			`
+				INSERT INTO thread_messages (
+					thread_id,
+					role,
+					kind,
+					item_id,
+					text,
+					state,
+					payload_json,
+					updated_at
+				)
+				VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			`,
+			input.threadId,
+			input.role ?? "assistant",
+			input.kind,
+			input.itemId,
+			input.text,
+			input.state,
+			input.payloadJson ?? null,
+		);
+	}
+
+	const message = database
+		.query<ThreadMessageRecord, [number, string]>(
+			`
+				SELECT
+					id,
+					thread_id AS threadId,
+					role,
+					kind,
+					item_id AS itemId,
+					text,
+					state,
+					payload_json AS payloadJson,
+					created_at AS createdAt,
+					COALESCE(updated_at, created_at) AS updatedAt
+				FROM thread_messages
+				WHERE thread_id = ? AND item_id = ?
+				ORDER BY id DESC
+				LIMIT 1
+			`,
+		)
+		.get(input.threadId, input.itemId);
+
+	if (!message) {
+		throw new Error(
+			`Failed to upsert thread activity ${input.itemId} for thread ${input.threadId}`,
+		);
+	}
+
 	return message;
 }
