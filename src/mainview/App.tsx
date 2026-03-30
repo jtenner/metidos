@@ -59,6 +59,22 @@ type VisibleMessage =
 			state: "completed" | "failed";
 	  };
 
+type MessageGroup =
+	| {
+			kind: "assistant";
+			key: string;
+			messages: Array<{
+				index: number;
+				message: VisibleMessage;
+			}>;
+	  }
+	| {
+			kind: "user";
+			index: number;
+			key: string;
+			text: string;
+	  };
+
 type DiffLine = {
 	kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
 	key: string;
@@ -1053,6 +1069,10 @@ function threadErrorLevelWeight(level: ThreadErrorLevel): number {
 		return 1;
 	}
 	return 0;
+}
+
+function isAssistantVisibleMessage(message: VisibleMessage): boolean {
+	return message.kind !== "chat" || message.speaker === "assistant";
 }
 
 function threadErrorPreview(thread: RpcThread): ThreadErrorPreview | null {
@@ -3822,17 +3842,36 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		(message: VisibleMessage): string => {
 			if (message.kind === "chat") {
 				if (message.tone === "error") {
-					return "Codex • Error";
+					return "Error";
 				}
-				return "Codex • Assistant";
+				return "Assistant";
 			}
 			if (message.kind === "reasoning") {
-				return "Codex • Reasoning";
+				return "Reasoning";
 			}
 			if (message.kind === "command") {
-				return "Codex • Command";
+				return "Command";
 			}
-			return "Codex • File Change";
+			return "File Change";
+		},
+		[],
+	);
+
+	const assistantMessageLabelClassName = useCallback(
+		(message: VisibleMessage): string => {
+			if (message.kind === "chat" && message.tone === "error") {
+				return "text-[#ff8ca0]";
+			}
+			if (message.kind === "reasoning") {
+				return "text-[#bfc5ff]";
+			}
+			if (message.kind === "command") {
+				return "text-[#93d8ff]";
+			}
+			if (message.kind === "file_change") {
+				return "text-[#8ce7c5]";
+			}
+			return "text-[#aaa4ff]";
 		},
 		[],
 	);
@@ -3873,14 +3912,42 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[],
 	);
 
-	const renderDesktopMessages = visibleMessages.map((message, index) => {
-		if (message.kind !== "chat" || message.speaker === "assistant") {
+	const groupedVisibleMessages = useMemo<MessageGroup[]>(() => {
+		const groups: MessageGroup[] = [];
+		visibleMessages.forEach((message, index) => {
+			if (isAssistantVisibleMessage(message)) {
+				const lastGroup = groups.at(-1);
+				const nextMessage = { index, message };
+				if (lastGroup?.kind === "assistant") {
+					lastGroup.messages.push(nextMessage);
+					return;
+				}
+				groups.push({
+					kind: "assistant",
+					key: `assistant-${index}`,
+					messages: [nextMessage],
+				});
+				return;
+			}
+
+			groups.push({
+				kind: "user",
+				index,
+				key: `user-${index}`,
+				text: message.kind === "chat" ? message.text : "",
+			});
+		});
+		return groups;
+	}, [visibleMessages]);
+
+	const renderDesktopMessages = groupedVisibleMessages.map((group) => {
+		if (group.kind === "assistant") {
 			return (
 				<div
 					className="group flex w-full min-w-0 items-start gap-6"
-					key={`${message.kind}-${index}`}
+					key={group.key}
 				>
-					<div className="w-8 h-8 rounded-sm bg-[#9c95f8] flex items-center justify-center shrink-0">
+					<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#9c95f8]">
 						<span
 							className="material-symbols-outlined text-[#1b0a71] text-sm"
 							style={{ fontVariationSettings: "'FILL' 1" }}
@@ -3888,41 +3955,40 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							psychology
 						</span>
 					</div>
-					<div className="min-w-0 flex-1 space-y-4">
-						<div
-							className={`font-label text-[10px] uppercase tracking-widest font-bold ${
-								message.kind === "chat" && message.tone === "error"
-									? "text-[#ff8ca0]"
-									: message.kind === "reasoning"
-										? "text-[#bfc5ff]"
-										: message.kind === "command"
-											? "text-[#93d8ff]"
-											: message.kind === "file_change"
-												? "text-[#8ce7c5]"
-												: "text-[#aaa4ff]"
-							}`}
-						>
-							{assistantMessageLabel(message)}
+					<div className="min-w-0 flex-1 space-y-5">
+						<div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#aaa4ff]">
+							Codex
 						</div>
-						<div className="min-w-0 max-w-full text-[#ffffff] leading-relaxed text-sm">
-							{renderAssistantMessageContent(message)}
-						</div>
+						{group.messages.map(({ message, index }, groupIndex) => (
+							<div
+								className={`min-w-0 space-y-4 ${groupIndex > 0 ? "pt-1" : ""}`}
+								key={`${message.kind}-${index}`}
+							>
+								<div
+									className={`font-label text-[10px] font-bold uppercase tracking-widest ${assistantMessageLabelClassName(
+										message,
+									)}`}
+								>
+									{assistantMessageLabel(message)}
+								</div>
+								<div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
+									{renderAssistantMessageContent(message)}
+								</div>
+							</div>
+						))}
 					</div>
 				</div>
 			);
 		}
 
 		return (
-			<div
-				className="flex w-full min-w-0 justify-end gap-6"
-				key={`${message.speaker}-${index}`}
-			>
+			<div className="flex w-full min-w-0 justify-end gap-6" key={group.key}>
 				<div className="min-w-0 w-full max-w-2xl space-y-3 text-right">
 					<div className="font-body text-[13px] font-semibold tracking-[0.01em] text-[#b7b3b1]">
 						{localUserLabel}
 					</div>
 					<div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
-						<MarkdownMessage text={message.text} />
+						<MarkdownMessage text={group.text} />
 					</div>
 				</div>
 				<div className="w-8 h-8 rounded-sm bg-[#262626] flex items-center justify-center shrink-0">
@@ -3932,12 +3998,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	});
 
-	const renderMobileMessages = visibleMessages.map((message, index) => {
-		if (message.kind !== "chat" || message.speaker === "assistant") {
+	const renderMobileMessages = groupedVisibleMessages.map((group) => {
+		if (group.kind === "assistant") {
 			return (
 				<div
 					className="flex flex-col items-start gap-3 max-w-full"
-					key={`${message.kind}-${index}`}
+					key={group.key}
 				>
 					<div className="flex items-center gap-2 text-[#aaa4ff] px-1">
 						<span
@@ -3946,22 +4012,30 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						>
 							hub
 						</span>
-						<span className="text-[10px] font-label uppercase tracking-wider font-bold">
-							{message.kind === "reasoning"
-								? "Reasoning"
-								: message.kind === "command"
-									? "Command"
-									: message.kind === "file_change"
-										? "File Change"
-										: message.kind === "chat" && message.tone === "error"
-											? "Error"
-											: "Intelligence"}
+						<span className="text-[10px] font-label font-bold uppercase tracking-wider">
+							Codex
 						</span>
 					</div>
-					<div className="glass-panel p-5 rounded-lg border border-[#aaa4ff]/10 w-full flex flex-col gap-4">
-						<div className="text-sm leading-relaxed text-[#ffffff]">
-							{renderAssistantMessageContent(message)}
-						</div>
+					<div className="flex w-full flex-col gap-4">
+						{group.messages.map(({ message, index }) => (
+							<div
+								className="w-full space-y-2"
+								key={`${message.kind}-${index}`}
+							>
+								<div
+									className={`px-1 text-[10px] font-label font-bold uppercase tracking-wider ${assistantMessageLabelClassName(
+										message,
+									)}`}
+								>
+									{assistantMessageLabel(message)}
+								</div>
+								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#aaa4ff]/10 p-5">
+									<div className="text-sm leading-relaxed text-[#ffffff]">
+										{renderAssistantMessageContent(message)}
+									</div>
+								</div>
+							</div>
+						))}
 					</div>
 				</div>
 			);
@@ -3970,7 +4044,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return (
 			<div
 				className="flex flex-col items-end gap-2 max-w-[90%] self-end"
-				key={`${message.speaker}-${index}`}
+				key={group.key}
 			>
 				<div className="flex items-center gap-2 px-1 text-[#b7b3b1]">
 					<span className="font-body text-[13px] font-semibold tracking-[0.01em]">
@@ -3981,7 +4055,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</span>
 				</div>
 				<div className="bg-[#1f2020] p-4 rounded-lg rounded-tr-none text-sm leading-relaxed text-[#ffffff] shadow-sm">
-					<MarkdownMessage text={message.text} />
+					<MarkdownMessage text={group.text} />
 				</div>
 			</div>
 		);
