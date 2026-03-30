@@ -1134,6 +1134,30 @@ function sortThreads(items: RpcThread[]): RpcThread[] {
 	});
 }
 
+function compareThreadsByRecency(left: RpcThread, right: RpcThread): number {
+	if (left.updatedAt !== right.updatedAt) {
+		return right.updatedAt.localeCompare(left.updatedAt);
+	}
+	if (left.createdAt !== right.createdAt) {
+		return right.createdAt.localeCompare(left.createdAt);
+	}
+	return right.id - left.id;
+}
+
+function latestThreadForWorktree(
+	items: RpcThread[],
+	projectId: number,
+	worktreePath: string,
+): RpcThread | null {
+	const matches = items
+		.filter(
+			(thread) =>
+				thread.projectId === projectId && thread.worktreePath === worktreePath,
+		)
+		.sort(compareThreadsByRecency);
+	return matches[0] ?? null;
+}
+
 function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
 	const next = items.filter((entry) => entry.id !== thread.id);
 	next.push(thread);
@@ -2299,21 +2323,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [activeSelectedWorktreePath, procedures, selectedProject]);
 
 	useEffect(() => {
-		if (!selectedThread || !selectedProjectId || !activeSelectedWorktreePath) {
+		if (!selectedProjectId || !activeSelectedWorktreePath) {
 			return;
 		}
 		if (
+			selectedThread &&
 			selectedThread.projectId === selectedProjectId &&
 			selectedThread.worktreePath === activeSelectedWorktreePath
 		) {
 			return;
 		}
-		clearThreadSelection();
+		const latestThread = latestThreadForWorktree(
+			threads,
+			selectedProjectId,
+			activeSelectedWorktreePath,
+		);
+		if (!latestThread) {
+			clearThreadSelection();
+			return;
+		}
+		if (selectedThreadId === latestThread.id) {
+			return;
+		}
+		void openThread(latestThread.id);
 	}, [
 		activeSelectedWorktreePath,
 		clearThreadSelection,
+		openThread,
 		selectedProjectId,
 		selectedThread,
+		selectedThreadId,
+		threads,
 	]);
 
 	useEffect(() => {
@@ -3518,6 +3558,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				filteredProjects.map((project) => {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
+					const isActiveThreadProject =
+						selectedThread?.projectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
 					const projectErrorPreviewText = projectThreadErrorPreviewText(
 						project.id,
@@ -3542,15 +3584,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const showWorktrees =
 						(state.expanded || Boolean(normalizedSidebarSearchQuery)) &&
 						!sidebarCollapsed;
-					const projectIndicatorClass = isActive
+					const showActiveProjectIndicator =
+						isActiveThreadProject && !showWorktrees;
+					const projectIndicatorClass = showActiveProjectIndicator
 						? "bg-[#4fefb2]"
 						: projectErrorLevel === "unread"
 							? "bg-[#ff304f]"
 							: projectErrorLevel === "failed"
 								? "bg-[#8f4956]"
-								: project.isOpen
-									? "bg-[#4fefb2]"
-									: "bg-[#5f5f5f]";
+								: "bg-[#5f5f5f]";
 					return (
 						<div
 							className="space-y-1"
@@ -3639,6 +3681,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											project.id,
 											worktree.path,
 										);
+										const isActiveThreadWorktree =
+											selectedThread?.projectId === project.id &&
+											selectedThread.worktreePath === worktree.path;
 										const worktreeErrorLevel = worktreeThreadErrorLevel(
 											project.id,
 											worktree.path,
@@ -3690,7 +3735,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																? "bg-[#ff304f]"
 																: worktreeErrorLevel === "failed"
 																	? "bg-[#8f4956]"
-																	: activeWorktree
+																	: isActiveThreadWorktree
 																		? "bg-[#4fefb2]"
 																		: "bg-transparent"
 														}`}

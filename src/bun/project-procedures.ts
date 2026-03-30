@@ -94,17 +94,6 @@ const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 
-const THREAD_INIT_SCHEMA = {
-	type: "object",
-	properties: {
-		status: {
-			type: "string",
-		},
-	},
-	required: ["status"],
-	additionalProperties: false,
-} as const;
-
 // Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
 // raw model IDs, but it does not expose a discovery API for enumerating them.
 const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
@@ -341,6 +330,10 @@ function tasksDirectoryPath(worktreePath: string): string {
 
 function taskTitleFromPath(taskPath: string): string {
 	return taskPath.replace(/\.[^./\\]+$/, "").replace(/\\/g, "/");
+}
+
+function formatTaskPrompt(taskTitle: string, taskContent: string): string {
+	return `Your job is to perform the task: ${taskTitle}\n${taskContent.trim()}\n\nDo this now.`;
 }
 
 function listProjectTaskFiles(
@@ -592,20 +585,6 @@ function codexThreadOptions(worktreePath: string, model: string) {
 	};
 }
 
-async function initializeCodexThread(
-	thread: ReturnType<typeof codex.startThread>,
-): Promise<void> {
-	await thread.run(
-		"Initialize this coding thread. Respond with JSON containing a status field set to ready.",
-		{
-			outputSchema: THREAD_INIT_SCHEMA,
-		},
-	);
-	if (!thread.id) {
-		throw new Error("Codex did not return a thread identifier.");
-	}
-}
-
 async function ensureCodexThread(
 	thread: ThreadRecord,
 ): Promise<ReturnType<typeof codex.startThread>> {
@@ -628,13 +607,6 @@ async function ensureCodexThread(
 					normalizeStoredCodexModel(thread.model),
 				),
 			);
-	if (!thread.codexThreadId) {
-		await initializeCodexThread(next);
-		if (!next.id) {
-			throw new Error("Codex did not return a thread identifier.");
-		}
-		updateThreadCodexId(db, thread.id, next.id);
-	}
 	codexThreadMap.set(thread.id, next);
 	return next;
 }
@@ -1254,24 +1226,13 @@ async function createThreadRecord(
 	const codexThread = codex.startThread(
 		codexThreadOptions(worktreePath, model),
 	);
-	try {
-		await initializeCodexThread(codexThread);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Unable to start Codex thread: ${message}`);
-	}
-
-	const codexThreadId = codexThread.id;
-	if (!codexThreadId) {
-		throw new Error("Codex did not provide a persistent thread id.");
-	}
 
 	const thread = createThread(db, {
 		projectId: project.id,
 		worktreePath,
 		title: buildThreadTitle(worktree, worktreePath),
 		model,
-		codexThreadId,
+		codexThreadId: codexThread.id ?? null,
 	});
 	codexThreadMap.set(thread.id, codexThread);
 	return thread;
@@ -1439,10 +1400,14 @@ export async function runProjectTaskProcedure(
 		worktreePath,
 		params.taskPath,
 	);
-	const taskContent = (await Bun.file(taskFilePath).text()).trim();
-	if (!taskContent) {
+	const taskContent = await Bun.file(taskFilePath).text();
+	if (!taskContent.trim()) {
 		throw new Error(`Task file is empty: ${params.taskPath}`);
 	}
+	const taskPrompt = formatTaskPrompt(
+		taskTitleFromPath(params.taskPath),
+		taskContent,
+	);
 
 	let thread = params.threadId ? threadById(params.threadId) : null;
 	if (thread) {
@@ -1460,7 +1425,7 @@ export async function runProjectTaskProcedure(
 		);
 	}
 
-	return queueThreadMessage(thread, taskContent);
+	return queueThreadMessage(thread, taskPrompt);
 }
 
 export async function renameThreadProcedure(
