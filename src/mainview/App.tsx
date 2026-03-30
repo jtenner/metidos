@@ -11,6 +11,8 @@ import {
 import type {
 	ProjectProcedures,
 	RpcProject,
+	RpcThread,
+	RpcThreadMessage,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "../bun/rpc-schema";
@@ -18,7 +20,6 @@ import type {
 type Message = {
 	speaker: "assistant" | "user";
 	text: string;
-	isSuggestion?: boolean;
 };
 
 type ProjectNodeState = {
@@ -43,13 +44,6 @@ type ProjectActionMenuState = {
 	x: number;
 	y: number;
 };
-
-const initialMessages: Message[] = [
-	{
-		speaker: "assistant",
-		text: "Neural context attached. Ask me about the selected project or worktree, and I will generate diffs, refactors, and command-safe patches.",
-	},
-];
 
 function shortName(value: string): string {
 	const normalized = value.replace(/[\\/]$/, "");
@@ -160,6 +154,24 @@ function formatDirectoryPathForInput(
 	);
 }
 
+function sortThreads(items: RpcThread[]): RpcThread[] {
+	return [...items].sort((left, right) => {
+		if (left.updatedAt !== right.updatedAt) {
+			return right.updatedAt.localeCompare(left.updatedAt);
+		}
+		if (left.createdAt !== right.createdAt) {
+			return right.createdAt.localeCompare(left.createdAt);
+		}
+		return right.id - left.id;
+	});
+}
+
+function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
+	const next = items.filter((entry) => entry.id !== thread.id);
+	next.push(thread);
+	return sortThreads(next);
+}
+
 function clampProjectMenuCoordinate(
 	value: number,
 	viewportSize: number,
@@ -200,6 +212,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState(false);
 	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
+	const [threads, setThreads] = useState<RpcThread[]>([]);
+	const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
+	const [threadMessages, setThreadMessages] = useState<RpcThreadMessage[]>([]);
+	const [threadsError, setThreadsError] = useState("");
+	const [chatError, setChatError] = useState("");
+	const [isThreadLoading, setIsThreadLoading] = useState(false);
+	const [isCreatingThread, setIsCreatingThread] = useState(false);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -208,7 +227,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [selectedWorktreePath, setSelectedWorktreePath] = useState<
 		string | null
 	>(null);
-	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [chatInput, setChatInput] = useState("");
 	const [isSending, setIsSending] = useState(false);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -220,6 +238,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		return projects.find((entry) => entry.id === selectedProjectId) ?? null;
 	}, [projects, selectedProjectId]);
+
+	const selectedThread = useMemo(() => {
+		if (!selectedThreadId) {
+			return null;
+		}
+		return threads.find((entry) => entry.id === selectedThreadId) ?? null;
+	}, [selectedThreadId, threads]);
 
 	const projectActionMenuProject = useMemo(() => {
 		if (!projectActionMenu) {
@@ -280,13 +305,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!selectedProject) {
 			return null;
 		}
-		if (
-			selectedWorktreePath &&
-			(selectedWorktreePath === selectedProject.path ||
-				selectedProjectWorktrees.some(
-					(worktree) => worktree.path === selectedWorktreePath,
-				))
-		) {
+		if (selectedWorktreePath) {
 			return selectedWorktreePath;
 		}
 		return primaryWorktreePath(selectedProject, selectedProjectWorktrees);
@@ -314,8 +333,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!selectedProject) {
 			return "";
 		}
+		if (!activeSelectedWorktree && selectedThread) {
+			return selectedThread.title;
+		}
 		return worktreeDisplayName(activeSelectedWorktree);
-	}, [activeSelectedWorktree, selectedProject]);
+	}, [activeSelectedWorktree, selectedProject, selectedThread]);
 
 	const isActiveWorktree = useCallback(
 		(projectId: number, worktreePath: string): boolean =>
@@ -390,6 +412,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		});
 	}, []);
 
+	const clearThreadSelection = useCallback(() => {
+		setSelectedThreadId(null);
+		setThreadMessages([]);
+		setChatError("");
+	}, []);
+
+	const syncThreadContext = useCallback((thread: RpcThread) => {
+		setSelectedProjectId(thread.projectId);
+		setSelectedWorktreePath(thread.worktreePath);
+	}, []);
+
 	const loadProjectWorktrees = useCallback(
 		async (projectId: number): Promise<RpcWorktree[]> => {
 			const result = await procedures.listProjectWorktrees({ projectId });
@@ -400,6 +433,32 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return result.worktrees;
 		},
 		[procedures, setProjectState],
+	);
+
+	const openThread = useCallback(
+		async (threadId: number) => {
+			setIsThreadLoading(true);
+			setThreadsError("");
+			setChatError("");
+			try {
+				const detail = await procedures.getThread({ threadId });
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				setSelectedThreadId(detail.thread.id);
+				setThreadMessages(detail.messages);
+				syncThreadContext(detail.thread);
+				try {
+					await loadProjectWorktrees(detail.thread.projectId);
+				} catch {
+					// Best effort; thread history should still open even if worktree metadata refresh fails.
+				}
+				setMobileProjectListOpen(false);
+			} catch (error) {
+				setThreadsError(error instanceof Error ? error.message : String(error));
+			} finally {
+				setIsThreadLoading(false);
+			}
+		},
+		[loadProjectWorktrees, procedures, syncThreadContext],
 	);
 
 	const resetAddProjectPath = useCallback(
@@ -416,11 +475,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const initialize = useCallback(async () => {
-		const [loaded, homeDirectoryResult] = await Promise.all([
+		const [loaded, homeDirectoryResult, loadedThreads] = await Promise.all([
 			procedures.listProjects({ includeClosed: true }),
 			procedures.getHomeDirectory(),
+			procedures.listThreads(),
 		]);
 		setProjects(loaded);
+		setThreads(sortThreads(loadedThreads));
 		hydrateProjectRows(loaded);
 		setHomeDirectory(homeDirectoryResult.homeDirectory);
 		setSupportsTildePath(homeDirectoryResult.supportsTildePath);
@@ -433,9 +494,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					homeDirectoryResult.supportsTildePath,
 				),
 		);
+		if (loadedThreads[0]) {
+			try {
+				const detail = await procedures.getThread({
+					threadId: loadedThreads[0].id,
+				});
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				setSelectedThreadId(detail.thread.id);
+				setThreadMessages(detail.messages);
+				setSelectedProjectId(detail.thread.projectId);
+				setSelectedWorktreePath(detail.thread.worktreePath);
+				try {
+					await loadProjectWorktrees(detail.thread.projectId);
+				} catch {
+					// Best effort; keep the thread selected even if worktree metadata is unavailable.
+				}
+				return;
+			} catch (error) {
+				setThreadsError(error instanceof Error ? error.message : String(error));
+			}
+		}
 		setSelectedProjectId((current) => current ?? loaded[0]?.id ?? null);
 		setSelectedWorktreePath((current) => current ?? loaded[0]?.path ?? null);
-	}, [hydrateProjectRows, procedures]);
+	}, [hydrateProjectRows, loadProjectWorktrees, procedures]);
 
 	const closeAddProjectForm = useCallback(() => {
 		setAddProjectOpen(false);
@@ -505,8 +586,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		async (projectId: number) => {
 			try {
 				await procedures.deleteProject({ projectId });
-				const loaded = await procedures.listProjects({ includeClosed: true });
+				const [loaded, loadedThreads] = await Promise.all([
+					procedures.listProjects({ includeClosed: true }),
+					procedures.listThreads(),
+				]);
 				setProjects(loaded);
+				setThreads(sortThreads(loadedThreads));
 				hydrateProjectRows(loaded);
 				clearProjectState(projectId);
 				setSelectedProjectId((current) => {
@@ -517,6 +602,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				});
 				if (selectedProjectId === projectId) {
 					setSelectedWorktreePath(loaded[0]?.path ?? null);
+				}
+				if (selectedThreadId) {
+					if (loadedThreads.some((thread) => thread.id === selectedThreadId)) {
+						void openThread(selectedThreadId);
+					} else if (loadedThreads[0]) {
+						void openThread(loadedThreads[0].id);
+					} else {
+						clearThreadSelection();
+					}
 				}
 				setProjectActionMenu((current) =>
 					current?.projectId === projectId ? null : current,
@@ -533,10 +627,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[
 			clearProjectState,
+			clearThreadSelection,
 			hydrateProjectRows,
+			openThread,
 			procedures,
 			projectActionMenu,
 			selectedProjectId,
+			selectedThreadId,
 			setProjectState,
 		],
 	);
@@ -618,6 +715,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [closeProjectActionMenu, projectActionMenu, projectActionMenuProject]);
 
 	useEffect(() => {
+		if (!selectedThreadId || selectedThread) {
+			return;
+		}
+		if (threads[0]) {
+			void openThread(threads[0].id);
+			return;
+		}
+		clearThreadSelection();
+	}, [
+		clearThreadSelection,
+		openThread,
+		selectedThread,
+		selectedThreadId,
+		threads,
+	]);
+
+	useEffect(() => {
 		if (!addProjectOpen) {
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
@@ -669,6 +783,47 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[homeDirectory, supportsTildePath],
 	);
+
+	const createThreadFromSelection = useCallback(async () => {
+		if (isCreatingThread) {
+			return;
+		}
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			setThreadsError("Select a project worktree before creating a thread.");
+			return;
+		}
+
+		setIsCreatingThread(true);
+		setThreadsError("");
+		setChatError("");
+		try {
+			const detail = await procedures.createThread({
+				projectId: selectedProject.id,
+				worktreePath: activeSelectedWorktreePath,
+			});
+			setThreads((prev) => upsertThreadList(prev, detail.thread));
+			setSelectedThreadId(detail.thread.id);
+			setThreadMessages(detail.messages);
+			syncThreadContext(detail.thread);
+			setMobileProjectListOpen(false);
+			try {
+				await loadProjectWorktrees(detail.thread.projectId);
+			} catch {
+				// Best effort; thread creation should still succeed even if the worktree refresh fails.
+			}
+		} catch (error) {
+			setThreadsError(error instanceof Error ? error.message : String(error));
+		} finally {
+			setIsCreatingThread(false);
+		}
+	}, [
+		activeSelectedWorktreePath,
+		isCreatingThread,
+		loadProjectWorktrees,
+		procedures,
+		selectedProject,
+		syncThreadContext,
+	]);
 
 	const submitAddProject = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
@@ -877,26 +1032,31 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!text || isSending) {
 			return;
 		}
+		if (!selectedThreadId) {
+			setChatError("Create or select a thread before sending a message.");
+			return;
+		}
 
-		setMessages((prev) => [...prev, { speaker: "user", text }]);
-		setChatInput("");
+		const pendingInput = text;
 		setIsSending(true);
-		setTimeout(() => {
-			setMessages((prev) => [
-				...prev,
-				{
-					speaker: "assistant",
-					text: `Queued action against ${
-						selectedProject
-							? `${selectedProject.name} · ${activeSelectedWorktreeFolder}`
-							: "No project selected"
-					}.`,
-					isSuggestion: true,
-				},
-			]);
-			setIsSending(false);
-		}, 500);
-	}, [activeSelectedWorktreeFolder, chatInput, isSending, selectedProject]);
+		setChatError("");
+		setChatInput("");
+		void (async () => {
+			try {
+				const detail = await procedures.sendThreadMessage({
+					threadId: selectedThreadId,
+					input: pendingInput,
+				});
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				setThreadMessages(detail.messages);
+			} catch (error) {
+				setChatError(error instanceof Error ? error.message : String(error));
+				setChatInput((current) => current || pendingInput);
+			} finally {
+				setIsSending(false);
+			}
+		})();
+	}, [chatInput, isSending, procedures, selectedThreadId]);
 
 	const onSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -916,40 +1076,46 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[postMessage],
 	);
 
-	const renderDesktopMessages = messages.map((message, index) => {
-		if (message.isSuggestion) {
-			return (
-				<div
-					key={`${message.speaker}-${index}`}
-					className="flex gap-6 bg-[#262626]/30 backdrop-blur-xl p-6 rounded-lg border border-[#484848]/10"
-				>
-					<div className="w-8 h-8 rounded-sm bg-[#fb81ae]/20 flex items-center justify-center shrink-0">
-						{materialSymbol("auto_awesome", "text-[#ff96bb] text-sm")}
-					</div>
-					<div className="flex-1 space-y-4">
-						<div className="font-label text-[10px] uppercase tracking-wider text-[#ff96bb] font-bold">
-							Suggested Refactor
-						</div>
-						<p className="text-sm text-[#adabaa]">{message.text}</p>
-						<div className="flex gap-3">
-							<button
-								type="button"
-								className="px-4 py-2 bg-gradient-to-r from-[#948def] to-[#aaa4ff] text-[#281d7c] font-label text-[10px] font-bold uppercase tracking-wider rounded-sm hover:opacity-90 transition-opacity"
-							>
-								Execute Refactor
-							</button>
-							<button
-								type="button"
-								className="px-4 py-2 bg-[#262626] text-[#f2f0ef] font-label text-[10px] font-bold uppercase tracking-wider rounded-sm hover:text-[#aaa4ff] transition-colors"
-							>
-								Discard
-							</button>
-						</div>
-					</div>
-				</div>
-			);
+	const visibleMessages = useMemo<Message[]>(() => {
+		if (isThreadLoading) {
+			return [
+				{
+					speaker: "assistant",
+					text: "Loading thread history...",
+				},
+			];
 		}
+		if (!selectedThread) {
+			return [
+				{
+					speaker: "assistant",
+					text: selectedProject
+						? "Create a thread from the Threads section to start a Codex conversation for the selected worktree."
+						: "Add a project, choose a worktree, and create a thread to begin.",
+				},
+			];
+		}
+		if (threadMessages.length === 0) {
+			return [
+				{
+					speaker: "assistant",
+					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask Codex to inspect, refactor, or debug this worktree.`,
+				},
+			];
+		}
+		return threadMessages.map((message) => ({
+			speaker: message.role,
+			text: message.text,
+		}));
+	}, [
+		activeSelectedWorktreeFolder,
+		isThreadLoading,
+		selectedProject,
+		selectedThread,
+		threadMessages,
+	]);
 
+	const renderDesktopMessages = visibleMessages.map((message, index) => {
 		if (message.speaker === "assistant") {
 			return (
 				<div className="flex gap-6 group" key={`${message.speaker}-${index}`}>
@@ -993,7 +1159,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	});
 
-	const renderMobileMessages = messages.map((message, index) => {
+	const renderMobileMessages = visibleMessages.map((message, index) => {
 		if (message.speaker === "assistant") {
 			return (
 				<div
@@ -1410,6 +1576,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																: "text-[#cfd1d4] hover:bg-[#202020]"
 													}`}
 													onClick={() => {
+														clearThreadSelection();
+														setThreadsError("");
 														selectProject(project, worktree.path);
 														void openOrCloseWorktree(project.id, worktree.path);
 													}}
@@ -1478,6 +1646,96 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		</div>
 	);
 
+	const threadSection = (
+		<div className="border-t border-[#262626] px-3 pt-3">
+			<div className="flex items-center justify-between">
+				<div className="flex items-center gap-2">
+					<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
+						Threads
+					</div>
+					<button
+						type="button"
+						className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff] disabled:cursor-not-allowed disabled:opacity-50"
+						onClick={() => {
+							void createThreadFromSelection();
+						}}
+						aria-label="Create thread"
+						disabled={
+							isCreatingThread ||
+							!selectedProject ||
+							!activeSelectedWorktreePath
+						}
+						title={
+							selectedProject && activeSelectedWorktreePath
+								? "Start a new Codex thread for the selected worktree"
+								: "Select a project worktree first"
+						}
+					>
+						+
+					</button>
+				</div>
+				{isCreatingThread ? (
+					<div className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
+						Creating
+					</div>
+				) : null}
+			</div>
+			<div className="mt-3 space-y-2">
+				{threads.length === 0 ? (
+					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						No threads yet. Use + to start a Codex thread for the selected
+						worktree.
+					</div>
+				) : (
+					threads.map((thread) => {
+						const threadProject =
+							projects.find((project) => project.id === thread.projectId) ??
+							null;
+						const isActive = selectedThreadId === thread.id;
+						return (
+							<button
+								type="button"
+								key={thread.id}
+								className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
+									isActive
+										? "bg-[#25233a] text-[#f2f0ef]"
+										: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
+								}`}
+								onClick={() => {
+									void openThread(thread.id);
+								}}
+							>
+								<div className="flex items-center gap-2">
+									<span
+										className={`h-2 w-2 shrink-0 rounded-full ${
+											isActive ? "bg-[#aaa4ff]" : "bg-[#4f5269]"
+										}`}
+									/>
+									<div
+										className="min-w-0 truncate text-sm font-medium"
+										title={thread.title}
+									>
+										{thread.title}
+									</div>
+								</div>
+								<div
+									className="mt-1 truncate text-[11px] text-[#8e8aa7]"
+									title={`${threadProject?.name ?? "Unknown project"} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
+								>
+									{threadProject?.name ?? "Unknown project"} |{" "}
+									{shortName(thread.worktreePath)}
+								</div>
+							</button>
+						);
+					})
+				)}
+				{threadsError ? (
+					<div className="text-xs text-[#ff6e84]">{threadsError}</div>
+				) : null}
+			</div>
+		</div>
+	);
+
 	useEffect(() => {
 		void initialize();
 	}, [initialize]);
@@ -1530,7 +1788,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 				<div className="h-10 bg-[#131313] flex items-center px-6 gap-2">
 					<span className="font-label text-xs font-bold text-[#aaa4ff] shrink-0">
-						{selectedProject?.name ?? "No project selected"}
+						{selectedThread?.title ??
+							selectedProject?.name ??
+							"No project selected"}
 					</span>
 					{selectedProject ? (
 						<>
@@ -1580,7 +1840,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</button>
 						</div>
 						{!sidebarCollapsed && addProjectOpen ? addProjectForm : null}
-						<div className="h-full overflow-y-auto py-2">{projectTree}</div>
+						<div className="h-full overflow-y-auto py-2">
+							{projectTree}
+							{!sidebarCollapsed ? threadSection : null}
+						</div>
 					</aside>
 
 					<section className="flex-1 bg-[#0e0e0e] flex flex-col min-h-0">
@@ -1618,21 +1881,31 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										842 Tokens
 									</span>
 								</div>
+								{chatError ? (
+									<div className="mt-3 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
+										{chatError}
+									</div>
+								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
 									<textarea
 										className="flex-1 bg-transparent border-none focus:ring-0 text-sm placeholder:text-[#adabaa]/50 resize-none font-body"
-										placeholder="Ask Codex to generate, refactor, or debug..."
+										placeholder={
+											selectedThread
+												? "Ask Codex to generate, refactor, or debug..."
+												: "Create a thread to start chatting with Codex..."
+										}
 										rows={3}
 										value={chatInput}
 										onChange={(event) =>
 											setChatInput(event.currentTarget.value)
 										}
 										onKeyDown={onEnter}
+										disabled={!selectedThread || isSending || isThreadLoading}
 									/>
 									<button
 										type="submit"
 										className="w-10 h-10 flex items-center justify-center bg-[#aaa4ff] rounded-sm text-[#281d7c] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-										disabled={isSending}
+										disabled={!selectedThread || isSending || isThreadLoading}
 									>
 										<span
 											className="material-symbols-outlined"
@@ -1688,6 +1961,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						{addProjectOpen ? addProjectForm : null}
 						{projectTree}
+						{threadSection}
 					</aside>
 				) : null}
 
@@ -1700,11 +1974,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							<div className="h-[1px] flex-grow bg-[#262626]" />
 						</div>
 						<h2 className="text-2xl font-headline font-extrabold tracking-tight">
-							{selectedProject?.name ?? "No project selected"}
+							{selectedThread?.title ??
+								selectedProject?.name ??
+								"No project selected"}
 						</h2>
 						<p className="text-xs text-[#adabaa] mt-1">
 							{selectedProject
-								? `${activeSelectedWorktreeFolder} · ${activeSelectedWorktreeName}`
+								? `${selectedProject.name} | ${activeSelectedWorktreeFolder} · ${activeSelectedWorktreeName}`
 								: "No worktree selected"}
 						</p>
 					</div>
@@ -1718,6 +1994,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						className="max-w-2xl mx-auto flex flex-col gap-3"
 						onSubmit={onSubmit}
 					>
+						{chatError ? (
+							<div className="rounded-lg border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
+								{chatError}
+							</div>
+						) : null}
 						<div className="flex items-center gap-2">
 							<button
 								type="button"
@@ -1741,16 +2022,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="relative flex items-end gap-2 bg-[#191a1a] p-2 rounded-xl shadow-2xl border border-[#484848]/10">
 							<textarea
 								className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-2 resize-none text-[#ffffff] placeholder:text-[#adabaa]/50"
-								placeholder="Ask intelligence..."
+								placeholder={
+									selectedThread
+										? "Ask Codex..."
+										: "Create a thread to chat with Codex..."
+								}
 								rows={1}
 								value={chatInput}
 								onChange={(event) => setChatInput(event.currentTarget.value)}
 								onKeyDown={onEnter}
+								disabled={!selectedThread || isSending || isThreadLoading}
 							/>
 							<button
 								className="bg-gradient-to-tr from-[#aaa4ff] to-[#9c95f8] text-[#1b0a71] p-2 rounded-lg shadow-lg active:scale-95 transition-transform flex items-center justify-center"
 								type="submit"
-								disabled={isSending}
+								disabled={!selectedThread || isSending || isThreadLoading}
 							>
 								{materialSymbol("arrow_upward")}
 							</button>

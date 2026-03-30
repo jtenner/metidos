@@ -47,6 +47,30 @@ export type RpcCreateWorktreeResult = {
 	worktreePath: string;
 };
 
+export type RpcThread = {
+	id: number;
+	projectId: number;
+	worktreePath: string;
+	title: string;
+	codexThreadId: string | null;
+	createdAt: string;
+	updatedAt: string;
+	lastRunAt: string | null;
+};
+
+export type RpcThreadMessage = {
+	id: number;
+	threadId: number;
+	role: "assistant" | "user";
+	text: string;
+	createdAt: string;
+};
+
+export type RpcThreadDetail = {
+	thread: RpcThread;
+	messages: RpcThreadMessage[];
+};
+
 export type AppRPCSchema = {
 	requests: {
 		getHomeDirectory: {
@@ -97,6 +121,22 @@ export type AppRPCSchema = {
 				worktreePath: string;
 			};
 		};
+		listThreads: {
+			params: undefined;
+			response: RpcThread[];
+		};
+		createThread: {
+			params: { projectId: number; worktreePath: string };
+			response: RpcThreadDetail;
+		};
+		getThread: {
+			params: { threadId: number };
+			response: RpcThreadDetail;
+		};
+		sendThreadMessage: {
+			params: { threadId: number; input: string };
+			response: RpcThreadDetail;
+		};
 	};
 };
 
@@ -133,4 +173,16 @@ export interface ProjectProcedures {
 	closeWorktree: (
 		params: AppRPCSchema["requests"]["closeWorktree"]["params"],
 	) => Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]>;
+	listThreads: (
+		params?: AppRPCSchema["requests"]["listThreads"]["params"],
+	) => Promise<AppRPCSchema["requests"]["listThreads"]["response"]>;
+	createThread: (
+		params: AppRPCSchema["requests"]["createThread"]["params"],
+	) => Promise<AppRPCSchema["requests"]["createThread"]["response"]>;
+	getThread: (
+		params: AppRPCSchema["requests"]["getThread"]["params"],
+	) => Promise<AppRPCSchema["requests"]["getThread"]["response"]>;
+	sendThreadMessage: (
+		params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
+	) => Promise<AppRPCSchema["requests"]["sendThreadMessage"]["response"]>;
 }

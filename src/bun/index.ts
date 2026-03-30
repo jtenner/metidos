@@ -6,13 +6,17 @@ import { initAppDatabase } from "./db";
 import {
 	closeProjectProcedure,
 	closeWorktreeProcedure,
+	createThreadProcedure,
 	createWorktreeProcedure,
 	deleteProjectProcedure,
+	getThreadProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectWorktreesProcedure,
 	listProjectsProcedure,
+	listThreadsProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
+	sendThreadMessageProcedure,
 	shutdownProjectPolling,
 } from "./project-procedures";
 import type { AppRPCSchema } from "./rpc-schema";
@@ -120,11 +124,15 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	listDirectorySuggestions: (params) =>
 		listDirectorySuggestionsProcedure(params),
 	listProjects: (params) => listProjectsProcedure(params),
+	listThreads: (params) => listThreadsProcedure(params),
 	openProject: (params) => openProjectProcedure(params),
 	closeProject: (params) => closeProjectProcedure(params),
 	deleteProject: (params) => deleteProjectProcedure(params),
 	listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),
 	createWorktree: (params) => createWorktreeProcedure(params),
+	createThread: (params) => createThreadProcedure(params),
+	getThread: (params) => getThreadProcedure(params),
+	sendThreadMessage: (params) => sendThreadMessageProcedure(params),
 	openWorktree: (params) => openWorktreeProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 };

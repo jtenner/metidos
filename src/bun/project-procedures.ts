@@ -1,14 +1,22 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
+import { Codex } from "@openai/codex-sdk";
 
-import type { ProjectRecord } from "./db";
+import type { ProjectRecord, ThreadRecord } from "./db";
 import {
+	createThread,
+	createThreadMessage,
 	deleteProject,
 	getProjectById,
+	getThreadById,
 	initAppDatabase,
 	listProjects,
+	listThreadMessages,
+	listThreads,
+	markThreadRan,
 	setProjectClosed,
+	updateThreadCodexId,
 	upsertProject,
 } from "./db";
 import type {
@@ -17,16 +25,26 @@ import type {
 	RpcOpenWorktreeResult,
 	RpcProject,
 	RpcProjectWorktreesResult,
+	RpcThread,
+	RpcThreadDetail,
+	RpcThreadMessage,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
 
 const db = initAppDatabase();
+const codex = new Codex();
 
 export async function listProjectsProcedure(
 	_params?: AppRPCSchema["requests"]["listProjects"]["params"],
 ): Promise<RpcProject[]> {
 	return listProjects(db);
+}
+
+export async function listThreadsProcedure(
+	_params?: AppRPCSchema["requests"]["listThreads"]["params"],
+): Promise<RpcThread[]> {
+	return listThreads(db).map(toRpcThread);
 }
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
@@ -52,6 +70,18 @@ type ProjectPollState = {
 };
 
 const projectPollMap = new Map<number, ProjectPollState>();
+const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
+
+const THREAD_INIT_SCHEMA = {
+	type: "object",
+	properties: {
+		status: {
+			type: "string",
+		},
+	},
+	required: ["status"],
+	additionalProperties: false,
+} as const;
 
 function expandHomeShorthandPath(value: string): string {
 	if (process.platform === "win32") {
@@ -118,6 +148,92 @@ function safeIsDirectory(path: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function shortName(value: string): string {
+	const normalized = value.replace(/[\\/]$/, "");
+	const parts = normalized.split(/[\\/]/).filter(Boolean);
+	return parts.at(-1) ?? value;
+}
+
+function toRpcThread(thread: ThreadRecord): RpcThread {
+	return thread;
+}
+
+function toRpcThreadMessages(messages: RpcThreadMessage[]): RpcThreadMessage[] {
+	return messages;
+}
+
+function codexThreadOptions(worktreePath: string) {
+	return {
+		approvalPolicy: "never" as const,
+		modelReasoningEffort: "medium" as const,
+		networkAccessEnabled: true,
+		sandboxMode: "workspace-write" as const,
+		workingDirectory: worktreePath,
+	};
+}
+
+async function initializeCodexThread(
+	thread: ReturnType<typeof codex.startThread>,
+): Promise<void> {
+	await thread.run(
+		"Initialize this coding thread. Respond with JSON containing a status field set to ready.",
+		{
+			outputSchema: THREAD_INIT_SCHEMA,
+		},
+	);
+	if (!thread.id) {
+		throw new Error("Codex did not return a thread identifier.");
+	}
+}
+
+async function ensureCodexThread(
+	thread: ThreadRecord,
+): Promise<ReturnType<typeof codex.startThread>> {
+	const active = codexThreadMap.get(thread.id);
+	if (active) {
+		return active;
+	}
+
+	const next = thread.codexThreadId
+		? codex.resumeThread(
+				thread.codexThreadId,
+				codexThreadOptions(thread.worktreePath),
+			)
+		: codex.startThread(codexThreadOptions(thread.worktreePath));
+	if (!thread.codexThreadId) {
+		await initializeCodexThread(next);
+		if (!next.id) {
+			throw new Error("Codex did not return a thread identifier.");
+		}
+		updateThreadCodexId(db, thread.id, next.id);
+	}
+	codexThreadMap.set(thread.id, next);
+	return next;
+}
+
+function buildThreadTitle(
+	worktree: RpcWorktree | null,
+	worktreePath: string,
+): string {
+	return worktree?.branch?.trim() || shortName(worktreePath);
+}
+
+function threadById(threadId: number): ThreadRecord {
+	const thread = getThreadById(db, threadId);
+	if (!thread) {
+		throw new Error(`Thread not found: ${threadId}`);
+	}
+	return thread;
+}
+
+async function buildThreadDetail(threadId: number): Promise<RpcThreadDetail> {
+	const thread = threadById(threadId);
+	return {
+		thread: toRpcThread(thread),
+		messages: toRpcThreadMessages(listThreadMessages(db, thread.id)),
+	};
 }
 
 function worktreePathFromName(
@@ -420,6 +536,14 @@ function projectByIdForPath(projectId: number): ProjectRecord {
 	return project;
 }
 
+async function findProjectWorktree(
+	project: ProjectRecord,
+	worktreePath: string,
+): Promise<RpcWorktree | null> {
+	const worktrees = await readProjectWorktrees(project.path, project.id);
+	return worktrees.find((entry) => entry.path === worktreePath) ?? null;
+}
+
 export async function openProjectProcedure(
 	params: AppRPCSchema["requests"]["openProject"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
@@ -489,6 +613,81 @@ export async function createWorktreeProcedure(
 		worktrees,
 		worktreePath,
 	};
+}
+
+export async function createThreadProcedure(
+	params: AppRPCSchema["requests"]["createThread"]["params"],
+): Promise<RpcThreadDetail> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	const worktree = await findProjectWorktree(project, worktreePath);
+	if (!worktree) {
+		throw new Error(
+			`Worktree not found for project ${project.path}: ${worktreePath}`,
+		);
+	}
+
+	const codexThread = codex.startThread(codexThreadOptions(worktreePath));
+	try {
+		await initializeCodexThread(codexThread);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Unable to start Codex thread: ${message}`);
+	}
+
+	const codexThreadId = codexThread.id;
+	if (!codexThreadId) {
+		throw new Error("Codex did not provide a persistent thread id.");
+	}
+
+	const thread = createThread(db, {
+		projectId: project.id,
+		worktreePath,
+		title: buildThreadTitle(worktree, worktreePath),
+		codexThreadId,
+	});
+	codexThreadMap.set(thread.id, codexThread);
+	return buildThreadDetail(thread.id);
+}
+
+export async function getThreadProcedure(
+	params: AppRPCSchema["requests"]["getThread"]["params"],
+): Promise<RpcThreadDetail> {
+	return buildThreadDetail(params.threadId);
+}
+
+export async function sendThreadMessageProcedure(
+	params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
+): Promise<RpcThreadDetail> {
+	const thread = threadById(params.threadId);
+	const input = params.input.trim();
+	if (!input) {
+		throw new Error("Thread input is required.");
+	}
+
+	const codexThread = await ensureCodexThread(thread);
+	try {
+		const turn = await codexThread.run(input);
+		const assistantText = turn.finalResponse.trim() || "No response returned.";
+		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
+			updateThreadCodexId(db, thread.id, codexThread.id);
+		}
+		createThreadMessage(db, {
+			threadId: thread.id,
+			role: "user",
+			text: input,
+		});
+		createThreadMessage(db, {
+			threadId: thread.id,
+			role: "assistant",
+			text: assistantText,
+		});
+		markThreadRan(db, thread.id);
+		return buildThreadDetail(thread.id);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Codex turn failed: ${message}`);
+	}
 }
 
 export async function openWorktreeProcedure(

@@ -189,11 +189,15 @@ const procedures: ProjectProcedures = {
 	listDirectorySuggestions: (params) =>
 		sendRequest("listDirectorySuggestions", params),
 	listProjects: (params) => sendRequest("listProjects", params),
+	listThreads: (params) => sendRequest("listThreads", params),
 	openProject: (params) => sendRequest("openProject", params),
 	closeProject: (params) => sendRequest("closeProject", params),
 	deleteProject: (params) => sendRequest("deleteProject", params),
 	listProjectWorktrees: (params) => sendRequest("listProjectWorktrees", params),
 	createWorktree: (params) => sendRequest("createWorktree", params),
+	createThread: (params) => sendRequest("createThread", params),
+	getThread: (params) => sendRequest("getThread", params),
+	sendThreadMessage: (params) => sendRequest("sendThreadMessage", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
 };
