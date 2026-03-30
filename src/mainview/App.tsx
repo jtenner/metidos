@@ -941,11 +941,14 @@ function commandStateLabel(
 	state: "in_progress" | "completed" | "failed",
 	exitCode: number | null,
 ): string {
+	if (exitCode !== null) {
+		return `Exit (${exitCode})`;
+	}
 	if (state === "failed") {
-		return exitCode === null ? "Failed" : `Failed (${exitCode})`;
+		return "Failed";
 	}
 	if (state === "completed") {
-		return exitCode === null ? "Completed" : `Completed (${exitCode})`;
+		return "Completed";
 	}
 	return "Running";
 }
@@ -973,10 +976,10 @@ function CommandExecutionMessage({
 					</div>
 				</div>
 				<span
-					className={`shrink-0 rounded-full px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${
-						state === "failed"
+					className={`shrink-0 rounded-full px-2 py-0.5 font-label text-[9px] tracking-[0.16em] ${
+						state === "failed" || (exitCode !== null && exitCode !== 0)
 							? "border border-[#7a2030] bg-[#381018] text-[#ff8698]"
-							: state === "completed"
+							: state === "completed" || exitCode === 0
 								? "border border-[#284240] bg-[#102522] text-[#74f0c0]"
 								: "border border-[#3b4162] bg-[#1c2135] text-[#c8c4ff]"
 					}`}
@@ -1042,24 +1045,6 @@ function FileChangeMessage({
 					>
 						{path}
 					</div>
-				</div>
-				<div className="flex shrink-0 items-center gap-2">
-					<span className="flex items-center gap-1 rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
-						{materialSymbol("expand_more", "text-[13px]")}
-						Diff
-					</span>
-					<span className="rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
-						{changeKind}
-					</span>
-					<span
-						className={`rounded-full px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${
-							state === "failed"
-								? "border border-[#7a2030] bg-[#381018] text-[#ff8698]"
-								: "border border-[#284240] bg-[#102522] text-[#74f0c0]"
-						}`}
-					>
-						{state === "failed" ? "Failed" : "Ready"}
-					</span>
 				</div>
 			</summary>
 			<div className="max-h-[28rem] overflow-auto border-t border-[#262b40] bg-[#0c1018] font-mono text-[12px] leading-5">
