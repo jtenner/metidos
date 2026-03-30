@@ -107,7 +107,9 @@ const procedures: ProjectProcedures = {
 	listProjects: (params) => sendRequest("listProjects", params),
 	openProject: (params) => sendRequest("openProject", params),
 	closeProject: (params) => sendRequest("closeProject", params),
+	deleteProject: (params) => sendRequest("deleteProject", params),
 	listProjectWorktrees: (params) => sendRequest("listProjectWorktrees", params),
+	createWorktree: (params) => sendRequest("createWorktree", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
 };

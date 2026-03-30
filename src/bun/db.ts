@@ -194,3 +194,7 @@ export function setProjectClosed(database: Database, projectId: number): void {
 		projectId,
 	);
 }
+
+export function deleteProject(database: Database, projectId: number): void {
+	database.run("DELETE FROM projects WHERE id = ?", projectId);
+}

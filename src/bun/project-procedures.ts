@@ -4,6 +4,7 @@ import { basename, dirname, resolve } from "node:path";
 
 import type { ProjectRecord } from "./db";
 import {
+	deleteProject,
 	getProjectById,
 	initAppDatabase,
 	listProjects,
@@ -12,6 +13,7 @@ import {
 } from "./db";
 import type {
 	AppRPCSchema,
+	RpcCreateWorktreeResult,
 	RpcOpenWorktreeResult,
 	RpcProject,
 	RpcProjectWorktreesResult,
@@ -116,6 +118,36 @@ function safeIsDirectory(path: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function worktreePathFromName(
+	projectPath: string,
+	worktreeName: string,
+): string {
+	const token = worktreeName
+		.trim()
+		.replace(/[^a-zA-Z0-9._-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+	if (!token) {
+		throw new Error("Worktree name must contain at least one valid character.");
+	}
+
+	return resolve(dirname(projectPath), `${basename(projectPath)}-${token}`);
+}
+
+async function readProjectWorktrees(
+	projectPath: string,
+	projectId?: number,
+): Promise<RpcWorktree[]> {
+	const worktrees = await listWorktreesForProjectPath(projectPath);
+	if (typeof projectId === "number") {
+		const state = projectPollMap.get(projectId);
+		if (state) {
+			state.worktrees = worktrees;
+		}
+	}
+	return worktrees;
 }
 
 export async function listDirectorySuggestionsProcedure(
@@ -396,7 +428,7 @@ export async function openProjectProcedure(
 
 	let worktrees: RpcWorktree[];
 	try {
-		worktrees = await listWorktreesForProjectPath(projectPath);
+		worktrees = await readProjectWorktrees(projectPath);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(
@@ -421,18 +453,41 @@ export async function listProjectWorktreesProcedure(
 	params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
 	const project = projectByIdForPath(params.projectId);
-	if (!projectPollMap.has(project.id)) {
-		ensureProjectPoller(project);
-		await refreshProjectPoll(project.id);
-	}
-	const state = projectPollMap.get(project.id);
-	if (!state) {
-		throw new Error(`Project state missing for id: ${project.id}`);
-	}
+	const worktrees = await readProjectWorktrees(project.path, project.id);
 
 	return {
 		project,
-		worktrees: state.worktrees,
+		worktrees,
+	};
+}
+
+export async function createWorktreeProcedure(
+	params: AppRPCSchema["requests"]["createWorktree"]["params"],
+): Promise<RpcCreateWorktreeResult> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreeName = params.name.trim();
+	if (!worktreeName) {
+		throw new Error("Worktree name is required.");
+	}
+
+	const worktreePath = worktreePathFromName(project.path, worktreeName);
+	if (existsSync(worktreePath)) {
+		throw new Error(`Worktree path already exists: ${worktreePath}`);
+	}
+
+	await runGitCommand(project.path, [
+		"worktree",
+		"add",
+		"-b",
+		worktreeName,
+		worktreePath,
+	]);
+
+	const worktrees = await readProjectWorktrees(project.path, project.id);
+	return {
+		project,
+		worktrees,
+		worktreePath,
 	};
 }
 
@@ -498,6 +553,19 @@ export async function closeProjectProcedure(
 		success: true,
 		projectId: project.id,
 		message: `Closed project ${project.name}`,
+	};
+}
+
+export async function deleteProjectProcedure(
+	params: AppRPCSchema["requests"]["deleteProject"]["params"],
+): Promise<AppRPCSchema["requests"]["deleteProject"]["response"]> {
+	const project = projectByIdForPath(params.projectId);
+	stopProjectPoller(project.id);
+	deleteProject(db, project.id);
+	return {
+		success: true,
+		projectId: project.id,
+		message: `Removed project ${project.name}`,
 	};
 }
 

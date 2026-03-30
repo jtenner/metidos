@@ -5,6 +5,8 @@ import { initAppDatabase } from "./db";
 import {
 	closeProjectProcedure,
 	closeWorktreeProcedure,
+	createWorktreeProcedure,
+	deleteProjectProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectWorktreesProcedure,
 	listProjectsProcedure,
@@ -108,7 +110,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	listProjects: (params) => listProjectsProcedure(params),
 	openProject: (params) => openProjectProcedure(params),
 	closeProject: (params) => closeProjectProcedure(params),
+	deleteProject: (params) => deleteProjectProcedure(params),
 	listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),
+	createWorktree: (params) => createWorktreeProcedure(params),
 	openWorktree: (params) => openWorktreeProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 };

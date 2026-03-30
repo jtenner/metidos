@@ -41,6 +41,12 @@ export type RpcDirectorySuggestionsResult = {
 	directories: string[];
 };
 
+export type RpcCreateWorktreeResult = {
+	project: RpcProject;
+	worktrees: RpcWorktree[];
+	worktreePath: string;
+};
+
 export type AppRPCSchema = {
 	requests: {
 		getHomeDirectory: {
@@ -67,9 +73,17 @@ export type AppRPCSchema = {
 			params: { projectId: number };
 			response: { success: boolean; projectId: number; message?: string };
 		};
+		deleteProject: {
+			params: { projectId: number };
+			response: { success: boolean; projectId: number; message?: string };
+		};
 		listProjectWorktrees: {
 			params: { projectId: number };
 			response: RpcProjectWorktreesResult;
+		};
+		createWorktree: {
+			params: { projectId: number; name: string };
+			response: RpcCreateWorktreeResult;
 		};
 		openWorktree: {
 			params: { projectId: number; worktreePath: string };
@@ -104,9 +118,15 @@ export interface ProjectProcedures {
 	closeProject: (
 		params: AppRPCSchema["requests"]["closeProject"]["params"],
 	) => Promise<AppRPCSchema["requests"]["closeProject"]["response"]>;
+	deleteProject: (
+		params: AppRPCSchema["requests"]["deleteProject"]["params"],
+	) => Promise<AppRPCSchema["requests"]["deleteProject"]["response"]>;
 	listProjectWorktrees: (
 		params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
 	) => Promise<RpcProjectWorktreesResult>;
+	createWorktree: (
+		params: AppRPCSchema["requests"]["createWorktree"]["params"],
+	) => Promise<RpcCreateWorktreeResult>;
 	openWorktree: (
 		params: AppRPCSchema["requests"]["openWorktree"]["params"],
 	) => Promise<RpcOpenWorktreeResult>;

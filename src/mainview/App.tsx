@@ -1,9 +1,11 @@
 import {
 	type FormEvent,
 	type KeyboardEvent,
+	type MouseEvent as ReactMouseEvent,
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import type {
@@ -36,6 +38,11 @@ type WorktreeNodeState = {
 
 type ProjectStateMap = Record<number, ProjectNodeState>;
 type WorktreeStateMap = Record<string, WorktreeNodeState>;
+type ProjectActionMenuState = {
+	projectId: number;
+	x: number;
+	y: number;
+};
 
 const initialMessages: Message[] = [
 	{
@@ -72,11 +79,19 @@ function defaultWorktreeState(): WorktreeNodeState {
 	};
 }
 
-function projectPathLabel(project: RpcProject | null): string {
+function projectPathLabel(
+	project: RpcProject | null,
+	homeDirectory: string,
+	supportsTildePath: boolean,
+): string {
 	if (!project) {
 		return "No project selected";
 	}
-	return `${project.name} · ${project.path}`;
+	return `${project.name} · ${formatPathForDisplay(
+		project.path,
+		homeDirectory,
+		supportsTildePath,
+	)}`;
 }
 
 function materialSymbol(name: string, className = ""): JSX.Element {
@@ -126,6 +141,14 @@ function formatDirectoryPathForInput(
 	);
 }
 
+function clampProjectMenuCoordinate(
+	value: number,
+	viewportSize: number,
+	menuSize: number,
+): number {
+	return Math.max(12, Math.min(value, viewportSize - menuSize - 12));
+}
+
 type AppProps = {
 	procedures: ProjectProcedures;
 };
@@ -143,6 +166,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [homeDirectory, setHomeDirectory] = useState("");
 	const [supportsTildePath, setSupportsTildePath] = useState(false);
 	const [addProjectOpen, setAddProjectOpen] = useState(false);
+	const [projectActionMenu, setProjectActionMenu] =
+		useState<ProjectActionMenuState | null>(null);
+	const [projectActionMenuLoading, setProjectActionMenuLoading] =
+		useState(false);
+	const [projectActionMenuError, setProjectActionMenuError] = useState("");
+	const [newWorktreeName, setNewWorktreeName] = useState("");
 	const [addProjectPath, setAddProjectPath] = useState("");
 	const [addProjectError, setAddProjectError] = useState("");
 	const [directorySuggestions, setDirectorySuggestions] = useState<string[]>(
@@ -151,6 +180,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [directorySuggestionsLoading, setDirectorySuggestionsLoading] =
 		useState(false);
 	const [isAddingProject, setIsAddingProject] = useState(false);
+	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -162,6 +192,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [chatInput, setChatInput] = useState("");
 	const [isSending, setIsSending] = useState(false);
+	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
+	const projectActionMenuRequestId = useRef(0);
 
 	const selectedProject = useMemo(() => {
 		if (!selectedProjectId) {
@@ -169,6 +201,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		return projects.find((entry) => entry.id === selectedProjectId) ?? null;
 	}, [projects, selectedProjectId]);
+
+	const selectedProjectPathLabel = useMemo(() => {
+		if (!selectedProject) {
+			return "/";
+		}
+		return formatPathForDisplay(
+			selectedProject.path,
+			homeDirectory,
+			supportsTildePath,
+		);
+	}, [homeDirectory, selectedProject, supportsTildePath]);
+
+	const projectActionMenuProject = useMemo(() => {
+		if (!projectActionMenu) {
+			return null;
+		}
+		return (
+			projects.find((project) => project.id === projectActionMenu.projectId) ??
+			null
+		);
+	}, [projectActionMenu, projects]);
 
 	const getProjectState = useCallback(
 		(projectId: number): ProjectNodeState =>
@@ -183,6 +236,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[worktreeStates],
 	);
+
+	const projectActionMenuWorktrees = useMemo(() => {
+		if (!projectActionMenuProject) {
+			return [];
+		}
+		return getProjectState(projectActionMenuProject.id).worktrees;
+	}, [getProjectState, projectActionMenuProject]);
 
 	const setProjectState = useCallback(
 		(projectId: number, update: Partial<ProjectNodeState>): void => {
@@ -232,6 +292,35 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return next;
 		});
 	}, []);
+
+	const clearProjectState = useCallback((projectId: number) => {
+		setProjectStates((prev) => {
+			const next = { ...prev } as ProjectStateMap;
+			delete next[projectId];
+			return next;
+		});
+		setWorktreeStates((prev) => {
+			const next = { ...prev } as WorktreeStateMap;
+			for (const key of Object.keys(next)) {
+				if (key.startsWith(`${projectId}::`)) {
+					delete next[key];
+				}
+			}
+			return next;
+		});
+	}, []);
+
+	const loadProjectWorktrees = useCallback(
+		async (projectId: number): Promise<RpcWorktree[]> => {
+			const result = await procedures.listProjectWorktrees({ projectId });
+			setProjectState(projectId, {
+				worktrees: result.worktrees,
+				error: "",
+			});
+			return result.worktrees;
+		},
+		[procedures, setProjectState],
+	);
 
 	const resetAddProjectPath = useCallback(
 		(nextPath?: string) => {
@@ -289,6 +378,164 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return nextOpen;
 		});
 	}, [addProjectPath, homeDirectory, supportsTildePath]);
+
+	const closeProjectActionMenu = useCallback(() => {
+		setProjectActionMenu(null);
+		setProjectActionMenuError("");
+		setProjectActionMenuLoading(false);
+		setNewWorktreeName("");
+	}, []);
+
+	const openProjectActionMenu = useCallback(
+		async (project: RpcProject, x: number, y: number) => {
+			const viewportWidth =
+				typeof window === "undefined" ? 1280 : window.innerWidth;
+			const viewportHeight =
+				typeof window === "undefined" ? 720 : window.innerHeight;
+			const requestId = ++projectActionMenuRequestId.current;
+
+			setSelectedProjectId(project.id);
+			setProjectActionMenu({
+				projectId: project.id,
+				x: clampProjectMenuCoordinate(x, viewportWidth, 336),
+				y: clampProjectMenuCoordinate(y, viewportHeight, 420),
+			});
+			setProjectActionMenuError("");
+			setProjectActionMenuLoading(true);
+			setNewWorktreeName("");
+
+			try {
+				await loadProjectWorktrees(project.id);
+				if (projectActionMenuRequestId.current === requestId) {
+					setProjectActionMenuLoading(false);
+				}
+			} catch (error) {
+				if (projectActionMenuRequestId.current === requestId) {
+					setProjectActionMenuError(
+						error instanceof Error ? error.message : String(error),
+					);
+					setProjectActionMenuLoading(false);
+				}
+			}
+		},
+		[loadProjectWorktrees],
+	);
+
+	const deleteTrackedProject = useCallback(
+		async (projectId: number) => {
+			try {
+				await procedures.deleteProject({ projectId });
+				const loaded = await procedures.listProjects({ includeClosed: true });
+				setProjects(loaded);
+				hydrateProjectRows(loaded);
+				clearProjectState(projectId);
+				setSelectedProjectId((current) => {
+					if (current && loaded.some((project) => project.id === current)) {
+						return current;
+					}
+					return loaded[0]?.id ?? null;
+				});
+				if (selectedProjectId === projectId) {
+					setSelectedWorktreePath(null);
+				}
+				setProjectActionMenu((current) =>
+					current?.projectId === projectId ? null : current,
+				);
+				setProjectActionMenuError("");
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (projectActionMenu?.projectId === projectId) {
+					setProjectActionMenuError(message);
+				} else {
+					setProjectState(projectId, { error: message });
+				}
+			}
+		},
+		[
+			clearProjectState,
+			hydrateProjectRows,
+			procedures,
+			projectActionMenu,
+			selectedProjectId,
+			setProjectState,
+		],
+	);
+
+	const submitNewWorktree = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault();
+			if (!projectActionMenu || isCreatingWorktree) {
+				return;
+			}
+
+			const name = newWorktreeName.trim();
+			if (!name) {
+				setProjectActionMenuError("Enter a worktree name.");
+				return;
+			}
+
+			setIsCreatingWorktree(true);
+			setProjectActionMenuError("");
+			try {
+				const result = await procedures.createWorktree({
+					projectId: projectActionMenu.projectId,
+					name,
+				});
+				setProjectState(projectActionMenu.projectId, {
+					worktrees: result.worktrees,
+					error: "",
+				});
+				setNewWorktreeName("");
+			} catch (error) {
+				setProjectActionMenuError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setIsCreatingWorktree(false);
+			}
+		},
+		[
+			isCreatingWorktree,
+			newWorktreeName,
+			procedures,
+			projectActionMenu,
+			setProjectState,
+		],
+	);
+
+	useEffect(() => {
+		if (!projectActionMenu) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if (
+				projectActionMenuRef.current &&
+				!projectActionMenuRef.current.contains(event.target as Node)
+			) {
+				closeProjectActionMenu();
+			}
+		};
+
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				closeProjectActionMenu();
+			}
+		};
+
+		document.addEventListener("mousedown", handlePointerDown);
+		document.addEventListener("keydown", handleKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", handlePointerDown);
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [closeProjectActionMenu, projectActionMenu]);
+
+	useEffect(() => {
+		if (projectActionMenu && !projectActionMenuProject) {
+			closeProjectActionMenu();
+		}
+	}, [closeProjectActionMenu, projectActionMenu, projectActionMenuProject]);
 
 	useEffect(() => {
 		if (!addProjectOpen) {
@@ -559,14 +806,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					text: `Queued action against ${
 						selectedWorktreePath
 							? shortName(selectedWorktreePath)
-							: projectPathLabel(selectedProject)
+							: projectPathLabel(
+									selectedProject,
+									homeDirectory,
+									supportsTildePath,
+								)
 					}.`,
 					isSuggestion: true,
 				},
 			]);
 			setIsSending(false);
 		}, 500);
-	}, [chatInput, isSending, selectedProject, selectedWorktreePath]);
+	}, [
+		chatInput,
+		homeDirectory,
+		isSending,
+		selectedProject,
+		selectedWorktreePath,
+		supportsTildePath,
+	]);
 
 	const onSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -805,6 +1063,148 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		</form>
 	);
 
+	const projectActionMenuPanel =
+		projectActionMenu && projectActionMenuProject ? (
+			<div
+				className="fixed z-[90] w-80 overflow-hidden rounded-lg border border-[#2f3150] bg-[#11131d]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				ref={projectActionMenuRef}
+				style={{
+					left: projectActionMenu.x,
+					top: projectActionMenu.y,
+				}}
+			>
+				<div className="border-b border-[#262b40] bg-[#151827] px-3 py-3">
+					<div className="flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+								Project Actions
+							</div>
+							<div className="truncate text-sm font-semibold text-[#f2f0ef]">
+								{projectActionMenuProject.name}
+							</div>
+							<div className="truncate text-[11px] text-[#8e8aa7]">
+								{formatPathForDisplay(
+									projectActionMenuProject.path,
+									homeDirectory,
+									supportsTildePath,
+								)}
+							</div>
+						</div>
+						<button
+							type="button"
+							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+							onClick={closeProjectActionMenu}
+						>
+							×
+						</button>
+					</div>
+				</div>
+				{projectActionMenuError ? (
+					<div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+						{projectActionMenuError}
+					</div>
+				) : null}
+				<div className="space-y-2 px-3 py-3">
+					<div className="flex items-center justify-between">
+						<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+							Active Worktrees
+						</div>
+						{projectActionMenuLoading ? (
+							<div className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
+								Loading
+							</div>
+						) : null}
+					</div>
+					<div className="max-h-56 space-y-1 overflow-y-auto">
+						{!projectActionMenuLoading &&
+						projectActionMenuWorktrees.length === 0 ? (
+							<div className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-3 text-xs text-[#8b8ea3]">
+								No worktrees found.
+							</div>
+						) : null}
+						{projectActionMenuWorktrees.map((worktree) => {
+							const worktreeState = getWorktreeState(
+								projectActionMenuProject.id,
+								worktree.path,
+							);
+							return (
+								<div
+									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
+									key={worktree.path}
+								>
+									<div className="flex items-center gap-2">
+										<span className="font-mono text-[11px] text-[#948def]">
+											{worktree.branch ?? "detached"}
+										</span>
+										<span className="truncate text-sm text-[#f2f0ef]">
+											{shortName(worktree.path)}
+										</span>
+										<span className="ml-auto text-[10px] uppercase tracking-widest text-[#adabaa]">
+											{worktreeState.opened ? "Tracking" : "Idle"}
+										</span>
+									</div>
+									<div className="truncate text-[11px] text-[#8e8aa7]">
+										{formatPathForDisplay(
+											worktree.path,
+											homeDirectory,
+											supportsTildePath,
+										)}
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+				<form
+					className="border-t border-[#262b40] bg-[#141724] px-3 py-3"
+					onSubmit={submitNewWorktree}
+				>
+					<label
+						className="block text-[10px] font-label uppercase tracking-widest text-[#8f89df]"
+						htmlFor="new-worktree-name"
+					>
+						New Worktree
+					</label>
+					<div className="mt-2 flex items-center gap-2">
+						<input
+							id="new-worktree-name"
+							className="min-w-0 flex-1 rounded-sm border border-[#353a55] bg-[#10131d] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f89] focus:border-[#7d73ff]"
+							placeholder="feature/new-worktree"
+							value={newWorktreeName}
+							onChange={(event) => {
+								setProjectActionMenuError("");
+								setNewWorktreeName(event.currentTarget.value);
+							}}
+							autoCapitalize="none"
+							autoCorrect="off"
+							spellCheck={false}
+						/>
+						<button
+							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={isCreatingWorktree}
+							type="submit"
+						>
+							{isCreatingWorktree ? "Creating" : "Create"}
+						</button>
+					</div>
+					<div className="mt-2 text-xs text-[#7f8397]">
+						Creates a new branch and sibling worktree folder.
+					</div>
+				</form>
+				<div className="border-t border-[#262b40] px-3 py-3">
+					<button
+						className="flex w-full items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#ff8ca0] transition-colors hover:bg-[#39161f]"
+						onClick={() =>
+							void deleteTrackedProject(projectActionMenuProject.id)
+						}
+						type="button"
+					>
+						Remove Project
+					</button>
+				</div>
+			</div>
+		) : null;
+
 	const projectTree = (
 		<div className="space-y-2">
 			{projects.length === 0 ? (
@@ -816,31 +1216,66 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
 					return (
-						<div className="space-y-1" key={project.id}>
-							<button
-								type="button"
-								className={`w-full px-3 py-2 rounded-sm flex items-center gap-2 text-left transition-colors ${
-									isActive
-										? "bg-[#262626] text-[#aaa4ff]"
-										: "text-[#d7d7d7] hover:bg-[#1f2020]"
-								}`}
-								onClick={() => {
-									void refreshProject(project);
-									if (!isActive) {
-										setSelectedProjectId(project.id);
-									}
-								}}
-							>
-								<span className="text-sm">{state.expanded ? "▾" : "▸"}</span>
-								<span
-									className={`w-2 h-2 rounded-full ${
-										project.isOpen ? "bg-[#4fefb2]" : "bg-[#5f5f5f]"
+						<div
+							className="space-y-1"
+							key={project.id}
+							onContextMenu={(event: ReactMouseEvent<HTMLDivElement>) => {
+								event.preventDefault();
+								void openProjectActionMenu(
+									project,
+									event.clientX + 6,
+									event.clientY + 6,
+								);
+							}}
+						>
+							<div className="flex items-center gap-1">
+								<button
+									type="button"
+									className={`min-w-0 flex-1 rounded-sm px-3 py-2 text-left transition-colors ${
+										isActive
+											? "bg-[#262626] text-[#aaa4ff]"
+											: "text-[#d7d7d7] hover:bg-[#1f2020]"
 									}`}
-								/>
-								<div className="font-medium text-sm truncate">
-									{project.name}
-								</div>
-							</button>
+									onClick={() => {
+										void refreshProject(project);
+										if (!isActive) {
+											setSelectedProjectId(project.id);
+										}
+									}}
+								>
+									<div className="flex items-center gap-2">
+										<span className="text-sm">
+											{state.expanded ? "▾" : "▸"}
+										</span>
+										<span
+											className={`w-2 h-2 rounded-full ${
+												project.isOpen ? "bg-[#4fefb2]" : "bg-[#5f5f5f]"
+											}`}
+										/>
+										<div className="font-medium text-sm truncate">
+											{project.name}
+										</div>
+									</div>
+								</button>
+								{!sidebarCollapsed ? (
+									<button
+										type="button"
+										className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+										onClick={(event) => {
+											event.stopPropagation();
+											const rect = event.currentTarget.getBoundingClientRect();
+											void openProjectActionMenu(
+												project,
+												rect.right + 8,
+												rect.bottom + 6,
+											);
+										}}
+										aria-label={`Project actions for ${project.name}`}
+									>
+										...
+									</button>
+								) : null}
+							</div>
 
 							{state.expanded && !sidebarCollapsed ? (
 								<div className="ml-3 space-y-1">
@@ -973,7 +1408,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</span>
 					<span className="text-on-surface-variant/40 text-xs">—</span>
 					<span className="font-label text-xs text-[#f2f0ef]">
-						{selectedProject?.path ?? "/"}
+						{selectedProjectPathLabel}
 					</span>
 					{selectedWorktreePath ? (
 						<>
@@ -1232,6 +1667,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</nav>
 				</div>
 			</div>
+			{projectActionMenuPanel}
 		</div>
 	);
 }
