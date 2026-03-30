@@ -71,6 +71,7 @@ export async function getCodexModelCatalogProcedure(
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
+const TASK_POLL_INTERVAL_MS = 1_500;
 const DIRECTORY_SUGGESTION_LIMIT = 10;
 
 type WorktreePollState = {
@@ -78,6 +79,8 @@ type WorktreePollState = {
 	files: string[];
 	diffTimer: ReturnType<typeof setInterval> | null;
 	filesTimer: ReturnType<typeof setInterval> | null;
+	taskInputs: Map<string, number>;
+	taskTimer: ReturnType<typeof setInterval> | null;
 	lastUpdatedAt: string;
 };
 
@@ -93,6 +96,9 @@ type ProjectPollState = {
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
+let worktreeTaskChangeListener:
+	| ((projectId: number, worktreePath: string) => void)
+	| null = null;
 
 // Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
 // raw model IDs, but it does not expose a discovery API for enumerating them.
@@ -463,6 +469,87 @@ function listPackageJsonTasks(
 	}
 
 	return tasks;
+}
+
+function readTaskInputStamps(
+	worktreePath: string,
+	currentDirectory = worktreePath,
+	result = new Map<string, number>(),
+): Map<string, number> {
+	if (!safeIsDirectory(currentDirectory)) {
+		return result;
+	}
+
+	const entries = sortDirectoryNames(readdirSync(currentDirectory));
+	const relativeDirectory =
+		relative(worktreePath, currentDirectory).replace(/\\/g, "/") || ".";
+
+	if (
+		relativeDirectory === ".tasks" ||
+		relativeDirectory.startsWith(".tasks/")
+	) {
+		for (const entry of entries) {
+			if (entry.startsWith(".")) {
+				continue;
+			}
+			const fullPath = resolve(currentDirectory, entry);
+			if (safeIsDirectory(fullPath)) {
+				readTaskInputStamps(worktreePath, fullPath, result);
+				continue;
+			}
+			if (!safeIsFile(fullPath)) {
+				continue;
+			}
+			const relativePath = relative(worktreePath, fullPath).replace(/\\/g, "/");
+			result.set(relativePath, statSync(fullPath).mtimeMs);
+		}
+		return result;
+	}
+
+	const packageJsonPath = resolve(currentDirectory, "package.json");
+	if (entries.includes("package.json") && safeIsFile(packageJsonPath)) {
+		const relativePath = relative(worktreePath, packageJsonPath).replace(
+			/\\/g,
+			"/",
+		);
+		result.set(relativePath, statSync(packageJsonPath).mtimeMs);
+	}
+
+	for (const entry of entries) {
+		if (entry === ".tasks") {
+			readTaskInputStamps(
+				worktreePath,
+				resolve(currentDirectory, entry),
+				result,
+			);
+			continue;
+		}
+
+		const fullPath = resolve(currentDirectory, entry);
+		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
+			continue;
+		}
+		readTaskInputStamps(worktreePath, fullPath, result);
+	}
+
+	return result;
+}
+
+function taskInputsChanged(
+	previous: Map<string, number>,
+	next: Map<string, number>,
+): boolean {
+	if (previous.size !== next.size) {
+		return true;
+	}
+
+	for (const [path, mtimeMs] of next) {
+		if (previous.get(path) !== mtimeMs) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
@@ -1347,6 +1434,9 @@ function stopWorktreePolling(
 	if (active.filesTimer) {
 		clearInterval(active.filesTimer);
 	}
+	if (active.taskTimer) {
+		clearInterval(active.taskTimer);
+	}
 	state.openWorktrees.delete(worktreePath);
 }
 
@@ -1362,6 +1452,8 @@ function startWorktreePolling(
 		files: [],
 		diffTimer: null,
 		filesTimer: null,
+		taskInputs: readTaskInputStamps(worktreePath),
+		taskTimer: null,
 		lastUpdatedAt: getNow(),
 	};
 
@@ -1383,12 +1475,29 @@ function startWorktreePolling(
 		}
 	};
 
+	const pollTasks = () => {
+		try {
+			const nextTaskInputs = readTaskInputStamps(worktreePath);
+			if (!taskInputsChanged(worktreeState.taskInputs, nextTaskInputs)) {
+				return;
+			}
+			worktreeState.taskInputs = nextTaskInputs;
+			worktreeState.lastUpdatedAt = getNow();
+			worktreeTaskChangeListener?.(state.id, worktreePath);
+		} catch (error) {
+			console.error(`Task poll failed for ${worktreePath}`, error);
+		}
+	};
+
 	worktreeState.diffTimer = setInterval(() => {
 		void pollDiff();
 	}, DIFF_POLL_INTERVAL_MS);
 	worktreeState.filesTimer = setInterval(() => {
 		void pollFiles();
 	}, FILE_POLL_INTERVAL_MS);
+	worktreeState.taskTimer = setInterval(() => {
+		pollTasks();
+	}, TASK_POLL_INTERVAL_MS);
 
 	state.openWorktrees.set(worktreePath, worktreeState);
 	void pollDiff();
@@ -1506,6 +1615,7 @@ export async function listProjectTasksProcedure(
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	await assertProjectWorktree(project, worktreePath);
+	startWorktreePolling(ensureProjectPoller(project), worktreePath);
 	return sortProjectTasks([
 		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
 		...listPackageJsonTasks(worktreePath),
@@ -1817,4 +1927,10 @@ export function shutdownProjectPolling(): void {
 	for (const projectId of projectPollMap.keys()) {
 		stopProjectPoller(projectId);
 	}
+}
+
+export function setWorktreeTaskChangeListener(
+	listener: ((projectId: number, worktreePath: string) => void) | null,
+): void {
+	worktreeTaskChangeListener = listener;
 }

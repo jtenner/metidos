@@ -24,10 +24,11 @@ import {
 	runProjectTaskProcedure,
 	sendThreadMessageProcedure,
 	setThreadPinnedProcedure,
+	setWorktreeTaskChangeListener,
 	shutdownProjectPolling,
 	updateThreadModelProcedure,
 } from "./project-procedures";
-import type { AppRPCSchema } from "./rpc-schema";
+import type { AppRPCSchema, RpcWorktreeTasksChanged } from "./rpc-schema";
 
 const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
@@ -71,7 +72,14 @@ type RpcReloadMessage = {
 	reason: string;
 };
 
-type RpcSocketMessage = RpcResponseMessage | RpcReloadMessage;
+type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
+	type: "tasks-changed";
+};
+
+type RpcSocketMessage =
+	| RpcResponseMessage
+	| RpcReloadMessage
+	| RpcTasksChangedMessage;
 
 type RpcRequestHandlerMap = {
 	[K in keyof RpcRequestMap]: (
@@ -286,6 +294,26 @@ function broadcastReload(reason: string): void {
 	}
 }
 
+function broadcastTasksChanged(projectId: number, worktreePath: string): void {
+	if (rpcClients.size === 0) {
+		return;
+	}
+
+	const payload: RpcTasksChangedMessage = {
+		type: "tasks-changed",
+		projectId,
+		worktreePath,
+	};
+	const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+	for (const client of rpcClients) {
+		try {
+			client.send(raw);
+		} catch {
+			rpcClients.delete(client);
+		}
+	}
+}
+
 function normalizeWatchFilename(filename?: string | Buffer | null): string {
 	if (typeof filename === "string") {
 		return filename.trim();
@@ -403,6 +431,9 @@ async function bootstrap(): Promise<void> {
 	initAppDatabase();
 	await queueMainviewBundleBuild();
 	startDevMainviewWatcher();
+	setWorktreeTaskChangeListener((projectId, worktreePath) => {
+		broadcastTasksChanged(projectId, worktreePath);
+	});
 
 	const server = Bun.serve({
 		port: SERVER_PORT,
@@ -506,12 +537,14 @@ async function bootstrap(): Promise<void> {
 
 process.on("SIGINT", () => {
 	shutdownDevWatchers();
+	setWorktreeTaskChangeListener(null);
 	shutdownProjectPolling();
 	process.exit(0);
 });
 
 process.on("SIGTERM", () => {
 	shutdownDevWatchers();
+	setWorktreeTaskChangeListener(null);
 	shutdownProjectPolling();
 	process.exit(0);
 });

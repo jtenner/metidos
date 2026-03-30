@@ -56,6 +56,11 @@ export type RpcProjectTask = {
 	command?: string | null;
 };
 
+export type RpcWorktreeTasksChanged = {
+	projectId: number;
+	worktreePath: string;
+};
+
 export type RpcCodexModelOption = {
 	id: string;
 	label: string;

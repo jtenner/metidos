@@ -26,6 +26,7 @@ import type {
 	RpcThreadRunStatus,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
+	RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 
 type VisibleMessage =
@@ -118,6 +119,8 @@ type PersistedMainviewState = {
 	sidebarSearchQuery: string;
 	openWorktrees: PersistedOpenWorktree[];
 };
+
+const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -1445,6 +1448,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
+	const projectTasksRequestIdRef = useRef(0);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
 
@@ -1949,6 +1953,38 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return result.worktrees;
 		},
 		[procedures, setProjectState],
+	);
+
+	const loadProjectTasks = useCallback(
+		async (projectId: number, worktreePath: string): Promise<void> => {
+			const requestId = ++projectTasksRequestIdRef.current;
+			setIsLoadingProjectTasks(true);
+			setTaskControlError("");
+
+			try {
+				const tasks = await procedures.listProjectTasks({
+					projectId,
+					worktreePath,
+				});
+				if (projectTasksRequestIdRef.current !== requestId) {
+					return;
+				}
+				setProjectTasks(tasks);
+			} catch (error) {
+				if (projectTasksRequestIdRef.current !== requestId) {
+					return;
+				}
+				setProjectTasks([]);
+				setTaskControlError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				if (projectTasksRequestIdRef.current === requestId) {
+					setIsLoadingProjectTasks(false);
+				}
+			}
+		},
+		[procedures],
 	);
 
 	const refreshThreadStatuses = useCallback(async () => {
@@ -2618,41 +2654,42 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	useEffect(() => {
 		if (!selectedProject || !activeSelectedWorktreePath) {
+			projectTasksRequestIdRef.current += 1;
 			setProjectTasks([]);
 			setIsLoadingProjectTasks(false);
+			setTaskControlError("");
 			return;
 		}
+		void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath);
+	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
 
-		let cancelled = false;
-		setIsLoadingProjectTasks(true);
-		setTaskControlError("");
-		void (async () => {
-			try {
-				const tasks = await procedures.listProjectTasks({
-					projectId: selectedProject.id,
-					worktreePath: activeSelectedWorktreePath,
-				});
-				if (!cancelled) {
-					setProjectTasks(tasks);
-				}
-			} catch (error) {
-				if (!cancelled) {
-					setProjectTasks([]);
-					setTaskControlError(
-						error instanceof Error ? error.message : String(error),
-					);
-				}
-			} finally {
-				if (!cancelled) {
-					setIsLoadingProjectTasks(false);
-				}
+	useEffect(() => {
+		const handleWorktreeTasksChanged = (
+			event: CustomEvent<RpcWorktreeTasksChanged>,
+		) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
 			}
-		})();
-
-		return () => {
-			cancelled = true;
+			if (
+				event.detail.projectId !== selectedProject.id ||
+				event.detail.worktreePath !== activeSelectedWorktreePath
+			) {
+				return;
+			}
+			void loadProjectTasks(event.detail.projectId, event.detail.worktreePath);
 		};
-	}, [activeSelectedWorktreePath, procedures, selectedProject]);
+
+		window.addEventListener(
+			WORKTREE_TASKS_CHANGED_EVENT_NAME,
+			handleWorktreeTasksChanged,
+		);
+		return () => {
+			window.removeEventListener(
+				WORKTREE_TASKS_CHANGED_EVENT_NAME,
+				handleWorktreeTasksChanged,
+			);
+		};
+	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
 
 	useEffect(() => {
 		if (!selectedProjectId || !activeSelectedWorktreePath) {

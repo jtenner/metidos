@@ -2,7 +2,11 @@ import * as React from "react";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 
-import type { AppRPCSchema, ProjectProcedures } from "../bun/rpc-schema";
+import type {
+	AppRPCSchema,
+	ProjectProcedures,
+	RpcWorktreeTasksChanged,
+} from "../bun/rpc-schema";
 import App from "./App";
 
 type RpcRequestMap = AppRPCSchema["requests"];
@@ -26,13 +30,26 @@ type RpcReloadMessage = {
 	reason: string;
 };
 
-type RpcSocketMessage = RpcResponseMessage | RpcReloadMessage;
+type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
+	type: "tasks-changed";
+};
+
+type RpcSocketMessage =
+	| RpcResponseMessage
+	| RpcReloadMessage
+	| RpcTasksChangedMessage;
 
 type RuntimeConfig = {
 	devServer: boolean;
 };
 
+const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
+
 declare global {
+	interface WindowEventMap {
+		"jt-ide:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
+	}
+
 	interface Window {
 		jtIdeProcedures: ProjectProcedures;
 		__jtIdeAppMountedAt?: number;
@@ -125,6 +142,20 @@ socket.addEventListener("message", (event) => {
 	const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
 	if (payload.type === "reload") {
 		reloadWindow(payload.reason);
+		return;
+	}
+	if (payload.type === "tasks-changed") {
+		window.dispatchEvent(
+			new CustomEvent<RpcWorktreeTasksChanged>(
+				WORKTREE_TASKS_CHANGED_EVENT_NAME,
+				{
+					detail: {
+						projectId: payload.projectId,
+						worktreePath: payload.worktreePath,
+					},
+				},
+			),
+		);
 		return;
 	}
 
