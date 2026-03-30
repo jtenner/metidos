@@ -23,6 +23,7 @@ import type {
 	RpcProject,
 	RpcProjectTask,
 	RpcThread,
+	RpcThreadDetail,
 	RpcThreadMessage,
 	RpcThreadRunStatus,
 	RpcWorktree,
@@ -154,6 +155,8 @@ const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
+const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
+const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
@@ -174,6 +177,49 @@ const codeBlockStyle = {
 const codeTagStyle = {
 	fontFamily: CODE_FONT_STACK,
 } satisfies CSSProperties;
+
+type DirectorySuggestionResultCacheEntry = {
+	directories: string[];
+	loadedAt: number;
+};
+
+function readLruValue<Key, Value>(
+	cache: Map<Key, Value>,
+	key: Key,
+): Value | null {
+	if (!cache.has(key)) {
+		return null;
+	}
+
+	const value = cache.get(key);
+	if (typeof value === "undefined") {
+		return null;
+	}
+
+	cache.delete(key);
+	cache.set(key, value);
+	return value;
+}
+
+function writeLruValue<Key, Value>(
+	cache: Map<Key, Value>,
+	key: Key,
+	value: Value,
+	maxEntries: number,
+): void {
+	if (cache.has(key)) {
+		cache.delete(key);
+	}
+	cache.set(key, value);
+
+	while (cache.size > maxEntries) {
+		const oldest = cache.keys().next();
+		if (oldest.done) {
+			return;
+		}
+		cache.delete(oldest.value);
+	}
+}
 
 const markdownComponents: Components = {
 	a({ href, children, ...props }) {
@@ -1756,6 +1802,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
 	);
 	const directorySuggestionPrefetchTimerRef = useRef<number | null>(null);
+	const directorySuggestionResultCacheRef = useRef(
+		new Map<string, DirectorySuggestionResultCacheEntry>(),
+	);
+	const directorySuggestionRequestCacheRef = useRef(
+		new Map<string, Promise<string[]>>(),
+	);
 	const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
@@ -2512,6 +2564,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setThreadMessages(detail.messages);
 	}, [procedures, selectedThreadId]);
 
+	const applyOpenedThreadDetail = useCallback(
+		async (detail: RpcThreadDetail) => {
+			setThreads((prev) => upsertThreadList(prev, detail.thread));
+			setSelectedThreadId(detail.thread.id);
+			selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+			setThreadMessages(detail.messages);
+			syncThreadContext(detail.thread);
+			try {
+				await loadProjectWorktrees(detail.thread.projectId);
+			} catch {
+				// Best effort; thread history should still open even if worktree metadata refresh fails.
+			}
+			setMobileProjectListOpen(false);
+		},
+		[loadProjectWorktrees, syncThreadContext],
+	);
+
 	const openThread = useCallback(
 		async (
 			threadId: number,
@@ -2533,24 +2602,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				) {
 					detail = await procedures.markThreadErrorSeen({ threadId });
 				}
-				setThreads((prev) => upsertThreadList(prev, detail.thread));
-				setSelectedThreadId(detail.thread.id);
-				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-				setThreadMessages(detail.messages);
-				syncThreadContext(detail.thread);
-				try {
-					await loadProjectWorktrees(detail.thread.projectId);
-				} catch {
-					// Best effort; thread history should still open even if worktree metadata refresh fails.
-				}
-				setMobileProjectListOpen(false);
+				await applyOpenedThreadDetail(detail);
 			} catch (error) {
 				setThreadsError(error instanceof Error ? error.message : String(error));
 			} finally {
 				setIsThreadLoading(false);
 			}
 		},
-		[loadProjectWorktrees, procedures, syncThreadContext],
+		[applyOpenedThreadDetail, procedures],
 	);
 
 	const resetAddProjectPath = useCallback(
@@ -2573,6 +2632,86 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 	}, []);
 
+	const readCachedDirectorySuggestions = useCallback((query: string) => {
+		const normalizedQuery = query.trim();
+		if (!normalizedQuery) {
+			return null;
+		}
+
+		const cached = readLruValue(
+			directorySuggestionResultCacheRef.current,
+			normalizedQuery,
+		);
+		if (!cached) {
+			return null;
+		}
+
+		return {
+			directories: cached.directories,
+			isStale:
+				cached.loadedAt + DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS < Date.now(),
+		};
+	}, []);
+
+	const cacheDirectorySuggestions = useCallback(
+		(query: string, directories: string[]) => {
+			const normalizedQuery = query.trim();
+			if (!normalizedQuery) {
+				return;
+			}
+
+			writeLruValue(
+				directorySuggestionResultCacheRef.current,
+				normalizedQuery,
+				{
+					directories,
+					loadedAt: Date.now(),
+				},
+				DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
+			);
+			prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
+		},
+		[],
+	);
+
+	const fetchDirectorySuggestions = useCallback(
+		async (
+			query: string,
+			options?: {
+				forceRefresh?: boolean;
+			},
+		): Promise<string[]> => {
+			const normalizedQuery = query.trim();
+			if (!normalizedQuery) {
+				return [];
+			}
+
+			const cached = readCachedDirectorySuggestions(normalizedQuery);
+			if (cached && !cached.isStale && !options?.forceRefresh) {
+				return cached.directories;
+			}
+
+			const inFlight =
+				directorySuggestionRequestCacheRef.current.get(normalizedQuery);
+			if (inFlight) {
+				return inFlight;
+			}
+
+			const request = procedures
+				.listDirectorySuggestions({ query: normalizedQuery })
+				.then((result) => {
+					cacheDirectorySuggestions(normalizedQuery, result.directories);
+					return result.directories;
+				})
+				.finally(() => {
+					directorySuggestionRequestCacheRef.current.delete(normalizedQuery);
+				});
+			directorySuggestionRequestCacheRef.current.set(normalizedQuery, request);
+			return request;
+		},
+		[cacheDirectorySuggestions, procedures, readCachedDirectorySuggestions],
+	);
+
 	const prefetchDirectorySuggestions = useCallback(
 		async (query: string) => {
 			const normalizedQuery = query.trim();
@@ -2587,12 +2726,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
 			try {
-				await procedures.listDirectorySuggestions({ query: normalizedQuery });
+				await fetchDirectorySuggestions(normalizedQuery);
 			} catch {
 				prefetchedDirectorySuggestionQueriesRef.current.delete(normalizedQuery);
 			}
 		},
-		[procedures],
+		[fetchDirectorySuggestions],
 	);
 
 	const scheduleDirectorySuggestionPrefetch = useCallback(
@@ -2670,13 +2809,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			void prefetchDirectorySuggestions(startupDirectoryPrefetchQuery);
 
 			const initialThread = pickInitialThread(sortedThreads, persistedState);
-			if (initialThread) {
-				void procedures
-					.getThread({
-						threadId: initialThread.id,
-					})
-					.catch(() => {});
-			}
+			const initialThreadDetailPromise = initialThread
+				? procedures
+						.getThread({
+							threadId: initialThread.id,
+						})
+						.catch(() => null)
+				: null;
 
 			const openProjects = loaded.filter((project) => project.isOpen === 1);
 			const openProjectIds = new Set(openProjects.map((project) => project.id));
@@ -2770,6 +2909,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 
 			if (initialThread) {
+				try {
+					let detail = initialThreadDetailPromise
+						? await initialThreadDetailPromise
+						: null;
+					if (detail?.thread.runStatus.hasUnreadError) {
+						detail = await procedures.markThreadErrorSeen({
+							threadId: initialThread.id,
+						});
+					}
+					if (detail) {
+						await applyOpenedThreadDetail(detail);
+						return;
+					}
+				} catch {
+					// Fall through to the normal open-thread flow below.
+				}
+
 				await openThread(initialThread.id, {
 					acknowledgeUnreadError: initialThread.runStatus.hasUnreadError,
 				});
@@ -2801,10 +2957,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setSessionStateReady(true);
 		}
 	}, [
+		applyOpenedThreadDetail,
 		hydrateProjectRows,
 		initialMainviewState,
 		loadProjectWorktrees,
 		openThread,
+		prefetchDirectorySuggestions,
 		procedures,
 		setProjectState,
 		setWorktreeState,
@@ -3447,14 +3605,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 
+		const cached = readCachedDirectorySuggestions(query);
 		let cancelled = false;
-		setDirectorySuggestions([]);
-		setDirectorySuggestionsLoading(true);
+		if (cached) {
+			setDirectorySuggestions(cached.directories);
+			setDirectorySuggestionsLoading(cached.isStale);
+		} else {
+			setDirectorySuggestions([]);
+			setDirectorySuggestionsLoading(true);
+		}
 		void (async () => {
 			try {
-				const result = await procedures.listDirectorySuggestions({ query });
+				const directories = await fetchDirectorySuggestions(query, {
+					forceRefresh: cached?.isStale,
+				});
 				if (!cancelled) {
-					setDirectorySuggestions(result.directories);
+					setDirectorySuggestions(directories);
 				}
 			} catch {
 				if (!cancelled) {
@@ -3474,7 +3640,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		addProjectOpen,
 		addProjectPath,
 		clearDirectorySuggestionPrefetchTimer,
-		procedures,
+		fetchDirectorySuggestions,
+		readCachedDirectorySuggestions,
 	]);
 
 	const updateActiveCodexModel = useCallback(

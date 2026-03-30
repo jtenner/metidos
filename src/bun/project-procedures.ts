@@ -438,12 +438,20 @@ function readDirectorySuggestionNamesFromDisk(
 	searchDirectory: string,
 ): string[] {
 	return sortDirectoryNames(
-		readdirSync(searchDirectory).filter((entry) => {
-			if (entry.startsWith(".")) {
+		readdirSync(searchDirectory, { withFileTypes: true })
+			.filter((entry) => {
+				if (entry.name.startsWith(".")) {
+					return false;
+				}
+				if (entry.isDirectory()) {
+					return true;
+				}
+				if (entry.isSymbolicLink()) {
+					return safeIsDirectory(resolve(searchDirectory, entry.name));
+				}
 				return false;
-			}
-			return safeIsDirectory(resolve(searchDirectory, entry));
-		}),
+			})
+			.map((entry) => entry.name),
 	);
 }
 
