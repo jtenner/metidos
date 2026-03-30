@@ -2607,48 +2607,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</button>
 					</div>
 				</form>
-				<div className="space-y-2 px-3 py-3">
+				<div className="flex justify-end gap-2 border-t border-[#262b40] px-3 py-3">
 					<button
 						type="button"
-						className="flex w-full items-center justify-between rounded-sm border border-[#2b3150] bg-[#141829] px-3 py-2 text-left text-sm text-[#f2f0ef] transition-colors hover:bg-[#1a1f34] disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#2b3150] bg-[#141829] text-[#d7d3ff] transition-colors hover:bg-[#1a1f34] disabled:cursor-not-allowed disabled:opacity-60"
 						onClick={() => {
 							void toggleThreadPinned();
 						}}
 						disabled={threadActionBusy !== null}
+						aria-label={
+							threadActionMenuThread.pinnedAt ? "Unpin thread" : "Pin thread"
+						}
+						title={
+							threadActionMenuThread.pinnedAt ? "Unpin thread" : "Pin thread"
+						}
 					>
-						<span className="flex items-center gap-2">
-							<span
-								className="material-symbols-outlined text-[16px] text-[#d7d3ff]"
-								style={{ fontVariationSettings: "'FILL' 1" }}
-							>
-								push_pin
-							</span>
-							<span>
-								{threadActionMenuThread.pinnedAt
-									? "Unpin Thread"
-									: "Pin to Top"}
-							</span>
-						</span>
-						<span className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8e8aa7]">
-							{threadActionBusy === "pin" ? "Working" : "Pin"}
+						<span
+							className="material-symbols-outlined text-[18px]"
+							style={{
+								fontVariationSettings: threadActionMenuThread.pinnedAt
+									? "'FILL' 1"
+									: "'FILL' 0",
+							}}
+						>
+							push_pin
 						</span>
 					</button>
 					<button
 						type="button"
-						className="flex w-full items-center justify-between rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-left text-sm text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
 						onClick={() => {
 							void deleteSelectedThread();
 						}}
 						disabled={threadActionBusy !== null}
+						aria-label="Delete thread"
+						title="Delete thread"
 					>
-						<span className="flex items-center gap-2">
-							<span className="material-symbols-outlined text-[16px]">
-								delete
-							</span>
-							<span>Delete Thread</span>
-						</span>
-						<span className="font-label text-[9px] uppercase tracking-[0.16em] text-[#ff8698]">
-							{threadActionBusy === "delete" ? "Deleting" : "Remove"}
+						<span className="material-symbols-outlined text-[18px]">
+							delete
 						</span>
 					</button>
 				</div>
