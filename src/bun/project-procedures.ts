@@ -66,6 +66,35 @@ export async function listThreadsProcedure(
 	return listThreads(db).map(toRpcThread);
 }
 
+export function startProcedureCacheMaintenance(): void {
+	if (directorySuggestionRefreshTimer !== null) {
+		return;
+	}
+
+	directorySuggestionRefreshTimer = setInterval(() => {
+		refreshRecentDirectorySuggestionEntries();
+	}, DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS);
+}
+
+export function warmProcedureStartupCaches(): void {
+	const homeDirectory = homedir();
+	if (safeIsDirectory(homeDirectory)) {
+		try {
+			readDirectorySuggestionEntries(homeDirectory);
+		} catch (error) {
+			console.error(
+				`Failed to warm directory suggestion cache for ${homeDirectory}`,
+				error,
+			);
+		}
+	}
+
+	const mostRecentThread = listThreads(db)[0] ?? null;
+	if (mostRecentThread) {
+		warmThreadDetailCache(mostRecentThread.id);
+	}
+}
+
 export async function getCodexModelCatalogProcedure(
 	_params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
 ): Promise<RpcCodexModelCatalog> {
@@ -78,6 +107,11 @@ const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const TASK_POLL_INTERVAL_MS = 1_500;
 const DIRECTORY_SUGGESTION_CACHE_TTL_MS = 60_000;
+const DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES = 96;
+const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
+const DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS = 5_000;
+const DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS = 90_000;
+const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
 const GIT_HISTORY_ENTRY_LIMIT = 20;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
@@ -111,9 +145,13 @@ const directorySuggestionCache = new Map<
 	string,
 	{
 		directoryNames: string[];
-		expiresAt: number;
+		lastAccessedAt: number;
+		loadedAt: number;
 	}
 >();
+const threadDetailCache = new Map<number, RpcThreadDetail>();
+let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
+	null;
 let worktreeTaskChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
@@ -124,6 +162,50 @@ const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
 const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
 const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
 const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
+
+function readLruValue<Key, Value>(
+	cache: Map<Key, Value>,
+	key: Key,
+): Value | null {
+	if (!cache.has(key)) {
+		return null;
+	}
+
+	const value = cache.get(key);
+	if (typeof value === "undefined") {
+		return null;
+	}
+
+	cache.delete(key);
+	cache.set(key, value);
+	return value;
+}
+
+function writeLruValue<Key, Value>(
+	cache: Map<Key, Value>,
+	key: Key,
+	value: Value,
+	maxEntries: number,
+): void {
+	if (cache.has(key)) {
+		cache.delete(key);
+	}
+	cache.set(key, value);
+
+	while (cache.size > maxEntries) {
+		const oldest = cache.keys().next();
+		if (oldest.done) {
+			return;
+		}
+		cache.delete(oldest.value);
+	}
+}
+
+function lruEntriesNewestFirst<Key, Value>(
+	cache: Map<Key, Value>,
+): Array<[Key, Value]> {
+	return [...cache.entries()].reverse();
+}
 
 // Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
 // raw model IDs, but it does not expose a discovery API for enumerating them.
@@ -352,14 +434,10 @@ function sortDirectoryNames(values: string[]): string[] {
 	);
 }
 
-function readDirectorySuggestionEntries(searchDirectory: string): string[] {
-	const now = Date.now();
-	const cached = directorySuggestionCache.get(searchDirectory);
-	if (cached && cached.expiresAt > now) {
-		return cached.directoryNames;
-	}
-
-	const directoryNames = sortDirectoryNames(
+function readDirectorySuggestionNamesFromDisk(
+	searchDirectory: string,
+): string[] {
+	return sortDirectoryNames(
 		readdirSync(searchDirectory).filter((entry) => {
 			if (entry.startsWith(".")) {
 				return false;
@@ -367,11 +445,63 @@ function readDirectorySuggestionEntries(searchDirectory: string): string[] {
 			return safeIsDirectory(resolve(searchDirectory, entry));
 		}),
 	);
-	directorySuggestionCache.set(searchDirectory, {
-		directoryNames,
-		expiresAt: now + DIRECTORY_SUGGESTION_CACHE_TTL_MS,
-	});
-	return directoryNames;
+}
+
+function refreshDirectorySuggestionEntries(
+	searchDirectory: string,
+	lastAccessedAt = Date.now(),
+): string[] {
+	try {
+		const directoryNames =
+			readDirectorySuggestionNamesFromDisk(searchDirectory);
+		writeLruValue(
+			directorySuggestionCache,
+			searchDirectory,
+			{
+				directoryNames,
+				lastAccessedAt,
+				loadedAt: Date.now(),
+			},
+			DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES,
+		);
+		return directoryNames;
+	} catch (error) {
+		directorySuggestionCache.delete(searchDirectory);
+		throw error;
+	}
+}
+
+function readDirectorySuggestionEntries(searchDirectory: string): string[] {
+	const now = Date.now();
+	const cached = readLruValue(directorySuggestionCache, searchDirectory);
+	if (cached && cached.loadedAt + DIRECTORY_SUGGESTION_CACHE_TTL_MS > now) {
+		cached.lastAccessedAt = now;
+		return cached.directoryNames;
+	}
+
+	return refreshDirectorySuggestionEntries(searchDirectory, now);
+}
+
+function refreshRecentDirectorySuggestionEntries(): void {
+	const now = Date.now();
+	for (const [searchDirectory, cached] of lruEntriesNewestFirst(
+		directorySuggestionCache,
+	)
+		.filter(
+			([, entry]) =>
+				now - entry.lastAccessedAt <=
+				DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS,
+		)
+		.slice(0, DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE)) {
+		try {
+			refreshDirectorySuggestionEntries(searchDirectory, cached.lastAccessedAt);
+		} catch (error) {
+			console.error(
+				`Failed to refresh directory suggestion cache for ${searchDirectory}`,
+				error,
+			);
+		}
+	}
 }
 
 function safeIsDirectory(path: string): boolean {
@@ -400,6 +530,10 @@ function normalizeRelativeTaskPath(taskPath: string): string {
 
 function taskTitleFromPath(taskPath: string): string {
 	return taskPath.replace(/\.[^./\\]+$/, "").replace(/\\/g, "/");
+}
+
+function invalidateThreadDetailCache(threadId: number): void {
+	threadDetailCache.delete(threadId);
 }
 
 function formatTaskPrompt(taskTitle: string, taskContent: string): string {
@@ -763,6 +897,7 @@ function setThreadRunStatus(
 	status: RpcThreadRunStatus,
 ): void {
 	threadRunStatusMap.set(threadId, status);
+	invalidateThreadDetailCache(threadId);
 }
 
 function toRpcThread(thread: ThreadRecord): RpcThread {
@@ -1049,6 +1184,30 @@ async function buildThreadDetail(threadId: number): Promise<RpcThreadDetail> {
 	};
 }
 
+async function readThreadDetailCached(
+	threadId: number,
+): Promise<RpcThreadDetail> {
+	const cached = readLruValue(threadDetailCache, threadId);
+	if (cached) {
+		return cached;
+	}
+
+	const detail = await buildThreadDetail(threadId);
+	writeLruValue(
+		threadDetailCache,
+		threadId,
+		detail,
+		THREAD_DETAIL_CACHE_MAX_ENTRIES,
+	);
+	return detail;
+}
+
+function warmThreadDetailCache(threadId: number): void {
+	void readThreadDetailCached(threadId).catch((error) => {
+		console.error(`Failed to warm thread detail cache for ${threadId}`, error);
+	});
+}
+
 async function runThreadMessageInBackground(
 	threadId: number,
 	input: string,
@@ -1068,6 +1227,7 @@ async function runThreadMessageInBackground(
 			if (event.type === "thread.started") {
 				if (event.thread_id && event.thread_id !== thread.codexThreadId) {
 					updateThreadCodexId(db, thread.id, event.thread_id);
+					invalidateThreadDetailCache(thread.id);
 				}
 				continue;
 			}
@@ -1144,6 +1304,7 @@ async function runThreadMessageInBackground(
 			lastAssistantText.trim() || "No response returned.";
 		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
 			updateThreadCodexId(db, thread.id, codexThread.id);
+			invalidateThreadDetailCache(thread.id);
 		}
 		if (lastAssistantItemId && lastAssistantText.trim()) {
 			await upsertAssistantChatActivity(
@@ -1158,6 +1319,7 @@ async function runThreadMessageInBackground(
 				role: "assistant",
 				text: finalAssistantText,
 			});
+			invalidateThreadDetailCache(threadId);
 		}
 		if (usage) {
 			setThreadUsage(
@@ -1166,6 +1328,7 @@ async function runThreadMessageInBackground(
 				usage,
 				buildNextCompactionTelemetry(threadById(threadId), usage),
 			);
+			invalidateThreadDetailCache(threadId);
 		}
 		markThreadRan(db, threadId);
 		setThreadRunStatus(threadId, {
@@ -1413,6 +1576,7 @@ async function upsertReasoningActivity(
 		text: item.text.trim() || "Reasoning",
 		state,
 	});
+	invalidateThreadDetailCache(threadId);
 }
 
 async function upsertAssistantChatActivity(
@@ -1429,6 +1593,7 @@ async function upsertAssistantChatActivity(
 		text,
 		state,
 	});
+	invalidateThreadDetailCache(threadId);
 }
 
 async function upsertCommandActivity(
@@ -1447,6 +1612,7 @@ async function upsertCommandActivity(
 			exitCode: item.exit_code ?? null,
 		} satisfies CommandActivityPayload),
 	});
+	invalidateThreadDetailCache(threadId);
 }
 
 async function upsertFileChangeActivity(
@@ -1475,6 +1641,7 @@ async function upsertFileChangeActivity(
 			});
 		}),
 	);
+	invalidateThreadDetailCache(threadId);
 }
 
 function parseWorktreeList(raw: string): RpcWorktree[] {
@@ -2011,13 +2178,13 @@ export async function createThreadProcedure(
 	const worktreePath = normalizePath(params.worktreePath);
 	const model = resolveCodexModel(params.model);
 	const thread = await createThreadRecord(project, worktreePath, model);
-	return buildThreadDetail(thread.id);
+	return readThreadDetailCached(thread.id);
 }
 
 export async function getThreadProcedure(
 	params: AppRPCSchema["requests"]["getThread"]["params"],
 ): Promise<RpcThreadDetail> {
-	return buildThreadDetail(params.threadId);
+	return readThreadDetailCached(params.threadId);
 }
 
 export async function markThreadErrorSeenProcedure(
@@ -2030,7 +2197,7 @@ export async function markThreadErrorSeenProcedure(
 		...currentStatus,
 		hasUnreadError: false,
 	});
-	return buildThreadDetail(thread.id);
+	return readThreadDetailCached(thread.id);
 }
 
 export async function sendThreadMessageProcedure(
@@ -2072,7 +2239,7 @@ async function queueThreadMessage(
 
 	void runThreadMessageInBackground(thread.id, input, startedAt);
 
-	return buildThreadDetail(thread.id);
+	return readThreadDetailCached(thread.id);
 }
 
 export async function runProjectTaskProcedure(
@@ -2137,6 +2304,7 @@ export async function renameThreadProcedure(
 	}
 
 	renameThread(db, thread.id, title);
+	invalidateThreadDetailCache(thread.id);
 	return toRpcThread(threadById(thread.id));
 }
 
@@ -2145,6 +2313,7 @@ export async function setThreadPinnedProcedure(
 ): Promise<RpcThread> {
 	const thread = threadById(params.threadId);
 	setThreadPinned(db, thread.id, params.pinned);
+	invalidateThreadDetailCache(thread.id);
 	return toRpcThread(threadById(thread.id));
 }
 
@@ -2159,6 +2328,7 @@ export async function updateThreadModelProcedure(
 	const model = resolveCodexModel(params.model);
 	setThreadModel(db, thread.id, model);
 	codexThreadMap.delete(thread.id);
+	invalidateThreadDetailCache(thread.id);
 	return toRpcThread(threadById(thread.id));
 }
 
@@ -2172,6 +2342,7 @@ export async function deleteThreadProcedure(
 
 	codexThreadMap.delete(thread.id);
 	threadRunStatusMap.delete(thread.id);
+	invalidateThreadDetailCache(thread.id);
 	deleteThread(db, thread.id);
 	return {
 		success: true,
@@ -2316,6 +2487,13 @@ export function getOpenWorktreeSnapshot(
 export function shutdownProjectPolling(): void {
 	for (const projectId of projectPollMap.keys()) {
 		stopProjectPoller(projectId);
+	}
+}
+
+export function shutdownProcedureCacheMaintenance(): void {
+	if (directorySuggestionRefreshTimer !== null) {
+		clearInterval(directorySuggestionRefreshTimer);
+		directorySuggestionRefreshTimer = null;
 	}
 }
 

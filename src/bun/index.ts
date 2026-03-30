@@ -28,8 +28,11 @@ import {
 	setThreadPinnedProcedure,
 	setWorktreeGitHistoryChangeListener,
 	setWorktreeTaskChangeListener,
+	shutdownProcedureCacheMaintenance,
 	shutdownProjectPolling,
+	startProcedureCacheMaintenance,
 	updateThreadModelProcedure,
+	warmProcedureStartupCaches,
 } from "./project-procedures";
 import type {
 	AppRPCSchema,
@@ -469,6 +472,7 @@ async function bootstrap(): Promise<void> {
 	initAppDatabase();
 	await queueMainviewBundleBuild();
 	startDevMainviewWatcher();
+	startProcedureCacheMaintenance();
 	setWorktreeTaskChangeListener((projectId, worktreePath) => {
 		broadcastTasksChanged(projectId, worktreePath);
 	});
@@ -574,12 +578,17 @@ async function bootstrap(): Promise<void> {
 	console.log(
 		`jt-ide web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
 	);
+
+	setTimeout(() => {
+		warmProcedureStartupCaches();
+	}, 0);
 }
 
 process.on("SIGINT", () => {
 	shutdownDevWatchers();
 	setWorktreeGitHistoryChangeListener(null);
 	setWorktreeTaskChangeListener(null);
+	shutdownProcedureCacheMaintenance();
 	shutdownProjectPolling();
 	process.exit(0);
 });
@@ -588,6 +597,7 @@ process.on("SIGTERM", () => {
 	shutdownDevWatchers();
 	setWorktreeGitHistoryChangeListener(null);
 	setWorktreeTaskChangeListener(null);
+	shutdownProcedureCacheMaintenance();
 	shutdownProjectPolling();
 	process.exit(0);
 });

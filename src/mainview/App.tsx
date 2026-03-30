@@ -2658,6 +2658,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					),
 			);
 
+			const startupDirectoryPrefetchQuery =
+				homeDirectoryResult.supportsTildePath
+					? "~/"
+					: formatDirectoryPathForInput(
+							homeDirectoryResult.homeDirectory,
+							homeDirectoryResult.homeDirectory,
+							homeDirectoryResult.supportsTildePath,
+						);
+			homeDirectoryPrefetchQueryRef.current = startupDirectoryPrefetchQuery;
+			void prefetchDirectorySuggestions(startupDirectoryPrefetchQuery);
+
+			const initialThread = pickInitialThread(sortedThreads, persistedState);
+			if (initialThread) {
+				void procedures
+					.getThread({
+						threadId: initialThread.id,
+					})
+					.catch(() => {});
+			}
+
 			const openProjects = loaded.filter((project) => project.isOpen === 1);
 			const openProjectIds = new Set(openProjects.map((project) => project.id));
 			const restoredProjectWorktrees = new Map<number, RpcWorktree[]>();
@@ -2749,7 +2769,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				});
 			}
 
-			const initialThread = pickInitialThread(sortedThreads, persistedState);
 			if (initialThread) {
 				await openThread(initialThread.id, {
 					acknowledgeUnreadError: initialThread.runStatus.hasUnreadError,
