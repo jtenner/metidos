@@ -451,27 +451,76 @@ function formatCompactTokenCount(value: number): string {
 	return value.toString();
 }
 
+function formatCompactionTransition(
+	beforeTokens: number | null,
+	afterTokens: number | null,
+): string | null {
+	if (
+		typeof beforeTokens !== "number" ||
+		typeof afterTokens !== "number" ||
+		beforeTokens <= 0 ||
+		afterTokens < 0
+	) {
+		return null;
+	}
+	return `${formatCompactTokenCount(beforeTokens)}→${formatCompactTokenCount(afterTokens)}`;
+}
+
 function ContextUsageMeter({
 	inputTokens,
 	contextWindowTokens,
+	estimatedTriggerTokens,
+	estimatedTriggerSource,
+	maxObservedInputTokens,
+	inferredCount,
+	lastInferredBeforeInputTokens,
+	lastInferredAfterInputTokens,
 }: {
 	inputTokens: number;
 	contextWindowTokens: number;
+	estimatedTriggerTokens: number;
+	estimatedTriggerSource: "heuristic" | "observed";
+	maxObservedInputTokens: number | null;
+	inferredCount: number;
+	lastInferredBeforeInputTokens: number | null;
+	lastInferredAfterInputTokens: number | null;
 }): JSX.Element {
+	const safeEstimatedTriggerTokens = Math.max(estimatedTriggerTokens, 1);
 	const safeContextWindowTokens = Math.max(contextWindowTokens, 1);
-	const usageRatio = Math.min(inputTokens / safeContextWindowTokens, 1);
+	const usageRatio = Math.min(inputTokens / safeEstimatedTriggerTokens, 1);
 	const usagePercent = Math.round(usageRatio * 100);
+	const windowUsagePercent = Math.round(
+		Math.min(inputTokens / safeContextWindowTokens, 1) * 100,
+	);
 	const radius = 9;
 	const circumference = 2 * Math.PI * radius;
 	const strokeOffset = circumference * (1 - usageRatio);
 	const strokeColor =
-		usageRatio >= 0.9 ? "#ff6e84" : usageRatio >= 0.7 ? "#ffbe78" : "#aaa4ff";
+		usageRatio >= 1 ? "#ff6e84" : usageRatio >= 0.85 ? "#ffbe78" : "#8bf0c0";
+	const estimateLabel =
+		estimatedTriggerSource === "observed" ? "Observed" : "Heuristic";
+	const lastCompactionTransition = formatCompactionTransition(
+		lastInferredBeforeInputTokens,
+		lastInferredAfterInputTokens,
+	);
+	const titleParts = [
+		`Last turn input: ${inputTokens.toLocaleString()} tokens`,
+		`${estimateLabel} compaction trigger: ${estimatedTriggerTokens.toLocaleString()} tokens`,
+		`Model window: ${contextWindowTokens.toLocaleString()} tokens`,
+	];
+	if (typeof maxObservedInputTokens === "number") {
+		titleParts.push(
+			`Max observed input: ${maxObservedInputTokens.toLocaleString()} tokens`,
+		);
+	}
+	if (lastCompactionTransition) {
+		titleParts.push(
+			`Last inferred compaction: ${lastCompactionTransition} (${inferredCount} observed)`,
+		);
+	}
 
 	return (
-		<div
-			className="flex items-center gap-3"
-			title={`${inputTokens.toLocaleString()} / ${contextWindowTokens.toLocaleString()} context tokens`}
-		>
+		<div className="flex items-center gap-3" title={titleParts.join(" • ")}>
 			<div className="relative h-7 w-7 shrink-0">
 				<svg
 					viewBox="0 0 24 24"
@@ -502,14 +551,38 @@ function ContextUsageMeter({
 					{usagePercent}
 				</span>
 			</div>
-			<div className="flex flex-col items-end leading-none">
-				<span className="font-label text-[10px] uppercase tracking-widest text-[#dad7ff]">
-					{formatCompactTokenCount(inputTokens)} /{" "}
-					{formatCompactTokenCount(contextWindowTokens)}
-				</span>
+			<div className="flex flex-col items-end leading-none text-right">
+				<div className="flex items-center gap-2">
+					<span className="font-label text-[10px] uppercase tracking-widest text-[#dad7ff]">
+						{formatCompactTokenCount(inputTokens)} /{" "}
+						{formatCompactTokenCount(estimatedTriggerTokens)}
+					</span>
+					<span
+						className={`rounded-full border px-1.5 py-[2px] font-label text-[8px] uppercase tracking-[0.18em] ${
+							estimatedTriggerSource === "observed"
+								? "border-[#2f6b5d] bg-[#142821] text-[#8bf0c0]"
+								: "border-[#4c4760] bg-[#1b1b24] text-[#b7b2d9]"
+						}`}
+					>
+						{estimateLabel}
+					</span>
+				</div>
 				<span className="mt-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f8d8b]">
-					Context
+					Compaction est. · Win {windowUsagePercent}%
 				</span>
+				<span className="mt-1 font-label text-[9px] uppercase tracking-[0.14em] text-[#6f6f89]">
+					{formatCompactTokenCount(inputTokens)} /{" "}
+					{formatCompactTokenCount(contextWindowTokens)} window
+				</span>
+				{lastCompactionTransition ? (
+					<span className="mt-1 font-label text-[9px] uppercase tracking-[0.12em] text-[#8bf0c0]">
+						Last compact {lastCompactionTransition}
+					</span>
+				) : inferredCount > 0 ? (
+					<span className="mt-1 font-label text-[9px] uppercase tracking-[0.12em] text-[#8bf0c0]">
+						{inferredCount} compact events observed
+					</span>
+				) : null}
 			</div>
 		</div>
 	);
@@ -1486,6 +1559,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const activeContextWindowTokens =
 		activeCodexModelOption?.contextWindowTokens ?? 400_000;
 	const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
+	const activeCompactionTriggerTokens =
+		selectedThread?.compaction.estimatedTriggerTokens ??
+		Math.round(activeContextWindowTokens * 0.8);
+	const activeCompactionTriggerSource =
+		selectedThread?.compaction.estimatedTriggerSource ?? "heuristic";
+	const activeMaxObservedInputTokens =
+		selectedThread?.compaction.maxObservedInputTokens ?? null;
+	const activeCompactionInferenceCount =
+		selectedThread?.compaction.inferredCount ?? 0;
+	const activeLastCompactionBeforeInputTokens =
+		selectedThread?.compaction.lastInferredBeforeInputTokens ?? null;
+	const activeLastCompactionAfterInputTokens =
+		selectedThread?.compaction.lastInferredAfterInputTokens ?? null;
 
 	const projectThreadErrorLevels = useMemo(() => {
 		const next = new Map<number, ThreadErrorLevel>();
@@ -4468,6 +4554,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									<ContextUsageMeter
 										inputTokens={activeContextInputTokens}
 										contextWindowTokens={activeContextWindowTokens}
+										estimatedTriggerTokens={activeCompactionTriggerTokens}
+										estimatedTriggerSource={activeCompactionTriggerSource}
+										maxObservedInputTokens={activeMaxObservedInputTokens}
+										inferredCount={activeCompactionInferenceCount}
+										lastInferredBeforeInputTokens={
+											activeLastCompactionBeforeInputTokens
+										}
+										lastInferredAfterInputTokens={
+											activeLastCompactionAfterInputTokens
+										}
 									/>
 								</div>
 								{modelControlError ? (

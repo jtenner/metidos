@@ -1,5 +1,7 @@
 # Codex SDK Capabilities (for Bun + Browser Integration)
 
+See also: [`docs/codex-context-management.md`](/home/jtenner/Projects/jt-ide/docs/codex-context-management.md) for a focused note on how the SDK handles context, thread persistence, and where Responses API compaction fits.
+
 ## What this SDK is
 
 The `@openai/codex-sdk` is a TypeScript wrapper around the `codex` CLI (`@openai/codex`).

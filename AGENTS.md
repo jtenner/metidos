@@ -17,6 +17,7 @@
 ├─ bun.lock
 ├─ docs/
 │  ├─ codex.md
+│  ├─ codex-context-management.md
 │  └─ references/
 │     ├─ ai_chat_mobile/
 │     │  ├─ code.html

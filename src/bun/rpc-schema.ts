@@ -89,6 +89,16 @@ export type RpcThreadUsage = {
 	outputTokens: number;
 };
 
+export type RpcThreadCompaction = {
+	estimatedTriggerTokens: number;
+	estimatedTriggerSource: "heuristic" | "observed";
+	maxObservedInputTokens: number | null;
+	inferredCount: number;
+	lastInferredAt: string | null;
+	lastInferredBeforeInputTokens: number | null;
+	lastInferredAfterInputTokens: number | null;
+};
+
 export type RpcThread = {
 	id: number;
 	projectId: number;
@@ -101,6 +111,7 @@ export type RpcThread = {
 	updatedAt: string;
 	lastRunAt: string | null;
 	usage: RpcThreadUsage | null;
+	compaction: RpcThreadCompaction;
 	runStatus: RpcThreadRunStatus;
 };
 

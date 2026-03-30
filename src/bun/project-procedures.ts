@@ -39,6 +39,7 @@ import type {
 	RpcProjectTask,
 	RpcProjectWorktreesResult,
 	RpcThread,
+	RpcThreadCompaction,
 	RpcThreadDetail,
 	RpcThreadMessage,
 	RpcThreadRunStatus,
@@ -99,6 +100,10 @@ const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 let worktreeTaskChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
+const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
+const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
+const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
+const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
 
 // Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
 // raw model IDs, but it does not expose a discovery API for enumerating them.
@@ -234,6 +239,19 @@ function buildCodexModelCatalog(): RpcCodexModelCatalog {
 		defaultModel: DEFAULT_THREAD_MODEL,
 		models: CODEx_MODEL_OPTIONS,
 	};
+}
+
+function contextWindowTokensForModel(model: string | null | undefined): number {
+	const normalized = normalizeStoredCodexModel(model);
+	return codexModelOptionMap.get(normalized)?.contextWindowTokens ?? 400_000;
+}
+
+function heuristicCompactionTriggerTokens(
+	model: string | null | undefined,
+): number {
+	return Math.round(
+		contextWindowTokensForModel(model) * DEFAULT_COMPACTION_ESTIMATE_RATIO,
+	);
 }
 
 function resolveCodexModel(model: string | null | undefined): string {
@@ -710,6 +728,7 @@ function toRpcThread(thread: ThreadRecord): RpcThread {
 		...thread,
 		model: normalizeStoredCodexModel(thread.model),
 		usage: threadUsageFromRecord(thread),
+		compaction: threadCompactionFromRecord(thread),
 		runStatus: threadRunStatusFromRecord(thread),
 	};
 }
@@ -726,6 +745,100 @@ function threadUsageFromRecord(thread: ThreadRecord): RpcThreadUsage | null {
 		inputTokens: thread.lastInputTokens ?? 0,
 		cachedInputTokens: thread.lastCachedInputTokens ?? 0,
 		outputTokens: thread.lastOutputTokens ?? 0,
+	};
+}
+
+function threadCompactionFromRecord(thread: ThreadRecord): RpcThreadCompaction {
+	return {
+		estimatedTriggerTokens:
+			thread.estimatedCompactionTriggerTokens ??
+			heuristicCompactionTriggerTokens(thread.model),
+		estimatedTriggerSource: thread.estimatedCompactionTriggerTokens
+			? "observed"
+			: "heuristic",
+		maxObservedInputTokens: thread.maxInputTokens,
+		inferredCount: thread.compactionCount,
+		lastInferredAt: thread.lastCompactionAt,
+		lastInferredBeforeInputTokens: thread.lastCompactionBeforeInputTokens,
+		lastInferredAfterInputTokens: thread.lastCompactionAfterInputTokens,
+	};
+}
+
+function buildNextCompactionTelemetry(
+	thread: ThreadRecord,
+	usage: RpcThreadUsage,
+): {
+	maxInputTokens: number;
+	estimatedCompactionTriggerTokens: number | null;
+	compactionCount: number;
+	lastCompactionAt: string | null;
+	lastCompactionBeforeInputTokens: number | null;
+	lastCompactionAfterInputTokens: number | null;
+} {
+	const previousInputTokens = thread.lastInputTokens;
+	const currentInputTokens = usage.inputTokens;
+	const contextWindowTokens = contextWindowTokensForModel(thread.model);
+	const heuristicTriggerTokens = heuristicCompactionTriggerTokens(thread.model);
+	const baselineTriggerTokens =
+		thread.estimatedCompactionTriggerTokens ?? heuristicTriggerTokens;
+	const maxInputTokens = Math.max(
+		thread.maxInputTokens ?? 0,
+		currentInputTokens,
+	);
+
+	let estimatedCompactionTriggerTokens =
+		thread.estimatedCompactionTriggerTokens ?? null;
+	let compactionCount = thread.compactionCount;
+	let lastCompactionAt = thread.lastCompactionAt;
+	let lastCompactionBeforeInputTokens = thread.lastCompactionBeforeInputTokens;
+	let lastCompactionAfterInputTokens = thread.lastCompactionAfterInputTokens;
+
+	if (typeof previousInputTokens === "number" && previousInputTokens > 0) {
+		const previousNearCompaction =
+			previousInputTokens >=
+			Math.round(
+				Math.min(
+					baselineTriggerTokens,
+					contextWindowTokens * COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO,
+				),
+			);
+		const currentDroppedSharply =
+			currentInputTokens <=
+			Math.round(previousInputTokens * COMPACTION_INFERENCE_MAX_CURRENT_RATIO);
+		const droppedByMeaningfulWindowShare =
+			previousInputTokens - currentInputTokens >=
+			Math.round(
+				contextWindowTokens * COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO,
+			);
+
+		if (
+			previousNearCompaction &&
+			currentDroppedSharply &&
+			droppedByMeaningfulWindowShare
+		) {
+			const nextSample = previousInputTokens;
+			const sampleCount = Math.max(compactionCount, 0);
+			estimatedCompactionTriggerTokens =
+				sampleCount > 0 && estimatedCompactionTriggerTokens
+					? Math.round(
+							(estimatedCompactionTriggerTokens * sampleCount + nextSample) /
+								(sampleCount + 1),
+						)
+					: nextSample;
+			compactionCount += 1;
+			lastCompactionAt = getNow();
+			lastCompactionBeforeInputTokens = previousInputTokens;
+			lastCompactionAfterInputTokens = currentInputTokens;
+		}
+	}
+
+	return {
+		maxInputTokens,
+		estimatedCompactionTriggerTokens,
+		compactionCount,
+		lastCompactionAt,
+		lastCompactionBeforeInputTokens,
+		lastCompactionAfterInputTokens,
 	};
 }
 
@@ -1005,7 +1118,12 @@ async function runThreadMessageInBackground(
 			});
 		}
 		if (usage) {
-			setThreadUsage(db, threadId, usage);
+			setThreadUsage(
+				db,
+				threadId,
+				usage,
+				buildNextCompactionTelemetry(threadById(threadId), usage),
+			);
 		}
 		markThreadRan(db, threadId);
 		setThreadRunStatus(threadId, {

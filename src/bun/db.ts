@@ -27,6 +27,15 @@ type ThreadUsageInput = {
 	outputTokens: number;
 };
 
+type ThreadCompactionStatsInput = {
+	maxInputTokens: number;
+	estimatedCompactionTriggerTokens: number | null;
+	compactionCount: number;
+	lastCompactionAt: string | null;
+	lastCompactionBeforeInputTokens: number | null;
+	lastCompactionAfterInputTokens: number | null;
+};
+
 type ThreadMessageInput = {
 	threadId: number;
 	role: "assistant" | "user";
@@ -70,6 +79,12 @@ export type ThreadRecord = {
 	lastInputTokens: number | null;
 	lastCachedInputTokens: number | null;
 	lastOutputTokens: number | null;
+	maxInputTokens: number | null;
+	estimatedCompactionTriggerTokens: number | null;
+	compactionCount: number;
+	lastCompactionAt: string | null;
+	lastCompactionBeforeInputTokens: number | null;
+	lastCompactionAfterInputTokens: number | null;
 	lastErrorAt: string | null;
 	lastErrorSeenAt: string | null;
 	lastErrorMessage: string | null;
@@ -166,6 +181,12 @@ function migrate(db: Database): void {
 				last_input_tokens INTEGER,
 				last_cached_input_tokens INTEGER,
 				last_output_tokens INTEGER,
+				max_input_tokens INTEGER,
+				estimated_compaction_trigger_tokens INTEGER,
+				compaction_count INTEGER NOT NULL DEFAULT 0,
+				last_compaction_at TEXT,
+				last_compaction_before_input_tokens INTEGER,
+				last_compaction_after_input_tokens INTEGER,
 				last_error_at TEXT,
 				last_error_seen_at TEXT,
 				last_error_message TEXT
@@ -178,6 +199,28 @@ function migrate(db: Database): void {
 		"last_cached_input_tokens INTEGER",
 	);
 	ensureThreadColumn(db, "last_output_tokens", "last_output_tokens INTEGER");
+	ensureThreadColumn(db, "max_input_tokens", "max_input_tokens INTEGER");
+	ensureThreadColumn(
+		db,
+		"estimated_compaction_trigger_tokens",
+		"estimated_compaction_trigger_tokens INTEGER",
+	);
+	ensureThreadColumn(
+		db,
+		"compaction_count",
+		"compaction_count INTEGER NOT NULL DEFAULT 0",
+	);
+	ensureThreadColumn(db, "last_compaction_at", "last_compaction_at TEXT");
+	ensureThreadColumn(
+		db,
+		"last_compaction_before_input_tokens",
+		"last_compaction_before_input_tokens INTEGER",
+	);
+	ensureThreadColumn(
+		db,
+		"last_compaction_after_input_tokens",
+		"last_compaction_after_input_tokens INTEGER",
+	);
 	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
@@ -388,6 +431,12 @@ export function listThreads(database: Database): ThreadRecord[] {
 						last_input_tokens AS lastInputTokens,
 						last_cached_input_tokens AS lastCachedInputTokens,
 						last_output_tokens AS lastOutputTokens,
+						max_input_tokens AS maxInputTokens,
+						estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+						compaction_count AS compactionCount,
+						last_compaction_at AS lastCompactionAt,
+						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
 						last_error_at AS lastErrorAt,
 						last_error_seen_at AS lastErrorSeenAt,
 						last_error_message AS lastErrorMessage
@@ -424,6 +473,12 @@ export function getThreadById(
 						last_input_tokens AS lastInputTokens,
 						last_cached_input_tokens AS lastCachedInputTokens,
 						last_output_tokens AS lastOutputTokens,
+						max_input_tokens AS maxInputTokens,
+						estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+						compaction_count AS compactionCount,
+						last_compaction_at AS lastCompactionAt,
+						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
 						last_error_at AS lastErrorAt,
 						last_error_seen_at AS lastErrorSeenAt,
 						last_error_message AS lastErrorMessage
@@ -566,6 +621,7 @@ export function setThreadUsage(
 	database: Database,
 	threadId: number,
 	usage: ThreadUsageInput,
+	compactionStats: ThreadCompactionStatsInput,
 ): void {
 	database.run(
 		`
@@ -574,12 +630,24 @@ export function setThreadUsage(
 				last_input_tokens = ?,
 				last_cached_input_tokens = ?,
 				last_output_tokens = ?,
+				max_input_tokens = ?,
+				estimated_compaction_trigger_tokens = ?,
+				compaction_count = ?,
+				last_compaction_at = ?,
+				last_compaction_before_input_tokens = ?,
+				last_compaction_after_input_tokens = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
 		usage.inputTokens,
 		usage.cachedInputTokens,
 		usage.outputTokens,
+		compactionStats.maxInputTokens,
+		compactionStats.estimatedCompactionTriggerTokens,
+		compactionStats.compactionCount,
+		compactionStats.lastCompactionAt,
+		compactionStats.lastCompactionBeforeInputTokens,
+		compactionStats.lastCompactionAfterInputTokens,
 		threadId,
 	);
 }
