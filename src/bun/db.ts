@@ -54,6 +54,7 @@ export type ThreadRecord = {
 	worktreePath: string;
 	title: string;
 	codexThreadId: string | null;
+	pinnedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
@@ -145,6 +146,7 @@ function migrate(db: Database): void {
 				worktree_path TEXT NOT NULL,
 				title TEXT NOT NULL,
 				codex_thread_id TEXT,
+				pinned_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				last_run_at TEXT,
@@ -156,6 +158,7 @@ function migrate(db: Database): void {
 	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
+	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
 	db.run(`
 			CREATE TABLE IF NOT EXISTS thread_messages (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -345,6 +348,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 					worktree_path AS worktreePath,
 					title,
 					codex_thread_id AS codexThreadId,
+					pinned_at AS pinnedAt,
 					created_at AS createdAt,
 					updated_at AS updatedAt,
 					last_run_at AS lastRunAt,
@@ -352,7 +356,12 @@ export function listThreads(database: Database): ThreadRecord[] {
 					last_error_seen_at AS lastErrorSeenAt,
 					last_error_message AS lastErrorMessage
 				FROM threads
-				ORDER BY updated_at DESC, created_at DESC, id DESC
+				ORDER BY
+					CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END ASC,
+					pinned_at DESC,
+					updated_at DESC,
+					created_at DESC,
+					id DESC
 			`,
 		)
 		.all();
@@ -371,6 +380,7 @@ export function getThreadById(
 					worktree_path AS worktreePath,
 					title,
 					codex_thread_id AS codexThreadId,
+					pinned_at AS pinnedAt,
 					created_at AS createdAt,
 					updated_at AS updatedAt,
 					last_run_at AS lastRunAt,
@@ -434,6 +444,45 @@ export function updateThreadCodexId(
 		codexThreadId,
 		threadId,
 	);
+}
+
+export function renameThread(
+	database: Database,
+	threadId: number,
+	title: string,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET title = ?
+			WHERE id = ?
+		`,
+		title,
+		threadId,
+	);
+}
+
+export function setThreadPinned(
+	database: Database,
+	threadId: number,
+	pinned: boolean,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET pinned_at = CASE
+				WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				ELSE NULL
+			END
+			WHERE id = ?
+		`,
+		pinned ? 1 : 0,
+		threadId,
+	);
+}
+
+export function deleteThread(database: Database, threadId: number): void {
+	database.run("DELETE FROM threads WHERE id = ?", threadId);
 }
 
 export function markThreadRan(database: Database, threadId: number): void {

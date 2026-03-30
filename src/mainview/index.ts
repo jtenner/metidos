@@ -199,6 +199,9 @@ const procedures: ProjectProcedures = {
 	getThread: (params) => sendRequest("getThread", params),
 	markThreadErrorSeen: (params) => sendRequest("markThreadErrorSeen", params),
 	sendThreadMessage: (params) => sendRequest("sendThreadMessage", params),
+	renameThread: (params) => sendRequest("renameThread", params),
+	setThreadPinned: (params) => sendRequest("setThreadPinned", params),
+	deleteThread: (params) => sendRequest("deleteThread", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
 };

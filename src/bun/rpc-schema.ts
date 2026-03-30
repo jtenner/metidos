@@ -61,6 +61,7 @@ export type RpcThread = {
 	worktreePath: string;
 	title: string;
 	codexThreadId: string | null;
+	pinnedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
@@ -200,6 +201,18 @@ export type AppRPCSchema = {
 			params: { threadId: number; input: string };
 			response: RpcThreadDetail;
 		};
+		renameThread: {
+			params: { threadId: number; title: string };
+			response: RpcThread;
+		};
+		setThreadPinned: {
+			params: { threadId: number; pinned: boolean };
+			response: RpcThread;
+		};
+		deleteThread: {
+			params: { threadId: number };
+			response: { success: boolean; threadId: number; message?: string };
+		};
 	};
 };
 
@@ -251,4 +264,13 @@ export interface ProjectProcedures {
 	sendThreadMessage: (
 		params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
 	) => Promise<AppRPCSchema["requests"]["sendThreadMessage"]["response"]>;
+	renameThread: (
+		params: AppRPCSchema["requests"]["renameThread"]["params"],
+	) => Promise<AppRPCSchema["requests"]["renameThread"]["response"]>;
+	setThreadPinned: (
+		params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
+	) => Promise<AppRPCSchema["requests"]["setThreadPinned"]["response"]>;
+	deleteThread: (
+		params: AppRPCSchema["requests"]["deleteThread"]["params"],
+	) => Promise<AppRPCSchema["requests"]["deleteThread"]["response"]>;
 }

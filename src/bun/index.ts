@@ -9,6 +9,7 @@ import {
 	createThreadProcedure,
 	createWorktreeProcedure,
 	deleteProjectProcedure,
+	deleteThreadProcedure,
 	getThreadProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectWorktreesProcedure,
@@ -17,7 +18,9 @@ import {
 	markThreadErrorSeenProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
+	renameThreadProcedure,
 	sendThreadMessageProcedure,
+	setThreadPinnedProcedure,
 	shutdownProjectPolling,
 } from "./project-procedures";
 import type { AppRPCSchema } from "./rpc-schema";
@@ -139,6 +142,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	getThread: (params) => getThreadProcedure(params),
 	markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
 	sendThreadMessage: (params) => sendThreadMessageProcedure(params),
+	renameThread: (params) => renameThreadProcedure(params),
+	setThreadPinned: (params) => setThreadPinnedProcedure(params),
+	deleteThread: (params) => deleteThreadProcedure(params),
 	openWorktree: (params) => openWorktreeProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 };

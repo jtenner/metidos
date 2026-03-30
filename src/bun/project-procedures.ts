@@ -8,6 +8,7 @@ import {
 	createThread,
 	createThreadMessage,
 	deleteProject,
+	deleteThread,
 	getProjectById,
 	getThreadById,
 	initAppDatabase,
@@ -17,7 +18,9 @@ import {
 	markThreadErrorSeen,
 	markThreadFailed,
 	markThreadRan,
+	renameThread,
 	setProjectClosed,
+	setThreadPinned,
 	touchThread,
 	updateThreadCodexId,
 	upsertProject,
@@ -1100,6 +1103,45 @@ export async function sendThreadMessageProcedure(
 	void runThreadMessageInBackground(thread.id, input, startedAt);
 
 	return buildThreadDetail(thread.id);
+}
+
+export async function renameThreadProcedure(
+	params: AppRPCSchema["requests"]["renameThread"]["params"],
+): Promise<RpcThread> {
+	const thread = threadById(params.threadId);
+	const title = params.title.trim();
+	if (!title) {
+		throw new Error("Thread title is required.");
+	}
+
+	renameThread(db, thread.id, title);
+	return toRpcThread(threadById(thread.id));
+}
+
+export async function setThreadPinnedProcedure(
+	params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
+): Promise<RpcThread> {
+	const thread = threadById(params.threadId);
+	setThreadPinned(db, thread.id, params.pinned);
+	return toRpcThread(threadById(thread.id));
+}
+
+export async function deleteThreadProcedure(
+	params: AppRPCSchema["requests"]["deleteThread"]["params"],
+): Promise<AppRPCSchema["requests"]["deleteThread"]["response"]> {
+	const thread = threadById(params.threadId);
+	if (threadRunStatusFromRecord(thread).state === "working") {
+		throw new Error("Thread is currently processing and cannot be deleted.");
+	}
+
+	codexThreadMap.delete(thread.id);
+	threadRunStatusMap.delete(thread.id);
+	deleteThread(db, thread.id);
+	return {
+		success: true,
+		threadId: thread.id,
+		message: `Deleted thread ${thread.title}`,
+	};
 }
 
 export async function openWorktreeProcedure(

@@ -81,6 +81,12 @@ type ProjectActionMenuState = {
 	y: number;
 };
 
+type ThreadActionMenuState = {
+	threadId: number;
+	x: number;
+	y: number;
+};
+
 type ThreadErrorLevel = "none" | "failed" | "unread";
 type ThreadErrorPreview = {
 	level: ThreadErrorLevel;
@@ -587,6 +593,19 @@ function formatDirectoryPathForInput(
 
 function sortThreads(items: RpcThread[]): RpcThread[] {
 	return [...items].sort((left, right) => {
+		const leftPinnedAt = left.pinnedAt ?? "";
+		const rightPinnedAt = right.pinnedAt ?? "";
+		if (leftPinnedAt || rightPinnedAt) {
+			if (!leftPinnedAt) {
+				return 1;
+			}
+			if (!rightPinnedAt) {
+				return -1;
+			}
+			if (leftPinnedAt !== rightPinnedAt) {
+				return rightPinnedAt.localeCompare(leftPinnedAt);
+			}
+		}
 		if (left.updatedAt !== right.updatedAt) {
 			return right.updatedAt.localeCompare(left.updatedAt);
 		}
@@ -601,6 +620,13 @@ function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
 	const next = items.filter((entry) => entry.id !== thread.id);
 	next.push(thread);
 	return sortThreads(next);
+}
+
+function removeThreadFromList(
+	items: RpcThread[],
+	threadId: number,
+): RpcThread[] {
+	return items.filter((entry) => entry.id !== threadId);
 }
 
 function clampProjectMenuCoordinate(
@@ -630,10 +656,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [addProjectOpen, setAddProjectOpen] = useState(false);
 	const [projectActionMenu, setProjectActionMenu] =
 		useState<ProjectActionMenuState | null>(null);
+	const [threadActionMenu, setThreadActionMenu] =
+		useState<ThreadActionMenuState | null>(null);
 	const [projectActionMenuLoading, setProjectActionMenuLoading] =
 		useState(false);
 	const [projectActionMenuError, setProjectActionMenuError] = useState("");
+	const [threadActionMenuError, setThreadActionMenuError] = useState("");
 	const [newWorktreeName, setNewWorktreeName] = useState("");
+	const [threadRenameTitle, setThreadRenameTitle] = useState("");
 	const [addProjectPath, setAddProjectPath] = useState("");
 	const [addProjectError, setAddProjectError] = useState("");
 	const [directorySuggestions, setDirectorySuggestions] = useState<string[]>(
@@ -650,6 +680,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [chatError, setChatError] = useState("");
 	const [isThreadLoading, setIsThreadLoading] = useState(false);
 	const [isCreatingThread, setIsCreatingThread] = useState(false);
+	const [threadActionBusy, setThreadActionBusy] = useState<
+		"rename" | "pin" | "delete" | null
+	>(null);
 	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -663,6 +696,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
+	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
@@ -760,6 +794,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			null
 		);
 	}, [projectActionMenu, projects]);
+
+	const threadActionMenuThread = useMemo(() => {
+		if (!threadActionMenu) {
+			return null;
+		}
+		return (
+			threads.find((thread) => thread.id === threadActionMenu.threadId) ?? null
+		);
+	}, [threadActionMenu, threads]);
 
 	const getProjectState = useCallback(
 		(projectId: number): ProjectNodeState =>
@@ -1205,6 +1248,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setNewWorktreeName("");
 	}, []);
 
+	const closeThreadActionMenu = useCallback(() => {
+		setThreadActionMenu(null);
+		setThreadActionMenuError("");
+		setThreadRenameTitle("");
+		setThreadActionBusy(null);
+	}, []);
+
 	const openProjectActionMenu = useCallback(
 		async (project: RpcProject, x: number, y: number) => {
 			const viewportWidth =
@@ -1213,6 +1263,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				typeof window === "undefined" ? 720 : window.innerHeight;
 			const requestId = ++projectActionMenuRequestId.current;
 
+			closeThreadActionMenu();
 			setProjectActionMenu({
 				projectId: project.id,
 				x: clampProjectMenuCoordinate(x, viewportWidth, 336),
@@ -1236,7 +1287,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			}
 		},
-		[loadProjectWorktrees],
+		[closeThreadActionMenu, loadProjectWorktrees],
+	);
+
+	const openThreadActionMenu = useCallback(
+		(thread: RpcThread, x: number, y: number) => {
+			const viewportWidth =
+				typeof window === "undefined" ? 1280 : window.innerWidth;
+			const viewportHeight =
+				typeof window === "undefined" ? 720 : window.innerHeight;
+
+			closeProjectActionMenu();
+			setThreadActionMenu({
+				threadId: thread.id,
+				x: clampProjectMenuCoordinate(x, viewportWidth, 336),
+				y: clampProjectMenuCoordinate(y, viewportHeight, 286),
+			});
+			setThreadActionMenuError("");
+			setThreadRenameTitle(thread.title);
+			setThreadActionBusy(null);
+		},
+		[closeProjectActionMenu],
 	);
 
 	const deleteTrackedProject = useCallback(
@@ -1294,6 +1365,94 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setProjectState,
 		],
 	);
+
+	const submitThreadRename = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault();
+			if (!threadActionMenuThread || threadActionBusy) {
+				return;
+			}
+
+			const title = threadRenameTitle.trim();
+			if (!title) {
+				setThreadActionMenuError("Enter a thread title.");
+				return;
+			}
+
+			setThreadActionBusy("rename");
+			setThreadActionMenuError("");
+			try {
+				const updatedThread = await procedures.renameThread({
+					threadId: threadActionMenuThread.id,
+					title,
+				});
+				setThreads((prev) => upsertThreadList(prev, updatedThread));
+				setThreadRenameTitle(updatedThread.title);
+			} catch (error) {
+				setThreadActionMenuError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setThreadActionBusy(null);
+			}
+		},
+		[procedures, threadActionBusy, threadActionMenuThread, threadRenameTitle],
+	);
+
+	const toggleThreadPinned = useCallback(async () => {
+		if (!threadActionMenuThread || threadActionBusy) {
+			return;
+		}
+
+		setThreadActionBusy("pin");
+		setThreadActionMenuError("");
+		try {
+			const updatedThread = await procedures.setThreadPinned({
+				threadId: threadActionMenuThread.id,
+				pinned: !threadActionMenuThread.pinnedAt,
+			});
+			setThreads((prev) => upsertThreadList(prev, updatedThread));
+		} catch (error) {
+			setThreadActionMenuError(
+				error instanceof Error ? error.message : String(error),
+			);
+		} finally {
+			setThreadActionBusy(null);
+		}
+	}, [procedures, threadActionBusy, threadActionMenuThread]);
+
+	const deleteSelectedThread = useCallback(async () => {
+		if (!threadActionMenuThread || threadActionBusy) {
+			return;
+		}
+
+		setThreadActionBusy("delete");
+		setThreadActionMenuError("");
+		try {
+			await procedures.deleteThread({
+				threadId: threadActionMenuThread.id,
+			});
+			setThreads((prev) =>
+				removeThreadFromList(prev, threadActionMenuThread.id),
+			);
+			if (selectedThreadId === threadActionMenuThread.id) {
+				clearThreadSelection();
+			}
+			closeThreadActionMenu();
+		} catch (error) {
+			setThreadActionMenuError(
+				error instanceof Error ? error.message : String(error),
+			);
+			setThreadActionBusy(null);
+		}
+	}, [
+		clearThreadSelection,
+		closeThreadActionMenu,
+		procedures,
+		selectedThreadId,
+		threadActionBusy,
+		threadActionMenuThread,
+	]);
 
 	const submitNewWorktree = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
@@ -1370,6 +1529,40 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			closeProjectActionMenu();
 		}
 	}, [closeProjectActionMenu, projectActionMenu, projectActionMenuProject]);
+
+	useEffect(() => {
+		if (!threadActionMenu) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if (
+				threadActionMenuRef.current &&
+				!threadActionMenuRef.current.contains(event.target as Node)
+			) {
+				closeThreadActionMenu();
+			}
+		};
+
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				closeThreadActionMenu();
+			}
+		};
+
+		document.addEventListener("mousedown", handlePointerDown);
+		document.addEventListener("keydown", handleKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", handlePointerDown);
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [closeThreadActionMenu, threadActionMenu]);
+
+	useEffect(() => {
+		if (threadActionMenu && !threadActionMenuThread) {
+			closeThreadActionMenu();
+		}
+	}, [closeThreadActionMenu, threadActionMenu, threadActionMenuThread]);
 
 	useEffect(() => {
 		const dismissErrorPreview = () => {
@@ -2341,6 +2534,127 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			</div>
 		) : null;
 
+	const threadActionMenuPanel =
+		threadActionMenu && threadActionMenuThread ? (
+			<div
+				className="fixed z-[95] w-80 overflow-hidden rounded-lg border border-[#2f3150] bg-[#11131d]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				ref={threadActionMenuRef}
+				style={{
+					left: threadActionMenu.x,
+					top: threadActionMenu.y,
+				}}
+			>
+				<div className="border-b border-[#262b40] bg-[#151827] px-3 py-3">
+					<div className="flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+								Thread Actions
+							</div>
+							<div className="truncate text-sm font-semibold text-[#f2f0ef]">
+								{threadActionMenuThread.title}
+							</div>
+							<div className="truncate text-[11px] text-[#8e8aa7]">
+								{formatPathForDisplay(
+									threadActionMenuThread.worktreePath,
+									homeDirectory,
+									supportsTildePath,
+								)}
+							</div>
+						</div>
+						<button
+							type="button"
+							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+							onClick={closeThreadActionMenu}
+						>
+							×
+						</button>
+					</div>
+				</div>
+				{threadActionMenuError ? (
+					<div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+						{threadActionMenuError}
+					</div>
+				) : null}
+				<form
+					className="border-b border-[#262b40] bg-[#141724] px-3 py-3"
+					onSubmit={submitThreadRename}
+				>
+					<label
+						className="block text-[10px] font-label uppercase tracking-widest text-[#8f89df]"
+						htmlFor="thread-rename-title"
+					>
+						Rename Thread
+					</label>
+					<div className="mt-2 flex items-center gap-2">
+						<input
+							id="thread-rename-title"
+							className="min-w-0 flex-1 rounded-sm border border-[#353a55] bg-[#10131d] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f89] focus:border-[#7d73ff]"
+							value={threadRenameTitle}
+							onChange={(event) => {
+								setThreadActionMenuError("");
+								setThreadRenameTitle(event.currentTarget.value);
+							}}
+							autoCapitalize="none"
+							autoCorrect="off"
+							spellCheck={false}
+						/>
+						<button
+							type="submit"
+							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							disabled={threadActionBusy !== null}
+						>
+							{threadActionBusy === "rename" ? "Saving" : "Save"}
+						</button>
+					</div>
+				</form>
+				<div className="space-y-2 px-3 py-3">
+					<button
+						type="button"
+						className="flex w-full items-center justify-between rounded-sm border border-[#2b3150] bg-[#141829] px-3 py-2 text-left text-sm text-[#f2f0ef] transition-colors hover:bg-[#1a1f34] disabled:cursor-not-allowed disabled:opacity-60"
+						onClick={() => {
+							void toggleThreadPinned();
+						}}
+						disabled={threadActionBusy !== null}
+					>
+						<span className="flex items-center gap-2">
+							<span
+								className="material-symbols-outlined text-[16px] text-[#d7d3ff]"
+								style={{ fontVariationSettings: "'FILL' 1" }}
+							>
+								push_pin
+							</span>
+							<span>
+								{threadActionMenuThread.pinnedAt
+									? "Unpin Thread"
+									: "Pin to Top"}
+							</span>
+						</span>
+						<span className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8e8aa7]">
+							{threadActionBusy === "pin" ? "Working" : "Pin"}
+						</span>
+					</button>
+					<button
+						type="button"
+						className="flex w-full items-center justify-between rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-left text-sm text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
+						onClick={() => {
+							void deleteSelectedThread();
+						}}
+						disabled={threadActionBusy !== null}
+					>
+						<span className="flex items-center gap-2">
+							<span className="material-symbols-outlined text-[16px]">
+								delete
+							</span>
+							<span>Delete Thread</span>
+						</span>
+						<span className="font-label text-[9px] uppercase tracking-[0.16em] text-[#ff8698]">
+							{threadActionBusy === "delete" ? "Deleting" : "Remove"}
+						</span>
+					</button>
+				</div>
+			</div>
+		) : null;
+
 	const projectTree = (
 		<div className="space-y-2">
 			{projects.length === 0 ? (
@@ -2595,6 +2909,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						const threadProject =
 							projects.find((project) => project.id === thread.projectId) ??
 							null;
+						const threadWorktree = threadProject
+							? (getProjectState(thread.projectId).worktrees.find(
+									(worktree) => worktree.path === thread.worktreePath,
+								) ?? null)
+							: null;
+						const threadBranchName =
+							threadWorktree?.branch?.trim() ||
+							(threadProject && thread.worktreePath === threadProject.path
+								? "Primary"
+								: "detached");
+						const threadFolderName = shortName(thread.worktreePath);
+						const threadPinned = Boolean(thread.pinnedAt);
 						const isActive = selectedThreadId === thread.id;
 						const isWorking = thread.runStatus.state === "working";
 						const hasRunError = thread.runStatus.state === "failed";
@@ -2613,6 +2939,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
 								}`}
 								{...errorPreviewHandlers(threadErrorPreviewText)}
+								onContextMenu={(event) => {
+									event.preventDefault();
+									event.stopPropagation();
+									hideErrorPreview();
+									openThreadActionMenu(
+										thread,
+										event.clientX + 6,
+										event.clientY + 6,
+									);
+								}}
 								onClick={() => {
 									hideErrorPreview();
 									void openThread(thread.id, {
@@ -2641,6 +2977,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										</div>
 									</div>
 									<div className="flex shrink-0 items-center gap-2">
+										{threadPinned ? (
+											<span
+												className="material-symbols-outlined text-[14px] text-[#d7d3ff]"
+												style={{ fontVariationSettings: "'FILL' 1" }}
+												title="Pinned"
+											>
+												push_pin
+											</span>
+										) : null}
 										{hasUnreadError ? (
 											<span className="rounded-full border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
 												Unread
@@ -2657,11 +3002,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									</div>
 								</div>
 								<div
-									className="mt-1 truncate text-[11px] text-[#8e8aa7]"
-									title={`${threadProject?.name ?? "Unknown project"} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
+									className="mt-1 flex min-w-0 items-center gap-1 text-[11px]"
+									title={`${threadBranchName} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
 								>
-									{threadProject?.name ?? "Unknown project"} |{" "}
-									{shortName(thread.worktreePath)}
+									<span className="min-w-0 truncate text-[#d7d7d7]">
+										{threadBranchName}
+									</span>
+									<span className="shrink-0 text-[#6f6f89]">|</span>
+									<span className="min-w-0 truncate text-[#8e8aa7]">
+										{threadFolderName}
+									</span>
 								</div>
 							</button>
 						);
@@ -3043,6 +3393,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</div>
 			) : null}
 			{projectActionMenuPanel}
+			{threadActionMenuPanel}
 		</div>
 	);
 }
