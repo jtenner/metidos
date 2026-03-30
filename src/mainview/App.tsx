@@ -3256,13 +3256,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								)}
 							</div>
 						</div>
-						<button
-							type="button"
-							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
-							onClick={closeProjectActionMenu}
-						>
-							×
-						</button>
+						<div className="flex items-center gap-1">
+							<button
+								type="button"
+								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] text-[#ff8ca0] transition-colors hover:bg-[#39161f] hover:text-[#ffd1d8]"
+								onClick={() =>
+									void deleteTrackedProject(projectActionMenuProject.id)
+								}
+								aria-label={`Remove ${projectActionMenuProject.name}`}
+								title="Remove Project"
+							>
+								<span className="material-symbols-outlined text-[18px]">
+									delete
+								</span>
+							</button>
+							<button
+								type="button"
+								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+								onClick={closeProjectActionMenu}
+								aria-label="Close project actions"
+							>
+								×
+							</button>
+						</div>
 					</div>
 				</div>
 				{projectActionMenuError ? (
@@ -3290,10 +3306,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						) : null}
 						{projectActionMenuWorktrees.map((worktree) => {
 							const worktreeState = getWorktreeState(
-								projectActionMenuProject.id,
-								worktree.path,
-							);
-							const activeWorktree = isActiveWorktree(
 								projectActionMenuProject.id,
 								worktree.path,
 							);
@@ -3336,9 +3348,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 													? "bg-[#ff304f]"
 													: worktreeErrorLevel === "failed"
 														? "bg-[#8f4956]"
-														: activeWorktree
-															? "bg-[#4fefb2]"
-															: "bg-transparent"
+														: "bg-transparent"
 											}`}
 										/>
 										<div
@@ -3397,17 +3407,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						Creates a new branch and sibling worktree folder.
 					</div>
 				</form>
-				<div className="border-t border-[#262b40] px-3 py-3">
-					<button
-						className="flex w-full items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#ff8ca0] transition-colors hover:bg-[#39161f]"
-						onClick={() =>
-							void deleteTrackedProject(projectActionMenuProject.id)
-						}
-						type="button"
-					>
-						Remove Project
-					</button>
-				</div>
 			</div>
 		) : null;
 
@@ -3571,8 +3570,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				filteredProjects.map((project) => {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
-					const isActiveThreadProject =
-						selectedThread?.projectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
 					const projectErrorPreviewText = projectThreadErrorPreviewText(
 						project.id,
@@ -3597,9 +3594,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const showWorktrees =
 						(state.expanded || Boolean(normalizedSidebarSearchQuery)) &&
 						!sidebarCollapsed;
-					const showActiveProjectIndicator =
-						isActiveThreadProject && !showWorktrees;
-					const projectIndicatorClass = showActiveProjectIndicator
+					const projectIndicatorClass = isActive
 						? "bg-[#4fefb2]"
 						: projectErrorLevel === "unread"
 							? "bg-[#ff304f]"
@@ -3694,9 +3689,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											project.id,
 											worktree.path,
 										);
-										const isActiveThreadWorktree =
-											selectedThread?.projectId === project.id &&
-											selectedThread.worktreePath === worktree.path;
 										const worktreeErrorLevel = worktreeThreadErrorLevel(
 											project.id,
 											worktree.path,
@@ -3748,9 +3740,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																? "bg-[#ff304f]"
 																: worktreeErrorLevel === "failed"
 																	? "bg-[#8f4956]"
-																	: isActiveThreadWorktree
-																		? "bg-[#4fefb2]"
-																		: "bg-transparent"
+																	: "bg-transparent"
 														}`}
 													/>
 													<div

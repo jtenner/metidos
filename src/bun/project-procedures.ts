@@ -654,10 +654,6 @@ type FileChangeActivityPayload = {
 	diffText: string;
 };
 
-function assistantChatActivityId(startedAt: string): string {
-	return `assistant:${startedAt}`;
-}
-
 function parseActivityPayload<T>(value: string | null): T | null {
 	if (!value) {
 		return null;
@@ -816,7 +812,8 @@ async function runThreadMessageInBackground(
 	input: string,
 	startedAt: string,
 ): Promise<void> {
-	let assistantText = "";
+	let lastAssistantText = "";
+	let lastAssistantItemId: string | null = null;
 	let terminalError: string | null = null;
 	let usage: RpcThreadUsage | null = null;
 
@@ -864,13 +861,14 @@ async function runThreadMessageInBackground(
 			if (item.type === "agent_message") {
 				const nextAssistantText = item.text.trim();
 				if (nextAssistantText) {
-					assistantText = nextAssistantText;
+					lastAssistantText = nextAssistantText;
+					lastAssistantItemId = item.id;
 				}
-				if (assistantText) {
+				if (nextAssistantText) {
 					await upsertAssistantChatActivity(
 						threadId,
-						startedAt,
-						assistantText,
+						item.id,
+						nextAssistantText,
 						event.type === "item.completed" ? "completed" : "in_progress",
 					);
 				}
@@ -900,14 +898,15 @@ async function runThreadMessageInBackground(
 			throw new Error(terminalError);
 		}
 
-		const finalAssistantText = assistantText.trim() || "No response returned.";
+		const finalAssistantText =
+			lastAssistantText.trim() || "No response returned.";
 		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
 			updateThreadCodexId(db, thread.id, codexThread.id);
 		}
-		if (assistantText.trim()) {
+		if (lastAssistantItemId && lastAssistantText.trim()) {
 			await upsertAssistantChatActivity(
 				threadId,
-				startedAt,
+				lastAssistantItemId,
 				finalAssistantText,
 				"completed",
 			);
@@ -931,11 +930,11 @@ async function runThreadMessageInBackground(
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		if (assistantText.trim()) {
+		if (lastAssistantItemId && lastAssistantText.trim()) {
 			await upsertAssistantChatActivity(
 				threadId,
-				startedAt,
-				assistantText,
+				lastAssistantItemId,
+				lastAssistantText,
 				"failed",
 			);
 		}
@@ -1154,13 +1153,13 @@ async function upsertReasoningActivity(
 
 async function upsertAssistantChatActivity(
 	threadId: number,
-	startedAt: string,
+	itemId: string,
 	text: string,
 	state: "in_progress" | "completed" | "failed",
 ): Promise<void> {
 	upsertThreadActivity(db, {
 		threadId,
-		itemId: assistantChatActivityId(startedAt),
+		itemId,
 		kind: "chat",
 		role: "assistant",
 		text,
