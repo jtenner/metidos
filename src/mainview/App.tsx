@@ -4132,7 +4132,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</div>
 							) : null}
 							{directorySuggestions.length > 0 ? (
-								<div className="app-scrollbar max-h-[34rem] overflow-y-auto">
+								<div className="app-scrollbar max-h-[30rem] overflow-y-auto overscroll-contain">
 									{directorySuggestions.map((directory) => {
 										const formattedDirectory = formatDirectoryPathForInput(
 											directory,

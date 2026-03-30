@@ -77,7 +77,6 @@ const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const TASK_POLL_INTERVAL_MS = 1_500;
-const DIRECTORY_SUGGESTION_LIMIT = 10;
 const GIT_HISTORY_ENTRY_LIMIT = 20;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
@@ -1227,9 +1226,7 @@ export async function listDirectorySuggestionsProcedure(
 				}
 				return safeIsDirectory(resolve(searchDirectory, entry));
 			}),
-		)
-			.slice(0, DIRECTORY_SUGGESTION_LIMIT)
-			.map((entry) => resolve(searchDirectory, entry));
+		).map((entry) => resolve(searchDirectory, entry));
 
 		return { directories };
 	} catch {
