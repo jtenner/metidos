@@ -104,7 +104,9 @@ export type RpcChatThreadMessage = {
 	threadId: number;
 	role: "assistant" | "user";
 	kind: "chat";
+	itemId: string | null;
 	text: string;
+	state: "in_progress" | "completed" | "failed" | null;
 	createdAt: string;
 	updatedAt: string;
 };

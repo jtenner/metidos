@@ -2877,6 +2877,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const visibleMessages = useMemo<VisibleMessage[]>(() => {
 		let messages: VisibleMessage[];
+		const hasInProgressAssistantChat = threadMessages.some(
+			(message) =>
+				message.kind === "chat" &&
+				message.role === "assistant" &&
+				message.state === "in_progress",
+		);
 		if (isThreadLoading) {
 			messages = [
 				{
@@ -2941,7 +2947,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				};
 			});
 		}
-		if (selectedThread?.runStatus.state === "working") {
+		if (
+			selectedThread?.runStatus.state === "working" &&
+			!hasInProgressAssistantChat
+		) {
 			messages.push({
 				kind: "chat",
 				speaker: "assistant",

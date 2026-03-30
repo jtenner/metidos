@@ -654,6 +654,10 @@ type FileChangeActivityPayload = {
 	diffText: string;
 };
 
+function assistantChatActivityId(startedAt: string): string {
+	return `assistant:${startedAt}`;
+}
+
 function parseActivityPayload<T>(value: string | null): T | null {
 	if (!value) {
 		return null;
@@ -728,7 +732,14 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 		threadId: message.threadId,
 		role: message.role,
 		kind: "chat",
+		itemId: message.itemId,
 		text: message.text,
+		state:
+			message.state === "in_progress" ||
+			message.state === "completed" ||
+			message.state === "failed"
+				? message.state
+				: null,
 		createdAt: message.createdAt,
 		updatedAt: message.updatedAt,
 	};
@@ -805,13 +816,14 @@ async function runThreadMessageInBackground(
 	input: string,
 	startedAt: string,
 ): Promise<void> {
+	let assistantText = "";
+	let terminalError: string | null = null;
+	let usage: RpcThreadUsage | null = null;
+
 	try {
 		const thread = threadById(threadId);
 		const codexThread = await ensureCodexThread(thread);
 		const { events } = await codexThread.runStreamed(input);
-		let assistantText = "";
-		let terminalError: string | null = null;
-		let usage: RpcThreadUsage | null = null;
 
 		for await (const event of events) {
 			if (event.type === "thread.started") {
@@ -850,7 +862,18 @@ async function runThreadMessageInBackground(
 
 			const item = event.item;
 			if (item.type === "agent_message") {
-				assistantText = item.text.trim() || assistantText;
+				const nextAssistantText = item.text.trim();
+				if (nextAssistantText) {
+					assistantText = nextAssistantText;
+				}
+				if (assistantText) {
+					await upsertAssistantChatActivity(
+						threadId,
+						startedAt,
+						assistantText,
+						event.type === "item.completed" ? "completed" : "in_progress",
+					);
+				}
 				continue;
 			}
 
@@ -881,11 +904,20 @@ async function runThreadMessageInBackground(
 		if (codexThread.id && codexThread.id !== thread.codexThreadId) {
 			updateThreadCodexId(db, thread.id, codexThread.id);
 		}
-		createThreadMessage(db, {
-			threadId,
-			role: "assistant",
-			text: finalAssistantText,
-		});
+		if (assistantText.trim()) {
+			await upsertAssistantChatActivity(
+				threadId,
+				startedAt,
+				finalAssistantText,
+				"completed",
+			);
+		} else {
+			createThreadMessage(db, {
+				threadId,
+				role: "assistant",
+				text: finalAssistantText,
+			});
+		}
 		if (usage) {
 			setThreadUsage(db, threadId, usage);
 		}
@@ -899,6 +931,14 @@ async function runThreadMessageInBackground(
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
+		if (assistantText.trim()) {
+			await upsertAssistantChatActivity(
+				threadId,
+				startedAt,
+				assistantText,
+				"failed",
+			);
+		}
 		const errorMessage = `Codex turn failed: ${message}`;
 		markThreadFailed(db, threadId, errorMessage);
 		setThreadRunStatus(threadId, {
@@ -1108,6 +1148,22 @@ async function upsertReasoningActivity(
 		itemId: item.id,
 		kind: "reasoning",
 		text: item.text.trim() || "Reasoning",
+		state,
+	});
+}
+
+async function upsertAssistantChatActivity(
+	threadId: number,
+	startedAt: string,
+	text: string,
+	state: "in_progress" | "completed" | "failed",
+): Promise<void> {
+	upsertThreadActivity(db, {
+		threadId,
+		itemId: assistantChatActivityId(startedAt),
+		kind: "chat",
+		role: "assistant",
+		text,
 		state,
 	});
 }

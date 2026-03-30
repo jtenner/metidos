@@ -39,7 +39,7 @@ type ThreadActivityInput = {
 	threadId: number;
 	itemId: string;
 	role?: "assistant" | "user";
-	kind: Exclude<ThreadActivityKind, "chat">;
+	kind: ThreadActivityKind;
 	text: string;
 	state: string | null;
 	payloadJson?: string | null;
