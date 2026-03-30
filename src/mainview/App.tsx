@@ -5265,94 +5265,111 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												: "No worktrees found."}
 										</div>
 									) : null}
-									{visibleWorktrees.map((worktree) => {
-										const wState = getWorktreeState(project.id, worktree.path);
-										const activeWorktree = isActiveWorktree(
-											project.id,
-											worktree.path,
-										);
-										const worktreeErrorLevel = worktreeThreadErrorLevel(
-											project.id,
-											worktree.path,
-										);
-										const worktreeErrorPreviewText =
-											worktreeThreadErrorPreviewText(project.id, worktree.path);
-										return (
-											<button
-												type="button"
-												key={worktree.path}
-												className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
-													activeWorktree
-														? "bg-[#25233a] text-[#f2f0ef]"
-														: wState.opened
-															? "bg-[#1f2020] text-[#f2f0ef]"
-															: "text-[#cfd1d4] hover:bg-[#202020]"
-												}`}
-												{...errorPreviewHandlers(worktreeErrorPreviewText)}
-												onClick={() => {
-													hideErrorPreview();
-													clearThreadSelection();
-													setThreadsError("");
-													selectProject(project, worktree.path);
-													void openOrCloseWorktree(project.id, worktree.path);
-												}}
-											>
-												<div
-													className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
-													style={{
-														gridTemplateColumns:
-															"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
-													}}
-												>
-													<span
-														className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
-														title={worktree.branch ?? "detached"}
-													>
-														{worktree.branch ?? "detached"}
-													</span>
-													<span
-														className="min-w-0 truncate text-sm leading-5"
-														title={shortName(worktree.path)}
-													>
-														{shortName(worktree.path)}
-													</span>
-													<span
-														className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-															worktreeErrorLevel === "unread"
-																? "bg-[#ff304f]"
-																: worktreeErrorLevel === "failed"
-																	? "bg-[#8f4956]"
-																	: "bg-transparent"
-														}`}
-													/>
-													<div
-														className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
-														title={formatPathForDisplay(
+									{visibleWorktrees.length > 0 ? (
+										<div className="app-scrollbar max-h-[18.75rem] overflow-y-auto overscroll-contain pr-1">
+											<div className="space-y-1">
+												{visibleWorktrees.map((worktree) => {
+													const wState = getWorktreeState(
+														project.id,
+														worktree.path,
+													);
+													const activeWorktree = isActiveWorktree(
+														project.id,
+														worktree.path,
+													);
+													const worktreeErrorLevel = worktreeThreadErrorLevel(
+														project.id,
+														worktree.path,
+													);
+													const worktreeErrorPreviewText =
+														worktreeThreadErrorPreviewText(
+															project.id,
 															worktree.path,
-															homeDirectory,
-															supportsTildePath,
-														)}
-													>
-														{formatPathForDisplay(
-															worktree.path,
-															homeDirectory,
-															supportsTildePath,
-														)}
-													</div>
-												</div>
-												{wState.loading ? (
-													<div className="text-xs text-[#8f8d8b]">
-														Syncing diff + file state...
-													</div>
-												) : null}
-												{wState.error ? (
-													<div className="text-xs text-[#ff6e84]">
-														{wState.error}
-													</div>
-												) : null}
-											</button>
-										);
-									})}
+														);
+													return (
+														<button
+															type="button"
+															key={worktree.path}
+															className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
+																activeWorktree
+																	? "bg-[#25233a] text-[#f2f0ef]"
+																	: wState.opened
+																		? "bg-[#1f2020] text-[#f2f0ef]"
+																		: "text-[#cfd1d4] hover:bg-[#202020]"
+															}`}
+															{...errorPreviewHandlers(
+																worktreeErrorPreviewText,
+															)}
+															onClick={() => {
+																hideErrorPreview();
+																clearThreadSelection();
+																setThreadsError("");
+																selectProject(project, worktree.path);
+																void openOrCloseWorktree(
+																	project.id,
+																	worktree.path,
+																);
+															}}
+														>
+															<div
+																className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
+																style={{
+																	gridTemplateColumns:
+																		"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
+																}}
+															>
+																<span
+																	className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
+																	title={worktree.branch ?? "detached"}
+																>
+																	{worktree.branch ?? "detached"}
+																</span>
+																<span
+																	className="min-w-0 truncate text-sm leading-5"
+																	title={shortName(worktree.path)}
+																>
+																	{shortName(worktree.path)}
+																</span>
+																<span
+																	className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+																		worktreeErrorLevel === "unread"
+																			? "bg-[#ff304f]"
+																			: worktreeErrorLevel === "failed"
+																				? "bg-[#8f4956]"
+																				: "bg-transparent"
+																	}`}
+																/>
+																<div
+																	className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+																	title={formatPathForDisplay(
+																		worktree.path,
+																		homeDirectory,
+																		supportsTildePath,
+																	)}
+																>
+																	{formatPathForDisplay(
+																		worktree.path,
+																		homeDirectory,
+																		supportsTildePath,
+																	)}
+																</div>
+															</div>
+															{wState.loading ? (
+																<div className="text-xs text-[#8f8d8b]">
+																	Syncing diff + file state...
+																</div>
+															) : null}
+															{wState.error ? (
+																<div className="text-xs text-[#ff6e84]">
+																	{wState.error}
+																</div>
+															) : null}
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									) : null}
 								</div>
 							) : null}
 						</div>
