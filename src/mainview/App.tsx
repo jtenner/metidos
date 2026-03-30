@@ -313,12 +313,33 @@ function CodexModelSelector({
 	const groupedModels = groupCodexModels(models);
 	const activeModel = findCodexModel(models, value);
 	const [open, setOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
 	const rootRef = useRef<HTMLDivElement | null>(null);
+	const searchInputRef = useRef<HTMLInputElement | null>(null);
 	const buttonLabel = activeModel
 		? codexModelLabel(activeModel)
 		: models.length === 0
 			? "Loading models"
 			: "Select model";
+	const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
+	const filteredGroups = useMemo(
+		() =>
+			groupedModels
+				.map((group) => ({
+					...group,
+					models: group.models.filter((model) =>
+						matchesSearchQuery(
+							normalizedSearchQuery,
+							model.id,
+							model.label,
+							model.summary,
+							model.group,
+						),
+					),
+				}))
+				.filter((group) => group.models.length > 0),
+		[groupedModels, normalizedSearchQuery],
+	);
 
 	useEffect(() => {
 		if (disabled && open) {
@@ -349,6 +370,14 @@ function CodexModelSelector({
 			document.removeEventListener("mousedown", handlePointerDown);
 			document.removeEventListener("keydown", handleKeyDown);
 		};
+	}, [open]);
+
+	useEffect(() => {
+		if (!open) {
+			setSearchQuery("");
+			return;
+		}
+		searchInputRef.current?.focus();
 	}, [open]);
 
 	return (
@@ -407,8 +436,46 @@ function CodexModelSelector({
 							: "rounded-2xl border-[#413e5e] bg-[#15161f]"
 					}`}
 				>
+					<div className="border-b border-[#3a355f] px-2 py-2">
+						<div className="flex items-center gap-2.5 rounded-md border border-[#3a355f] bg-[#101114] px-3 py-2">
+							{materialSymbol("search", "text-[15px] text-[#8f89df]")}
+							<input
+								ref={searchInputRef}
+								className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
+								placeholder="Search models"
+								value={searchQuery}
+								onChange={(event) => {
+									setSearchQuery(event.currentTarget.value);
+								}}
+								onKeyDown={(event) => {
+									event.stopPropagation();
+								}}
+								autoCapitalize="none"
+								autoCorrect="off"
+								spellCheck={false}
+							/>
+							{searchQuery ? (
+								<button
+									type="button"
+									className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1b1d28] hover:text-[#f2f0ef]"
+									onClick={() => {
+										setSearchQuery("");
+										searchInputRef.current?.focus();
+									}}
+									aria-label="Clear model search"
+								>
+									×
+								</button>
+							) : null}
+						</div>
+					</div>
 					<div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
-						{groupedModels.map((group) => (
+						{filteredGroups.length === 0 ? (
+							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+								No matching models.
+							</div>
+						) : null}
+						{filteredGroups.map((group) => (
 							<div key={group.group} className="px-2 pb-2 last:pb-0">
 								<div className="px-2 pb-1 pt-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
 									{group.group}
@@ -3037,7 +3104,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					{materialSymbol("search", "text-[16px] text-[#8f89df]")}
 					<input
 						className="min-w-0 flex-1 bg-transparent text-sm text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
-						placeholder="Search projects and threads"
 						value={sidebarSearchQuery}
 						onChange={(event) => {
 							setSidebarSearchQuery(event.currentTarget.value);
@@ -3097,6 +3163,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const showWorktrees =
 						(state.expanded || Boolean(normalizedSidebarSearchQuery)) &&
 						!sidebarCollapsed;
+					const projectIndicatorClass = isActive
+						? "bg-[#4fefb2]"
+						: projectErrorLevel === "unread"
+							? "bg-[#ff304f]"
+							: projectErrorLevel === "failed"
+								? "bg-[#8f4956]"
+								: project.isOpen
+									? "bg-[#4fefb2]"
+									: "bg-[#5f5f5f]";
 					return (
 						<div
 							className="space-y-1"
@@ -3110,14 +3185,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								);
 							}}
 						>
-							<div className="flex items-center gap-1">
+							<div
+								className={`group/project flex w-full items-center gap-1 rounded-sm transition-colors ${
+									isActive ? "bg-[#262626]" : "hover:bg-[#1f2020]"
+								}`}
+							>
 								<button
 									type="button"
-									className={`min-w-0 flex-1 rounded-sm px-3 py-2 text-left transition-colors ${
-										isActive
-											? "bg-[#262626] text-[#aaa4ff]"
-											: "text-[#d7d7d7] hover:bg-[#1f2020]"
-									}`}
+									className={`min-w-0 flex-1 px-3 py-2 text-left ${isActive ? "text-[#aaa4ff]" : "text-[#d7d7d7]"}`}
 									{...errorPreviewHandlers(projectErrorPreviewText)}
 									onClick={() => {
 										hideErrorPreview();
@@ -3129,15 +3204,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											{state.expanded ? "▾" : "▸"}
 										</span>
 										<span
-											className={`w-2 h-2 rounded-full ${
-												projectErrorLevel === "unread"
-													? "bg-[#ff304f]"
-													: projectErrorLevel === "failed"
-														? "bg-[#8f4956]"
-														: project.isOpen
-															? "bg-[#4fefb2]"
-															: "bg-[#5f5f5f]"
-											}`}
+											className={`w-2 h-2 rounded-full ${projectIndicatorClass}`}
 										/>
 										<div className="font-medium text-sm truncate">
 											{project.name}
@@ -3147,7 +3214,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{!sidebarCollapsed ? (
 									<button
 										type="button"
-										className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+										className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-all hover:bg-[#202537] hover:text-[#f2f0ef] ${
+											isActive
+												? "opacity-100"
+												: "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
+										}`}
 										onClick={(event) => {
 											event.stopPropagation();
 											const rect = event.currentTarget.getBoundingClientRect();
