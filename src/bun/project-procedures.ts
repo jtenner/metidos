@@ -35,6 +35,7 @@ import type {
 	RpcCreateWorktreeResult,
 	RpcOpenWorktreeResult,
 	RpcProject,
+	RpcProjectTask,
 	RpcProjectWorktreesResult,
 	RpcThread,
 	RpcThreadDetail,
@@ -307,6 +308,86 @@ function safeIsDirectory(path: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function safeIsFile(path: string): boolean {
+	try {
+		return statSync(path).isFile();
+	} catch {
+		return false;
+	}
+}
+
+function tasksDirectoryPath(worktreePath: string): string {
+	return resolve(worktreePath, ".tasks");
+}
+
+function taskTitleFromPath(taskPath: string): string {
+	return taskPath.replace(/\.[^./\\]+$/, "").replace(/\\/g, "/");
+}
+
+function listProjectTaskFiles(
+	tasksDirectory: string,
+	prefix = "",
+): RpcProjectTask[] {
+	if (!safeIsDirectory(tasksDirectory)) {
+		return [];
+	}
+
+	const tasks: RpcProjectTask[] = [];
+	for (const entry of sortDirectoryNames(
+		readdirSync(tasksDirectory).filter((value) => !value.startsWith(".")),
+	)) {
+		const fullPath = resolve(tasksDirectory, entry);
+		const relativePath = prefix ? `${prefix}/${entry}` : entry;
+		if (safeIsDirectory(fullPath)) {
+			tasks.push(...listProjectTaskFiles(fullPath, relativePath));
+			continue;
+		}
+		if (!safeIsFile(fullPath)) {
+			continue;
+		}
+		tasks.push({
+			path: relativePath.replace(/\\/g, "/"),
+			title: taskTitleFromPath(relativePath),
+		});
+	}
+
+	return tasks;
+}
+
+function resolveProjectTaskFilePath(
+	worktreePath: string,
+	taskPath: string,
+): string {
+	const normalizedTaskPath = taskPath
+		.trim()
+		.replace(/\\/g, "/")
+		.replace(/^\/+/, "");
+	if (!normalizedTaskPath) {
+		throw new Error("Task path is required.");
+	}
+
+	const tasksDirectory = tasksDirectoryPath(worktreePath);
+	if (!safeIsDirectory(tasksDirectory)) {
+		throw new Error(`No .tasks directory found in ${worktreePath}.`);
+	}
+
+	const fullPath = resolve(tasksDirectory, normalizedTaskPath);
+	const relativePath = relative(tasksDirectory, fullPath);
+	if (
+		relativePath === "" ||
+		relativePath === ".." ||
+		relativePath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+		relativePath.split(/[\\/]/).includes("..")
+	) {
+		throw new Error(`Task path must stay within ${tasksDirectory}.`);
+	}
+	if (!safeIsFile(fullPath)) {
+		throw new Error(`Task not found: ${normalizedTaskPath}`);
+	}
+
+	return fullPath;
 }
 
 function shortName(value: string): string {
@@ -1105,6 +1186,51 @@ async function findProjectWorktree(
 	return worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
 
+async function assertProjectWorktree(
+	project: ProjectRecord,
+	worktreePath: string,
+): Promise<RpcWorktree> {
+	const worktree = await findProjectWorktree(project, worktreePath);
+	if (!worktree) {
+		throw new Error(
+			`Worktree not found for project ${project.path}: ${worktreePath}`,
+		);
+	}
+	return worktree;
+}
+
+async function createThreadRecord(
+	project: ProjectRecord,
+	worktreePath: string,
+	model: string,
+): Promise<ThreadRecord> {
+	const worktree = await assertProjectWorktree(project, worktreePath);
+	const codexThread = codex.startThread(
+		codexThreadOptions(worktreePath, model),
+	);
+	try {
+		await initializeCodexThread(codexThread);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Unable to start Codex thread: ${message}`);
+	}
+
+	const codexThreadId = codexThread.id;
+	if (!codexThreadId) {
+		throw new Error("Codex did not provide a persistent thread id.");
+	}
+
+	const thread = createThread(db, {
+		projectId: project.id,
+		worktreePath,
+		title: buildThreadTitle(worktree, worktreePath),
+		model,
+		codexThreadId,
+	});
+	codexThreadMap.set(thread.id, codexThread);
+	return thread;
+}
+
 export async function openProjectProcedure(
 	params: AppRPCSchema["requests"]["openProject"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
@@ -1146,6 +1272,15 @@ export async function listProjectWorktreesProcedure(
 	};
 }
 
+export async function listProjectTasksProcedure(
+	params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
+): Promise<RpcProjectTask[]> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	await assertProjectWorktree(project, worktreePath);
+	return listProjectTaskFiles(tasksDirectoryPath(worktreePath));
+}
+
 export async function createWorktreeProcedure(
 	params: AppRPCSchema["requests"]["createWorktree"]["params"],
 ): Promise<RpcCreateWorktreeResult> {
@@ -1182,36 +1317,7 @@ export async function createThreadProcedure(
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	const model = resolveCodexModel(params.model);
-	const worktree = await findProjectWorktree(project, worktreePath);
-	if (!worktree) {
-		throw new Error(
-			`Worktree not found for project ${project.path}: ${worktreePath}`,
-		);
-	}
-
-	const codexThread = codex.startThread(
-		codexThreadOptions(worktreePath, model),
-	);
-	try {
-		await initializeCodexThread(codexThread);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Unable to start Codex thread: ${message}`);
-	}
-
-	const codexThreadId = codexThread.id;
-	if (!codexThreadId) {
-		throw new Error("Codex did not provide a persistent thread id.");
-	}
-
-	const thread = createThread(db, {
-		projectId: project.id,
-		worktreePath,
-		title: buildThreadTitle(worktree, worktreePath),
-		model,
-		codexThreadId,
-	});
-	codexThreadMap.set(thread.id, codexThread);
+	const thread = await createThreadRecord(project, worktreePath, model);
 	return buildThreadDetail(thread.id);
 }
 
@@ -1243,6 +1349,13 @@ export async function sendThreadMessageProcedure(
 		throw new Error("Thread input is required.");
 	}
 
+	return queueThreadMessage(thread, input);
+}
+
+async function queueThreadMessage(
+	thread: ThreadRecord,
+	input: string,
+): Promise<RpcThreadDetail> {
 	if (threadRunStatusFromRecord(thread).state === "working") {
 		throw new Error("Thread is already processing a message.");
 	}
@@ -1267,6 +1380,41 @@ export async function sendThreadMessageProcedure(
 	void runThreadMessageInBackground(thread.id, input, startedAt);
 
 	return buildThreadDetail(thread.id);
+}
+
+export async function runProjectTaskProcedure(
+	params: AppRPCSchema["requests"]["runProjectTask"]["params"],
+): Promise<RpcThreadDetail> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	await assertProjectWorktree(project, worktreePath);
+
+	const taskFilePath = resolveProjectTaskFilePath(
+		worktreePath,
+		params.taskPath,
+	);
+	const taskContent = (await Bun.file(taskFilePath).text()).trim();
+	if (!taskContent) {
+		throw new Error(`Task file is empty: ${params.taskPath}`);
+	}
+
+	let thread = params.threadId ? threadById(params.threadId) : null;
+	if (thread) {
+		if (
+			thread.projectId !== project.id ||
+			normalizePath(thread.worktreePath) !== worktreePath
+		) {
+			throw new Error("Selected task must run in the active worktree thread.");
+		}
+	} else {
+		thread = await createThreadRecord(
+			project,
+			worktreePath,
+			resolveCodexModel(params.model),
+		);
+	}
+
+	return queueThreadMessage(thread, taskContent);
 }
 
 export async function renameThreadProcedure(

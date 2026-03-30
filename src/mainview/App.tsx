@@ -19,6 +19,7 @@ import type {
 	ProjectProcedures,
 	RpcCodexModelOption,
 	RpcProject,
+	RpcProjectTask,
 	RpcThread,
 	RpcThreadMessage,
 	RpcThreadRunStatus,
@@ -536,6 +537,146 @@ function CodexModelSelector({
 	);
 }
 
+function ProjectTaskSelector({
+	tasks,
+	loading,
+	disabled,
+	onSelect,
+	variant,
+}: {
+	tasks: RpcProjectTask[];
+	loading: boolean;
+	disabled: boolean;
+	onSelect: (task: RpcProjectTask) => void;
+	variant: "desktop" | "mobile";
+}): JSX.Element {
+	const [open, setOpen] = useState(false);
+	const rootRef = useRef<HTMLDivElement | null>(null);
+	const buttonLabel = loading
+		? "Loading Tasks"
+		: tasks.length > 0
+			? `Tasks (${tasks.length})`
+			: "Tasks";
+
+	useEffect(() => {
+		if (disabled && open) {
+			setOpen(false);
+		}
+	}, [disabled, open]);
+
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+				setOpen(false);
+			}
+		};
+
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handlePointerDown);
+		document.addEventListener("keydown", handleKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", handlePointerDown);
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [open]);
+
+	return (
+		<div ref={rootRef} className="relative">
+			<button
+				type="button"
+				className={`flex items-center gap-2 transition-colors ${
+					variant === "desktop"
+						? "rounded-sm bg-[#191a1a] px-3 py-1.5 hover:bg-[#262626]"
+						: "rounded-full border border-[#484848]/20 bg-[#191a1a] px-3 py-1.5 hover:bg-[#262626]"
+				} ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+				onClick={() => {
+					if (!disabled) {
+						setOpen((current) => !current);
+					}
+				}}
+				disabled={disabled}
+				aria-expanded={open}
+				aria-haspopup="menu"
+			>
+				{materialSymbol(
+					"checklist",
+					variant === "desktop"
+						? "text-[#ff96bb] text-[16px]"
+						: "text-on-surface-variant text-sm",
+				)}
+				<span
+					className={`font-label uppercase ${
+						variant === "desktop"
+							? "text-[10px] font-bold text-[#f2f0ef]"
+							: "text-[10px] tracking-widest text-[#f2f0ef]"
+					}`}
+				>
+					{buttonLabel}
+				</span>
+			</button>
+			{open ? (
+				<div
+					className={`absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[18rem] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+						variant === "desktop"
+							? "rounded-md border-[#3a355f] bg-[#14131d]"
+							: "rounded-2xl border-[#413e5e] bg-[#15161f]"
+					}`}
+				>
+					<div className="border-b border-[#3a355f] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
+						Project Tasks
+					</div>
+					<div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
+						{loading ? (
+							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+								Loading tasks...
+							</div>
+						) : tasks.length === 0 ? (
+							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+								No task files found in `.tasks`.
+							</div>
+						) : (
+							tasks.map((task) => (
+								<button
+									key={task.path}
+									type="button"
+									className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1d1c2a]"
+									onClick={() => {
+										setOpen(false);
+										onSelect(task);
+									}}
+								>
+									<span className="mt-0.5 shrink-0 text-[#ff96bb]">
+										{materialSymbol("task_alt", "text-[16px]")}
+									</span>
+									<span className="min-w-0 flex-1">
+										<span className="block truncate font-label text-[10px] font-bold uppercase tracking-wider text-[#f2f0ef]">
+											{task.title}
+										</span>
+										{task.path !== task.title ? (
+											<span className="mt-1 block truncate text-[11px] leading-4 text-[#a6a0c9]">
+												{task.path}
+											</span>
+										) : null}
+									</span>
+								</button>
+							))
+						)}
+					</div>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
 function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
 	return (
 		thread?.runStatus ?? {
@@ -956,6 +1097,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
 	const [threads, setThreads] = useState<RpcThread[]>([]);
+	const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
 	const [defaultCodexModel, setDefaultCodexModel] = useState("");
 	const [pendingThreadModel, setPendingThreadModel] = useState("");
@@ -963,10 +1105,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [threadMessages, setThreadMessages] = useState<RpcThreadMessage[]>([]);
 	const [threadsError, setThreadsError] = useState("");
 	const [modelControlError, setModelControlError] = useState("");
+	const [taskControlError, setTaskControlError] = useState("");
 	const [chatError, setChatError] = useState("");
 	const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
 	const [isThreadLoading, setIsThreadLoading] = useState(false);
 	const [isCreatingThread, setIsCreatingThread] = useState(false);
+	const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
+	const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
 	const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
 	const [threadActionBusy, setThreadActionBusy] = useState<
 		"rename" | "pin" | "delete" | null
@@ -1188,6 +1333,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		return worktreeDisplayName(activeSelectedWorktree);
 	}, [activeSelectedWorktree, selectedProject, selectedThread]);
+
+	const taskSelectorDisabled =
+		!selectedProject ||
+		!activeSelectedWorktreePath ||
+		isLoadingProjectTasks ||
+		isRunningProjectTask ||
+		isSending ||
+		selectedThreadIsWorking ||
+		isThreadLoading;
 
 	const normalizedSidebarSearchQuery = useMemo(
 		() => normalizeSearchQuery(sidebarSearchQuery),
@@ -1990,6 +2144,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [defaultCodexModel, selectedThread]);
 
 	useEffect(() => {
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			setProjectTasks([]);
+			setIsLoadingProjectTasks(false);
+			return;
+		}
+
+		let cancelled = false;
+		setIsLoadingProjectTasks(true);
+		setTaskControlError("");
+		void (async () => {
+			try {
+				const tasks = await procedures.listProjectTasks({
+					projectId: selectedProject.id,
+					worktreePath: activeSelectedWorktreePath,
+				});
+				if (!cancelled) {
+					setProjectTasks(tasks);
+				}
+			} catch (error) {
+				if (!cancelled) {
+					setProjectTasks([]);
+					setTaskControlError(
+						error instanceof Error ? error.message : String(error),
+					);
+				}
+			} finally {
+				if (!cancelled) {
+					setIsLoadingProjectTasks(false);
+				}
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [activeSelectedWorktreePath, procedures, selectedProject]);
+
+	useEffect(() => {
 		if (!selectedThread || !selectedProjectId || !activeSelectedWorktreePath) {
 			return;
 		}
@@ -2138,6 +2330,58 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 		},
 		[isUpdatingThreadModel, procedures, selectedThread],
+	);
+
+	const runSelectedTask = useCallback(
+		async (task: RpcProjectTask) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				setTaskControlError("Select a project worktree before running a task.");
+				return;
+			}
+
+			setIsRunningProjectTask(true);
+			setTaskControlError("");
+			setThreadsError("");
+			setChatError("");
+			try {
+				const detail = await procedures.runProjectTask({
+					projectId: selectedProject.id,
+					worktreePath: activeSelectedWorktreePath,
+					taskPath: task.path,
+					threadId: selectedThread?.id ?? null,
+					model: selectedThread
+						? null
+						: activeCodexModel || defaultCodexModel || null,
+				});
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				setSelectedThreadId(detail.thread.id);
+				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+				setThreadMessages(detail.messages);
+				syncThreadContext(detail.thread);
+				setMobileProjectListOpen(false);
+				try {
+					await loadProjectWorktrees(detail.thread.projectId);
+				} catch {
+					// Best effort; task execution should still succeed without a worktree refresh.
+				}
+			} catch (error) {
+				setTaskControlError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setIsRunningProjectTask(false);
+			}
+		},
+		[
+			activeCodexModel,
+			activeSelectedWorktreePath,
+			defaultCodexModel,
+			loadProjectWorktrees,
+			procedures,
+			selectedProject,
+			selectedThread,
+			syncThreadContext,
+		],
 	);
 
 	const createThreadFromSelection = useCallback(async () => {
@@ -3658,12 +3902,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											variant="desktop"
 										/>
 									</div>
-									<div className="flex items-center bg-[#191a1a] px-3 py-1.5 rounded-sm gap-2 cursor-pointer hover:bg-[#262626] transition-colors">
-										{materialSymbol("checklist", "text-[#ff96bb] text-[16px]")}
-										<span className="font-label text-[10px] uppercase font-bold text-[#f2f0ef]">
-											Active Tasks (4)
-										</span>
-									</div>
+									<ProjectTaskSelector
+										tasks={projectTasks}
+										loading={isLoadingProjectTasks}
+										disabled={taskSelectorDisabled}
+										onSelect={(task) => {
+											void runSelectedTask(task);
+										}}
+										variant="desktop"
+									/>
 									<div className="flex-1" />
 									<span className="font-label text-[10px] text-[#adabaa] uppercase tracking-widest opacity-50">
 										842 Tokens
@@ -3672,6 +3919,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{modelControlError ? (
 									<div className="mt-2 text-xs text-[#ff6e84]">
 										{modelControlError}
+									</div>
+								) : null}
+								{taskControlError ? (
+									<div className="mt-2 text-xs text-[#ff6e84]">
+										{taskControlError}
 									</div>
 								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
@@ -3805,18 +4057,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									variant="mobile"
 								/>
 							</div>
-							<button
-								type="button"
-								className="flex items-center gap-2 bg-[#191a1a] px-3 py-1.5 rounded-full border border-[#484848]/20 hover:bg-[#262626] transition-colors"
-							>
-								{materialSymbol("checklist", "text-on-surface-variant text-sm")}
-								<span className="text-[10px] font-label uppercase tracking-widest">
-									Tasks
-								</span>
-							</button>
+							<ProjectTaskSelector
+								tasks={projectTasks}
+								loading={isLoadingProjectTasks}
+								disabled={taskSelectorDisabled}
+								onSelect={(task) => {
+									void runSelectedTask(task);
+								}}
+								variant="mobile"
+							/>
 						</div>
 						{modelControlError ? (
 							<div className="text-xs text-[#ff6e84]">{modelControlError}</div>
+						) : null}
+						{taskControlError ? (
+							<div className="text-xs text-[#ff6e84]">{taskControlError}</div>
 						) : null}
 						<div className="relative flex items-end gap-2 bg-[#191a1a] p-2 rounded-xl shadow-2xl border border-[#484848]/10">
 							<textarea
