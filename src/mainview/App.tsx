@@ -5,6 +5,7 @@ import {
 	type HTMLAttributes,
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -1556,7 +1557,7 @@ function SidebarSectionHeader({
 	onToggle,
 	action,
 }: {
-	title: string;
+	title: ReactNode;
 	open: boolean;
 	onToggle: () => void;
 	action?: JSX.Element | null;
@@ -5227,7 +5228,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const threadSection = (
 		<div className="border-t border-[#262626] px-3 py-3">
 			<SidebarSectionHeader
-				title="Threads"
+				title={
+					<>
+						<span>Threads</span>
+						<span className="font-medium normal-case text-[#85879a]">
+							{" - "}
+							{selectedProject ? shortName(selectedProject.path) : "No Project"}
+						</span>
+					</>
+				}
 				open={threadsSectionOpen}
 				onToggle={() => {
 					setThreadsSectionOpen((current) => !current);
