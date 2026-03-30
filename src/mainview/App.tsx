@@ -1995,8 +1995,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, []);
 
 	return (
-		<div className="min-h-screen bg-[#0e0e0e] text-[#ffffff]">
-			<div className="hidden md:flex flex-col min-h-screen">
+		<div className="h-screen overflow-hidden bg-[#0e0e0e] text-[#ffffff]">
+			<div className="hidden h-full md:flex md:flex-col">
 				<header className="flex justify-between items-center w-full px-6 h-14 bg-[#131313] border-b border-[#262626] z-50">
 					<div className="flex items-center gap-8">
 						<h1 className="text-xl font-black tracking-tighter text-[#aaa4ff]">
@@ -2054,9 +2054,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					) : null}
 				</div>
 
-				<main className="flex flex-1 min-h-0">
+				<main className="flex flex-1 min-h-0 overflow-hidden">
 					<aside
-						className={`shrink-0 border-r border-[#262626] bg-[#131313] transition-all duration-300 ${
+						className={`flex min-h-0 shrink-0 flex-col border-r border-[#262626] bg-[#131313] transition-all duration-300 ${
 							sidebarCollapsed ? "w-14" : "w-80"
 						}`}
 					>
@@ -2089,13 +2089,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</button>
 						</div>
 						{!sidebarCollapsed && addProjectOpen ? addProjectForm : null}
-						<div className="h-full overflow-y-auto py-2">
+						<div className="flex-1 overflow-y-auto py-2">
 							{projectTree}
 							{!sidebarCollapsed ? threadSection : null}
 						</div>
 					</aside>
 
-					<section className="flex-1 bg-[#0e0e0e] flex flex-col min-h-0">
+					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
 						<div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar">
 							<div className="max-w-4xl mx-auto mb-12">
 								<h1 className="font-headline text-4xl font-extrabold tracking-tight text-[#ffffff] mb-2">
@@ -2180,7 +2180,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</main>
 			</div>
 
-			<div className="md:hidden min-h-screen">
+			<div className="flex h-full flex-col overflow-hidden md:hidden">
 				<header className="fixed top-0 w-full z-50 bg-[#0e0e0e] flex items-center justify-between px-4 h-14">
 					<div className="flex items-center gap-3">
 						<button
@@ -2224,8 +2224,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</aside>
 				) : null}
 
-				<main className="pt-14 pb-52 min-h-screen px-4 flex flex-col gap-6 max-w-2xl mx-auto">
-					<div className="mt-6">
+				<main className="mx-auto flex w-full max-w-2xl flex-1 min-h-0 flex-col gap-6 px-4 pt-14 pb-16">
+					<div className="mt-6 shrink-0">
 						<div className="flex items-center gap-2 mb-1">
 							<span className="text-[10px] font-label uppercase tracking-widest text-[#aaa4ff]">
 								Active Session
@@ -2243,7 +2243,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								: "No worktree selected"}
 						</p>
 					</div>
-					<div className="flex-1 overflow-y-auto flex flex-col gap-8 hide-scrollbar pb-6">
+					<div className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar">
 						{renderMobileMessages}
 					</div>
 				</main>

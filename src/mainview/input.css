@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @source "../**/*.{html,js,jsx,ts,tsx}";
 
+html,
+body,
+#app {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: #0e0e0e;
+	overflow: hidden;
+}
+
 @font-face {
 	font-family: "Fira Code";
 	src: url("/fonts/fira-code-vf.woff2") format("woff2-variations");
