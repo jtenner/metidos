@@ -1926,6 +1926,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return worktreeDisplayName(activeSelectedWorktree);
 	}, [activeSelectedWorktree, selectedProject, selectedThread]);
 
+	const localUserLabel = useMemo(() => {
+		const normalizedHomeDirectory = homeDirectory.replace(/[\\/]+$/, "");
+		if (!normalizedHomeDirectory) {
+			return "User";
+		}
+		const label = shortName(normalizedHomeDirectory);
+		if (!label || label === "/" || /^[A-Za-z]:$/.test(label)) {
+			return "User";
+		}
+		return label;
+	}, [homeDirectory]);
+
 	const activeScreenTitle = selectedThread?.title ?? "No thread selected";
 	const activeScreenSubtitlePrimary = selectedProject
 		? activeSelectedWorktreeFolder
@@ -3906,8 +3918,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				key={`${message.speaker}-${index}`}
 			>
 				<div className="min-w-0 w-full max-w-2xl space-y-3 text-right">
-					<div className="font-label text-[10px] uppercase tracking-widest text-[#adabaa] font-bold">
-						Local User
+					<div className="font-body text-[13px] font-semibold tracking-[0.01em] text-[#b7b3b1]">
+						{localUserLabel}
 					</div>
 					<div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
 						<MarkdownMessage text={message.text} />
@@ -3960,9 +3972,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				className="flex flex-col items-end gap-2 max-w-[90%] self-end"
 				key={`${message.speaker}-${index}`}
 			>
-				<div className="flex items-center gap-2 text-[#adabaa] px-1">
-					<span className="text-[10px] font-label uppercase">User</span>
-					<span className="material-symbols-outlined text-xs">
+				<div className="flex items-center gap-2 px-1 text-[#b7b3b1]">
+					<span className="font-body text-[13px] font-semibold tracking-[0.01em]">
+						{localUserLabel}
+					</span>
+					<span className="material-symbols-outlined text-sm text-[#9f9b99]">
 						account_circle
 					</span>
 				</div>
