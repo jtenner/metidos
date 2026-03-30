@@ -21,12 +21,28 @@ type RpcResponseMessage = {
 	error?: string;
 };
 
+type RpcReloadMessage = {
+	type: "reload";
+	reason: string;
+};
+
+type RpcSocketMessage = RpcResponseMessage | RpcReloadMessage;
+
+type RuntimeConfig = {
+	devServer: boolean;
+};
+
 declare global {
 	interface Window {
 		jtIdeProcedures: ProjectProcedures;
 		__jtIdeAppMountedAt?: number;
+		__jtIdeRuntime?: RuntimeConfig;
 	}
 }
+
+const runtimeConfig: RuntimeConfig = window.__jtIdeRuntime ?? {
+	devServer: false,
+};
 
 const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const socket = new WebSocket(`${socketProtocol}//${window.location.host}/rpc`);
@@ -34,9 +50,71 @@ const pendingRequests = new Map<number, PendingRequest>();
 let nextRequestId = 1;
 let resolveConnection!: () => void;
 let rejectConnection!: (reason?: unknown) => void;
+let isPageUnloading = false;
+let devRecoveryScheduled = false;
+let devRecoveryTimer: number | null = null;
+
 const connectionReady = new Promise<void>((resolve, reject) => {
 	resolveConnection = resolve;
 	rejectConnection = reject;
+});
+
+function clearDevRecoveryTimer(): void {
+	if (devRecoveryTimer !== null) {
+		window.clearTimeout(devRecoveryTimer);
+		devRecoveryTimer = null;
+	}
+}
+
+function reloadWindow(reason: string): void {
+	if (!runtimeConfig.devServer || isPageUnloading) {
+		return;
+	}
+
+	console.info(`[jt-ide] reloading dev client (${reason})`);
+	isPageUnloading = true;
+	clearDevRecoveryTimer();
+	window.location.reload();
+}
+
+async function waitForDevServer(): Promise<void> {
+	if (!runtimeConfig.devServer || isPageUnloading) {
+		return;
+	}
+
+	try {
+		const response = await fetch("/health", {
+			cache: "no-store",
+		});
+		if (response.ok) {
+			reloadWindow("server-ready");
+			return;
+		}
+	} catch {
+		// Ignore transient failures while the watch process restarts.
+	}
+
+	devRecoveryTimer = window.setTimeout(() => {
+		void waitForDevServer();
+	}, 250);
+}
+
+function scheduleDevRecovery(reason: string): void {
+	if (!runtimeConfig.devServer || isPageUnloading || devRecoveryScheduled) {
+		return;
+	}
+
+	devRecoveryScheduled = true;
+	console.info(`[jt-ide] waiting for dev server restart (${reason})`);
+	clearDevRecoveryTimer();
+	devRecoveryTimer = window.setTimeout(() => {
+		void waitForDevServer();
+	}, 120);
+}
+
+window.addEventListener("beforeunload", () => {
+	isPageUnloading = true;
+	clearDevRecoveryTimer();
 });
 
 socket.addEventListener("open", () => {
@@ -44,10 +122,12 @@ socket.addEventListener("open", () => {
 });
 
 socket.addEventListener("message", (event) => {
-	const payload = JSON.parse(String(event.data)) as RpcResponseMessage;
-	if (payload.type !== "response") {
+	const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
+	if (payload.type === "reload") {
+		reloadWindow(payload.reason);
 		return;
 	}
+
 	const pending = pendingRequests.get(payload.id);
 	if (!pending) {
 		return;
@@ -67,6 +147,10 @@ socket.addEventListener("close", () => {
 		pending.reject(error);
 	}
 	pendingRequests.clear();
+
+	if (runtimeConfig.devServer) {
+		scheduleDevRecovery("rpc-close");
+	}
 });
 
 socket.addEventListener("error", () => {

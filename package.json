@@ -1,29 +1,29 @@
 {
-  "name": "jt-ide",
-  "private": true,
-  "version": "0.0.1",
-  "scripts": {
-    "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
-    "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
-    "start": "bun run dev",
-    "dev": "bun run tailwind:build && bun run src/bun/index.ts",
-    "dev:watch": "bun run tailwind:watch & bun --watch src/bun/index.ts",
-    "validate": "bunx biome check src/bun src/mainview/index.ts src/mainview/input.css",
-    "build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jt-ide-build --target browser",
-    "format": "bunx biome format src --write"
-  },
-  "dependencies": {
-    "@openai/codex-sdk": "^0.117.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@tailwindcss/cli": "^4.2.2",
-    "@types/bun": "latest",
-    "tailwindcss": "^4.2.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  }
+	"name": "jt-ide",
+	"private": true,
+	"version": "0.0.1",
+	"scripts": {
+		"tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
+		"tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
+		"start": "bun run tailwind:build && bun run src/bun/index.ts",
+		"dev": "bun run tailwind:watch & bun --watch src/bun/index.ts --dev",
+		"dev:watch": "bun run dev",
+		"validate": "bunx biome check src/bun src/mainview/index.ts src/mainview/input.css",
+		"build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jt-ide-build --target browser",
+		"format": "bunx biome format src --write"
+	},
+	"dependencies": {
+		"@openai/codex-sdk": "^0.117.0",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@tailwindcss/cli": "^4.2.2",
+		"@types/bun": "latest",
+		"tailwindcss": "^4.2.2"
+	},
+	"peerDependencies": {
+		"typescript": "^5.0.0"
+	}
 }

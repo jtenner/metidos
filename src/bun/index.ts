@@ -1,3 +1,4 @@
+import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
@@ -17,9 +18,13 @@ import {
 import type { AppRPCSchema } from "./rpc-schema";
 
 const DEFAULT_SERVER_PORT = "7599";
+const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
+const MAINVIEW_ENTRYPOINT = resolve(process.cwd(), "src/mainview/index.ts");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
 const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jt-ide-build");
+const MAINVIEW_RELOAD_DEBOUNCE_MS = 90;
+const MAINVIEW_WATCH_INTERVAL_MS = 250;
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -44,6 +49,13 @@ type RpcResponseMessage =
 			ok: false;
 			error: string;
 	  };
+
+type RpcReloadMessage = {
+	type: "reload";
+	reason: string;
+};
+
+type RpcSocketMessage = RpcResponseMessage | RpcReloadMessage;
 
 type RpcRequestHandlerMap = {
 	[K in keyof RpcRequestMap]: (
@@ -94,10 +106,10 @@ function resolveServerPort(args: string[], envPort?: string): number {
 	return parsedPort;
 }
 
-const SERVER_PORT = resolveServerPort(
-	Bun.argv.slice(2),
-	process.env.JT_IDE_PORT,
-);
+const SERVER_ARGS = Bun.argv.slice(2);
+const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JT_IDE_PORT);
+const IS_DEV_SERVER =
+	SERVER_ARGS.includes("--dev") || process.env.JT_IDE_DEV === "1";
 
 const rpcHandlers: RpcRequestHandlerMap = {
 	getHomeDirectory: async () => ({
@@ -117,7 +129,17 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 };
 
-function jsonResponse(body: string, contentType: string): Response {
+const rpcClients = new Set<ServerWebSocket<unknown>>();
+const pendingMainviewChanges = new Set<string>();
+
+let mainviewBundlePath = resolve(MAINVIEW_BUILD_DIR, "index.js");
+let mainviewBuildPromise: Promise<string> | null = null;
+let mainviewRebuildQueued = false;
+let devMainviewPollTimer: ReturnType<typeof setInterval> | null = null;
+let pendingMainviewReloadTimer: ReturnType<typeof setTimeout> | null = null;
+let mainviewFileStamps = new Map<string, number>();
+
+function stringResponse(body: string, contentType: string): Response {
 	return new Response(body, {
 		headers: {
 			"content-type": contentType,
@@ -133,6 +155,18 @@ function fileResponse(path: string, contentType: string): Response {
 			"cache-control": "no-store",
 		},
 	});
+}
+
+async function htmlResponse(): Promise<Response> {
+	const runtimeScript = `<script>window.__jtIdeRuntime=${JSON.stringify({
+		devServer: IS_DEV_SERVER,
+	})};</script>`;
+	const template = await Bun.file(MAINVIEW_HTML_PATH).text();
+	const html = template.includes("</head>")
+		? template.replace("</head>", `${runtimeScript}\n\t</head>`)
+		: `${runtimeScript}\n${template}`;
+
+	return stringResponse(html, "text/html; charset=utf-8");
 }
 
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
@@ -158,7 +192,7 @@ function toErrorMessage(error: unknown): string {
 
 async function buildMainviewBundle(): Promise<string> {
 	const buildResult = await Bun.build({
-		entrypoints: [resolve(process.cwd(), "src/mainview/index.ts")],
+		entrypoints: [MAINVIEW_ENTRYPOINT],
 		format: "esm",
 		minify: false,
 		outdir: MAINVIEW_BUILD_DIR,
@@ -183,13 +217,168 @@ async function buildMainviewBundle(): Promise<string> {
 	return mainviewBundle.path;
 }
 
+function queueMainviewBundleBuild(): Promise<string> {
+	if (mainviewBuildPromise) {
+		mainviewRebuildQueued = true;
+		return mainviewBuildPromise;
+	}
+
+	mainviewBuildPromise = (async () => {
+		try {
+			do {
+				mainviewRebuildQueued = false;
+				mainviewBundlePath = await buildMainviewBundle();
+			} while (mainviewRebuildQueued);
+
+			return mainviewBundlePath;
+		} finally {
+			mainviewBuildPromise = null;
+		}
+	})();
+
+	return mainviewBuildPromise;
+}
+
+function broadcastReload(reason: string): void {
+	if (!IS_DEV_SERVER || rpcClients.size === 0) {
+		return;
+	}
+
+	const payload: RpcReloadMessage = {
+		type: "reload",
+		reason,
+	};
+	const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+	for (const client of rpcClients) {
+		try {
+			client.send(raw);
+		} catch {
+			rpcClients.delete(client);
+		}
+	}
+}
+
+function normalizeWatchFilename(filename?: string | Buffer | null): string {
+	if (typeof filename === "string") {
+		return filename.trim();
+	}
+	if (filename) {
+		return filename.toString("utf8").trim();
+	}
+	return "";
+}
+
+function flushPendingMainviewReloads(): void {
+	pendingMainviewReloadTimer = null;
+	const changedFiles = [...pendingMainviewChanges].map((entry) =>
+		entry.toLowerCase(),
+	);
+	pendingMainviewChanges.clear();
+
+	const requiresBuild = changedFiles.some(
+		(entry) => !entry || entry.endsWith(".ts") || entry.endsWith(".tsx"),
+	);
+	const requiresReload =
+		requiresBuild ||
+		changedFiles.some(
+			(entry) => !entry || entry === "index.css" || entry === "index.html",
+		);
+	if (!requiresReload) {
+		return;
+	}
+
+	void (async () => {
+		if (requiresBuild) {
+			try {
+				await queueMainviewBundleBuild();
+			} catch (error) {
+				console.error(
+					"Failed to rebuild the mainview bundle after a source change",
+					error,
+				);
+				return;
+			}
+		}
+
+		broadcastReload(requiresBuild ? "mainview-source" : "mainview-asset");
+	})();
+}
+
+function enqueueMainviewReload(filename?: string | Buffer | null): void {
+	const normalizedFilename = normalizeWatchFilename(filename);
+	pendingMainviewChanges.add(normalizedFilename);
+
+	if (pendingMainviewReloadTimer) {
+		clearTimeout(pendingMainviewReloadTimer);
+	}
+	pendingMainviewReloadTimer = setTimeout(
+		flushPendingMainviewReloads,
+		MAINVIEW_RELOAD_DEBOUNCE_MS,
+	);
+}
+
+function readMainviewFileStamps(): Map<string, number> {
+	const nextStamps = new Map<string, number>();
+
+	for (const entry of readdirSync(MAINVIEW_SOURCE_DIR)) {
+		const entryPath = resolve(MAINVIEW_SOURCE_DIR, entry);
+		const stats = statSync(entryPath, {
+			throwIfNoEntry: false,
+		});
+		if (!stats?.isFile()) {
+			continue;
+		}
+		nextStamps.set(entry, stats.mtimeMs);
+	}
+
+	return nextStamps;
+}
+
+function startDevMainviewWatcher(): void {
+	if (!IS_DEV_SERVER || devMainviewPollTimer) {
+		return;
+	}
+
+	mainviewFileStamps = readMainviewFileStamps();
+	devMainviewPollTimer = setInterval(() => {
+		const nextStamps = readMainviewFileStamps();
+		for (const [entry, mtimeMs] of nextStamps) {
+			const previousMtimeMs = mainviewFileStamps.get(entry);
+			if (previousMtimeMs !== mtimeMs) {
+				enqueueMainviewReload(entry);
+			}
+		}
+		for (const entry of mainviewFileStamps.keys()) {
+			if (!nextStamps.has(entry)) {
+				enqueueMainviewReload(entry);
+			}
+		}
+		mainviewFileStamps = nextStamps;
+	}, MAINVIEW_WATCH_INTERVAL_MS);
+}
+
+function shutdownDevWatchers(): void {
+	if (devMainviewPollTimer) {
+		clearInterval(devMainviewPollTimer);
+		devMainviewPollTimer = null;
+	}
+	mainviewFileStamps.clear();
+
+	if (pendingMainviewReloadTimer) {
+		clearTimeout(pendingMainviewReloadTimer);
+		pendingMainviewReloadTimer = null;
+	}
+	pendingMainviewChanges.clear();
+}
+
 async function bootstrap(): Promise<void> {
 	initAppDatabase();
-	const mainviewBundlePath = await buildMainviewBundle();
+	await queueMainviewBundleBuild();
+	startDevMainviewWatcher();
 
 	const server = Bun.serve({
 		port: SERVER_PORT,
-		fetch(request, serverInstance) {
+		async fetch(request, serverInstance) {
 			const { pathname } = new URL(request.url);
 
 			if (pathname === "/rpc") {
@@ -200,7 +389,7 @@ async function bootstrap(): Promise<void> {
 			}
 
 			if (pathname === "/" || pathname === "/index.html") {
-				return fileResponse(MAINVIEW_HTML_PATH, "text/html; charset=utf-8");
+				return htmlResponse();
 			}
 
 			if (pathname === "/index.css") {
@@ -215,8 +404,12 @@ async function bootstrap(): Promise<void> {
 			}
 
 			if (pathname === "/health") {
-				return jsonResponse(
-					JSON.stringify({ ok: true, port: SERVER_PORT }),
+				return stringResponse(
+					JSON.stringify({
+						devServer: IS_DEV_SERVER,
+						ok: true,
+						port: SERVER_PORT,
+					}),
 					"application/json; charset=utf-8",
 				);
 			}
@@ -224,6 +417,12 @@ async function bootstrap(): Promise<void> {
 			return new Response("Not found", { status: 404 });
 		},
 		websocket: {
+			open(ws) {
+				rpcClients.add(ws);
+			},
+			close(ws) {
+				rpcClients.delete(ws);
+			},
 			message(ws, rawMessage) {
 				void (async () => {
 					try {
@@ -242,7 +441,7 @@ async function bootstrap(): Promise<void> {
 							result,
 							type: "response",
 						};
-						ws.send(JSON.stringify(response));
+						ws.send(JSON.stringify(response satisfies RpcSocketMessage));
 					} catch (error) {
 						let requestId = -1;
 						try {
@@ -261,22 +460,26 @@ async function bootstrap(): Promise<void> {
 							error: toErrorMessage(error),
 							type: "response",
 						};
-						ws.send(JSON.stringify(response));
+						ws.send(JSON.stringify(response satisfies RpcSocketMessage));
 					}
 				})();
 			},
 		},
 	});
 
-	console.log(`jt-ide web app listening on http://localhost:${server.port}`);
+	console.log(
+		`jt-ide web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
+	);
 }
 
 process.on("SIGINT", () => {
+	shutdownDevWatchers();
 	shutdownProjectPolling();
 	process.exit(0);
 });
 
 process.on("SIGTERM", () => {
+	shutdownDevWatchers();
 	shutdownProjectPolling();
 	process.exit(0);
 });

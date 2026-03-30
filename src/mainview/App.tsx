@@ -79,19 +79,38 @@ function defaultWorktreeState(): WorktreeNodeState {
 	};
 }
 
-function projectPathLabel(
-	project: RpcProject | null,
-	homeDirectory: string,
-	supportsTildePath: boolean,
+function findPrimaryWorktree(
+	project: RpcProject,
+	worktrees: RpcWorktree[],
+): RpcWorktree | null {
+	return worktrees.find((worktree) => worktree.path === project.path) ?? null;
+}
+
+function primaryWorktreePath(
+	project: RpcProject,
+	worktrees: RpcWorktree[],
 ): string {
-	if (!project) {
-		return "No project selected";
-	}
-	return `${project.name} · ${formatPathForDisplay(
-		project.path,
-		homeDirectory,
-		supportsTildePath,
-	)}`;
+	return findPrimaryWorktree(project, worktrees)?.path ?? project.path;
+}
+
+function orderProjectWorktrees(
+	project: RpcProject,
+	worktrees: RpcWorktree[],
+): RpcWorktree[] {
+	const primaryPath = primaryWorktreePath(project, worktrees);
+	return [...worktrees].sort((left, right) => {
+		if (left.path === primaryPath && right.path !== primaryPath) {
+			return -1;
+		}
+		if (right.path === primaryPath && left.path !== primaryPath) {
+			return 1;
+		}
+		return 0;
+	});
+}
+
+function worktreeDisplayName(worktree: RpcWorktree | null): string {
+	return worktree?.branch ?? "Primary";
 }
 
 function materialSymbol(name: string, className = ""): JSX.Element {
@@ -202,17 +221,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return projects.find((entry) => entry.id === selectedProjectId) ?? null;
 	}, [projects, selectedProjectId]);
 
-	const selectedProjectPathLabel = useMemo(() => {
-		if (!selectedProject) {
-			return "/";
-		}
-		return formatPathForDisplay(
-			selectedProject.path,
-			homeDirectory,
-			supportsTildePath,
-		);
-	}, [homeDirectory, selectedProject, supportsTildePath]);
-
 	const projectActionMenuProject = useMemo(() => {
 		if (!projectActionMenu) {
 			return null;
@@ -241,8 +249,80 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!projectActionMenuProject) {
 			return [];
 		}
-		return getProjectState(projectActionMenuProject.id).worktrees;
+		return orderProjectWorktrees(
+			projectActionMenuProject,
+			getProjectState(projectActionMenuProject.id).worktrees,
+		);
 	}, [getProjectState, projectActionMenuProject]);
+
+	const selectProject = useCallback(
+		(project: RpcProject, worktreePath?: string | null): void => {
+			setSelectedProjectId(project.id);
+			setSelectedWorktreePath(
+				worktreePath ??
+					primaryWorktreePath(project, getProjectState(project.id).worktrees),
+			);
+		},
+		[getProjectState],
+	);
+
+	const selectedProjectWorktrees = useMemo(() => {
+		if (!selectedProject) {
+			return [];
+		}
+		return orderProjectWorktrees(
+			selectedProject,
+			getProjectState(selectedProject.id).worktrees,
+		);
+	}, [selectedProject, getProjectState]);
+
+	const activeSelectedWorktreePath = useMemo(() => {
+		if (!selectedProject) {
+			return null;
+		}
+		if (
+			selectedWorktreePath &&
+			(selectedWorktreePath === selectedProject.path ||
+				selectedProjectWorktrees.some(
+					(worktree) => worktree.path === selectedWorktreePath,
+				))
+		) {
+			return selectedWorktreePath;
+		}
+		return primaryWorktreePath(selectedProject, selectedProjectWorktrees);
+	}, [selectedProject, selectedProjectWorktrees, selectedWorktreePath]);
+
+	const activeSelectedWorktree = useMemo(() => {
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			return null;
+		}
+		return (
+			selectedProjectWorktrees.find(
+				(worktree) => worktree.path === activeSelectedWorktreePath,
+			) ?? findPrimaryWorktree(selectedProject, selectedProjectWorktrees)
+		);
+	}, [activeSelectedWorktreePath, selectedProject, selectedProjectWorktrees]);
+
+	const activeSelectedWorktreeFolder = useMemo(() => {
+		if (!activeSelectedWorktreePath) {
+			return "No worktree selected";
+		}
+		return shortName(activeSelectedWorktreePath);
+	}, [activeSelectedWorktreePath]);
+
+	const activeSelectedWorktreeName = useMemo(() => {
+		if (!selectedProject) {
+			return "";
+		}
+		return worktreeDisplayName(activeSelectedWorktree);
+	}, [activeSelectedWorktree, selectedProject]);
+
+	const isActiveWorktree = useCallback(
+		(projectId: number, worktreePath: string): boolean =>
+			selectedProjectId === projectId &&
+			activeSelectedWorktreePath === worktreePath,
+		[activeSelectedWorktreePath, selectedProjectId],
+	);
 
 	const setProjectState = useCallback(
 		(projectId: number, update: Partial<ProjectNodeState>): void => {
@@ -354,6 +434,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				),
 		);
 		setSelectedProjectId((current) => current ?? loaded[0]?.id ?? null);
+		setSelectedWorktreePath((current) => current ?? loaded[0]?.path ?? null);
 	}, [hydrateProjectRows, procedures]);
 
 	const closeAddProjectForm = useCallback(() => {
@@ -394,7 +475,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				typeof window === "undefined" ? 720 : window.innerHeight;
 			const requestId = ++projectActionMenuRequestId.current;
 
-			setSelectedProjectId(project.id);
 			setProjectActionMenu({
 				projectId: project.id,
 				x: clampProjectMenuCoordinate(x, viewportWidth, 336),
@@ -436,7 +516,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					return loaded[0]?.id ?? null;
 				});
 				if (selectedProjectId === projectId) {
-					setSelectedWorktreePath(null);
+					setSelectedWorktreePath(loaded[0]?.path ?? null);
 				}
 				setProjectActionMenu((current) =>
 					current?.projectId === projectId ? null : current,
@@ -618,8 +698,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					worktrees: result.worktrees,
 					openWorktrees: existingState.openWorktrees,
 				});
-				setSelectedProjectId(result.project.id);
-				setSelectedWorktreePath(null);
+				selectProject(result.project, result.project.path);
 				resetAddProjectPath();
 				setAddProjectOpen(false);
 				setMobileProjectListOpen(false);
@@ -638,6 +717,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			isAddingProject,
 			procedures,
 			resetAddProjectPath,
+			selectProject,
 			setProjectState,
 		],
 	);
@@ -681,11 +761,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				} catch {
 					// best effort
 				}
-				if (
-					topProjectPath(selectedWorktreePath) &&
-					recordedWorktreeSelection(selectedProjectId, project.id)
-				) {
-					setSelectedWorktreePath(null);
+				if (selectedProjectId === project.id) {
+					setSelectedWorktreePath(project.path);
 				}
 				return;
 			}
@@ -701,7 +778,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					error: "",
 				});
 				if (!selectedProjectId) {
-					setSelectedProjectId(project.id);
+					selectProject(project);
 				}
 			} catch (error) {
 				setProjectState(project.id, {
@@ -715,8 +792,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			getProjectState,
 			setProjectState,
 			procedures,
-			selectedWorktreePath,
 			selectedProjectId,
+			selectProject,
 		],
 	);
 
@@ -745,7 +822,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						),
 					});
 					if (selectedWorktreePath === worktreePath) {
-						setSelectedWorktreePath(null);
+						setSelectedWorktreePath(
+							projects.find((project) => project.id === projectId)?.path ??
+								null,
+						);
 					}
 				} catch {
 					setWorktreeState(projectId, worktreePath, {
@@ -783,6 +863,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			getProjectState,
 			getWorktreeState,
 			procedures,
+			projects,
 			selectedWorktreePath,
 			setProjectState,
 			setWorktreeState,
@@ -804,27 +885,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				{
 					speaker: "assistant",
 					text: `Queued action against ${
-						selectedWorktreePath
-							? shortName(selectedWorktreePath)
-							: projectPathLabel(
-									selectedProject,
-									homeDirectory,
-									supportsTildePath,
-								)
+						selectedProject
+							? `${selectedProject.name} · ${activeSelectedWorktreeFolder}`
+							: "No project selected"
 					}.`,
 					isSuggestion: true,
 				},
 			]);
 			setIsSending(false);
 		}, 500);
-	}, [
-		chatInput,
-		homeDirectory,
-		isSending,
-		selectedProject,
-		selectedWorktreePath,
-		supportsTildePath,
-	]);
+	}, [activeSelectedWorktreeFolder, chatInput, isSending, selectedProject]);
 
 	const onSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
@@ -1127,6 +1197,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								projectActionMenuProject.id,
 								worktree.path,
 							);
+							const activeWorktree = isActiveWorktree(
+								projectActionMenuProject.id,
+								worktree.path,
+							);
 							return (
 								<div
 									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
@@ -1140,7 +1214,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											{shortName(worktree.path)}
 										</span>
 										<span className="ml-auto text-[10px] uppercase tracking-widest text-[#adabaa]">
-											{worktreeState.opened ? "Tracking" : "Idle"}
+											{activeWorktree
+												? "Active"
+												: worktreeState.opened
+													? "Tracking"
+													: "Idle"}
 										</span>
 									</div>
 									<div className="truncate text-[11px] text-[#8e8aa7]">
@@ -1238,9 +1316,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}`}
 									onClick={() => {
 										void refreshProject(project);
-										if (!isActive) {
-											setSelectedProjectId(project.id);
-										}
 									}}
 								>
 									<div className="flex items-center gap-2">
@@ -1294,49 +1369,61 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											No worktrees found.
 										</div>
 									) : null}
-									{state.worktrees.map((worktree) => {
-										const wState = getWorktreeState(project.id, worktree.path);
-										return (
-											<button
-												type="button"
-												key={worktree.path}
-												className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
-													wState.opened
-														? "bg-[#1f2020] text-[#f2f0ef]"
-														: "text-[#cfd1d4] hover:bg-[#202020]"
-												}`}
-												onClick={() => {
-													void openOrCloseWorktree(project.id, worktree.path);
-													setSelectedProjectId(project.id);
-													if (!sidebarCollapsed) {
-														setSelectedWorktreePath(worktree.path);
-													}
-												}}
-											>
-												<div className="flex items-center gap-2">
-													<span className="font-mono text-xs text-[#948def]">
-														{worktree.branch ?? "detached"}
-													</span>
-													<span className="text-sm">
-														{shortName(worktree.path)}
-													</span>
-													<span className="ml-auto text-[10px] uppercase tracking-wide text-[#adabaa]">
-														{wState.opened ? "Tracking" : "Closed"}
-													</span>
-												</div>
-												{wState.loading ? (
-													<div className="text-xs text-[#8f8d8b]">
-														Syncing diff + file state...
+									{orderProjectWorktrees(project, state.worktrees).map(
+										(worktree) => {
+											const wState = getWorktreeState(
+												project.id,
+												worktree.path,
+											);
+											const activeWorktree = isActiveWorktree(
+												project.id,
+												worktree.path,
+											);
+											return (
+												<button
+													type="button"
+													key={worktree.path}
+													className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
+														activeWorktree
+															? "bg-[#25233a] text-[#f2f0ef]"
+															: wState.opened
+																? "bg-[#1f2020] text-[#f2f0ef]"
+																: "text-[#cfd1d4] hover:bg-[#202020]"
+													}`}
+													onClick={() => {
+														selectProject(project, worktree.path);
+														void openOrCloseWorktree(project.id, worktree.path);
+													}}
+												>
+													<div className="flex items-center gap-2">
+														<span className="font-mono text-xs text-[#948def]">
+															{worktree.branch ?? "detached"}
+														</span>
+														<span className="text-sm">
+															{shortName(worktree.path)}
+														</span>
+														<span className="ml-auto text-[10px] uppercase tracking-wide text-[#adabaa]">
+															{activeWorktree
+																? "Active"
+																: wState.opened
+																	? "Tracking"
+																	: "Closed"}
+														</span>
 													</div>
-												) : null}
-												{wState.error ? (
-													<div className="text-xs text-[#ff6e84]">
-														{wState.error}
-													</div>
-												) : null}
-											</button>
-										);
-									})}
+													{wState.loading ? (
+														<div className="text-xs text-[#8f8d8b]">
+															Syncing diff + file state...
+														</div>
+													) : null}
+													{wState.error ? (
+														<div className="text-xs text-[#ff6e84]">
+															{wState.error}
+														</div>
+													) : null}
+												</button>
+											);
+										},
+									)}
 								</div>
 							) : null}
 						</div>
@@ -1403,18 +1490,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</header>
 
 				<div className="h-10 bg-[#131313] flex items-center px-6 gap-2">
-					<span className="font-label text-xs font-bold text-[#aaa4ff]">
+					<span className="font-label text-xs font-bold text-[#aaa4ff] shrink-0">
 						{selectedProject?.name ?? "No project selected"}
 					</span>
-					<span className="text-on-surface-variant/40 text-xs">—</span>
-					<span className="font-label text-xs text-[#f2f0ef]">
-						{selectedProjectPathLabel}
-					</span>
-					{selectedWorktreePath ? (
+					{selectedProject ? (
 						<>
-							<span className="text-on-surface-variant/40 text-xs">—</span>
-							<span className="font-label text-xs text-[#adabaa]">
-								{shortName(selectedWorktreePath)}
+							<span className="text-[#4f5269] text-xs shrink-0">|</span>
+							<span className="font-label text-xs text-[#f2f0ef] truncate">
+								{activeSelectedWorktreeFolder}
+							</span>
+							<span className="font-label text-xs text-[#8f8d8b] truncate">
+								{activeSelectedWorktreeName}
 							</span>
 						</>
 					) : null}
@@ -1578,9 +1664,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							{selectedProject?.name ?? "No project selected"}
 						</h2>
 						<p className="text-xs text-[#adabaa] mt-1">
-							{selectedWorktreePath
-								? shortName(selectedWorktreePath)
-								: "Main branch context"}
+							{selectedProject
+								? `${activeSelectedWorktreeFolder} · ${activeSelectedWorktreeName}`
+								: "No worktree selected"}
 						</p>
 					</div>
 					<div className="flex-1 overflow-y-auto flex flex-col gap-8 hide-scrollbar pb-6">
@@ -1670,15 +1756,4 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			{projectActionMenuPanel}
 		</div>
 	);
-}
-
-function recordedWorktreeSelection(
-	current: number | null,
-	target: number,
-): boolean {
-	return current !== target;
-}
-
-function topProjectPath(value: string | null): boolean {
-	return value !== null && value !== "";
 }
