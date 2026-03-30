@@ -1,6 +1,6 @@
 import {
-	type ChangeEvent,
 	type CSSProperties,
+	type ChangeEvent,
 	type FormEvent,
 	type HTMLAttributes,
 	type KeyboardEvent,
@@ -102,12 +102,31 @@ type ErrorPreviewPopoverState = {
 	y: number;
 };
 
+type PersistedOpenWorktree = {
+	projectId: number;
+	worktreePath: string;
+};
+
+type PersistedMainviewState = {
+	version: number;
+	selectedProjectId: number | null;
+	selectedWorktreePath: string | null;
+	selectedThreadId: number | null;
+	pendingThreadModel: string;
+	chatInput: string;
+	sidebarCollapsed: boolean;
+	sidebarSearchQuery: string;
+	openWorktrees: PersistedOpenWorktree[];
+};
+
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
 const COMPOSER_MAX_HEIGHT_PX = 240;
+const MAINVIEW_STATE_STORAGE_KEY = "jt-ide:mainview-state";
+const MAINVIEW_STATE_STORAGE_VERSION = 1;
 
 const codeBlockStyle = {
 	margin: 0,
@@ -253,6 +272,123 @@ function orderProjectWorktrees(
 
 function worktreeDisplayName(worktree: RpcWorktree | null): string {
 	return worktree?.branch ?? "Primary";
+}
+
+function defaultPersistedMainviewState(): PersistedMainviewState {
+	return {
+		version: MAINVIEW_STATE_STORAGE_VERSION,
+		selectedProjectId: null,
+		selectedWorktreePath: null,
+		selectedThreadId: null,
+		pendingThreadModel: "",
+		chatInput: "",
+		sidebarCollapsed: false,
+		sidebarSearchQuery: "",
+		openWorktrees: [],
+	};
+}
+
+function normalizePersistedOpenWorktrees(
+	value: unknown,
+): PersistedOpenWorktree[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	const next: PersistedOpenWorktree[] = [];
+	const seen = new Set<string>();
+	for (const entry of value) {
+		if (!entry || typeof entry !== "object") {
+			continue;
+		}
+		const candidate = entry as Partial<PersistedOpenWorktree>;
+		const projectId = candidate.projectId;
+		const worktreePath = candidate.worktreePath;
+		if (!Number.isInteger(projectId) || projectId < 1) {
+			continue;
+		}
+		if (typeof worktreePath !== "string" || !worktreePath.trim()) {
+			continue;
+		}
+
+		const key = `${projectId}:${worktreePath}`;
+		if (seen.has(key)) {
+			continue;
+		}
+
+		seen.add(key);
+		next.push({
+			projectId,
+			worktreePath,
+		});
+	}
+
+	return next;
+}
+
+function readPersistedMainviewState(): PersistedMainviewState {
+	const fallback = defaultPersistedMainviewState();
+	if (typeof window === "undefined") {
+		return fallback;
+	}
+
+	try {
+		const raw = window.sessionStorage.getItem(MAINVIEW_STATE_STORAGE_KEY);
+		if (!raw) {
+			return fallback;
+		}
+
+		const parsed = JSON.parse(raw) as Partial<PersistedMainviewState>;
+		if (parsed.version !== MAINVIEW_STATE_STORAGE_VERSION) {
+			return fallback;
+		}
+
+		return {
+			version: MAINVIEW_STATE_STORAGE_VERSION,
+			selectedProjectId: Number.isInteger(parsed.selectedProjectId)
+				? parsed.selectedProjectId
+				: null,
+			selectedWorktreePath:
+				typeof parsed.selectedWorktreePath === "string" &&
+				parsed.selectedWorktreePath.trim()
+					? parsed.selectedWorktreePath
+					: null,
+			selectedThreadId: Number.isInteger(parsed.selectedThreadId)
+				? parsed.selectedThreadId
+				: null,
+			pendingThreadModel:
+				typeof parsed.pendingThreadModel === "string"
+					? parsed.pendingThreadModel
+					: "",
+			chatInput: typeof parsed.chatInput === "string" ? parsed.chatInput : "",
+			sidebarCollapsed:
+				typeof parsed.sidebarCollapsed === "boolean"
+					? parsed.sidebarCollapsed
+					: false,
+			sidebarSearchQuery:
+				typeof parsed.sidebarSearchQuery === "string"
+					? parsed.sidebarSearchQuery
+					: "",
+			openWorktrees: normalizePersistedOpenWorktrees(parsed.openWorktrees),
+		};
+	} catch {
+		return fallback;
+	}
+}
+
+function writePersistedMainviewState(state: PersistedMainviewState): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	try {
+		window.sessionStorage.setItem(
+			MAINVIEW_STATE_STORAGE_KEY,
+			JSON.stringify(state),
+		);
+	} catch {
+		// Ignore storage write failures and continue without reload persistence.
+	}
 }
 
 function materialSymbol(name: string, className = ""): JSX.Element {
@@ -1159,6 +1295,47 @@ function latestThreadForWorktree(
 	return matches[0] ?? null;
 }
 
+function serializeOpenWorktrees(
+	projectStates: ProjectStateMap,
+): PersistedOpenWorktree[] {
+	return Object.entries(projectStates).flatMap(([projectId, state]) =>
+		[...state.openWorktrees].map((worktreePath) => ({
+			projectId: Number.parseInt(projectId, 10),
+			worktreePath,
+		})),
+	);
+}
+
+function pickInitialThread(
+	threads: RpcThread[],
+	persistedState: PersistedMainviewState,
+): RpcThread | null {
+	if (persistedState.selectedThreadId !== null) {
+		const selectedThread =
+			threads.find((thread) => thread.id === persistedState.selectedThreadId) ??
+			null;
+		if (selectedThread) {
+			return selectedThread;
+		}
+	}
+
+	if (
+		persistedState.selectedProjectId !== null &&
+		persistedState.selectedWorktreePath
+	) {
+		const selectedWorktreeThread = latestThreadForWorktree(
+			threads,
+			persistedState.selectedProjectId,
+			persistedState.selectedWorktreePath,
+		);
+		if (selectedWorktreeThread) {
+			return selectedWorktreeThread;
+		}
+	}
+
+	return threads[0] ?? null;
+}
+
 function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
 	const next = items.filter((entry) => entry.id !== thread.id);
 	next.push(thread);
@@ -1191,6 +1368,12 @@ declare global {
 }
 
 export default function App({ procedures }: AppProps): JSX.Element {
+	const initialMainviewStateRef = useRef<PersistedMainviewState | null>(null);
+	if (!initialMainviewStateRef.current) {
+		initialMainviewStateRef.current = readPersistedMainviewState();
+	}
+	const initialMainviewState = initialMainviewStateRef.current;
+
 	const [projects, setProjects] = useState<RpcProject[]>([]);
 	const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
 	const [worktreeStates, setWorktreeStates] = useState<WorktreeStateMap>({});
@@ -1220,14 +1403,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
 	const [defaultCodexModel, setDefaultCodexModel] = useState("");
-	const [pendingThreadModel, setPendingThreadModel] = useState("");
-	const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
+	const [pendingThreadModel, setPendingThreadModel] = useState(
+		initialMainviewState.pendingThreadModel,
+	);
+	const [selectedThreadId, setSelectedThreadId] = useState<number | null>(
+		initialMainviewState.selectedThreadId,
+	);
 	const [threadMessages, setThreadMessages] = useState<RpcThreadMessage[]>([]);
 	const [threadsError, setThreadsError] = useState("");
 	const [modelControlError, setModelControlError] = useState("");
 	const [taskControlError, setTaskControlError] = useState("");
 	const [chatError, setChatError] = useState("");
-	const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
+	const [sidebarSearchQuery, setSidebarSearchQuery] = useState(
+		initialMainviewState.sidebarSearchQuery,
+	);
 	const [isThreadLoading, setIsThreadLoading] = useState(false);
 	const [isCreatingThread, setIsCreatingThread] = useState(false);
 	const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
@@ -1236,18 +1425,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [threadActionBusy, setThreadActionBusy] = useState<
 		"rename" | "pin" | "delete" | null
 	>(null);
-	const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+	const [sidebarCollapsed, setSidebarCollapsed] = useState(
+		initialMainviewState.sidebarCollapsed,
+	);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
-		null,
+		initialMainviewState.selectedProjectId,
 	);
 	const [selectedWorktreePath, setSelectedWorktreePath] = useState<
 		string | null
-	>(null);
-	const [chatInput, setChatInput] = useState("");
+	>(initialMainviewState.selectedWorktreePath);
+	const [chatInput, setChatInput] = useState(initialMainviewState.chatInput);
 	const [isSending, setIsSending] = useState(false);
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
+	const [sessionStateReady, setSessionStateReady] = useState(false);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1364,6 +1556,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const activeChatError = chatError || selectedThreadRunError;
 
 	useEffect(() => {
+		void chatInput;
 		resizeComposerTextarea(
 			desktopComposerRef.current,
 			DESKTOP_COMPOSER_MIN_HEIGHT_PX,
@@ -1750,6 +1943,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const result = await procedures.listProjectWorktrees({ projectId });
 			setProjectState(projectId, {
 				worktrees: result.worktrees,
+				loadingWorktrees: false,
 				error: "",
 			});
 			return result.worktrees;
@@ -1855,59 +2049,168 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const initialize = useCallback(async () => {
-		const [loaded, homeDirectoryResult, loadedThreads, modelCatalog] =
-			await Promise.all([
-				procedures.listProjects({ includeClosed: true }),
-				procedures.getHomeDirectory(),
-				procedures.listThreads(),
-				procedures.getCodexModelCatalog(),
-			]);
-		setProjects(loaded);
-		setThreads(sortThreads(loadedThreads));
-		setCodexModels(modelCatalog.models);
-		setDefaultCodexModel(modelCatalog.defaultModel);
-		setPendingThreadModel((current) => current || modelCatalog.defaultModel);
-		hydrateProjectRows(loaded);
-		setHomeDirectory(homeDirectoryResult.homeDirectory);
-		setSupportsTildePath(homeDirectoryResult.supportsTildePath);
-		setAddProjectPath(
-			(current) =>
-				current ||
-				formatDirectoryPathForInput(
-					homeDirectoryResult.homeDirectory,
-					homeDirectoryResult.homeDirectory,
-					homeDirectoryResult.supportsTildePath,
-				),
-		);
-		if (loadedThreads[0]) {
-			try {
-				let detail = await procedures.getThread({
-					threadId: loadedThreads[0].id,
+		const persistedState = initialMainviewState;
+
+		try {
+			const [loaded, homeDirectoryResult, loadedThreads, modelCatalog] =
+				await Promise.all([
+					procedures.listProjects({ includeClosed: true }),
+					procedures.getHomeDirectory(),
+					procedures.listThreads(),
+					procedures.getCodexModelCatalog(),
+				]);
+			const sortedThreads = sortThreads(loadedThreads);
+
+			setProjects(loaded);
+			setThreads(sortedThreads);
+			setCodexModels(modelCatalog.models);
+			setDefaultCodexModel(modelCatalog.defaultModel);
+			setPendingThreadModel((current) => current || modelCatalog.defaultModel);
+			hydrateProjectRows(loaded);
+			setHomeDirectory(homeDirectoryResult.homeDirectory);
+			setSupportsTildePath(homeDirectoryResult.supportsTildePath);
+			setAddProjectPath(
+				(current) =>
+					current ||
+					formatDirectoryPathForInput(
+						homeDirectoryResult.homeDirectory,
+						homeDirectoryResult.homeDirectory,
+						homeDirectoryResult.supportsTildePath,
+					),
+			);
+
+			const openProjects = loaded.filter((project) => project.isOpen === 1);
+			const openProjectIds = new Set(openProjects.map((project) => project.id));
+			const restoredProjectWorktrees = new Map<number, RpcWorktree[]>();
+
+			for (const project of openProjects) {
+				setProjectState(project.id, {
+					expanded: true,
+					loadingWorktrees: true,
+					error: "",
 				});
-				if (detail.thread.runStatus.hasUnreadError) {
-					detail = await procedures.markThreadErrorSeen({
-						threadId: loadedThreads[0].id,
-					});
-				}
-				setThreads((prev) => upsertThreadList(prev, detail.thread));
-				setSelectedThreadId(detail.thread.id);
-				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-				setThreadMessages(detail.messages);
-				setSelectedProjectId(detail.thread.projectId);
-				setSelectedWorktreePath(detail.thread.worktreePath);
-				try {
-					await loadProjectWorktrees(detail.thread.projectId);
-				} catch {
-					// Best effort; keep the thread selected even if worktree metadata is unavailable.
-				}
-				return;
-			} catch (error) {
-				setThreadsError(error instanceof Error ? error.message : String(error));
 			}
+
+			await Promise.all(
+				openProjects.map(async (project) => {
+					try {
+						const worktrees = await loadProjectWorktrees(project.id);
+						restoredProjectWorktrees.set(project.id, worktrees);
+					} catch (error) {
+						setProjectState(project.id, {
+							loadingWorktrees: false,
+							error: error instanceof Error ? error.message : String(error),
+						});
+					}
+				}),
+			);
+
+			const restoredOpenWorktrees = await Promise.all(
+				persistedState.openWorktrees
+					.filter(({ projectId }) => openProjectIds.has(projectId))
+					.map(async ({ projectId, worktreePath }) => {
+						try {
+							const result = await procedures.openWorktree({
+								projectId,
+								worktreePath,
+							});
+							return {
+								ok: true as const,
+								projectId,
+								snapshot: result.worktree,
+								worktreePath,
+							};
+						} catch (error) {
+							return {
+								ok: false as const,
+								projectId,
+								error: error instanceof Error ? error.message : String(error),
+								worktreePath,
+							};
+						}
+					}),
+			);
+
+			for (const result of restoredOpenWorktrees) {
+				if (result.ok) {
+					setWorktreeState(result.projectId, result.worktreePath, {
+						loading: false,
+						opened: true,
+						snapshot: result.snapshot,
+						error: "",
+					});
+					continue;
+				}
+
+				setWorktreeState(result.projectId, result.worktreePath, {
+					loading: false,
+					opened: false,
+					snapshot: undefined,
+					error: result.error,
+				});
+			}
+
+			if (restoredOpenWorktrees.some((result) => result.ok)) {
+				setProjectStates((prev) => {
+					const next = { ...prev } as ProjectStateMap;
+					for (const result of restoredOpenWorktrees) {
+						if (!result.ok) {
+							continue;
+						}
+						const current = next[result.projectId] ?? defaultProjectState();
+						next[result.projectId] = {
+							...current,
+							openWorktrees: new Set([
+								...current.openWorktrees,
+								result.worktreePath,
+							]),
+						};
+					}
+					return next;
+				});
+			}
+
+			const initialThread = pickInitialThread(sortedThreads, persistedState);
+			if (initialThread) {
+				await openThread(initialThread.id, {
+					acknowledgeUnreadError: initialThread.runStatus.hasUnreadError,
+				});
+				return;
+			}
+
+			const initialProject =
+				loaded.find(
+					(project) => project.id === persistedState.selectedProjectId,
+				) ??
+				loaded[0] ??
+				null;
+			const initialWorktreePath =
+				initialProject === null
+					? null
+					: initialProject.id === persistedState.selectedProjectId &&
+							persistedState.selectedWorktreePath
+						? persistedState.selectedWorktreePath
+						: primaryWorktreePath(
+								initialProject,
+								restoredProjectWorktrees.get(initialProject.id) ?? [],
+							);
+
+			setSelectedProjectId(initialProject?.id ?? null);
+			setSelectedWorktreePath(initialWorktreePath);
+		} catch (error) {
+			setThreadsError(error instanceof Error ? error.message : String(error));
+		} finally {
+			setSessionStateReady(true);
 		}
-		setSelectedProjectId((current) => current ?? loaded[0]?.id ?? null);
-		setSelectedWorktreePath((current) => current ?? loaded[0]?.path ?? null);
-	}, [hydrateProjectRows, loadProjectWorktrees, procedures]);
+	}, [
+		hydrateProjectRows,
+		initialMainviewState,
+		loadProjectWorktrees,
+		openThread,
+		procedures,
+		setProjectState,
+		setWorktreeState,
+	]);
 
 	const closeAddProjectForm = useCallback(() => {
 		setAddProjectOpen(false);
@@ -2273,6 +2576,34 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	useEffect(() => {
 		selectedThreadIdRef.current = selectedThreadId;
 	}, [selectedThreadId]);
+
+	useEffect(() => {
+		if (!sessionStateReady) {
+			return;
+		}
+
+		writePersistedMainviewState({
+			version: MAINVIEW_STATE_STORAGE_VERSION,
+			selectedProjectId,
+			selectedWorktreePath,
+			selectedThreadId,
+			pendingThreadModel,
+			chatInput,
+			sidebarCollapsed,
+			sidebarSearchQuery,
+			openWorktrees: serializeOpenWorktrees(projectStates),
+		});
+	}, [
+		chatInput,
+		pendingThreadModel,
+		projectStates,
+		selectedProjectId,
+		selectedThreadId,
+		selectedWorktreePath,
+		sessionStateReady,
+		sidebarCollapsed,
+		sidebarSearchQuery,
+	]);
 
 	useEffect(() => {
 		if (selectedThread?.model) {
