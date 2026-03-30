@@ -77,6 +77,7 @@ const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const TASK_POLL_INTERVAL_MS = 1_500;
+const DIRECTORY_SUGGESTION_CACHE_TTL_MS = 60_000;
 const GIT_HISTORY_ENTRY_LIMIT = 20;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
@@ -106,6 +107,13 @@ type ProjectPollState = {
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
+const directorySuggestionCache = new Map<
+	string,
+	{
+		directoryNames: string[];
+		expiresAt: number;
+	}
+>();
 let worktreeTaskChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
@@ -342,6 +350,28 @@ function sortDirectoryNames(values: string[]): string[] {
 			sensitivity: "base",
 		}),
 	);
+}
+
+function readDirectorySuggestionEntries(searchDirectory: string): string[] {
+	const now = Date.now();
+	const cached = directorySuggestionCache.get(searchDirectory);
+	if (cached && cached.expiresAt > now) {
+		return cached.directoryNames;
+	}
+
+	const directoryNames = sortDirectoryNames(
+		readdirSync(searchDirectory).filter((entry) => {
+			if (entry.startsWith(".")) {
+				return false;
+			}
+			return safeIsDirectory(resolve(searchDirectory, entry));
+		}),
+	);
+	directorySuggestionCache.set(searchDirectory, {
+		directoryNames,
+		expiresAt: now + DIRECTORY_SUGGESTION_CACHE_TTL_MS,
+	});
+	return directoryNames;
 }
 
 function safeIsDirectory(path: string): boolean {
@@ -1213,20 +1243,17 @@ export async function listDirectorySuggestionsProcedure(
 
 	try {
 		const normalizedPrefix = namePrefix.toLocaleLowerCase();
-		const directories = sortDirectoryNames(
-			readdirSync(searchDirectory).filter((entry) => {
-				if (entry.startsWith(".")) {
-					return false;
-				}
+		const directories = readDirectorySuggestionEntries(searchDirectory)
+			.filter((entry) => {
 				if (
 					normalizedPrefix &&
 					!entry.toLocaleLowerCase().startsWith(normalizedPrefix)
 				) {
 					return false;
 				}
-				return safeIsDirectory(resolve(searchDirectory, entry));
-			}),
-		).map((entry) => resolve(searchDirectory, entry));
+				return true;
+			})
+			.map((entry) => resolve(searchDirectory, entry));
 
 		return { directories };
 	} catch {

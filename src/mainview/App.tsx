@@ -153,6 +153,7 @@ const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
@@ -1754,6 +1755,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const gitHistoryDiffCacheRef = useRef(
 		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
 	);
+	const directorySuggestionPrefetchTimerRef = useRef<number | null>(null);
+	const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
+	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
 
@@ -2562,6 +2566,67 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[homeDirectory, supportsTildePath],
 	);
 
+	const clearDirectorySuggestionPrefetchTimer = useCallback(() => {
+		if (directorySuggestionPrefetchTimerRef.current !== null) {
+			window.clearTimeout(directorySuggestionPrefetchTimerRef.current);
+			directorySuggestionPrefetchTimerRef.current = null;
+		}
+	}, []);
+
+	const prefetchDirectorySuggestions = useCallback(
+		async (query: string) => {
+			const normalizedQuery = query.trim();
+			if (!normalizedQuery) {
+				return;
+			}
+			if (
+				prefetchedDirectorySuggestionQueriesRef.current.has(normalizedQuery)
+			) {
+				return;
+			}
+
+			prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
+			try {
+				await procedures.listDirectorySuggestions({ query: normalizedQuery });
+			} catch {
+				prefetchedDirectorySuggestionQueriesRef.current.delete(normalizedQuery);
+			}
+		},
+		[procedures],
+	);
+
+	const scheduleDirectorySuggestionPrefetch = useCallback(
+		(directory: string) => {
+			const prefetchQuery = formatDirectoryPathForInput(
+				directory,
+				homeDirectory,
+				supportsTildePath,
+			);
+			if (!prefetchQuery.trim()) {
+				return;
+			}
+			if (
+				prefetchedDirectorySuggestionQueriesRef.current.has(
+					prefetchQuery.trim(),
+				)
+			) {
+				return;
+			}
+
+			clearDirectorySuggestionPrefetchTimer();
+			directorySuggestionPrefetchTimerRef.current = window.setTimeout(() => {
+				directorySuggestionPrefetchTimerRef.current = null;
+				void prefetchDirectorySuggestions(prefetchQuery);
+			}, DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS);
+		},
+		[
+			clearDirectorySuggestionPrefetchTimer,
+			homeDirectory,
+			prefetchDirectorySuggestions,
+			supportsTildePath,
+		],
+	);
+
 	const initialize = useCallback(async () => {
 		const persistedState = initialMainviewState;
 
@@ -3321,10 +3386,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [refreshThreadStatuses, threads.length]);
 
 	useEffect(() => {
+		if (!homeDirectory) {
+			return;
+		}
+
+		const prefetchQuery = supportsTildePath
+			? "~/"
+			: formatDirectoryPathForInput(
+					homeDirectory,
+					homeDirectory,
+					supportsTildePath,
+				);
+		if (homeDirectoryPrefetchQueryRef.current === prefetchQuery) {
+			return;
+		}
+
+		homeDirectoryPrefetchQueryRef.current = prefetchQuery;
+		void prefetchDirectorySuggestions(prefetchQuery);
+	}, [homeDirectory, prefetchDirectorySuggestions, supportsTildePath]);
+
+	useEffect(() => {
+		return () => {
+			clearDirectorySuggestionPrefetchTimer();
+		};
+	}, [clearDirectorySuggestionPrefetchTimer]);
+
+	useEffect(() => {
 		if (!addProjectOpen) {
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
 			setHoveredDirectorySuggestion(null);
+			clearDirectorySuggestionPrefetchTimer();
 			return;
 		}
 
@@ -3332,6 +3424,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!query) {
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
+			clearDirectorySuggestionPrefetchTimer();
 			return;
 		}
 
@@ -3358,7 +3451,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return () => {
 			cancelled = true;
 		};
-	}, [addProjectOpen, addProjectPath, procedures]);
+	}, [
+		addProjectOpen,
+		addProjectPath,
+		clearDirectorySuggestionPrefetchTimer,
+		procedures,
+	]);
 
 	const updateActiveCodexModel = useCallback(
 		async (model: string) => {
@@ -4151,19 +4249,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												onMouseDown={(event) => event.preventDefault()}
 												onMouseEnter={() => {
 													setHoveredDirectorySuggestion(directory);
+													scheduleDirectorySuggestionPrefetch(directory);
 												}}
 												onMouseLeave={() => {
 													setHoveredDirectorySuggestion((current) =>
 														current === directory ? null : current,
 													);
+													clearDirectorySuggestionPrefetchTimer();
 												}}
 												onFocus={() => {
 													setHoveredDirectorySuggestion(directory);
+													scheduleDirectorySuggestionPrefetch(directory);
 												}}
 												onBlur={() => {
 													setHoveredDirectorySuggestion((current) =>
 														current === directory ? null : current,
 													);
+													clearDirectorySuggestionPrefetchTimer();
 												}}
 												onClick={() => selectDirectorySuggestion(directory)}
 											>
