@@ -2033,11 +2033,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	}, [activeSelectedWorktreePath, selectedProject, selectedProjectWorktrees]);
 
-	const activeSelectedWorktreeState = useMemo(() => {
+	const activeSelectedWorktreeOpened = useMemo(() => {
 		if (!selectedProject || !activeSelectedWorktreePath) {
-			return null;
+			return false;
 		}
-		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath);
+		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath)
+			.opened;
 	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
 
 	const activeSelectedWorktreeFolder = useMemo(() => {
@@ -2079,7 +2080,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const taskSelectorDisabled =
 		!selectedProject ||
 		!activeSelectedWorktreePath ||
-		!activeSelectedWorktreeState?.opened ||
+		!activeSelectedWorktreeOpened ||
 		isLoadingProjectTasks ||
 		isRunningProjectTask ||
 		isSending ||
@@ -3454,7 +3455,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (
 			!selectedProject ||
 			!activeSelectedWorktreePath ||
-			!activeSelectedWorktreeState?.opened
+			!activeSelectedWorktreeOpened
 		) {
 			projectTasksRequestIdRef.current += 1;
 			setProjectTasks([]);
@@ -3465,7 +3466,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath);
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeState,
+		activeSelectedWorktreeOpened,
 		loadProjectTasks,
 		selectedProject,
 	]);
@@ -3474,7 +3475,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (
 			!selectedProject ||
 			!activeSelectedWorktreePath ||
-			!activeSelectedWorktreeState?.opened
+			!activeSelectedWorktreeOpened
 		) {
 			gitHistoryRequestIdRef.current += 1;
 			setGitHistory(null);
@@ -3485,7 +3486,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		void loadGitHistory(selectedProject.id, activeSelectedWorktreePath);
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeState,
+		activeSelectedWorktreeOpened,
 		loadGitHistory,
 		selectedProject,
 	]);
@@ -3497,7 +3498,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			if (
 				!selectedProject ||
 				!activeSelectedWorktreePath ||
-				!activeSelectedWorktreeState?.opened
+				!activeSelectedWorktreeOpened
 			) {
 				return;
 			}
@@ -3522,7 +3523,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		};
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeState,
+		activeSelectedWorktreeOpened,
 		loadProjectTasks,
 		selectedProject,
 	]);
@@ -3534,7 +3535,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			if (
 				!selectedProject ||
 				!activeSelectedWorktreePath ||
-				!activeSelectedWorktreeState?.opened
+				!activeSelectedWorktreeOpened
 			) {
 				return;
 			}
@@ -3561,7 +3562,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		};
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeState,
+		activeSelectedWorktreeOpened,
 		loadGitHistory,
 		selectedProject,
 	]);
@@ -3601,7 +3602,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (
 			!selectedProjectId ||
 			!activeSelectedWorktreePath ||
-			!activeSelectedWorktreeState?.opened
+			!activeSelectedWorktreeOpened
 		) {
 			return;
 		}
@@ -3627,7 +3628,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		void openThread(latestThread.id);
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeState,
+		activeSelectedWorktreeOpened,
 		clearThreadSelection,
 		openThread,
 		selectedProjectId,
