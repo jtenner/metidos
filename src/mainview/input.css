@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @source "../**/*.{html,js,jsx,ts,tsx}";
 
+@font-face {
+	font-family: "Fira Code";
+	src: url("/fonts/fira-code-vf.woff2") format("woff2-variations");
+	font-weight: 300 700;
+	font-style: normal;
+	font-display: swap;
+}
+
 .material-symbols-outlined {
 	font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 	font-size: 20px;
@@ -27,4 +35,9 @@
 }
 .font-label {
 	font-family: "Space Grotesk", Inter, sans-serif;
+}
+
+.font-mono {
+	font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
+		Consolas, "Liberation Mono", "Courier New", monospace;
 }

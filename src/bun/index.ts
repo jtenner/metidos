@@ -27,6 +27,10 @@ const MAINVIEW_ENTRYPOINT = resolve(process.cwd(), "src/mainview/index.ts");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
 const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jt-ide-build");
+const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
+	process.cwd(),
+	"node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
+);
 const MAINVIEW_RELOAD_DEBOUNCE_MS = 90;
 const MAINVIEW_WATCH_INTERVAL_MS = 250;
 
@@ -409,6 +413,10 @@ async function bootstrap(): Promise<void> {
 					mainviewBundlePath,
 					"application/javascript; charset=utf-8",
 				);
+			}
+
+			if (pathname === "/fonts/fira-code-vf.woff2") {
+				return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
 			}
 
 			if (pathname === "/health") {

@@ -6,6 +6,7 @@
       "name": "jt-ide",
       "dependencies": {
         "@openai/codex-sdk": "^0.117.0",
+        "firacode": "^6.2.0",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
       },
@@ -132,6 +133,8 @@
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
     "enhanced-resolve": ["enhanced-resolve@5.20.1", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.0" } }, "sha512-Qohcme7V1inbAfvjItgw0EaxVX5q2rdVEZHRBrEQdRZTssLDGsL8Lwrznl8oQ/6kuTJONLaDcGjkNP247XEhcA=="],
+
+    "firacode": ["firacode@6.2.0", "", {}, "sha512-t5R3aO2BmhRXnYtKXbImLVNsILuCIbJ/XlDzBufjpi3il8P/CVdpWco83Ud3r2Tl0gitAmyP4o1fbJ52ozV1jw=="],
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
