@@ -1441,6 +1441,40 @@ function GitHistoryDiffModal({
 	);
 }
 
+function SidebarSectionHeader({
+	title,
+	open,
+	onToggle,
+	action,
+}: {
+	title: string;
+	open: boolean;
+	onToggle: () => void;
+	action?: JSX.Element | null;
+}): JSX.Element {
+	return (
+		<div className="flex items-center gap-3">
+			<button
+				type="button"
+				className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1 text-left transition-colors hover:bg-[#191b24]"
+				onClick={onToggle}
+				aria-expanded={open}
+			>
+				<span className="shrink-0 text-[#aaa4ff]">
+					{materialSymbol(
+						open ? "expand_more" : "chevron_right",
+						"text-[16px]",
+					)}
+				</span>
+				<span className="font-label text-[11px] tracking-[0.12em] text-[#e6e3f7]">
+					{title}
+				</span>
+			</button>
+			{action ?? null}
+		</div>
+	);
+}
+
 function sortThreads(items: RpcThread[]): RpcThread[] {
 	return [...items].sort((left, right) => {
 		const leftPinnedAt = left.pinnedAt ?? "";
@@ -1600,7 +1634,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState<RpcWorktreeGitHistoryResult | null>(null);
 	const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
 	const [gitHistoryError, setGitHistoryError] = useState("");
-	const [gitHistoryPanelOpen, setGitHistoryPanelOpen] = useState(true);
+	const [projectsSectionOpen, setProjectsSectionOpen] = useState(true);
+	const [threadsSectionOpen, setThreadsSectionOpen] = useState(true);
+	const [gitSectionOpen, setGitSectionOpen] = useState(true);
 	const [gitHistoryModal, setGitHistoryModal] =
 		useState<GitHistoryModalState | null>(null);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
@@ -1898,11 +1934,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		isSending ||
 		selectedThreadIsWorking ||
 		isThreadLoading;
-
-	const gitHistoryTitleHash =
-		gitHistory?.headShortHash ??
-		activeSelectedWorktree?.head?.slice(0, 7) ??
-		"--";
 
 	const closeGitHistoryModal = useCallback(() => {
 		setGitHistoryModal(null);
@@ -4310,8 +4341,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			</div>
 		) : null;
 
-	const sidebarSearch = !sidebarCollapsed ? (
-		<div className="border-b border-[#262626] px-3 py-3">
+	const sidebarSearch = (
+		<div className="px-1 pb-1 pt-2">
 			<label className="block">
 				<span className="sr-only">Search projects and threads</span>
 				<div className="flex items-center gap-2 rounded-sm border border-[#2f3242] bg-[#101114] px-3 py-2">
@@ -4339,7 +4370,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</div>
 			</label>
 		</div>
-	) : null;
+	);
 
 	const projectTree = (
 		<div className="space-y-2">
@@ -4375,8 +4406,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						),
 					);
 					const showWorktrees =
-						(state.expanded || Boolean(normalizedSidebarSearchQuery)) &&
-						!sidebarCollapsed;
+						state.expanded || Boolean(normalizedSidebarSearchQuery);
 					const projectIndicatorClass = isActive
 						? "bg-[#4fefb2]"
 						: projectErrorLevel === "unread"
@@ -4423,28 +4453,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										</div>
 									</div>
 								</button>
-								{!sidebarCollapsed ? (
-									<button
-										type="button"
-										className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-all hover:bg-[#202537] hover:text-[#f2f0ef] ${
-											isActive
-												? "opacity-100"
-												: "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
-										}`}
-										onClick={(event) => {
-											event.stopPropagation();
-											const rect = event.currentTarget.getBoundingClientRect();
-											void openProjectActionMenu(
-												project,
-												rect.right + 8,
-												rect.bottom + 6,
-											);
-										}}
-										aria-label={`Project actions for ${project.name}`}
-									>
-										...
-									</button>
-								) : null}
+								<button
+									type="button"
+									className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-all hover:bg-[#202537] hover:text-[#f2f0ef] ${
+										isActive
+											? "opacity-100"
+											: "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
+									}`}
+									onClick={(event) => {
+										event.stopPropagation();
+										const rect = event.currentTarget.getBoundingClientRect();
+										void openProjectActionMenu(
+											project,
+											rect.right + 8,
+											rect.bottom + 6,
+										);
+									}}
+									aria-label={`Project actions for ${project.name}`}
+								>
+									...
+								</button>
 							</div>
 
 							{showWorktrees ? (
@@ -4563,16 +4591,47 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		</div>
 	);
 
-	const threadSection = (
-		<div className="border-t border-[#262626] px-3 pt-3">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
-						Threads
-					</div>
+	const projectSection = (
+		<div className="px-3 py-3">
+			<SidebarSectionHeader
+				title="Projects"
+				open={projectsSectionOpen}
+				onToggle={() => {
+					setProjectsSectionOpen((current) => !current);
+				}}
+				action={
 					<button
 						type="button"
-						className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff] disabled:cursor-not-allowed disabled:opacity-50"
+						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
+						onClick={toggleAddProjectForm}
+						aria-label={addProjectOpen ? "Close add project" : "Add project"}
+					>
+						+
+					</button>
+				}
+			/>
+			{projectsSectionOpen ? (
+				<div className="mt-2 space-y-3">
+					{sidebarSearch}
+					{addProjectOpen ? addProjectForm : null}
+					{projectTree}
+				</div>
+			) : null}
+		</div>
+	);
+
+	const threadSection = (
+		<div className="border-t border-[#262626] px-3 py-3">
+			<SidebarSectionHeader
+				title="Threads"
+				open={threadsSectionOpen}
+				onToggle={() => {
+					setThreadsSectionOpen((current) => !current);
+				}}
+				action={
+					<button
+						type="button"
+						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff] disabled:cursor-not-allowed disabled:opacity-50"
 						onClick={() => {
 							void createThreadFromSelection();
 						}}
@@ -4590,164 +4649,162 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					>
 						+
 					</button>
-				</div>
-				{isCreatingThread ? (
-					<div className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
-						Creating
-					</div>
-				) : null}
-			</div>
-			<div className="mt-3 space-y-2">
-				{!selectedProject || !activeSelectedWorktreePath ? (
-					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
-						Select a project worktree first.
-					</div>
-				) : filteredVisibleThreads.length === 0 ? (
-					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
-						{normalizedSidebarSearchQuery
-							? "No matching threads in this worktree."
-							: "No threads in this worktree yet. Use + to start a Codex thread for the selected worktree."}
-					</div>
-				) : (
-					filteredVisibleThreads.map((thread) => {
-						const threadProject =
-							projects.find((project) => project.id === thread.projectId) ??
-							null;
-						const threadWorktree = threadProject
-							? (getProjectState(thread.projectId).worktrees.find(
-									(worktree) => worktree.path === thread.worktreePath,
-								) ?? null)
-							: null;
-						const threadBranchName =
-							threadWorktree?.branch?.trim() ||
-							(threadProject && thread.worktreePath === threadProject.path
-								? "Primary"
-								: "detached");
-						const threadFolderName = shortName(thread.worktreePath);
-						const threadPinned = Boolean(thread.pinnedAt);
-						const isActive = selectedThreadId === thread.id;
-						const isWorking = thread.runStatus.state === "working";
-						const hasRunError = thread.runStatus.state === "failed";
-						const hasUnreadError = thread.runStatus.hasUnreadError;
-						const threadErrorPreviewText =
-							hasUnreadError || hasRunError
-								? (thread.runStatus.error ?? "")
-								: "";
-						return (
-							<button
-								type="button"
-								key={thread.id}
-								className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
-									isActive
-										? "bg-[#25233a] text-[#f2f0ef]"
-										: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
-								}`}
-								{...errorPreviewHandlers(threadErrorPreviewText)}
-								onContextMenu={(event) => {
-									event.preventDefault();
-									event.stopPropagation();
-									hideErrorPreview();
-									openThreadActionMenu(
-										thread,
-										event.clientX + 6,
-										event.clientY + 6,
-									);
-								}}
-								onClick={() => {
-									hideErrorPreview();
-									void openThread(thread.id, {
-										acknowledgeUnreadError: hasUnreadError,
-									});
-								}}
-							>
-								<div className="flex items-center justify-between gap-3">
-									<div className="flex min-w-0 items-center gap-2">
-										<span
-											className={`h-2 w-2 shrink-0 rounded-full ${
-												hasUnreadError
-													? "bg-[#ff304f]"
-													: hasRunError
-														? "bg-[#8f4956]"
-														: isActive
-															? "bg-[#aaa4ff]"
-															: "bg-[#4f5269]"
-											}`}
-										/>
-										<div
-											className="min-w-0 truncate text-sm font-medium"
-											title={thread.title}
-										>
-											{thread.title}
+				}
+			/>
+			{threadsSectionOpen ? (
+				<div className="mt-3 space-y-2">
+					{!selectedProject || !activeSelectedWorktreePath ? (
+						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+							Select a project worktree first.
+						</div>
+					) : filteredVisibleThreads.length === 0 ? (
+						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+							{normalizedSidebarSearchQuery
+								? "No matching threads in this worktree."
+								: "No threads in this worktree yet. Use + to start a Codex thread for the selected worktree."}
+						</div>
+					) : (
+						filteredVisibleThreads.map((thread) => {
+							const threadProject =
+								projects.find((project) => project.id === thread.projectId) ??
+								null;
+							const threadWorktree = threadProject
+								? (getProjectState(thread.projectId).worktrees.find(
+										(worktree) => worktree.path === thread.worktreePath,
+									) ?? null)
+								: null;
+							const threadBranchName =
+								threadWorktree?.branch?.trim() ||
+								(threadProject && thread.worktreePath === threadProject.path
+									? "Primary"
+									: "detached");
+							const threadFolderName = shortName(thread.worktreePath);
+							const threadPinned = Boolean(thread.pinnedAt);
+							const isActive = selectedThreadId === thread.id;
+							const isWorking = thread.runStatus.state === "working";
+							const hasRunError = thread.runStatus.state === "failed";
+							const hasUnreadError = thread.runStatus.hasUnreadError;
+							const threadErrorPreviewText =
+								hasUnreadError || hasRunError
+									? (thread.runStatus.error ?? "")
+									: "";
+							return (
+								<button
+									type="button"
+									key={thread.id}
+									className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
+										isActive
+											? "bg-[#25233a] text-[#f2f0ef]"
+											: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
+									}`}
+									{...errorPreviewHandlers(threadErrorPreviewText)}
+									onContextMenu={(event) => {
+										event.preventDefault();
+										event.stopPropagation();
+										hideErrorPreview();
+										openThreadActionMenu(
+											thread,
+											event.clientX + 6,
+											event.clientY + 6,
+										);
+									}}
+									onClick={() => {
+										hideErrorPreview();
+										void openThread(thread.id, {
+											acknowledgeUnreadError: hasUnreadError,
+										});
+									}}
+								>
+									<div className="flex items-center justify-between gap-3">
+										<div className="flex min-w-0 items-center gap-2">
+											<span
+												className={`h-2 w-2 shrink-0 rounded-full ${
+													hasUnreadError
+														? "bg-[#ff304f]"
+														: hasRunError
+															? "bg-[#8f4956]"
+															: isActive
+																? "bg-[#aaa4ff]"
+																: "bg-[#4f5269]"
+												}`}
+											/>
+											<div
+												className="min-w-0 truncate text-sm font-medium"
+												title={thread.title}
+											>
+												{thread.title}
+											</div>
+										</div>
+										<div className="flex shrink-0 items-center gap-2">
+											{threadPinned ? (
+												<span
+													className="material-symbols-outlined text-[14px] text-[#d7d3ff]"
+													style={{ fontVariationSettings: "'FILL' 1" }}
+													title="Pinned"
+												>
+													push_pin
+												</span>
+											) : null}
+											{hasUnreadError ? (
+												<span className="rounded-full border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
+													Unread
+												</span>
+											) : null}
+											{isWorking ? (
+												<BeatLoader
+													color="#aaa4ff"
+													margin={1}
+													size={5}
+													speedMultiplier={0.85}
+												/>
+											) : null}
 										</div>
 									</div>
-									<div className="flex shrink-0 items-center gap-2">
-										{threadPinned ? (
-											<span
-												className="material-symbols-outlined text-[14px] text-[#d7d3ff]"
-												style={{ fontVariationSettings: "'FILL' 1" }}
-												title="Pinned"
-											>
-												push_pin
-											</span>
-										) : null}
-										{hasUnreadError ? (
-											<span className="rounded-full border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
-												Unread
-											</span>
-										) : null}
-										{isWorking ? (
-											<BeatLoader
-												color="#aaa4ff"
-												margin={1}
-												size={5}
-												speedMultiplier={0.85}
-											/>
-										) : null}
+									<div
+										className="mt-1 flex min-w-0 items-center gap-1 text-[11px]"
+										title={`${threadBranchName} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
+									>
+										<span className="min-w-0 truncate text-[#d7d7d7]">
+											{threadBranchName}
+										</span>
+										<span className="shrink-0 text-[#6f6f89]">|</span>
+										<span className="min-w-0 truncate text-[#8e8aa7]">
+											{threadFolderName}
+										</span>
 									</div>
-								</div>
-								<div
-									className="mt-1 flex min-w-0 items-center gap-1 text-[11px]"
-									title={`${threadBranchName} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
-								>
-									<span className="min-w-0 truncate text-[#d7d7d7]">
-										{threadBranchName}
-									</span>
-									<span className="shrink-0 text-[#6f6f89]">|</span>
-									<span className="min-w-0 truncate text-[#8e8aa7]">
-										{threadFolderName}
-									</span>
-								</div>
-							</button>
-						);
-					})
-				)}
-				{threadsError ? (
-					<div className="text-xs text-[#ff6e84]">{threadsError}</div>
-				) : null}
-			</div>
+								</button>
+							);
+						})
+					)}
+					{threadsError ? (
+						<div className="text-xs text-[#ff6e84]">{threadsError}</div>
+					) : null}
+				</div>
+			) : null}
 		</div>
 	);
 
-	const gitHistorySection = (
-		<div className="border-t border-[#262626] px-3 pt-3 pb-3">
-			<button
-				type="button"
-				className="flex w-full items-center justify-between gap-3 text-left"
-				onClick={() => {
-					setGitHistoryPanelOpen((current) => !current);
+	const gitSection = (
+		<div className="border-t border-[#262626] px-3 py-3">
+			<SidebarSectionHeader
+				title="Git"
+				open={gitSectionOpen}
+				onToggle={() => {
+					setGitSectionOpen((current) => !current);
 				}}
-			>
-				<span className="font-label text-[11px] font-bold tracking-[0.08em] text-[#d8d8d8]">
-					{`Git History - ${gitHistoryTitleHash} ${gitHistoryPanelOpen ? "-" : "+"}`}
-				</span>
-				{gitHistory?.branch || activeSelectedWorktree?.branch ? (
-					<span className="shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
-						{gitHistory?.branch ?? activeSelectedWorktree?.branch}
-					</span>
-				) : null}
-			</button>
-			{gitHistoryPanelOpen ? (
-				<div className="mt-3 space-y-2">
+			/>
+			{gitSectionOpen ? (
+				<div className="mt-3 space-y-3">
+					<div className="flex items-center justify-between gap-3 px-1">
+						<span className="font-label text-[11px] tracking-[0.12em] text-[#d8d8d8]">
+							Git History
+						</span>
+						{gitHistory?.branch || activeSelectedWorktree?.branch ? (
+							<span className="shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+								{gitHistory?.branch ?? activeSelectedWorktree?.branch}
+							</span>
+						) : null}
+					</div>
 					{!selectedProject || !activeSelectedWorktreePath ? (
 						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
 							Select a project worktree first.
@@ -4876,26 +4933,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							sidebarCollapsed ? "w-14" : "w-80"
 						}`}
 					>
-						<div className="flex items-center justify-between px-3 py-3 border-b border-[#262626]">
-							<div className="flex items-center gap-2">
-								{!sidebarCollapsed ? (
-									<>
-										<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
-											Projects
-										</div>
-										<button
-											type="button"
-											className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
-											onClick={toggleAddProjectForm}
-											aria-label={
-												addProjectOpen ? "Close add project" : "Add project"
-											}
-										>
-											+
-										</button>
-									</>
-								) : null}
-							</div>
+						<div className="flex items-center justify-end border-b border-[#262626] px-3 py-3">
 							<button
 								type="button"
 								className="px-2 py-1 rounded-sm text-[#aaa4ff] hover:bg-[#202020]"
@@ -4904,12 +4942,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{sidebarCollapsed ? "☰" : "⟨"}
 							</button>
 						</div>
-						{sidebarSearch}
-						{!sidebarCollapsed && addProjectOpen ? addProjectForm : null}
 						<div className="flex-1 overflow-y-auto py-2">
-							{projectTree}
+							{!sidebarCollapsed ? projectSection : null}
 							{!sidebarCollapsed ? threadSection : null}
-							{!sidebarCollapsed ? gitHistorySection : null}
+							{!sidebarCollapsed ? gitSection : null}
 						</div>
 					</aside>
 
@@ -5047,29 +5083,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</header>
 
 				{mobileProjectListOpen ? (
-					<aside className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] p-3">
-						<div className="mb-3 flex items-center justify-between border-b border-[#303030] pb-3">
-							<div className="flex items-center gap-2">
-								<div className="text-xs uppercase tracking-widest text-[#d8d8d8]">
-									Projects
-								</div>
-								<button
-									type="button"
-									className="flex h-6 w-6 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
-									onClick={toggleAddProjectForm}
-									aria-label={
-										addProjectOpen ? "Close add project" : "Add project"
-									}
-								>
-									+
-								</button>
-							</div>
-						</div>
-						{sidebarSearch}
-						{addProjectOpen ? addProjectForm : null}
-						{projectTree}
+					<aside className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] py-2">
+						{projectSection}
 						{threadSection}
-						{gitHistorySection}
+						{gitSection}
 					</aside>
 				) : null}
 
