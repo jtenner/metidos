@@ -848,6 +848,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					error: "",
 				});
 				setProjectState(projectId, {
+					expanded: false,
+					loadingWorktrees: false,
 					openWorktrees: new Set([...projectState.openWorktrees, worktreePath]),
 				});
 				setSelectedProjectId(projectId);
@@ -1206,27 +1208,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
 									key={worktree.path}
 								>
-									<div className="flex items-center gap-2">
-										<span className="font-mono text-[11px] text-[#948def]">
+									<div
+										className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
+										style={{
+											gridTemplateColumns:
+												"minmax(0, 11.5rem) minmax(0, 1fr) auto",
+										}}
+									>
+										<span
+											className="min-w-0 truncate font-mono text-[11px] leading-5 text-[#948def]"
+											title={worktree.branch ?? "detached"}
+										>
 											{worktree.branch ?? "detached"}
 										</span>
-										<span className="truncate text-sm text-[#f2f0ef]">
+										<span
+											className="min-w-0 truncate text-sm leading-5 text-[#f2f0ef]"
+											title={shortName(worktree.path)}
+										>
 											{shortName(worktree.path)}
 										</span>
-										<span className="ml-auto text-[10px] uppercase tracking-widest text-[#adabaa]">
-											{activeWorktree
-												? "Active"
-												: worktreeState.opened
-													? "Tracking"
-													: "Idle"}
-										</span>
-									</div>
-									<div className="truncate text-[11px] text-[#8e8aa7]">
-										{formatPathForDisplay(
-											worktree.path,
-											homeDirectory,
-											supportsTildePath,
-										)}
+										<span
+											className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+												activeWorktree ? "bg-[#4fefb2]" : "bg-transparent"
+											}`}
+										/>
+										<div
+											className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+											title={formatPathForDisplay(
+												worktree.path,
+												homeDirectory,
+												supportsTildePath,
+											)}
+										>
+											{formatPathForDisplay(
+												worktree.path,
+												homeDirectory,
+												supportsTildePath,
+											)}
+										</div>
 									</div>
 								</div>
 							);
@@ -1395,20 +1414,46 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														void openOrCloseWorktree(project.id, worktree.path);
 													}}
 												>
-													<div className="flex items-center gap-2">
-														<span className="font-mono text-xs text-[#948def]">
+													<div
+														className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
+														style={{
+															gridTemplateColumns:
+																"minmax(0, 11.5rem) minmax(0, 1fr) auto",
+														}}
+													>
+														<span
+															className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
+															title={worktree.branch ?? "detached"}
+														>
 															{worktree.branch ?? "detached"}
 														</span>
-														<span className="text-sm">
+														<span
+															className="min-w-0 truncate text-sm leading-5"
+															title={shortName(worktree.path)}
+														>
 															{shortName(worktree.path)}
 														</span>
-														<span className="ml-auto text-[10px] uppercase tracking-wide text-[#adabaa]">
-															{activeWorktree
-																? "Active"
-																: wState.opened
-																	? "Tracking"
-																	: "Closed"}
-														</span>
+														<span
+															className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+																activeWorktree
+																	? "bg-[#4fefb2]"
+																	: "bg-transparent"
+															}`}
+														/>
+														<div
+															className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+															title={formatPathForDisplay(
+																worktree.path,
+																homeDirectory,
+																supportsTildePath,
+															)}
+														>
+															{formatPathForDisplay(
+																worktree.path,
+																homeDirectory,
+																supportsTildePath,
+															)}
+														</div>
 													</div>
 													{wState.loading ? (
 														<div className="text-xs text-[#8f8d8b]">
