@@ -1,6 +1,7 @@
 import {
 	type CSSProperties,
 	type FormEvent,
+	type HTMLAttributes,
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	useCallback,
@@ -54,6 +55,16 @@ type ProjectActionMenuState = {
 };
 
 type ThreadErrorLevel = "none" | "failed" | "unread";
+type ThreadErrorPreview = {
+	level: ThreadErrorLevel;
+	text: string;
+	updatedAt: string;
+};
+type ErrorPreviewPopoverState = {
+	text: string;
+	x: number;
+	y: number;
+};
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -245,6 +256,47 @@ function mergeThreadErrorLevel(
 	return "none";
 }
 
+function threadErrorLevelWeight(level: ThreadErrorLevel): number {
+	if (level === "unread") {
+		return 2;
+	}
+	if (level === "failed") {
+		return 1;
+	}
+	return 0;
+}
+
+function threadErrorPreview(thread: RpcThread): ThreadErrorPreview | null {
+	const level = threadErrorLevel(thread);
+	const text = thread.runStatus.error?.trim() ?? "";
+	if (level === "none" || !text) {
+		return null;
+	}
+	return {
+		level,
+		text,
+		updatedAt: thread.runStatus.updatedAt ?? thread.updatedAt,
+	};
+}
+
+function pickPreferredThreadErrorPreview(
+	current: ThreadErrorPreview | undefined,
+	next: ThreadErrorPreview,
+): ThreadErrorPreview {
+	if (!current) {
+		return next;
+	}
+	const currentWeight = threadErrorLevelWeight(current.level);
+	const nextWeight = threadErrorLevelWeight(next.level);
+	if (nextWeight > currentWeight) {
+		return next;
+	}
+	if (nextWeight < currentWeight) {
+		return current;
+	}
+	return next.updatedAt >= current.updatedAt ? next : current;
+}
+
 function ProcessingMessage(): JSX.Element {
 	return (
 		<div className="flex items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
@@ -378,6 +430,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	>(null);
 	const [chatInput, setChatInput] = useState("");
 	const [isSending, setIsSending] = useState(false);
+	const [errorPreviewPopover, setErrorPreviewPopover] =
+		useState<ErrorPreviewPopoverState | null>(null);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const selectedThreadIdRef = useRef<number | null>(null);
@@ -417,6 +471,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return next;
 	}, [threads]);
 
+	const projectThreadErrorPreviews = useMemo(() => {
+		const next = new Map<number, ThreadErrorPreview>();
+		for (const thread of threads) {
+			const preview = threadErrorPreview(thread);
+			if (!preview) {
+				continue;
+			}
+			next.set(
+				thread.projectId,
+				pickPreferredThreadErrorPreview(next.get(thread.projectId), preview),
+			);
+		}
+		return next;
+	}, [threads]);
+
 	const worktreeThreadErrorLevels = useMemo(() => {
 		const next = new Map<string, ThreadErrorLevel>();
 		for (const thread of threads) {
@@ -426,6 +495,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 			const key = worktreeKey(thread.projectId, thread.worktreePath);
 			next.set(key, mergeThreadErrorLevel(next.get(key) ?? "none", level));
+		}
+		return next;
+	}, [threads]);
+
+	const worktreeThreadErrorPreviews = useMemo(() => {
+		const next = new Map<string, ThreadErrorPreview>();
+		for (const thread of threads) {
+			const preview = threadErrorPreview(thread);
+			if (!preview) {
+				continue;
+			}
+			const key = worktreeKey(thread.projectId, thread.worktreePath);
+			next.set(key, pickPreferredThreadErrorPreview(next.get(key), preview));
 		}
 		return next;
 	}, [threads]);
@@ -550,6 +632,69 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			worktreeThreadErrorLevels.get(worktreeKey(projectId, worktreePath)) ??
 			"none",
 		[worktreeThreadErrorLevels],
+	);
+
+	const projectThreadErrorPreviewText = useCallback(
+		(projectId: number): string =>
+			projectThreadErrorPreviews.get(projectId)?.text ?? "",
+		[projectThreadErrorPreviews],
+	);
+
+	const worktreeThreadErrorPreviewText = useCallback(
+		(projectId: number, worktreePath: string): string =>
+			worktreeThreadErrorPreviews.get(worktreeKey(projectId, worktreePath))
+				?.text ?? "",
+		[worktreeThreadErrorPreviews],
+	);
+
+	const showErrorPreview = useCallback(
+		(event: ReactMouseEvent<HTMLElement>, text: string): void => {
+			const previewText = text.trim();
+			if (!previewText) {
+				setErrorPreviewPopover(null);
+				return;
+			}
+			const viewportWidth =
+				typeof window === "undefined" ? 1280 : window.innerWidth;
+			const viewportHeight =
+				typeof window === "undefined" ? 720 : window.innerHeight;
+			setErrorPreviewPopover({
+				text: previewText,
+				x: clampProjectMenuCoordinate(event.clientX + 18, viewportWidth, 368),
+				y: clampProjectMenuCoordinate(event.clientY + 18, viewportHeight, 196),
+			});
+		},
+		[],
+	);
+
+	const hideErrorPreview = useCallback((): void => {
+		setErrorPreviewPopover(null);
+	}, []);
+
+	const errorPreviewHandlers = useCallback(
+		(
+			text: string | null | undefined,
+		): Pick<
+			HTMLAttributes<HTMLElement>,
+			"onMouseEnter" | "onMouseMove" | "onMouseLeave"
+		> => {
+			const previewText = text?.trim();
+			if (!previewText) {
+				return {};
+			}
+			return {
+				onMouseEnter: (event) => {
+					showErrorPreview(event as ReactMouseEvent<HTMLElement>, previewText);
+				},
+				onMouseMove: (event) => {
+					showErrorPreview(event as ReactMouseEvent<HTMLElement>, previewText);
+				},
+				onMouseLeave: () => {
+					hideErrorPreview();
+				},
+			};
+		},
+		[hideErrorPreview, showErrorPreview],
 	);
 
 	const setProjectState = useCallback(
@@ -984,6 +1129,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			closeProjectActionMenu();
 		}
 	}, [closeProjectActionMenu, projectActionMenu, projectActionMenuProject]);
+
+	useEffect(() => {
+		const dismissErrorPreview = () => {
+			hideErrorPreview();
+		};
+
+		window.addEventListener("resize", dismissErrorPreview);
+		window.addEventListener("scroll", dismissErrorPreview, true);
+		document.addEventListener("mousedown", dismissErrorPreview);
+		return () => {
+			window.removeEventListener("resize", dismissErrorPreview);
+			window.removeEventListener("scroll", dismissErrorPreview, true);
+			document.removeEventListener("mousedown", dismissErrorPreview);
+		};
+	}, [hideErrorPreview]);
 
 	useEffect(() => {
 		selectedThreadIdRef.current = selectedThreadId;
@@ -1722,10 +1882,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								projectActionMenuProject.id,
 								worktree.path,
 							);
+							const worktreeErrorPreviewText = worktreeThreadErrorPreviewText(
+								projectActionMenuProject.id,
+								worktree.path,
+							);
 							return (
 								<div
 									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
 									key={worktree.path}
+									{...errorPreviewHandlers(worktreeErrorPreviewText)}
 								>
 									<div
 										className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
@@ -1838,6 +2003,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
+					const projectErrorPreviewText = projectThreadErrorPreviewText(
+						project.id,
+					);
 					return (
 						<div
 							className="space-y-1"
@@ -1859,7 +2027,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											? "bg-[#262626] text-[#aaa4ff]"
 											: "text-[#d7d7d7] hover:bg-[#1f2020]"
 									}`}
+									{...errorPreviewHandlers(projectErrorPreviewText)}
 									onClick={() => {
+										hideErrorPreview();
 										void refreshProject(project);
 									}}
 								>
@@ -1934,6 +2104,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												project.id,
 												worktree.path,
 											);
+											const worktreeErrorPreviewText =
+												worktreeThreadErrorPreviewText(
+													project.id,
+													worktree.path,
+												);
 											return (
 												<button
 													type="button"
@@ -1945,7 +2120,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																? "bg-[#1f2020] text-[#f2f0ef]"
 																: "text-[#cfd1d4] hover:bg-[#202020]"
 													}`}
+													{...errorPreviewHandlers(worktreeErrorPreviewText)}
 													onClick={() => {
+														hideErrorPreview();
 														clearThreadSelection();
 														setThreadsError("");
 														selectProject(project, worktree.path);
@@ -2069,6 +2246,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						const isWorking = thread.runStatus.state === "working";
 						const hasRunError = thread.runStatus.state === "failed";
 						const hasUnreadError = thread.runStatus.hasUnreadError;
+						const threadErrorPreviewText =
+							hasUnreadError || hasRunError
+								? (thread.runStatus.error ?? "")
+								: "";
 						return (
 							<button
 								type="button"
@@ -2078,7 +2259,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										? "bg-[#25233a] text-[#f2f0ef]"
 										: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
 								}`}
+								{...errorPreviewHandlers(threadErrorPreviewText)}
 								onClick={() => {
+									hideErrorPreview();
 									void openThread(thread.id, {
 										acknowledgeUnreadError: hasUnreadError,
 									});
@@ -2490,6 +2673,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</nav>
 				</div>
 			</div>
+			{errorPreviewPopover ? (
+				<div
+					className="pointer-events-none fixed z-[110] max-w-[22rem] rounded-md border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+					style={{
+						left: errorPreviewPopover.x,
+						top: errorPreviewPopover.y,
+					}}
+				>
+					<div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#ff8698]">
+						Error Preview
+					</div>
+					<div className="whitespace-pre-wrap break-words">
+						{errorPreviewPopover.text}
+					</div>
+				</div>
+			) : null}
 			{projectActionMenuPanel}
 		</div>
 	);
