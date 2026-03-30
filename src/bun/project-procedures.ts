@@ -10,6 +10,7 @@ import {
 	createThreadMessage,
 	deleteProject,
 	deleteThread,
+	getProject,
 	getProjectById,
 	getThreadById,
 	initAppDatabase,
@@ -1979,7 +1980,7 @@ function startWorktreePolling(
 		history: emptyGitHistoryResult(state.id, worktreePath),
 		historySignature: null,
 		historyTimer: null,
-		taskInputs: readTaskInputStamps(worktreePath),
+		taskInputs: new Map(),
 		taskTimer: null,
 		lastUpdatedAt: getNow(),
 	};
@@ -2123,10 +2124,11 @@ export async function openProjectProcedure(
 ): Promise<RpcProjectWorktreesResult> {
 	const projectPath = normalizePath(params.projectPath);
 	assertProjectDirectory(projectPath);
+	const existingProject = getProject(db, projectPath);
 
 	let worktrees: RpcWorktree[];
 	try {
-		worktrees = await readProjectWorktrees(projectPath);
+		worktrees = await readProjectWorktrees(projectPath, existingProject?.id);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(
@@ -2402,13 +2404,6 @@ export async function openWorktreeProcedure(
 	}
 
 	const worktreeState = startWorktreePolling(state, worktreePath);
-	await Promise.all([readDiff(worktreePath), readFiles(worktreePath)]).then(
-		([diff, files]) => {
-			worktreeState.diff = diff;
-			worktreeState.files = files;
-			worktreeState.lastUpdatedAt = getNow();
-		},
-	);
 
 	return {
 		project,

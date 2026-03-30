@@ -2033,6 +2033,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	}, [activeSelectedWorktreePath, selectedProject, selectedProjectWorktrees]);
 
+	const activeSelectedWorktreeState = useMemo(() => {
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			return null;
+		}
+		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath);
+	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
+
 	const activeSelectedWorktreeFolder = useMemo(() => {
 		if (!activeSelectedWorktreePath) {
 			return "No worktree selected";
@@ -2072,6 +2079,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const taskSelectorDisabled =
 		!selectedProject ||
 		!activeSelectedWorktreePath ||
+		!activeSelectedWorktreeState?.opened ||
 		isLoadingProjectTasks ||
 		isRunningProjectTask ||
 		isSending ||
@@ -2865,21 +2873,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				: null;
 
 			const openProjects = loaded.filter((project) => project.isOpen === 1);
-			const openProjectIds = new Set(openProjects.map((project) => project.id));
+			const restoredOpenProjectIds = new Set(
+				openProjects.map((project) => project.id),
+			);
+			for (const entry of persistedState.openWorktrees) {
+				restoredOpenProjectIds.add(entry.projectId);
+			}
+			if (persistedState.selectedProjectId !== null) {
+				restoredOpenProjectIds.add(persistedState.selectedProjectId);
+			}
+			if (initialThread) {
+				restoredOpenProjectIds.add(initialThread.projectId);
+			}
 			const restoredProjectWorktrees = new Map<number, RpcWorktree[]>();
+			const restoredProjects = loaded.filter((project) =>
+				restoredOpenProjectIds.has(project.id),
+			);
 
-			for (const project of openProjects) {
+			for (const project of restoredProjects) {
 				setProjectState(project.id, {
 					expanded: true,
-					loadingWorktrees: true,
+					loadingWorktrees: getProjectState(project.id).worktrees.length === 0,
 					error: "",
 				});
 			}
 
-			await Promise.all(
-				openProjects.map(async (project) => {
+			const restoredProjectWorktreesPromise = Promise.all(
+				restoredProjects.map(async (project) => {
 					try {
-						const worktrees = await loadProjectWorktrees(project.id);
+						const worktrees = await loadProjectWorktrees(project.id, {
+							backgroundRefresh: true,
+						});
 						restoredProjectWorktrees.set(project.id, worktrees);
 					} catch (error) {
 						setProjectState(project.id, {
@@ -2890,9 +2914,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}),
 			);
 
-			const restoredOpenWorktrees = await Promise.all(
+			const restoredOpenWorktreesPromise = Promise.all(
 				persistedState.openWorktrees
-					.filter(({ projectId }) => openProjectIds.has(projectId))
+					.filter(({ projectId }) => restoredOpenProjectIds.has(projectId))
 					.map(async ({ projectId, worktreePath }) => {
 						try {
 							const result = await procedures.openWorktree({
@@ -2915,6 +2939,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						}
 					}),
 			);
+
+			await restoredProjectWorktreesPromise;
+			const restoredOpenWorktrees = await restoredOpenWorktreesPromise;
 
 			for (const result of restoredOpenWorktrees) {
 				if (result.ok) {
@@ -3424,7 +3451,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [defaultCodexModel, selectedThread]);
 
 	useEffect(() => {
-		if (!selectedProject || !activeSelectedWorktreePath) {
+		if (
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			!activeSelectedWorktreeState?.opened
+		) {
 			projectTasksRequestIdRef.current += 1;
 			setProjectTasks([]);
 			setIsLoadingProjectTasks(false);
@@ -3432,10 +3463,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 		void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath);
-	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
+	}, [
+		activeSelectedWorktreePath,
+		activeSelectedWorktreeState,
+		loadProjectTasks,
+		selectedProject,
+	]);
 
 	useEffect(() => {
-		if (!selectedProject || !activeSelectedWorktreePath) {
+		if (
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			!activeSelectedWorktreeState?.opened
+		) {
 			gitHistoryRequestIdRef.current += 1;
 			setGitHistory(null);
 			setGitHistoryLoading(false);
@@ -3443,13 +3483,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 		void loadGitHistory(selectedProject.id, activeSelectedWorktreePath);
-	}, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
+	}, [
+		activeSelectedWorktreePath,
+		activeSelectedWorktreeState,
+		loadGitHistory,
+		selectedProject,
+	]);
 
 	useEffect(() => {
 		const handleWorktreeTasksChanged = (
 			event: CustomEvent<RpcWorktreeTasksChanged>,
 		) => {
-			if (!selectedProject || !activeSelectedWorktreePath) {
+			if (
+				!selectedProject ||
+				!activeSelectedWorktreePath ||
+				!activeSelectedWorktreeState?.opened
+			) {
 				return;
 			}
 			if (
@@ -3471,13 +3520,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				handleWorktreeTasksChanged,
 			);
 		};
-	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
+	}, [
+		activeSelectedWorktreePath,
+		activeSelectedWorktreeState,
+		loadProjectTasks,
+		selectedProject,
+	]);
 
 	useEffect(() => {
 		const handleWorktreeGitHistoryChanged = (
 			event: CustomEvent<RpcWorktreeGitHistoryChanged>,
 		) => {
-			if (!selectedProject || !activeSelectedWorktreePath) {
+			if (
+				!selectedProject ||
+				!activeSelectedWorktreePath ||
+				!activeSelectedWorktreeState?.opened
+			) {
 				return;
 			}
 			if (
@@ -3501,7 +3559,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				handleWorktreeGitHistoryChanged,
 			);
 		};
-	}, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
+	}, [
+		activeSelectedWorktreePath,
+		activeSelectedWorktreeState,
+		loadGitHistory,
+		selectedProject,
+	]);
 
 	useEffect(() => {
 		if (!gitHistoryModal) {
@@ -3535,7 +3598,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [closeGitHistoryModal, gitHistoryModal]);
 
 	useEffect(() => {
-		if (!selectedProjectId || !activeSelectedWorktreePath) {
+		if (
+			!selectedProjectId ||
+			!activeSelectedWorktreePath ||
+			!activeSelectedWorktreeState?.opened
+		) {
 			return;
 		}
 		if (
@@ -3560,6 +3627,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		void openThread(latestThread.id);
 	}, [
 		activeSelectedWorktreePath,
+		activeSelectedWorktreeState,
 		clearThreadSelection,
 		openThread,
 		selectedProjectId,
@@ -4052,7 +4120,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					error: "",
 				});
 				setProjectState(projectId, {
-					expanded: false,
 					loadingWorktrees: false,
 					openWorktrees: new Set([...projectState.openWorktrees, worktreePath]),
 				});
