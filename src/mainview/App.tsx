@@ -27,7 +27,7 @@ import type {
 type Message = {
 	speaker: "assistant" | "user";
 	text: string;
-	state?: "complete" | "working";
+	state?: "complete" | "working" | "error";
 };
 
 type ProjectNodeState = {
@@ -252,6 +252,14 @@ function ProcessingMessage(): JSX.Element {
 			<span className="font-label text-[11px] uppercase tracking-[0.16em] text-[#c3beff]">
 				Processing
 			</span>
+		</div>
+	);
+}
+
+function ChatErrorMessage({ text }: { text: string }): JSX.Element {
+	return (
+		<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+			<MarkdownMessage text={text} />
 		</div>
 	);
 }
@@ -661,12 +669,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 
-		const detail = await procedures.getThread({
+		let detail = await procedures.getThread({
 			threadId: selectedSummary.id,
 		});
 		if (selectedThreadIdRef.current !== selectedSummary.id) {
 			setThreads(loadedThreads);
 			return;
+		}
+		if (detail.thread.runStatus.hasUnreadError) {
+			detail = await procedures.markThreadErrorSeen({
+				threadId: selectedSummary.id,
+			});
 		}
 		selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 		setThreads(upsertThreadList(loadedThreads, detail.thread));
@@ -684,9 +697,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setThreadsError("");
 			setChatError("");
 			try {
-				const detail = options?.acknowledgeUnreadError
+				let detail = options?.acknowledgeUnreadError
 					? await procedures.markThreadErrorSeen({ threadId })
 					: await procedures.getThread({ threadId });
+				if (
+					!options?.acknowledgeUnreadError &&
+					detail.thread.runStatus.hasUnreadError
+				) {
+					detail = await procedures.markThreadErrorSeen({ threadId });
+				}
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
 				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
@@ -742,9 +761,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 		if (loadedThreads[0]) {
 			try {
-				const detail = await procedures.getThread({
+				let detail = await procedures.getThread({
 					threadId: loadedThreads[0].id,
 				});
+				if (detail.thread.runStatus.hasUnreadError) {
+					detail = await procedures.markThreadErrorSeen({
+						threadId: loadedThreads[0].id,
+					});
+				}
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
 				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
@@ -1364,17 +1388,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const visibleMessages = useMemo<Message[]>(() => {
+		let messages: Message[];
 		if (isThreadLoading) {
-			return [
+			messages = [
 				{
 					speaker: "assistant",
 					state: "complete",
 					text: "Loading thread history...",
 				},
 			];
-		}
-		if (!selectedThread) {
-			return [
+		} else if (!selectedThread) {
+			messages = [
 				{
 					speaker: "assistant",
 					state: "complete",
@@ -1383,31 +1407,39 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						: "Add a project, choose a worktree, and create a thread to begin.",
 				},
 			];
-		}
-		if (threadMessages.length === 0) {
-			return [
+		} else if (threadMessages.length === 0) {
+			messages = [
 				{
 					speaker: "assistant",
 					state: "complete",
 					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask Codex to inspect, refactor, or debug this worktree.`,
 				},
 			];
+		} else {
+			messages = threadMessages.map((message) => ({
+				speaker: message.role,
+				state: "complete" as const,
+				text: message.text,
+			}));
 		}
-		const messages = threadMessages.map((message) => ({
-			speaker: message.role,
-			state: "complete" as const,
-			text: message.text,
-		}));
-		if (selectedThread.runStatus.state === "working") {
+		if (selectedThread?.runStatus.state === "working") {
 			messages.push({
 				speaker: "assistant",
 				state: "working",
 				text: "Processing",
 			});
 		}
+		if (activeChatError) {
+			messages.push({
+				speaker: "assistant",
+				state: "error",
+				text: activeChatError,
+			});
+		}
 		return messages;
 	}, [
 		activeSelectedWorktreeFolder,
+		activeChatError,
 		isThreadLoading,
 		selectedProject,
 		selectedThread,
@@ -1427,12 +1459,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</span>
 					</div>
 					<div className="flex-1 space-y-4">
-						<div className="font-label text-[10px] uppercase tracking-widest text-[#aaa4ff] font-bold">
-							Codex • Assistant
+						<div
+							className={`font-label text-[10px] uppercase tracking-widest font-bold ${
+								message.state === "error" ? "text-[#ff8ca0]" : "text-[#aaa4ff]"
+							}`}
+						>
+							{message.state === "error"
+								? "Codex • Error"
+								: "Codex • Assistant"}
 						</div>
 						<div className="text-[#ffffff] leading-relaxed text-sm">
 							{message.state === "working" ? (
 								<ProcessingMessage />
+							) : message.state === "error" ? (
+								<ChatErrorMessage text={message.text} />
 							) : (
 								<MarkdownMessage text={message.text} />
 							)}
@@ -1484,6 +1524,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="text-sm leading-relaxed text-[#ffffff]">
 							{message.state === "working" ? (
 								<ProcessingMessage />
+							) : message.state === "error" ? (
+								<ChatErrorMessage text={message.text} />
 							) : (
 								<MarkdownMessage text={message.text} />
 							)}
@@ -2241,11 +2283,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										842 Tokens
 									</span>
 								</div>
-								{activeChatError ? (
-									<div className="mt-3 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
-										{activeChatError}
-									</div>
-								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
 									<textarea
 										className="flex-1 bg-transparent border-none focus:ring-0 text-sm placeholder:text-[#adabaa]/50 resize-none font-body"
@@ -2364,11 +2401,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						className="max-w-2xl mx-auto flex flex-col gap-3"
 						onSubmit={onSubmit}
 					>
-						{activeChatError ? (
-							<div className="rounded-lg border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff8ca0]">
-								{activeChatError}
-							</div>
-						) : null}
 						<div className="flex items-center gap-2">
 							<button
 								type="button"
