@@ -992,7 +992,8 @@ function ProjectTaskSelector({
 }): JSX.Element {
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement | null>(null);
-	const unavailable = disabled || (!loading && tasks.length === 0);
+	const noTasksAvailable = !loading && tasks.length === 0;
+	const unavailable = disabled || noTasksAvailable;
 	const buttonLabel = loading
 		? "Loading Tasks"
 		: tasks.length > 0
@@ -1040,7 +1041,10 @@ function ProjectTaskSelector({
 	}, [open]);
 
 	return (
-		<div ref={rootRef} className="relative">
+		<div
+			ref={rootRef}
+			className={noTasksAvailable ? "group relative" : "relative"}
+		>
 			<button
 				type="button"
 				className={`flex items-center gap-2 transition-colors ${
@@ -1057,7 +1061,8 @@ function ProjectTaskSelector({
 						setOpen((current) => !current);
 					}
 				}}
-				disabled={unavailable}
+				disabled={disabled}
+				aria-disabled={unavailable}
 				aria-expanded={open}
 				aria-haspopup="menu"
 			>
@@ -1077,6 +1082,13 @@ function ProjectTaskSelector({
 					{buttonLabel}
 				</span>
 			</button>
+			{noTasksAvailable ? (
+				<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+					<div className="whitespace-nowrap rounded-md border border-[#3a355f] bg-[#14131d] px-3 py-2 text-xs text-[#d7d3ff] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+						No tasks found.
+					</div>
+				</div>
+			) : null}
 			{open ? (
 				<div
 					className={`absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[18rem] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
