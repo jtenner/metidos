@@ -1683,6 +1683,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [threadRenameTitle, setThreadRenameTitle] = useState("");
 	const [addProjectPath, setAddProjectPath] = useState("");
 	const [addProjectError, setAddProjectError] = useState("");
+	const [hoveredDirectorySuggestion, setHoveredDirectorySuggestion] = useState<
+		string | null
+	>(null);
 	const [directorySuggestions, setDirectorySuggestions] = useState<string[]>(
 		[],
 	);
@@ -3321,6 +3324,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		if (!addProjectOpen) {
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
+			setHoveredDirectorySuggestion(null);
 			return;
 		}
 
@@ -3355,20 +3359,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			cancelled = true;
 		};
 	}, [addProjectOpen, addProjectPath, procedures]);
-
-	const selectDirectorySuggestion = useCallback(
-		(directory: string) => {
-			setAddProjectError("");
-			setAddProjectPath(
-				formatDirectoryPathForInput(
-					directory,
-					homeDirectory,
-					supportsTildePath,
-				),
-			);
-		},
-		[homeDirectory, supportsTildePath],
-	);
 
 	const updateActiveCodexModel = useCallback(
 		async (model: string) => {
@@ -3503,14 +3493,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		syncThreadContext,
 	]);
 
-	const submitAddProject = useCallback(
-		async (event: FormEvent<HTMLFormElement>) => {
-			event.preventDefault();
+	const openProjectFromInput = useCallback(
+		async (projectPathInput: string) => {
 			if (isAddingProject) {
 				return;
 			}
 
-			const projectPath = addProjectPath.trim();
+			const projectPath = projectPathInput.trim();
 			if (!projectPath) {
 				setAddProjectError("Enter the project folder path.");
 				return;
@@ -3544,7 +3533,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 		},
 		[
-			addProjectPath,
 			getProjectState,
 			hydrateProjectRows,
 			isAddingProject,
@@ -3553,6 +3541,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			selectProject,
 			setProjectState,
 		],
+	);
+
+	const selectDirectorySuggestion = useCallback(
+		async (directory: string) => {
+			const formattedDirectory = formatDirectoryPathForInput(
+				directory,
+				homeDirectory,
+				supportsTildePath,
+			);
+			setAddProjectError("");
+			setHoveredDirectorySuggestion(null);
+			setAddProjectPath(formattedDirectory);
+			await openProjectFromInput(formattedDirectory);
+		},
+		[homeDirectory, openProjectFromInput, supportsTildePath],
+	);
+
+	const submitAddProject = useCallback(
+		async (event: FormEvent<HTMLFormElement>) => {
+			event.preventDefault();
+			await openProjectFromInput(addProjectPath);
+		},
+		[addProjectPath, openProjectFromInput],
 	);
 
 	const refreshProject = useCallback(
@@ -4057,6 +4068,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	});
 
+	const hoveredDirectorySuggestionPath = hoveredDirectorySuggestion
+		? formatDirectoryPathForInput(
+				hoveredDirectorySuggestion,
+				homeDirectory,
+				supportsTildePath,
+			)
+		: "";
+	const displayedAddProjectPath =
+		hoveredDirectorySuggestionPath || addProjectPath;
+	const addProjectInputIsPreviewing = hoveredDirectorySuggestionPath.length > 0;
+
 	const addProjectForm = (
 		<form
 			className="space-y-2 border-b border-[#262626] bg-[#151515] px-3 py-3"
@@ -4067,11 +4089,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<div className="relative mt-2 space-y-2">
 					<div className="flex items-start gap-2">
 						<input
-							className="min-w-0 flex-1 rounded-sm border border-[#3b3b3b] bg-[#101010] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f6f] focus:border-[#7d73ff]"
+							className={`min-w-0 flex-1 rounded-sm border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#7d73ff] ${
+								addProjectInputIsPreviewing
+									? "border-[#8e86f3] bg-[#171a28] text-[#ffffff] shadow-[0_0_0_1px_rgba(142,134,243,0.18)]"
+									: "border-[#3b3b3b] bg-[#101010] text-[#f2f0ef]"
+							}`}
 							placeholder={supportsTildePath ? "~/project" : "/path/to/project"}
-							value={addProjectPath}
+							value={displayedAddProjectPath}
 							onChange={(event) => {
 								setAddProjectError("");
+								setHoveredDirectorySuggestion(null);
 								setAddProjectPath(event.currentTarget.value);
 							}}
 							autoCapitalize="none"
@@ -4104,34 +4131,65 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									No matching folders.
 								</div>
 							) : null}
-							{directorySuggestions.map((directory) => {
-								const formattedDirectory = formatDirectoryPathForInput(
-									directory,
-									homeDirectory,
-									supportsTildePath,
-								);
-								return (
-									<button
-										type="button"
-										key={directory}
-										className="flex w-full items-center gap-3 border-t border-[#1b1d2a] px-3 py-2 text-left transition-colors hover:bg-[#191b29]"
-										onMouseDown={(event) => event.preventDefault()}
-										onClick={() => selectDirectorySuggestion(directory)}
-									>
-										<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#1a1730] text-[#aaa4ff]">
-											{materialSymbol("folder", "text-[18px]")}
-										</div>
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-sm font-medium normal-case text-[#f2f0ef]">
-												{shortName(directory)}
-											</div>
-											<div className="truncate text-[11px] normal-case text-[#8e8aa7]">
-												{formattedDirectory}
-											</div>
-										</div>
-									</button>
-								);
-							})}
+							{directorySuggestions.length > 0 ? (
+								<div className="app-scrollbar max-h-[34rem] overflow-y-auto">
+									{directorySuggestions.map((directory) => {
+										const formattedDirectory = formatDirectoryPathForInput(
+											directory,
+											homeDirectory,
+											supportsTildePath,
+										);
+										return (
+											<button
+												type="button"
+												key={directory}
+												className={`flex w-full items-center gap-3 border-t border-[#1b1d2a] px-3 py-2 text-left transition-colors ${
+													hoveredDirectorySuggestion === directory
+														? "bg-[#1b2033]"
+														: "hover:bg-[#191b29]"
+												}`}
+												disabled={isAddingProject}
+												onMouseDown={(event) => event.preventDefault()}
+												onMouseEnter={() => {
+													setHoveredDirectorySuggestion(directory);
+												}}
+												onMouseLeave={() => {
+													setHoveredDirectorySuggestion((current) =>
+														current === directory ? null : current,
+													);
+												}}
+												onFocus={() => {
+													setHoveredDirectorySuggestion(directory);
+												}}
+												onBlur={() => {
+													setHoveredDirectorySuggestion((current) =>
+														current === directory ? null : current,
+													);
+												}}
+												onClick={() => selectDirectorySuggestion(directory)}
+											>
+												<div
+													className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-[#aaa4ff] ${
+														hoveredDirectorySuggestion === directory
+															? "bg-[#241f46]"
+															: "bg-[#1a1730]"
+													}`}
+												>
+													{materialSymbol("folder", "text-[18px]")}
+												</div>
+												<div className="min-w-0 flex-1">
+													<div className="truncate text-sm font-medium normal-case text-[#f2f0ef]">
+														{shortName(directory)}
+													</div>
+													<div className="truncate text-[11px] normal-case text-[#8e8aa7]">
+														{formattedDirectory}
+													</div>
+												</div>
+											</button>
+										);
+									})}
+								</div>
+							) : null}
 						</div>
 					) : null}
 				</div>
