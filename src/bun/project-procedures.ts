@@ -102,6 +102,7 @@ export async function getCodexModelCatalogProcedure(
 }
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
+const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
@@ -134,6 +135,7 @@ type ProjectPollState = {
 	project: ProjectRecord;
 	projectPath: string;
 	worktrees: RpcWorktree[];
+	worktreesLoadedAt: number;
 	projectTimer: ReturnType<typeof setInterval> | null;
 	openWorktrees: Map<string, WorktreePollState>;
 };
@@ -1389,11 +1391,30 @@ async function readProjectWorktrees(
 	projectPath: string,
 	projectId?: number,
 ): Promise<RpcWorktree[]> {
+	if (typeof projectId === "number") {
+		const state = projectPollMap.get(projectId);
+		if (state && state.worktreesLoadedAt > 0) {
+			if (
+				Date.now() - state.worktreesLoadedAt >
+				PROJECT_WORKTREE_CACHE_STALE_MS
+			) {
+				void refreshProjectPoll(projectId).catch((error) => {
+					console.error(
+						`Worktree refresh failed for project ${projectId}`,
+						error,
+					);
+				});
+			}
+			return state.worktrees;
+		}
+	}
+
 	const worktrees = await listWorktreesForProjectPath(projectPath);
 	if (typeof projectId === "number") {
 		const state = projectPollMap.get(projectId);
 		if (state) {
 			state.worktrees = worktrees;
+			state.worktreesLoadedAt = Date.now();
 		}
 	}
 	return worktrees;
@@ -1879,6 +1900,7 @@ async function refreshProjectPoll(projectId: number): Promise<void> {
 
 	const worktrees = await listWorktreesForProjectPath(state.projectPath);
 	state.worktrees = worktrees;
+	state.worktreesLoadedAt = Date.now();
 
 	const activeWorktrees = new Set(worktrees.map((w) => w.path));
 	for (const [wtPath] of state.openWorktrees) {
@@ -1896,6 +1918,7 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 			project,
 			projectPath: project.path,
 			worktrees: [],
+			worktreesLoadedAt: 0,
 			projectTimer: null,
 			openWorktrees: new Map(),
 		};
@@ -2117,6 +2140,7 @@ export async function openProjectProcedure(
 	});
 	const state = ensureProjectPoller(project);
 	state.worktrees = worktrees;
+	state.worktreesLoadedAt = Date.now();
 
 	return {
 		project,
@@ -2128,6 +2152,7 @@ export async function listProjectWorktreesProcedure(
 	params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
 ): Promise<RpcProjectWorktreesResult> {
 	const project = projectByIdForPath(params.projectId);
+	ensureProjectPoller(project);
 	const worktrees = await readProjectWorktrees(project.path, project.id);
 
 	return {

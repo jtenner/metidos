@@ -1798,6 +1798,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const projectTasksRequestIdRef = useRef(0);
 	const gitHistoryRequestIdRef = useRef(0);
 	const gitHistoryDiffRequestIdRef = useRef(0);
+	const projectWorktreeRequestCacheRef = useRef(
+		new Map<number, Promise<RpcWorktree[]>>(),
+	);
 	const gitHistoryDiffCacheRef = useRef(
 		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
 	);
@@ -2433,17 +2436,61 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setSelectedWorktreePath(thread.worktreePath);
 	}, []);
 
-	const loadProjectWorktrees = useCallback(
+	const requestProjectWorktrees = useCallback(
 		async (projectId: number): Promise<RpcWorktree[]> => {
-			const result = await procedures.listProjectWorktrees({ projectId });
-			setProjectState(projectId, {
-				worktrees: result.worktrees,
-				loadingWorktrees: false,
-				error: "",
-			});
-			return result.worktrees;
+			const existing = projectWorktreeRequestCacheRef.current.get(projectId);
+			if (existing) {
+				return existing;
+			}
+
+			const request = procedures
+				.listProjectWorktrees({ projectId })
+				.then((result) => {
+					setProjectState(projectId, {
+						worktrees: result.worktrees,
+						loadingWorktrees: false,
+						error: "",
+					});
+					return result.worktrees;
+				})
+				.finally(() => {
+					projectWorktreeRequestCacheRef.current.delete(projectId);
+				});
+			projectWorktreeRequestCacheRef.current.set(projectId, request);
+			return request;
 		},
 		[procedures, setProjectState],
+	);
+
+	const loadProjectWorktrees = useCallback(
+		async (
+			projectId: number,
+			options?: {
+				backgroundRefresh?: boolean;
+				preferCached?: boolean;
+			},
+		): Promise<RpcWorktree[]> => {
+			const current = getProjectState(projectId);
+			if ((options?.preferCached ?? true) && current.worktrees.length > 0) {
+				setProjectState(projectId, {
+					loadingWorktrees: false,
+					error: "",
+				});
+				if (options?.backgroundRefresh) {
+					void requestProjectWorktrees(projectId).catch(() => {
+						// Keep rendering the cached worktree list if the background refresh fails.
+					});
+				}
+				return current.worktrees;
+			}
+
+			setProjectState(projectId, {
+				loadingWorktrees: true,
+				error: "",
+			});
+			return requestProjectWorktrees(projectId);
+		},
+		[getProjectState, requestProjectWorktrees, setProjectState],
 	);
 
 	const loadProjectTasks = useCallback(
@@ -3020,11 +3067,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				y: clampProjectMenuCoordinate(y, viewportHeight, 420),
 			});
 			setProjectActionMenuError("");
-			setProjectActionMenuLoading(true);
+			setProjectActionMenuLoading(
+				getProjectState(project.id).worktrees.length === 0,
+			);
 			setNewWorktreeName("");
 
 			try {
-				await loadProjectWorktrees(project.id);
+				await loadProjectWorktrees(project.id, {
+					backgroundRefresh: true,
+				});
 				if (projectActionMenuRequestId.current === requestId) {
 					setProjectActionMenuLoading(false);
 				}
@@ -3037,7 +3088,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			}
 		},
-		[closeThreadActionMenu, loadProjectWorktrees],
+		[closeThreadActionMenu, getProjectState, loadProjectWorktrees],
 	);
 
 	const openThreadActionMenu = useCallback(
@@ -3853,9 +3904,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		async (project: RpcProject) => {
 			const current = getProjectState(project.id);
 			const expanded = !current.expanded;
+			const hasCachedWorktrees = current.worktrees.length > 0;
 			setProjectState(project.id, {
 				expanded,
-				loadingWorktrees: expanded,
+				loadingWorktrees: expanded && !hasCachedWorktrees,
 				error: "",
 			});
 
@@ -3891,6 +3943,31 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				if (selectedProjectId === project.id) {
 					setSelectedWorktreePath(project.path);
 				}
+				return;
+			}
+
+			if (hasCachedWorktrees) {
+				if (!selectedProjectId) {
+					selectProject(project);
+				}
+				void procedures
+					.openProject({
+						projectPath: project.path,
+						name: project.name,
+					})
+					.then((result) => {
+						setProjectState(project.id, {
+							worktrees: result.worktrees,
+							loadingWorktrees: false,
+							error: "",
+						});
+					})
+					.catch((error) => {
+						setProjectState(project.id, {
+							loadingWorktrees: false,
+							error: error instanceof Error ? error.message : String(error),
+						});
+					});
 				return;
 			}
 
@@ -4594,10 +4671,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									{...errorPreviewHandlers(worktreeErrorPreviewText)}
 								>
 									<div
-										className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
+										className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
 										style={{
 											gridTemplateColumns:
-												"minmax(0, 11.5rem) minmax(0, 1fr) auto",
+												"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
 										}}
 									>
 										<span
@@ -4986,10 +5063,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												}}
 											>
 												<div
-													className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
+													className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
 													style={{
 														gridTemplateColumns:
-															"minmax(0, 11.5rem) minmax(0, 1fr) auto",
+															"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
 													}}
 												>
 													<span
