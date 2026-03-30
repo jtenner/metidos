@@ -3544,7 +3544,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const selectDirectorySuggestion = useCallback(
-		async (directory: string) => {
+		(directory: string) => {
 			const formattedDirectory = formatDirectoryPathForInput(
 				directory,
 				homeDirectory,
@@ -3553,9 +3553,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setAddProjectError("");
 			setHoveredDirectorySuggestion(null);
 			setAddProjectPath(formattedDirectory);
-			await openProjectFromInput(formattedDirectory);
 		},
-		[homeDirectory, openProjectFromInput, supportsTildePath],
+		[homeDirectory, supportsTildePath],
 	);
 
 	const submitAddProject = useCallback(
