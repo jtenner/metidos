@@ -13,6 +13,16 @@ body {
 	overflow: hidden;
 }
 
+:root {
+	--app-scrollbar-size: 10px;
+	--app-scrollbar-track: #101522;
+	--app-scrollbar-thumb-color: #4a4f73;
+	--app-scrollbar-thumb-start: #6f66d8;
+	--app-scrollbar-thumb-end: #4a4f73;
+	--app-scrollbar-thumb-hover-start: #8e89df;
+	--app-scrollbar-thumb-hover-end: #5c628f;
+}
+
 @font-face {
 	font-family: "Fira Code";
 	src: url("/fonts/fira-code-vf.woff2") format("woff2-variations");
@@ -39,32 +49,40 @@ body {
 	scrollbar-width: none;
 }
 
-.app-scrollbar {
+* {
 	scrollbar-width: thin;
-	scrollbar-color: #4a4f73 #101522;
+	scrollbar-color: var(--app-scrollbar-thumb-color) var(--app-scrollbar-track);
 }
 
-.app-scrollbar::-webkit-scrollbar {
-	width: 10px;
-	height: 10px;
+*::-webkit-scrollbar {
+	width: var(--app-scrollbar-size);
+	height: var(--app-scrollbar-size);
 }
 
-.app-scrollbar::-webkit-scrollbar-track {
-	background: #101522;
+*::-webkit-scrollbar-track {
+	background: var(--app-scrollbar-track);
 }
 
-.app-scrollbar::-webkit-scrollbar-thumb {
-	border: 2px solid #101522;
+*::-webkit-scrollbar-thumb {
+	border: 2px solid var(--app-scrollbar-track);
 	border-radius: 999px;
-	background: linear-gradient(180deg, #6f66d8 0%, #4a4f73 100%);
+	background: linear-gradient(
+		180deg,
+		var(--app-scrollbar-thumb-start) 0%,
+		var(--app-scrollbar-thumb-end) 100%
+	);
 }
 
-.app-scrollbar::-webkit-scrollbar-thumb:hover {
-	background: linear-gradient(180deg, #8e89df 0%, #5c628f 100%);
+*::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(
+		180deg,
+		var(--app-scrollbar-thumb-hover-start) 0%,
+		var(--app-scrollbar-thumb-hover-end) 100%
+	);
 }
 
-.app-scrollbar::-webkit-scrollbar-corner {
-	background: #101522;
+*::-webkit-scrollbar-corner {
+	background: var(--app-scrollbar-track);
 }
 
 .font-headline {
