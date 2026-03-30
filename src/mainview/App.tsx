@@ -5582,7 +5582,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const gitSection = (
 		<div className="border-t border-[#262626] px-3 py-3">
 			<SidebarSectionHeader
-				title="Git"
+				title={
+					<>
+						<span>Git</span>
+						{gitHistory?.branch || activeSelectedWorktree?.branch ? (
+							<span className="font-medium normal-case text-[#85879a]">
+								{" - "}
+								{gitHistory?.branch ?? activeSelectedWorktree?.branch}
+							</span>
+						) : null}
+					</>
+				}
 				open={gitSectionOpen}
 				onToggle={() => {
 					setGitSectionOpen((current) => !current);
@@ -5590,15 +5600,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			/>
 			{gitSectionOpen ? (
 				<div className="mt-3 space-y-3">
-					<div className="flex items-center justify-between gap-3 px-1">
+					<div className="px-1">
 						<span className="font-label text-[11px] tracking-[0.12em] text-[#d8d8d8]">
 							Git History
 						</span>
-						{gitHistory?.branch || activeSelectedWorktree?.branch ? (
-							<span className="shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
-								{gitHistory?.branch ?? activeSelectedWorktree?.branch}
-							</span>
-						) : null}
 					</div>
 					{!selectedProject || !activeSelectedWorktreePath ? (
 						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
