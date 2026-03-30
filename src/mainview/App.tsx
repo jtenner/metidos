@@ -1815,6 +1815,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
+	const initializedRef = useRef(false);
 
 	const selectedProject = useMemo(() => {
 		if (!selectedProjectId) {
@@ -5464,6 +5465,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	useEffect(() => {
+		if (initializedRef.current) {
+			return;
+		}
+		initializedRef.current = true;
 		void initialize();
 	}, [initialize]);
 
