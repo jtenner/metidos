@@ -265,7 +265,7 @@ function materialSymbol(name: string, className = ""): JSX.Element {
 
 function MarkdownMessage({ text }: { text: string }): JSX.Element {
 	return (
-		<div className="message-markdown">
+		<div className="message-markdown min-w-0 break-words">
 			<ReactMarkdown
 				components={markdownComponents}
 				remarkPlugins={[remarkGfm]}
@@ -862,7 +862,7 @@ function pickPreferredThreadErrorPreview(
 
 function ProcessingMessage(): JSX.Element {
 	return (
-		<div className="flex items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
+		<div className="flex w-full min-w-0 items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
 			<BeatLoader color="#aaa4ff" margin={2} size={6} speedMultiplier={0.85} />
 			<span className="font-label text-[11px] uppercase tracking-[0.16em] text-[#c3beff]">
 				Processing
@@ -873,7 +873,7 @@ function ProcessingMessage(): JSX.Element {
 
 function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 	return (
-		<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+		<div className="w-full min-w-0 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
 			<MarkdownMessage text={text} />
 		</div>
 	);
@@ -962,7 +962,7 @@ function CommandExecutionMessage({
 	state: "in_progress" | "completed" | "failed";
 }): JSX.Element {
 	return (
-		<details className="overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
 				<div className="min-w-0">
 					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
@@ -1001,7 +1001,7 @@ function ReasoningMessage({
 	text: string;
 }): JSX.Element {
 	return (
-		<div className="rounded-sm border border-[#2a2f48] bg-[#111521] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+		<div className="w-full min-w-0 rounded-sm border border-[#2a2f48] bg-[#111521] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
 			<div className="mb-2 flex items-center justify-between gap-3">
 				<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
 					Reasoning
@@ -1030,7 +1030,7 @@ function FileChangeMessage({
 }): JSX.Element {
 	const lines = parseUnifiedDiff(diffText);
 	return (
-		<div className="overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+		<div className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<div className="flex items-center justify-between gap-3 border-b border-[#262b40] px-3 py-3">
 				<div className="min-w-0">
 					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
@@ -3034,7 +3034,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const renderDesktopMessages = visibleMessages.map((message, index) => {
 		if (message.kind !== "chat" || message.speaker === "assistant") {
 			return (
-				<div className="flex gap-6 group" key={`${message.kind}-${index}`}>
+				<div
+					className="group flex w-full min-w-0 items-start gap-6"
+					key={`${message.kind}-${index}`}
+				>
 					<div className="w-8 h-8 rounded-sm bg-[#9c95f8] flex items-center justify-center shrink-0">
 						<span
 							className="material-symbols-outlined text-[#1b0a71] text-sm"
@@ -3043,7 +3046,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							psychology
 						</span>
 					</div>
-					<div className="flex-1 space-y-4">
+					<div className="min-w-0 flex-1 space-y-4">
 						<div
 							className={`font-label text-[10px] uppercase tracking-widest font-bold ${
 								message.kind === "chat" && message.tone === "error"
@@ -3059,7 +3062,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						>
 							{assistantMessageLabel(message)}
 						</div>
-						<div className="text-[#ffffff] leading-relaxed text-sm">
+						<div className="min-w-0 max-w-full text-[#ffffff] leading-relaxed text-sm">
 							{renderAssistantMessageContent(message)}
 						</div>
 					</div>
@@ -3069,14 +3072,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 		return (
 			<div
-				className="flex gap-6 justify-end"
+				className="flex w-full min-w-0 justify-end gap-6"
 				key={`${message.speaker}-${index}`}
 			>
-				<div className="flex-1 text-right space-y-2 max-w-2xl">
+				<div className="min-w-0 w-full max-w-2xl space-y-3 text-right">
 					<div className="font-label text-[10px] uppercase tracking-widest text-[#adabaa] font-bold">
 						Local User
 					</div>
-					<div className="bg-[#262626] inline-block p-4 rounded-sm text-sm text-[#ffffff] text-left">
+					<div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
 						<MarkdownMessage text={message.text} />
 					</div>
 				</div>
@@ -4084,7 +4087,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									Deep contextual reasoning active. Project indexing complete.
 								</p>
 							</div>
-							<div className="max-w-4xl mx-auto">{renderDesktopMessages}</div>
+							<div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-10">
+								{renderDesktopMessages}
+							</div>
 						</div>
 						<form
 							className="bg-[#131313] border-t border-[#262626] p-6"
