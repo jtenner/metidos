@@ -1030,8 +1030,8 @@ function FileChangeMessage({
 }): JSX.Element {
 	const lines = parseUnifiedDiff(diffText);
 	return (
-		<div className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
-			<div className="flex items-center justify-between gap-3 border-b border-[#262b40] px-3 py-3">
+		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
 				<div className="min-w-0">
 					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
 						File Change
@@ -1044,6 +1044,10 @@ function FileChangeMessage({
 					</div>
 				</div>
 				<div className="flex shrink-0 items-center gap-2">
+					<span className="flex items-center gap-1 rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
+						{materialSymbol("expand_more", "text-[13px]")}
+						Diff
+					</span>
 					<span className="rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
 						{changeKind}
 					</span>
@@ -1057,8 +1061,8 @@ function FileChangeMessage({
 						{state === "failed" ? "Failed" : "Ready"}
 					</span>
 				</div>
-			</div>
-			<div className="max-h-[28rem] overflow-auto bg-[#0c1018] font-mono text-[12px] leading-5">
+			</summary>
+			<div className="max-h-[28rem] overflow-auto border-t border-[#262b40] bg-[#0c1018] font-mono text-[12px] leading-5">
 				{lines.map((line) => (
 					<div
 						key={`${path}:${line.key}`}
@@ -1078,7 +1082,7 @@ function FileChangeMessage({
 					</div>
 				))}
 			</div>
-		</div>
+		</details>
 	);
 }
 
