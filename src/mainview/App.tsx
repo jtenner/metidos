@@ -92,7 +92,6 @@ type GitHistoryModalState = {
 };
 
 type ProjectNodeState = {
-	expanded: boolean;
 	worktrees: RpcWorktree[];
 	loadingWorktrees: boolean;
 	error: string;
@@ -149,6 +148,14 @@ type PersistedMainviewState = {
 	openWorktrees: PersistedOpenWorktree[];
 };
 
+type PersistedTreeViewState = {
+	version: number;
+	projectsSectionOpen: boolean;
+	threadsSectionOpen: boolean;
+	gitSectionOpen: boolean;
+	openProjectPaths: string[];
+};
+
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
 	"jt-ide:worktree-git-history-changed";
@@ -164,6 +171,8 @@ const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
 const COMPOSER_MAX_HEIGHT_PX = 240;
 const MAINVIEW_STATE_STORAGE_KEY = "jt-ide:mainview-state";
 const MAINVIEW_STATE_STORAGE_VERSION = 1;
+const TREE_VIEW_STATE_STORAGE_KEY = "jt-ide:tree-view-state";
+const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 
 const codeBlockStyle = {
 	margin: 0,
@@ -304,7 +313,6 @@ function worktreeKey(projectId: number, worktreePath: string): string {
 
 function defaultProjectState(): ProjectNodeState {
 	return {
-		expanded: false,
 		worktrees: [],
 		loadingWorktrees: false,
 		error: "",
@@ -368,6 +376,16 @@ function defaultPersistedMainviewState(): PersistedMainviewState {
 	};
 }
 
+function defaultPersistedTreeViewState(): PersistedTreeViewState {
+	return {
+		version: TREE_VIEW_STATE_STORAGE_VERSION,
+		projectsSectionOpen: true,
+		threadsSectionOpen: true,
+		gitSectionOpen: true,
+		openProjectPaths: [],
+	};
+}
+
 function normalizePersistedOpenWorktrees(
 	value: unknown,
 ): PersistedOpenWorktree[] {
@@ -403,6 +421,27 @@ function normalizePersistedOpenWorktrees(
 		});
 	}
 
+	return next;
+}
+
+function normalizePersistedOpenProjectPaths(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	const next: string[] = [];
+	const seen = new Set<string>();
+	for (const entry of value) {
+		if (typeof entry !== "string") {
+			continue;
+		}
+		const projectPath = entry.trim();
+		if (!projectPath || seen.has(projectPath)) {
+			continue;
+		}
+		seen.add(projectPath);
+		next.push(projectPath);
+	}
 	return next;
 }
 
@@ -456,6 +495,46 @@ function readPersistedMainviewState(): PersistedMainviewState {
 	}
 }
 
+function readPersistedTreeViewState(): PersistedTreeViewState {
+	const fallback = defaultPersistedTreeViewState();
+	if (typeof window === "undefined") {
+		return fallback;
+	}
+
+	try {
+		const raw = window.localStorage.getItem(TREE_VIEW_STATE_STORAGE_KEY);
+		if (!raw) {
+			return fallback;
+		}
+
+		const parsed = JSON.parse(raw) as Partial<PersistedTreeViewState>;
+		if (parsed.version !== TREE_VIEW_STATE_STORAGE_VERSION) {
+			return fallback;
+		}
+
+		return {
+			version: TREE_VIEW_STATE_STORAGE_VERSION,
+			projectsSectionOpen:
+				typeof parsed.projectsSectionOpen === "boolean"
+					? parsed.projectsSectionOpen
+					: true,
+			threadsSectionOpen:
+				typeof parsed.threadsSectionOpen === "boolean"
+					? parsed.threadsSectionOpen
+					: true,
+			gitSectionOpen:
+				typeof parsed.gitSectionOpen === "boolean"
+					? parsed.gitSectionOpen
+					: true,
+			openProjectPaths: normalizePersistedOpenProjectPaths(
+				parsed.openProjectPaths,
+			),
+		};
+	} catch {
+		return fallback;
+	}
+}
+
 function writePersistedMainviewState(state: PersistedMainviewState): void {
 	if (typeof window === "undefined") {
 		return;
@@ -468,6 +547,21 @@ function writePersistedMainviewState(state: PersistedMainviewState): void {
 		);
 	} catch {
 		// Ignore storage write failures and continue without reload persistence.
+	}
+}
+
+function writePersistedTreeViewState(state: PersistedTreeViewState): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	try {
+		window.localStorage.setItem(
+			TREE_VIEW_STATE_STORAGE_KEY,
+			JSON.stringify(state),
+		);
+	} catch {
+		// Ignore storage write failures and continue without persistent tree state.
 	}
 }
 
@@ -1712,6 +1806,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		initialMainviewStateRef.current = readPersistedMainviewState();
 	}
 	const initialMainviewState = initialMainviewStateRef.current;
+	const initialTreeViewStateRef = useRef<PersistedTreeViewState | null>(null);
+	if (!initialTreeViewStateRef.current) {
+		initialTreeViewStateRef.current = readPersistedTreeViewState();
+	}
+	const initialTreeViewState = initialTreeViewStateRef.current;
 
 	const [projects, setProjects] = useState<RpcProject[]>([]);
 	const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
@@ -1747,9 +1846,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState<RpcWorktreeGitHistoryResult | null>(null);
 	const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
 	const [gitHistoryError, setGitHistoryError] = useState("");
-	const [projectsSectionOpen, setProjectsSectionOpen] = useState(true);
-	const [threadsSectionOpen, setThreadsSectionOpen] = useState(true);
-	const [gitSectionOpen, setGitSectionOpen] = useState(true);
+	const [projectsSectionOpen, setProjectsSectionOpen] = useState(
+		initialTreeViewState.projectsSectionOpen,
+	);
+	const [threadsSectionOpen, setThreadsSectionOpen] = useState(
+		initialTreeViewState.threadsSectionOpen,
+	);
+	const [gitSectionOpen, setGitSectionOpen] = useState(
+		initialTreeViewState.gitSectionOpen,
+	);
+	const [openProjectTreePaths, setOpenProjectTreePaths] = useState<Set<string>>(
+		() => new Set(initialTreeViewState.openProjectPaths),
+	);
 	const [gitHistoryModal, setGitHistoryModal] =
 		useState<GitHistoryModalState | null>(null);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
@@ -1973,6 +2081,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		(projectId: number): ProjectNodeState =>
 			projectStates[projectId] ?? defaultProjectState(),
 		[projectStates],
+	);
+
+	const isProjectTreeOpen = useCallback(
+		(projectPath: string): boolean => openProjectTreePaths.has(projectPath),
+		[openProjectTreePaths],
+	);
+
+	const setProjectTreeOpen = useCallback(
+		(projectPath: string, open: boolean): void => {
+			setOpenProjectTreePaths((prev) => {
+				const next = new Set(prev);
+				if (open) {
+					next.add(projectPath);
+				} else {
+					next.delete(projectPath);
+				}
+				return next;
+			});
+		},
+		[],
 	);
 
 	const getWorktreeState = useCallback(
@@ -2879,6 +3007,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const restoredOpenProjectIds = new Set(
 				openProjects.map((project) => project.id),
 			);
+			const initiallyOpenProjectTreePaths = new Set(
+				initialTreeViewState.openProjectPaths,
+			);
 			for (const entry of persistedState.openWorktrees) {
 				restoredOpenProjectIds.add(entry.projectId);
 			}
@@ -2895,8 +3026,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			for (const project of restoredProjects) {
 				setProjectState(project.id, {
-					expanded: true,
-					loadingWorktrees: getProjectState(project.id).worktrees.length === 0,
+					loadingWorktrees:
+						initiallyOpenProjectTreePaths.has(project.path) &&
+						getProjectState(project.id).worktrees.length === 0,
 					error: "",
 				});
 			}
@@ -3037,6 +3169,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		applyOpenedThreadDetail,
 		hydrateProjectRows,
 		initialMainviewState,
+		initialTreeViewState,
 		loadProjectWorktrees,
 		openThread,
 		prefetchDirectorySuggestions,
@@ -3143,6 +3276,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const deleteTrackedProject = useCallback(
 		async (projectId: number) => {
+			const removedProjectPath =
+				projects.find((project) => project.id === projectId)?.path ?? null;
 			try {
 				await procedures.deleteProject({ projectId });
 				const [loaded, loadedThreads] = await Promise.all([
@@ -3153,6 +3288,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setThreads(sortThreads(loadedThreads));
 				hydrateProjectRows(loaded);
 				clearProjectState(projectId);
+				if (removedProjectPath) {
+					setProjectTreeOpen(removedProjectPath, false);
+				}
 				setSelectedProjectId((current) => {
 					if (current && loaded.some((project) => project.id === current)) {
 						return current;
@@ -3189,11 +3327,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			clearThreadSelection,
 			hydrateProjectRows,
 			openThread,
+			projects,
 			procedures,
 			projectActionMenu,
 			selectedProjectId,
 			selectedThreadId,
 			setProjectState,
+			setProjectTreeOpen,
 		],
 	);
 
@@ -3440,6 +3580,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		sessionStateReady,
 		sidebarCollapsed,
 		sidebarSearchQuery,
+	]);
+
+	useEffect(() => {
+		if (!sessionStateReady) {
+			return;
+		}
+
+		writePersistedTreeViewState({
+			version: TREE_VIEW_STATE_STORAGE_VERSION,
+			projectsSectionOpen,
+			threadsSectionOpen,
+			gitSectionOpen,
+			openProjectPaths: [...openProjectTreePaths].filter((projectPath) =>
+				projects.some((project) => project.path === projectPath),
+			),
+		});
+	}, [
+		gitSectionOpen,
+		openProjectTreePaths,
+		projects,
+		projectsSectionOpen,
+		sessionStateReady,
+		threadsSectionOpen,
 	]);
 
 	useEffect(() => {
@@ -3920,12 +4083,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setProjects(loaded);
 				hydrateProjectRows(loaded);
 				setProjectState(result.project.id, {
-					expanded: true,
 					loadingWorktrees: false,
 					error: "",
 					worktrees: result.worktrees,
 					openWorktrees: existingState.openWorktrees,
 				});
+				setProjectTreeOpen(result.project.path, true);
 				selectProject(result.project, result.project.path);
 				resetAddProjectPath();
 				setAddProjectOpen(false);
@@ -3946,6 +4109,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			resetAddProjectPath,
 			selectProject,
 			setProjectState,
+			setProjectTreeOpen,
 		],
 	);
 
@@ -3974,10 +4138,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const refreshProject = useCallback(
 		async (project: RpcProject) => {
 			const current = getProjectState(project.id);
-			const expanded = !current.expanded;
+			const expanded = !isProjectTreeOpen(project.path);
 			const hasCachedWorktrees = current.worktrees.length > 0;
+			setProjectTreeOpen(project.path, expanded);
 			setProjectState(project.id, {
-				expanded,
 				loadingWorktrees: expanded && !hasCachedWorktrees,
 				error: "",
 			});
@@ -4002,7 +4166,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					return next;
 				});
 				setProjectState(project.id, {
-					expanded: false,
 					openWorktrees: new Set(),
 					loadingWorktrees: false,
 				});
@@ -4057,7 +4220,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			} catch (error) {
 				setProjectState(project.id, {
-					expanded: false,
 					loadingWorktrees: false,
 					error: error instanceof Error ? error.message : String(error),
 				});
@@ -4065,7 +4227,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[
 			getProjectState,
+			isProjectTreeOpen,
 			setProjectState,
+			setProjectTreeOpen,
 			procedures,
 			selectedProjectId,
 			selectProject,
@@ -4989,6 +5153,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			) : (
 				filteredProjects.map((project) => {
 					const state = getProjectState(project.id);
+					const projectTreeOpen = isProjectTreeOpen(project.path);
 					const isActive = selectedProjectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
 					const projectErrorPreviewText = projectThreadErrorPreviewText(
@@ -5012,7 +5177,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						),
 					);
 					const showWorktrees =
-						state.expanded || Boolean(normalizedSidebarSearchQuery);
+						projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
 					const projectIndicatorClass = isActive
 						? "bg-[#4fefb2]"
 						: projectErrorLevel === "unread"
@@ -5049,7 +5214,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								>
 									<div className="flex items-center gap-2">
 										<span className="text-sm">
-											{state.expanded ? "▾" : "▸"}
+											{projectTreeOpen ? "▾" : "▸"}
 										</span>
 										<span
 											className={`w-2 h-2 rounded-full ${projectIndicatorClass}`}
