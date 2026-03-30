@@ -1074,6 +1074,15 @@ function isAssistantVisibleMessage(message: VisibleMessage): boolean {
 	return message.kind !== "chat" || message.speaker === "assistant";
 }
 
+function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
+	return (
+		message.kind === "chat" &&
+		message.speaker === "assistant" &&
+		message.tone !== "working" &&
+		message.tone !== "error"
+	);
+}
+
 function threadErrorPreview(thread: RpcThread): ThreadErrorPreview | null {
 	const level = threadErrorLevel(thread);
 	const text = thread.runStatus.error?.trim() ?? "";
@@ -3950,20 +3959,24 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							psychology
 						</span>
 					</div>
-					<div className="min-w-0 flex-1 space-y-5">
+					<div className="min-w-0 flex-1 space-y-4">
 						<div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#aaa4ff]">
 							Codex
 						</div>
-						{group.messages.map(({ message, index }, groupIndex) => (
-							<div
-								className={`min-w-0 ${groupIndex > 0 ? "pt-1" : ""}`}
-								key={`${message.kind}-${index}`}
-							>
-								<div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
-									{renderAssistantMessageContent(message)}
+						<div className="space-y-3">
+							{group.messages.map(({ message, index }) => (
+								<div
+									className={`min-w-0 ${
+										isPlainAssistantTextMessage(message) ? "py-3" : ""
+									}`}
+									key={`${message.kind}-${index}`}
+								>
+									<div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
+										{renderAssistantMessageContent(message)}
+									</div>
 								</div>
-							</div>
-						))}
+							))}
+						</div>
 					</div>
 				</div>
 			);
@@ -4004,9 +4017,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							Codex
 						</span>
 					</div>
-					<div className="flex w-full flex-col gap-4">
+					<div className="flex w-full flex-col gap-3">
 						{group.messages.map(({ message, index }) => (
-							<div className="w-full" key={`${message.kind}-${index}`}>
+							<div
+								className={`w-full ${
+									isPlainAssistantTextMessage(message) ? "py-3" : ""
+								}`}
+								key={`${message.kind}-${index}`}
+							>
 								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#aaa4ff]/10 p-5">
 									<div className="text-sm leading-relaxed text-[#ffffff]">
 										{renderAssistantMessageContent(message)}
