@@ -2110,6 +2110,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		visibleThreads,
 	]);
 
+	const filteredGitHistoryEntries = useMemo(() => {
+		const entries = gitHistory?.entries ?? [];
+		if (!normalizedSidebarSearchQuery) {
+			return entries;
+		}
+
+		return entries.filter((entry) =>
+			matchesSearchQuery(
+				normalizedSidebarSearchQuery,
+				entry.hash,
+				entry.shortHash,
+				entry.subject,
+				entry.authorName,
+				entry.committedAt,
+				gitHistory?.branch,
+				activeSelectedWorktree?.branch,
+			),
+		);
+	}, [activeSelectedWorktree, gitHistory, normalizedSidebarSearchQuery]);
+
 	const isActiveWorktree = useCallback(
 		(projectId: number, worktreePath: string): boolean =>
 			selectedProjectId === projectId &&
@@ -4344,11 +4364,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const sidebarSearch = (
 		<div className="px-1 pb-1 pt-2">
 			<label className="block">
-				<span className="sr-only">Search projects and threads</span>
+				<span className="sr-only">
+					Search projects, threads, and git history
+				</span>
 				<div className="flex items-center gap-2 rounded-sm border border-[#2f3242] bg-[#101114] px-3 py-2">
 					{materialSymbol("search", "text-[16px] text-[#8f89df]")}
 					<input
 						className="min-w-0 flex-1 bg-transparent text-sm text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
+						placeholder="Search projects, threads, and git..."
 						value={sidebarSearchQuery}
 						onChange={(event) => {
 							setSidebarSearchQuery(event.currentTarget.value);
@@ -4612,7 +4635,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			/>
 			{projectsSectionOpen ? (
 				<div className="mt-2 space-y-3">
-					{sidebarSearch}
 					{addProjectOpen ? addProjectForm : null}
 					{projectTree}
 				</div>
@@ -4817,9 +4839,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-xs text-[#ff9db0]">
 							{gitHistoryError}
 						</div>
-					) : gitHistory && gitHistory.entries.length > 0 ? (
+					) : filteredGitHistoryEntries.length > 0 ? (
 						<div className="max-h-64 space-y-1 overflow-y-auto pr-1 hide-scrollbar">
-							{gitHistory.entries.map((entry) => (
+							{filteredGitHistoryEntries.map((entry) => (
 								<button
 									type="button"
 									key={entry.hash}
@@ -4850,7 +4872,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 					) : (
 						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
-							No commits found for this worktree yet.
+							{normalizedSidebarSearchQuery
+								? "No matching git history."
+								: "No commits found for this worktree yet."}
 						</div>
 					)}
 				</div>
@@ -4943,6 +4967,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</button>
 						</div>
 						<div className="flex-1 overflow-y-auto py-2">
+							{!sidebarCollapsed ? (
+								<div className="px-3 pb-2">{sidebarSearch}</div>
+							) : null}
 							{!sidebarCollapsed ? projectSection : null}
 							{!sidebarCollapsed ? threadSection : null}
 							{!sidebarCollapsed ? gitSection : null}
@@ -5084,6 +5111,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 				{mobileProjectListOpen ? (
 					<aside className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] py-2">
+						<div className="px-3 pb-2">{sidebarSearch}</div>
 						{projectSection}
 						{threadSection}
 						{gitSection}
