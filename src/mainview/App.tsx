@@ -653,6 +653,15 @@ function ProjectTaskSelector({
 			? `Tasks (${tasks.length})`
 			: "Tasks";
 
+	const taskMetaText = (task: RpcProjectTask): string | null => {
+		if (task.kind === "script") {
+			return task.command?.trim()
+				? `${task.path} · ${task.command}`
+				: task.path;
+		}
+		return task.path !== task.title ? task.path : null;
+	};
+
 	useEffect(() => {
 		if (disabled && open) {
 			setOpen(false);
@@ -736,12 +745,12 @@ function ProjectTaskSelector({
 							</div>
 						) : tasks.length === 0 ? (
 							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
-								No task files found in `.tasks`.
+								No project tasks found.
 							</div>
 						) : (
 							tasks.map((task) => (
 								<button
-									key={task.path}
+									key={task.id}
 									type="button"
 									className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1d1c2a]"
 									onClick={() => {
@@ -750,15 +759,18 @@ function ProjectTaskSelector({
 									}}
 								>
 									<span className="mt-0.5 shrink-0 text-[#ff96bb]">
-										{materialSymbol("task_alt", "text-[16px]")}
+										{materialSymbol(
+											task.kind === "script" ? "terminal" : "task_alt",
+											"text-[16px]",
+										)}
 									</span>
 									<span className="min-w-0 flex-1">
 										<span className="block truncate font-label text-[10px] font-bold uppercase tracking-wider text-[#f2f0ef]">
 											{task.title}
 										</span>
-										{task.path !== task.title ? (
+										{taskMetaText(task) ? (
 											<span className="mt-1 block truncate text-[11px] leading-4 text-[#a6a0c9]">
-												{task.path}
+												{taskMetaText(task)}
 											</span>
 										) : null}
 									</span>
@@ -2504,7 +2516,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				const detail = await procedures.runProjectTask({
 					projectId: selectedProject.id,
 					worktreePath: activeSelectedWorktreePath,
-					taskPath: task.path,
+					task,
 					threadId: selectedThread?.id ?? null,
 					model: selectedThread
 						? null

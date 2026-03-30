@@ -50,6 +50,7 @@
  │  │  └─ rpc-schema.ts
  │  └─ mainview/
  │     ├─ App.tsx
+ │     ├─ index.css
  │     ├─ index.html
  │     ├─ index.ts
  │     └─ input.css

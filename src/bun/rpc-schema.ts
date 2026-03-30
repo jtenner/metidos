@@ -48,8 +48,12 @@ export type RpcCreateWorktreeResult = {
 };
 
 export type RpcProjectTask = {
+	id: string;
+	kind: "file" | "script";
 	path: string;
 	title: string;
+	scriptName?: string | null;
+	command?: string | null;
 };
 
 export type RpcCodexModelOption = {
@@ -244,7 +248,7 @@ export type AppRPCSchema = {
 			params: {
 				projectId: number;
 				worktreePath: string;
-				taskPath: string;
+				task: RpcProjectTask;
 				threadId?: number | null;
 				model?: string | null;
 			};
