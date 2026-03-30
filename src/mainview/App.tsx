@@ -53,6 +53,8 @@ type ProjectActionMenuState = {
 	y: number;
 };
 
+type ThreadErrorLevel = "none" | "failed" | "unread";
+
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
@@ -220,6 +222,29 @@ function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
 	);
 }
 
+function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
+	if (thread.runStatus.hasUnreadError) {
+		return "unread";
+	}
+	if (thread.runStatus.state === "failed") {
+		return "failed";
+	}
+	return "none";
+}
+
+function mergeThreadErrorLevel(
+	current: ThreadErrorLevel,
+	next: ThreadErrorLevel,
+): ThreadErrorLevel {
+	if (current === "unread" || next === "unread") {
+		return "unread";
+	}
+	if (current === "failed" || next === "failed") {
+		return "failed";
+	}
+	return "none";
+}
+
 function ProcessingMessage(): JSX.Element {
 	return (
 		<div className="flex items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
@@ -369,6 +394,34 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[selectedThread],
 	);
 
+	const projectThreadErrorLevels = useMemo(() => {
+		const next = new Map<number, ThreadErrorLevel>();
+		for (const thread of threads) {
+			const level = threadErrorLevel(thread);
+			if (level === "none") {
+				continue;
+			}
+			next.set(
+				thread.projectId,
+				mergeThreadErrorLevel(next.get(thread.projectId) ?? "none", level),
+			);
+		}
+		return next;
+	}, [threads]);
+
+	const worktreeThreadErrorLevels = useMemo(() => {
+		const next = new Map<string, ThreadErrorLevel>();
+		for (const thread of threads) {
+			const level = threadErrorLevel(thread);
+			if (level === "none") {
+				continue;
+			}
+			const key = worktreeKey(thread.projectId, thread.worktreePath);
+			next.set(key, mergeThreadErrorLevel(next.get(key) ?? "none", level));
+		}
+		return next;
+	}, [threads]);
+
 	const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
 
 	const selectedThreadRunError =
@@ -476,6 +529,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			selectedProjectId === projectId &&
 			activeSelectedWorktreePath === worktreePath,
 		[activeSelectedWorktreePath, selectedProjectId],
+	);
+
+	const projectThreadErrorLevel = useCallback(
+		(projectId: number): ThreadErrorLevel =>
+			projectThreadErrorLevels.get(projectId) ?? "none",
+		[projectThreadErrorLevels],
+	);
+
+	const worktreeThreadErrorLevel = useCallback(
+		(projectId: number, worktreePath: string): ThreadErrorLevel =>
+			worktreeThreadErrorLevels.get(worktreeKey(projectId, worktreePath)) ??
+			"none",
+		[worktreeThreadErrorLevels],
 	);
 
 	const setProjectState = useCallback(
@@ -1610,6 +1676,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								projectActionMenuProject.id,
 								worktree.path,
 							);
+							const worktreeErrorLevel = worktreeThreadErrorLevel(
+								projectActionMenuProject.id,
+								worktree.path,
+							);
 							return (
 								<div
 									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
@@ -1636,7 +1706,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										</span>
 										<span
 											className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-												activeWorktree ? "bg-[#4fefb2]" : "bg-transparent"
+												worktreeErrorLevel === "unread"
+													? "bg-[#ff304f]"
+													: worktreeErrorLevel === "failed"
+														? "bg-[#8f4956]"
+														: activeWorktree
+															? "bg-[#4fefb2]"
+															: "bg-transparent"
 											}`}
 										/>
 										<div
@@ -1719,6 +1795,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				projects.map((project) => {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
+					const projectErrorLevel = projectThreadErrorLevel(project.id);
 					return (
 						<div
 							className="space-y-1"
@@ -1750,7 +1827,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										</span>
 										<span
 											className={`w-2 h-2 rounded-full ${
-												project.isOpen ? "bg-[#4fefb2]" : "bg-[#5f5f5f]"
+												projectErrorLevel === "unread"
+													? "bg-[#ff304f]"
+													: projectErrorLevel === "failed"
+														? "bg-[#8f4956]"
+														: project.isOpen
+															? "bg-[#4fefb2]"
+															: "bg-[#5f5f5f]"
 											}`}
 										/>
 										<div className="font-medium text-sm truncate">
@@ -1805,6 +1888,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												project.id,
 												worktree.path,
 											);
+											const worktreeErrorLevel = worktreeThreadErrorLevel(
+												project.id,
+												worktree.path,
+											);
 											return (
 												<button
 													type="button"
@@ -1844,9 +1931,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														</span>
 														<span
 															className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-																activeWorktree
-																	? "bg-[#4fefb2]"
-																	: "bg-transparent"
+																worktreeErrorLevel === "unread"
+																	? "bg-[#ff304f]"
+																	: worktreeErrorLevel === "failed"
+																		? "bg-[#8f4956]"
+																		: activeWorktree
+																			? "bg-[#4fefb2]"
+																			: "bg-transparent"
 															}`}
 														/>
 														<div
