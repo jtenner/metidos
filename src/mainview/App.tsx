@@ -827,10 +827,10 @@ function CodexModelSelector({
 		>
 			<button
 				type="button"
-				className={`flex w-full items-center gap-2 overflow-hidden border text-left transition-colors ${
+				className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
 					variant === "desktop"
-						? "rounded-sm border-[#3a3a44] bg-[#131313] px-3 py-1.5 hover:bg-[#181a20]"
-						: "rounded-xl border-[#3c415d] bg-[#1b1d24] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
+						? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#181a20]"
+						: "h-10 gap-2 rounded-xl border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
 				} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
 					open
 						? "border-[#8e86f3] shadow-[0_0_0_1px_rgba(142,134,243,0.18)]"
@@ -845,34 +845,36 @@ function CodexModelSelector({
 				aria-expanded={open}
 				aria-haspopup="menu"
 			>
-				<span
-					className={`shrink-0 ${
-						variant === "desktop" ? "text-[#948def]" : "text-[#aaa4ff]"
-					}`}
-				>
-					{materialSymbol("neurology", "text-[16px]")}
-				</span>
 				<span className="min-w-0 flex-1">
 					<span
 						className={`block truncate font-label font-bold uppercase text-[#f2f0ef] ${
 							variant === "desktop"
-								? "text-[10px] tracking-wider"
-								: "text-[10px] tracking-widest"
+								? "text-[10px] leading-none tracking-wider"
+								: "text-[10px] leading-none tracking-widest"
 						}`}
 					>
 						{buttonLabel}
 					</span>
 				</span>
-				<span className="shrink-0 text-[#8f8d8b]">
-					{materialSymbol(open ? "expand_less" : "expand_more", "text-[16px]")}
+				<span
+					className={`shrink-0 text-[#8f8d8b] ${
+						variant === "desktop"
+							? "leading-none"
+							: "flex h-4 items-center leading-none"
+					}`}
+				>
+					{materialSymbol(
+						open ? "expand_less" : "expand_more",
+						variant === "desktop" ? "text-[13px]" : "text-[16px]",
+					)}
 				</span>
 			</button>
 			{open ? (
 				<div
-					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "rounded-md border-[#3a355f] bg-[#14131d]"
-							: "rounded-2xl border-[#413e5e] bg-[#15161f]"
+							? "z-40 rounded-md border-[#3a355f] bg-[#14131d]"
+							: "z-50 rounded-2xl border-[#413e5e] bg-[#15161f]"
 					}`}
 				>
 					<div className="border-b border-[#3a355f] px-2 py-2">
@@ -990,6 +992,7 @@ function ProjectTaskSelector({
 }): JSX.Element {
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement | null>(null);
+	const unavailable = disabled || (!loading && tasks.length === 0);
 	const buttonLabel = loading
 		? "Loading Tasks"
 		: tasks.length > 0
@@ -1006,10 +1009,10 @@ function ProjectTaskSelector({
 	};
 
 	useEffect(() => {
-		if (disabled && open) {
+		if (unavailable && open) {
 			setOpen(false);
 		}
-	}, [disabled, open]);
+	}, [open, unavailable]);
 
 	useEffect(() => {
 		if (!open) {
@@ -1042,15 +1045,19 @@ function ProjectTaskSelector({
 				type="button"
 				className={`flex items-center gap-2 transition-colors ${
 					variant === "desktop"
-						? "rounded-sm bg-[#191a1a] px-3 py-1.5 hover:bg-[#262626]"
-						: "rounded-xl border border-[#3c415d] bg-[#1b1d24] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
-				} ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+						? unavailable
+							? "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5"
+							: "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5 hover:bg-[#262626]"
+						: unavailable
+							? "h-10 rounded-xl border border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+							: "h-10 rounded-xl border border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
+				} ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
 				onClick={() => {
-					if (!disabled) {
+					if (!unavailable) {
 						setOpen((current) => !current);
 					}
 				}}
-				disabled={disabled}
+				disabled={unavailable}
 				aria-expanded={open}
 				aria-haspopup="menu"
 			>
@@ -1063,8 +1070,8 @@ function ProjectTaskSelector({
 				<span
 					className={`font-label uppercase ${
 						variant === "desktop"
-							? "text-[10px] font-bold text-[#f2f0ef]"
-							: "text-[10px] tracking-widest text-[#f2f0ef]"
+							? "text-[10px] font-bold leading-none text-[#f2f0ef]"
+							: "text-[10px] leading-none tracking-widest text-[#f2f0ef]"
 					}`}
 				>
 					{buttonLabel}
@@ -5891,7 +5898,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						className="max-w-2xl mx-auto flex flex-col gap-3"
 						onSubmit={onSubmit}
 					>
-						<div className="overflow-hidden rounded-[1.35rem] border border-[#34384d] bg-[#17191f] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+						<div className="overflow-visible rounded-[1.35rem] border border-[#34384d] bg-[#17191f] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
 							<div className="border-b border-[#2d3144] px-2 py-2">
 								<div className="flex items-center gap-2">
 									<div className="min-w-0 flex-1">
@@ -5916,7 +5923,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									/>
 								</div>
 							</div>
-							<div className="relative flex items-end gap-2 bg-[#17191f] px-2 py-2">
+							<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#17191f] px-2 py-2">
 								<textarea
 									ref={mobileComposerRef}
 									className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#2f3347] bg-[#1d1f24] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#8e86f3] focus:outline-none"
