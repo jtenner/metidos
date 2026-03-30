@@ -39,6 +39,34 @@ body {
 	scrollbar-width: none;
 }
 
+.app-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: #4a4f73 #101522;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
+	background: #101522;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+	border: 2px solid #101522;
+	border-radius: 999px;
+	background: linear-gradient(180deg, #6f66d8 0%, #4a4f73 100%);
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, #8e89df 0%, #5c628f 100%);
+}
+
+.app-scrollbar::-webkit-scrollbar-corner {
+	background: #101522;
+}
+
 .font-headline {
 	font-family: Manrope, Inter, sans-serif;
 }
