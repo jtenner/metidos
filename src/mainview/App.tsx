@@ -1,4 +1,5 @@
 import {
+	type CSSProperties,
 	type FormEvent,
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
@@ -8,6 +9,10 @@ import {
 	useRef,
 	useState,
 } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import remarkGfm from "remark-gfm";
 import type {
 	ProjectProcedures,
 	RpcProject,
@@ -43,6 +48,77 @@ type ProjectActionMenuState = {
 	projectId: number;
 	x: number;
 	y: number;
+};
+
+const CODE_FONT_STACK =
+	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+const codeBlockStyle = {
+	margin: 0,
+	border: "1px solid rgba(125, 115, 255, 0.18)",
+	borderRadius: "0.5rem",
+	background: "#101114",
+	padding: "0.875rem 1rem",
+	fontSize: "0.8125rem",
+	lineHeight: "1.6",
+} satisfies CSSProperties;
+
+const codeTagStyle = {
+	fontFamily: CODE_FONT_STACK,
+} satisfies CSSProperties;
+
+const markdownComponents: Components = {
+	a({ href, children, ...props }) {
+		return (
+			<a
+				{...props}
+				href={href}
+				target="_blank"
+				rel="noreferrer"
+				className="text-[#b5b0ff] underline decoration-[#6f66d8] underline-offset-2 transition-colors hover:text-[#ddd9ff]"
+			>
+				{children}
+			</a>
+		);
+	},
+	code({ children, className, node: _node, ...props }) {
+		const code = String(children).replace(/\n$/, "");
+		const languageMatch = /language-([\w-]+)/.exec(className ?? "");
+		const isBlockCode = Boolean(languageMatch) || code.includes("\n");
+		if (isBlockCode) {
+			return (
+				<SyntaxHighlighter
+					PreTag="div"
+					language={languageMatch?.[1] ?? "text"}
+					style={vscDarkPlus}
+					customStyle={codeBlockStyle}
+					codeTagProps={{ style: codeTagStyle }}
+					wrapLongLines
+				>
+					{code}
+				</SyntaxHighlighter>
+			);
+		}
+
+		return (
+			<code
+				{...props}
+				className={`rounded-sm bg-[#1b1d24] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#d9d5ff] ${className ?? ""}`.trim()}
+			>
+				{children}
+			</code>
+		);
+	},
+	pre({ children }) {
+		return <div className="my-3 overflow-x-auto">{children}</div>;
+	},
+	table({ children }) {
+		return (
+			<div className="my-3 overflow-x-auto">
+				<table className="message-markdown-table">{children}</table>
+			</div>
+		);
+	},
 };
 
 function shortName(value: string): string {
@@ -112,6 +188,19 @@ function materialSymbol(name: string, className = ""): JSX.Element {
 		<span className={`material-symbols-outlined ${className}`.trim()}>
 			{name}
 		</span>
+	);
+}
+
+function MarkdownMessage({ text }: { text: string }): JSX.Element {
+	return (
+		<div className="message-markdown">
+			<ReactMarkdown
+				components={markdownComponents}
+				remarkPlugins={[remarkGfm]}
+			>
+				{text}
+			</ReactMarkdown>
+		</div>
 	);
 }
 
@@ -1132,7 +1221,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							Codex • Assistant
 						</div>
 						<div className="text-[#ffffff] leading-relaxed text-sm">
-							{message.text}
+							<MarkdownMessage text={message.text} />
 						</div>
 					</div>
 				</div>
@@ -1149,7 +1238,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						Local User
 					</div>
 					<div className="bg-[#262626] inline-block p-4 rounded-sm text-sm text-[#ffffff] text-left">
-						{message.text}
+						<MarkdownMessage text={message.text} />
 					</div>
 				</div>
 				<div className="w-8 h-8 rounded-sm bg-[#262626] flex items-center justify-center shrink-0">
@@ -1178,9 +1267,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</span>
 					</div>
 					<div className="glass-panel p-5 rounded-lg border border-[#aaa4ff]/10 w-full flex flex-col gap-4">
-						<p className="text-sm leading-relaxed text-[#ffffff]">
-							{message.text}
-						</p>
+						<div className="text-sm leading-relaxed text-[#ffffff]">
+							<MarkdownMessage text={message.text} />
+						</div>
 					</div>
 				</div>
 			);
@@ -1198,7 +1287,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</span>
 				</div>
 				<div className="bg-[#1f2020] p-4 rounded-lg rounded-tr-none text-sm leading-relaxed text-[#ffffff] shadow-sm">
-					{message.text}
+					<MarkdownMessage text={message.text} />
 				</div>
 			</div>
 		);
