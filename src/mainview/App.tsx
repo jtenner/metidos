@@ -1493,15 +1493,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<header className="flex justify-between items-center w-full px-6 h-14 bg-[#131313] border-b border-[#262626] z-50">
 					<div className="flex items-center gap-8">
 						<h1 className="text-xl font-black tracking-tighter text-[#aaa4ff]">
-							The Monolithic Intelligence
+							JT_IDE
 						</h1>
 						<nav className="flex items-center gap-6">
-							<button
-								type="button"
-								className="font-label text-xs uppercase tracking-wider text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200"
-							>
-								File Tree
-							</button>
 							<button
 								type="button"
 								className="font-label text-xs uppercase tracking-wider text-[#aaa4ff] border-b-2 border-[#7c4dff] pb-1"
@@ -1665,7 +1659,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							menu
 						</button>
 						<h1 className="font-headline tracking-wider uppercase text-sm font-bold text-[#aaa4ff]">
-							Monolithic IDE
+							JT_IDE
 						</h1>
 					</div>
 					<div className="flex items-center gap-3">
