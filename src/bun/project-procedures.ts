@@ -14,6 +14,8 @@ import {
 	listProjects,
 	listThreadMessages,
 	listThreads,
+	markThreadErrorSeen,
+	markThreadFailed,
 	markThreadRan,
 	setProjectClosed,
 	touchThread,
@@ -159,15 +161,43 @@ function shortName(value: string): string {
 	return parts.at(-1) ?? value;
 }
 
-function getThreadRunStatus(threadId: number): RpcThreadRunStatus {
-	return (
-		threadRunStatusMap.get(threadId) ?? {
-			state: "idle",
-			startedAt: null,
-			updatedAt: null,
-			error: null,
-		}
+function hasUnreadThreadError(thread: ThreadRecord): boolean {
+	return Boolean(
+		thread.lastErrorAt &&
+			(!thread.lastErrorSeenAt || thread.lastErrorSeenAt < thread.lastErrorAt),
 	);
+}
+
+function threadRunStatusFromRecord(thread: ThreadRecord): RpcThreadRunStatus {
+	const active = threadRunStatusMap.get(thread.id);
+	const hasUnreadError = hasUnreadThreadError(thread);
+	if (active) {
+		return {
+			...active,
+			hasUnreadError,
+		};
+	}
+
+	const failureIsCurrent =
+		thread.lastErrorAt &&
+		(!thread.lastRunAt || thread.lastErrorAt >= thread.lastRunAt);
+	if (failureIsCurrent) {
+		return {
+			state: "failed",
+			startedAt: null,
+			updatedAt: thread.lastErrorAt,
+			error: thread.lastErrorMessage ?? "Codex turn failed.",
+			hasUnreadError,
+		};
+	}
+
+	return {
+		state: "idle",
+		startedAt: null,
+		updatedAt: thread.lastRunAt ?? thread.updatedAt,
+		error: null,
+		hasUnreadError: false,
+	};
 }
 
 function setThreadRunStatus(
@@ -180,7 +210,7 @@ function setThreadRunStatus(
 function toRpcThread(thread: ThreadRecord): RpcThread {
 	return {
 		...thread,
-		runStatus: getThreadRunStatus(thread.id),
+		runStatus: threadRunStatusFromRecord(thread),
 	};
 }
 
@@ -284,15 +314,18 @@ async function runThreadMessageInBackground(
 			startedAt,
 			updatedAt: getNow(),
 			error: null,
+			hasUnreadError: false,
 		});
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		touchThread(db, threadId);
+		const errorMessage = `Codex turn failed: ${message}`;
+		markThreadFailed(db, threadId, errorMessage);
 		setThreadRunStatus(threadId, {
 			state: "failed",
 			startedAt,
 			updatedAt: getNow(),
-			error: `Codex turn failed: ${message}`,
+			error: errorMessage,
+			hasUnreadError: true,
 		});
 		console.error(`Codex turn failed for thread ${threadId}`, error);
 	}
@@ -718,6 +751,19 @@ export async function getThreadProcedure(
 	return buildThreadDetail(params.threadId);
 }
 
+export async function markThreadErrorSeenProcedure(
+	params: AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
+): Promise<RpcThreadDetail> {
+	const thread = threadById(params.threadId);
+	markThreadErrorSeen(db, thread.id);
+	const currentStatus = threadRunStatusFromRecord(thread);
+	setThreadRunStatus(thread.id, {
+		...currentStatus,
+		hasUnreadError: false,
+	});
+	return buildThreadDetail(thread.id);
+}
+
 export async function sendThreadMessageProcedure(
 	params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
 ): Promise<RpcThreadDetail> {
@@ -727,10 +773,11 @@ export async function sendThreadMessageProcedure(
 		throw new Error("Thread input is required.");
 	}
 
-	if (getThreadRunStatus(thread.id).state === "working") {
+	if (threadRunStatusFromRecord(thread).state === "working") {
 		throw new Error("Thread is already processing a message.");
 	}
 
+	markThreadErrorSeen(db, thread.id);
 	createThreadMessage(db, {
 		threadId: thread.id,
 		role: "user",
@@ -744,6 +791,7 @@ export async function sendThreadMessageProcedure(
 		startedAt,
 		updatedAt: startedAt,
 		error: null,
+		hasUnreadError: false,
 	});
 
 	void runThreadMessageInBackground(thread.id, input, startedAt);

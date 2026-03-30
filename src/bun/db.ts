@@ -45,6 +45,9 @@ export type ThreadRecord = {
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
+	lastErrorAt: string | null;
+	lastErrorSeenAt: string | null;
+	lastErrorMessage: string | null;
 };
 
 export type ThreadMessageRecord = {
@@ -74,6 +77,27 @@ function ensureAppDirectory(appDataPath: string): void {
 	}
 }
 
+function tableHasColumn(
+	db: Database,
+	tableName: string,
+	columnName: string,
+): boolean {
+	return db
+		.query<{ name: string }>(`PRAGMA table_info(${tableName})`)
+		.all()
+		.some((column) => column.name === columnName);
+}
+
+function ensureThreadColumn(
+	db: Database,
+	columnName: string,
+	columnDefinition: string,
+): void {
+	if (!tableHasColumn(db, "threads", columnName)) {
+		db.run(`ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
+	}
+}
+
 function migrate(db: Database): void {
 	db.run(`
 			CREATE TABLE IF NOT EXISTS projects (
@@ -96,9 +120,15 @@ function migrate(db: Database): void {
 				codex_thread_id TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-				last_run_at TEXT
+				last_run_at TEXT,
+				last_error_at TEXT,
+				last_error_seen_at TEXT,
+				last_error_message TEXT
 			);
 		`);
+	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
+	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
+	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
 	db.run(`
 			CREATE TABLE IF NOT EXISTS thread_messages (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -276,7 +306,10 @@ export function listThreads(database: Database): ThreadRecord[] {
 					codex_thread_id AS codexThreadId,
 					created_at AS createdAt,
 					updated_at AS updatedAt,
-					last_run_at AS lastRunAt
+					last_run_at AS lastRunAt,
+					last_error_at AS lastErrorAt,
+					last_error_seen_at AS lastErrorSeenAt,
+					last_error_message AS lastErrorMessage
 				FROM threads
 				ORDER BY updated_at DESC, created_at DESC, id DESC
 			`,
@@ -299,7 +332,10 @@ export function getThreadById(
 					codex_thread_id AS codexThreadId,
 					created_at AS createdAt,
 					updated_at AS updatedAt,
-					last_run_at AS lastRunAt
+					last_run_at AS lastRunAt,
+					last_error_at AS lastErrorAt,
+					last_error_seen_at AS lastErrorSeenAt,
+					last_error_message AS lastErrorMessage
 				FROM threads
 				WHERE id = ?
 			`,
@@ -365,7 +401,48 @@ export function markThreadRan(database: Database, threadId: number): void {
 			UPDATE threads
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-				last_run_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				last_run_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_at = NULL,
+				last_error_seen_at = NULL,
+				last_error_message = NULL
+			WHERE id = ?
+		`,
+		threadId,
+	);
+}
+
+export function markThreadFailed(
+	database: Database,
+	threadId: number,
+	errorMessage: string,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_seen_at = NULL,
+				last_error_message = ?
+			WHERE id = ?
+		`,
+		errorMessage,
+		threadId,
+	);
+}
+
+export function markThreadErrorSeen(
+	database: Database,
+	threadId: number,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET
+				last_error_seen_at = CASE
+					WHEN last_error_at IS NULL THEN NULL
+					ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				END
 			WHERE id = ?
 		`,
 		threadId,

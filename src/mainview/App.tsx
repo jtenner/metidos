@@ -215,6 +215,7 @@ function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
 			startedAt: null,
 			updatedAt: null,
 			error: null,
+			hasUnreadError: false,
 		}
 	);
 }
@@ -607,12 +608,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [procedures, selectedThreadId]);
 
 	const openThread = useCallback(
-		async (threadId: number) => {
+		async (
+			threadId: number,
+			options?: {
+				acknowledgeUnreadError?: boolean;
+			},
+		) => {
 			setIsThreadLoading(true);
 			setThreadsError("");
 			setChatError("");
 			try {
-				const detail = await procedures.getThread({ threadId });
+				const detail = options?.acknowledgeUnreadError
+					? await procedures.markThreadErrorSeen({ threadId })
+					: await procedures.getThread({ threadId });
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
 				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
@@ -1927,6 +1935,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						const isActive = selectedThreadId === thread.id;
 						const isWorking = thread.runStatus.state === "working";
 						const hasRunError = thread.runStatus.state === "failed";
+						const hasUnreadError = thread.runStatus.hasUnreadError;
 						return (
 							<button
 								type="button"
@@ -1937,18 +1946,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
 								}`}
 								onClick={() => {
-									void openThread(thread.id);
+									void openThread(thread.id, {
+										acknowledgeUnreadError: hasUnreadError,
+									});
 								}}
 							>
 								<div className="flex items-center justify-between gap-3">
 									<div className="flex min-w-0 items-center gap-2">
 										<span
 											className={`h-2 w-2 shrink-0 rounded-full ${
-												hasRunError
-													? "bg-[#ff6e84]"
-													: isActive
-														? "bg-[#aaa4ff]"
-														: "bg-[#4f5269]"
+												hasUnreadError
+													? "bg-[#ff304f]"
+													: hasRunError
+														? "bg-[#8f4956]"
+														: isActive
+															? "bg-[#aaa4ff]"
+															: "bg-[#4f5269]"
 											}`}
 										/>
 										<div
@@ -1958,14 +1971,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											{thread.title}
 										</div>
 									</div>
-									{isWorking ? (
-										<BeatLoader
-											color="#aaa4ff"
-											margin={1}
-											size={5}
-											speedMultiplier={0.85}
-										/>
-									) : null}
+									<div className="flex shrink-0 items-center gap-2">
+										{hasUnreadError ? (
+											<span className="rounded-full border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
+												Unread
+											</span>
+										) : null}
+										{isWorking ? (
+											<BeatLoader
+												color="#aaa4ff"
+												margin={1}
+												size={5}
+												speedMultiplier={0.85}
+											/>
+										) : null}
+									</div>
 								</div>
 								<div
 									className="mt-1 truncate text-[11px] text-[#8e8aa7]"

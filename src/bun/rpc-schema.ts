@@ -52,6 +52,7 @@ export type RpcThreadRunStatus = {
 	startedAt: string | null;
 	updatedAt: string | null;
 	error: string | null;
+	hasUnreadError: boolean;
 };
 
 export type RpcThread = {
@@ -141,6 +142,10 @@ export type AppRPCSchema = {
 			params: { threadId: number };
 			response: RpcThreadDetail;
 		};
+		markThreadErrorSeen: {
+			params: { threadId: number };
+			response: RpcThreadDetail;
+		};
 		sendThreadMessage: {
 			params: { threadId: number; input: string };
 			response: RpcThreadDetail;
@@ -190,6 +195,9 @@ export interface ProjectProcedures {
 	getThread: (
 		params: AppRPCSchema["requests"]["getThread"]["params"],
 	) => Promise<AppRPCSchema["requests"]["getThread"]["response"]>;
+	markThreadErrorSeen: (
+		params: AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
+	) => Promise<AppRPCSchema["requests"]["markThreadErrorSeen"]["response"]>;
 	sendThreadMessage: (
 		params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
 	) => Promise<AppRPCSchema["requests"]["sendThreadMessage"]["response"]>;

@@ -197,6 +197,7 @@ const procedures: ProjectProcedures = {
 	createWorktree: (params) => sendRequest("createWorktree", params),
 	createThread: (params) => sendRequest("createThread", params),
 	getThread: (params) => sendRequest("getThread", params),
+	markThreadErrorSeen: (params) => sendRequest("markThreadErrorSeen", params),
 	sendThreadMessage: (params) => sendRequest("sendThreadMessage", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
