@@ -5,6 +5,7 @@ import { Codex, type ThreadItem } from "@openai/codex-sdk";
 
 import type { ProjectRecord, ThreadMessageRecord, ThreadRecord } from "./db";
 import {
+	DEFAULT_THREAD_MODEL,
 	createThread,
 	createThreadMessage,
 	deleteProject,
@@ -20,6 +21,7 @@ import {
 	markThreadRan,
 	renameThread,
 	setProjectClosed,
+	setThreadModel,
 	setThreadPinned,
 	touchThread,
 	updateThreadCodexId,
@@ -28,6 +30,8 @@ import {
 } from "./db";
 import type {
 	AppRPCSchema,
+	RpcCodexModelCatalog,
+	RpcCodexModelOption,
 	RpcCreateWorktreeResult,
 	RpcOpenWorktreeResult,
 	RpcProject,
@@ -53,6 +57,12 @@ export async function listThreadsProcedure(
 	_params?: AppRPCSchema["requests"]["listThreads"]["params"],
 ): Promise<RpcThread[]> {
 	return listThreads(db).map(toRpcThread);
+}
+
+export async function getCodexModelCatalogProcedure(
+	_params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
+): Promise<RpcCodexModelCatalog> {
+	return buildCodexModelCatalog();
 }
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
@@ -91,6 +101,146 @@ const THREAD_INIT_SCHEMA = {
 	required: ["status"],
 	additionalProperties: false,
 } as const;
+
+// Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
+// raw model IDs, but it does not expose a discovery API for enumerating them.
+const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
+	{
+		id: "gpt-5.4",
+		label: "GPT-5.4",
+		group: "Frontier",
+		summary: "Latest flagship model for complex reasoning and coding.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.4-pro",
+		label: "GPT-5.4 Pro",
+		group: "Frontier",
+		summary: "Higher-precision GPT-5.4 variant for harder tasks.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.4-mini",
+		label: "GPT-5.4 Mini",
+		group: "Frontier",
+		summary: "Faster lower-cost GPT-5.4 model for coding and subagents.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.4-nano",
+		label: "GPT-5.4 Nano",
+		group: "Frontier",
+		summary: "Cheapest GPT-5.4-class model for simple tasks.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5-mini",
+		label: "GPT-5 Mini",
+		group: "Frontier",
+		summary: "Near-frontier intelligence for cost-sensitive workloads.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5-nano",
+		label: "GPT-5 Nano",
+		group: "Frontier",
+		summary: "Fastest and most cost-efficient GPT-5 model.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5",
+		label: "GPT-5",
+		group: "Frontier",
+		summary: "Previous GPT-5 frontier model for coding and agentic work.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-4.1",
+		label: "GPT-4.1",
+		group: "Frontier",
+		summary: "Highest-capability non-reasoning general model.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5-codex",
+		label: "GPT-5-Codex",
+		group: "Coding",
+		summary: "GPT-5 variant optimized for agentic coding in Codex.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.3-codex",
+		label: "GPT-5.3-Codex",
+		group: "Coding",
+		summary: "Previous high-capability agentic coding model.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.2-codex",
+		label: "GPT-5.2-Codex",
+		group: "Coding",
+		summary: "Long-horizon coding model for complex repo work.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.1-codex",
+		label: "GPT-5.1-Codex",
+		group: "Coding",
+		summary: "GPT-5.1 variant optimized for agentic coding in Codex.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.1-codex-max",
+		label: "GPT-5.1-Codex-Max",
+		group: "Coding",
+		summary: "GPT-5.1 Codex variant tuned for longer-running tasks.",
+		deprecated: false,
+	},
+	{
+		id: "gpt-5.1-codex-mini",
+		label: "GPT-5.1-Codex-Mini",
+		group: "Coding",
+		summary: "Smaller cheaper GPT-5.1 Codex model.",
+		deprecated: false,
+	},
+	{
+		id: "codex-mini-latest",
+		label: "Codex Mini Latest",
+		group: "Coding",
+		summary: "Deprecated fast reasoning model for older Codex workflows.",
+		deprecated: true,
+	},
+];
+
+const codexModelOptionMap = new Map(
+	CODEx_MODEL_OPTIONS.map((model) => [model.id, model]),
+);
+
+function buildCodexModelCatalog(): RpcCodexModelCatalog {
+	return {
+		defaultModel: DEFAULT_THREAD_MODEL,
+		models: CODEx_MODEL_OPTIONS,
+	};
+}
+
+function resolveCodexModel(model: string | null | undefined): string {
+	const normalized = model?.trim();
+	if (!normalized) {
+		return DEFAULT_THREAD_MODEL;
+	}
+	if (!codexModelOptionMap.has(normalized)) {
+		throw new Error(`Unsupported Codex model: ${normalized}`);
+	}
+	return normalized;
+}
+
+function normalizeStoredCodexModel(model: string | null | undefined): string {
+	const normalized = model?.trim();
+	if (!normalized || !codexModelOptionMap.has(normalized)) {
+		return DEFAULT_THREAD_MODEL;
+	}
+	return normalized;
+}
 
 function expandHomeShorthandPath(value: string): string {
 	if (process.platform === "win32") {
@@ -214,6 +364,7 @@ function setThreadRunStatus(
 function toRpcThread(thread: ThreadRecord): RpcThread {
 	return {
 		...thread,
+		model: normalizeStoredCodexModel(thread.model),
 		runStatus: threadRunStatusFromRecord(thread),
 	};
 }
@@ -316,9 +467,10 @@ function toRpcThreadMessages(
 	return messages.map(toRpcThreadMessage);
 }
 
-function codexThreadOptions(worktreePath: string) {
+function codexThreadOptions(worktreePath: string, model: string) {
 	return {
 		approvalPolicy: "never" as const,
+		model,
 		modelReasoningEffort: "medium" as const,
 		networkAccessEnabled: true,
 		sandboxMode: "workspace-write" as const,
@@ -351,9 +503,17 @@ async function ensureCodexThread(
 	const next = thread.codexThreadId
 		? codex.resumeThread(
 				thread.codexThreadId,
-				codexThreadOptions(thread.worktreePath),
+				codexThreadOptions(
+					thread.worktreePath,
+					normalizeStoredCodexModel(thread.model),
+				),
 			)
-		: codex.startThread(codexThreadOptions(thread.worktreePath));
+		: codex.startThread(
+				codexThreadOptions(
+					thread.worktreePath,
+					normalizeStoredCodexModel(thread.model),
+				),
+			);
 	if (!thread.codexThreadId) {
 		await initializeCodexThread(next);
 		if (!next.id) {
@@ -1021,6 +1181,7 @@ export async function createThreadProcedure(
 ): Promise<RpcThreadDetail> {
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
+	const model = resolveCodexModel(params.model);
 	const worktree = await findProjectWorktree(project, worktreePath);
 	if (!worktree) {
 		throw new Error(
@@ -1028,7 +1189,9 @@ export async function createThreadProcedure(
 		);
 	}
 
-	const codexThread = codex.startThread(codexThreadOptions(worktreePath));
+	const codexThread = codex.startThread(
+		codexThreadOptions(worktreePath, model),
+	);
 	try {
 		await initializeCodexThread(codexThread);
 	} catch (error) {
@@ -1045,6 +1208,7 @@ export async function createThreadProcedure(
 		projectId: project.id,
 		worktreePath,
 		title: buildThreadTitle(worktree, worktreePath),
+		model,
 		codexThreadId,
 	});
 	codexThreadMap.set(thread.id, codexThread);
@@ -1123,6 +1287,20 @@ export async function setThreadPinnedProcedure(
 ): Promise<RpcThread> {
 	const thread = threadById(params.threadId);
 	setThreadPinned(db, thread.id, params.pinned);
+	return toRpcThread(threadById(thread.id));
+}
+
+export async function updateThreadModelProcedure(
+	params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
+): Promise<RpcThread> {
+	const thread = threadById(params.threadId);
+	if (threadRunStatusFromRecord(thread).state === "working") {
+		throw new Error("Thread model cannot change while Codex is processing.");
+	}
+
+	const model = resolveCodexModel(params.model);
+	setThreadModel(db, thread.id, model);
+	codexThreadMap.delete(thread.id);
 	return toRpcThread(threadById(thread.id));
 }
 

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = ".jt-ide";
 const DB_FILE_NAME = "app.db";
+export const DEFAULT_THREAD_MODEL = "gpt-5.4";
 let appDatabase: Database | null = null;
 
 type ProjectInput = {
@@ -16,6 +17,7 @@ type ThreadInput = {
 	projectId: number;
 	worktreePath: string;
 	title: string;
+	model: string;
 	codexThreadId?: string | null;
 };
 
@@ -53,6 +55,7 @@ export type ThreadRecord = {
 	projectId: number;
 	worktreePath: string;
 	title: string;
+	model: string;
 	codexThreadId: string | null;
 	pinnedAt: string | null;
 	createdAt: string;
@@ -145,6 +148,7 @@ function migrate(db: Database): void {
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 				worktree_path TEXT NOT NULL,
 				title TEXT NOT NULL,
+				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				codex_thread_id TEXT,
 				pinned_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -159,6 +163,15 @@ function migrate(db: Database): void {
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
 	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
+	ensureThreadColumn(db, "model", "model TEXT");
+	db.run(
+		`
+			UPDATE threads
+			SET model = ?
+			WHERE model IS NULL OR TRIM(model) = ''
+		`,
+		DEFAULT_THREAD_MODEL,
+	);
 	db.run(`
 			CREATE TABLE IF NOT EXISTS thread_messages (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -347,6 +360,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 					project_id AS projectId,
 					worktree_path AS worktreePath,
 					title,
+					model,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 					created_at AS createdAt,
@@ -379,6 +393,7 @@ export function getThreadById(
 					project_id AS projectId,
 					worktree_path AS worktreePath,
 					title,
+					model,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 					created_at AS createdAt,
@@ -404,10 +419,12 @@ export function createThread(
 				project_id,
 				worktree_path,
 				title,
+				model,
 				codex_thread_id,
 				updated_at
 			)
 			VALUES (
+				?,
 				?,
 				?,
 				?,
@@ -418,6 +435,7 @@ export function createThread(
 		input.projectId,
 		input.worktreePath,
 		input.title,
+		input.model,
 		input.codexThreadId ?? null,
 	);
 	const threadId = Number(result.lastInsertRowid);
@@ -458,6 +476,24 @@ export function renameThread(
 			WHERE id = ?
 		`,
 		title,
+		threadId,
+	);
+}
+
+export function setThreadModel(
+	database: Database,
+	threadId: number,
+	model: string,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET
+				model = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+		model,
 		threadId,
 	);
 }

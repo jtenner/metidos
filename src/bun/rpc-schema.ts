@@ -47,6 +47,19 @@ export type RpcCreateWorktreeResult = {
 	worktreePath: string;
 };
 
+export type RpcCodexModelOption = {
+	id: string;
+	label: string;
+	group: string;
+	summary: string;
+	deprecated: boolean;
+};
+
+export type RpcCodexModelCatalog = {
+	defaultModel: string;
+	models: RpcCodexModelOption[];
+};
+
 export type RpcThreadRunStatus = {
 	state: "idle" | "working" | "failed";
 	startedAt: string | null;
@@ -60,6 +73,7 @@ export type RpcThread = {
 	projectId: number;
 	worktreePath: string;
 	title: string;
+	model: string;
 	codexThreadId: string | null;
 	pinnedAt: string | null;
 	createdAt: string;
@@ -141,6 +155,10 @@ export type AppRPCSchema = {
 			params: { query: string };
 			response: RpcDirectorySuggestionsResult;
 		};
+		getCodexModelCatalog: {
+			params: undefined;
+			response: RpcCodexModelCatalog;
+		};
 		listProjects: {
 			params:
 				| {
@@ -186,7 +204,11 @@ export type AppRPCSchema = {
 			response: RpcThread[];
 		};
 		createThread: {
-			params: { projectId: number; worktreePath: string };
+			params: {
+				projectId: number;
+				worktreePath: string;
+				model?: string | null;
+			};
 			response: RpcThreadDetail;
 		};
 		getThread: {
@@ -209,6 +231,10 @@ export type AppRPCSchema = {
 			params: { threadId: number; pinned: boolean };
 			response: RpcThread;
 		};
+		updateThreadModel: {
+			params: { threadId: number; model: string };
+			response: RpcThread;
+		};
 		deleteThread: {
 			params: { threadId: number };
 			response: { success: boolean; threadId: number; message?: string };
@@ -225,6 +251,9 @@ export interface ProjectProcedures {
 	) => Promise<
 		AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]
 	>;
+	getCodexModelCatalog: (
+		params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
+	) => Promise<AppRPCSchema["requests"]["getCodexModelCatalog"]["response"]>;
 	listProjects: (
 		params?: AppRPCSchema["requests"]["listProjects"]["params"],
 	) => Promise<AppRPCSchema["requests"]["listProjects"]["response"]>;
@@ -270,6 +299,9 @@ export interface ProjectProcedures {
 	setThreadPinned: (
 		params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
 	) => Promise<AppRPCSchema["requests"]["setThreadPinned"]["response"]>;
+	updateThreadModel: (
+		params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
+	) => Promise<AppRPCSchema["requests"]["updateThreadModel"]["response"]>;
 	deleteThread: (
 		params: AppRPCSchema["requests"]["deleteThread"]["params"],
 	) => Promise<AppRPCSchema["requests"]["deleteThread"]["response"]>;

@@ -188,6 +188,7 @@ const procedures: ProjectProcedures = {
 	getHomeDirectory: (params) => sendRequest("getHomeDirectory", params),
 	listDirectorySuggestions: (params) =>
 		sendRequest("listDirectorySuggestions", params),
+	getCodexModelCatalog: (params) => sendRequest("getCodexModelCatalog", params),
 	listProjects: (params) => sendRequest("listProjects", params),
 	listThreads: (params) => sendRequest("listThreads", params),
 	openProject: (params) => sendRequest("openProject", params),
@@ -201,6 +202,7 @@ const procedures: ProjectProcedures = {
 	sendThreadMessage: (params) => sendRequest("sendThreadMessage", params),
 	renameThread: (params) => sendRequest("renameThread", params),
 	setThreadPinned: (params) => sendRequest("setThreadPinned", params),
+	updateThreadModel: (params) => sendRequest("updateThreadModel", params),
 	deleteThread: (params) => sendRequest("deleteThread", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),

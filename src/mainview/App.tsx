@@ -17,6 +17,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 import type {
 	ProjectProcedures,
+	RpcCodexModelOption,
 	RpcProject,
 	RpcThread,
 	RpcThreadMessage,
@@ -177,6 +178,22 @@ function shortName(value: string): string {
 	return parts.at(-1) ?? value;
 }
 
+function normalizeSearchQuery(value: string): string {
+	return value.trim().toLowerCase();
+}
+
+function matchesSearchQuery(
+	searchQuery: string,
+	...values: Array<string | null | undefined>
+): boolean {
+	if (!searchQuery) {
+		return true;
+	}
+	return values.some((value) =>
+		(value ?? "").toLowerCase().includes(searchQuery),
+	);
+}
+
 function worktreeKey(projectId: number, worktreePath: string): string {
 	return `${projectId}::${worktreePath}`;
 }
@@ -250,6 +267,204 @@ function MarkdownMessage({ text }: { text: string }): JSX.Element {
 			>
 				{text}
 			</ReactMarkdown>
+		</div>
+	);
+}
+
+function groupCodexModels(
+	models: RpcCodexModelOption[],
+): Array<{ group: string; models: RpcCodexModelOption[] }> {
+	const grouped = new Map<string, RpcCodexModelOption[]>();
+	for (const model of models) {
+		const entries = grouped.get(model.group) ?? [];
+		entries.push(model);
+		grouped.set(model.group, entries);
+	}
+	return [...grouped.entries()].map(([group, entries]) => ({
+		group,
+		models: entries,
+	}));
+}
+
+function codexModelLabel(model: RpcCodexModelOption): string {
+	return model.deprecated ? `${model.label} (Deprecated)` : model.label;
+}
+
+function findCodexModel(
+	models: RpcCodexModelOption[],
+	modelId: string,
+): RpcCodexModelOption | null {
+	return models.find((model) => model.id === modelId) ?? null;
+}
+
+function CodexModelSelector({
+	models,
+	value,
+	disabled,
+	onChange,
+	variant,
+}: {
+	models: RpcCodexModelOption[];
+	value: string;
+	disabled: boolean;
+	onChange: (value: string) => void;
+	variant: "desktop" | "mobile";
+}): JSX.Element {
+	const groupedModels = groupCodexModels(models);
+	const activeModel = findCodexModel(models, value);
+	const [open, setOpen] = useState(false);
+	const rootRef = useRef<HTMLDivElement | null>(null);
+	const buttonLabel = activeModel
+		? codexModelLabel(activeModel)
+		: models.length === 0
+			? "Loading models"
+			: "Select model";
+
+	useEffect(() => {
+		if (disabled && open) {
+			setOpen(false);
+		}
+	}, [disabled, open]);
+
+	useEffect(() => {
+		if (!open) {
+			return;
+		}
+
+		const handlePointerDown = (event: MouseEvent) => {
+			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+				setOpen(false);
+			}
+		};
+
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handlePointerDown);
+		document.addEventListener("keydown", handleKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", handlePointerDown);
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [open]);
+
+	return (
+		<div
+			ref={rootRef}
+			className="relative"
+			title={activeModel?.summary ?? "Codex model"}
+		>
+			<button
+				type="button"
+				className={`flex w-full items-center gap-2 overflow-hidden border text-left transition-colors ${
+					variant === "desktop"
+						? "rounded-sm border-[#3a3a44] bg-[#131313] px-3 py-1.5 hover:bg-[#181a20]"
+						: "rounded-full border-[#484848]/20 bg-[#191a1a] px-3 py-1.5 hover:bg-[#262626]"
+				} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
+					open
+						? "border-[#8e86f3] shadow-[0_0_0_1px_rgba(142,134,243,0.18)]"
+						: ""
+				}`}
+				onClick={() => {
+					if (!disabled) {
+						setOpen((current) => !current);
+					}
+				}}
+				disabled={disabled}
+				aria-expanded={open}
+				aria-haspopup="menu"
+			>
+				<span
+					className={`shrink-0 ${
+						variant === "desktop" ? "text-[#948def]" : "text-[#aaa4ff]"
+					}`}
+				>
+					{materialSymbol("neurology", "text-[16px]")}
+				</span>
+				<span className="min-w-0 flex-1">
+					<span
+						className={`block truncate font-label font-bold uppercase text-[#f2f0ef] ${
+							variant === "desktop"
+								? "text-[10px] tracking-wider"
+								: "text-[10px] tracking-widest"
+						}`}
+					>
+						{buttonLabel}
+					</span>
+				</span>
+				<span className="shrink-0 text-[#8f8d8b]">
+					{materialSymbol(open ? "expand_less" : "expand_more", "text-[16px]")}
+				</span>
+			</button>
+			{open ? (
+				<div
+					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+						variant === "desktop"
+							? "rounded-md border-[#3a355f] bg-[#14131d]"
+							: "rounded-2xl border-[#413e5e] bg-[#15161f]"
+					}`}
+				>
+					<div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
+						{groupedModels.map((group) => (
+							<div key={group.group} className="px-2 pb-2 last:pb-0">
+								<div className="px-2 pb-1 pt-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
+									{group.group}
+								</div>
+								<div className="space-y-1">
+									{group.models.map((model) => {
+										const selected = model.id === value;
+										return (
+											<button
+												key={model.id}
+												type="button"
+												className={`flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors ${
+													selected
+														? "bg-[#282244] text-[#f7f5ff]"
+														: "text-[#e8e4ff] hover:bg-[#1d1c2a]"
+												}`}
+												onClick={() => {
+													setOpen(false);
+													if (model.id !== value) {
+														onChange(model.id);
+													}
+												}}
+											>
+												<span
+													className={`mt-0.5 shrink-0 ${
+														selected ? "text-[#aaa4ff]" : "text-[#5d5a72]"
+													}`}
+												>
+													{materialSymbol(
+														selected
+															? "check_circle"
+															: "radio_button_unchecked",
+														"text-[16px]",
+													)}
+												</span>
+												<span className="min-w-0 flex-1">
+													<span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
+														{codexModelLabel(model)}
+													</span>
+													<span
+														className={`mt-1 block text-[11px] leading-4 ${
+															selected ? "text-[#cbc5ff]" : "text-[#a6a0c9]"
+														}`}
+													>
+														{model.summary}
+													</span>
+												</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }
@@ -674,12 +889,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
 	const [threads, setThreads] = useState<RpcThread[]>([]);
+	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
+	const [defaultCodexModel, setDefaultCodexModel] = useState("");
+	const [pendingThreadModel, setPendingThreadModel] = useState("");
 	const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
 	const [threadMessages, setThreadMessages] = useState<RpcThreadMessage[]>([]);
 	const [threadsError, setThreadsError] = useState("");
+	const [modelControlError, setModelControlError] = useState("");
 	const [chatError, setChatError] = useState("");
+	const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
 	const [isThreadLoading, setIsThreadLoading] = useState(false);
 	const [isCreatingThread, setIsCreatingThread] = useState(false);
+	const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
 	const [threadActionBusy, setThreadActionBusy] = useState<
 		"rename" | "pin" | "delete" | null
 	>(null);
@@ -719,6 +940,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		() => threadRunStatus(selectedThread),
 		[selectedThread],
 	);
+
+	const activeCodexModel = useMemo(() => {
+		if (selectedThread?.model) {
+			return selectedThread.model;
+		}
+		return pendingThreadModel || defaultCodexModel;
+	}, [defaultCodexModel, pendingThreadModel, selectedThread]);
 
 	const projectThreadErrorLevels = useMemo(() => {
 		const next = new Map<number, ThreadErrorLevel>();
@@ -777,6 +1005,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [threads]);
 
 	const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
+	const modelSelectorDisabled =
+		codexModels.length === 0 ||
+		isCreatingThread ||
+		isThreadLoading ||
+		isSending ||
+		isUpdatingThreadModel ||
+		selectedThreadIsWorking;
 
 	const selectedThreadRunError =
 		selectedThreadRunStatus.state === "failed"
@@ -887,6 +1122,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return worktreeDisplayName(activeSelectedWorktree);
 	}, [activeSelectedWorktree, selectedProject, selectedThread]);
 
+	const normalizedSidebarSearchQuery = useMemo(
+		() => normalizeSearchQuery(sidebarSearchQuery),
+		[sidebarSearchQuery],
+	);
+
 	const visibleThreads = useMemo(() => {
 		if (!selectedProjectId || !activeSelectedWorktreePath) {
 			return [];
@@ -897,6 +1137,87 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				thread.worktreePath === activeSelectedWorktreePath,
 		);
 	}, [activeSelectedWorktreePath, selectedProjectId, threads]);
+
+	const filteredProjects = useMemo(() => {
+		if (!normalizedSidebarSearchQuery) {
+			return projects;
+		}
+
+		return projects.filter((project) => {
+			const projectState = getProjectState(project.id);
+			const matchingWorktree = projectState.worktrees.some((worktree) =>
+				matchesSearchQuery(
+					normalizedSidebarSearchQuery,
+					project.name,
+					project.path,
+					formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
+					worktree.branch,
+					worktree.path,
+					shortName(worktree.path),
+					formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
+				),
+			);
+
+			const matchingThread = threads.some(
+				(thread) =>
+					thread.projectId === project.id &&
+					matchesSearchQuery(
+						normalizedSidebarSearchQuery,
+						thread.title,
+						thread.worktreePath,
+						shortName(thread.worktreePath),
+						formatPathForDisplay(
+							thread.worktreePath,
+							homeDirectory,
+							supportsTildePath,
+						),
+					),
+			);
+
+			return (
+				matchesSearchQuery(
+					normalizedSidebarSearchQuery,
+					project.name,
+					project.path,
+					formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
+				) ||
+				matchingWorktree ||
+				matchingThread
+			);
+		});
+	}, [
+		getProjectState,
+		homeDirectory,
+		normalizedSidebarSearchQuery,
+		projects,
+		supportsTildePath,
+		threads,
+	]);
+
+	const filteredVisibleThreads = useMemo(() => {
+		if (!normalizedSidebarSearchQuery) {
+			return visibleThreads;
+		}
+
+		return visibleThreads.filter((thread) =>
+			matchesSearchQuery(
+				normalizedSidebarSearchQuery,
+				thread.title,
+				thread.worktreePath,
+				shortName(thread.worktreePath),
+				formatPathForDisplay(
+					thread.worktreePath,
+					homeDirectory,
+					supportsTildePath,
+				),
+			),
+		);
+	}, [
+		homeDirectory,
+		normalizedSidebarSearchQuery,
+		supportsTildePath,
+		visibleThreads,
+	]);
 
 	const isActiveWorktree = useCallback(
 		(projectId: number, worktreePath: string): boolean =>
@@ -1051,6 +1372,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setSelectedThreadId(null);
 		setThreadMessages([]);
 		setChatError("");
+		setModelControlError("");
 		selectedThreadIdRef.current = null;
 		selectedThreadRunStateRef.current = "idle";
 	}, []);
@@ -1125,6 +1447,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setIsThreadLoading(true);
 			setThreadsError("");
 			setChatError("");
+			setModelControlError("");
 			try {
 				let detail = options?.acknowledgeUnreadError
 					? await procedures.markThreadErrorSeen({ threadId })
@@ -1169,13 +1492,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const initialize = useCallback(async () => {
-		const [loaded, homeDirectoryResult, loadedThreads] = await Promise.all([
-			procedures.listProjects({ includeClosed: true }),
-			procedures.getHomeDirectory(),
-			procedures.listThreads(),
-		]);
+		const [loaded, homeDirectoryResult, loadedThreads, modelCatalog] =
+			await Promise.all([
+				procedures.listProjects({ includeClosed: true }),
+				procedures.getHomeDirectory(),
+				procedures.listThreads(),
+				procedures.getCodexModelCatalog(),
+			]);
 		setProjects(loaded);
 		setThreads(sortThreads(loadedThreads));
+		setCodexModels(modelCatalog.models);
+		setDefaultCodexModel(modelCatalog.defaultModel);
+		setPendingThreadModel((current) => current || modelCatalog.defaultModel);
 		hydrateProjectRows(loaded);
 		setHomeDirectory(homeDirectoryResult.homeDirectory);
 		setSupportsTildePath(homeDirectoryResult.supportsTildePath);
@@ -1584,6 +1912,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [selectedThreadId]);
 
 	useEffect(() => {
+		if (selectedThread?.model) {
+			setPendingThreadModel(selectedThread.model);
+			setModelControlError("");
+			return;
+		}
+		if (defaultCodexModel) {
+			setPendingThreadModel(defaultCodexModel);
+		}
+	}, [defaultCodexModel, selectedThread]);
+
+	useEffect(() => {
 		if (!selectedThread || !selectedProjectId || !activeSelectedWorktreePath) {
 			return;
 		}
@@ -1699,6 +2038,41 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[homeDirectory, supportsTildePath],
 	);
 
+	const updateActiveCodexModel = useCallback(
+		async (model: string) => {
+			setModelControlError("");
+			if (!model) {
+				return;
+			}
+
+			if (!selectedThread) {
+				setPendingThreadModel(model);
+				return;
+			}
+
+			if (selectedThread.model === model || isUpdatingThreadModel) {
+				return;
+			}
+
+			setIsUpdatingThreadModel(true);
+			try {
+				const updatedThread = await procedures.updateThreadModel({
+					threadId: selectedThread.id,
+					model,
+				});
+				setThreads((prev) => upsertThreadList(prev, updatedThread));
+				setPendingThreadModel(updatedThread.model);
+			} catch (error) {
+				setModelControlError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setIsUpdatingThreadModel(false);
+			}
+		},
+		[isUpdatingThreadModel, procedures, selectedThread],
+	);
+
 	const createThreadFromSelection = useCallback(async () => {
 		if (isCreatingThread) {
 			return;
@@ -1710,11 +2084,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 		setIsCreatingThread(true);
 		setThreadsError("");
+		setModelControlError("");
 		setChatError("");
 		try {
 			const detail = await procedures.createThread({
 				projectId: selectedProject.id,
 				worktreePath: activeSelectedWorktreePath,
+				model: activeCodexModel || defaultCodexModel || undefined,
 			});
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);
@@ -1734,6 +2110,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 	}, [
 		activeSelectedWorktreePath,
+		activeCodexModel,
+		defaultCodexModel,
 		isCreatingThread,
 		loadProjectWorktrees,
 		procedures,
@@ -2651,20 +3029,74 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			</div>
 		) : null;
 
+	const sidebarSearch = !sidebarCollapsed ? (
+		<div className="border-b border-[#262626] px-3 py-3">
+			<label className="block">
+				<span className="sr-only">Search projects and threads</span>
+				<div className="flex items-center gap-2 rounded-sm border border-[#2f3242] bg-[#101114] px-3 py-2">
+					{materialSymbol("search", "text-[16px] text-[#8f89df]")}
+					<input
+						className="min-w-0 flex-1 bg-transparent text-sm text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
+						placeholder="Search projects and threads"
+						value={sidebarSearchQuery}
+						onChange={(event) => {
+							setSidebarSearchQuery(event.currentTarget.value);
+						}}
+						autoCapitalize="none"
+						autoCorrect="off"
+						spellCheck={false}
+					/>
+					{sidebarSearchQuery ? (
+						<button
+							type="button"
+							className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1b1d28] hover:text-[#f2f0ef]"
+							onClick={() => setSidebarSearchQuery("")}
+							aria-label="Clear sidebar search"
+						>
+							×
+						</button>
+					) : null}
+				</div>
+			</label>
+		</div>
+	) : null;
+
 	const projectTree = (
 		<div className="space-y-2">
-			{projects.length === 0 ? (
+			{filteredProjects.length === 0 ? (
 				<div className="px-3 text-sm text-[#a7a7a7]">
-					No projects in database. Use + to add a project folder.
+					{normalizedSidebarSearchQuery
+						? "No matching projects."
+						: "No projects in database. Use + to add a project folder."}
 				</div>
 			) : (
-				projects.map((project) => {
+				filteredProjects.map((project) => {
 					const state = getProjectState(project.id);
 					const isActive = selectedProjectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
 					const projectErrorPreviewText = projectThreadErrorPreviewText(
 						project.id,
 					);
+					const visibleWorktrees = orderProjectWorktrees(
+						project,
+						state.worktrees,
+					).filter((worktree) =>
+						matchesSearchQuery(
+							normalizedSidebarSearchQuery,
+							project.name,
+							worktree.branch,
+							worktree.path,
+							shortName(worktree.path),
+							formatPathForDisplay(
+								worktree.path,
+								homeDirectory,
+								supportsTildePath,
+							),
+						),
+					);
+					const showWorktrees =
+						(state.expanded || Boolean(normalizedSidebarSearchQuery)) &&
+						!sidebarCollapsed;
 					return (
 						<div
 							className="space-y-1"
@@ -2732,7 +3164,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								) : null}
 							</div>
 
-							{state.expanded && !sidebarCollapsed ? (
+							{showWorktrees ? (
 								<div className="ml-3 space-y-1">
 									{state.loadingWorktrees ? (
 										<div className="text-xs text-[#a8a6a4] px-2 py-1">
@@ -2744,109 +3176,103 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											{state.error}
 										</div>
 									) : null}
-									{state.worktrees.length === 0 ? (
+									{visibleWorktrees.length === 0 ? (
 										<div className="text-xs text-[#8f8d8b] px-2 py-1">
-											No worktrees found.
+											{normalizedSidebarSearchQuery
+												? "No matching worktrees."
+												: "No worktrees found."}
 										</div>
 									) : null}
-									{orderProjectWorktrees(project, state.worktrees).map(
-										(worktree) => {
-											const wState = getWorktreeState(
-												project.id,
-												worktree.path,
-											);
-											const activeWorktree = isActiveWorktree(
-												project.id,
-												worktree.path,
-											);
-											const worktreeErrorLevel = worktreeThreadErrorLevel(
-												project.id,
-												worktree.path,
-											);
-											const worktreeErrorPreviewText =
-												worktreeThreadErrorPreviewText(
-													project.id,
-													worktree.path,
-												);
-											return (
-												<button
-													type="button"
-													key={worktree.path}
-													className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
-														activeWorktree
-															? "bg-[#25233a] text-[#f2f0ef]"
-															: wState.opened
-																? "bg-[#1f2020] text-[#f2f0ef]"
-																: "text-[#cfd1d4] hover:bg-[#202020]"
-													}`}
-													{...errorPreviewHandlers(worktreeErrorPreviewText)}
-													onClick={() => {
-														hideErrorPreview();
-														clearThreadSelection();
-														setThreadsError("");
-														selectProject(project, worktree.path);
-														void openOrCloseWorktree(project.id, worktree.path);
+									{visibleWorktrees.map((worktree) => {
+										const wState = getWorktreeState(project.id, worktree.path);
+										const activeWorktree = isActiveWorktree(
+											project.id,
+											worktree.path,
+										);
+										const worktreeErrorLevel = worktreeThreadErrorLevel(
+											project.id,
+											worktree.path,
+										);
+										const worktreeErrorPreviewText =
+											worktreeThreadErrorPreviewText(project.id, worktree.path);
+										return (
+											<button
+												type="button"
+												key={worktree.path}
+												className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
+													activeWorktree
+														? "bg-[#25233a] text-[#f2f0ef]"
+														: wState.opened
+															? "bg-[#1f2020] text-[#f2f0ef]"
+															: "text-[#cfd1d4] hover:bg-[#202020]"
+												}`}
+												{...errorPreviewHandlers(worktreeErrorPreviewText)}
+												onClick={() => {
+													hideErrorPreview();
+													clearThreadSelection();
+													setThreadsError("");
+													selectProject(project, worktree.path);
+													void openOrCloseWorktree(project.id, worktree.path);
+												}}
+											>
+												<div
+													className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
+													style={{
+														gridTemplateColumns:
+															"minmax(0, 11.5rem) minmax(0, 1fr) auto",
 													}}
 												>
-													<div
-														className="grid min-w-0 items-center gap-x-3 gap-y-0.5"
-														style={{
-															gridTemplateColumns:
-																"minmax(0, 11.5rem) minmax(0, 1fr) auto",
-														}}
+													<span
+														className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
+														title={worktree.branch ?? "detached"}
 													>
-														<span
-															className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
-															title={worktree.branch ?? "detached"}
-														>
-															{worktree.branch ?? "detached"}
-														</span>
-														<span
-															className="min-w-0 truncate text-sm leading-5"
-															title={shortName(worktree.path)}
-														>
-															{shortName(worktree.path)}
-														</span>
-														<span
-															className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-																worktreeErrorLevel === "unread"
-																	? "bg-[#ff304f]"
-																	: worktreeErrorLevel === "failed"
-																		? "bg-[#8f4956]"
-																		: activeWorktree
-																			? "bg-[#4fefb2]"
-																			: "bg-transparent"
-															}`}
-														/>
-														<div
-															className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
-															title={formatPathForDisplay(
-																worktree.path,
-																homeDirectory,
-																supportsTildePath,
-															)}
-														>
-															{formatPathForDisplay(
-																worktree.path,
-																homeDirectory,
-																supportsTildePath,
-															)}
-														</div>
+														{worktree.branch ?? "detached"}
+													</span>
+													<span
+														className="min-w-0 truncate text-sm leading-5"
+														title={shortName(worktree.path)}
+													>
+														{shortName(worktree.path)}
+													</span>
+													<span
+														className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+															worktreeErrorLevel === "unread"
+																? "bg-[#ff304f]"
+																: worktreeErrorLevel === "failed"
+																	? "bg-[#8f4956]"
+																	: activeWorktree
+																		? "bg-[#4fefb2]"
+																		: "bg-transparent"
+														}`}
+													/>
+													<div
+														className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+														title={formatPathForDisplay(
+															worktree.path,
+															homeDirectory,
+															supportsTildePath,
+														)}
+													>
+														{formatPathForDisplay(
+															worktree.path,
+															homeDirectory,
+															supportsTildePath,
+														)}
 													</div>
-													{wState.loading ? (
-														<div className="text-xs text-[#8f8d8b]">
-															Syncing diff + file state...
-														</div>
-													) : null}
-													{wState.error ? (
-														<div className="text-xs text-[#ff6e84]">
-															{wState.error}
-														</div>
-													) : null}
-												</button>
-											);
-										},
-									)}
+												</div>
+												{wState.loading ? (
+													<div className="text-xs text-[#8f8d8b]">
+														Syncing diff + file state...
+													</div>
+												) : null}
+												{wState.error ? (
+													<div className="text-xs text-[#ff6e84]">
+														{wState.error}
+													</div>
+												) : null}
+											</button>
+										);
+									})}
 								</div>
 							) : null}
 						</div>
@@ -2895,13 +3321,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
 						Select a project worktree first.
 					</div>
-				) : visibleThreads.length === 0 ? (
+				) : filteredVisibleThreads.length === 0 ? (
 					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
-						No threads in this worktree yet. Use + to start a Codex thread for
-						the selected worktree.
+						{normalizedSidebarSearchQuery
+							? "No matching threads in this worktree."
+							: "No threads in this worktree yet. Use + to start a Codex thread for the selected worktree."}
 					</div>
 				) : (
-					visibleThreads.map((thread) => {
+					filteredVisibleThreads.map((thread) => {
 						const threadProject =
 							projects.find((project) => project.id === thread.projectId) ??
 							null;
@@ -3123,6 +3550,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{sidebarCollapsed ? "☰" : "⟨"}
 							</button>
 						</div>
+						{sidebarSearch}
 						{!sidebarCollapsed && addProjectOpen ? addProjectForm : null}
 						<div className="flex-1 overflow-y-auto py-2">
 							{projectTree}
@@ -3148,11 +3576,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						>
 							<div className="max-w-4xl mx-auto">
 								<div className="flex items-center gap-2 p-2 border-b border-[#484848]/10">
-									<div className="flex items-center bg-[#131313] px-3 py-1.5 rounded-sm gap-2 cursor-pointer hover:bg-[#262626] transition-colors">
-										{materialSymbol("neurology", "text-[#948def] text-[16px]")}
-										<span className="font-label text-[10px] uppercase font-bold text-[#f2f0ef]">
-											Model: Mono-X-Large
-										</span>
+									<div className="min-w-[15rem] max-w-[22rem]">
+										<CodexModelSelector
+											models={codexModels}
+											value={activeCodexModel}
+											disabled={modelSelectorDisabled}
+											onChange={(value) => {
+												void updateActiveCodexModel(value);
+											}}
+											variant="desktop"
+										/>
 									</div>
 									<div className="flex items-center bg-[#191a1a] px-3 py-1.5 rounded-sm gap-2 cursor-pointer hover:bg-[#262626] transition-colors">
 										{materialSymbol("checklist", "text-[#ff96bb] text-[16px]")}
@@ -3165,6 +3598,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										842 Tokens
 									</span>
 								</div>
+								{modelControlError ? (
+									<div className="mt-2 text-xs text-[#ff6e84]">
+										{modelControlError}
+									</div>
+								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
 									<textarea
 										className="flex-1 bg-transparent border-none focus:ring-0 text-sm placeholder:text-[#adabaa]/50 resize-none font-body"
@@ -3248,6 +3686,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</button>
 							</div>
 						</div>
+						{sidebarSearch}
 						{addProjectOpen ? addProjectForm : null}
 						{projectTree}
 						{threadSection}
@@ -3284,15 +3723,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						onSubmit={onSubmit}
 					>
 						<div className="flex items-center gap-2">
-							<button
-								type="button"
-								className="flex items-center gap-2 bg-[#191a1a] px-3 py-1.5 rounded-full border border-[#484848]/20 hover:bg-[#262626] transition-colors"
-							>
-								{materialSymbol("auto_awesome", "text-[#aaa4ff] text-sm")}
-								<span className="text-[10px] font-label uppercase tracking-widest font-bold">
-									GPT-4 Turbo
-								</span>
-							</button>
+							<div className="min-w-0 flex-1">
+								<CodexModelSelector
+									models={codexModels}
+									value={activeCodexModel}
+									disabled={modelSelectorDisabled}
+									onChange={(value) => {
+										void updateActiveCodexModel(value);
+									}}
+									variant="mobile"
+								/>
+							</div>
 							<button
 								type="button"
 								className="flex items-center gap-2 bg-[#191a1a] px-3 py-1.5 rounded-full border border-[#484848]/20 hover:bg-[#262626] transition-colors"
@@ -3303,6 +3744,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</span>
 							</button>
 						</div>
+						{modelControlError ? (
+							<div className="text-xs text-[#ff6e84]">{modelControlError}</div>
+						) : null}
 						<div className="relative flex items-end gap-2 bg-[#191a1a] p-2 rounded-xl shadow-2xl border border-[#484848]/10">
 							<textarea
 								className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-2 resize-none text-[#ffffff] placeholder:text-[#adabaa]/50"

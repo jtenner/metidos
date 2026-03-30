@@ -10,6 +10,7 @@ import {
 	createWorktreeProcedure,
 	deleteProjectProcedure,
 	deleteThreadProcedure,
+	getCodexModelCatalogProcedure,
 	getThreadProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectWorktreesProcedure,
@@ -22,6 +23,7 @@ import {
 	sendThreadMessageProcedure,
 	setThreadPinnedProcedure,
 	shutdownProjectPolling,
+	updateThreadModelProcedure,
 } from "./project-procedures";
 import type { AppRPCSchema } from "./rpc-schema";
 
@@ -131,6 +133,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	}),
 	listDirectorySuggestions: (params) =>
 		listDirectorySuggestionsProcedure(params),
+	getCodexModelCatalog: (params) => getCodexModelCatalogProcedure(params),
 	listProjects: (params) => listProjectsProcedure(params),
 	listThreads: (params) => listThreadsProcedure(params),
 	openProject: (params) => openProjectProcedure(params),
@@ -144,6 +147,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	sendThreadMessage: (params) => sendThreadMessageProcedure(params),
 	renameThread: (params) => renameThreadProcedure(params),
 	setThreadPinned: (params) => setThreadPinnedProcedure(params),
+	updateThreadModel: (params) => updateThreadModelProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
 	openWorktree: (params) => openWorktreeProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
