@@ -23,6 +23,7 @@ import {
 	setProjectClosed,
 	setThreadModel,
 	setThreadPinned,
+	setThreadUsage,
 	touchThread,
 	updateThreadCodexId,
 	upsertProject,
@@ -41,6 +42,7 @@ import type {
 	RpcThreadDetail,
 	RpcThreadMessage,
 	RpcThreadRunStatus,
+	RpcThreadUsage,
 	RpcWorktree,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
@@ -112,6 +114,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Latest flagship model for complex reasoning and coding.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.4-pro",
@@ -119,6 +122,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Higher-precision GPT-5.4 variant for harder tasks.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.4-mini",
@@ -126,6 +130,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Faster lower-cost GPT-5.4 model for coding and subagents.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.4-nano",
@@ -133,6 +138,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Cheapest GPT-5.4-class model for simple tasks.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5-mini",
@@ -140,6 +146,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Near-frontier intelligence for cost-sensitive workloads.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5-nano",
@@ -147,6 +154,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Fastest and most cost-efficient GPT-5 model.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5",
@@ -154,6 +162,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Previous GPT-5 frontier model for coding and agentic work.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-4.1",
@@ -161,6 +170,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Frontier",
 		summary: "Highest-capability non-reasoning general model.",
 		deprecated: false,
+		contextWindowTokens: 1_047_576,
 	},
 	{
 		id: "gpt-5-codex",
@@ -168,6 +178,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "GPT-5 variant optimized for agentic coding in Codex.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.3-codex",
@@ -175,6 +186,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "Previous high-capability agentic coding model.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.2-codex",
@@ -182,6 +194,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "Long-horizon coding model for complex repo work.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.1-codex",
@@ -189,6 +202,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "GPT-5.1 variant optimized for agentic coding in Codex.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.1-codex-max",
@@ -196,6 +210,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "GPT-5.1 Codex variant tuned for longer-running tasks.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "gpt-5.1-codex-mini",
@@ -203,6 +218,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "Smaller cheaper GPT-5.1 Codex model.",
 		deprecated: false,
+		contextWindowTokens: 400_000,
 	},
 	{
 		id: "codex-mini-latest",
@@ -210,6 +226,7 @@ const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
 		group: "Coding",
 		summary: "Deprecated fast reasoning model for older Codex workflows.",
 		deprecated: true,
+		contextWindowTokens: 200_000,
 	},
 ];
 
@@ -446,7 +463,23 @@ function toRpcThread(thread: ThreadRecord): RpcThread {
 	return {
 		...thread,
 		model: normalizeStoredCodexModel(thread.model),
+		usage: threadUsageFromRecord(thread),
 		runStatus: threadRunStatusFromRecord(thread),
+	};
+}
+
+function threadUsageFromRecord(thread: ThreadRecord): RpcThreadUsage | null {
+	if (
+		thread.lastInputTokens === null &&
+		thread.lastCachedInputTokens === null &&
+		thread.lastOutputTokens === null
+	) {
+		return null;
+	}
+	return {
+		inputTokens: thread.lastInputTokens ?? 0,
+		cachedInputTokens: thread.lastCachedInputTokens ?? 0,
+		outputTokens: thread.lastOutputTokens ?? 0,
 	};
 }
 
@@ -640,6 +673,7 @@ async function runThreadMessageInBackground(
 		const { events } = await codexThread.runStreamed(input);
 		let assistantText = "";
 		let terminalError: string | null = null;
+		let usage: RpcThreadUsage | null = null;
 
 		for await (const event of events) {
 			if (event.type === "thread.started") {
@@ -656,6 +690,15 @@ async function runThreadMessageInBackground(
 
 			if (event.type === "error") {
 				terminalError = event.message || "Codex event stream failed.";
+				continue;
+			}
+
+			if (event.type === "turn.completed") {
+				usage = {
+					inputTokens: event.usage.input_tokens,
+					cachedInputTokens: event.usage.cached_input_tokens,
+					outputTokens: event.usage.output_tokens,
+				};
 				continue;
 			}
 
@@ -705,6 +748,9 @@ async function runThreadMessageInBackground(
 			role: "assistant",
 			text: finalAssistantText,
 		});
+		if (usage) {
+			setThreadUsage(db, threadId, usage);
+		}
 		markThreadRan(db, threadId);
 		setThreadRunStatus(threadId, {
 			state: "idle",

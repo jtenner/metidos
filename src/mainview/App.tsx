@@ -1,4 +1,5 @@
 import {
+	type ChangeEvent,
 	type CSSProperties,
 	type FormEvent,
 	type HTMLAttributes,
@@ -104,6 +105,9 @@ type ErrorPreviewPopoverState = {
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
+const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
+const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
+const COMPOSER_MAX_HEIGHT_PX = 240;
 
 const codeBlockStyle = {
 	margin: 0,
@@ -296,6 +300,97 @@ function findCodexModel(
 	modelId: string,
 ): RpcCodexModelOption | null {
 	return models.find((model) => model.id === modelId) ?? null;
+}
+
+function formatCompactTokenCount(value: number): string {
+	if (value >= 1_000_000) {
+		return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+	}
+	if (value >= 1_000) {
+		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
+	}
+	return value.toString();
+}
+
+function ContextUsageMeter({
+	inputTokens,
+	contextWindowTokens,
+}: {
+	inputTokens: number;
+	contextWindowTokens: number;
+}): JSX.Element {
+	const safeContextWindowTokens = Math.max(contextWindowTokens, 1);
+	const usageRatio = Math.min(inputTokens / safeContextWindowTokens, 1);
+	const usagePercent = Math.round(usageRatio * 100);
+	const radius = 9;
+	const circumference = 2 * Math.PI * radius;
+	const strokeOffset = circumference * (1 - usageRatio);
+	const strokeColor =
+		usageRatio >= 0.9 ? "#ff6e84" : usageRatio >= 0.7 ? "#ffbe78" : "#aaa4ff";
+
+	return (
+		<div
+			className="flex items-center gap-3"
+			title={`${inputTokens.toLocaleString()} / ${contextWindowTokens.toLocaleString()} context tokens`}
+		>
+			<div className="relative h-7 w-7 shrink-0">
+				<svg
+					viewBox="0 0 24 24"
+					className="-rotate-90 h-7 w-7"
+					aria-hidden="true"
+				>
+					<circle
+						cx="12"
+						cy="12"
+						r={radius}
+						fill="none"
+						stroke="rgba(143, 141, 139, 0.22)"
+						strokeWidth="2"
+					/>
+					<circle
+						cx="12"
+						cy="12"
+						r={radius}
+						fill="none"
+						stroke={strokeColor}
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeDasharray={circumference}
+						strokeDashoffset={strokeOffset}
+					/>
+				</svg>
+				<span className="absolute inset-0 flex items-center justify-center font-label text-[8px] font-bold uppercase tracking-[0.08em] text-[#f2f0ef]">
+					{usagePercent}
+				</span>
+			</div>
+			<div className="flex flex-col items-end leading-none">
+				<span className="font-label text-[10px] uppercase tracking-widest text-[#dad7ff]">
+					{formatCompactTokenCount(inputTokens)} /{" "}
+					{formatCompactTokenCount(contextWindowTokens)}
+				</span>
+				<span className="mt-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f8d8b]">
+					Context
+				</span>
+			</div>
+		</div>
+	);
+}
+
+function resizeComposerTextarea(
+	element: HTMLTextAreaElement | null,
+	minHeightPx: number,
+): void {
+	if (!element) {
+		return;
+	}
+	element.style.height = "auto";
+	const nextHeight = Math.min(
+		Math.max(element.scrollHeight, minHeightPx),
+		COMPOSER_MAX_HEIGHT_PX,
+	);
+	element.style.height = `${nextHeight}px`;
+	element.style.overflowY =
+		element.scrollHeight > COMPOSER_MAX_HEIGHT_PX ? "auto" : "hidden";
 }
 
 function CodexModelSelector({
@@ -1130,6 +1225,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState<ErrorPreviewPopoverState | null>(null);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
+	const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
+	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
@@ -1159,6 +1256,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		return pendingThreadModel || defaultCodexModel;
 	}, [defaultCodexModel, pendingThreadModel, selectedThread]);
+
+	const activeCodexModelOption = useMemo(
+		() => findCodexModel(codexModels, activeCodexModel),
+		[activeCodexModel, codexModels],
+	);
+
+	const activeContextWindowTokens =
+		activeCodexModelOption?.contextWindowTokens ?? 400_000;
+	const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
 
 	const projectThreadErrorLevels = useMemo(() => {
 		const next = new Map<number, ThreadErrorLevel>();
@@ -1231,6 +1337,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			: "";
 
 	const activeChatError = chatError || selectedThreadRunError;
+
+	useEffect(() => {
+		resizeComposerTextarea(
+			desktopComposerRef.current,
+			DESKTOP_COMPOSER_MIN_HEIGHT_PX,
+		);
+		resizeComposerTextarea(
+			mobileComposerRef.current,
+			MOBILE_COMPOSER_MIN_HEIGHT_PX,
+		);
+	}, [chatInput]);
 
 	const projectActionMenuProject = useMemo(() => {
 		if (!projectActionMenu) {
@@ -2678,11 +2795,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[postMessage],
 	);
 
+	const onChatInputChange = useCallback(
+		(event: ChangeEvent<HTMLTextAreaElement>) => {
+			setChatInput(event.currentTarget.value);
+			resizeComposerTextarea(
+				event.currentTarget,
+				event.currentTarget === desktopComposerRef.current
+					? DESKTOP_COMPOSER_MIN_HEIGHT_PX
+					: MOBILE_COMPOSER_MIN_HEIGHT_PX,
+			);
+		},
+		[],
+	);
+
 	const onEnter = useCallback(
 		(event: KeyboardEvent<HTMLTextAreaElement>) => {
-			if (event.key === "Enter" && !event.shiftKey) {
+			if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+				return;
+			}
+			if (event.metaKey || event.ctrlKey) {
 				event.preventDefault();
-				postMessage();
+				if (!event.shiftKey && !event.altKey) {
+					postMessage();
+				}
 			}
 		},
 		[postMessage],
@@ -3912,9 +4047,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										variant="desktop"
 									/>
 									<div className="flex-1" />
-									<span className="font-label text-[10px] text-[#adabaa] uppercase tracking-widest opacity-50">
-										842 Tokens
-									</span>
+									<ContextUsageMeter
+										inputTokens={activeContextInputTokens}
+										contextWindowTokens={activeContextWindowTokens}
+									/>
 								</div>
 								{modelControlError ? (
 									<div className="mt-2 text-xs text-[#ff6e84]">
@@ -3928,17 +4064,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								) : null}
 								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
 									<textarea
-										className="flex-1 bg-transparent border-none focus:ring-0 text-sm placeholder:text-[#adabaa]/50 resize-none font-body"
+										ref={desktopComposerRef}
+										className="flex-1 overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 placeholder:text-[#adabaa]/50 resize-none font-body px-2"
 										placeholder={
 											selectedThread
 												? "Ask Codex to generate, refactor, or debug..."
 												: "Create a thread to start chatting with Codex..."
 										}
 										rows={3}
+										style={{
+											minHeight: `${DESKTOP_COMPOSER_MIN_HEIGHT_PX}px`,
+											maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
+										}}
 										value={chatInput}
-										onChange={(event) =>
-											setChatInput(event.currentTarget.value)
-										}
+										onChange={onChatInputChange}
 										onKeyDown={onEnter}
 										disabled={
 											!selectedThread ||
@@ -4075,15 +4214,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						) : null}
 						<div className="relative flex items-end gap-2 bg-[#191a1a] p-2 rounded-xl shadow-2xl border border-[#484848]/10">
 							<textarea
-								className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-2 resize-none text-[#ffffff] placeholder:text-[#adabaa]/50"
+								ref={mobileComposerRef}
+								className="flex-grow overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 py-2 px-3 resize-none text-[#ffffff] placeholder:text-[#adabaa]/50"
 								placeholder={
 									selectedThread
 										? "Ask Codex..."
 										: "Create a thread to chat with Codex..."
 								}
 								rows={1}
+								style={{
+									minHeight: `${MOBILE_COMPOSER_MIN_HEIGHT_PX}px`,
+									maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
+								}}
 								value={chatInput}
-								onChange={(event) => setChatInput(event.currentTarget.value)}
+								onChange={onChatInputChange}
 								onKeyDown={onEnter}
 								disabled={
 									!selectedThread ||

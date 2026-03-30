@@ -58,6 +58,7 @@ export type RpcCodexModelOption = {
 	group: string;
 	summary: string;
 	deprecated: boolean;
+	contextWindowTokens: number;
 };
 
 export type RpcCodexModelCatalog = {
@@ -73,6 +74,12 @@ export type RpcThreadRunStatus = {
 	hasUnreadError: boolean;
 };
 
+export type RpcThreadUsage = {
+	inputTokens: number;
+	cachedInputTokens: number;
+	outputTokens: number;
+};
+
 export type RpcThread = {
 	id: number;
 	projectId: number;
@@ -84,6 +91,7 @@ export type RpcThread = {
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
+	usage: RpcThreadUsage | null;
 	runStatus: RpcThreadRunStatus;
 };
 

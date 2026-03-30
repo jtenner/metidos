@@ -21,6 +21,12 @@ type ThreadInput = {
 	codexThreadId?: string | null;
 };
 
+type ThreadUsageInput = {
+	inputTokens: number;
+	cachedInputTokens: number;
+	outputTokens: number;
+};
+
 type ThreadMessageInput = {
 	threadId: number;
 	role: "assistant" | "user";
@@ -61,6 +67,9 @@ export type ThreadRecord = {
 	createdAt: string;
 	updatedAt: string;
 	lastRunAt: string | null;
+	lastInputTokens: number | null;
+	lastCachedInputTokens: number | null;
+	lastOutputTokens: number | null;
 	lastErrorAt: string | null;
 	lastErrorSeenAt: string | null;
 	lastErrorMessage: string | null;
@@ -154,11 +163,21 @@ function migrate(db: Database): void {
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				last_run_at TEXT,
+				last_input_tokens INTEGER,
+				last_cached_input_tokens INTEGER,
+				last_output_tokens INTEGER,
 				last_error_at TEXT,
 				last_error_seen_at TEXT,
 				last_error_message TEXT
 			);
 		`);
+	ensureThreadColumn(db, "last_input_tokens", "last_input_tokens INTEGER");
+	ensureThreadColumn(
+		db,
+		"last_cached_input_tokens",
+		"last_cached_input_tokens INTEGER",
+	);
+	ensureThreadColumn(db, "last_output_tokens", "last_output_tokens INTEGER");
 	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
@@ -363,12 +382,15 @@ export function listThreads(database: Database): ThreadRecord[] {
 					model,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
-					created_at AS createdAt,
-					updated_at AS updatedAt,
-					last_run_at AS lastRunAt,
-					last_error_at AS lastErrorAt,
-					last_error_seen_at AS lastErrorSeenAt,
-					last_error_message AS lastErrorMessage
+						created_at AS createdAt,
+						updated_at AS updatedAt,
+						last_run_at AS lastRunAt,
+						last_input_tokens AS lastInputTokens,
+						last_cached_input_tokens AS lastCachedInputTokens,
+						last_output_tokens AS lastOutputTokens,
+						last_error_at AS lastErrorAt,
+						last_error_seen_at AS lastErrorSeenAt,
+						last_error_message AS lastErrorMessage
 				FROM threads
 				ORDER BY
 					CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END ASC,
@@ -396,12 +418,15 @@ export function getThreadById(
 					model,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
-					created_at AS createdAt,
-					updated_at AS updatedAt,
-					last_run_at AS lastRunAt,
-					last_error_at AS lastErrorAt,
-					last_error_seen_at AS lastErrorSeenAt,
-					last_error_message AS lastErrorMessage
+						created_at AS createdAt,
+						updated_at AS updatedAt,
+						last_run_at AS lastRunAt,
+						last_input_tokens AS lastInputTokens,
+						last_cached_input_tokens AS lastCachedInputTokens,
+						last_output_tokens AS lastOutputTokens,
+						last_error_at AS lastErrorAt,
+						last_error_seen_at AS lastErrorSeenAt,
+						last_error_message AS lastErrorMessage
 				FROM threads
 				WHERE id = ?
 			`,
@@ -533,6 +558,28 @@ export function markThreadRan(database: Database, threadId: number): void {
 				last_error_message = NULL
 			WHERE id = ?
 		`,
+		threadId,
+	);
+}
+
+export function setThreadUsage(
+	database: Database,
+	threadId: number,
+	usage: ThreadUsageInput,
+): void {
+	database.run(
+		`
+			UPDATE threads
+			SET
+				last_input_tokens = ?,
+				last_cached_input_tokens = ?,
+				last_output_tokens = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+		usage.inputTokens,
+		usage.cachedInputTokens,
+		usage.outputTokens,
 		threadId,
 	);
 }
