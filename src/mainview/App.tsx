@@ -70,7 +70,6 @@ type MessageGroup =
 	  }
 	| {
 			kind: "user";
-			index: number;
 			key: string;
 			text: string;
 	  };
@@ -1314,30 +1313,64 @@ function FileChangeMessage({
 	diffText,
 	path,
 	state,
+	worktreePath,
 }: {
 	changeKind: "add" | "delete" | "update";
 	diffText: string;
 	path: string;
 	state: "completed" | "failed";
+	worktreePath?: string;
 }): JSX.Element {
+	const fileHref = buildLocalFileHref(path, worktreePath);
 	return (
 		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
-				<div className="min-w-0">
-					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+				<div className="min-w-0 text-sm">
+					<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
 						File Change
-					</div>
-					<div
-						className="truncate font-mono text-[12px] text-[#b8b2ff] underline decoration-[#6f66d8] underline-offset-2"
+					</span>
+					<span className="px-1 text-[#7c82a8]">-</span>
+					<a
+						className="font-mono text-[12px] text-[#b8b2ff] underline decoration-[#6f66d8] underline-offset-2"
+						href={fileHref}
+						onClick={(event) => event.stopPropagation()}
+						rel="noreferrer"
+						target="_blank"
 						title={path}
 					>
 						{path}
-					</div>
+					</a>
 				</div>
 			</summary>
 			<DiffViewer diffText={diffText} className="max-h-[28rem]" />
 		</details>
 	);
+}
+
+function isAbsoluteLocalPath(value: string): boolean {
+	return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function joinLocalPath(basePath: string, nextPath: string): string {
+	const normalizedBase = basePath.replace(/\\/g, "/").replace(/\/+$/, "");
+	const normalizedNext = nextPath.replace(/\\/g, "/").replace(/^\.?\//, "");
+	return `${normalizedBase}/${normalizedNext}`;
+}
+
+function toFileHref(path: string): string {
+	const normalizedPath = path.replace(/\\/g, "/");
+	if (/^[A-Za-z]:\//.test(normalizedPath)) {
+		return `file:///${encodeURI(normalizedPath)}`;
+	}
+	return `file://${encodeURI(normalizedPath)}`;
+}
+
+function buildLocalFileHref(path: string, worktreePath?: string): string {
+	const absolutePath =
+		isAbsoluteLocalPath(path) || !worktreePath
+			? path
+			: joinLocalPath(worktreePath, path);
+	return toFileHref(absolutePath);
 }
 
 function formatPathForDisplay(
@@ -3838,44 +3871,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		threadMessages,
 	]);
 
-	const assistantMessageLabel = useCallback(
-		(message: VisibleMessage): string => {
-			if (message.kind === "chat") {
-				if (message.tone === "error") {
-					return "Error";
-				}
-				return "Assistant";
-			}
-			if (message.kind === "reasoning") {
-				return "Reasoning";
-			}
-			if (message.kind === "command") {
-				return "Command";
-			}
-			return "File Change";
-		},
-		[],
-	);
-
-	const assistantMessageLabelClassName = useCallback(
-		(message: VisibleMessage): string => {
-			if (message.kind === "chat" && message.tone === "error") {
-				return "text-[#ff8ca0]";
-			}
-			if (message.kind === "reasoning") {
-				return "text-[#bfc5ff]";
-			}
-			if (message.kind === "command") {
-				return "text-[#93d8ff]";
-			}
-			if (message.kind === "file_change") {
-				return "text-[#8ce7c5]";
-			}
-			return "text-[#aaa4ff]";
-		},
-		[],
-	);
-
 	const renderAssistantMessageContent = useCallback(
 		(message: VisibleMessage): JSX.Element => {
 			if (message.kind === "chat") {
@@ -3906,10 +3901,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					diffText={message.diffText}
 					path={message.path}
 					state={message.state}
+					worktreePath={activeSelectedWorktreePath ?? undefined}
 				/>
 			);
 		},
-		[],
+		[activeSelectedWorktreePath],
 	);
 
 	const groupedVisibleMessages = useMemo<MessageGroup[]>(() => {
@@ -3932,7 +3928,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			groups.push({
 				kind: "user",
-				index,
 				key: `user-${index}`,
 				text: message.kind === "chat" ? message.text : "",
 			});
@@ -3961,16 +3956,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						{group.messages.map(({ message, index }, groupIndex) => (
 							<div
-								className={`min-w-0 space-y-4 ${groupIndex > 0 ? "pt-1" : ""}`}
+								className={`min-w-0 ${groupIndex > 0 ? "pt-1" : ""}`}
 								key={`${message.kind}-${index}`}
 							>
-								<div
-									className={`font-label text-[10px] font-bold uppercase tracking-widest ${assistantMessageLabelClassName(
-										message,
-									)}`}
-								>
-									{assistantMessageLabel(message)}
-								</div>
 								<div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
 									{renderAssistantMessageContent(message)}
 								</div>
@@ -4018,17 +4006,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 					<div className="flex w-full flex-col gap-4">
 						{group.messages.map(({ message, index }) => (
-							<div
-								className="w-full space-y-2"
-								key={`${message.kind}-${index}`}
-							>
-								<div
-									className={`px-1 text-[10px] font-label font-bold uppercase tracking-wider ${assistantMessageLabelClassName(
-										message,
-									)}`}
-								>
-									{assistantMessageLabel(message)}
-								</div>
+							<div className="w-full" key={`${message.kind}-${index}`}>
 								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#aaa4ff]/10 p-5">
 									<div className="text-sm leading-relaxed text-[#ffffff]">
 										{renderAssistantMessageContent(message)}
