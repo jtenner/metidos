@@ -844,6 +844,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return worktreeDisplayName(activeSelectedWorktree);
 	}, [activeSelectedWorktree, selectedProject, selectedThread]);
 
+	const visibleThreads = useMemo(() => {
+		if (!selectedProjectId || !activeSelectedWorktreePath) {
+			return [];
+		}
+		return threads.filter(
+			(thread) =>
+				thread.projectId === selectedProjectId &&
+				thread.worktreePath === activeSelectedWorktreePath,
+		);
+	}, [activeSelectedWorktreePath, selectedProjectId, threads]);
+
 	const isActiveWorktree = useCallback(
 		(projectId: number, worktreePath: string): boolean =>
 			selectedProjectId === projectId &&
@@ -1378,6 +1389,24 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	useEffect(() => {
 		selectedThreadIdRef.current = selectedThreadId;
 	}, [selectedThreadId]);
+
+	useEffect(() => {
+		if (!selectedThread || !selectedProjectId || !activeSelectedWorktreePath) {
+			return;
+		}
+		if (
+			selectedThread.projectId === selectedProjectId &&
+			selectedThread.worktreePath === activeSelectedWorktreePath
+		) {
+			return;
+		}
+		clearThreadSelection();
+	}, [
+		activeSelectedWorktreePath,
+		clearThreadSelection,
+		selectedProjectId,
+		selectedThread,
+	]);
 
 	useEffect(() => {
 		if (!selectedThreadId || selectedThread) {
@@ -2552,13 +2581,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				) : null}
 			</div>
 			<div className="mt-3 space-y-2">
-				{threads.length === 0 ? (
+				{!selectedProject || !activeSelectedWorktreePath ? (
 					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
-						No threads yet. Use + to start a Codex thread for the selected
-						worktree.
+						Select a project worktree first.
+					</div>
+				) : visibleThreads.length === 0 ? (
+					<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						No threads in this worktree yet. Use + to start a Codex thread for
+						the selected worktree.
 					</div>
 				) : (
-					threads.map((thread) => {
+					visibleThreads.map((thread) => {
 						const threadProject =
 							projects.find((project) => project.id === thread.projectId) ??
 							null;
