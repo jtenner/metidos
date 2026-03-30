@@ -19,12 +19,15 @@ import remarkGfm from "remark-gfm";
 import type {
 	ProjectProcedures,
 	RpcCodexModelOption,
+	RpcGitHistoryEntry,
 	RpcProject,
 	RpcProjectTask,
 	RpcThread,
 	RpcThreadMessage,
 	RpcThreadRunStatus,
 	RpcWorktree,
+	RpcWorktreeGitHistoryChanged,
+	RpcWorktreeGitHistoryResult,
 	RpcWorktreeSnapshot,
 	RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
@@ -57,9 +60,18 @@ type VisibleMessage =
 	  };
 
 type DiffLine = {
-	kind: "meta" | "hunk" | "context" | "add" | "remove";
+	kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
 	key: string;
 	text: string;
+};
+
+type GitHistoryModalState = {
+	projectId: number;
+	worktreePath: string;
+	entry: RpcGitHistoryEntry;
+	diffText: string;
+	loading: boolean;
+	error: string;
 };
 
 type ProjectNodeState = {
@@ -121,6 +133,8 @@ type PersistedMainviewState = {
 };
 
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
+const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
+	"jt-ide:worktree-git-history-changed";
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -1104,49 +1118,55 @@ function parseUnifiedDiff(diffText: string): DiffLine[] {
 	}
 
 	const keyCounts = new Map<string, number>();
-	return trimmed
-		.split(/\r?\n/)
-		.filter(
-			(line) => !line.startsWith("diff --git ") && !line.startsWith("index "),
-		)
-		.filter((line) => !line.startsWith("--- ") && !line.startsWith("+++ "))
-		.map((line): DiffLine => {
-			const count = (keyCounts.get(line) ?? 0) + 1;
-			keyCounts.set(line, count);
-			if (line.startsWith("@@")) {
-				return {
-					kind: "hunk",
-					key: `hunk:${line}:${count}`,
-					text: line,
-				};
-			}
-			if (line.startsWith("+")) {
-				return {
-					kind: "add",
-					key: `add:${line}:${count}`,
-					text: line,
-				};
-			}
-			if (line.startsWith("-")) {
-				return {
-					kind: "remove",
-					key: `remove:${line}:${count}`,
-					text: line,
-				};
-			}
-			if (line.startsWith("\\")) {
-				return {
-					kind: "meta",
-					key: `meta:${line}:${count}`,
-					text: line,
-				};
-			}
+	return trimmed.split(/\r?\n/).map((line): DiffLine => {
+		const count = (keyCounts.get(line) ?? 0) + 1;
+		keyCounts.set(line, count);
+		if (
+			line.startsWith("diff --git ") ||
+			line.startsWith("index ") ||
+			line.startsWith("--- ") ||
+			line.startsWith("+++ ")
+		) {
 			return {
-				kind: "context",
-				key: `context:${line}:${count}`,
+				kind: "file",
+				key: `file:${line}:${count}`,
 				text: line,
 			};
-		});
+		}
+		if (line.startsWith("@@")) {
+			return {
+				kind: "hunk",
+				key: `hunk:${line}:${count}`,
+				text: line,
+			};
+		}
+		if (line.startsWith("+")) {
+			return {
+				kind: "add",
+				key: `add:${line}:${count}`,
+				text: line,
+			};
+		}
+		if (line.startsWith("-")) {
+			return {
+				kind: "remove",
+				key: `remove:${line}:${count}`,
+				text: line,
+			};
+		}
+		if (line.startsWith("\\")) {
+			return {
+				kind: "meta",
+				key: `meta:${line}:${count}`,
+				text: line,
+			};
+		}
+		return {
+			kind: "context",
+			key: `context:${line}:${count}`,
+			text: line,
+		};
+	});
 }
 
 function commandStateLabel(
@@ -1163,6 +1183,42 @@ function commandStateLabel(
 		return "Completed";
 	}
 	return "Running";
+}
+
+function DiffViewer({
+	diffText,
+	className = "",
+}: {
+	diffText: string;
+	className?: string;
+}): JSX.Element {
+	const lines = parseUnifiedDiff(diffText);
+	return (
+		<div
+			className={`overflow-auto border-t border-[#262b40] bg-[#0c1018] font-mono text-[12px] leading-5 ${className}`.trim()}
+		>
+			{lines.map((line) => (
+				<div
+					key={line.key}
+					className={`whitespace-pre-wrap break-all px-3 py-0.5 ${
+						line.kind === "add"
+							? "bg-[#10261d] text-[#80f2c5]"
+							: line.kind === "remove"
+								? "bg-[#31141b] text-[#ff9bb0]"
+								: line.kind === "hunk"
+									? "bg-[#181f33] text-[#aeb7e8]"
+									: line.kind === "file"
+										? "bg-[#121827] text-[#8cc5ff]"
+										: line.kind === "meta"
+											? "bg-[#10141d] text-[#7f88ad]"
+											: "text-[#d7d8e0]"
+					}`}
+				>
+					{line.text || " "}
+				</div>
+			))}
+		</div>
+	);
 }
 
 function CommandExecutionMessage({
@@ -1243,7 +1299,6 @@ function FileChangeMessage({
 	path: string;
 	state: "completed" | "failed";
 }): JSX.Element {
-	const lines = parseUnifiedDiff(diffText);
 	return (
 		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
@@ -1259,26 +1314,7 @@ function FileChangeMessage({
 					</div>
 				</div>
 			</summary>
-			<div className="max-h-[28rem] overflow-auto border-t border-[#262b40] bg-[#0c1018] font-mono text-[12px] leading-5">
-				{lines.map((line) => (
-					<div
-						key={`${path}:${line.key}`}
-						className={`whitespace-pre-wrap break-all px-3 py-0.5 ${
-							line.kind === "add"
-								? "bg-[#10261d] text-[#80f2c5]"
-								: line.kind === "remove"
-									? "bg-[#31141b] text-[#ff9bb0]"
-									: line.kind === "hunk"
-										? "bg-[#181f33] text-[#aeb7e8]"
-										: line.kind === "meta"
-											? "bg-[#10141d] text-[#7f88ad]"
-											: "text-[#d7d8e0]"
-						}`}
-					>
-						{line.text || " "}
-					</div>
-				))}
-			</div>
+			<DiffViewer diffText={diffText} className="max-h-[28rem]" />
 		</details>
 	);
 }
@@ -1319,6 +1355,88 @@ function formatDirectoryPathForInput(
 ): string {
 	return ensureTrailingSeparator(
 		formatPathForDisplay(value, homeDirectory, supportsTildePath),
+	);
+}
+
+function formatGitHistoryTimestamp(value: string): string {
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return value;
+	}
+
+	return new Intl.DateTimeFormat(undefined, {
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	}).format(date);
+}
+
+function GitHistoryDiffModal({
+	state,
+	onClose,
+}: {
+	state: GitHistoryModalState;
+	onClose: () => void;
+}): JSX.Element {
+	return (
+		<div className="fixed inset-0 z-[120]">
+			<button
+				type="button"
+				className="absolute inset-0 bg-[#05060b]/84 backdrop-blur-sm"
+				onClick={onClose}
+				aria-label="Close git diff"
+			/>
+			<div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
+				<div className="relative flex h-full w-full flex-col border border-[#24293d] bg-[#0c1018] shadow-[0_24px_56px_rgba(0,0,0,0.56)] md:h-auto md:max-h-[88vh] md:max-w-5xl md:overflow-hidden md:rounded-xl">
+					<div className="flex items-start justify-between gap-4 border-b border-[#262b40] bg-[#101522] px-4 py-4 md:px-6">
+						<div className="min-w-0">
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="rounded-full border border-[#3d4260] bg-[#171c2c] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+									{state.entry.shortHash}
+								</span>
+								<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#8e95bc]">
+									{state.entry.authorName} ·{" "}
+									{formatGitHistoryTimestamp(state.entry.committedAt)}
+								</span>
+							</div>
+							<h2 className="mt-2 truncate text-base font-semibold text-[#f2f0ef] md:text-lg">
+								{state.entry.subject}
+							</h2>
+						</div>
+						<button
+							type="button"
+							className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#363b55] bg-[#151a29] text-[#d7d3ff] transition-colors hover:bg-[#1d2335]"
+							onClick={onClose}
+							aria-label="Close git diff"
+						>
+							×
+						</button>
+					</div>
+					<div className="min-h-0 flex-1 overflow-hidden">
+						{state.loading ? (
+							<div className="flex h-full items-center justify-center px-6 py-10">
+								<div className="flex items-center gap-3 rounded-full border border-[#303755] bg-[#14192a] px-4 py-3 text-sm text-[#d7d3ff]">
+									<BeatLoader
+										color="#aaa4ff"
+										margin={2}
+										size={6}
+										speedMultiplier={0.85}
+									/>
+									<span>Loading commit diff...</span>
+								</div>
+							</div>
+						) : state.error ? (
+							<div className="px-6 py-6 text-sm text-[#ff9db0]">
+								{state.error}
+							</div>
+						) : (
+							<DiffViewer diffText={state.diffText} className="h-full" />
+						)}
+					</div>
+				</div>
+			</div>
+		</div>
 	);
 }
 
@@ -1477,6 +1595,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
 	const [threads, setThreads] = useState<RpcThread[]>([]);
 	const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
+	const [gitHistory, setGitHistory] =
+		useState<RpcWorktreeGitHistoryResult | null>(null);
+	const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
+	const [gitHistoryError, setGitHistoryError] = useState("");
+	const [gitHistoryPanelOpen, setGitHistoryPanelOpen] = useState(true);
+	const [gitHistoryModal, setGitHistoryModal] =
+		useState<GitHistoryModalState | null>(null);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
 	const [defaultCodexModel, setDefaultCodexModel] = useState("");
 	const [pendingThreadModel, setPendingThreadModel] = useState(
@@ -1522,6 +1647,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const projectTasksRequestIdRef = useRef(0);
+	const gitHistoryRequestIdRef = useRef(0);
+	const gitHistoryDiffRequestIdRef = useRef(0);
+	const gitHistoryDiffCacheRef = useRef(
+		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
+	);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
 
@@ -1767,6 +1897,89 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		isSending ||
 		selectedThreadIsWorking ||
 		isThreadLoading;
+
+	const gitHistoryTitleHash =
+		gitHistory?.headShortHash ??
+		activeSelectedWorktree?.head?.slice(0, 7) ??
+		"--";
+
+	const closeGitHistoryModal = useCallback(() => {
+		setGitHistoryModal(null);
+	}, []);
+
+	const openGitHistoryDiff = useCallback(
+		async (entry: RpcGitHistoryEntry) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
+			}
+
+			const projectId = selectedProject.id;
+			const worktreePath = activeSelectedWorktreePath;
+			const cacheKey = `${projectId}::${worktreePath}::${entry.hash}`;
+			const cached = gitHistoryDiffCacheRef.current.get(cacheKey);
+
+			setGitHistoryModal({
+				projectId,
+				worktreePath,
+				entry: cached?.commit ?? entry,
+				diffText: cached?.diffText ?? "",
+				loading: !cached,
+				error: "",
+			});
+
+			if (cached) {
+				return;
+			}
+
+			const requestId = ++gitHistoryDiffRequestIdRef.current;
+			try {
+				const result = await procedures.getWorktreeGitCommitDiff({
+					projectId,
+					worktreePath,
+					commitHash: entry.hash,
+				});
+				if (gitHistoryDiffRequestIdRef.current !== requestId) {
+					return;
+				}
+
+				gitHistoryDiffCacheRef.current.set(cacheKey, {
+					commit: result.commit,
+					diffText: result.diffText,
+				});
+				setGitHistoryModal((current) =>
+					current &&
+					current.projectId === projectId &&
+					current.worktreePath === worktreePath &&
+					current.entry.hash === entry.hash
+						? {
+								...current,
+								entry: result.commit,
+								diffText: result.diffText,
+								loading: false,
+								error: "",
+							}
+						: current,
+				);
+			} catch (error) {
+				if (gitHistoryDiffRequestIdRef.current !== requestId) {
+					return;
+				}
+				setGitHistoryModal((current) =>
+					current &&
+					current.projectId === projectId &&
+					current.worktreePath === worktreePath &&
+					current.entry.hash === entry.hash
+						? {
+								...current,
+								loading: false,
+								error: error instanceof Error ? error.message : String(error),
+							}
+						: current,
+				);
+			}
+		},
+		[activeSelectedWorktreePath, procedures, selectedProject],
+	);
 
 	const normalizedSidebarSearchQuery = useMemo(
 		() => normalizeSearchQuery(sidebarSearchQuery),
@@ -2067,6 +2280,49 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			} finally {
 				if (projectTasksRequestIdRef.current === requestId) {
 					setIsLoadingProjectTasks(false);
+				}
+			}
+		},
+		[procedures],
+	);
+
+	const loadGitHistory = useCallback(
+		async (
+			projectId: number,
+			worktreePath: string,
+			options?: {
+				silent?: boolean;
+			},
+		): Promise<void> => {
+			const requestId = ++gitHistoryRequestIdRef.current;
+			if (!options?.silent) {
+				setGitHistoryLoading(true);
+				setGitHistoryError("");
+			}
+
+			try {
+				const result = await procedures.listWorktreeGitHistory({
+					projectId,
+					worktreePath,
+				});
+				if (gitHistoryRequestIdRef.current !== requestId) {
+					return;
+				}
+				setGitHistory(result);
+				setGitHistoryError("");
+			} catch (error) {
+				if (gitHistoryRequestIdRef.current !== requestId) {
+					return;
+				}
+				if (!options?.silent) {
+					setGitHistory(null);
+				}
+				setGitHistoryError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				if (!options?.silent && gitHistoryRequestIdRef.current === requestId) {
+					setGitHistoryLoading(false);
 				}
 			}
 		},
@@ -2750,6 +3006,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
 
 	useEffect(() => {
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			gitHistoryRequestIdRef.current += 1;
+			setGitHistory(null);
+			setGitHistoryLoading(false);
+			setGitHistoryError("");
+			return;
+		}
+		void loadGitHistory(selectedProject.id, activeSelectedWorktreePath);
+	}, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
+
+	useEffect(() => {
 		const handleWorktreeTasksChanged = (
 			event: CustomEvent<RpcWorktreeTasksChanged>,
 		) => {
@@ -2776,6 +3043,67 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			);
 		};
 	}, [activeSelectedWorktreePath, loadProjectTasks, selectedProject]);
+
+	useEffect(() => {
+		const handleWorktreeGitHistoryChanged = (
+			event: CustomEvent<RpcWorktreeGitHistoryChanged>,
+		) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
+			}
+			if (
+				event.detail.projectId !== selectedProject.id ||
+				event.detail.worktreePath !== activeSelectedWorktreePath
+			) {
+				return;
+			}
+			void loadGitHistory(event.detail.projectId, event.detail.worktreePath, {
+				silent: true,
+			});
+		};
+
+		window.addEventListener(
+			WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+			handleWorktreeGitHistoryChanged,
+		);
+		return () => {
+			window.removeEventListener(
+				WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+				handleWorktreeGitHistoryChanged,
+			);
+		};
+	}, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
+
+	useEffect(() => {
+		if (!gitHistoryModal) {
+			return;
+		}
+		if (
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			gitHistoryModal.projectId !== selectedProject.id ||
+			gitHistoryModal.worktreePath !== activeSelectedWorktreePath
+		) {
+			setGitHistoryModal(null);
+		}
+	}, [activeSelectedWorktreePath, gitHistoryModal, selectedProject]);
+
+	useEffect(() => {
+		if (!gitHistoryModal) {
+			return;
+		}
+
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				closeGitHistoryModal();
+			}
+		};
+
+		document.addEventListener("keydown", handleKeyDown);
+		return () => {
+			document.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [closeGitHistoryModal, gitHistoryModal]);
 
 	useEffect(() => {
 		if (!selectedProjectId || !activeSelectedWorktreePath) {
@@ -4399,6 +4727,79 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		</div>
 	);
 
+	const gitHistorySection = (
+		<div className="border-t border-[#262626] px-3 pt-3 pb-3">
+			<button
+				type="button"
+				className="flex w-full items-center justify-between gap-3 text-left"
+				onClick={() => {
+					setGitHistoryPanelOpen((current) => !current);
+				}}
+			>
+				<span className="font-label text-[11px] font-bold tracking-[0.08em] text-[#d8d8d8]">
+					{`Git History - ${gitHistoryTitleHash} ${gitHistoryPanelOpen ? "-" : "+"}`}
+				</span>
+				{gitHistory?.branch || activeSelectedWorktree?.branch ? (
+					<span className="shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+						{gitHistory?.branch ?? activeSelectedWorktree?.branch}
+					</span>
+				) : null}
+			</button>
+			{gitHistoryPanelOpen ? (
+				<div className="mt-3 space-y-2">
+					{!selectedProject || !activeSelectedWorktreePath ? (
+						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+							Select a project worktree first.
+						</div>
+					) : gitHistoryLoading ? (
+						<div className="rounded-sm border border-[#24293d] bg-[#121723] px-3 py-3 text-xs text-[#c8c4ff]">
+							Loading git history...
+						</div>
+					) : gitHistoryError ? (
+						<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-xs text-[#ff9db0]">
+							{gitHistoryError}
+						</div>
+					) : gitHistory && gitHistory.entries.length > 0 ? (
+						<div className="max-h-64 space-y-1 overflow-y-auto pr-1 hide-scrollbar">
+							{gitHistory.entries.map((entry) => (
+								<button
+									type="button"
+									key={entry.hash}
+									className="w-full rounded-sm border border-[#20242f] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1d2029]"
+									onClick={() => {
+										void openGitHistoryDiff(entry);
+									}}
+								>
+									<div className="flex items-start gap-3">
+										<span className="mt-0.5 shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+											{entry.shortHash}
+										</span>
+										<div className="min-w-0 flex-1">
+											<div
+												className="truncate text-sm text-[#f2f0ef]"
+												title={entry.subject}
+											>
+												{entry.subject}
+											</div>
+											<div className="mt-1 truncate text-[11px] text-[#8e8aa7]">
+												{entry.authorName} ·{" "}
+												{formatGitHistoryTimestamp(entry.committedAt)}
+											</div>
+										</div>
+									</div>
+								</button>
+							))}
+						</div>
+					) : (
+						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+							No commits found for this worktree yet.
+						</div>
+					)}
+				</div>
+			) : null}
+		</div>
+	);
+
 	useEffect(() => {
 		void initialize();
 	}, [initialize]);
@@ -4507,6 +4908,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="flex-1 overflow-y-auto py-2">
 							{projectTree}
 							{!sidebarCollapsed ? threadSection : null}
+							{!sidebarCollapsed ? gitHistorySection : null}
 						</div>
 					</aside>
 
@@ -4666,6 +5068,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						{addProjectOpen ? addProjectForm : null}
 						{projectTree}
 						{threadSection}
+						{gitHistorySection}
 					</aside>
 				) : null}
 
@@ -4815,6 +5218,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						{errorPreviewPopover.text}
 					</div>
 				</div>
+			) : null}
+			{gitHistoryModal ? (
+				<GitHistoryDiffModal
+					state={gitHistoryModal}
+					onClose={closeGitHistoryModal}
+				/>
 			) : null}
 			{projectActionMenuPanel}
 			{threadActionMenuPanel}

@@ -61,6 +61,36 @@ export type RpcWorktreeTasksChanged = {
 	worktreePath: string;
 };
 
+export type RpcWorktreeGitHistoryChanged = {
+	projectId: number;
+	worktreePath: string;
+};
+
+export type RpcGitHistoryEntry = {
+	hash: string;
+	shortHash: string;
+	subject: string;
+	authorName: string;
+	committedAt: string;
+};
+
+export type RpcWorktreeGitHistoryResult = {
+	projectId: number;
+	worktreePath: string;
+	branch: string | null;
+	headHash: string | null;
+	headShortHash: string | null;
+	entries: RpcGitHistoryEntry[];
+	lastUpdatedAt: string;
+};
+
+export type RpcGitCommitDiffResult = {
+	projectId: number;
+	worktreePath: string;
+	commit: RpcGitHistoryEntry;
+	diffText: string;
+};
+
 export type RpcCodexModelOption = {
 	id: string;
 	label: string;
@@ -230,6 +260,14 @@ export type AppRPCSchema = {
 			params: { projectId: number; worktreePath: string };
 			response: RpcOpenWorktreeResult;
 		};
+		listWorktreeGitHistory: {
+			params: { projectId: number; worktreePath: string };
+			response: RpcWorktreeGitHistoryResult;
+		};
+		getWorktreeGitCommitDiff: {
+			params: { projectId: number; worktreePath: string; commitHash: string };
+			response: RpcGitCommitDiffResult;
+		};
 		closeWorktree: {
 			params: { projectId: number; worktreePath: string };
 			response: {
@@ -327,6 +365,14 @@ export interface ProjectProcedures {
 	openWorktree: (
 		params: AppRPCSchema["requests"]["openWorktree"]["params"],
 	) => Promise<RpcOpenWorktreeResult>;
+	listWorktreeGitHistory: (
+		params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
+	) => Promise<AppRPCSchema["requests"]["listWorktreeGitHistory"]["response"]>;
+	getWorktreeGitCommitDiff: (
+		params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
+	) => Promise<
+		AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["response"]
+	>;
 	closeWorktree: (
 		params: AppRPCSchema["requests"]["closeWorktree"]["params"],
 	) => Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]>;

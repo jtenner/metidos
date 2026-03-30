@@ -12,11 +12,13 @@ import {
 	deleteThreadProcedure,
 	getCodexModelCatalogProcedure,
 	getThreadProcedure,
+	getWorktreeGitCommitDiffProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectTasksProcedure,
 	listProjectWorktreesProcedure,
 	listProjectsProcedure,
 	listThreadsProcedure,
+	listWorktreeGitHistoryProcedure,
 	markThreadErrorSeenProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
@@ -24,11 +26,16 @@ import {
 	runProjectTaskProcedure,
 	sendThreadMessageProcedure,
 	setThreadPinnedProcedure,
+	setWorktreeGitHistoryChangeListener,
 	setWorktreeTaskChangeListener,
 	shutdownProjectPolling,
 	updateThreadModelProcedure,
 } from "./project-procedures";
-import type { AppRPCSchema, RpcWorktreeTasksChanged } from "./rpc-schema";
+import type {
+	AppRPCSchema,
+	RpcWorktreeGitHistoryChanged,
+	RpcWorktreeTasksChanged,
+} from "./rpc-schema";
 
 const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
@@ -76,10 +83,15 @@ type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
 	type: "tasks-changed";
 };
 
+type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
+	type: "git-history-changed";
+};
+
 type RpcSocketMessage =
 	| RpcResponseMessage
 	| RpcReloadMessage
-	| RpcTasksChangedMessage;
+	| RpcTasksChangedMessage
+	| RpcGitHistoryChangedMessage;
 
 type RpcRequestHandlerMap = {
 	[K in keyof RpcRequestMap]: (
@@ -162,6 +174,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	updateThreadModel: (params) => updateThreadModelProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
 	openWorktree: (params) => openWorktreeProcedure(params),
+	listWorktreeGitHistory: (params) => listWorktreeGitHistoryProcedure(params),
+	getWorktreeGitCommitDiff: (params) =>
+		getWorktreeGitCommitDiffProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 };
 
@@ -314,6 +329,29 @@ function broadcastTasksChanged(projectId: number, worktreePath: string): void {
 	}
 }
 
+function broadcastGitHistoryChanged(
+	projectId: number,
+	worktreePath: string,
+): void {
+	if (rpcClients.size === 0) {
+		return;
+	}
+
+	const payload: RpcGitHistoryChangedMessage = {
+		type: "git-history-changed",
+		projectId,
+		worktreePath,
+	};
+	const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+	for (const client of rpcClients) {
+		try {
+			client.send(raw);
+		} catch {
+			rpcClients.delete(client);
+		}
+	}
+}
+
 function normalizeWatchFilename(filename?: string | Buffer | null): string {
 	if (typeof filename === "string") {
 		return filename.trim();
@@ -434,6 +472,9 @@ async function bootstrap(): Promise<void> {
 	setWorktreeTaskChangeListener((projectId, worktreePath) => {
 		broadcastTasksChanged(projectId, worktreePath);
 	});
+	setWorktreeGitHistoryChangeListener((projectId, worktreePath) => {
+		broadcastGitHistoryChanged(projectId, worktreePath);
+	});
 
 	const server = Bun.serve({
 		port: SERVER_PORT,
@@ -537,6 +578,7 @@ async function bootstrap(): Promise<void> {
 
 process.on("SIGINT", () => {
 	shutdownDevWatchers();
+	setWorktreeGitHistoryChangeListener(null);
 	setWorktreeTaskChangeListener(null);
 	shutdownProjectPolling();
 	process.exit(0);
@@ -544,6 +586,7 @@ process.on("SIGINT", () => {
 
 process.on("SIGTERM", () => {
 	shutdownDevWatchers();
+	setWorktreeGitHistoryChangeListener(null);
 	setWorktreeTaskChangeListener(null);
 	shutdownProjectPolling();
 	process.exit(0);

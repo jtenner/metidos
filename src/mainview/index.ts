@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import type {
 	AppRPCSchema,
 	ProjectProcedures,
+	RpcWorktreeGitHistoryChanged,
 	RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import App from "./App";
@@ -34,20 +35,28 @@ type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
 	type: "tasks-changed";
 };
 
+type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
+	type: "git-history-changed";
+};
+
 type RpcSocketMessage =
 	| RpcResponseMessage
 	| RpcReloadMessage
-	| RpcTasksChangedMessage;
+	| RpcTasksChangedMessage
+	| RpcGitHistoryChangedMessage;
 
 type RuntimeConfig = {
 	devServer: boolean;
 };
 
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
+const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
+	"jt-ide:worktree-git-history-changed";
 
 declare global {
 	interface WindowEventMap {
 		"jt-ide:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
+		"jt-ide:worktree-git-history-changed": CustomEvent<RpcWorktreeGitHistoryChanged>;
 	}
 
 	interface Window {
@@ -158,6 +167,20 @@ socket.addEventListener("message", (event) => {
 		);
 		return;
 	}
+	if (payload.type === "git-history-changed") {
+		window.dispatchEvent(
+			new CustomEvent<RpcWorktreeGitHistoryChanged>(
+				WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+				{
+					detail: {
+						projectId: payload.projectId,
+						worktreePath: payload.worktreePath,
+					},
+				},
+			),
+		);
+		return;
+	}
 
 	const pending = pendingRequests.get(payload.id);
 	if (!pending) {
@@ -238,6 +261,10 @@ const procedures: ProjectProcedures = {
 	updateThreadModel: (params) => sendRequest("updateThreadModel", params),
 	deleteThread: (params) => sendRequest("deleteThread", params),
 	openWorktree: (params) => sendRequest("openWorktree", params),
+	listWorktreeGitHistory: (params) =>
+		sendRequest("listWorktreeGitHistory", params),
+	getWorktreeGitCommitDiff: (params) =>
+		sendRequest("getWorktreeGitCommitDiff", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
 };
 

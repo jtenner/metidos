@@ -34,6 +34,8 @@ import type {
 	RpcCodexModelCatalog,
 	RpcCodexModelOption,
 	RpcCreateWorktreeResult,
+	RpcGitCommitDiffResult,
+	RpcGitHistoryEntry,
 	RpcOpenWorktreeResult,
 	RpcProject,
 	RpcProjectTask,
@@ -45,6 +47,7 @@ import type {
 	RpcThreadRunStatus,
 	RpcThreadUsage,
 	RpcWorktree,
+	RpcWorktreeGitHistoryResult,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
 
@@ -72,14 +75,21 @@ export async function getCodexModelCatalogProcedure(
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
+const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const TASK_POLL_INTERVAL_MS = 1_500;
 const DIRECTORY_SUGGESTION_LIMIT = 10;
+const GIT_HISTORY_ENTRY_LIMIT = 20;
+const GIT_LOG_FIELD_SEPARATOR = "\u001f";
+const GIT_LOG_RECORD_SEPARATOR = "\u001e";
 
 type WorktreePollState = {
 	diff: string[];
 	files: string[];
 	diffTimer: ReturnType<typeof setInterval> | null;
 	filesTimer: ReturnType<typeof setInterval> | null;
+	history: RpcWorktreeGitHistoryResult;
+	historySignature: string | null;
+	historyTimer: ReturnType<typeof setInterval> | null;
 	taskInputs: Map<string, number>;
 	taskTimer: ReturnType<typeof setInterval> | null;
 	lastUpdatedAt: string;
@@ -98,6 +108,9 @@ const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 let worktreeTaskChangeListener:
+	| ((projectId: number, worktreePath: string) => void)
+	| null = null;
+let worktreeGitHistoryChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
 const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
@@ -1234,6 +1247,17 @@ function assertProjectDirectory(projectPath: string): void {
 }
 
 async function runGitCommand(cwd: string, args: string[]): Promise<string> {
+	const { exitCode, stderr, stdout } = await runGitCommandResult(cwd, args);
+	if (exitCode !== 0) {
+		throw new Error(stderr || `git command failed with exit code ${exitCode}`);
+	}
+	return stdout.trimEnd();
+}
+
+async function runGitCommandResult(
+	cwd: string,
+	args: string[],
+): Promise<{ exitCode: number; stderr: string; stdout: string }> {
 	const proc = Bun.spawn({
 		cmd: ["git", ...args],
 		cwd,
@@ -1245,11 +1269,22 @@ async function runGitCommand(cwd: string, args: string[]): Promise<string> {
 	const stderr = await new Response(proc.stderr).text();
 	const exitCode = await proc.exited;
 
-	if (exitCode !== 0) {
-		throw new Error(stderr || `git command failed with exit code ${exitCode}`);
-	}
+	return {
+		exitCode,
+		stderr: stderr.trim(),
+		stdout,
+	};
+}
 
-	return stdout.trim();
+async function tryRunGitCommand(
+	cwd: string,
+	args: string[],
+): Promise<string | null> {
+	const result = await runGitCommandResult(cwd, args);
+	if (result.exitCode !== 0) {
+		return null;
+	}
+	return result.stdout.trimEnd();
 }
 
 function normalizeGitPath(worktreePath: string, value: string): string {
@@ -1489,6 +1524,152 @@ async function readFiles(worktreePath: string): Promise<string[]> {
 	return raw.split(/\r?\n/).filter(Boolean);
 }
 
+function emptyGitHistoryResult(
+	projectId: number,
+	worktreePath: string,
+	options?: {
+		branch?: string | null;
+		lastUpdatedAt?: string;
+	},
+): RpcWorktreeGitHistoryResult {
+	return {
+		projectId,
+		worktreePath,
+		branch: options?.branch ?? null,
+		headHash: null,
+		headShortHash: null,
+		entries: [],
+		lastUpdatedAt: options?.lastUpdatedAt ?? getNow(),
+	};
+}
+
+function parseGitHistoryEntryRecord(record: string): RpcGitHistoryEntry | null {
+	const [hash, shortHash, subject, authorName, committedAt] = record.split(
+		GIT_LOG_FIELD_SEPARATOR,
+	);
+	if (!hash || !shortHash) {
+		return null;
+	}
+
+	return {
+		hash,
+		shortHash,
+		subject: subject || shortHash,
+		authorName: authorName || "Unknown",
+		committedAt: committedAt || getNow(),
+	};
+}
+
+function parseGitHistoryEntries(raw: string): RpcGitHistoryEntry[] {
+	if (!raw) {
+		return [];
+	}
+
+	return raw
+		.split(GIT_LOG_RECORD_SEPARATOR)
+		.map((record) => record.trim())
+		.filter(Boolean)
+		.map(parseGitHistoryEntryRecord)
+		.filter((entry): entry is RpcGitHistoryEntry => entry !== null);
+}
+
+function buildGitHistorySignature(
+	branch: string | null,
+	headHash: string | null,
+	entries: RpcGitHistoryEntry[],
+): string {
+	return [
+		branch ?? "",
+		headHash ?? "",
+		...entries.map((entry) => entry.hash),
+	].join("\n");
+}
+
+async function readGitHistory(
+	projectId: number,
+	worktreePath: string,
+): Promise<{
+	history: RpcWorktreeGitHistoryResult;
+	signature: string;
+}> {
+	const branch =
+		(
+			await tryRunGitCommand(worktreePath, ["branch", "--show-current"])
+		)?.trim() || null;
+	const headHash =
+		(await tryRunGitCommand(worktreePath, ["rev-parse", "HEAD"]))?.trim() ||
+		null;
+	const headShortHash =
+		(
+			await tryRunGitCommand(worktreePath, ["rev-parse", "--short=7", "HEAD"])
+		)?.trim() || null;
+	const lastUpdatedAt = getNow();
+
+	if (!headHash || !headShortHash) {
+		return {
+			history: emptyGitHistoryResult(projectId, worktreePath, {
+				branch,
+				lastUpdatedAt,
+			}),
+			signature: buildGitHistorySignature(branch, null, []),
+		};
+	}
+
+	const rawEntries =
+		(await tryRunGitCommand(worktreePath, [
+			"log",
+			`--max-count=${GIT_HISTORY_ENTRY_LIMIT}`,
+			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
+			headHash,
+		])) ?? "";
+	const entries = parseGitHistoryEntries(rawEntries);
+
+	return {
+		history: {
+			projectId,
+			worktreePath,
+			branch,
+			headHash,
+			headShortHash,
+			entries,
+			lastUpdatedAt,
+		},
+		signature: buildGitHistorySignature(branch, headHash, entries),
+	};
+}
+
+async function readGitCommitEntry(
+	worktreePath: string,
+	commitHash: string,
+): Promise<RpcGitHistoryEntry> {
+	const raw = await runGitCommand(worktreePath, [
+		"show",
+		"--no-patch",
+		"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI",
+		commitHash,
+	]);
+	const entry = parseGitHistoryEntryRecord(raw);
+	if (!entry) {
+		throw new Error(`Unable to read commit metadata: ${commitHash}`);
+	}
+	return entry;
+}
+
+async function readGitCommitDiff(
+	worktreePath: string,
+	commitHash: string,
+): Promise<string> {
+	return runGitCommand(worktreePath, [
+		"show",
+		"--format=",
+		"--no-ext-diff",
+		"--find-renames",
+		"--submodule=diff",
+		"--unified=3",
+		commitHash,
+	]);
+}
+
 function getNow(): string {
 	return new Date().toISOString();
 }
@@ -1552,6 +1733,9 @@ function stopWorktreePolling(
 	if (active.filesTimer) {
 		clearInterval(active.filesTimer);
 	}
+	if (active.historyTimer) {
+		clearInterval(active.historyTimer);
+	}
 	if (active.taskTimer) {
 		clearInterval(active.taskTimer);
 	}
@@ -1570,6 +1754,9 @@ function startWorktreePolling(
 		files: [],
 		diffTimer: null,
 		filesTimer: null,
+		history: emptyGitHistoryResult(state.id, worktreePath),
+		historySignature: null,
+		historyTimer: null,
 		taskInputs: readTaskInputStamps(worktreePath),
 		taskTimer: null,
 		lastUpdatedAt: getNow(),
@@ -1593,6 +1780,25 @@ function startWorktreePolling(
 		}
 	};
 
+	const pollGitHistory = async () => {
+		try {
+			const previousSignature = worktreeState.historySignature;
+			const { history, signature } = await readGitHistory(
+				state.id,
+				worktreePath,
+			);
+			worktreeState.history = history;
+			worktreeState.historySignature = signature;
+			worktreeState.lastUpdatedAt = history.lastUpdatedAt;
+
+			if (previousSignature !== null && previousSignature !== signature) {
+				worktreeGitHistoryChangeListener?.(state.id, worktreePath);
+			}
+		} catch (error) {
+			console.error(`Git history poll failed for ${worktreePath}`, error);
+		}
+	};
+
 	const pollTasks = () => {
 		try {
 			const nextTaskInputs = readTaskInputStamps(worktreePath);
@@ -1613,6 +1819,9 @@ function startWorktreePolling(
 	worktreeState.filesTimer = setInterval(() => {
 		void pollFiles();
 	}, FILE_POLL_INTERVAL_MS);
+	worktreeState.historyTimer = setInterval(() => {
+		void pollGitHistory();
+	}, GIT_HISTORY_POLL_INTERVAL_MS);
 	worktreeState.taskTimer = setInterval(() => {
 		pollTasks();
 	}, TASK_POLL_INTERVAL_MS);
@@ -1620,6 +1829,7 @@ function startWorktreePolling(
 	state.openWorktrees.set(worktreePath, worktreeState);
 	void pollDiff();
 	void pollFiles();
+	void pollGitHistory();
 
 	return worktreeState;
 }
@@ -1983,6 +2193,44 @@ export async function openWorktreeProcedure(
 	};
 }
 
+export async function listWorktreeGitHistoryProcedure(
+	params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
+): Promise<RpcWorktreeGitHistoryResult> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	await assertProjectWorktree(project, worktreePath);
+
+	const state = startWorktreePolling(
+		ensureProjectPoller(project),
+		worktreePath,
+	);
+	const { history, signature } = await readGitHistory(project.id, worktreePath);
+	state.history = history;
+	state.historySignature = signature;
+	state.lastUpdatedAt = history.lastUpdatedAt;
+	return history;
+}
+
+export async function getWorktreeGitCommitDiffProcedure(
+	params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
+): Promise<RpcGitCommitDiffResult> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	await assertProjectWorktree(project, worktreePath);
+
+	const [commit, diffText] = await Promise.all([
+		readGitCommitEntry(worktreePath, params.commitHash),
+		readGitCommitDiff(worktreePath, params.commitHash),
+	]);
+
+	return {
+		projectId: project.id,
+		worktreePath,
+		commit,
+		diffText,
+	};
+}
+
 export async function closeWorktreeProcedure(
 	params: AppRPCSchema["requests"]["closeWorktree"]["params"],
 ): Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]> {
@@ -2051,4 +2299,10 @@ export function setWorktreeTaskChangeListener(
 	listener: ((projectId: number, worktreePath: string) => void) | null,
 ): void {
 	worktreeTaskChangeListener = listener;
+}
+
+export function setWorktreeGitHistoryChangeListener(
+	listener: ((projectId: number, worktreePath: string) => void) | null,
+): void {
+	worktreeGitHistoryChangeListener = listener;
 }
