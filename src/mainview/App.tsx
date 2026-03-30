@@ -1456,17 +1456,17 @@ function SidebarSectionHeader({
 		<div className="flex items-center gap-3">
 			<button
 				type="button"
-				className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1 text-left transition-colors hover:bg-[#191b24]"
+				className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1.5 text-left transition-colors hover:bg-[#191b24]"
 				onClick={onToggle}
 				aria-expanded={open}
 			>
-				<span className="shrink-0 text-[#aaa4ff]">
+				<span className="shrink-0 text-[#b7b2ff]">
 					{materialSymbol(
 						open ? "expand_more" : "chevron_right",
-						"text-[16px]",
+						"text-[18px]",
 					)}
 				</span>
-				<span className="font-label text-[11px] tracking-[0.12em] text-[#e6e3f7]">
+				<span className="font-label text-[13px] font-bold uppercase tracking-[0.18em] text-[#f4f1ff]">
 					{title}
 				</span>
 			</button>
