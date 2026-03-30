@@ -659,10 +659,6 @@ function ContextUsageMeter({
 	const safeEstimatedTriggerTokens = Math.max(estimatedTriggerTokens, 1);
 	const safeContextWindowTokens = Math.max(contextWindowTokens, 1);
 	const usageRatio = Math.min(inputTokens / safeEstimatedTriggerTokens, 1);
-	const usagePercent = Math.round(usageRatio * 100);
-	const windowUsagePercent = Math.round(
-		Math.min(inputTokens / safeContextWindowTokens, 1) * 100,
-	);
 	const radius = 9;
 	const circumference = 2 * Math.PI * radius;
 	const strokeOffset = circumference * (1 - usageRatio);
@@ -691,7 +687,7 @@ function ContextUsageMeter({
 	}
 
 	return (
-		<div className="flex items-center gap-3" title={titleParts.join(" • ")}>
+		<div className="flex items-center" title={titleParts.join(" • ")}>
 			<div className="relative h-7 w-7 shrink-0">
 				<svg
 					viewBox="0 0 24 24"
@@ -718,42 +714,6 @@ function ContextUsageMeter({
 						strokeDashoffset={strokeOffset}
 					/>
 				</svg>
-				<span className="absolute inset-0 flex items-center justify-center font-label text-[8px] font-bold uppercase tracking-[0.08em] text-[#f2f0ef]">
-					{usagePercent}
-				</span>
-			</div>
-			<div className="flex flex-col items-end leading-none text-right">
-				<div className="flex items-center gap-2">
-					<span className="font-label text-[10px] uppercase tracking-widest text-[#dad7ff]">
-						{formatCompactTokenCount(inputTokens)} /{" "}
-						{formatCompactTokenCount(estimatedTriggerTokens)}
-					</span>
-					<span
-						className={`rounded-full border px-1.5 py-[2px] font-label text-[8px] uppercase tracking-[0.18em] ${
-							estimatedTriggerSource === "observed"
-								? "border-[#2f6b5d] bg-[#142821] text-[#8bf0c0]"
-								: "border-[#4c4760] bg-[#1b1b24] text-[#b7b2d9]"
-						}`}
-					>
-						{estimateLabel}
-					</span>
-				</div>
-				<span className="mt-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f8d8b]">
-					Compaction est. · Win {windowUsagePercent}%
-				</span>
-				<span className="mt-1 font-label text-[9px] uppercase tracking-[0.14em] text-[#6f6f89]">
-					{formatCompactTokenCount(inputTokens)} /{" "}
-					{formatCompactTokenCount(contextWindowTokens)} window
-				</span>
-				{lastCompactionTransition ? (
-					<span className="mt-1 font-label text-[9px] uppercase tracking-[0.12em] text-[#8bf0c0]">
-						Last compact {lastCompactionTransition}
-					</span>
-				) : inferredCount > 0 ? (
-					<span className="mt-1 font-label text-[9px] uppercase tracking-[0.12em] text-[#8bf0c0]">
-						{inferredCount} compact events observed
-					</span>
-				) : null}
 			</div>
 		</div>
 	);
