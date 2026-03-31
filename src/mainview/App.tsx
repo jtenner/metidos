@@ -2162,6 +2162,25 @@ function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
 	return sortThreads(next);
 }
 
+function compareProjects(left: RpcProject, right: RpcProject): number {
+	const openedAtDiff =
+		Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt);
+	if (Number.isFinite(openedAtDiff) && openedAtDiff !== 0) {
+		return openedAtDiff;
+	}
+
+	return left.name.localeCompare(right.name);
+}
+
+function upsertProjectList(
+	items: RpcProject[],
+	project: RpcProject,
+): RpcProject[] {
+	const next = items.filter((entry) => entry.id !== project.id);
+	next.push(project);
+	return next.sort(compareProjects);
+}
+
 function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
 	if (!thread.runStatus.hasUnreadError) {
 		return thread;
@@ -5132,10 +5151,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setAddProjectError("");
 			try {
 				const result = await procedures.openProject({ projectPath });
-				const loaded = await procedures.listProjects({ includeClosed: true });
 				const existingState = getProjectState(result.project.id);
-				setProjects(loaded);
-				hydrateProjectRows(loaded);
+				setProjects((prev) => upsertProjectList(prev, result.project));
+				hydrateProjectRows([result.project]);
 				setProjectState(result.project.id, {
 					loadingWorktrees: false,
 					error: "",
