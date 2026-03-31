@@ -3022,6 +3022,35 @@ async function assertProjectWorktree(
 	return worktree;
 }
 
+function trackedProjectWorktree(
+	state: ProjectPollState,
+	worktreePath: string,
+): RpcWorktree | null {
+	return state.worktrees.find((entry) => entry.path === worktreePath) ?? null;
+}
+
+async function ensureTrackedProjectWorktree(
+	project: ProjectRecord,
+	state: ProjectPollState,
+	worktreePath: string,
+	options?: GitCommandOptions,
+): Promise<RpcWorktree> {
+	const known = trackedProjectWorktree(state, worktreePath);
+	if (known) {
+		return known;
+	}
+
+	await refreshProjectPoll(project.id, options);
+	const refreshed = trackedProjectWorktree(state, worktreePath);
+	if (refreshed) {
+		return refreshed;
+	}
+
+	throw new Error(
+		`Worktree not found for project ${project.path}: ${worktreePath}`,
+	);
+}
+
 async function createThreadRecord(
 	project: ProjectRecord,
 	worktreePath: string,
@@ -3400,7 +3429,6 @@ export async function listWorktreeGitHistoryProcedure(
 	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath, requestGitOptions);
 	const offset =
 		Number.isInteger(params.offset) && typeof params.offset === "number"
 			? Math.max(params.offset, 0)
@@ -3408,7 +3436,30 @@ export async function listWorktreeGitHistoryProcedure(
 	const limit = normalizeGitHistoryPageLimit(params.limit);
 
 	const projectState = ensureProjectPoller(project);
+	await ensureTrackedProjectWorktree(
+		project,
+		projectState,
+		worktreePath,
+		requestGitOptions,
+	);
 	const state = ensureWorktreePollState(projectState, worktreePath);
+	if (offset === 0 && state.historySignature !== null) {
+		if (!state.history.headHash) {
+			startWorktreePolling(projectState, worktreePath);
+			return {
+				...state.history,
+				entries: [],
+				limit,
+				nextOffset: null,
+			};
+		}
+
+		await fillGitHistoryCache(state, worktreePath, 0, limit, requestGitOptions);
+		startWorktreePolling(projectState, worktreePath);
+		warmGitHistoryCache(state, worktreePath);
+		return buildGitHistoryResultFromCache(state, limit, 0);
+	}
+
 	if (offset === 0) {
 		const { history, summary, signature } = await readGitHistoryFirstPage(
 			project.id,
