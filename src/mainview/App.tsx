@@ -26,6 +26,7 @@ import type {
 	RpcGitHistoryEntry,
 	RpcProject,
 	RpcProjectTask,
+	RpcRequestPriority,
 	RpcThread,
 	RpcThreadDetail,
 	RpcThreadMessage,
@@ -234,6 +235,12 @@ type DirectorySuggestionResultCacheEntry = {
 	loadedAt: number;
 };
 
+type PendingSharedRequest<T> = {
+	controller: AbortController;
+	promise: Promise<T>;
+	waiterCount: number;
+};
+
 function readLruValue<Key, Value>(
 	cache: Map<Key, Value>,
 	key: Key,
@@ -270,6 +277,65 @@ function writeLruValue<Key, Value>(
 		}
 		cache.delete(oldest.value);
 	}
+}
+
+function createAbortError(reason: unknown, fallbackMessage: string): Error {
+	if (reason instanceof Error) {
+		return reason;
+	}
+
+	const error = new Error(
+		typeof reason === "string" && reason.trim() ? reason : fallbackMessage,
+		{
+			cause: reason,
+		},
+	);
+	if (reason instanceof DOMException && reason.name) {
+		error.name = reason.name;
+	} else {
+		error.name = "AbortError";
+	}
+	return error;
+}
+
+function isAbortError(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		(error.name === "AbortError" || error.name === "TimeoutError")
+	);
+}
+
+async function awaitAbortableResult<T>(
+	promise: Promise<T>,
+	signal: AbortSignal | null | undefined,
+	fallbackMessage: string,
+): Promise<T> {
+	if (!signal) {
+		return promise;
+	}
+	if (signal.aborted) {
+		throw createAbortError(signal.reason, fallbackMessage);
+	}
+
+	return new Promise<T>((resolve, reject) => {
+		const handleAbort = () => {
+			signal.removeEventListener("abort", handleAbort);
+			reject(createAbortError(signal.reason, fallbackMessage));
+		};
+		signal.addEventListener("abort", handleAbort, {
+			once: true,
+		});
+		void promise.then(
+			(value) => {
+				signal.removeEventListener("abort", handleAbort);
+				resolve(value);
+			},
+			(error) => {
+				signal.removeEventListener("abort", handleAbort);
+				reject(error);
+			},
+		);
+	});
 }
 
 const markdownComponents: Components = {
@@ -2232,8 +2298,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const projectTasksRequestIdRef = useRef(0);
+	const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
 	const gitHistoryRequestIdRef = useRef(0);
+	const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
 	const gitHistoryDiffRequestIdRef = useRef(0);
+	const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
+		null,
+	);
 	const gitHistoryLoadingMoreRef = useRef(false);
 	const projectWorktreeRequestCacheRef = useRef(
 		new Map<number, Promise<RpcWorktree[]>>(),
@@ -2252,7 +2323,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		new Map<string, DirectorySuggestionResultCacheEntry>(),
 	);
 	const directorySuggestionRequestCacheRef = useRef(
-		new Map<string, Promise<string[]>>(),
+		new Map<string, PendingSharedRequest<string[]>>(),
+	);
+	const directorySuggestionRequestIdRef = useRef(0);
+	const directorySuggestionAbortControllerRef = useRef<AbortController | null>(
+		null,
 	);
 	const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
@@ -3062,22 +3137,58 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[getProjectState, requestProjectWorktrees, setProjectState],
 	);
 
+	const abortProjectTasksRequest = useCallback((reason: string) => {
+		const controller = projectTasksAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		projectTasksAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
+	}, []);
+
+	const abortGitHistoryRequests = useCallback((reason: string) => {
+		const historyController = gitHistoryAbortControllerRef.current;
+		if (historyController) {
+			gitHistoryAbortControllerRef.current = null;
+			historyController.abort(createAbortError(null, reason));
+		}
+
+		const loadMoreController = gitHistoryLoadMoreAbortControllerRef.current;
+		if (loadMoreController) {
+			gitHistoryLoadMoreAbortControllerRef.current = null;
+			loadMoreController.abort(createAbortError(null, reason));
+		}
+	}, []);
+
 	const loadProjectTasks = useCallback(
 		async (projectId: number, worktreePath: string): Promise<void> => {
 			const requestId = ++projectTasksRequestIdRef.current;
+			abortProjectTasksRequest("Project task request was superseded.");
+			const controller = new AbortController();
+			projectTasksAbortControllerRef.current = controller;
 			setIsLoadingProjectTasks(true);
 			setTaskControlError("");
 
 			try {
-				const tasks = await procedures.listProjectTasks({
-					projectId,
-					worktreePath,
-				});
+				const tasks = await procedures.listProjectTasks(
+					{
+						projectId,
+						worktreePath,
+					},
+					{
+						priority: "foreground",
+						signal: controller.signal,
+					},
+				);
 				if (projectTasksRequestIdRef.current !== requestId) {
 					return;
 				}
 				setProjectTasks(tasks);
 			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
 				if (projectTasksRequestIdRef.current !== requestId) {
 					return;
 				}
@@ -3086,12 +3197,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					error instanceof Error ? error.message : String(error),
 				);
 			} finally {
+				if (projectTasksAbortControllerRef.current === controller) {
+					projectTasksAbortControllerRef.current = null;
+				}
 				if (projectTasksRequestIdRef.current === requestId) {
 					setIsLoadingProjectTasks(false);
 				}
 			}
 		},
-		[procedures],
+		[abortProjectTasksRequest, procedures],
 	);
 
 	const resetGitHistoryScrollPosition = useCallback(() => {
@@ -3122,6 +3236,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				preferCached?: boolean;
 			},
 		): Promise<void> => {
+			const requestId = ++gitHistoryRequestIdRef.current;
+			abortGitHistoryRequests("Git history request was superseded.");
+			const controller = new AbortController();
+			gitHistoryAbortControllerRef.current = controller;
 			const cacheKey = worktreeKey(projectId, worktreePath);
 			const cachedHistory = readLruValue(gitHistoryCacheRef.current, cacheKey);
 			if (options?.preferCached && cachedHistory) {
@@ -3130,21 +3248,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setGitHistoryLoadingMore(false);
 				gitHistoryLoadingMoreRef.current = false;
 				setGitHistoryError("");
+				if (gitHistoryAbortControllerRef.current === controller) {
+					gitHistoryAbortControllerRef.current = null;
+				}
 				return;
 			}
 			if (!options?.silent) {
 				setGitHistoryLoading(true);
 				setGitHistoryError("");
 			}
-			const requestId = ++gitHistoryRequestIdRef.current;
 
 			try {
-				const result = await procedures.listWorktreeGitHistory({
-					projectId,
-					worktreePath,
-					offset: 0,
-					limit: GIT_HISTORY_PAGE_SIZE,
-				});
+				const result = await procedures.listWorktreeGitHistory(
+					{
+						projectId,
+						worktreePath,
+						offset: 0,
+						limit: GIT_HISTORY_PAGE_SIZE,
+					},
+					{
+						priority: options?.silent ? "default" : "foreground",
+						signal: controller.signal,
+					},
+				);
 				if (gitHistoryRequestIdRef.current !== requestId) {
 					return;
 				}
@@ -3154,6 +3280,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				cacheGitHistoryResult(nextHistory);
 				setGitHistoryError("");
 			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
 				if (gitHistoryRequestIdRef.current !== requestId) {
 					return;
 				}
@@ -3164,6 +3293,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					);
 				}
 			} finally {
+				if (gitHistoryAbortControllerRef.current === controller) {
+					gitHistoryAbortControllerRef.current = null;
+				}
 				if (gitHistoryRequestIdRef.current === requestId) {
 					setGitHistoryLoading(false);
 					setGitHistoryLoadingMore(false);
@@ -3171,7 +3303,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			}
 		},
-		[cacheGitHistoryResult, procedures],
+		[abortGitHistoryRequests, cacheGitHistoryResult, procedures],
 	);
 
 	const loadMoreGitHistory = useCallback(async (): Promise<void> => {
@@ -3191,17 +3323,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		const nextOffset = gitHistory.nextOffset;
 		const expectedHeadHash = gitHistory.headHash;
 		const expectedBranch = gitHistory.branch;
+		const controller = new AbortController();
+		if (gitHistoryLoadMoreAbortControllerRef.current) {
+			gitHistoryLoadMoreAbortControllerRef.current.abort(
+				createAbortError(
+					null,
+					"Git history pagination request was superseded.",
+				),
+			);
+		}
+		gitHistoryLoadMoreAbortControllerRef.current = controller;
 
 		gitHistoryLoadingMoreRef.current = true;
 		setGitHistoryLoadingMore(true);
 
 		try {
-			const result = await procedures.listWorktreeGitHistory({
-				projectId: selectedProject.id,
-				worktreePath: activeSelectedWorktreePath,
-				offset: nextOffset,
-				limit: GIT_HISTORY_PAGE_SIZE,
-			});
+			const result = await procedures.listWorktreeGitHistory(
+				{
+					projectId: selectedProject.id,
+					worktreePath: activeSelectedWorktreePath,
+					offset: nextOffset,
+					limit: GIT_HISTORY_PAGE_SIZE,
+				},
+				{
+					priority: "foreground",
+					signal: controller.signal,
+				},
+			);
 			if (gitHistoryRequestIdRef.current !== requestId) {
 				return;
 			}
@@ -3227,6 +3375,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			cacheGitHistoryResult(nextHistory);
 			setGitHistoryError("");
 		} catch (error) {
+			if (isAbortError(error)) {
+				return;
+			}
 			if (gitHistoryRequestIdRef.current !== requestId) {
 				return;
 			}
@@ -3234,6 +3385,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				error instanceof Error ? error.message : String(error),
 			);
 		} finally {
+			if (gitHistoryLoadMoreAbortControllerRef.current === controller) {
+				gitHistoryLoadMoreAbortControllerRef.current = null;
+			}
 			if (gitHistoryRequestIdRef.current === requestId) {
 				setGitHistoryLoadingMore(false);
 				gitHistoryLoadingMoreRef.current = false;
@@ -3418,11 +3572,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[],
 	);
 
+	const abortDirectorySuggestionRequest = useCallback((reason: string) => {
+		const controller = directorySuggestionAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		directorySuggestionAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
+	}, []);
+
 	const fetchDirectorySuggestions = useCallback(
 		async (
 			query: string,
 			options?: {
 				forceRefresh?: boolean | undefined;
+				priority?: RpcRequestPriority;
+				signal?: AbortSignal;
 			},
 		): Promise<string[]> => {
 			const normalizedQuery = query.trim();
@@ -3438,11 +3604,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const inFlight =
 				directorySuggestionRequestCacheRef.current.get(normalizedQuery);
 			if (inFlight) {
-				return inFlight;
+				inFlight.waiterCount += 1;
+				try {
+					return await awaitAbortableResult(
+						inFlight.promise,
+						options?.signal,
+						"Directory suggestion request was aborted.",
+					);
+				} finally {
+					inFlight.waiterCount = Math.max(0, inFlight.waiterCount - 1);
+					if (
+						inFlight.waiterCount === 0 &&
+						directorySuggestionRequestCacheRef.current.get(normalizedQuery) ===
+							inFlight
+					) {
+						inFlight.controller.abort(
+							createAbortError(
+								null,
+								"Directory suggestion request was aborted.",
+							),
+						);
+					}
+				}
 			}
 
+			const controller = new AbortController();
+			const pendingRequest: PendingSharedRequest<string[]> = {
+				controller,
+				promise: Promise.resolve([]),
+				waiterCount: 1,
+			};
 			const request = procedures
-				.listDirectorySuggestions({ query: normalizedQuery })
+				.listDirectorySuggestions(
+					{ query: normalizedQuery },
+					{
+						priority: options?.priority ?? "foreground",
+						signal: controller.signal,
+					},
+				)
 				.then((result) => {
 					cacheDirectorySuggestions(normalizedQuery, result.directories);
 					return result.directories;
@@ -3450,8 +3649,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				.finally(() => {
 					directorySuggestionRequestCacheRef.current.delete(normalizedQuery);
 				});
-			directorySuggestionRequestCacheRef.current.set(normalizedQuery, request);
-			return request;
+			pendingRequest.promise = request;
+			directorySuggestionRequestCacheRef.current.set(
+				normalizedQuery,
+				pendingRequest,
+			);
+
+			try {
+				return await awaitAbortableResult(
+					request,
+					options?.signal,
+					"Directory suggestion request was aborted.",
+				);
+			} finally {
+				pendingRequest.waiterCount = Math.max(
+					0,
+					pendingRequest.waiterCount - 1,
+				);
+				if (
+					pendingRequest.waiterCount === 0 &&
+					directorySuggestionRequestCacheRef.current.get(normalizedQuery) ===
+						pendingRequest
+				) {
+					controller.abort(
+						createAbortError(null, "Directory suggestion request was aborted."),
+					);
+				}
+			}
 		},
 		[cacheDirectorySuggestions, procedures, readCachedDirectorySuggestions],
 	);
@@ -3470,8 +3694,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
 			try {
-				await fetchDirectorySuggestions(normalizedQuery);
-			} catch {
+				await fetchDirectorySuggestions(normalizedQuery, {
+					priority: "background",
+				});
+			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
 				prefetchedDirectorySuggestionQueriesRef.current.delete(normalizedQuery);
 			}
 		},
@@ -4225,6 +4454,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			!activeSelectedWorktreeOpened
 		) {
 			projectTasksRequestIdRef.current += 1;
+			abortProjectTasksRequest("Project task request was cleared.");
 			setProjectTasks([]);
 			setIsLoadingProjectTasks(false);
 			setTaskControlError("");
@@ -4234,6 +4464,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [
 		activeSelectedWorktreePath,
 		activeSelectedWorktreeOpened,
+		abortProjectTasksRequest,
 		loadProjectTasks,
 		selectedProject,
 	]);
@@ -4245,6 +4476,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			!activeSelectedWorktreeOpened
 		) {
 			gitHistoryRequestIdRef.current += 1;
+			abortGitHistoryRequests("Git history request was cleared.");
 			setGitHistory(null);
 			setGitHistoryLoading(false);
 			setGitHistoryLoadingMore(false);
@@ -4260,6 +4492,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [
 		activeSelectedWorktreePath,
 		activeSelectedWorktreeOpened,
+		abortGitHistoryRequests,
 		loadGitHistory,
 		resetGitHistoryScrollPosition,
 		selectedProject,
@@ -4510,7 +4743,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [clearDirectorySuggestionPrefetchTimer]);
 
 	useEffect(() => {
+		return () => {
+			abortProjectTasksRequest("Project task request was canceled.");
+			abortGitHistoryRequests("Git history request was canceled.");
+			abortDirectorySuggestionRequest(
+				"Directory suggestion request was canceled.",
+			);
+		};
+	}, [
+		abortDirectorySuggestionRequest,
+		abortGitHistoryRequests,
+		abortProjectTasksRequest,
+	]);
+
+	useEffect(() => {
 		if (!addProjectOpen) {
+			directorySuggestionRequestIdRef.current += 1;
+			abortDirectorySuggestionRequest(
+				"Directory suggestion request was cleared.",
+			);
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
 			setHoveredDirectorySuggestion(null);
@@ -4520,14 +4771,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 		const query = addProjectPath.trim();
 		if (!query) {
+			directorySuggestionRequestIdRef.current += 1;
+			abortDirectorySuggestionRequest(
+				"Directory suggestion request was cleared.",
+			);
 			setDirectorySuggestions([]);
 			setDirectorySuggestionsLoading(false);
 			clearDirectorySuggestionPrefetchTimer();
 			return;
 		}
 
+		const requestId = ++directorySuggestionRequestIdRef.current;
+		abortDirectorySuggestionRequest(
+			"Directory suggestion request was superseded.",
+		);
+		const controller = new AbortController();
+		directorySuggestionAbortControllerRef.current = controller;
 		const cached = readCachedDirectorySuggestions(query);
-		let cancelled = false;
 		if (cached) {
 			setDirectorySuggestions(cached.directories);
 			setDirectorySuggestionsLoading(cached.isStale);
@@ -4537,30 +4797,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		void (async () => {
 			try {
-				const directories = await fetchDirectorySuggestions(
-					query,
-					cached ? { forceRefresh: cached.isStale } : undefined,
-				);
-				if (!cancelled) {
+				const directories = await fetchDirectorySuggestions(query, {
+					...(cached ? { forceRefresh: cached.isStale } : {}),
+					priority: "foreground",
+					signal: controller.signal,
+				});
+				if (directorySuggestionRequestIdRef.current === requestId) {
 					setDirectorySuggestions(directories);
 				}
-			} catch {
-				if (!cancelled) {
+			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
+				if (directorySuggestionRequestIdRef.current === requestId) {
 					setDirectorySuggestions([]);
 				}
 			} finally {
-				if (!cancelled) {
+				if (directorySuggestionAbortControllerRef.current === controller) {
+					directorySuggestionAbortControllerRef.current = null;
+				}
+				if (directorySuggestionRequestIdRef.current === requestId) {
 					setDirectorySuggestionsLoading(false);
 				}
 			}
 		})();
 
 		return () => {
-			cancelled = true;
+			directorySuggestionRequestIdRef.current += 1;
+			if (directorySuggestionAbortControllerRef.current === controller) {
+				directorySuggestionAbortControllerRef.current = null;
+			}
+			controller.abort(
+				createAbortError(null, "Directory suggestion request was superseded."),
+			);
 		};
 	}, [
 		addProjectOpen,
 		addProjectPath,
+		abortDirectorySuggestionRequest,
 		clearDirectorySuggestionPrefetchTimer,
 		fetchDirectorySuggestions,
 		readCachedDirectorySuggestions,
