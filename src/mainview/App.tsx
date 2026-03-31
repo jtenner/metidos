@@ -2349,8 +2349,51 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					procedures.getCodexModelCatalog(),
 				]);
 			const sortedThreads = sortThreads(loadedThreads);
+			const initialThread = pickInitialThread(sortedThreads, persistedState);
+			const openProjects = loaded.filter((project) => project.isOpen === 1);
+			const restoredOpenProjectIds = new Set(
+				openProjects.map((project) => project.id),
+			);
+			for (const entry of persistedState.openWorktrees) {
+				restoredOpenProjectIds.add(entry.projectId);
+			}
+			if (persistedState.selectedProjectId !== null) {
+				restoredOpenProjectIds.add(persistedState.selectedProjectId);
+			}
+			if (initialThread) {
+				restoredOpenProjectIds.add(initialThread.projectId);
+			}
+			const optimisticProjects = loaded.map((project) =>
+				restoredOpenProjectIds.has(project.id)
+					? {
+							...project,
+							isOpen: 1 as const,
+						}
+					: project,
+			);
+			const initialThreadProject =
+				initialThread === null
+					? undefined
+					: optimisticProjects.find(
+							(project) => project.id === initialThread.projectId,
+						);
+			const initialProject =
+				initialThreadProject ??
+				optimisticProjects.find(
+					(project) => project.id === persistedState.selectedProjectId,
+				) ??
+				optimisticProjects[0] ??
+				null;
+			const initialWorktreePath =
+				initialThread?.worktreePath ??
+				(initialProject === null
+					? null
+					: initialProject.id === persistedState.selectedProjectId &&
+							persistedState.selectedWorktreePath
+						? persistedState.selectedWorktreePath
+						: initialProject.path);
 
-			setProjects(loaded);
+			setProjects(optimisticProjects);
 			setThreads(sortedThreads);
 			setCodexModels(modelCatalog.models);
 			setDefaultCodexModel(modelCatalog.defaultModel);
@@ -2372,6 +2415,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						homeDirectoryResult.supportsTildePath,
 					),
 			);
+			selectedProjectIdRef.current = initialProject?.id ?? null;
+			selectedWorktreePathRef.current = initialWorktreePath;
+			setSelectedProjectId(initialProject?.id ?? null);
+			setSelectedWorktreePath(initialWorktreePath);
 
 			const startupDirectoryPrefetchQuery =
 				homeDirectoryResult.supportsTildePath
@@ -2384,7 +2431,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			homeDirectoryPrefetchQueryRef.current = startupDirectoryPrefetchQuery;
 			void prefetchDirectorySuggestions(startupDirectoryPrefetchQuery);
 
-			const initialThread = pickInitialThread(sortedThreads, persistedState);
+			await Promise.resolve();
+
 			const initialThreadDetailPromise = initialThread
 				? procedures.getThread(
 						{
@@ -2401,23 +2449,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					})
 				: null;
 
-			const openProjects = loaded.filter((project) => project.isOpen === 1);
-			const restoredOpenProjectIds = new Set(
-				openProjects.map((project) => project.id),
-			);
 			const initiallyOpenProjectTreePaths = new Set(
 				initialTreeViewState.openProjectPaths,
 			);
-			for (const entry of persistedState.openWorktrees) {
-				restoredOpenProjectIds.add(entry.projectId);
-			}
-			if (persistedState.selectedProjectId !== null) {
-				restoredOpenProjectIds.add(persistedState.selectedProjectId);
-			}
-			if (initialThread) {
-				restoredOpenProjectIds.add(initialThread.projectId);
-			}
-			const restoredProjectWorktrees = new Map<number, RpcWorktree[]>();
 			const restoredProjects = loaded.filter((project) =>
 				restoredOpenProjectIds.has(project.id),
 			);
@@ -2438,7 +2472,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							projectPath: project.path,
 							name: project.name,
 						});
-						restoredProjectWorktrees.set(result.project.id, result.worktrees);
 						setProjects((prev) => upsertProjectList(prev, result.project));
 						setProjectState(result.project.id, {
 							worktrees: result.worktrees,
@@ -2528,28 +2561,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				await initialThreadOpenPromise;
 				return;
 			}
-
-			const initialProject =
-				loaded.find(
-					(project) => project.id === persistedState.selectedProjectId,
-				) ??
-				loaded[0] ??
-				null;
-			const initialWorktreePath =
-				initialProject === null
-					? null
-					: initialProject.id === persistedState.selectedProjectId &&
-							persistedState.selectedWorktreePath
-						? persistedState.selectedWorktreePath
-						: primaryWorktreePath(
-								initialProject,
-								restoredProjectWorktrees.get(initialProject.id) ?? [],
-							);
-
-			selectedProjectIdRef.current = initialProject?.id ?? null;
-			selectedWorktreePathRef.current = initialWorktreePath;
-			setSelectedProjectId(initialProject?.id ?? null);
-			setSelectedWorktreePath(initialWorktreePath);
 		} catch (error) {
 			setThreadsError(error instanceof Error ? error.message : String(error));
 		} finally {
