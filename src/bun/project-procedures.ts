@@ -2145,6 +2145,35 @@ async function readFiles(
 	return raw.split(/\r?\n/).filter(Boolean);
 }
 
+async function readWorktreeSnapshot(
+	worktreePath: string,
+	options?: GitCommandPriority | GitCommandOptions,
+): Promise<Omit<RpcWorktreeSnapshot, "path">> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
+	const controller = new AbortController();
+	const signal = normalizedOptions.signal
+		? AbortSignal.any([normalizedOptions.signal, controller.signal])
+		: controller.signal;
+	const snapshotOptions: GitCommandOptions = {
+		priority: normalizedOptions.priority,
+		signal,
+	};
+
+	const [diff, files] = await Promise.all([
+		readDiff(worktreePath, snapshotOptions),
+		readFiles(worktreePath, snapshotOptions),
+	]).catch((error) => {
+		controller.abort(createAbortError(null, "Worktree snapshot read failed."));
+		throw error;
+	});
+
+	return {
+		diff,
+		files,
+		lastUpdatedAt: getNow(),
+	};
+}
+
 type DecoratedGitHistoryEntry = RpcGitHistoryEntry & {
 	decoration: string;
 };
@@ -3396,17 +3425,24 @@ export async function openWorktreeProcedure(
 	}
 
 	const worktreeState = ensureWorktreePollState(state, worktreePath);
-	const { history, summary, signature } = await readGitHistoryFirstPage(
+	const historyPromise = readGitHistoryFirstPage(
 		project.id,
 		worktreePath,
 		DEFAULT_GIT_HISTORY_PAGE_SIZE,
 		requestGitOptions,
 	);
+	const snapshotPromise = readWorktreeSnapshot(worktreePath, requestGitOptions);
+	const [{ history, summary, signature }, snapshot] = await Promise.all([
+		historyPromise,
+		snapshotPromise,
+	]);
+	worktreeState.diff = snapshot.diff;
+	worktreeState.files = snapshot.files;
 	worktreeState.history = summary;
 	worktreeState.historyEntries = history.entries;
 	worktreeState.historyNextOffset = history.nextOffset;
 	worktreeState.historySignature = signature;
-	worktreeState.lastUpdatedAt = summary.lastUpdatedAt;
+	worktreeState.lastUpdatedAt = snapshot.lastUpdatedAt;
 	startWorktreePolling(state, worktreePath);
 	warmGitHistoryCache(worktreeState, worktreePath);
 
@@ -3414,9 +3450,7 @@ export async function openWorktreeProcedure(
 		project,
 		worktree: {
 			path: worktreePath,
-			diff: worktreeState.diff,
-			files: worktreeState.files,
-			lastUpdatedAt: worktreeState.lastUpdatedAt,
+			...snapshot,
 		},
 		history,
 	};
