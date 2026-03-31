@@ -1,4 +1,11 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+	type FSWatcher,
+	existsSync,
+	readFileSync,
+	readdirSync,
+	statSync,
+	watch,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { Codex, type ThreadItem } from "@openai/codex-sdk";
@@ -114,7 +121,6 @@ const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_GIT_HISTORY_PAGE_SIZE = 20;
 const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
-const TASK_POLL_INTERVAL_MS = 1_500;
 const DIRECTORY_SUGGESTION_CACHE_TTL_MS = 60_000;
 const DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES = 96;
 const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
@@ -156,6 +162,11 @@ type PendingGitHistoryPrefetch = {
 	promise: Promise<void>;
 };
 
+type TaskWatchTarget = {
+	kind: "directory" | "tasks";
+	path: string;
+};
+
 type WorktreePollState = {
 	diff: string[];
 	diffPolling: boolean;
@@ -171,9 +182,8 @@ type WorktreePollState = {
 	historySignature: string | null;
 	historyTimer: ReturnType<typeof setInterval> | null;
 	tasks: RpcProjectTask[] | null;
-	taskInputs: Map<string, number>;
-	taskInputsLoaded: boolean;
-	taskTimer: ReturnType<typeof setInterval> | null;
+	taskWatchTargets: TaskWatchTarget[];
+	taskWatchers: FSWatcher[];
 	lastUpdatedAt: string;
 };
 
@@ -854,56 +864,57 @@ function listPackageJsonTasks(
 	return tasks;
 }
 
-function readTaskInputStamps(
+function addTaskWatchTarget(
+	watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
+	path: string,
+	kind: TaskWatchTarget["kind"],
+): void {
+	const currentKind = watchTargetKinds.get(path);
+	if (currentKind === "tasks" || currentKind === kind) {
+		return;
+	}
+	watchTargetKinds.set(path, kind);
+}
+
+function collectTaskWatchTargets(
 	worktreePath: string,
-	currentDirectory = worktreePath,
-	result = new Map<string, number>(),
-): Map<string, number> {
+	currentDirectory: string,
+	watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
+): void {
 	if (!safeIsDirectory(currentDirectory)) {
-		return result;
+		return;
 	}
 
 	const entries = sortDirectoryNames(readdirSync(currentDirectory));
 	const relativeDirectory =
 		relative(worktreePath, currentDirectory).replace(/\\/g, "/") || ".";
+	const insideTasksDirectory =
+		relativeDirectory === ".tasks" || relativeDirectory.startsWith(".tasks/");
+	addTaskWatchTarget(
+		watchTargetKinds,
+		currentDirectory,
+		insideTasksDirectory ? "tasks" : "directory",
+	);
 
-	if (
-		relativeDirectory === ".tasks" ||
-		relativeDirectory.startsWith(".tasks/")
-	) {
+	if (insideTasksDirectory) {
 		for (const entry of entries) {
 			if (entry.startsWith(".")) {
 				continue;
 			}
 			const fullPath = resolve(currentDirectory, entry);
 			if (safeIsDirectory(fullPath)) {
-				readTaskInputStamps(worktreePath, fullPath, result);
-				continue;
+				collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
 			}
-			if (!safeIsFile(fullPath)) {
-				continue;
-			}
-			const relativePath = relative(worktreePath, fullPath).replace(/\\/g, "/");
-			result.set(relativePath, statSync(fullPath).mtimeMs);
 		}
-		return result;
-	}
-
-	const packageJsonPath = resolve(currentDirectory, "package.json");
-	if (entries.includes("package.json") && safeIsFile(packageJsonPath)) {
-		const relativePath = relative(worktreePath, packageJsonPath).replace(
-			/\\/g,
-			"/",
-		);
-		result.set(relativePath, statSync(packageJsonPath).mtimeMs);
+		return;
 	}
 
 	for (const entry of entries) {
 		if (entry === ".tasks") {
-			readTaskInputStamps(
+			collectTaskWatchTargets(
 				worktreePath,
 				resolve(currentDirectory, entry),
-				result,
+				watchTargetKinds,
 			);
 			continue;
 		}
@@ -912,27 +923,17 @@ function readTaskInputStamps(
 		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
 			continue;
 		}
-		readTaskInputStamps(worktreePath, fullPath, result);
+		collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
 	}
-
-	return result;
 }
 
-function taskInputsChanged(
-	previous: Map<string, number>,
-	next: Map<string, number>,
-): boolean {
-	if (previous.size !== next.size) {
-		return true;
-	}
-
-	for (const [path, mtimeMs] of next) {
-		if (previous.get(path) !== mtimeMs) {
-			return true;
-		}
-	}
-
-	return false;
+function readTaskWatchTargets(worktreePath: string): TaskWatchTarget[] {
+	const watchTargetKinds = new Map<string, TaskWatchTarget["kind"]>();
+	collectTaskWatchTargets(worktreePath, worktreePath, watchTargetKinds);
+	return [...watchTargetKinds.entries()].map(([path, kind]) => ({
+		path,
+		kind,
+	}));
 }
 
 function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
@@ -2880,9 +2881,7 @@ function stopWorktreePolling(
 	if (active.historyTimer) {
 		clearInterval(active.historyTimer);
 	}
-	if (active.taskTimer) {
-		clearInterval(active.taskTimer);
-	}
+	closeTaskWatchers(active);
 	abortGitHistoryPrefetch(
 		active,
 		`Stopped worktree polling for ${worktreePath}.`,
@@ -2909,9 +2908,8 @@ function createWorktreePollState(
 		historySignature: null,
 		historyTimer: null,
 		tasks: null,
-		taskInputs: new Map(),
-		taskInputsLoaded: false,
-		taskTimer: null,
+		taskWatchTargets: [],
+		taskWatchers: [],
 		lastUpdatedAt: getNow(),
 	};
 }
@@ -2930,38 +2928,76 @@ function ensureWorktreePollState(
 	return worktreeState;
 }
 
+function closeTaskWatchers(worktreeState: WorktreePollState): void {
+	for (const watcher of worktreeState.taskWatchers) {
+		try {
+			watcher.close();
+		} catch {
+			// Ignore watcher shutdown failures during task watcher cleanup.
+		}
+	}
+	worktreeState.taskWatchers = [];
+}
+
 function startWorktreeTaskPolling(
 	state: ProjectPollState,
 	worktreePath: string,
 ): WorktreePollState {
 	const worktreeState = ensureWorktreePollState(state, worktreePath);
-	if (worktreeState.taskTimer) {
+	if (worktreeState.taskWatchers.length > 0) {
 		return worktreeState;
 	}
 
-	const pollTasks = () => {
-		try {
-			const nextTaskInputs = readTaskInputStamps(worktreePath);
-			if (!worktreeState.taskInputsLoaded) {
-				worktreeState.taskInputs = nextTaskInputs;
-				worktreeState.taskInputsLoaded = true;
-				return;
-			}
-			if (!taskInputsChanged(worktreeState.taskInputs, nextTaskInputs)) {
-				return;
-			}
-			worktreeState.taskInputs = nextTaskInputs;
-			worktreeState.tasks = null;
-			worktreeState.lastUpdatedAt = getNow();
-			worktreeTaskChangeListener?.(state.id, worktreePath);
-		} catch (error) {
-			console.error(`Task poll failed for ${worktreePath}`, error);
+	const invalidateTaskState = () => {
+		if (
+			worktreeState.tasks === null &&
+			worktreeState.taskWatchTargets.length === 0
+		) {
+			return;
 		}
+
+		closeTaskWatchers(worktreeState);
+		worktreeState.taskWatchTargets = [];
+		worktreeState.tasks = null;
+		worktreeState.lastUpdatedAt = getNow();
+		worktreeTaskChangeListener?.(state.id, worktreePath);
 	};
 
-	worktreeState.taskTimer = setInterval(() => {
-		pollTasks();
-	}, TASK_POLL_INTERVAL_MS);
+	for (const target of worktreeState.taskWatchTargets) {
+		if (!safeIsDirectory(target.path)) {
+			continue;
+		}
+
+		try {
+			const watcher = watch(target.path, (eventType, filename) => {
+				const watchedName = filename ? String(filename) : "";
+				if (target.kind === "tasks") {
+					if (watchedName.startsWith(".")) {
+						return;
+					}
+					invalidateTaskState();
+					return;
+				}
+
+				if (
+					eventType === "rename" ||
+					watchedName === "package.json" ||
+					watchedName === ".tasks" ||
+					!watchedName
+				) {
+					invalidateTaskState();
+				}
+			});
+			watcher.on("error", (error) => {
+				console.error(`Task watcher failed for ${target.path}`, error);
+				invalidateTaskState();
+			});
+			worktreeState.taskWatchers.push(watcher);
+		} catch (error) {
+			console.error(`Failed to watch task inputs in ${target.path}`, error);
+		}
+	}
+
 	return worktreeState;
 }
 
@@ -3241,13 +3277,10 @@ export async function listProjectTasksProcedure(
 	}
 
 	throwIfAborted(context?.signal, "Project task read was aborted.");
-	const taskInputs = worktreeState.taskInputsLoaded
-		? worktreeState.taskInputs
-		: readTaskInputStamps(worktreePath);
+	const taskWatchTargets = readTaskWatchTargets(worktreePath);
 	throwIfAborted(context?.signal, "Project task read was aborted.");
 	const tasks = readProjectTasksFromDisk(worktreePath);
-	worktreeState.taskInputs = taskInputs;
-	worktreeState.taskInputsLoaded = true;
+	worktreeState.taskWatchTargets = taskWatchTargets;
 	worktreeState.tasks = tasks;
 	worktreeState.lastUpdatedAt = getNow();
 	startWorktreeTaskPolling(projectState, worktreePath);
