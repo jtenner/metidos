@@ -1,24 +1,13 @@
-import {
-	type FSWatcher,
-	existsSync,
-	readFileSync,
-	readdirSync,
-	statSync,
-	watch,
-} from "node:fs";
-import { homedir } from "node:os";
+import { type FSWatcher, existsSync, watch } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import {
 	Codex,
 	type Thread as CodexThread,
-	type ModelReasoningEffort,
 	type ThreadItem,
 } from "@openai/codex-sdk";
 
-import type { ProjectRecord, ThreadMessageRecord, ThreadRecord } from "./db";
+import type { ProjectRecord, ThreadRecord } from "./db";
 import {
-	DEFAULT_THREAD_MODEL,
-	DEFAULT_THREAD_REASONING_EFFORT,
 	createThread,
 	createThreadMessage,
 	deleteProject,
@@ -56,19 +45,66 @@ import {
 	normalizeGitHistoryPageLimit,
 	normalizeGitPath,
 	readFileChangeDiff,
-	readGitCommitDiffResult,
 	readGitHistoryFirstPage,
-	readGitHistoryPageEntries,
 	readGitHistorySummary,
 	readWorktreeSnapshot,
 	runGitCommand,
 } from "./git";
+import {
+	buildCodexModelCatalog,
+	contextWindowTokensForModel,
+	normalizeStoredCodexModel,
+	normalizeStoredCodexReasoningEffort,
+	resolveCodexModel,
+	resolveCodexReasoningEffort,
+} from "./project-procedures/codex-catalog";
+import {
+	listDirectorySuggestions,
+	shutdownDirectorySuggestionCacheMaintenance,
+	startDirectorySuggestionCacheMaintenance,
+	warmDirectorySuggestionCache,
+} from "./project-procedures/directory-suggestions";
+import {
+	type PendingGitCommitDiffRequest,
+	type PendingGitHistoryPrefetch,
+	abortGitHistoryPrefetch,
+	buildGitHistoryResultFromCache,
+	fillGitHistoryCache,
+	getCachedGitCommitDiffResult,
+	warmGitHistoryCache,
+} from "./project-procedures/git-history";
+import {
+	type TaskWatchTarget,
+	formatPackageScriptTaskPrompt,
+	formatTaskPrompt,
+	readProjectTasksFromDisk,
+	readTaskWatchTargets,
+	resolvePackageJsonTask,
+	resolveProjectTaskFilePath,
+	taskTitleFromPath,
+} from "./project-procedures/project-tasks";
+import {
+	awaitAbortableResult,
+	createAbortError,
+	isAbortError,
+	normalizePath,
+	readLruValue,
+	safeIsDirectory,
+	shortName,
+	throwIfAborted,
+	writeLruValue,
+} from "./project-procedures/shared";
+import {
+	buildNextCompactionTelemetry,
+	buildThreadTitle,
+	threadRunStatusFromRecord,
+	toRpcThread,
+	toRpcThreadMessages,
+} from "./project-procedures/thread-detail";
 import type {
 	AppRPCSchema,
 	RpcCodexModelCatalog,
-	RpcCodexModelOption,
 	RpcCodexReasoningEffort,
-	RpcCodexReasoningEffortOption,
 	RpcCreateWorktreeResult,
 	RpcGitCommitDiffResult,
 	RpcGitHistoryEntry,
@@ -79,9 +115,7 @@ import type {
 	RpcRequestContext,
 	RpcRequestPriority,
 	RpcThread,
-	RpcThreadCompaction,
 	RpcThreadDetail,
-	RpcThreadMessage,
 	RpcThreadRunStatus,
 	RpcThreadUsage,
 	RpcWorktree,
@@ -107,31 +141,17 @@ export async function listProjectsProcedure(
 export async function listThreadsProcedure(
 	_params?: AppRPCSchema["requests"]["listThreads"]["params"],
 ): Promise<RpcThread[]> {
-	return listThreads(db).map(toRpcThread);
+	return listThreads(db).map((thread) =>
+		toRpcThread(thread, currentThreadRunStatus(thread)),
+	);
 }
 
 export function startProcedureCacheMaintenance(): void {
-	if (directorySuggestionRefreshTimer !== null) {
-		return;
-	}
-
-	directorySuggestionRefreshTimer = setInterval(() => {
-		refreshRecentDirectorySuggestionEntries();
-	}, DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS);
+	startDirectorySuggestionCacheMaintenance();
 }
 
 export function warmProcedureStartupCaches(): void {
-	const homeDirectory = homedir();
-	if (safeIsDirectory(homeDirectory)) {
-		try {
-			readDirectorySuggestionEntries(homeDirectory);
-		} catch (error) {
-			console.error(
-				`Failed to warm directory suggestion cache for ${homeDirectory}`,
-				error,
-			);
-		}
-	}
+	warmDirectorySuggestionCache();
 
 	const mostRecentThread = listThreads(db)[0] ?? null;
 	if (mostRecentThread) {
@@ -148,32 +168,11 @@ export async function getCodexModelCatalogProcedure(
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
-const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
-const DIRECTORY_SUGGESTION_CACHE_TTL_MS = 60_000;
-const DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES = 96;
-const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
-const DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS = 5_000;
-const DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS = 90_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
 const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
 
 type ProjectWorktreeReadOptions = GitCommandOptions & {
 	forceRefresh?: boolean;
-};
-
-type PendingGitCommitDiffRequest = {
-	promise: Promise<RpcGitCommitDiffResult>;
-};
-
-type PendingGitHistoryPrefetch = {
-	controller: AbortController;
-	priority: GitCommandPriority;
-	promise: Promise<void>;
-};
-
-type TaskWatchTarget = {
-	kind: "directory" | "tasks";
-	path: string;
 };
 
 type WorktreePollState = {
@@ -208,32 +207,18 @@ const codexThreadMap = new Map<number, CodexThread>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 const threadTurnAbortControllerMap = new Map<number, AbortController>();
 const threadTurnCompletionMap = new Map<number, Promise<void>>();
-const directorySuggestionCache = new Map<
-	string,
-	{
-		directoryNames: string[];
-		lastAccessedAt: number;
-		loadedAt: number;
-	}
->();
 const threadDetailCache = new Map<number, RpcThreadDetail>();
 const gitCommitDiffCache = new Map<string, RpcGitCommitDiffResult>();
 const gitCommitDiffRequestCache = new Map<
 	string,
 	PendingGitCommitDiffRequest
 >();
-let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
-	null;
 let worktreeTaskChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
 let worktreeGitHistoryChangeListener:
 	| ((projectId: number, worktreePath: string) => void)
 	| null = null;
-const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
-const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
-const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
-const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
 
 function joltRpcUrl(): string {
 	const configured = process.env.JOLT_RPC_URL?.trim();
@@ -270,118 +255,6 @@ function createCodexClient(
 	});
 }
 
-function readLruValue<Key, Value>(
-	cache: Map<Key, Value>,
-	key: Key,
-): Value | null {
-	if (!cache.has(key)) {
-		return null;
-	}
-
-	const value = cache.get(key);
-	if (typeof value === "undefined") {
-		return null;
-	}
-
-	cache.delete(key);
-	cache.set(key, value);
-	return value;
-}
-
-function writeLruValue<Key, Value>(
-	cache: Map<Key, Value>,
-	key: Key,
-	value: Value,
-	maxEntries: number,
-): void {
-	if (cache.has(key)) {
-		cache.delete(key);
-	}
-	cache.set(key, value);
-
-	while (cache.size > maxEntries) {
-		const oldest = cache.keys().next();
-		if (oldest.done) {
-			return;
-		}
-		cache.delete(oldest.value);
-	}
-}
-
-function lruEntriesNewestFirst<Key, Value>(
-	cache: Map<Key, Value>,
-): Array<[Key, Value]> {
-	return [...cache.entries()].reverse();
-}
-
-function createAbortError(reason: unknown, fallbackMessage: string): Error {
-	if (reason instanceof Error) {
-		return reason;
-	}
-
-	const error = new Error(
-		typeof reason === "string" && reason.trim() ? reason : fallbackMessage,
-		{
-			cause: reason,
-		},
-	);
-	if (reason instanceof DOMException && reason.name) {
-		error.name = reason.name;
-	} else {
-		error.name = "AbortError";
-	}
-	return error;
-}
-
-function isAbortError(error: unknown): boolean {
-	return (
-		error instanceof Error &&
-		(error.name === "AbortError" || error.name === "TimeoutError")
-	);
-}
-
-function throwIfAborted(
-	signal: AbortSignal | null | undefined,
-	fallbackMessage: string,
-): void {
-	if (signal?.aborted) {
-		throw createAbortError(signal.reason, fallbackMessage);
-	}
-}
-
-async function awaitAbortableResult<T>(
-	promise: Promise<T>,
-	signal: AbortSignal | null | undefined,
-	fallbackMessage: string,
-): Promise<T> {
-	if (!signal) {
-		return promise;
-	}
-	if (signal.aborted) {
-		throw createAbortError(signal.reason, fallbackMessage);
-	}
-
-	return new Promise<T>((resolve, reject) => {
-		const handleAbort = () => {
-			signal.removeEventListener("abort", handleAbort);
-			reject(createAbortError(signal.reason, fallbackMessage));
-		};
-		signal.addEventListener("abort", handleAbort, {
-			once: true,
-		});
-		void promise.then(
-			(value) => {
-				signal.removeEventListener("abort", handleAbort);
-				resolve(value);
-			},
-			(error) => {
-				signal.removeEventListener("abort", handleAbort);
-				reject(error);
-			},
-		);
-	});
-}
-
 function gitPriorityFromRpcRequest(
 	priority: RpcRequestPriority,
 ): GitCommandPriority {
@@ -399,388 +272,6 @@ function gitCommandOptionsFromRequest(
 		priority: gitPriorityFromRpcRequest(context.priority),
 		signal: context.signal,
 	};
-}
-
-// Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
-// raw model IDs, but it does not expose a discovery API for enumerating them.
-const CODEx_MODEL_OPTIONS: RpcCodexModelOption[] = [
-	{
-		id: "gpt-5.4",
-		label: "GPT-5.4",
-		group: "Frontier",
-		summary: "Latest flagship model for complex reasoning and coding.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.4-pro",
-		label: "GPT-5.4 Pro",
-		group: "Frontier",
-		summary: "Higher-precision GPT-5.4 variant for harder tasks.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.4-mini",
-		label: "GPT-5.4 Mini",
-		group: "Frontier",
-		summary: "Faster lower-cost GPT-5.4 model for coding and subagents.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.4-nano",
-		label: "GPT-5.4 Nano",
-		group: "Frontier",
-		summary: "Cheapest GPT-5.4-class model for simple tasks.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5-mini",
-		label: "GPT-5 Mini",
-		group: "Frontier",
-		summary: "Near-frontier intelligence for cost-sensitive workloads.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5-nano",
-		label: "GPT-5 Nano",
-		group: "Frontier",
-		summary: "Fastest and most cost-efficient GPT-5 model.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5",
-		label: "GPT-5",
-		group: "Frontier",
-		summary: "Previous GPT-5 frontier model for coding and agentic work.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-4.1",
-		label: "GPT-4.1",
-		group: "Frontier",
-		summary: "Highest-capability non-reasoning general model.",
-		deprecated: false,
-		contextWindowTokens: 1_047_576,
-	},
-	{
-		id: "gpt-5-codex",
-		label: "GPT-5-Codex",
-		group: "Coding",
-		summary: "GPT-5 variant optimized for agentic coding in Codex.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.3-codex",
-		label: "GPT-5.3-Codex",
-		group: "Coding",
-		summary: "Previous high-capability agentic coding model.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.2-codex",
-		label: "GPT-5.2-Codex",
-		group: "Coding",
-		summary: "Long-horizon coding model for complex repo work.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.1-codex",
-		label: "GPT-5.1-Codex",
-		group: "Coding",
-		summary: "GPT-5.1 variant optimized for agentic coding in Codex.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.1-codex-max",
-		label: "GPT-5.1-Codex-Max",
-		group: "Coding",
-		summary: "GPT-5.1 Codex variant tuned for longer-running tasks.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "gpt-5.1-codex-mini",
-		label: "GPT-5.1-Codex-Mini",
-		group: "Coding",
-		summary: "Smaller cheaper GPT-5.1 Codex model.",
-		deprecated: false,
-		contextWindowTokens: 400_000,
-	},
-	{
-		id: "codex-mini-latest",
-		label: "Codex Mini Latest",
-		group: "Coding",
-		summary: "Deprecated fast reasoning model for older Codex workflows.",
-		deprecated: true,
-		contextWindowTokens: 200_000,
-	},
-];
-
-const codexModelOptionMap = new Map(
-	CODEx_MODEL_OPTIONS.map((model) => [model.id, model]),
-);
-
-const CODEX_REASONING_EFFORT_OPTIONS: RpcCodexReasoningEffortOption[] = [
-	{
-		id: "minimal",
-		label: "Minimal",
-	},
-	{
-		id: "low",
-		label: "Low",
-	},
-	{
-		id: "medium",
-		label: "Medium",
-	},
-	{
-		id: "high",
-		label: "High",
-	},
-	{
-		id: "xhigh",
-		label: "Extra High",
-	},
-];
-
-const codexReasoningEffortOptionMap = new Map(
-	CODEX_REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
-);
-
-function buildCodexModelCatalog(): RpcCodexModelCatalog {
-	return {
-		defaultModel: DEFAULT_THREAD_MODEL,
-		defaultReasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
-		models: CODEx_MODEL_OPTIONS,
-		reasoningEfforts: CODEX_REASONING_EFFORT_OPTIONS,
-	};
-}
-
-function contextWindowTokensForModel(model: string | null | undefined): number {
-	const normalized = normalizeStoredCodexModel(model);
-	return codexModelOptionMap.get(normalized)?.contextWindowTokens ?? 400_000;
-}
-
-function heuristicCompactionTriggerTokens(
-	model: string | null | undefined,
-): number {
-	return Math.round(
-		contextWindowTokensForModel(model) * DEFAULT_COMPACTION_ESTIMATE_RATIO,
-	);
-}
-
-function resolveCodexModel(model: string | null | undefined): string {
-	const normalized = model?.trim();
-	if (!normalized) {
-		return DEFAULT_THREAD_MODEL;
-	}
-	if (!codexModelOptionMap.has(normalized)) {
-		throw new Error(`Unsupported Codex model: ${normalized}`);
-	}
-	return normalized;
-}
-
-function normalizeStoredCodexModel(model: string | null | undefined): string {
-	const normalized = model?.trim();
-	if (!normalized || !codexModelOptionMap.has(normalized)) {
-		return DEFAULT_THREAD_MODEL;
-	}
-	return normalized;
-}
-
-function resolveCodexReasoningEffort(
-	reasoningEffort: string | null | undefined,
-): RpcCodexReasoningEffort {
-	const normalized = reasoningEffort?.trim() as
-		| ModelReasoningEffort
-		| undefined;
-	if (!normalized) {
-		return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
-	}
-	if (!codexReasoningEffortOptionMap.has(normalized)) {
-		throw new Error(`Unsupported reasoning effort: ${normalized}`);
-	}
-	return normalized;
-}
-
-function normalizeStoredCodexReasoningEffort(
-	reasoningEffort: string | null | undefined,
-): RpcCodexReasoningEffort {
-	const normalized = reasoningEffort?.trim() as
-		| ModelReasoningEffort
-		| undefined;
-	if (!normalized || !codexReasoningEffortOptionMap.has(normalized)) {
-		return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
-	}
-	return normalized;
-}
-
-function expandHomeShorthandPath(value: string): string {
-	if (process.platform === "win32") {
-		return value;
-	}
-	if (value === "~") {
-		return homedir();
-	}
-	if (value.startsWith("~/")) {
-		return resolve(homedir(), value.slice(2));
-	}
-	return value;
-}
-
-function normalizePath(value: string): string {
-	return resolve(expandHomeShorthandPath(value));
-}
-
-function parseDirectorySuggestionQuery(query: string): {
-	searchDirectory: string;
-	namePrefix: string;
-} {
-	if (process.platform !== "win32" && (query === "~" || query === "~/")) {
-		return {
-			searchDirectory: homedir(),
-			namePrefix: "",
-		};
-	}
-
-	const hasTrailingSeparator = /[\\/]$/.test(query);
-	const expandedQuery = expandHomeShorthandPath(query);
-	if (hasTrailingSeparator) {
-		return {
-			searchDirectory: resolve(expandedQuery),
-			namePrefix: "",
-		};
-	}
-
-	return {
-		searchDirectory: resolve(dirname(expandedQuery)),
-		namePrefix: basename(expandedQuery),
-	};
-}
-
-function sortDirectoryNames(values: string[]): string[] {
-	return [...values].sort((left, right) =>
-		left.localeCompare(right, undefined, {
-			numeric: true,
-			sensitivity: "base",
-		}),
-	);
-}
-
-function readDirectorySuggestionNamesFromDisk(
-	searchDirectory: string,
-): string[] {
-	return sortDirectoryNames(
-		readdirSync(searchDirectory, { withFileTypes: true })
-			.filter((entry) => {
-				if (entry.name.startsWith(".")) {
-					return false;
-				}
-				if (entry.isDirectory()) {
-					return true;
-				}
-				if (entry.isSymbolicLink()) {
-					return safeIsDirectory(resolve(searchDirectory, entry.name));
-				}
-				return false;
-			})
-			.map((entry) => entry.name),
-	);
-}
-
-function refreshDirectorySuggestionEntries(
-	searchDirectory: string,
-	lastAccessedAt = Date.now(),
-): string[] {
-	try {
-		const directoryNames =
-			readDirectorySuggestionNamesFromDisk(searchDirectory);
-		writeLruValue(
-			directorySuggestionCache,
-			searchDirectory,
-			{
-				directoryNames,
-				lastAccessedAt,
-				loadedAt: Date.now(),
-			},
-			DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES,
-		);
-		return directoryNames;
-	} catch (error) {
-		directorySuggestionCache.delete(searchDirectory);
-		throw error;
-	}
-}
-
-function readDirectorySuggestionEntries(searchDirectory: string): string[] {
-	const now = Date.now();
-	const cached = readLruValue(directorySuggestionCache, searchDirectory);
-	if (cached && cached.loadedAt + DIRECTORY_SUGGESTION_CACHE_TTL_MS > now) {
-		cached.lastAccessedAt = now;
-		return cached.directoryNames;
-	}
-
-	return refreshDirectorySuggestionEntries(searchDirectory, now);
-}
-
-function refreshRecentDirectorySuggestionEntries(): void {
-	const now = Date.now();
-	for (const [searchDirectory, cached] of lruEntriesNewestFirst(
-		directorySuggestionCache,
-	)
-		.filter(
-			([, entry]) =>
-				now - entry.lastAccessedAt <=
-				DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS,
-		)
-		.slice(0, DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE)) {
-		try {
-			refreshDirectorySuggestionEntries(searchDirectory, cached.lastAccessedAt);
-		} catch (error) {
-			console.error(
-				`Failed to refresh directory suggestion cache for ${searchDirectory}`,
-				error,
-			);
-		}
-	}
-}
-
-function safeIsDirectory(path: string): boolean {
-	try {
-		return statSync(path).isDirectory();
-	} catch {
-		return false;
-	}
-}
-
-function safeIsFile(path: string): boolean {
-	try {
-		return statSync(path).isFile();
-	} catch {
-		return false;
-	}
-}
-
-function tasksDirectoryPath(worktreePath: string): string {
-	return resolve(worktreePath, ".tasks");
-}
-
-function normalizeRelativeTaskPath(taskPath: string): string {
-	return taskPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-}
-
-function taskTitleFromPath(taskPath: string): string {
-	return taskPath.replace(/\.[^./\\]+$/, "").replace(/\\/g, "/");
 }
 
 function invalidateThreadDetailCache(threadId: number): void {
@@ -810,360 +301,6 @@ function clearProjectThreadRuntimeState(projectId: number): void {
 	}
 }
 
-function formatTaskPrompt(taskTitle: string, taskContent: string): string {
-	return `Your job is to perform the task: ${taskTitle}\n${taskContent.trim()}\n\nDo this now.`;
-}
-
-function formatPackageScriptTaskPrompt(task: {
-	packageJsonPath: string;
-	packageDirectory: string;
-	scriptName: string;
-	command: string;
-}): string {
-	return [
-		`Your job is to run the package script "${task.scriptName}".`,
-		`package.json: ${task.packageJsonPath}`,
-		`Working directory: ${task.packageDirectory}`,
-		`Run command: bun run ${task.scriptName}`,
-		`Script definition: ${task.command}`,
-		"",
-		"Inspect the repository as needed, then run this task now and address any issues required to get it passing.",
-	].join("\n");
-}
-
-function isIgnoredPackageDirectory(name: string): boolean {
-	return (
-		name === ".git" ||
-		name === "node_modules" ||
-		name === ".next" ||
-		name === ".turbo" ||
-		name === ".yarn" ||
-		name === "dist" ||
-		name === "build"
-	);
-}
-
-function listProjectTaskFiles(
-	tasksDirectory: string,
-	prefix = "",
-): RpcProjectTask[] {
-	if (!safeIsDirectory(tasksDirectory)) {
-		return [];
-	}
-
-	const tasks: RpcProjectTask[] = [];
-	for (const entry of sortDirectoryNames(
-		readdirSync(tasksDirectory).filter((value) => !value.startsWith(".")),
-	)) {
-		const fullPath = resolve(tasksDirectory, entry);
-		const relativePath = prefix ? `${prefix}/${entry}` : entry;
-		if (safeIsDirectory(fullPath)) {
-			tasks.push(...listProjectTaskFiles(fullPath, relativePath));
-			continue;
-		}
-		if (!safeIsFile(fullPath)) {
-			continue;
-		}
-		tasks.push({
-			id: `file:${relativePath.replace(/\\/g, "/")}`,
-			kind: "file",
-			path: relativePath.replace(/\\/g, "/"),
-			title: taskTitleFromPath(relativePath),
-			scriptName: null,
-			command: null,
-		});
-	}
-
-	return tasks;
-}
-
-function listPackageJsonTasks(
-	rootDirectory: string,
-	currentDirectory = rootDirectory,
-): RpcProjectTask[] {
-	if (!safeIsDirectory(currentDirectory)) {
-		return [];
-	}
-
-	const tasks: RpcProjectTask[] = [];
-	const entries = sortDirectoryNames(readdirSync(currentDirectory));
-	const packageJsonPath = resolve(currentDirectory, "package.json");
-	if (entries.includes("package.json") && safeIsFile(packageJsonPath)) {
-		try {
-			const parsed = JSON.parse(
-				readFileSync(packageJsonPath, "utf8"),
-			) as Partial<{
-				scripts: Record<string, unknown>;
-			}>;
-			const scripts =
-				parsed.scripts && typeof parsed.scripts === "object"
-					? parsed.scripts
-					: null;
-			if (scripts) {
-				const relativePackageJsonPath =
-					relative(rootDirectory, packageJsonPath).replace(/\\/g, "/") ||
-					"package.json";
-				for (const scriptName of Object.keys(scripts).sort((a, b) =>
-					a.localeCompare(b),
-				)) {
-					const command = scripts[scriptName];
-					if (typeof command !== "string" || !command.trim()) {
-						continue;
-					}
-					tasks.push({
-						id: `script:${relativePackageJsonPath}:${scriptName}`,
-						kind: "script",
-						path: relativePackageJsonPath,
-						title: scriptName,
-						scriptName,
-						command,
-					});
-				}
-			}
-		} catch {
-			// Ignore invalid package.json files so one malformed package does not hide all tasks.
-		}
-	}
-
-	for (const entry of entries) {
-		if (entry === "package.json") {
-			continue;
-		}
-		const fullPath = resolve(currentDirectory, entry);
-		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
-			continue;
-		}
-		tasks.push(...listPackageJsonTasks(rootDirectory, fullPath));
-	}
-
-	return tasks;
-}
-
-function addTaskWatchTarget(
-	watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
-	path: string,
-	kind: TaskWatchTarget["kind"],
-): void {
-	const currentKind = watchTargetKinds.get(path);
-	if (currentKind === "tasks" || currentKind === kind) {
-		return;
-	}
-	watchTargetKinds.set(path, kind);
-}
-
-function collectTaskWatchTargets(
-	worktreePath: string,
-	currentDirectory: string,
-	watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
-): void {
-	if (!safeIsDirectory(currentDirectory)) {
-		return;
-	}
-
-	const entries = sortDirectoryNames(readdirSync(currentDirectory));
-	const relativeDirectory =
-		relative(worktreePath, currentDirectory).replace(/\\/g, "/") || ".";
-	const insideTasksDirectory =
-		relativeDirectory === ".tasks" || relativeDirectory.startsWith(".tasks/");
-	addTaskWatchTarget(
-		watchTargetKinds,
-		currentDirectory,
-		insideTasksDirectory ? "tasks" : "directory",
-	);
-
-	if (insideTasksDirectory) {
-		for (const entry of entries) {
-			if (entry.startsWith(".")) {
-				continue;
-			}
-			const fullPath = resolve(currentDirectory, entry);
-			if (safeIsDirectory(fullPath)) {
-				collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
-			}
-		}
-		return;
-	}
-
-	for (const entry of entries) {
-		if (entry === ".tasks") {
-			collectTaskWatchTargets(
-				worktreePath,
-				resolve(currentDirectory, entry),
-				watchTargetKinds,
-			);
-			continue;
-		}
-
-		const fullPath = resolve(currentDirectory, entry);
-		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
-			continue;
-		}
-		collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
-	}
-}
-
-function readTaskWatchTargets(worktreePath: string): TaskWatchTarget[] {
-	const watchTargetKinds = new Map<string, TaskWatchTarget["kind"]>();
-	collectTaskWatchTargets(worktreePath, worktreePath, watchTargetKinds);
-	return [...watchTargetKinds.entries()].map(([path, kind]) => ({
-		path,
-		kind,
-	}));
-}
-
-function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
-	return [...tasks].sort((left, right) => {
-		if (left.kind !== right.kind) {
-			return left.kind === "file" ? -1 : 1;
-		}
-		const titleResult = left.title.localeCompare(right.title);
-		if (titleResult !== 0) {
-			return titleResult;
-		}
-		return left.path.localeCompare(right.path);
-	});
-}
-
-function readProjectTasksFromDisk(worktreePath: string): RpcProjectTask[] {
-	return sortProjectTasks([
-		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
-		...listPackageJsonTasks(worktreePath),
-	]);
-}
-
-function resolveProjectTaskFilePath(
-	worktreePath: string,
-	taskPath: string,
-): string {
-	const normalizedTaskPath = normalizeRelativeTaskPath(taskPath);
-	if (!normalizedTaskPath) {
-		throw new Error("Task path is required.");
-	}
-
-	const tasksDirectory = tasksDirectoryPath(worktreePath);
-	if (!safeIsDirectory(tasksDirectory)) {
-		throw new Error(`No .tasks directory found in ${worktreePath}.`);
-	}
-
-	const fullPath = resolve(tasksDirectory, normalizedTaskPath);
-	const relativePath = relative(tasksDirectory, fullPath);
-	if (
-		relativePath === "" ||
-		relativePath === ".." ||
-		relativePath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
-		relativePath.split(/[\\/]/).includes("..")
-	) {
-		throw new Error(`Task path must stay within ${tasksDirectory}.`);
-	}
-	if (!safeIsFile(fullPath)) {
-		throw new Error(`Task not found: ${normalizedTaskPath}`);
-	}
-
-	return fullPath;
-}
-
-function resolvePackageJsonTask(
-	worktreePath: string,
-	task: RpcProjectTask,
-): {
-	packageJsonPath: string;
-	packageDirectory: string;
-	scriptName: string;
-	command: string;
-} {
-	const normalizedPackageJsonPath = normalizeRelativeTaskPath(task.path);
-	if (!normalizedPackageJsonPath) {
-		throw new Error("Package task path is required.");
-	}
-	if (!task.scriptName?.trim()) {
-		throw new Error("Package task script name is required.");
-	}
-
-	const packageJsonPath = resolve(worktreePath, normalizedPackageJsonPath);
-	const relativePath = relative(worktreePath, packageJsonPath);
-	if (
-		relativePath === "" ||
-		relativePath === ".." ||
-		relativePath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
-		relativePath.split(/[\\/]/).includes("..")
-	) {
-		throw new Error(`Package task path must stay within ${worktreePath}.`);
-	}
-	if (!safeIsFile(packageJsonPath)) {
-		throw new Error(`package.json not found: ${normalizedPackageJsonPath}`);
-	}
-
-	let parsed: Partial<{ scripts: Record<string, unknown> }>;
-	try {
-		parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as Partial<{
-			scripts: Record<string, unknown>;
-		}>;
-	} catch {
-		throw new Error(`Invalid package.json: ${normalizedPackageJsonPath}`);
-	}
-
-	const command = parsed.scripts?.[task.scriptName];
-	if (typeof command !== "string" || !command.trim()) {
-		throw new Error(
-			`Script "${task.scriptName}" not found in ${normalizedPackageJsonPath}`,
-		);
-	}
-
-	const packageDirectory =
-		relative(worktreePath, dirname(packageJsonPath)).replace(/\\/g, "/") || ".";
-	return {
-		packageJsonPath: normalizedPackageJsonPath,
-		packageDirectory,
-		scriptName: task.scriptName,
-		command,
-	};
-}
-
-function shortName(value: string): string {
-	const normalized = value.replace(/[\\/]$/, "");
-	const parts = normalized.split(/[\\/]/).filter(Boolean);
-	return parts.at(-1) ?? value;
-}
-
-function hasUnreadThreadError(thread: ThreadRecord): boolean {
-	return Boolean(
-		thread.lastErrorAt &&
-			(!thread.lastErrorSeenAt || thread.lastErrorSeenAt < thread.lastErrorAt),
-	);
-}
-
-function threadRunStatusFromRecord(thread: ThreadRecord): RpcThreadRunStatus {
-	const active = threadRunStatusMap.get(thread.id);
-	const hasUnreadError = hasUnreadThreadError(thread);
-	if (active) {
-		return {
-			...active,
-			hasUnreadError,
-		};
-	}
-
-	const failureIsCurrent =
-		thread.lastErrorAt &&
-		(!thread.lastRunAt || thread.lastErrorAt >= thread.lastRunAt);
-	if (failureIsCurrent) {
-		return {
-			state: "failed",
-			startedAt: null,
-			updatedAt: thread.lastErrorAt,
-			error: thread.lastErrorMessage ?? "Codex turn failed.",
-			hasUnreadError,
-		};
-	}
-
-	return {
-		state: "idle",
-		startedAt: null,
-		updatedAt: thread.lastRunAt ?? thread.updatedAt,
-		error: null,
-		hasUnreadError: false,
-	};
-}
-
 function setThreadRunStatus(
 	threadId: number,
 	status: RpcThreadRunStatus,
@@ -1172,231 +309,8 @@ function setThreadRunStatus(
 	invalidateThreadDetailCache(threadId);
 }
 
-function toRpcThread(thread: ThreadRecord): RpcThread {
-	return {
-		...thread,
-		model: normalizeStoredCodexModel(thread.model),
-		reasoningEffort: normalizeStoredCodexReasoningEffort(
-			thread.reasoningEffort,
-		),
-		usage: threadUsageFromRecord(thread),
-		compaction: threadCompactionFromRecord(thread),
-		runStatus: threadRunStatusFromRecord(thread),
-	};
-}
-
-function threadUsageFromRecord(thread: ThreadRecord): RpcThreadUsage | null {
-	if (
-		thread.lastInputTokens === null &&
-		thread.lastCachedInputTokens === null &&
-		thread.lastOutputTokens === null
-	) {
-		return null;
-	}
-	return {
-		inputTokens: thread.lastInputTokens ?? 0,
-		cachedInputTokens: thread.lastCachedInputTokens ?? 0,
-		outputTokens: thread.lastOutputTokens ?? 0,
-	};
-}
-
-function threadCompactionFromRecord(thread: ThreadRecord): RpcThreadCompaction {
-	return {
-		estimatedTriggerTokens:
-			thread.estimatedCompactionTriggerTokens ??
-			heuristicCompactionTriggerTokens(thread.model),
-		estimatedTriggerSource: thread.estimatedCompactionTriggerTokens
-			? "observed"
-			: "heuristic",
-		maxObservedInputTokens: thread.maxInputTokens,
-		inferredCount: thread.compactionCount,
-		lastInferredAt: thread.lastCompactionAt,
-		lastInferredBeforeInputTokens: thread.lastCompactionBeforeInputTokens,
-		lastInferredAfterInputTokens: thread.lastCompactionAfterInputTokens,
-	};
-}
-
-function buildNextCompactionTelemetry(
-	thread: ThreadRecord,
-	usage: RpcThreadUsage,
-): {
-	maxInputTokens: number;
-	estimatedCompactionTriggerTokens: number | null;
-	compactionCount: number;
-	lastCompactionAt: string | null;
-	lastCompactionBeforeInputTokens: number | null;
-	lastCompactionAfterInputTokens: number | null;
-} {
-	const previousInputTokens = thread.lastInputTokens;
-	const currentInputTokens = usage.inputTokens;
-	const contextWindowTokens = contextWindowTokensForModel(thread.model);
-	const heuristicTriggerTokens = heuristicCompactionTriggerTokens(thread.model);
-	const baselineTriggerTokens =
-		thread.estimatedCompactionTriggerTokens ?? heuristicTriggerTokens;
-	const maxInputTokens = Math.max(
-		thread.maxInputTokens ?? 0,
-		currentInputTokens,
-	);
-
-	let estimatedCompactionTriggerTokens =
-		thread.estimatedCompactionTriggerTokens ?? null;
-	let compactionCount = thread.compactionCount;
-	let lastCompactionAt = thread.lastCompactionAt;
-	let lastCompactionBeforeInputTokens = thread.lastCompactionBeforeInputTokens;
-	let lastCompactionAfterInputTokens = thread.lastCompactionAfterInputTokens;
-
-	if (typeof previousInputTokens === "number" && previousInputTokens > 0) {
-		const previousNearCompaction =
-			previousInputTokens >=
-			Math.round(
-				Math.min(
-					baselineTriggerTokens,
-					contextWindowTokens * COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO,
-				),
-			);
-		const currentDroppedSharply =
-			currentInputTokens <=
-			Math.round(previousInputTokens * COMPACTION_INFERENCE_MAX_CURRENT_RATIO);
-		const droppedByMeaningfulWindowShare =
-			previousInputTokens - currentInputTokens >=
-			Math.round(
-				contextWindowTokens * COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO,
-			);
-
-		if (
-			previousNearCompaction &&
-			currentDroppedSharply &&
-			droppedByMeaningfulWindowShare
-		) {
-			const nextSample = previousInputTokens;
-			const sampleCount = Math.max(compactionCount, 0);
-			estimatedCompactionTriggerTokens =
-				sampleCount > 0 && estimatedCompactionTriggerTokens
-					? Math.round(
-							(estimatedCompactionTriggerTokens * sampleCount + nextSample) /
-								(sampleCount + 1),
-						)
-					: nextSample;
-			compactionCount += 1;
-			lastCompactionAt = getNow();
-			lastCompactionBeforeInputTokens = previousInputTokens;
-			lastCompactionAfterInputTokens = currentInputTokens;
-		}
-	}
-
-	return {
-		maxInputTokens,
-		estimatedCompactionTriggerTokens,
-		compactionCount,
-		lastCompactionAt,
-		lastCompactionBeforeInputTokens,
-		lastCompactionAfterInputTokens,
-	};
-}
-
-type CommandActivityPayload = {
-	command: string;
-	output: string;
-	exitCode: number | null;
-};
-
-type FileChangeActivityPayload = {
-	path: string;
-	changeKind: "add" | "delete" | "update";
-	diffText: string;
-};
-
-function parseActivityPayload<T>(value: string | null): T | null {
-	if (!value) {
-		return null;
-	}
-	try {
-		return JSON.parse(value) as T;
-	} catch {
-		return null;
-	}
-}
-
-function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
-	if (message.kind === "command" && message.itemId) {
-		const payload = parseActivityPayload<CommandActivityPayload>(
-			message.payloadJson,
-		);
-		return {
-			id: message.id,
-			threadId: message.threadId,
-			role: "assistant",
-			kind: "command",
-			itemId: message.itemId,
-			text: message.text,
-			state:
-				message.state === "completed" || message.state === "failed"
-					? message.state
-					: "in_progress",
-			command: payload?.command ?? message.text,
-			output: payload?.output ?? "",
-			exitCode: typeof payload?.exitCode === "number" ? payload.exitCode : null,
-			createdAt: message.createdAt,
-			updatedAt: message.updatedAt,
-		};
-	}
-
-	if (message.kind === "file_change" && message.itemId) {
-		const payload = parseActivityPayload<FileChangeActivityPayload>(
-			message.payloadJson,
-		);
-		return {
-			id: message.id,
-			threadId: message.threadId,
-			role: "assistant",
-			kind: "file_change",
-			itemId: message.itemId,
-			text: message.text,
-			state: message.state === "failed" ? "failed" : "completed",
-			path: payload?.path ?? message.text,
-			changeKind: payload?.changeKind ?? "update",
-			diffText: payload?.diffText ?? "",
-			createdAt: message.createdAt,
-			updatedAt: message.updatedAt,
-		};
-	}
-
-	if (message.kind === "reasoning" && message.itemId) {
-		return {
-			id: message.id,
-			threadId: message.threadId,
-			role: "assistant",
-			kind: "reasoning",
-			itemId: message.itemId,
-			text: message.text,
-			state: message.state === "completed" ? "completed" : "in_progress",
-			createdAt: message.createdAt,
-			updatedAt: message.updatedAt,
-		};
-	}
-
-	return {
-		id: message.id,
-		threadId: message.threadId,
-		role: message.role,
-		kind: "chat",
-		itemId: message.itemId,
-		text: message.text,
-		state:
-			message.state === "in_progress" ||
-			message.state === "completed" ||
-			message.state === "failed"
-				? message.state
-				: null,
-		createdAt: message.createdAt,
-		updatedAt: message.updatedAt,
-	};
-}
-
-function toRpcThreadMessages(
-	messages: ThreadMessageRecord[],
-): RpcThreadMessage[] {
-	return messages.map(toRpcThreadMessage);
+function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
+	return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
 
 function codexThreadOptions(
@@ -1450,13 +364,6 @@ async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
 	return next;
 }
 
-function buildThreadTitle(
-	worktree: RpcWorktree | null,
-	worktreePath: string,
-): string {
-	return worktree?.branch?.trim() || shortName(worktreePath);
-}
-
 function threadById(threadId: number): ThreadRecord {
 	const thread = getThreadById(db, threadId);
 	if (!thread) {
@@ -1465,10 +372,15 @@ function threadById(threadId: number): ThreadRecord {
 	return thread;
 }
 
+function rpcThreadById(threadId: number): RpcThread {
+	const thread = threadById(threadId);
+	return toRpcThread(thread, currentThreadRunStatus(thread));
+}
+
 async function buildThreadDetail(threadId: number): Promise<RpcThreadDetail> {
 	const thread = threadById(threadId);
 	return {
-		thread: toRpcThread(thread),
+		thread: toRpcThread(thread, currentThreadRunStatus(thread)),
 		messages: toRpcThreadMessages(listThreadMessages(db, thread.id)),
 	};
 }
@@ -1655,11 +567,16 @@ async function runThreadMessageInBackground(
 			invalidateThreadDetailCache(threadId);
 		}
 		if (usage) {
+			const currentThread = threadById(threadId);
 			setThreadUsage(
 				db,
 				threadId,
 				usage,
-				buildNextCompactionTelemetry(threadById(threadId), usage),
+				buildNextCompactionTelemetry(
+					currentThread,
+					usage,
+					contextWindowTokensForModel(currentThread.model),
+				),
 			);
 			invalidateThreadDetailCache(threadId);
 		}
@@ -1771,41 +688,16 @@ async function readProjectWorktrees(
 export async function listDirectorySuggestionsProcedure(
 	params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
 ): Promise<AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]> {
-	const query = params.query.trim();
-	if (!query) {
-		return { directories: [] };
-	}
-
-	const { searchDirectory, namePrefix } = parseDirectorySuggestionQuery(query);
-	if (!safeIsDirectory(searchDirectory)) {
-		return { directories: [] };
-	}
-
-	try {
-		const normalizedPrefix = namePrefix.toLocaleLowerCase();
-		const directories = readDirectorySuggestionEntries(searchDirectory)
-			.filter((entry) => {
-				if (
-					normalizedPrefix &&
-					!entry.toLocaleLowerCase().startsWith(normalizedPrefix)
-				) {
-					return false;
-				}
-				return true;
-			})
-			.map((entry) => resolve(searchDirectory, entry));
-
-		return { directories };
-	} catch {
-		return { directories: [] };
-	}
+	return {
+		directories: listDirectorySuggestions(params.query),
+	};
 }
 
 function assertProjectDirectory(projectPath: string): void {
 	if (!existsSync(projectPath)) {
 		throw new Error(`Project path does not exist: ${projectPath}`);
 	}
-	if (!statSync(projectPath).isDirectory()) {
+	if (!safeIsDirectory(projectPath)) {
 		throw new Error(`Project path must be a directory: ${projectPath}`);
 	}
 }
@@ -1817,6 +709,18 @@ function logBackgroundGitFailure(message: string, error: unknown): void {
 
 	console.error(message, error);
 }
+
+type CommandActivityPayload = {
+	command: string;
+	output: string;
+	exitCode: number | null;
+};
+
+type FileChangeActivityPayload = {
+	path: string;
+	changeKind: "add" | "delete" | "update";
+	diffText: string;
+};
 
 async function upsertReasoningActivity(
 	threadId: number,
@@ -1930,185 +834,6 @@ async function listFreshProjectWorktrees(
 	return mergeProjectWorktreePins(projectId, worktrees);
 }
 
-function applyGitHistoryCachePage(
-	worktreeState: WorktreePollState,
-	offset: number,
-	page: {
-		entries: RpcGitHistoryEntry[];
-		nextOffset: number | null;
-	},
-): void {
-	const prefix = worktreeState.historyEntries.slice(0, offset);
-	worktreeState.historyEntries = [...prefix, ...page.entries];
-	worktreeState.historyNextOffset = page.nextOffset;
-}
-
-function hasGitHistoryCacheRange(
-	worktreeState: WorktreePollState,
-	offset: number,
-	limit: number,
-): boolean {
-	if (worktreeState.historyEntries.length >= offset + limit) {
-		return true;
-	}
-
-	return (
-		worktreeState.historyNextOffset === null &&
-		worktreeState.historyEntries.length >= offset
-	);
-}
-
-function buildGitHistoryResultFromCache(
-	worktreeState: WorktreePollState,
-	limit: number,
-	offset: number,
-): RpcWorktreeGitHistoryResult {
-	const endOffset = Math.min(
-		offset + limit,
-		worktreeState.historyEntries.length,
-	);
-
-	return {
-		...worktreeState.history,
-		entries: worktreeState.historyEntries.slice(offset, endOffset),
-		limit,
-		nextOffset:
-			endOffset < worktreeState.historyEntries.length
-				? endOffset
-				: worktreeState.historyNextOffset,
-	};
-}
-
-function abortGitHistoryPrefetch(
-	worktreeState: WorktreePollState,
-	reason: string,
-): void {
-	const prefetch = worktreeState.historyPrefetch;
-	if (!prefetch) {
-		return;
-	}
-
-	if (worktreeState.historyPrefetch === prefetch) {
-		worktreeState.historyPrefetch = null;
-	}
-	prefetch.controller.abort(createAbortError(null, reason));
-}
-
-async function fillGitHistoryCache(
-	worktreeState: WorktreePollState,
-	worktreePath: string,
-	offset: number,
-	limit: number,
-	options?: GitCommandPriority | GitCommandOptions,
-): Promise<void> {
-	const normalizedOptions = normalizeGitCommandOptions(options);
-	while (
-		!hasGitHistoryCacheRange(worktreeState, offset, limit) &&
-		worktreeState.historyNextOffset !== null
-	) {
-		throwIfAborted(
-			normalizedOptions.signal,
-			"Git history cache fill was aborted.",
-		);
-		const currentPrefetch = worktreeState.historyPrefetch;
-		if (
-			currentPrefetch &&
-			normalizedOptions.priority === "foreground" &&
-			currentPrefetch.priority === "background"
-		) {
-			abortGitHistoryPrefetch(
-				worktreeState,
-				`Foreground git history request replaced background warming for ${worktreePath}.`,
-			);
-			continue;
-		}
-		if (currentPrefetch) {
-			await awaitAbortableResult(
-				currentPrefetch.promise,
-				normalizedOptions.signal,
-				"Git history cache fill was aborted.",
-			);
-			continue;
-		}
-
-		const expectedSignature = worktreeState.historySignature;
-		const fetchOffset = worktreeState.historyEntries.length;
-		const fetchLimit = Math.max(
-			GIT_HISTORY_PREFETCH_CHUNK_SIZE,
-			offset + limit - fetchOffset,
-		);
-		const controller = new AbortController();
-		const prefetch: PendingGitHistoryPrefetch = {
-			controller,
-			priority: normalizedOptions.priority,
-			promise: Promise.resolve(),
-		};
-		const promise = (async () => {
-			try {
-				const page = await readGitHistoryPageEntries(
-					worktreePath,
-					fetchOffset,
-					fetchLimit,
-					{
-						priority: normalizedOptions.priority,
-						signal: controller.signal,
-					},
-				);
-				if (
-					worktreeState.historySignature !== expectedSignature ||
-					worktreeState.historyEntries.length !== fetchOffset
-				) {
-					return;
-				}
-				applyGitHistoryCachePage(worktreeState, fetchOffset, page);
-			} finally {
-				if (worktreeState.historyPrefetch === prefetch) {
-					worktreeState.historyPrefetch = null;
-				}
-			}
-		})();
-		prefetch.promise = promise;
-		worktreeState.historyPrefetch = prefetch;
-		await awaitAbortableResult(
-			promise,
-			normalizedOptions.signal,
-			"Git history cache fill was aborted.",
-		);
-	}
-}
-
-function warmGitHistoryCache(
-	worktreeState: WorktreePollState,
-	worktreePath: string,
-): void {
-	if (
-		worktreeState.historyNextOffset === null ||
-		worktreeState.historyPrefetch
-	) {
-		return;
-	}
-
-	void fillGitHistoryCache(
-		worktreeState,
-		worktreePath,
-		worktreeState.historyEntries.length,
-		DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
-		"background",
-	).catch((error) => {
-		logBackgroundGitFailure(
-			`Git history prefetch failed for ${worktreePath}`,
-			error,
-		);
-	});
-}
-
-function gitCommitDiffCacheKey(
-	worktreePath: string,
-	commitHash: string,
-): string {
-	return `${worktreePath}\n${commitHash}`;
-}
-
 function findKnownProjectWorktree(
 	projectId: number,
 	worktreePath: string,
@@ -2118,58 +843,6 @@ function findKnownProjectWorktree(
 		return null;
 	}
 	return state.worktrees.find((entry) => entry.path === worktreePath) ?? null;
-}
-
-async function getCachedGitCommitDiffResult(
-	projectId: number,
-	worktreePath: string,
-	commitHash: string,
-	options?: GitCommandPriority | GitCommandOptions,
-): Promise<RpcGitCommitDiffResult> {
-	const normalizedOptions = normalizeGitCommandOptions(options);
-	const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
-	const cached = readLruValue(gitCommitDiffCache, cacheKey);
-	if (cached) {
-		return cached;
-	}
-
-	const pending = gitCommitDiffRequestCache.get(cacheKey);
-	if (pending) {
-		return awaitAbortableResult(
-			pending.promise,
-			normalizedOptions.signal,
-			"Commit diff read was aborted.",
-		);
-	}
-
-	const pendingRequest: PendingGitCommitDiffRequest = {
-		promise: Promise.resolve(null as never),
-	};
-	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
-		priority: normalizedOptions.priority,
-	})
-		.then((result) => {
-			writeLruValue(
-				gitCommitDiffCache,
-				cacheKey,
-				result,
-				GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES,
-			);
-			return result;
-		})
-		.finally(() => {
-			if (gitCommitDiffRequestCache.get(cacheKey) === pendingRequest) {
-				gitCommitDiffRequestCache.delete(cacheKey);
-			}
-		});
-	pendingRequest.promise = promise;
-	gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
-
-	return awaitAbortableResult(
-		promise,
-		normalizedOptions.signal,
-		"Commit diff read was aborted.",
-	);
 }
 
 function getNow(): string {
@@ -2730,7 +1403,7 @@ export async function markThreadErrorSeenProcedure(
 ): Promise<RpcThreadDetail> {
 	const thread = threadById(params.threadId);
 	markThreadErrorSeen(db, thread.id);
-	const currentStatus = threadRunStatusFromRecord(thread);
+	const currentStatus = currentThreadRunStatus(thread);
 	setThreadRunStatus(thread.id, {
 		...currentStatus,
 		hasUnreadError: false,
@@ -2754,7 +1427,7 @@ async function queueThreadMessage(
 	thread: ThreadRecord,
 	input: string,
 ): Promise<RpcThreadDetail> {
-	if (threadRunStatusFromRecord(thread).state === "working") {
+	if (currentThreadRunStatus(thread).state === "working") {
 		throw new Error("Thread is already processing a message.");
 	}
 
@@ -2851,7 +1524,7 @@ export async function stopThreadTurnProcedure(
 	params: AppRPCSchema["requests"]["stopThreadTurn"]["params"],
 ): Promise<RpcThreadDetail> {
 	const thread = threadById(params.threadId);
-	if (threadRunStatusFromRecord(thread).state !== "working") {
+	if (currentThreadRunStatus(thread).state !== "working") {
 		return readThreadDetailCached(thread.id);
 	}
 
@@ -2887,7 +1560,7 @@ export async function renameThreadProcedure(
 			: params.summary?.trim() || null;
 	renameThread(db, thread.id, title, normalizedSummary);
 	invalidateThreadDetailCache(thread.id);
-	return toRpcThread(threadById(thread.id));
+	return rpcThreadById(thread.id);
 }
 
 export async function setThreadPinnedProcedure(
@@ -2896,14 +1569,14 @@ export async function setThreadPinnedProcedure(
 	const thread = threadById(params.threadId);
 	setThreadPinned(db, thread.id, params.pinned);
 	invalidateThreadDetailCache(thread.id);
-	return toRpcThread(threadById(thread.id));
+	return rpcThreadById(thread.id);
 }
 
 export async function updateThreadModelProcedure(
 	params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
 ): Promise<RpcThread> {
 	const thread = threadById(params.threadId);
-	if (threadRunStatusFromRecord(thread).state === "working") {
+	if (currentThreadRunStatus(thread).state === "working") {
 		throw new Error("Thread model cannot change while Codex is processing.");
 	}
 
@@ -2911,14 +1584,14 @@ export async function updateThreadModelProcedure(
 	setThreadModel(db, thread.id, model);
 	codexThreadMap.delete(thread.id);
 	invalidateThreadDetailCache(thread.id);
-	return toRpcThread(threadById(thread.id));
+	return rpcThreadById(thread.id);
 }
 
 export async function updateThreadReasoningEffortProcedure(
 	params: AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
 ): Promise<RpcThread> {
 	const thread = threadById(params.threadId);
-	if (threadRunStatusFromRecord(thread).state === "working") {
+	if (currentThreadRunStatus(thread).state === "working") {
 		throw new Error(
 			"Thread reasoning effort cannot change while Codex is processing.",
 		);
@@ -2928,14 +1601,14 @@ export async function updateThreadReasoningEffortProcedure(
 	setThreadReasoningEffort(db, thread.id, reasoningEffort);
 	codexThreadMap.delete(thread.id);
 	invalidateThreadDetailCache(thread.id);
-	return toRpcThread(threadById(thread.id));
+	return rpcThreadById(thread.id);
 }
 
 export async function deleteThreadProcedure(
 	params: AppRPCSchema["requests"]["deleteThread"]["params"],
 ): Promise<AppRPCSchema["requests"]["deleteThread"]["response"]> {
 	const thread = threadById(params.threadId);
-	if (threadRunStatusFromRecord(thread).state === "working") {
+	if (currentThreadRunStatus(thread).state === "working") {
 		throw new Error("Thread is currently processing and cannot be deleted.");
 	}
 
@@ -2981,7 +1654,7 @@ export async function openWorktreeProcedure(
 	worktreeState.historySignature = signature;
 	worktreeState.lastUpdatedAt = snapshot.lastUpdatedAt;
 	syncProjectWorktreeBackgroundPolling(state);
-	warmGitHistoryCache(worktreeState, worktreePath);
+	warmGitHistoryCache(worktreeState, worktreePath, logBackgroundGitFailure);
 
 	return {
 		project,
@@ -3027,7 +1700,7 @@ export async function listWorktreeGitHistoryProcedure(
 
 		await fillGitHistoryCache(state, worktreePath, 0, limit, requestGitOptions);
 		syncProjectWorktreeBackgroundPolling(projectState);
-		warmGitHistoryCache(state, worktreePath);
+		warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
 		return buildGitHistoryResultFromCache(state, limit, 0);
 	}
 
@@ -3044,7 +1717,7 @@ export async function listWorktreeGitHistoryProcedure(
 		state.historySignature = signature;
 		state.lastUpdatedAt = summary.lastUpdatedAt;
 		syncProjectWorktreeBackgroundPolling(projectState);
-		warmGitHistoryCache(state, worktreePath);
+		warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
 		return history;
 	}
 
@@ -3081,7 +1754,7 @@ export async function listWorktreeGitHistoryProcedure(
 		requestGitOptions,
 	);
 	syncProjectWorktreeBackgroundPolling(projectState);
-	warmGitHistoryCache(state, worktreePath);
+	warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
 	return buildGitHistoryResultFromCache(state, limit, offset);
 }
 
@@ -3100,7 +1773,12 @@ export async function getWorktreeGitCommitDiffProcedure(
 		project.id,
 		worktreePath,
 		params.commitHash,
-		requestGitOptions,
+		{
+			gitCommitDiffCache,
+			gitCommitDiffRequestCache,
+			maxEntries: GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES,
+			requestOptions: requestGitOptions,
+		},
 	);
 }
 
@@ -3181,7 +1859,7 @@ export async function deleteProjectProcedure(
 		(thread) => thread.projectId === project.id,
 	);
 	const workingThread = projectThreads.find(
-		(thread) => threadRunStatusFromRecord(thread).state === "working",
+		(thread) => currentThreadRunStatus(thread).state === "working",
 	);
 	if (workingThread) {
 		throw new Error(
@@ -3233,10 +1911,7 @@ export function suspendActiveWorktreePolling(): void {
 }
 
 export function shutdownProcedureCacheMaintenance(): void {
-	if (directorySuggestionRefreshTimer !== null) {
-		clearInterval(directorySuggestionRefreshTimer);
-		directorySuggestionRefreshTimer = null;
-	}
+	shutdownDirectorySuggestionCacheMaintenance();
 }
 
 export function setWorktreeTaskChangeListener(

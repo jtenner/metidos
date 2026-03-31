@@ -20,6 +20,7 @@
 ├─ bunfig.toml
 ├─ docs/
 │  ├─ codex.md
+│  ├─ 2026-03-31-correctness-issues.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md
 │  └─ references/
@@ -55,10 +56,20 @@
 │  │  ├─ db.ts
 │  │  ├─ git.ts
 │  │  ├─ index.ts
+│  │  ├─ project-procedures/
+│  │  │  ├─ codex-catalog.ts
+│  │  │  ├─ directory-suggestions.ts
+│  │  │  ├─ git-history.ts
+│  │  │  ├─ project-tasks.ts
+│  │  │  ├─ shared.ts
+│  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
 │  │  └─ rpc-schema.ts
 │  └─ mainview/
 │     ├─ App.tsx
+│     ├─ app/
+│     │  ├─ message-ui.tsx
+│     │  └─ state.ts
 │     ├─ controls/
 │     │  ├─ codex-model-selector.tsx
 │     │  ├─ codex-utils.ts
