@@ -1,9 +1,6 @@
 - Address issue 1 in `docs/2026-03-31-correctness-issues.md`: make project deletion coordinate with active Codex runs and clear deleted-project thread state.
   Update `deleteProjectProcedure(...)` in `src/bun/project-procedures.ts` so project deletes either block on working threads or cancel them first, then remove affected entries from `codexThreadMap`, `threadRunStatusMap`, and `threadDetailCache`.
 
-- Address issue 2 in `docs/2026-03-31-correctness-issues.md`: add stale-response protection to `openThread(...)`.
-  Rework the thread-open path in `src/mainview/App.tsx` so slower `getThread(...)` responses cannot overwrite a newer user selection. Use the same request ID and abort pattern already used by the git-history and project-task loaders.
-
 - Address issue 3 in `docs/2026-03-31-correctness-issues.md`: stop using stale cached worktree lists for correctness-critical operations.
   Tighten the worktree validation flow in `src/bun/project-procedures.ts` so `createThreadProcedure(...)`, `runProjectTaskProcedure(...)`, `setWorktreePinnedProcedure(...)`, and explicit worktree opens do a foreground refresh or direct git validation instead of trusting stale cached worktree state.
 

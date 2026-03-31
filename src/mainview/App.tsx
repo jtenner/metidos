@@ -241,6 +241,10 @@ type PendingSharedRequest<T> = {
 	waiterCount: number;
 };
 
+type OpenThreadOptions = {
+	detailPromise?: Promise<RpcThreadDetail> | null;
+};
+
 function readLruValue<Key, Value>(
 	cache: Map<Key, Value>,
 	key: Key,
@@ -2352,6 +2356,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
 		null,
 	);
+	const threadOpenRequestIdRef = useRef(0);
+	const threadOpenAbortControllerRef = useRef<AbortController | null>(null);
 	const gitHistoryLoadingMoreRef = useRef(false);
 	const projectWorktreeRequestCacheRef = useRef(
 		new Map<number, Promise<RpcWorktree[]>>(),
@@ -3118,15 +3124,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		});
 	}, []);
 
-	const clearThreadSelection = useCallback(() => {
-		setSelectedThreadId(null);
-		setThreadMessages([]);
-		setChatError("");
-		setModelControlError("");
-		selectedThreadIdRef.current = null;
-		selectedThreadRunStateRef.current = "idle";
-	}, []);
-
 	const syncThreadContext = useCallback((thread: RpcThread) => {
 		setSelectedProjectId(thread.projectId);
 		setSelectedWorktreePath(thread.worktreePath);
@@ -3212,6 +3209,28 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			loadMoreController.abort(createAbortError(null, reason));
 		}
 	}, []);
+
+	const abortThreadOpenRequest = useCallback((reason: string) => {
+		const controller = threadOpenAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		threadOpenAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
+	}, []);
+
+	const clearThreadSelection = useCallback(() => {
+		threadOpenRequestIdRef.current += 1;
+		abortThreadOpenRequest("Thread selection was cleared.");
+		setSelectedThreadId(null);
+		setThreadMessages([]);
+		setChatError("");
+		setModelControlError("");
+		setIsThreadLoading(false);
+		selectedThreadIdRef.current = null;
+		selectedThreadRunStateRef.current = "idle";
+	}, [abortThreadOpenRequest]);
 
 	const loadProjectTasks = useCallback(
 		async (projectId: number, worktreePath: string): Promise<void> => {
@@ -3646,24 +3665,75 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[loadProjectWorktrees, syncThreadContext],
 	);
 
+	const loadThreadDetailForOpen = useCallback(
+		async (
+			threadId: number,
+			signal: AbortSignal,
+			options?: OpenThreadOptions,
+		): Promise<RpcThreadDetail> => {
+			const prefetchedDetail = options?.detailPromise
+				? await awaitAbortableResult(
+						options.detailPromise.catch(() => null),
+						signal,
+						"Thread open request was aborted.",
+					)
+				: null;
+			if (prefetchedDetail) {
+				return prefetchedDetail;
+			}
+
+			return procedures.getThread(
+				{ threadId },
+				{
+					priority: "foreground",
+					signal,
+				},
+			);
+		},
+		[procedures],
+	);
+
 	const openThread = useCallback(
-		async (threadId: number) => {
+		async (threadId: number, options?: OpenThreadOptions) => {
+			const requestId = ++threadOpenRequestIdRef.current;
+			abortThreadOpenRequest("Thread open request was superseded.");
+			const controller = new AbortController();
+			threadOpenAbortControllerRef.current = controller;
 			setIsThreadLoading(true);
 			setThreadsError("");
 			setChatError("");
 			setModelControlError("");
 			try {
 				const detail = prepareOpenedThreadDetail(
-					await procedures.getThread({ threadId }),
+					await loadThreadDetailForOpen(threadId, controller.signal, options),
 				);
+				if (threadOpenRequestIdRef.current !== requestId) {
+					return;
+				}
 				applyOpenedThreadDetail(detail);
 			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
+				if (threadOpenRequestIdRef.current !== requestId) {
+					return;
+				}
 				setThreadsError(error instanceof Error ? error.message : String(error));
 			} finally {
-				setIsThreadLoading(false);
+				if (threadOpenAbortControllerRef.current === controller) {
+					threadOpenAbortControllerRef.current = null;
+				}
+				if (threadOpenRequestIdRef.current === requestId) {
+					setIsThreadLoading(false);
+				}
 			}
 		},
-		[applyOpenedThreadDetail, prepareOpenedThreadDetail, procedures],
+		[
+			abortThreadOpenRequest,
+			applyOpenedThreadDetail,
+			loadThreadDetailForOpen,
+			prepareOpenedThreadDetail,
+		],
 	);
 
 	const resetAddProjectPath = useCallback(
@@ -3939,28 +4009,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			const initialThread = pickInitialThread(sortedThreads, persistedState);
 			const initialThreadDetailPromise = initialThread
-				? procedures
-						.getThread({
+				? procedures.getThread(
+						{
 							threadId: initialThread.id,
-						})
-						.catch(() => null)
+						},
+						{
+							priority: "foreground",
+						},
+					)
 				: null;
 			const initialThreadOpenPromise = initialThread
-				? (async () => {
-						try {
-							const detail = initialThreadDetailPromise
-								? await initialThreadDetailPromise
-								: null;
-							if (detail) {
-								applyOpenedThreadDetail(prepareOpenedThreadDetail(detail));
-								return;
-							}
-						} catch {
-							// Fall through to the normal open-thread flow below.
-						}
-
-						await openThread(initialThread.id);
-					})()
+				? openThread(initialThread.id, {
+						detailPromise: initialThreadDetailPromise,
+					})
 				: null;
 
 			const openProjects = loaded.filter((project) => project.isOpen === 1);
@@ -4109,8 +4170,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setSessionStateReady(true);
 		}
 	}, [
-		prepareOpenedThreadDetail,
-		applyOpenedThreadDetail,
 		cacheGitHistoryResult,
 		getProjectState,
 		hydrateProjectRows,
