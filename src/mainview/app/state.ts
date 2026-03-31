@@ -18,18 +18,18 @@ export type VisibleMessage =
 			kind: "chat";
 			speaker: "assistant" | "user";
 			text: string;
-			tone?: "normal" | "working" | "error";
+			tone?: "normal" | "working" | "error" | "notice";
 	  }
 	| {
 			kind: "reasoning";
 			text: string;
-			state: "in_progress" | "completed";
+			state: "in_progress" | "completed" | "stopped";
 	  }
 	| {
 			kind: "command";
 			command: string;
 			output: string;
-			state: "in_progress" | "completed" | "failed";
+			state: "in_progress" | "completed" | "failed" | "stopped";
 			exitCode: number | null;
 	  }
 	| {
@@ -37,7 +37,7 @@ export type VisibleMessage =
 			path: string;
 			diffText: string;
 			changeKind: "add" | "delete" | "update";
-			state: "completed" | "failed";
+			state: "in_progress" | "completed" | "failed" | "stopped";
 	  };
 
 export type MessageGroup =
@@ -98,7 +98,7 @@ export type ThreadActionMenuState = {
 	y: number;
 };
 
-export type ThreadErrorLevel = "none" | "failed" | "unread";
+export type ThreadErrorLevel = "none" | "stopped" | "failed" | "unread";
 
 export type ThreadErrorPreview = {
 	level: ThreadErrorLevel;
@@ -651,6 +651,9 @@ export function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
 	if (thread.runStatus.state === "failed") {
 		return "failed";
 	}
+	if (thread.runStatus.state === "stopped") {
+		return "stopped";
+	}
 	return "none";
 }
 
@@ -666,8 +669,10 @@ export function mergeThreadErrorLevel(
 export function threadErrorLevelWeight(level: ThreadErrorLevel): number {
 	switch (level) {
 		case "unread":
-			return 2;
+			return 3;
 		case "failed":
+			return 2;
+		case "stopped":
 			return 1;
 		default:
 			return 0;

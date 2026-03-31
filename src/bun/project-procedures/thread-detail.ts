@@ -14,6 +14,10 @@ import {
 } from "./codex-catalog";
 import { shortName } from "./shared";
 
+export const THREAD_STOPPED_MESSAGE = "Codex turn was stopped by the user.";
+export const THREAD_INTERRUPTED_MESSAGE =
+	"Codex turn was interrupted before completion.";
+
 const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
 const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
 const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
@@ -37,6 +41,12 @@ function hasUnreadThreadError(thread: ThreadRecord): boolean {
 	);
 }
 
+export function isStoppedThreadMessage(message: string | null): boolean {
+	return (
+		message === THREAD_STOPPED_MESSAGE || message === THREAD_INTERRUPTED_MESSAGE
+	);
+}
+
 export function threadRunStatusFromRecord(
 	thread: ThreadRecord,
 	activeStatus?: RpcThreadRunStatus,
@@ -45,7 +55,7 @@ export function threadRunStatusFromRecord(
 	if (activeStatus) {
 		return {
 			...activeStatus,
-			hasUnreadError,
+			hasUnreadError: activeStatus.state === "stopped" ? false : hasUnreadError,
 		};
 	}
 
@@ -53,6 +63,15 @@ export function threadRunStatusFromRecord(
 		thread.lastErrorAt &&
 		(!thread.lastRunAt || thread.lastErrorAt >= thread.lastRunAt);
 	if (failureIsCurrent) {
+		if (isStoppedThreadMessage(thread.lastErrorMessage)) {
+			return {
+				state: "stopped",
+				startedAt: null,
+				updatedAt: thread.lastErrorAt,
+				error: thread.lastErrorMessage,
+				hasUnreadError: false,
+			};
+		}
 		return {
 			state: "failed",
 			startedAt: null,
@@ -220,7 +239,9 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 			itemId: message.itemId,
 			text: message.text,
 			state:
-				message.state === "completed" || message.state === "failed"
+				message.state === "completed" ||
+				message.state === "failed" ||
+				message.state === "stopped"
 					? message.state
 					: "in_progress",
 			command: payload?.command ?? message.text,
@@ -242,7 +263,12 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 			kind: "file_change",
 			itemId: message.itemId,
 			text: message.text,
-			state: message.state === "failed" ? "failed" : "completed",
+			state:
+				message.state === "in_progress" ||
+				message.state === "failed" ||
+				message.state === "stopped"
+					? message.state
+					: "completed",
 			path: payload?.path ?? message.text,
 			changeKind: payload?.changeKind ?? "update",
 			diffText: payload?.diffText ?? "",
@@ -259,7 +285,10 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 			kind: "reasoning",
 			itemId: message.itemId,
 			text: message.text,
-			state: message.state === "completed" ? "completed" : "in_progress",
+			state:
+				message.state === "completed" || message.state === "stopped"
+					? message.state
+					: "in_progress",
 			createdAt: message.createdAt,
 			updatedAt: message.updatedAt,
 		};
@@ -275,7 +304,8 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 		state:
 			message.state === "in_progress" ||
 			message.state === "completed" ||
-			message.state === "failed"
+			message.state === "failed" ||
+			message.state === "stopped"
 				? message.state
 				: null,
 		createdAt: message.createdAt,

@@ -34,6 +34,7 @@ import type {
 } from "../bun/rpc-schema";
 import {
 	ChatErrorMessage,
+	ChatNoticeMessage,
 	CommandExecutionMessage,
 	ContextUsageMeter,
 	FileChangeMessage,
@@ -469,6 +470,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadRunStatus.state === "failed"
 			? (selectedThreadRunStatus.error ?? "")
 			: "";
+	const selectedThreadRunNotice =
+		selectedThreadRunStatus.state === "stopped"
+			? (selectedThreadRunStatus.error ?? "")
+			: "";
 	const composerActionDisabled = selectedThreadIsWorking
 		? !selectedThread || isThreadLoading || isStoppingThread
 		: !selectedThread || isSending || isThreadLoading;
@@ -480,6 +485,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		: "Send message";
 
 	const activeChatError = chatError || selectedThreadRunError;
+	const activeChatNotice = selectedThreadRunNotice;
 
 	useEffect(() => {
 		void chatInput;
@@ -1875,7 +1881,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			selectedSummary.runStatus.state === "working" ||
 			selectedThreadRunStateRef.current === "working" ||
 			(selectedSummary.runStatus.state === "failed" &&
-				selectedThreadRunStateRef.current !== "failed");
+				selectedThreadRunStateRef.current !== "failed") ||
+			(selectedSummary.runStatus.state === "stopped" &&
+				selectedThreadRunStateRef.current !== "stopped");
 
 		if (!shouldRefreshSelectedDetail) {
 			selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
@@ -4040,10 +4048,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				text: activeChatError,
 			});
 		}
+		if (activeChatNotice) {
+			messages.push({
+				kind: "chat",
+				speaker: "assistant",
+				tone: "notice",
+				text: activeChatNotice,
+			});
+		}
 		return messages;
 	}, [
 		activeSelectedWorktreeFolder,
 		activeChatError,
+		activeChatNotice,
 		isThreadLoading,
 		selectedProject,
 		selectedThread,
@@ -4058,6 +4075,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 				if (message.tone === "error") {
 					return <ChatErrorMessage text={message.text} />;
+				}
+				if (message.tone === "notice") {
+					return <ChatNoticeMessage text={message.text} />;
 				}
 				return <MarkdownMessage text={message.text} />;
 			}
@@ -4476,7 +4496,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 													? "bg-[#ff304f]"
 													: worktreeErrorLevel === "failed"
 														? "bg-[#8f4956]"
-														: "bg-transparent"
+														: worktreeErrorLevel === "stopped"
+															? "bg-[#b98a3a]"
+															: "bg-transparent"
 											}`}
 										/>
 										<div
@@ -4722,7 +4744,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							? "bg-[#ff304f]"
 							: projectErrorLevel === "failed"
 								? "bg-[#8f4956]"
-								: "bg-[#5f5f5f]";
+								: projectErrorLevel === "stopped"
+									? "bg-[#b98a3a]"
+									: "bg-[#5f5f5f]";
 					return (
 						<div
 							className="space-y-1"
@@ -4880,7 +4904,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																				? "bg-[#ff304f]"
 																				: worktreeErrorLevel === "failed"
 																					? "bg-[#8f4956]"
-																					: "bg-transparent"
+																					: worktreeErrorLevel === "stopped"
+																						? "bg-[#b98a3a]"
+																						: "bg-transparent"
 																		}`}
 																	/>
 																	<div
@@ -5055,9 +5081,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							const isActive = selectedThreadId === thread.id;
 							const isWorking = thread.runStatus.state === "working";
 							const hasRunError = thread.runStatus.state === "failed";
+							const hasRunStopped = thread.runStatus.state === "stopped";
 							const hasUnreadError = thread.runStatus.hasUnreadError;
 							const threadErrorPreviewText =
-								hasUnreadError || hasRunError
+								hasUnreadError || hasRunError || hasRunStopped
 									? (thread.runStatus.error ?? "")
 									: "";
 							const threadPreviewHandlers = threadErrorPreviewText
@@ -5098,9 +5125,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														? "bg-[#ff304f]"
 														: hasRunError
 															? "bg-[#8f4956]"
-															: isActive
-																? "bg-[#bdd5e6]"
-																: "bg-[#545d64]"
+															: hasRunStopped
+																? "bg-[#b98a3a]"
+																: isActive
+																	? "bg-[#bdd5e6]"
+																	: "bg-[#545d64]"
 												}`}
 											/>
 											<div

@@ -854,6 +854,28 @@ export function markThreadRan(database: Database, threadId: number): void {
 	);
 }
 
+export function markThreadStopped(
+	database: Database,
+	threadId: number,
+	message: string,
+): void {
+	runStatement(
+		database,
+		`
+			UPDATE threads
+			SET
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_run_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				last_error_message = ?
+			WHERE id = ?
+		`,
+		message,
+		threadId,
+	);
+}
+
 export function setThreadUsage(
 	database: Database,
 	threadId: number,
@@ -1114,7 +1136,7 @@ export function upsertThreadActivity(
 	return message;
 }
 
-export function settleInProgressThreadMessages(
+export function stopInProgressThreadMessages(
 	database: Database,
 	threadId: number,
 ): void {
@@ -1123,10 +1145,7 @@ export function settleInProgressThreadMessages(
 		`
 			UPDATE thread_messages
 			SET
-				state = CASE
-					WHEN kind IN ('command', 'file_change') THEN 'failed'
-					ELSE 'completed'
-				END,
+				state = 'stopped',
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE thread_id = ?
 				AND state = 'in_progress'

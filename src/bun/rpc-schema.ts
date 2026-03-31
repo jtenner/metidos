@@ -147,7 +147,7 @@ export type RpcCodexModelCatalog = {
 };
 
 export type RpcThreadRunStatus = {
-	state: "idle" | "working" | "failed";
+	state: "idle" | "working" | "failed" | "stopped";
 	startedAt: string | null;
 	updatedAt: string | null;
 	error: string | null;
@@ -195,7 +195,7 @@ export type RpcChatThreadMessage = {
 	kind: "chat";
 	itemId: string | null;
 	text: string;
-	state: "in_progress" | "completed" | "failed" | null;
+	state: "in_progress" | "completed" | "failed" | "stopped" | null;
 	createdAt: string;
 	updatedAt: string;
 };
@@ -207,7 +207,7 @@ export type RpcReasoningThreadMessage = {
 	kind: "reasoning";
 	itemId: string;
 	text: string;
-	state: "in_progress" | "completed";
+	state: "in_progress" | "completed" | "stopped";
 	createdAt: string;
 	updatedAt: string;
 };
@@ -219,7 +219,7 @@ export type RpcCommandThreadMessage = {
 	kind: "command";
 	itemId: string;
 	text: string;
-	state: "in_progress" | "completed" | "failed";
+	state: "in_progress" | "completed" | "failed" | "stopped";
 	command: string;
 	output: string;
 	exitCode: number | null;
@@ -234,7 +234,7 @@ export type RpcFileChangeThreadMessage = {
 	kind: "file_change";
 	itemId: string;
 	text: string;
-	state: "completed" | "failed";
+	state: "in_progress" | "completed" | "failed" | "stopped";
 	path: string;
 	changeKind: "add" | "delete" | "update";
 	diffText: string;

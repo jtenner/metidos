@@ -23,6 +23,7 @@ import {
 	markThreadErrorSeen,
 	markThreadFailed,
 	markThreadRan,
+	markThreadStopped,
 	renameThread,
 	setProjectClosed,
 	setProjectWorktreePinned,
@@ -30,7 +31,7 @@ import {
 	setThreadPinned,
 	setThreadReasoningEffort,
 	setThreadUsage,
-	settleInProgressThreadMessages,
+	stopInProgressThreadMessages,
 	touchThread,
 	updateThreadCodexId,
 	upsertProject,
@@ -95,8 +96,11 @@ import {
 	writeLruValue,
 } from "./project-procedures/shared";
 import {
+	THREAD_INTERRUPTED_MESSAGE,
+	THREAD_STOPPED_MESSAGE,
 	buildNextCompactionTelemetry,
 	buildThreadTitle,
+	isStoppedThreadMessage,
 	threadRunStatusFromRecord,
 	toRpcThread,
 	toRpcThreadMessages,
@@ -414,25 +418,46 @@ async function settleCanceledThreadTurn(
 	startedAt: string,
 	lastAssistantItemId: string | null,
 	lastAssistantText: string,
+	message: string,
 ): Promise<void> {
 	if (lastAssistantItemId && lastAssistantText.trim()) {
 		await upsertAssistantChatActivity(
 			threadId,
 			lastAssistantItemId,
 			lastAssistantText.trim(),
-			"completed",
+			"stopped",
 		);
 	}
-	settleInProgressThreadMessages(db, threadId);
+	stopInProgressThreadMessages(db, threadId);
 	invalidateThreadDetailCache(threadId);
-	markThreadRan(db, threadId);
+	markThreadStopped(db, threadId, message);
 	setThreadRunStatus(threadId, {
-		state: "idle",
+		state: "stopped",
 		startedAt,
 		updatedAt: getNow(),
-		error: null,
+		error: message,
 		hasUnreadError: false,
 	});
+}
+
+function interruptionMessageFromAbort(reason: unknown): string {
+	const message =
+		reason instanceof Error
+			? reason.message
+			: typeof reason === "string"
+				? reason
+				: "";
+	const normalizedMessage = message.trim();
+	if (
+		normalizedMessage === THREAD_STOPPED_MESSAGE ||
+		normalizedMessage.toLowerCase().includes("stopped by the user")
+	) {
+		return THREAD_STOPPED_MESSAGE;
+	}
+	if (isStoppedThreadMessage(normalizedMessage)) {
+		return normalizedMessage;
+	}
+	return THREAD_INTERRUPTED_MESSAGE;
 }
 
 function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
@@ -595,6 +620,7 @@ async function runThreadMessageInBackground(
 				startedAt,
 				lastAssistantItemId,
 				lastAssistantText,
+				interruptionMessageFromAbort(controller.signal.reason),
 			);
 			return;
 		}
@@ -726,7 +752,7 @@ async function upsertReasoningActivity(
 	threadId: number,
 	itemId: string,
 	item: Extract<ThreadItem, { type: "reasoning" }>,
-	state: "in_progress" | "completed",
+	state: "in_progress" | "completed" | "stopped",
 ): Promise<void> {
 	upsertThreadActivity(db, {
 		threadId,
@@ -742,7 +768,7 @@ async function upsertAssistantChatActivity(
 	threadId: number,
 	itemId: string,
 	text: string,
-	state: "in_progress" | "completed" | "failed",
+	state: "in_progress" | "completed" | "failed" | "stopped",
 ): Promise<void> {
 	upsertThreadActivity(db, {
 		threadId,

@@ -4,7 +4,7 @@ Source: `docs/2026-03-31-correctness-issues-2.md`
 
 - [x] Fix `openOrCloseWorktree(...)` so async open/close results do not apply against stale captured state.
 - [x] Add request ordering or cancellation for worktree open/close actions so slower responses cannot overwrite newer user selections.
-- [ ] Preserve explicit cancellation semantics for stopped Codex turns instead of persisting them as clean completions.
+- [x] Preserve explicit cancellation semantics for stopped Codex turns instead of persisting them as clean completions.
 - [x] Harden task discovery and task watch target collection against symlink recursion and directory cycles.
 - [x] Prevent closed projects from recreating backend pollers through active worktree sync.
 - [x] Refresh cached git history for selected unopened worktrees so the UI cannot stay stale indefinitely.

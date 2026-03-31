@@ -210,7 +210,8 @@ export function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
 		message.kind === "chat" &&
 		message.speaker === "assistant" &&
 		message.tone !== "working" &&
-		message.tone !== "error"
+		message.tone !== "error" &&
+		message.tone !== "notice"
 	);
 }
 
@@ -226,6 +227,14 @@ export function ProcessingMessage(): JSX.Element {
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 	return (
 		<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+			{text}
+		</div>
+	);
+}
+
+export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
+	return (
+		<div className="rounded-sm border border-[#6d5930] bg-[#261f12] px-3 py-3 text-sm text-[#f2d79b]">
 			{text}
 		</div>
 	);
@@ -258,11 +267,14 @@ function parseUnifiedDiff(diffText: string): DiffLine[] {
 }
 
 function commandStateLabel(
-	state: "in_progress" | "completed" | "failed",
+	state: "in_progress" | "completed" | "failed" | "stopped",
 	exitCode: number | null,
 ): string {
 	if (state === "in_progress") {
 		return "Running";
+	}
+	if (state === "stopped") {
+		return "Stopped";
 	}
 	if (state === "failed") {
 		return exitCode === null ? "Failed" : `Failed (${exitCode})`;
@@ -316,7 +328,7 @@ export function CommandExecutionMessage({
 }: {
 	command: string;
 	output: string;
-	state: "in_progress" | "completed" | "failed";
+	state: "in_progress" | "completed" | "failed" | "stopped";
 	exitCode: number | null;
 }): JSX.Element {
 	return (
@@ -347,7 +359,7 @@ export function ReasoningMessage({
 	state,
 	text,
 }: {
-	state: "in_progress" | "completed";
+	state: "in_progress" | "completed" | "stopped";
 	text: string;
 }): JSX.Element {
 	return (
@@ -357,7 +369,11 @@ export function ReasoningMessage({
 					Reasoning
 				</div>
 				<div className="text-[10px] uppercase tracking-widest text-[#70808c]">
-					{state === "completed" ? "Complete" : "Working"}
+					{state === "completed"
+						? "Complete"
+						: state === "stopped"
+							? "Stopped"
+							: "Working"}
 				</div>
 			</div>
 			<div className="mt-2 text-sm leading-6 text-[#d6e7f2]">{text}</div>
@@ -401,7 +417,7 @@ export function FileChangeMessage({
 	path: string;
 	diffText: string;
 	changeKind: "add" | "delete" | "update";
-	state: "completed" | "failed";
+	state: "in_progress" | "completed" | "failed" | "stopped";
 	worktreePath?: string | undefined;
 }): JSX.Element {
 	const changeLabel =
@@ -410,6 +426,14 @@ export function FileChangeMessage({
 			: changeKind === "delete"
 				? "Deleted"
 				: "Updated";
+	const stateLabel =
+		state === "failed"
+			? "Failed"
+			: state === "stopped"
+				? "Stopped"
+				: state === "in_progress"
+					? "Working"
+					: changeLabel;
 	return (
 		<div className="space-y-3 rounded-sm border border-[#2c353c] bg-[#13181b] p-4">
 			<div className="flex items-center justify-between gap-4">
@@ -425,7 +449,7 @@ export function FileChangeMessage({
 					</a>
 				</div>
 				<div className="shrink-0 rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
-					{state === "failed" ? "Failed" : changeLabel}
+					{stateLabel}
 				</div>
 			</div>
 			{diffText.trim() ? <DiffViewer diffText={diffText} /> : null}
