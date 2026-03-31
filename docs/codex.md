@@ -27,9 +27,9 @@ Creates a client for the local CLI process.
 
 ### Jolt sidecar MCP
 
-In this repo, `new Codex({ ... })` is also where the local `jolt` MCP sidecar is attached through `config.mcp_servers`.
+In this repo, each `Codex` client attaches the local `jolt` MCP sidecar through `config.mcp_servers`.
 
-That sidecar exposes a small set of Jolt control tools:
+The sidecar exposes these Jolt control tools:
 
 - `set_thread_title`
 - `new_codex`
@@ -37,11 +37,11 @@ That sidecar exposes a small set of Jolt control tools:
 - `set_active_worktree`
 - `thread_status`
 
-The intent is:
+Guidance:
 
-- use the tools sparingly for thread/worktree lifecycle changes
-- allow `set_thread_title` to be used whenever the thread focus materially changes
-- keep the sidecar attached at client construction time, so every thread created from that `Codex` instance can reach the same server
+- use lifecycle tools sparingly
+- let `set_thread_title` run whenever a short title would better match the thread focus
+- attach the sidecar at client construction so every thread from that `Codex` instance can reach it
 
 ### `codex.startThread(options?)`
 Starts a new thread object for a fresh conversation.

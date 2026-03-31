@@ -81,7 +81,7 @@ class JoltRpcClient {
 								this.pendingRequests.delete(requestId);
 								reject(
 									new Error(
-										`Jolt RPC request "${String(method)}" timed out after ${timeoutMs}ms.`,
+										`RPC "${String(method)}" timed out after ${timeoutMs}ms.`,
 									),
 								);
 							}, timeoutMs);
@@ -184,7 +184,7 @@ class JoltRpcClient {
 			});
 
 			nextSocket.addEventListener("error", () => {
-				resetSocket(new Error(`Unable to connect to Jolt RPC at ${this.url}.`));
+				resetSocket(new Error(`Could not connect to Jolt RPC at ${this.url}.`));
 			});
 		});
 
@@ -266,16 +266,14 @@ async function resolveProjectId(params?: {
 		if (matched) {
 			return matched.id;
 		}
-		throw new Error(`Jolt project not found for path ${params.projectPath}`);
+		throw new Error(`Project not found: ${params.projectPath}`);
 	}
 
 	if (typeof activeProjectId === "number") {
 		return activeProjectId;
 	}
 
-	throw new Error(
-		"projectId or projectPath is required when no active Jolt project context is available.",
-	);
+	throw new Error("projectId or projectPath required with no active project.");
 }
 
 async function resolveProjectIdForWorktreePath(
@@ -333,7 +331,7 @@ async function resolveProjectIdForWorktreePath(
 		}
 	}
 
-	throw new Error(`Jolt worktree not found: ${worktreePath}`);
+	throw new Error(`Worktree not found: ${worktreePath}`);
 }
 
 async function resolveWorktreeTarget(params?: {
@@ -363,9 +361,7 @@ async function resolveWorktreeTarget(params?: {
 		};
 	}
 
-	throw new Error(
-		"worktreePath is required when no active Jolt worktree context is available.",
-	);
+	throw new Error("worktreePath required with no active worktree.");
 }
 
 function resolveThreadId(threadId?: number | null): number {
@@ -375,9 +371,7 @@ function resolveThreadId(threadId?: number | null): number {
 	if (typeof activeThreadId === "number") {
 		return activeThreadId;
 	}
-	throw new Error(
-		"threadId is required when no active Jolt thread context is available.",
-	);
+	throw new Error("threadId required with no active thread.");
 }
 
 function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
@@ -424,15 +418,15 @@ server.registerTool(
 	{
 		title: "Set Thread Title",
 		description:
-			"Update the current Jolt thread title. This is the one sidecar tool that can be used whenever the thread focus materially changes.",
+			"Update the current Jolt thread title. Use it whenever a short title would better match the current focus.",
 		inputSchema: {
-			title: z.string().trim().min(1).describe("New thread title."),
+			title: z.string().trim().min(1).describe("Short title."),
 			threadId: z
 				.number()
 				.int()
 				.positive()
 				.optional()
-				.describe("Optional Jolt thread id. Defaults to the current thread."),
+				.describe("Defaults to the current thread."),
 		},
 		annotations: {
 			idempotentHint: false,
@@ -446,13 +440,10 @@ server.registerTool(
 			threadId: resolvedThreadId,
 			title,
 		});
-		return textResult(
-			`Set Jolt thread ${thread.id} title to "${thread.title}".`,
-			{
-				threadId: thread.id,
-				title: thread.title,
-			},
-		);
+		return textResult(`Renamed thread ${thread.id}.`, {
+			threadId: thread.id,
+			title: thread.title,
+		});
 	},
 );
 
@@ -461,43 +452,32 @@ server.registerTool(
 	{
 		title: "New Codex",
 		description:
-			"Create and immediately start a separate Jolt Codex thread. Use this sparingly, only when work should continue in a distinct thread or worktree.",
+			"Start a separate Jolt Codex thread. Use sparingly for distinct work or a different worktree.",
 		inputSchema: {
-			input: z
-				.string()
-				.trim()
-				.min(1)
-				.describe("Initial prompt to send to the new thread."),
+			input: z.string().trim().min(1).describe("Initial prompt."),
 			projectId: z
 				.number()
 				.int()
 				.positive()
 				.optional()
-				.describe("Optional Jolt project id."),
+				.describe("Jolt project id."),
 			projectPath: z
 				.string()
 				.trim()
 				.min(1)
 				.optional()
-				.describe("Optional project path if projectId is not known."),
+				.describe("Project path if projectId is unknown."),
 			worktreePath: z
 				.string()
 				.trim()
 				.min(1)
 				.optional()
-				.describe(
-					"Optional worktree path. Defaults to the current worktree when available.",
-				),
-			model: z
-				.string()
-				.trim()
-				.min(1)
-				.optional()
-				.describe("Optional Codex model override for the new thread."),
+				.describe("Defaults to the current worktree."),
+			model: z.string().trim().min(1).optional().describe("Model override."),
 			reasoningEffort: z
 				.enum(["minimal", "low", "medium", "high", "xhigh"])
 				.optional()
-				.describe("Optional reasoning effort override."),
+				.describe("Reasoning override."),
 		},
 		annotations: {
 			idempotentHint: false,
@@ -530,7 +510,7 @@ server.registerTool(
 		});
 		const payload = threadStatusPayload(started);
 		return textResult(
-			`Started Jolt thread ${payload.threadId} on ${payload.worktreePath}. Status: ${payload.status}.`,
+			`Started thread ${payload.threadId} (${payload.status}).`,
 			payload,
 		);
 	},
@@ -541,25 +521,21 @@ server.registerTool(
 	{
 		title: "New Worktree",
 		description:
-			"Create a new git worktree inside Jolt. Use sparingly because it creates a new branch/worktree on disk.",
+			"Create a Jolt worktree. Use sparingly; this creates a branch and worktree.",
 		inputSchema: {
-			name: z
-				.string()
-				.trim()
-				.min(1)
-				.describe("Branch and worktree name to create."),
+			name: z.string().trim().min(1).describe("Branch/worktree name."),
 			projectId: z
 				.number()
 				.int()
 				.positive()
 				.optional()
-				.describe("Optional Jolt project id."),
+				.describe("Jolt project id."),
 			projectPath: z
 				.string()
 				.trim()
 				.min(1)
 				.optional()
-				.describe("Optional Jolt project path."),
+				.describe("Jolt project path."),
 		},
 		annotations: {
 			destructiveHint: true,
@@ -577,7 +553,7 @@ server.registerTool(
 			projectId: resolvedProjectId,
 			name,
 		});
-		return textResult(`Created Jolt worktree ${result.worktreePath}.`, {
+		return textResult(`Created worktree ${result.worktreePath}.`, {
 			projectId: result.project.id,
 			projectPath: result.project.path,
 			worktreePath: result.worktreePath,
@@ -590,25 +566,21 @@ server.registerTool(
 	{
 		title: "Set Active Worktree",
 		description:
-			"Set the user's active worktree in Jolt. Use sparingly when work should clearly shift to a different worktree.",
+			"Set the active Jolt worktree. Use sparingly when work clearly moves.",
 		inputSchema: {
 			projectId: z
 				.number()
 				.int()
 				.positive()
 				.optional()
-				.describe("Optional Jolt project id."),
+				.describe("Jolt project id."),
 			projectPath: z
 				.string()
 				.trim()
 				.min(1)
 				.optional()
-				.describe("Optional Jolt project path."),
-			worktreePath: z
-				.string()
-				.trim()
-				.min(1)
-				.describe("Worktree path to mark active."),
+				.describe("Jolt project path."),
+			worktreePath: z.string().trim().min(1).describe("Worktree path."),
 		},
 		annotations: {
 			idempotentHint: true,
@@ -626,10 +598,7 @@ server.registerTool(
 			projectId: target.projectId,
 			worktreePath: target.worktreePath,
 		});
-		return textResult(
-			`Set Jolt active worktree to ${target.worktreePath}.`,
-			target,
-		);
+		return textResult("Set active worktree.", target);
 	},
 );
 
@@ -638,14 +607,14 @@ server.registerTool(
 	{
 		title: "Thread Status",
 		description:
-			"Check whether a Jolt thread is Created, Turning, Stopped, or Errored.",
+			"Get a Jolt thread status: Created, Turning, Stopped, or Errored.",
 		inputSchema: {
 			threadId: z
 				.number()
 				.int()
 				.positive()
 				.optional()
-				.describe("Optional Jolt thread id. Defaults to the current thread."),
+				.describe("Defaults to the current thread."),
 		},
 		annotations: {
 			idempotentHint: true,
@@ -659,7 +628,7 @@ server.registerTool(
 		});
 		const payload = threadStatusPayload(detail);
 		return textResult(
-			`Jolt thread ${payload.threadId} is ${payload.status}.`,
+			`Thread ${payload.threadId}: ${payload.status}.`,
 			payload,
 		);
 	},
