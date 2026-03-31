@@ -168,7 +168,9 @@ type WorktreePollState = {
 	historyPrefetch: PendingGitHistoryPrefetch | null;
 	historySignature: string | null;
 	historyTimer: ReturnType<typeof setInterval> | null;
+	tasks: RpcProjectTask[] | null;
 	taskInputs: Map<string, number>;
+	taskInputsLoaded: boolean;
 	taskTimer: ReturnType<typeof setInterval> | null;
 	lastUpdatedAt: string;
 };
@@ -927,6 +929,13 @@ function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
 		}
 		return left.path.localeCompare(right.path);
 	});
+}
+
+function readProjectTasksFromDisk(worktreePath: string): RpcProjectTask[] {
+	return sortProjectTasks([
+		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
+		...listPackageJsonTasks(worktreePath),
+	]);
 }
 
 function resolveProjectTaskFilePath(
@@ -2870,7 +2879,9 @@ function createWorktreePollState(
 		historyPrefetch: null,
 		historySignature: null,
 		historyTimer: null,
+		tasks: null,
 		taskInputs: new Map(),
+		taskInputsLoaded: false,
 		taskTimer: null,
 		lastUpdatedAt: getNow(),
 	};
@@ -2890,16 +2901,51 @@ function ensureWorktreePollState(
 	return worktreeState;
 }
 
+function startWorktreeTaskPolling(
+	state: ProjectPollState,
+	worktreePath: string,
+): WorktreePollState {
+	const worktreeState = ensureWorktreePollState(state, worktreePath);
+	if (worktreeState.taskTimer) {
+		return worktreeState;
+	}
+
+	const pollTasks = () => {
+		try {
+			const nextTaskInputs = readTaskInputStamps(worktreePath);
+			if (!worktreeState.taskInputsLoaded) {
+				worktreeState.taskInputs = nextTaskInputs;
+				worktreeState.taskInputsLoaded = true;
+				return;
+			}
+			if (!taskInputsChanged(worktreeState.taskInputs, nextTaskInputs)) {
+				return;
+			}
+			worktreeState.taskInputs = nextTaskInputs;
+			worktreeState.tasks = null;
+			worktreeState.lastUpdatedAt = getNow();
+			worktreeTaskChangeListener?.(state.id, worktreePath);
+		} catch (error) {
+			console.error(`Task poll failed for ${worktreePath}`, error);
+		}
+	};
+
+	worktreeState.taskTimer = setInterval(() => {
+		pollTasks();
+	}, TASK_POLL_INTERVAL_MS);
+	return worktreeState;
+}
+
 function startWorktreePolling(
 	state: ProjectPollState,
 	worktreePath: string,
 ): WorktreePollState {
 	const worktreeState = ensureWorktreePollState(state, worktreePath);
+	startWorktreeTaskPolling(state, worktreePath);
 	if (
 		worktreeState.diffTimer ||
 		worktreeState.filesTimer ||
-		worktreeState.historyTimer ||
-		worktreeState.taskTimer
+		worktreeState.historyTimer
 	) {
 		return worktreeState;
 	}
@@ -2971,20 +3017,6 @@ function startWorktreePolling(
 		}
 	};
 
-	const pollTasks = () => {
-		try {
-			const nextTaskInputs = readTaskInputStamps(worktreePath);
-			if (!taskInputsChanged(worktreeState.taskInputs, nextTaskInputs)) {
-				return;
-			}
-			worktreeState.taskInputs = nextTaskInputs;
-			worktreeState.lastUpdatedAt = getNow();
-			worktreeTaskChangeListener?.(state.id, worktreePath);
-		} catch (error) {
-			console.error(`Task poll failed for ${worktreePath}`, error);
-		}
-	};
-
 	worktreeState.diffTimer = setInterval(() => {
 		void pollDiff();
 	}, DIFF_POLL_INTERVAL_MS);
@@ -2994,9 +3026,6 @@ function startWorktreePolling(
 	worktreeState.historyTimer = setInterval(() => {
 		void pollGitHistory();
 	}, GIT_HISTORY_POLL_INTERVAL_MS);
-	worktreeState.taskTimer = setInterval(() => {
-		pollTasks();
-	}, TASK_POLL_INTERVAL_MS);
 
 	void pollDiff();
 	void pollFiles();
@@ -3165,13 +3194,30 @@ export async function listProjectTasksProcedure(
 	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath, requestGitOptions);
+	const projectState = ensureProjectPoller(project);
+	await ensureTrackedProjectWorktree(
+		project,
+		projectState,
+		worktreePath,
+		requestGitOptions,
+	);
+	const worktreeState = ensureWorktreePollState(projectState, worktreePath);
+	if (worktreeState.tasks !== null) {
+		startWorktreeTaskPolling(projectState, worktreePath);
+		return worktreeState.tasks;
+	}
+
 	throwIfAborted(context?.signal, "Project task read was aborted.");
-	const tasks = sortProjectTasks([
-		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
-		...listPackageJsonTasks(worktreePath),
-	]);
-	startWorktreePolling(ensureProjectPoller(project), worktreePath);
+	const taskInputs = worktreeState.taskInputsLoaded
+		? worktreeState.taskInputs
+		: readTaskInputStamps(worktreePath);
+	throwIfAborted(context?.signal, "Project task read was aborted.");
+	const tasks = readProjectTasksFromDisk(worktreePath);
+	worktreeState.taskInputs = taskInputs;
+	worktreeState.taskInputsLoaded = true;
+	worktreeState.tasks = tasks;
+	worktreeState.lastUpdatedAt = getNow();
+	startWorktreeTaskPolling(projectState, worktreePath);
 	return tasks;
 }
 
