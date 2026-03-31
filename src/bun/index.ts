@@ -26,6 +26,7 @@ import {
 	renameThreadProcedure,
 	runProjectTaskProcedure,
 	sendThreadMessageProcedure,
+	setActiveWorktreeProcedure,
 	setThreadPinnedProcedure,
 	setWorktreeGitHistoryChangeListener,
 	setWorktreePinnedProcedure,
@@ -33,6 +34,7 @@ import {
 	shutdownProcedureCacheMaintenance,
 	shutdownProjectPolling,
 	startProcedureCacheMaintenance,
+	suspendActiveWorktreePolling,
 	updateThreadModelProcedure,
 	warmProcedureStartupCaches,
 } from "./project-procedures";
@@ -211,6 +213,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	updateThreadModel: (params) => updateThreadModelProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
 	openWorktree: (params, context) => openWorktreeProcedure(params, context),
+	setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
 	listWorktreeGitHistory: (params, context) =>
 		listWorktreeGitHistoryProcedure(params, context),
 	getWorktreeGitCommitDiff: (params, context) =>
@@ -770,6 +773,9 @@ async function bootstrap(): Promise<void> {
 			close(ws) {
 				rpcClients.delete(ws);
 				abortAllPendingRpcRequests(ws, "RPC connection closed.");
+				if (rpcClients.size === 0) {
+					suspendActiveWorktreePolling();
+				}
 			},
 			message(ws, rawMessage) {
 				void (async () => {

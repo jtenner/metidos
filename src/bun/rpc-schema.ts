@@ -34,6 +34,12 @@ export type RpcOpenWorktreeResult = {
 	history: RpcWorktreeGitHistoryResult;
 };
 
+export type RpcSetActiveWorktreeResult = {
+	success: boolean;
+	projectId: number | null;
+	worktreePath: string | null;
+};
+
 export type RpcHomeDirectoryResult = {
 	homeDirectory: string;
 	supportsTildePath: boolean;
@@ -281,6 +287,13 @@ export type AppRPCSchema = {
 			params: { projectId: number; worktreePath: string };
 			response: RpcOpenWorktreeResult;
 		};
+		setActiveWorktree: {
+			params: {
+				projectId: number | null;
+				worktreePath: string | null;
+			};
+			response: RpcSetActiveWorktreeResult;
+		};
 		listWorktreeGitHistory: {
 			params: {
 				projectId: number;
@@ -407,6 +420,10 @@ export interface ProjectProcedures {
 	openWorktree: RpcProcedureCall<
 		AppRPCSchema["requests"]["openWorktree"]["params"],
 		RpcOpenWorktreeResult
+	>;
+	setActiveWorktree: RpcProcedureCall<
+		AppRPCSchema["requests"]["setActiveWorktree"]["params"],
+		AppRPCSchema["requests"]["setActiveWorktree"]["response"]
 	>;
 	listWorktreeGitHistory: RpcProcedureCall<
 		AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],

@@ -544,6 +544,7 @@ const procedures: ProjectProcedures = {
 	updateThreadModel: createProcedure("updateThreadModel"),
 	deleteThread: createProcedure("deleteThread"),
 	openWorktree: createProcedure("openWorktree"),
+	setActiveWorktree: createProcedure("setActiveWorktree"),
 	listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),
 	getWorktreeGitCommitDiff: createProcedure("getWorktreeGitCommitDiff"),
 	closeWorktree: createProcedure("closeWorktree"),

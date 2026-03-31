@@ -2341,6 +2341,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
 	const [sessionStateReady, setSessionStateReady] = useState(false);
+	const [isDocumentVisible, setIsDocumentVisible] = useState(
+		() => document.visibilityState === "visible",
+	);
 	const [gitHistoryScrollTop, setGitHistoryScrollTop] = useState(0);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -2642,6 +2645,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath)
 			.opened;
 	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
+
+	const activePollingProjectId =
+		isDocumentVisible &&
+		selectedProject &&
+		activeSelectedWorktreePath &&
+		activeSelectedWorktreeOpened
+			? selectedProject.id
+			: null;
+	const activePollingWorktreePath =
+		activePollingProjectId !== null ? activeSelectedWorktreePath : null;
 
 	const activeSelectedWorktreeFolder = useMemo(() => {
 		if (!activeSelectedWorktreePath) {
@@ -4603,6 +4616,28 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	useEffect(() => {
 		selectedThreadIdRef.current = selectedThreadId;
 	}, [selectedThreadId]);
+
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			setIsDocumentVisible(document.visibilityState === "visible");
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		return () => {
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+		};
+	}, []);
+
+	useEffect(() => {
+		void procedures
+			.setActiveWorktree({
+				projectId: activePollingProjectId,
+				worktreePath: activePollingWorktreePath,
+			})
+			.catch(() => {
+				// Best effort; active worktree polling will resync on the next selection or visibility change.
+			});
+	}, [activePollingProjectId, activePollingWorktreePath, procedures]);
 
 	useEffect(() => {
 		if (!sessionStateReady) {

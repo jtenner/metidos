@@ -116,8 +116,6 @@ export async function getCodexModelCatalogProcedure(
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
-const DIFF_POLL_INTERVAL_MS = 2_000;
-const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_GIT_HISTORY_PAGE_SIZE = 20;
 const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
@@ -169,11 +167,7 @@ type TaskWatchTarget = {
 
 type WorktreePollState = {
 	diff: string[];
-	diffPolling: boolean;
 	files: string[];
-	diffTimer: ReturnType<typeof setInterval> | null;
-	filesPolling: boolean;
-	filesTimer: ReturnType<typeof setInterval> | null;
 	history: RpcWorktreeGitHistorySummary;
 	historyEntries: RpcGitHistoryEntry[];
 	historyNextOffset: number | null;
@@ -193,6 +187,7 @@ type ProjectPollState = {
 	projectPath: string;
 	worktrees: RpcWorktree[];
 	worktreesLoadedAt: number;
+	activeWorktreePath: string | null;
 	projectTimer: ReturnType<typeof setInterval> | null;
 	openWorktrees: Map<string, WorktreePollState>;
 };
@@ -2829,6 +2824,12 @@ async function refreshProjectPoll(
 			stopWorktreePolling(state, wtPath);
 		}
 	}
+	if (
+		state.activeWorktreePath !== null &&
+		!activeWorktrees.has(state.activeWorktreePath)
+	) {
+		state.activeWorktreePath = null;
+	}
 }
 
 function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
@@ -2840,6 +2841,7 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 			projectPath: project.path,
 			worktrees: [],
 			worktreesLoadedAt: 0,
+			activeWorktreePath: null,
 			projectTimer: null,
 			openWorktrees: new Map(),
 		};
@@ -2872,20 +2874,11 @@ function stopWorktreePolling(
 	const active = state.openWorktrees.get(worktreePath);
 	if (!active) return;
 
-	if (active.diffTimer) {
-		clearInterval(active.diffTimer);
-	}
-	if (active.filesTimer) {
-		clearInterval(active.filesTimer);
-	}
-	if (active.historyTimer) {
-		clearInterval(active.historyTimer);
-	}
-	closeTaskWatchers(active);
-	abortGitHistoryPrefetch(
+	stopWorktreeBackgroundPolling(
 		active,
 		`Stopped worktree polling for ${worktreePath}.`,
 	);
+	closeTaskWatchers(active);
 	state.openWorktrees.delete(worktreePath);
 }
 
@@ -2895,11 +2888,7 @@ function createWorktreePollState(
 ): WorktreePollState {
 	return {
 		diff: [],
-		diffPolling: false,
 		files: [],
-		diffTimer: null,
-		filesPolling: false,
-		filesTimer: null,
 		history: emptyGitHistorySummary(projectId, worktreePath),
 		historyEntries: [],
 		historyNextOffset: null,
@@ -2937,6 +2926,17 @@ function closeTaskWatchers(worktreeState: WorktreePollState): void {
 		}
 	}
 	worktreeState.taskWatchers = [];
+}
+
+function stopWorktreeBackgroundPolling(
+	worktreeState: WorktreePollState,
+	reason: string,
+): void {
+	if (worktreeState.historyTimer) {
+		clearInterval(worktreeState.historyTimer);
+		worktreeState.historyTimer = null;
+	}
+	abortGitHistoryPrefetch(worktreeState, reason);
 }
 
 function startWorktreeTaskPolling(
@@ -3001,49 +3001,14 @@ function startWorktreeTaskPolling(
 	return worktreeState;
 }
 
-function startWorktreePolling(
+function startWorktreeGitHistoryPolling(
 	state: ProjectPollState,
 	worktreePath: string,
 ): WorktreePollState {
 	const worktreeState = ensureWorktreePollState(state, worktreePath);
-	startWorktreeTaskPolling(state, worktreePath);
-	if (
-		worktreeState.diffTimer ||
-		worktreeState.filesTimer ||
-		worktreeState.historyTimer
-	) {
+	if (worktreeState.historyTimer) {
 		return worktreeState;
 	}
-
-	const pollDiff = async () => {
-		if (worktreeState.diffPolling) {
-			return;
-		}
-		worktreeState.diffPolling = true;
-		try {
-			worktreeState.diff = await readDiff(worktreePath, "background");
-			worktreeState.lastUpdatedAt = getNow();
-		} catch (error) {
-			logBackgroundGitFailure(`Diff poll failed for ${worktreePath}`, error);
-		} finally {
-			worktreeState.diffPolling = false;
-		}
-	};
-
-	const pollFiles = async () => {
-		if (worktreeState.filesPolling) {
-			return;
-		}
-		worktreeState.filesPolling = true;
-		try {
-			worktreeState.files = await readFiles(worktreePath, "background");
-			worktreeState.lastUpdatedAt = getNow();
-		} catch (error) {
-			logBackgroundGitFailure(`File poll failed for ${worktreePath}`, error);
-		} finally {
-			worktreeState.filesPolling = false;
-		}
-	};
 
 	const pollGitHistory = async () => {
 		if (worktreeState.historyPolling) {
@@ -3082,20 +3047,27 @@ function startWorktreePolling(
 		}
 	};
 
-	worktreeState.diffTimer = setInterval(() => {
-		void pollDiff();
-	}, DIFF_POLL_INTERVAL_MS);
-	worktreeState.filesTimer = setInterval(() => {
-		void pollFiles();
-	}, FILE_POLL_INTERVAL_MS);
 	worktreeState.historyTimer = setInterval(() => {
 		void pollGitHistory();
 	}, GIT_HISTORY_POLL_INTERVAL_MS);
 
-	void pollDiff();
-	void pollFiles();
+	void pollGitHistory();
 
 	return worktreeState;
+}
+
+function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
+	for (const [worktreePath, worktreeState] of state.openWorktrees) {
+		if (state.activeWorktreePath === worktreePath) {
+			startWorktreeGitHistoryPolling(state, worktreePath);
+			continue;
+		}
+
+		stopWorktreeBackgroundPolling(
+			worktreeState,
+			`Worktree ${worktreePath} is no longer the active view.`,
+		);
+	}
 }
 
 function stopProjectPoller(projectId: number): void {
@@ -3558,7 +3530,7 @@ export async function openWorktreeProcedure(
 	worktreeState.historyNextOffset = history.nextOffset;
 	worktreeState.historySignature = signature;
 	worktreeState.lastUpdatedAt = snapshot.lastUpdatedAt;
-	startWorktreePolling(state, worktreePath);
+	syncProjectWorktreeBackgroundPolling(state);
 	warmGitHistoryCache(worktreeState, worktreePath);
 
 	return {
@@ -3594,7 +3566,7 @@ export async function listWorktreeGitHistoryProcedure(
 	const state = ensureWorktreePollState(projectState, worktreePath);
 	if (offset === 0 && state.historySignature !== null) {
 		if (!state.history.headHash) {
-			startWorktreePolling(projectState, worktreePath);
+			syncProjectWorktreeBackgroundPolling(projectState);
 			return {
 				...state.history,
 				entries: [],
@@ -3604,7 +3576,7 @@ export async function listWorktreeGitHistoryProcedure(
 		}
 
 		await fillGitHistoryCache(state, worktreePath, 0, limit, requestGitOptions);
-		startWorktreePolling(projectState, worktreePath);
+		syncProjectWorktreeBackgroundPolling(projectState);
 		warmGitHistoryCache(state, worktreePath);
 		return buildGitHistoryResultFromCache(state, limit, 0);
 	}
@@ -3621,7 +3593,7 @@ export async function listWorktreeGitHistoryProcedure(
 		state.historyNextOffset = history.nextOffset;
 		state.historySignature = signature;
 		state.lastUpdatedAt = summary.lastUpdatedAt;
-		startWorktreePolling(projectState, worktreePath);
+		syncProjectWorktreeBackgroundPolling(projectState);
 		warmGitHistoryCache(state, worktreePath);
 		return history;
 	}
@@ -3658,7 +3630,7 @@ export async function listWorktreeGitHistoryProcedure(
 		limit,
 		requestGitOptions,
 	);
-	startWorktreePolling(projectState, worktreePath);
+	syncProjectWorktreeBackgroundPolling(projectState);
 	warmGitHistoryCache(state, worktreePath);
 	return buildGitHistoryResultFromCache(state, limit, offset);
 }
@@ -3682,12 +3654,53 @@ export async function getWorktreeGitCommitDiffProcedure(
 	);
 }
 
+export async function setActiveWorktreeProcedure(
+	params: AppRPCSchema["requests"]["setActiveWorktree"]["params"],
+): Promise<AppRPCSchema["requests"]["setActiveWorktree"]["response"]> {
+	const hasProjectId = typeof params.projectId === "number";
+	const hasWorktreePath =
+		typeof params.worktreePath === "string" &&
+		params.worktreePath.trim().length > 0;
+	if (hasProjectId !== hasWorktreePath) {
+		throw new Error(
+			"Active worktree updates must provide both projectId and worktreePath, or neither.",
+		);
+	}
+
+	const projectId = hasProjectId ? params.projectId : null;
+	const worktreePath = hasWorktreePath
+		? normalizePath(params.worktreePath ?? "")
+		: null;
+	if (projectId !== null) {
+		ensureProjectPoller(projectByIdForPath(projectId));
+	}
+
+	for (const state of projectPollMap.values()) {
+		const nextActiveWorktreePath = state.id === projectId ? worktreePath : null;
+		if (state.activeWorktreePath === nextActiveWorktreePath) {
+			continue;
+		}
+		state.activeWorktreePath = nextActiveWorktreePath;
+		syncProjectWorktreeBackgroundPolling(state);
+	}
+
+	return {
+		success: true,
+		projectId,
+		worktreePath,
+	};
+}
+
 export async function closeWorktreeProcedure(
 	params: AppRPCSchema["requests"]["closeWorktree"]["params"],
 ): Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]> {
 	const state = projectPollMap.get(params.projectId);
 	if (state) {
-		stopWorktreePolling(state, normalizePath(params.worktreePath));
+		const normalizedPath = normalizePath(params.worktreePath);
+		stopWorktreePolling(state, normalizedPath);
+		if (state.activeWorktreePath === normalizedPath) {
+			state.activeWorktreePath = null;
+		}
 	}
 
 	return {
@@ -3756,6 +3769,16 @@ export function getOpenWorktreeSnapshot(
 export function shutdownProjectPolling(): void {
 	for (const projectId of projectPollMap.keys()) {
 		stopProjectPoller(projectId);
+	}
+}
+
+export function suspendActiveWorktreePolling(): void {
+	for (const state of projectPollMap.values()) {
+		if (state.activeWorktreePath === null) {
+			continue;
+		}
+		state.activeWorktreePath = null;
+		syncProjectWorktreeBackgroundPolling(state);
 	}
 }
 
