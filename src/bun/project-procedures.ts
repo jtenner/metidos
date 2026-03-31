@@ -1559,6 +1559,10 @@ async function settleCanceledThreadTurn(
 	});
 }
 
+function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
+	return `${startedAt}:${itemId}`;
+}
+
 async function runThreadMessageInBackground(
 	threadId: number,
 	input: string,
@@ -1615,15 +1619,16 @@ async function runThreadMessageInBackground(
 
 			const item = event.item;
 			if (item.type === "agent_message") {
+				const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
 				const nextAssistantText = item.text.trim();
 				if (nextAssistantText) {
 					lastAssistantText = nextAssistantText;
-					lastAssistantItemId = item.id;
+					lastAssistantItemId = activityItemId;
 				}
 				if (nextAssistantText) {
 					await upsertAssistantChatActivity(
 						threadId,
-						item.id,
+						activityItemId,
 						nextAssistantText,
 						event.type === "item.completed" ? "completed" : "in_progress",
 					);
@@ -1634,6 +1639,7 @@ async function runThreadMessageInBackground(
 			if (item.type === "reasoning") {
 				await upsertReasoningActivity(
 					threadId,
+					buildThreadTurnActivityId(startedAt, item.id),
 					item,
 					event.type === "item.completed" ? "completed" : "in_progress",
 				);
@@ -1641,12 +1647,21 @@ async function runThreadMessageInBackground(
 			}
 
 			if (item.type === "command_execution") {
-				await upsertCommandActivity(threadId, item);
+				await upsertCommandActivity(
+					threadId,
+					buildThreadTurnActivityId(startedAt, item.id),
+					item,
+				);
 				continue;
 			}
 
 			if (item.type === "file_change") {
-				await upsertFileChangeActivity(threadId, thread.worktreePath, item);
+				await upsertFileChangeActivity(
+					threadId,
+					buildThreadTurnActivityId(startedAt, item.id),
+					thread.worktreePath,
+					item,
+				);
 			}
 		}
 
@@ -2184,12 +2199,13 @@ async function readFileChangeDiff(
 
 async function upsertReasoningActivity(
 	threadId: number,
+	itemId: string,
 	item: Extract<ThreadItem, { type: "reasoning" }>,
 	state: "in_progress" | "completed",
 ): Promise<void> {
 	upsertThreadActivity(db, {
 		threadId,
-		itemId: item.id,
+		itemId,
 		kind: "reasoning",
 		text: item.text.trim() || "Reasoning",
 		state,
@@ -2216,11 +2232,12 @@ async function upsertAssistantChatActivity(
 
 async function upsertCommandActivity(
 	threadId: number,
+	itemId: string,
 	item: Extract<ThreadItem, { type: "command_execution" }>,
 ): Promise<void> {
 	upsertThreadActivity(db, {
 		threadId,
-		itemId: item.id,
+		itemId,
 		kind: "command",
 		text: item.command,
 		state: item.status,
@@ -2235,6 +2252,7 @@ async function upsertCommandActivity(
 
 async function upsertFileChangeActivity(
 	threadId: number,
+	itemId: string,
 	worktreePath: string,
 	item: Extract<ThreadItem, { type: "file_change" }>,
 ): Promise<void> {
@@ -2247,7 +2265,7 @@ async function upsertFileChangeActivity(
 			const gitPath = normalizeGitPath(worktreePath, change.path);
 			upsertThreadActivity(db, {
 				threadId,
-				itemId: `${item.id}:${gitPath}`,
+				itemId: `${itemId}:${gitPath}`,
 				kind: "file_change",
 				text: gitPath,
 				state: item.status,
