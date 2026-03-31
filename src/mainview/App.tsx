@@ -284,6 +284,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const gitHistoryRequestIdRef = useRef(0);
 	const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
 	const gitHistoryDiffRequestIdRef = useRef(0);
+	const gitHistoryDiffAbortControllerRef = useRef<AbortController | null>(null);
+	const gitHistoryDiffPreloadAbortControllerRef = useRef(
+		new Map<string, AbortController>(),
+	);
 	const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
 		null,
 	);
@@ -297,7 +301,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		new Map<string, GitHistoryDiffCacheEntry>(),
 	);
 	const gitHistoryDiffRequestCacheRef = useRef(
-		new Map<string, Promise<GitHistoryDiffCacheEntry>>(),
+		new Map<string, PendingSharedRequest<GitHistoryDiffCacheEntry>>(),
 	);
 	const gitHistoryCacheRef = useRef(
 		new Map<string, RpcWorktreeGitHistoryResult>(),
@@ -663,15 +667,38 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadIsWorking ||
 		isThreadLoading;
 
-	const closeGitHistoryModal = useCallback(() => {
-		setGitHistoryModal(null);
+	const abortGitHistoryDiffRequest = useCallback((reason: string) => {
+		const controller = gitHistoryDiffAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		gitHistoryDiffAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
 	}, []);
 
+	const abortAllGitHistoryDiffPreloads = useCallback((reason: string) => {
+		for (const controller of gitHistoryDiffPreloadAbortControllerRef.current.values()) {
+			controller.abort(createAbortError(null, reason));
+		}
+		gitHistoryDiffPreloadAbortControllerRef.current.clear();
+	}, []);
+
+	const closeGitHistoryModal = useCallback(() => {
+		gitHistoryDiffRequestIdRef.current += 1;
+		abortGitHistoryDiffRequest("Commit diff request was cleared.");
+		setGitHistoryModal(null);
+	}, [abortGitHistoryDiffRequest]);
+
 	const loadGitHistoryDiff = useCallback(
-		(
+		async (
 			projectId: number,
 			worktreePath: string,
 			entry: RpcGitHistoryEntry,
+			options?: {
+				priority?: RpcRequestPriority;
+				signal?: AbortSignal;
+			},
 		): Promise<GitHistoryDiffCacheEntry> => {
 			const cacheKey = gitHistoryDiffCacheKey(
 				projectId,
@@ -685,15 +712,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			const pending = gitHistoryDiffRequestCacheRef.current.get(cacheKey);
 			if (pending) {
-				return pending;
+				pending.waiterCount += 1;
+				try {
+					return await awaitAbortableResult(
+						pending.promise,
+						options?.signal,
+						"Commit diff read was aborted.",
+					);
+				} finally {
+					pending.waiterCount = Math.max(0, pending.waiterCount - 1);
+					if (
+						pending.waiterCount === 0 &&
+						gitHistoryDiffRequestCacheRef.current.get(cacheKey) === pending
+					) {
+						pending.controller.abort(
+							createAbortError(null, "Commit diff read was aborted."),
+						);
+					}
+				}
 			}
 
+			const controller = new AbortController();
+			const pendingRequest: PendingSharedRequest<GitHistoryDiffCacheEntry> = {
+				controller,
+				promise: Promise.resolve(null as never),
+				waiterCount: 1,
+			};
 			const request = procedures
-				.getWorktreeGitCommitDiff({
-					projectId,
-					worktreePath,
-					commitHash: entry.hash,
-				})
+				.getWorktreeGitCommitDiff(
+					{
+						projectId,
+						worktreePath,
+						commitHash: entry.hash,
+					},
+					{
+						priority: options?.priority ?? "foreground",
+						signal: controller.signal,
+					},
+				)
 				.then((result) => {
 					const nextValue = {
 						commit: result.commit,
@@ -708,12 +764,36 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					return nextValue;
 				})
 				.finally(() => {
-					if (gitHistoryDiffRequestCacheRef.current.get(cacheKey) === request) {
+					if (
+						gitHistoryDiffRequestCacheRef.current.get(cacheKey) ===
+						pendingRequest
+					) {
 						gitHistoryDiffRequestCacheRef.current.delete(cacheKey);
 					}
 				});
-			gitHistoryDiffRequestCacheRef.current.set(cacheKey, request);
-			return request;
+			pendingRequest.promise = request;
+			gitHistoryDiffRequestCacheRef.current.set(cacheKey, pendingRequest);
+
+			try {
+				return await awaitAbortableResult(
+					request,
+					options?.signal,
+					"Commit diff read was aborted.",
+				);
+			} finally {
+				pendingRequest.waiterCount = Math.max(
+					0,
+					pendingRequest.waiterCount - 1,
+				);
+				if (
+					pendingRequest.waiterCount === 0 &&
+					gitHistoryDiffRequestCacheRef.current.get(cacheKey) === pendingRequest
+				) {
+					controller.abort(
+						createAbortError(null, "Commit diff read was aborted."),
+					);
+				}
+			}
 		},
 		[procedures],
 	);
@@ -724,15 +804,67 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				return;
 			}
 
+			const cacheKey = gitHistoryDiffCacheKey(
+				selectedProject.id,
+				activeSelectedWorktreePath,
+				entry.hash,
+			);
+			if (gitHistoryDiffPreloadAbortControllerRef.current.has(cacheKey)) {
+				return;
+			}
+
+			const controller = new AbortController();
+			gitHistoryDiffPreloadAbortControllerRef.current.set(cacheKey, controller);
 			void loadGitHistoryDiff(
 				selectedProject.id,
 				activeSelectedWorktreePath,
 				entry,
-			).catch(() => {
-				// Hover preloads should never surface errors ahead of explicit open.
-			});
+				{
+					priority: "default",
+					signal: controller.signal,
+				},
+			)
+				.catch((error) => {
+					if (isAbortError(error)) {
+						return;
+					}
+					// Hover preloads should never surface errors ahead of explicit open.
+				})
+				.finally(() => {
+					if (
+						gitHistoryDiffPreloadAbortControllerRef.current.get(cacheKey) ===
+						controller
+					) {
+						gitHistoryDiffPreloadAbortControllerRef.current.delete(cacheKey);
+					}
+				});
 		},
 		[activeSelectedWorktreePath, loadGitHistoryDiff, selectedProject],
+	);
+
+	const cancelPreloadGitHistoryDiff = useCallback(
+		(entry: RpcGitHistoryEntry) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
+			}
+
+			const cacheKey = gitHistoryDiffCacheKey(
+				selectedProject.id,
+				activeSelectedWorktreePath,
+				entry.hash,
+			);
+			const controller =
+				gitHistoryDiffPreloadAbortControllerRef.current.get(cacheKey);
+			if (!controller) {
+				return;
+			}
+
+			gitHistoryDiffPreloadAbortControllerRef.current.delete(cacheKey);
+			controller.abort(
+				createAbortError(null, "Commit diff preload was aborted."),
+			);
+		},
+		[activeSelectedWorktreePath, selectedProject],
 	);
 
 	const openGitHistoryDiff = useCallback(
@@ -749,6 +881,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				entry.hash,
 			);
 			const cached = readLruValue(gitHistoryDiffCacheRef.current, cacheKey);
+			const requestId = gitHistoryDiffRequestIdRef.current + 1;
+			gitHistoryDiffRequestIdRef.current = requestId;
+			abortGitHistoryDiffRequest("Commit diff request was superseded.");
 
 			setGitHistoryModal({
 				projectId,
@@ -763,9 +898,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				return;
 			}
 
-			const requestId = ++gitHistoryDiffRequestIdRef.current;
+			const controller = new AbortController();
+			gitHistoryDiffAbortControllerRef.current = controller;
 			try {
-				const result = await loadGitHistoryDiff(projectId, worktreePath, entry);
+				const result = await loadGitHistoryDiff(
+					projectId,
+					worktreePath,
+					entry,
+					{
+						priority: "foreground",
+						signal: controller.signal,
+					},
+				);
 				if (gitHistoryDiffRequestIdRef.current !== requestId) {
 					return;
 				}
@@ -785,6 +929,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						: current,
 				);
 			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
 				if (gitHistoryDiffRequestIdRef.current !== requestId) {
 					return;
 				}
@@ -800,9 +947,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							}
 						: current,
 				);
+			} finally {
+				if (gitHistoryDiffAbortControllerRef.current === controller) {
+					gitHistoryDiffAbortControllerRef.current = null;
+				}
 			}
 		},
-		[activeSelectedWorktreePath, loadGitHistoryDiff, selectedProject],
+		[
+			abortGitHistoryDiffRequest,
+			activeSelectedWorktreePath,
+			loadGitHistoryDiff,
+			selectedProject,
+		],
 	);
 
 	const normalizedSidebarSearchQuery = useMemo(
@@ -2958,9 +3114,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			gitHistoryModal.projectId !== selectedProject.id ||
 			gitHistoryModal.worktreePath !== activeSelectedWorktreePath
 		) {
-			setGitHistoryModal(null);
+			closeGitHistoryModal();
 		}
-	}, [activeSelectedWorktreePath, gitHistoryModal, selectedProject]);
+	}, [
+		activeSelectedWorktreePath,
+		closeGitHistoryModal,
+		gitHistoryModal,
+		selectedProject,
+	]);
+
+	useEffect(() => {
+		const preloadScope = `${selectedProject?.id ?? "none"}::${
+			activeSelectedWorktreePath ?? "none"
+		}`;
+		return () => {
+			abortAllGitHistoryDiffPreloads(
+				`Commit diff preload was cleared for ${preloadScope}.`,
+			);
+		};
+	}, [
+		abortAllGitHistoryDiffPreloads,
+		activeSelectedWorktreePath,
+		selectedProject?.id,
+	]);
+
+	useEffect(
+		() => () => {
+			gitHistoryDiffRequestIdRef.current += 1;
+			abortGitHistoryDiffRequest("Commit diff request was cleared.");
+		},
+		[abortGitHistoryDiffRequest],
+	);
 
 	useEffect(() => {
 		if (!gitHistoryModal) {
@@ -5053,8 +5237,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											onFocus={() => {
 												preloadGitHistoryDiff(entry);
 											}}
+											onBlur={() => {
+												cancelPreloadGitHistoryDiff(entry);
+											}}
 											onPointerDown={() => {
 												preloadGitHistoryDiff(entry);
+											}}
+											onMouseLeave={() => {
+												cancelPreloadGitHistoryDiff(entry);
 											}}
 											onClick={() => {
 												void openGitHistoryDiff(entry);

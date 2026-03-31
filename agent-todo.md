@@ -8,5 +8,5 @@ Source: `docs/2026-03-31-correctness-issues-2.md`
 - [x] Harden task discovery and task watch target collection against symlink recursion and directory cycles.
 - [x] Prevent closed projects from recreating backend pollers through active worktree sync.
 - [x] Refresh cached git history for selected unopened worktrees so the UI cannot stay stale indefinitely.
-- [ ] Make commit diff loading abortable end to end, including hover preloads and shared pending diff requests.
+- [x] Make commit diff loading abortable end to end, including hover preloads and shared pending diff requests.
 - [x] Fix the dev mainview watcher so nested `src/mainview/**` files trigger rebuild and reload behavior.

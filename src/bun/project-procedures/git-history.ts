@@ -23,7 +23,9 @@ import {
 const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
 
 export type PendingGitCommitDiffRequest = {
+	controller: AbortController;
 	promise: Promise<RpcGitCommitDiffResult>;
+	waiterCount: number;
 };
 
 export type PendingGitHistoryPrefetch = {
@@ -237,18 +239,35 @@ export async function getCachedGitCommitDiffResult(
 
 	const pending = options.gitCommitDiffRequestCache.get(cacheKey);
 	if (pending) {
-		return awaitAbortableResult(
-			pending.promise,
-			normalizedOptions.signal,
-			"Commit diff read was aborted.",
-		);
+		pending.waiterCount += 1;
+		try {
+			return await awaitAbortableResult(
+				pending.promise,
+				normalizedOptions.signal,
+				"Commit diff read was aborted.",
+			);
+		} finally {
+			pending.waiterCount = Math.max(0, pending.waiterCount - 1);
+			if (
+				pending.waiterCount === 0 &&
+				options.gitCommitDiffRequestCache.get(cacheKey) === pending
+			) {
+				pending.controller.abort(
+					createAbortError(null, "Commit diff read was aborted."),
+				);
+			}
+		}
 	}
 
+	const controller = new AbortController();
 	const pendingRequest: PendingGitCommitDiffRequest = {
+		controller,
 		promise: Promise.resolve(null as never),
+		waiterCount: 1,
 	};
 	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
 		priority: normalizedOptions.priority,
+		signal: controller.signal,
 	})
 		.then((result) => {
 			writeLruValue(
@@ -267,9 +286,19 @@ export async function getCachedGitCommitDiffResult(
 	pendingRequest.promise = promise;
 	options.gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
 
-	return awaitAbortableResult(
-		promise,
-		normalizedOptions.signal,
-		"Commit diff read was aborted.",
-	);
+	try {
+		return await awaitAbortableResult(
+			promise,
+			normalizedOptions.signal,
+			"Commit diff read was aborted.",
+		);
+	} finally {
+		pendingRequest.waiterCount = Math.max(0, pendingRequest.waiterCount - 1);
+		if (
+			pendingRequest.waiterCount === 0 &&
+			options.gitCommitDiffRequestCache.get(cacheKey) === pendingRequest
+		) {
+			controller.abort(createAbortError(null, "Commit diff read was aborted."));
+		}
+	}
 }
