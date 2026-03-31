@@ -189,6 +189,9 @@ const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
 const IS_DEV_SERVER =
 	SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
 
+process.env.JOLT_PORT = String(SERVER_PORT);
+process.env.JOLT_RPC_URL = `ws://127.0.0.1:${SERVER_PORT}/rpc`;
+
 const rpcHandlers: RpcRequestHandlerMap = {
 	getHomeDirectory: async () => ({
 		homeDirectory: homedir(),

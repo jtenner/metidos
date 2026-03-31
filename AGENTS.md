@@ -48,6 +48,7 @@
 ├─ package.json
 ├─ src/
  │  ├─ bun/
+ │  │  ├─ codex-sidecar-mcp.ts
  │  │  ├─ db.ts
  │  │  ├─ index.ts
  │  │  ├─ project-procedures.ts

@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import {
 	Codex,
+	type Thread as CodexThread,
 	type ModelReasoningEffort,
 	type ThreadItem,
 } from "@openai/codex-sdk";
@@ -74,7 +75,12 @@ import type {
 } from "./rpc-schema";
 
 const db = initAppDatabase();
-const codex = new Codex();
+const JOLT_DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
+const JOLT_MCP_SERVER_NAME = "jolt";
+const JOLT_SIDECAR_SERVER_PATH = resolve(
+	process.cwd(),
+	"src/bun/codex-sidecar-mcp.ts",
+);
 
 export async function listProjectsProcedure(
 	_params?: AppRPCSchema["requests"]["listProjects"]["params"],
@@ -202,7 +208,7 @@ type ProjectPollState = {
 };
 
 const projectPollMap = new Map<number, ProjectPollState>();
-const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
+const codexThreadMap = new Map<number, CodexThread>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 const threadTurnAbortControllerMap = new Map<number, AbortController>();
 const threadTurnCompletionMap = new Map<number, Promise<void>>();
@@ -241,6 +247,41 @@ const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
 const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
 const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
 const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
+
+function joltRpcUrl(): string {
+	const configured = process.env.JOLT_RPC_URL?.trim();
+	if (configured) {
+		return configured;
+	}
+
+	const configuredPort = process.env.JOLT_PORT?.trim();
+	if (configuredPort) {
+		return `ws://127.0.0.1:${configuredPort}/rpc`;
+	}
+
+	return JOLT_DEFAULT_RPC_URL;
+}
+
+function createCodexClient(
+	thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
+): Codex {
+	return new Codex({
+		config: {
+			mcp_servers: {
+				[JOLT_MCP_SERVER_NAME]: {
+					command: process.execPath,
+					args: [JOLT_SIDECAR_SERVER_PATH],
+					env: {
+						JOLT_ACTIVE_PROJECT_ID: String(thread.projectId),
+						JOLT_ACTIVE_THREAD_ID: String(thread.id),
+						JOLT_ACTIVE_WORKTREE_PATH: thread.worktreePath,
+						JOLT_RPC_URL: joltRpcUrl(),
+					},
+				},
+			},
+		},
+	});
+}
 
 function readLruValue<Key, Value>(
 	cache: Map<Key, Value>,
@@ -1409,30 +1450,38 @@ function codexThreadOptions(
 	};
 }
 
-async function ensureCodexThread(
-	thread: ThreadRecord,
-): Promise<ReturnType<typeof codex.startThread>> {
+function createManagedCodexThread(thread: ThreadRecord): CodexThread {
+	const client = createCodexClient(thread);
+	const model = normalizeStoredCodexModel(thread.model);
+	const normalizedReasoningEffort = normalizeStoredCodexReasoningEffort(
+		thread.reasoningEffort,
+	);
+
+	return thread.codexThreadId
+		? client.resumeThread(
+				thread.codexThreadId,
+				codexThreadOptions(
+					thread.worktreePath,
+					model,
+					normalizedReasoningEffort,
+				),
+			)
+		: client.startThread(
+				codexThreadOptions(
+					thread.worktreePath,
+					model,
+					normalizedReasoningEffort,
+				),
+			);
+}
+
+async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
 	const active = codexThreadMap.get(thread.id);
 	if (active) {
 		return active;
 	}
 
-	const next = thread.codexThreadId
-		? codex.resumeThread(
-				thread.codexThreadId,
-				codexThreadOptions(
-					thread.worktreePath,
-					normalizeStoredCodexModel(thread.model),
-					normalizeStoredCodexReasoningEffort(thread.reasoningEffort),
-				),
-			)
-		: codex.startThread(
-				codexThreadOptions(
-					thread.worktreePath,
-					normalizeStoredCodexModel(thread.model),
-					normalizeStoredCodexReasoningEffort(thread.reasoningEffort),
-				),
-			);
+	const next = createManagedCodexThread(thread);
 	codexThreadMap.set(thread.id, next);
 	return next;
 }
@@ -3285,9 +3334,6 @@ async function createThreadRecord(
 		...options,
 		forceRefresh: true,
 	});
-	const codexThread = codex.startThread(
-		codexThreadOptions(worktreePath, model, reasoningEffort),
-	);
 
 	const thread = createThread(db, {
 		projectId: project.id,
@@ -3295,10 +3341,17 @@ async function createThreadRecord(
 		title: buildThreadTitle(worktree, worktreePath),
 		model,
 		reasoningEffort,
-		codexThreadId: codexThread.id ?? null,
+		codexThreadId: null,
 	});
-	codexThreadMap.set(thread.id, codexThread);
-	return thread;
+	try {
+		const codexThread = createManagedCodexThread(thread);
+		codexThreadMap.set(thread.id, codexThread);
+		return thread;
+	} catch (error) {
+		clearThreadRuntimeState(thread.id);
+		deleteThread(db, thread.id);
+		throw error;
+	}
 }
 
 export async function openProjectProcedure(

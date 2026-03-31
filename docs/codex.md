@@ -25,6 +25,24 @@ Creates a client for the local CLI process.
 - `env` — full environment object passed to CLI process.
 - `config` — object converted to repeated `--config key=value` CLI flags.
 
+### Jolt sidecar MCP
+
+In this repo, `new Codex({ ... })` is also where the local `jolt` MCP sidecar is attached through `config.mcp_servers`.
+
+That sidecar exposes a small set of Jolt control tools:
+
+- `set_thread_title`
+- `new_codex`
+- `new_worktree`
+- `set_active_worktree`
+- `thread_status`
+
+The intent is:
+
+- use the tools sparingly for thread/worktree lifecycle changes
+- allow `set_thread_title` to be used whenever the thread focus materially changes
+- keep the sidecar attached at client construction time, so every thread created from that `Codex` instance can reach the same server
+
 ### `codex.startThread(options?)`
 Starts a new thread object for a fresh conversation.
 

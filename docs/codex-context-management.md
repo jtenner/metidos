@@ -25,7 +25,7 @@ The newer Responses API solves the API-side long-context problem by:
 
 This app already uses the SDK in the thread-oriented way the official docs describe:
 
-- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) creates a singleton `Codex` client.
+- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) constructs a `Codex` client per Jolt thread so thread-local MCP config can be attached at creation time.
 - [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) uses `codex.startThread(...)` for new conversations.
 - [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) uses `codex.resumeThread(...)` when a stored `codexThreadId` exists.
 - [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) persists the emitted `thread_id` when the SDK reports `thread.started`.
