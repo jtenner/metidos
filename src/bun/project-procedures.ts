@@ -7,7 +7,7 @@ import {
 	watch,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, relative, resolve } from "node:path";
+import { basename, delimiter, dirname, relative, resolve } from "node:path";
 import {
 	Codex,
 	type Thread as CodexThread,
@@ -81,6 +81,24 @@ const JOLT_SIDECAR_SERVER_PATH = resolve(
 	process.cwd(),
 	"src/bun/codex-sidecar-mcp.ts",
 );
+const GIT_EXECUTABLE_FALLBACK_DIRECTORIES =
+	process.platform === "darwin"
+		? [
+				"/opt/homebrew/bin",
+				"/usr/local/bin",
+				"/usr/bin",
+				"/bin",
+				"/Library/Developer/CommandLineTools/usr/bin",
+			]
+		: process.platform === "win32"
+			? [
+					"C:\\Program Files\\Git\\cmd",
+					"C:\\Program Files\\Git\\bin",
+					"C:\\Program Files (x86)\\Git\\cmd",
+					"C:\\Program Files (x86)\\Git\\bin",
+				]
+			: ["/usr/local/bin", "/usr/bin", "/bin"];
+let cachedGitExecutablePath: string | null = null;
 
 export async function listProjectsProcedure(
 	_params?: AppRPCSchema["requests"]["listProjects"]["params"],
@@ -805,6 +823,72 @@ function safeIsFile(path: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function safeIsExecutableFile(path: string): boolean {
+	try {
+		const stats = statSync(path);
+		if (!stats.isFile()) {
+			return false;
+		}
+		return process.platform === "win32" || (stats.mode & 0o111) !== 0;
+	} catch {
+		return false;
+	}
+}
+
+function gitExecutableCandidateNames(): string[] {
+	return process.platform === "win32"
+		? ["git.exe", "git.cmd", "git.bat", "git"]
+		: ["git"];
+}
+
+function readProcessPathValue(): string {
+	return process.env.PATH?.trim() || process.env.Path?.trim() || "";
+}
+
+function resolveGitExecutablePath(): string {
+	if (
+		cachedGitExecutablePath &&
+		safeIsExecutableFile(cachedGitExecutablePath)
+	) {
+		return cachedGitExecutablePath;
+	}
+
+	const discoveredGitPath = Bun.which("git");
+	if (discoveredGitPath && safeIsExecutableFile(discoveredGitPath)) {
+		cachedGitExecutablePath = discoveredGitPath;
+		return discoveredGitPath;
+	}
+
+	const searchDirectories = [
+		...readProcessPathValue()
+			.split(delimiter)
+			.map((entry) => entry.trim())
+			.filter(Boolean),
+		...GIT_EXECUTABLE_FALLBACK_DIRECTORIES,
+	];
+	const seenDirectories = new Set<string>();
+
+	for (const directory of searchDirectories) {
+		if (seenDirectories.has(directory)) {
+			continue;
+		}
+		seenDirectories.add(directory);
+
+		for (const executableName of gitExecutableCandidateNames()) {
+			const candidatePath = resolve(directory, executableName);
+			if (!safeIsExecutableFile(candidatePath)) {
+				continue;
+			}
+			cachedGitExecutablePath = candidatePath;
+			return candidatePath;
+		}
+	}
+
+	throw new Error(
+		"Could not locate the git executable. Ensure git is installed and available on PATH.",
+	);
 }
 
 function tasksDirectoryPath(worktreePath: string): string {
@@ -2041,8 +2125,9 @@ async function runGitCommandResult(
 	return enqueueGitCommand(cwd, priority, signal, async (taskSignal) => {
 		throwIfAborted(signal, "Git command was aborted.");
 		throwIfAborted(taskSignal, "Git command was aborted.");
+		const gitExecutablePath = resolveGitExecutablePath();
 		const proc = Bun.spawn({
-			cmd: ["git", ...args],
+			cmd: [gitExecutablePath, ...args],
 			cwd,
 			stdout: "pipe",
 			stderr: "pipe",
