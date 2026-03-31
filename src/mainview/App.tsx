@@ -2412,6 +2412,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[selectedThread],
 	);
 
+	const hasWorkingThreads = useMemo(
+		() => threads.some((thread) => thread.runStatus.state === "working"),
+		[threads],
+	);
+
 	const activeCodexModel = useMemo(() => {
 		if (selectedThread?.model) {
 			return selectedThread.model;
@@ -4903,8 +4908,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	]);
 
 	useEffect(() => {
-		if (threads.length === 0) {
-			selectedThreadRunStateRef.current = "idle";
+		if (!hasWorkingThreads) {
+			if (threads.length === 0) {
+				selectedThreadRunStateRef.current = "idle";
+			}
 			return;
 		}
 
@@ -4935,7 +4942,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			cancelled = true;
 			window.clearInterval(timer);
 		};
-	}, [refreshThreadStatuses, threads.length]);
+	}, [hasWorkingThreads, refreshThreadStatuses, threads.length]);
 
 	useEffect(() => {
 		if (!homeDirectory) {

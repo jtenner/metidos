@@ -9,6 +9,3 @@
 
 - Address issue 7 in `docs/2026-03-31-correctness-issues.md`: replace recursive task polling with a narrower invalidation strategy.
   Rework task change detection in `src/bun/project-procedures.ts` so `.tasks` files and task-relevant `package.json` files are watched directly or scanned much more selectively. Avoid recursive repo walks every 1.5 seconds.
-
-- Address issue 8 in `docs/2026-03-31-correctness-issues.md`: stop rereading the full thread list on a fixed 1.5-second loop.
-  Update the thread-status refresh logic in `src/mainview/App.tsx` so thread polling is scoped to active work instead of continuously calling `listThreads()` and follow-up `getThread(...)` reads for the entire app session.
