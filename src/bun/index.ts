@@ -1,6 +1,6 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 
 import { MAINVIEW_BUILD_DIR, buildMainviewBundle } from "./build-mainview";
@@ -641,17 +641,52 @@ function enqueueMainviewReload(filename?: string | Buffer | null): void {
 
 function readMainviewFileStamps(): Map<string, number> {
 	const nextStamps = new Map<string, number>();
+	const visitedRealPaths = new Set<string>();
 
-	for (const entry of readdirSync(MAINVIEW_SOURCE_DIR)) {
-		const entryPath = resolve(MAINVIEW_SOURCE_DIR, entry);
-		const stats = statSync(entryPath, {
-			throwIfNoEntry: false,
-		});
-		if (!stats?.isFile()) {
-			continue;
+	const readDirectory = (directoryPath: string) => {
+		let realPath: string;
+		try {
+			realPath = realpathSync(directoryPath);
+		} catch {
+			return;
 		}
-		nextStamps.set(entry, stats.mtimeMs);
-	}
+
+		if (visitedRealPaths.has(realPath)) {
+			return;
+		}
+		visitedRealPaths.add(realPath);
+
+		let entries: string[];
+		try {
+			entries = readdirSync(directoryPath);
+		} catch {
+			return;
+		}
+
+		for (const entry of entries) {
+			const entryPath = resolve(directoryPath, entry);
+			const stats = statSync(entryPath, {
+				throwIfNoEntry: false,
+			});
+			if (!stats) {
+				continue;
+			}
+			if (stats.isDirectory()) {
+				readDirectory(entryPath);
+				continue;
+			}
+			if (!stats.isFile()) {
+				continue;
+			}
+
+			nextStamps.set(
+				relative(MAINVIEW_SOURCE_DIR, entryPath).replace(/\\/g, "/"),
+				stats.mtimeMs,
+			);
+		}
+	};
+
+	readDirectory(MAINVIEW_SOURCE_DIR);
 
 	return nextStamps;
 }
