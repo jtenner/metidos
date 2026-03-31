@@ -1409,18 +1409,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			gitHistoryAbortControllerRef.current = controller;
 			const cacheKey = worktreeKey(projectId, worktreePath);
 			const cachedHistory = readLruValue(gitHistoryCacheRef.current, cacheKey);
-			if (options?.preferCached && cachedHistory) {
+			const serveCachedHistory = Boolean(
+				options?.preferCached && cachedHistory,
+			);
+			const silentRefresh = options?.silent || serveCachedHistory;
+			if (serveCachedHistory && cachedHistory) {
 				setGitHistory(cachedHistory);
 				setGitHistoryLoading(false);
 				setGitHistoryLoadingMore(false);
 				gitHistoryLoadingMoreRef.current = false;
 				setGitHistoryError("");
-				if (gitHistoryAbortControllerRef.current === controller) {
-					gitHistoryAbortControllerRef.current = null;
-				}
-				return;
 			}
-			if (!options?.silent) {
+			if (!silentRefresh) {
 				setGitHistoryLoading(true);
 				setGitHistoryError("");
 			}
@@ -1434,7 +1434,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						limit: GIT_HISTORY_PAGE_SIZE,
 					},
 					{
-						priority: options?.silent ? "default" : "foreground",
+						priority: silentRefresh ? "default" : "foreground",
 						signal: controller.signal,
 					},
 				);
@@ -1453,7 +1453,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				if (gitHistoryRequestIdRef.current !== requestId) {
 					return;
 				}
-				if (!options?.silent && !cachedHistory) {
+				if (!silentRefresh && !cachedHistory) {
 					setGitHistory(null);
 					setGitHistoryError(
 						error instanceof Error ? error.message : String(error),
