@@ -2333,6 +2333,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
+	const threadStatusPollInFlightRef = useRef(false);
 	const initializedRef = useRef(false);
 
 	const selectedProject = useMemo(() => {
@@ -3420,12 +3421,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const refreshThreadStatuses = useCallback(async () => {
+		const activeSelectedThreadId = selectedThreadIdRef.current;
 		const loadedThreads = sortThreads(await procedures.listThreads());
 		const selectedSummary =
-			selectedThreadId === null
+			activeSelectedThreadId === null
 				? null
-				: (loadedThreads.find((thread) => thread.id === selectedThreadId) ??
-					null);
+				: (loadedThreads.find(
+						(thread) => thread.id === activeSelectedThreadId,
+					) ?? null);
 
 		if (!selectedSummary) {
 			selectedThreadRunStateRef.current = "idle";
@@ -3460,7 +3463,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 		setThreads(upsertThreadList(loadedThreads, detail.thread));
 		setThreadMessages(detail.messages);
-	}, [procedures, selectedThreadId]);
+	}, [procedures]);
 
 	const applyOpenedThreadDetail = useCallback(
 		async (detail: RpcThreadDetail) => {
@@ -4696,12 +4699,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 		let cancelled = false;
 		const poll = async () => {
+			if (threadStatusPollInFlightRef.current) {
+				return;
+			}
+
+			threadStatusPollInFlightRef.current = true;
 			try {
 				await refreshThreadStatuses();
 			} catch (error) {
 				if (!cancelled) {
 					console.error("Failed to poll thread statuses", error);
 				}
+			} finally {
+				threadStatusPollInFlightRef.current = false;
 			}
 		};
 
