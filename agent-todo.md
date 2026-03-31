@@ -7,9 +7,6 @@
 - Address issue 4 in `docs/2026-03-31-correctness-issues.md`: preserve real git-history failures instead of treating them as empty history.
   Change the git-history helpers in `src/bun/project-procedures.ts` so only true "no HEAD yet" cases become empty history. Permission errors, corrupt repos, and other non-zero git exits should surface as actual errors.
 
-- Address issue 5 in `docs/2026-03-31-correctness-issues.md`: make the browser RPC client recover from socket loss outside dev mode.
-  Refactor `src/mainview/index.ts` so the `/rpc` transport can reconnect or force a deterministic reload after close. A single socket drop should not permanently brick the session until manual refresh.
-
 - Address issue 6 in `docs/2026-03-31-correctness-issues.md`: reduce the amount of always-on per-worktree background polling.
   Revisit the polling setup in `src/bun/project-procedures.ts` so diff, status, history, and task refresh work do not all run independently at fixed intervals for every opened worktree. Back off or suspend this work when the worktree is not actively in view.
 

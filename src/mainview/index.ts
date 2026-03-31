@@ -71,6 +71,8 @@ type RuntimeConfig = {
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
 	"jt-ide:worktree-git-history-changed";
+const RPC_RECONNECT_BASE_DELAY_MS = 250;
+const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 
 declare global {
 	interface WindowEventMap {
@@ -90,24 +92,46 @@ const runtimeConfig: RuntimeConfig = window.__jtIdeRuntime ?? {
 };
 
 const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const socket = new WebSocket(`${socketProtocol}//${window.location.host}/rpc`);
+const socketUrl = `${socketProtocol}//${window.location.host}/rpc`;
 const pendingRequests = new Map<number, PendingRequest>();
+let socket: WebSocket | null = null;
 let nextRequestId = 1;
-let resolveConnection!: () => void;
-let rejectConnection!: (reason?: unknown) => void;
+let resolveConnection = () => {};
+let rejectConnection = (_reason?: unknown) => {};
+let connectionReadyResolved = false;
 let isPageUnloading = false;
 let devRecoveryScheduled = false;
 let devRecoveryTimer: number | null = null;
+let rpcReconnectTimer: number | null = null;
+let rpcReconnectAttempt = 0;
+let connectionReady!: Promise<void>;
 
-const connectionReady = new Promise<void>((resolve, reject) => {
-	resolveConnection = resolve;
-	rejectConnection = reject;
-});
+function resetConnectionReady(): void {
+	connectionReadyResolved = false;
+	connectionReady = new Promise<void>((resolve, reject) => {
+		resolveConnection = () => {
+			connectionReadyResolved = true;
+			resolve();
+		};
+		rejectConnection = (reason?: unknown) => {
+			reject(reason);
+		};
+	});
+}
+
+resetConnectionReady();
 
 function clearDevRecoveryTimer(): void {
 	if (devRecoveryTimer !== null) {
 		window.clearTimeout(devRecoveryTimer);
 		devRecoveryTimer = null;
+	}
+}
+
+function clearRpcReconnectTimer(): void {
+	if (rpcReconnectTimer !== null) {
+		window.clearTimeout(rpcReconnectTimer);
+		rpcReconnectTimer = null;
 	}
 }
 
@@ -160,75 +184,146 @@ function scheduleDevRecovery(reason: string): void {
 window.addEventListener("beforeunload", () => {
 	isPageUnloading = true;
 	clearDevRecoveryTimer();
+	clearRpcReconnectTimer();
 });
 
-socket.addEventListener("open", () => {
-	resolveConnection();
-});
-
-socket.addEventListener("message", (event) => {
-	const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
-	if (payload.type === "reload") {
-		reloadWindow(payload.reason);
-		return;
-	}
-	if (payload.type === "tasks-changed") {
-		window.dispatchEvent(
-			new CustomEvent<RpcWorktreeTasksChanged>(
-				WORKTREE_TASKS_CHANGED_EVENT_NAME,
-				{
-					detail: {
-						projectId: payload.projectId,
-						worktreePath: payload.worktreePath,
-					},
-				},
-			),
-		);
-		return;
-	}
-	if (payload.type === "git-history-changed") {
-		window.dispatchEvent(
-			new CustomEvent<RpcWorktreeGitHistoryChanged>(
-				WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-				{
-					detail: {
-						projectId: payload.projectId,
-						worktreePath: payload.worktreePath,
-					},
-				},
-			),
-		);
-		return;
-	}
-
-	const pending = pendingRequests.get(payload.id);
-	if (!pending) {
-		return;
-	}
-	pendingRequests.delete(payload.id);
-	if (payload.ok) {
-		pending.resolve(payload.result);
-		return;
-	}
-	pending.reject(new Error(payload.error || "RPC request failed"));
-});
-
-socket.addEventListener("close", () => {
-	const error = new Error("RPC connection closed");
-	rejectConnection(error);
+function rejectPendingRequests(reason: unknown): void {
 	for (const pending of pendingRequests.values()) {
-		pending.reject(error);
+		pending.reject(reason);
 	}
 	pendingRequests.clear();
+}
 
-	if (runtimeConfig.devServer) {
-		scheduleDevRecovery("rpc-close");
+function scheduleRpcReconnect(reason: string): void {
+	if (
+		runtimeConfig.devServer ||
+		isPageUnloading ||
+		rpcReconnectTimer !== null
+	) {
+		return;
 	}
-});
 
-socket.addEventListener("error", () => {
-	console.error("jt-ide RPC socket encountered an error");
-});
+	const delay = Math.min(
+		RPC_RECONNECT_BASE_DELAY_MS * 2 ** rpcReconnectAttempt,
+		RPC_RECONNECT_MAX_DELAY_MS,
+	);
+	rpcReconnectAttempt += 1;
+	console.info(`[jt-ide] reconnecting RPC socket in ${delay}ms (${reason})`);
+	rpcReconnectTimer = window.setTimeout(() => {
+		rpcReconnectTimer = null;
+		connectRpcSocket("reconnect");
+	}, delay);
+}
+
+function connectRpcSocket(reason: "initial" | "reconnect"): void {
+	if (isPageUnloading) {
+		return;
+	}
+	if (
+		socket &&
+		(socket.readyState === WebSocket.CONNECTING ||
+			socket.readyState === WebSocket.OPEN)
+	) {
+		return;
+	}
+
+	clearRpcReconnectTimer();
+	const nextSocket = new WebSocket(socketUrl);
+	socket = nextSocket;
+	if (reason === "reconnect") {
+		console.info("[jt-ide] opening replacement RPC socket");
+	}
+
+	nextSocket.addEventListener("open", () => {
+		if (socket !== nextSocket) {
+			return;
+		}
+
+		rpcReconnectAttempt = 0;
+		resolveConnection();
+	});
+
+	nextSocket.addEventListener("message", (event) => {
+		if (socket !== nextSocket) {
+			return;
+		}
+
+		const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
+		if (payload.type === "reload") {
+			reloadWindow(payload.reason);
+			return;
+		}
+		if (payload.type === "tasks-changed") {
+			window.dispatchEvent(
+				new CustomEvent<RpcWorktreeTasksChanged>(
+					WORKTREE_TASKS_CHANGED_EVENT_NAME,
+					{
+						detail: {
+							projectId: payload.projectId,
+							worktreePath: payload.worktreePath,
+						},
+					},
+				),
+			);
+			return;
+		}
+		if (payload.type === "git-history-changed") {
+			window.dispatchEvent(
+				new CustomEvent<RpcWorktreeGitHistoryChanged>(
+					WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+					{
+						detail: {
+							projectId: payload.projectId,
+							worktreePath: payload.worktreePath,
+						},
+					},
+				),
+			);
+			return;
+		}
+
+		const pending = pendingRequests.get(payload.id);
+		if (!pending) {
+			return;
+		}
+		pendingRequests.delete(payload.id);
+		if (payload.ok) {
+			pending.resolve(payload.result);
+			return;
+		}
+		pending.reject(new Error(payload.error || "RPC request failed"));
+	});
+
+	nextSocket.addEventListener("close", () => {
+		if (socket !== nextSocket) {
+			return;
+		}
+
+		socket = null;
+		const error = new Error("RPC connection closed");
+		rejectPendingRequests(error);
+
+		if (runtimeConfig.devServer) {
+			rejectConnection(error);
+			scheduleDevRecovery("rpc-close");
+			return;
+		}
+
+		if (connectionReadyResolved) {
+			resetConnectionReady();
+		}
+		scheduleRpcReconnect("rpc-close");
+	});
+
+	nextSocket.addEventListener("error", () => {
+		if (socket !== nextSocket) {
+			return;
+		}
+		console.error("jt-ide RPC socket encountered an error");
+	});
+}
+
+connectRpcSocket("initial");
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
 	if (reason instanceof Error) {
@@ -302,8 +397,23 @@ async function waitForConnection(signal: AbortSignal | null): Promise<void> {
 	]);
 }
 
-function sendSocketMessage(message: RpcClientMessage): void {
-	socket.send(JSON.stringify(message));
+async function waitForOpenSocket(
+	signal: AbortSignal | null,
+): Promise<WebSocket> {
+	while (true) {
+		await waitForConnection(signal);
+		const activeSocket = socket;
+		if (activeSocket && activeSocket.readyState === WebSocket.OPEN) {
+			return activeSocket;
+		}
+	}
+}
+
+function sendSocketMessage(
+	targetSocket: WebSocket,
+	message: RpcClientMessage,
+): void {
+	targetSocket.send(JSON.stringify(message));
 }
 
 async function sendRequest<K extends RpcMethodName>(
@@ -312,7 +422,7 @@ async function sendRequest<K extends RpcMethodName>(
 	options?: RpcProcedureCallOptions,
 ): Promise<RpcRequestMap[K]["response"]> {
 	const signal = buildRequestSignal(options);
-	await waitForConnection(signal);
+	const requestSocket = await waitForOpenSocket(signal);
 	if (signal?.aborted) {
 		throw createAbortError(
 			signal.reason,
@@ -341,8 +451,8 @@ async function sendRequest<K extends RpcMethodName>(
 			if (signal) {
 				const handleAbort = () => {
 					finalize(() => {
-						if (socket.readyState === WebSocket.OPEN) {
-							sendSocketMessage({
+						if (requestSocket.readyState === WebSocket.OPEN) {
+							sendSocketMessage(requestSocket, {
 								type: "cancel",
 								id,
 							});
@@ -379,7 +489,7 @@ async function sendRequest<K extends RpcMethodName>(
 					}),
 			});
 			try {
-				sendSocketMessage({
+				sendSocketMessage(requestSocket, {
 					type: "request",
 					id,
 					method,
