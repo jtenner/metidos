@@ -31,6 +31,7 @@ export type RpcProjectWorktreesResult = {
 export type RpcOpenWorktreeResult = {
 	project: RpcProject;
 	worktree: RpcWorktreeSnapshot;
+	history: RpcWorktreeGitHistoryResult;
 };
 
 export type RpcHomeDirectoryResult = {
@@ -75,14 +76,19 @@ export type RpcGitHistoryEntry = {
 	committedAt: string;
 };
 
-export type RpcWorktreeGitHistoryResult = {
+export type RpcWorktreeGitHistorySummary = {
 	projectId: number;
 	worktreePath: string;
 	branch: string | null;
 	headHash: string | null;
 	headShortHash: string | null;
-	entries: RpcGitHistoryEntry[];
 	lastUpdatedAt: string;
+};
+
+export type RpcWorktreeGitHistoryResult = RpcWorktreeGitHistorySummary & {
+	entries: RpcGitHistoryEntry[];
+	limit: number;
+	nextOffset: number | null;
 };
 
 export type RpcGitCommitDiffResult = {
@@ -262,7 +268,12 @@ export type AppRPCSchema = {
 			response: RpcOpenWorktreeResult;
 		};
 		listWorktreeGitHistory: {
-			params: { projectId: number; worktreePath: string };
+			params: {
+				projectId: number;
+				worktreePath: string;
+				offset?: number;
+				limit?: number;
+			};
 			response: RpcWorktreeGitHistoryResult;
 		};
 		getWorktreeGitCommitDiff: {

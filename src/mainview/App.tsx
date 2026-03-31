@@ -6,6 +6,7 @@ import {
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
+	type UIEvent,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -165,6 +166,12 @@ const CODE_FONT_STACK =
 const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
 const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
 const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;
+const GIT_HISTORY_PAGE_SIZE = 20;
+const GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES = 8;
+const GIT_HISTORY_ROW_HEIGHT_PX = 66;
+const GIT_HISTORY_DOM_WINDOW_SIZE = 20;
+const GIT_HISTORY_RENDER_OVERSCAN_ROWS = 8;
+const GIT_HISTORY_LOAD_MORE_THRESHOLD_PX = GIT_HISTORY_ROW_HEIGHT_PX * 3;
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
@@ -311,6 +318,10 @@ function worktreeKey(projectId: number, worktreePath: string): string {
 	return `${projectId}::${worktreePath}`;
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+	return Math.min(Math.max(value, min), max);
+}
+
 function defaultProjectState(): ProjectNodeState {
 	return {
 		worktrees: [],
@@ -325,6 +336,54 @@ function defaultWorktreeState(): WorktreeNodeState {
 		loading: false,
 		opened: false,
 		error: "",
+	};
+}
+
+function mergeResetGitHistory(
+	current: RpcWorktreeGitHistoryResult | null,
+	nextPage: RpcWorktreeGitHistoryResult,
+): RpcWorktreeGitHistoryResult {
+	if (
+		!current ||
+		current.projectId !== nextPage.projectId ||
+		current.worktreePath !== nextPage.worktreePath ||
+		current.headHash !== nextPage.headHash ||
+		current.branch !== nextPage.branch
+	) {
+		return nextPage;
+	}
+
+	const nextHashes = new Set(nextPage.entries.map((entry) => entry.hash));
+	const preservedTail = current.entries.filter(
+		(entry) => !nextHashes.has(entry.hash),
+	);
+
+	return {
+		...nextPage,
+		entries: [...nextPage.entries, ...preservedTail],
+		nextOffset:
+			preservedTail.length > 0 ? current.nextOffset : nextPage.nextOffset,
+	};
+}
+
+function appendGitHistoryPage(
+	current: RpcWorktreeGitHistoryResult,
+	nextPage: RpcWorktreeGitHistoryResult,
+): RpcWorktreeGitHistoryResult {
+	const existingHashes = new Set(current.entries.map((entry) => entry.hash));
+	const appendedEntries = nextPage.entries.filter(
+		(entry) => !existingHashes.has(entry.hash),
+	);
+
+	return {
+		...current,
+		branch: nextPage.branch,
+		headHash: nextPage.headHash,
+		headShortHash: nextPage.headShortHash,
+		lastUpdatedAt: nextPage.lastUpdatedAt,
+		entries: [...current.entries, ...appendedEntries],
+		limit: nextPage.limit,
+		nextOffset: nextPage.nextOffset,
 	};
 }
 
@@ -934,7 +993,7 @@ function CodexModelSelector({
 								<div className="px-2 pb-1 pt-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
 									{group.group}
 								</div>
-								<div className="space-y-1">
+								<div>
 									{group.models.map((model) => {
 										const selected = model.id === value;
 										return (
@@ -1840,6 +1899,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [gitHistory, setGitHistory] =
 		useState<RpcWorktreeGitHistoryResult | null>(null);
 	const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
+	const [gitHistoryLoadingMore, setGitHistoryLoadingMore] = useState(false);
 	const [gitHistoryError, setGitHistoryError] = useState("");
 	const [projectsSectionOpen, setProjectsSectionOpen] = useState(
 		initialTreeViewState.projectsSectionOpen,
@@ -1894,19 +1954,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
 	const [sessionStateReady, setSessionStateReady] = useState(false);
+	const [gitHistoryScrollTop, setGitHistoryScrollTop] = useState(0);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
+	const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
 	const projectActionMenuRequestId = useRef(0);
 	const projectTasksRequestIdRef = useRef(0);
 	const gitHistoryRequestIdRef = useRef(0);
 	const gitHistoryDiffRequestIdRef = useRef(0);
+	const gitHistoryLoadingMoreRef = useRef(false);
 	const projectWorktreeRequestCacheRef = useRef(
 		new Map<number, Promise<RpcWorktree[]>>(),
 	);
 	const gitHistoryDiffCacheRef = useRef(
 		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
+	);
+	const gitHistoryCacheRef = useRef(
+		new Map<string, RpcWorktreeGitHistoryResult>(),
 	);
 	const directorySuggestionPrefetchTimerRef = useRef<number | null>(null);
 	const directorySuggestionResultCacheRef = useRef(
@@ -2407,6 +2473,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		);
 	}, [activeSelectedWorktree, gitHistory, normalizedSidebarSearchQuery]);
 
+	const visibleGitHistoryEntries = useMemo(() => {
+		const totalEntries = filteredGitHistoryEntries.length;
+		if (totalEntries === 0) {
+			return {
+				entries: [] as RpcGitHistoryEntry[],
+				topSpacerHeight: 0,
+				bottomSpacerHeight: 0,
+			};
+		}
+
+		const windowSize = Math.min(GIT_HISTORY_DOM_WINDOW_SIZE, totalEntries);
+		const maxStartIndex = Math.max(0, totalEntries - windowSize);
+		const startIndex = clampNumber(
+			Math.floor(gitHistoryScrollTop / GIT_HISTORY_ROW_HEIGHT_PX) -
+				GIT_HISTORY_RENDER_OVERSCAN_ROWS,
+			0,
+			maxStartIndex,
+		);
+		const endIndex = Math.min(totalEntries, startIndex + windowSize);
+
+		return {
+			entries: filteredGitHistoryEntries.slice(startIndex, endIndex),
+			topSpacerHeight: startIndex * GIT_HISTORY_ROW_HEIGHT_PX,
+			bottomSpacerHeight: (totalEntries - endIndex) * GIT_HISTORY_ROW_HEIGHT_PX,
+		};
+	}, [filteredGitHistoryEntries, gitHistoryScrollTop]);
+
 	const isActiveWorktree = useCallback(
 		(projectId: number, worktreePath: string): boolean =>
 			selectedProjectId === projectId &&
@@ -2659,47 +2752,174 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[procedures],
 	);
 
+	const resetGitHistoryScrollPosition = useCallback(() => {
+		setGitHistoryScrollTop(0);
+		if (gitHistoryListRef.current) {
+			gitHistoryListRef.current.scrollTop = 0;
+		}
+	}, []);
+
+	const cacheGitHistoryResult = useCallback(
+		(history: RpcWorktreeGitHistoryResult) => {
+			writeLruValue(
+				gitHistoryCacheRef.current,
+				worktreeKey(history.projectId, history.worktreePath),
+				history,
+				GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
+			);
+		},
+		[],
+	);
+
 	const loadGitHistory = useCallback(
 		async (
 			projectId: number,
 			worktreePath: string,
 			options?: {
 				silent?: boolean;
+				preferCached?: boolean;
 			},
 		): Promise<void> => {
-			const requestId = ++gitHistoryRequestIdRef.current;
-			if (!options?.silent) {
+			const cacheKey = worktreeKey(projectId, worktreePath);
+			const cachedHistory = readLruValue(gitHistoryCacheRef.current, cacheKey);
+			if (options?.preferCached && cachedHistory) {
+				setGitHistory(cachedHistory);
+				setGitHistoryLoading(false);
+				setGitHistoryLoadingMore(false);
+				gitHistoryLoadingMoreRef.current = false;
+				setGitHistoryError("");
+				return;
+			} else if (!options?.silent) {
 				setGitHistoryLoading(true);
 				setGitHistoryError("");
 			}
+			const requestId = ++gitHistoryRequestIdRef.current;
 
 			try {
 				const result = await procedures.listWorktreeGitHistory({
 					projectId,
 					worktreePath,
+					offset: 0,
+					limit: GIT_HISTORY_PAGE_SIZE,
 				});
 				if (gitHistoryRequestIdRef.current !== requestId) {
 					return;
 				}
-				setGitHistory(result);
+
+				const nextHistory = mergeResetGitHistory(cachedHistory, result);
+				setGitHistory(nextHistory);
+				cacheGitHistoryResult(nextHistory);
 				setGitHistoryError("");
 			} catch (error) {
 				if (gitHistoryRequestIdRef.current !== requestId) {
 					return;
 				}
-				if (!options?.silent) {
+				if (!options?.silent && !cachedHistory) {
 					setGitHistory(null);
+					setGitHistoryError(
+						error instanceof Error ? error.message : String(error),
+					);
 				}
-				setGitHistoryError(
-					error instanceof Error ? error.message : String(error),
-				);
 			} finally {
-				if (!options?.silent && gitHistoryRequestIdRef.current === requestId) {
+				if (gitHistoryRequestIdRef.current === requestId) {
 					setGitHistoryLoading(false);
+					setGitHistoryLoadingMore(false);
+					gitHistoryLoadingMoreRef.current = false;
 				}
 			}
 		},
-		[procedures],
+		[cacheGitHistoryResult, procedures],
+	);
+
+	const loadMoreGitHistory = useCallback(async (): Promise<void> => {
+		if (
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			!gitHistory ||
+			gitHistory.nextOffset === null ||
+			gitHistoryLoading ||
+			gitHistoryLoadingMore ||
+			gitHistoryLoadingMoreRef.current
+		) {
+			return;
+		}
+
+		const requestId = gitHistoryRequestIdRef.current;
+		const nextOffset = gitHistory.nextOffset;
+		const expectedHeadHash = gitHistory.headHash;
+		const expectedBranch = gitHistory.branch;
+
+		gitHistoryLoadingMoreRef.current = true;
+		setGitHistoryLoadingMore(true);
+
+		try {
+			const result = await procedures.listWorktreeGitHistory({
+				projectId: selectedProject.id,
+				worktreePath: activeSelectedWorktreePath,
+				offset: nextOffset,
+				limit: GIT_HISTORY_PAGE_SIZE,
+			});
+			if (gitHistoryRequestIdRef.current !== requestId) {
+				return;
+			}
+
+			if (
+				result.headHash !== expectedHeadHash ||
+				result.branch !== expectedBranch
+			) {
+				void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
+					silent: true,
+				});
+				return;
+			}
+
+			const nextHistory = appendGitHistoryPage(gitHistory, result);
+			setGitHistory((current) =>
+				current &&
+				current.projectId === nextHistory.projectId &&
+				current.worktreePath === nextHistory.worktreePath
+					? nextHistory
+					: current,
+			);
+			cacheGitHistoryResult(nextHistory);
+			setGitHistoryError("");
+		} catch (error) {
+			if (gitHistoryRequestIdRef.current !== requestId) {
+				return;
+			}
+			setGitHistoryError(
+				error instanceof Error ? error.message : String(error),
+			);
+		} finally {
+			if (gitHistoryRequestIdRef.current === requestId) {
+				setGitHistoryLoadingMore(false);
+				gitHistoryLoadingMoreRef.current = false;
+			}
+		}
+	}, [
+		activeSelectedWorktreePath,
+		cacheGitHistoryResult,
+		gitHistory,
+		gitHistoryLoading,
+		gitHistoryLoadingMore,
+		loadGitHistory,
+		procedures,
+		selectedProject,
+	]);
+
+	const handleGitHistoryScroll = useCallback(
+		(event: UIEvent<HTMLDivElement>) => {
+			const container = event.currentTarget;
+			setGitHistoryScrollTop(container.scrollTop);
+
+			if (
+				container.scrollHeight - container.scrollTop - container.clientHeight <=
+				GIT_HISTORY_LOAD_MORE_THRESHOLD_PX
+			) {
+				void loadMoreGitHistory();
+			}
+		},
+		[loadMoreGitHistory],
 	);
 
 	const refreshThreadStatuses = useCallback(async () => {
@@ -3055,6 +3275,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							});
 							return {
 								ok: true as const,
+								history: result.history,
 								projectId,
 								snapshot: result.worktree,
 								worktreePath,
@@ -3075,6 +3296,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			for (const result of restoredOpenWorktrees) {
 				if (result.ok) {
+					cacheGitHistoryResult(result.history);
 					setWorktreeState(result.projectId, result.worktreePath, {
 						loading: false,
 						opened: true,
@@ -3162,6 +3384,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 	}, [
 		applyOpenedThreadDetail,
+		cacheGitHistoryResult,
 		hydrateProjectRows,
 		initialMainviewState,
 		initialTreeViewState,
@@ -3680,16 +3903,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			gitHistoryRequestIdRef.current += 1;
 			setGitHistory(null);
 			setGitHistoryLoading(false);
+			setGitHistoryLoadingMore(false);
+			gitHistoryLoadingMoreRef.current = false;
 			setGitHistoryError("");
+			resetGitHistoryScrollPosition();
 			return;
 		}
-		void loadGitHistory(selectedProject.id, activeSelectedWorktreePath);
+		resetGitHistoryScrollPosition();
+		void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
+			preferCached: true,
+		});
 	}, [
 		activeSelectedWorktreePath,
 		activeSelectedWorktreeOpened,
 		loadGitHistory,
+		resetGitHistoryScrollPosition,
 		selectedProject,
 	]);
+
+	useEffect(() => {
+		resetGitHistoryScrollPosition();
+	}, [normalizedSidebarSearchQuery, resetGitHistoryScrollPosition]);
 
 	useEffect(() => {
 		const handleWorktreeTasksChanged = (
@@ -3765,6 +3999,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		activeSelectedWorktreeOpened,
 		loadGitHistory,
 		selectedProject,
+	]);
+
+	useEffect(() => {
+		if (
+			!normalizedSidebarSearchQuery ||
+			!gitHistory ||
+			gitHistory.nextOffset === null ||
+			gitHistoryLoading ||
+			gitHistoryLoadingMore
+		) {
+			return;
+		}
+		if (filteredGitHistoryEntries.length >= GIT_HISTORY_PAGE_SIZE) {
+			return;
+		}
+		void loadMoreGitHistory();
+	}, [
+		filteredGitHistoryEntries.length,
+		gitHistory,
+		gitHistoryLoading,
+		gitHistoryLoadingMore,
+		loadMoreGitHistory,
+		normalizedSidebarSearchQuery,
 	]);
 
 	useEffect(() => {
@@ -4315,6 +4572,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					projectId,
 					worktreePath,
 				});
+				cacheGitHistoryResult(result.history);
 				setWorktreeState(projectId, worktreePath, {
 					loading: false,
 					opened: true,
@@ -4327,6 +4585,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				});
 				setSelectedProjectId(projectId);
 				setSelectedWorktreePath(worktreePath);
+				setGitHistory(result.history);
 			} catch (error) {
 				setWorktreeState(projectId, worktreePath, {
 					loading: false,
@@ -4339,6 +4598,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			getWorktreeState,
 			procedures,
 			projects,
+			cacheGitHistoryResult,
 			selectedWorktreePath,
 			setProjectState,
 			setWorktreeState,
@@ -5690,40 +5950,79 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="rounded-sm border border-[#24293d] bg-[#121723] px-3 py-3 text-xs text-[#c8c4ff]">
 							Loading git history...
 						</div>
-					) : gitHistoryError ? (
+					) : gitHistoryError && filteredGitHistoryEntries.length === 0 ? (
 						<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-xs text-[#ff9db0]">
 							{gitHistoryError}
 						</div>
 					) : filteredGitHistoryEntries.length > 0 ? (
-						<div className="max-h-64 space-y-1 overflow-y-auto pr-1 hide-scrollbar">
-							{filteredGitHistoryEntries.map((entry) => (
-								<button
-									type="button"
-									key={entry.hash}
-									className="w-full rounded-sm border border-[#20242f] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1d2029]"
-									onClick={() => {
-										void openGitHistoryDiff(entry);
-									}}
-								>
-									<div className="flex items-start gap-3">
-										<span className="mt-0.5 shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
-											{entry.shortHash}
-										</span>
-										<div className="min-w-0 flex-1">
-											<div
-												className="truncate text-sm text-[#f2f0ef]"
-												title={entry.subject}
-											>
-												{entry.subject}
+						<div className="space-y-2">
+							<div
+								ref={gitHistoryListRef}
+								className="max-h-64 overflow-y-auto pr-1 hide-scrollbar"
+								onScroll={handleGitHistoryScroll}
+							>
+								{visibleGitHistoryEntries.topSpacerHeight > 0 ? (
+									<div
+										aria-hidden="true"
+										style={{
+											height: `${visibleGitHistoryEntries.topSpacerHeight}px`,
+										}}
+									/>
+								) : null}
+								<div>
+									{visibleGitHistoryEntries.entries.map((entry) => (
+										<button
+											type="button"
+											key={entry.hash}
+											className="w-full rounded-sm border border-[#20242f] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1d2029]"
+											style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
+											onClick={() => {
+												void openGitHistoryDiff(entry);
+											}}
+										>
+											<div className="flex items-start gap-3">
+												<span className="mt-0.5 shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+													{entry.shortHash}
+												</span>
+												<div className="min-w-0 flex-1">
+													<div
+														className="truncate text-sm text-[#f2f0ef]"
+														title={entry.subject}
+													>
+														{entry.subject}
+													</div>
+													<div className="mt-1 truncate text-[11px] text-[#8e8aa7]">
+														{entry.authorName} ·{" "}
+														{formatGitHistoryTimestamp(entry.committedAt)}
+													</div>
+												</div>
 											</div>
-											<div className="mt-1 truncate text-[11px] text-[#8e8aa7]">
-												{entry.authorName} ·{" "}
-												{formatGitHistoryTimestamp(entry.committedAt)}
-											</div>
-										</div>
-									</div>
-								</button>
-							))}
+										</button>
+									))}
+								</div>
+								{visibleGitHistoryEntries.bottomSpacerHeight > 0 ? (
+									<div
+										aria-hidden="true"
+										style={{
+											height: `${visibleGitHistoryEntries.bottomSpacerHeight}px`,
+										}}
+									/>
+								) : null}
+							</div>
+							{gitHistoryLoadingMore ? (
+								<div className="px-1 text-[11px] text-[#8e8aa7]">
+									Loading more commits...
+								</div>
+							) : null}
+							{gitHistoryError ? (
+								<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-[11px] text-[#ff9db0]">
+									{gitHistoryError}
+								</div>
+							) : null}
+						</div>
+					) : gitHistoryLoadingMore ? (
+						<div className="rounded-sm border border-[#24293d] bg-[#121723] px-3 py-3 text-xs text-[#c8c4ff]">
+							Loading more git history...
 						</div>
 					) : (
 						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">

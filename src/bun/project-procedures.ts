@@ -51,6 +51,7 @@ import type {
 	RpcThreadUsage,
 	RpcWorktree,
 	RpcWorktreeGitHistoryResult,
+	RpcWorktreeGitHistorySummary,
 	RpcWorktreeSnapshot,
 } from "./rpc-schema";
 
@@ -109,6 +110,8 @@ const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const DIFF_POLL_INTERVAL_MS = 2_000;
 const FILE_POLL_INTERVAL_MS = 4_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
+const DEFAULT_GIT_HISTORY_PAGE_SIZE = 20;
+const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
 const TASK_POLL_INTERVAL_MS = 1_500;
 const DIRECTORY_SUGGESTION_CACHE_TTL_MS = 60_000;
 const DIRECTORY_SUGGESTION_CACHE_MAX_ENTRIES = 96;
@@ -116,7 +119,6 @@ const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
 const DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS = 5_000;
 const DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS = 90_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
-const GIT_HISTORY_ENTRY_LIMIT = 20;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
 
@@ -125,7 +127,10 @@ type WorktreePollState = {
 	files: string[];
 	diffTimer: ReturnType<typeof setInterval> | null;
 	filesTimer: ReturnType<typeof setInterval> | null;
-	history: RpcWorktreeGitHistoryResult;
+	history: RpcWorktreeGitHistorySummary;
+	historyEntries: RpcGitHistoryEntry[];
+	historyNextOffset: number | null;
+	historyPrefetchPromise: Promise<void> | null;
 	historySignature: string | null;
 	historyTimer: ReturnType<typeof setInterval> | null;
 	taskInputs: Map<string, number>;
@@ -1776,21 +1781,26 @@ async function readFiles(worktreePath: string): Promise<string[]> {
 	return raw.split(/\r?\n/).filter(Boolean);
 }
 
-function emptyGitHistoryResult(
+type DecoratedGitHistoryEntry = RpcGitHistoryEntry & {
+	decoration: string;
+};
+
+function emptyGitHistorySummary(
 	projectId: number,
 	worktreePath: string,
 	options?: {
 		branch?: string | null;
+		headHash?: string | null;
+		headShortHash?: string | null;
 		lastUpdatedAt?: string;
 	},
-): RpcWorktreeGitHistoryResult {
+): RpcWorktreeGitHistorySummary {
 	return {
 		projectId,
 		worktreePath,
 		branch: options?.branch ?? null,
-		headHash: null,
-		headShortHash: null,
-		entries: [],
+		headHash: options?.headHash ?? null,
+		headShortHash: options?.headShortHash ?? null,
 		lastUpdatedAt: options?.lastUpdatedAt ?? getNow(),
 	};
 }
@@ -1825,69 +1835,326 @@ function parseGitHistoryEntries(raw: string): RpcGitHistoryEntry[] {
 		.filter((entry): entry is RpcGitHistoryEntry => entry !== null);
 }
 
+function parseDecoratedGitHistoryEntryRecord(
+	record: string,
+): DecoratedGitHistoryEntry | null {
+	const [hash, shortHash, subject, authorName, committedAt, decoration] =
+		record.split(GIT_LOG_FIELD_SEPARATOR);
+	if (!hash || !shortHash) {
+		return null;
+	}
+
+	return {
+		hash,
+		shortHash,
+		subject: subject || shortHash,
+		authorName: authorName || "Unknown",
+		committedAt: committedAt || getNow(),
+		decoration: decoration || "",
+	};
+}
+
+function parseDecoratedGitHistoryEntries(
+	raw: string,
+): DecoratedGitHistoryEntry[] {
+	if (!raw) {
+		return [];
+	}
+
+	return raw
+		.split(GIT_LOG_RECORD_SEPARATOR)
+		.map((record) => record.trim())
+		.filter(Boolean)
+		.map(parseDecoratedGitHistoryEntryRecord)
+		.filter((entry): entry is DecoratedGitHistoryEntry => entry !== null);
+}
+
+function parseGitBranchFromDecoration(decoration: string): string | null {
+	for (const token of decoration.split(",")) {
+		const trimmedToken = token.trim();
+		if (!trimmedToken.startsWith("HEAD -> ")) {
+			continue;
+		}
+
+		const branch = trimmedToken.replace("HEAD -> ", "").trim();
+		return branch || null;
+	}
+
+	return null;
+}
+
 function buildGitHistorySignature(
 	branch: string | null,
 	headHash: string | null,
-	entries: RpcGitHistoryEntry[],
 ): string {
-	return [
-		branch ?? "",
-		headHash ?? "",
-		...entries.map((entry) => entry.hash),
-	].join("\n");
+	return [branch ?? "", headHash ?? ""].join("\n");
 }
 
-async function readGitHistory(
+function normalizeGitHistoryPageLimit(limit?: number): number {
+	if (!Number.isInteger(limit)) {
+		return DEFAULT_GIT_HISTORY_PAGE_SIZE;
+	}
+	return Math.min(Math.max(limit, 1), DEFAULT_GIT_HISTORY_PAGE_SIZE);
+}
+
+async function readGitHistorySummary(
 	projectId: number,
 	worktreePath: string,
 ): Promise<{
-	history: RpcWorktreeGitHistoryResult;
+	history: RpcWorktreeGitHistorySummary;
 	signature: string;
 }> {
-	const branch =
-		(
-			await tryRunGitCommand(worktreePath, ["branch", "--show-current"])
-		)?.trim() || null;
-	const headHash =
-		(await tryRunGitCommand(worktreePath, ["rev-parse", "HEAD"]))?.trim() ||
-		null;
-	const headShortHash =
-		(
-			await tryRunGitCommand(worktreePath, ["rev-parse", "--short=7", "HEAD"])
-		)?.trim() || null;
 	const lastUpdatedAt = getNow();
+	const rawHead =
+		(await tryRunGitCommand(worktreePath, [
+			"show",
+			"--no-patch",
+			"--decorate=short",
+			"--pretty=format:%H%x1f%h%x1f%D",
+			"HEAD",
+		])) ?? "";
 
-	if (!headHash || !headShortHash) {
+	if (!rawHead) {
+		const branch =
+			(
+				await tryRunGitCommand(worktreePath, [
+					"symbolic-ref",
+					"--quiet",
+					"--short",
+					"HEAD",
+				])
+			)?.trim() || null;
+		const history = emptyGitHistorySummary(projectId, worktreePath, {
+			branch,
+			lastUpdatedAt,
+		});
 		return {
-			history: emptyGitHistoryResult(projectId, worktreePath, {
-				branch,
-				lastUpdatedAt,
-			}),
-			signature: buildGitHistorySignature(branch, null, []),
+			history,
+			signature: buildGitHistorySignature(history.branch, history.headHash),
 		};
 	}
 
+	const [headHash, headShortHash, decoration] = rawHead.split(
+		GIT_LOG_FIELD_SEPARATOR,
+	);
+	const history = emptyGitHistorySummary(projectId, worktreePath, {
+		branch: parseGitBranchFromDecoration(decoration || ""),
+		headHash: headHash || null,
+		headShortHash: headShortHash || headHash?.slice(0, 7) || null,
+		lastUpdatedAt,
+	});
+
+	return {
+		history,
+		signature: buildGitHistorySignature(history.branch, history.headHash),
+	};
+}
+
+async function readGitHistoryPageEntries(
+	worktreePath: string,
+	offset: number,
+	limit: number,
+): Promise<{
+	entries: RpcGitHistoryEntry[];
+	nextOffset: number | null;
+}> {
 	const rawEntries =
 		(await tryRunGitCommand(worktreePath, [
 			"log",
-			`--max-count=${GIT_HISTORY_ENTRY_LIMIT}`,
+			`--skip=${offset}`,
+			`--max-count=${limit + 1}`,
 			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
-			headHash,
+			"HEAD",
 		])) ?? "";
-	const entries = parseGitHistoryEntries(rawEntries);
+	const parsedEntries = parseGitHistoryEntries(rawEntries);
+	const hasMore = parsedEntries.length > limit;
+
+	return {
+		entries: hasMore ? parsedEntries.slice(0, limit) : parsedEntries,
+		nextOffset: hasMore ? offset + limit : null,
+	};
+}
+
+async function readGitHistoryFirstPage(
+	projectId: number,
+	worktreePath: string,
+	limit: number,
+): Promise<{
+	history: RpcWorktreeGitHistoryResult;
+	summary: RpcWorktreeGitHistorySummary;
+	signature: string;
+}> {
+	const lastUpdatedAt = getNow();
+	const rawEntries =
+		(await tryRunGitCommand(worktreePath, [
+			"log",
+			"--decorate=short",
+			`--max-count=${limit + 1}`,
+			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
+			"HEAD",
+		])) ?? "";
+	const parsedEntries = parseDecoratedGitHistoryEntries(rawEntries);
+
+	if (parsedEntries.length === 0) {
+		const { history: summary, signature } = await readGitHistorySummary(
+			projectId,
+			worktreePath,
+		);
+		return {
+			history: {
+				...summary,
+				entries: [],
+				limit,
+				nextOffset: null,
+			},
+			summary,
+			signature,
+		};
+	}
+
+	const firstEntry = parsedEntries[0];
+	const hasMore = parsedEntries.length > limit;
+	const trimmedEntries = hasMore
+		? parsedEntries.slice(0, limit)
+		: parsedEntries;
+	const summary = emptyGitHistorySummary(projectId, worktreePath, {
+		branch: parseGitBranchFromDecoration(firstEntry.decoration),
+		headHash: firstEntry.hash,
+		headShortHash: firstEntry.shortHash,
+		lastUpdatedAt,
+	});
+	const entries = trimmedEntries.map(
+		({ decoration: _decoration, ...entry }) => ({
+			...entry,
+		}),
+	);
 
 	return {
 		history: {
-			projectId,
-			worktreePath,
-			branch,
-			headHash,
-			headShortHash,
+			...summary,
 			entries,
-			lastUpdatedAt,
+			limit,
+			nextOffset: hasMore ? limit : null,
 		},
-		signature: buildGitHistorySignature(branch, headHash, entries),
+		summary,
+		signature: buildGitHistorySignature(summary.branch, summary.headHash),
 	};
+}
+
+function applyGitHistoryCachePage(
+	worktreeState: WorktreePollState,
+	offset: number,
+	page: {
+		entries: RpcGitHistoryEntry[];
+		nextOffset: number | null;
+	},
+): void {
+	const prefix = worktreeState.historyEntries.slice(0, offset);
+	worktreeState.historyEntries = [...prefix, ...page.entries];
+	worktreeState.historyNextOffset = page.nextOffset;
+}
+
+function hasGitHistoryCacheRange(
+	worktreeState: WorktreePollState,
+	offset: number,
+	limit: number,
+): boolean {
+	if (worktreeState.historyEntries.length >= offset + limit) {
+		return true;
+	}
+
+	return (
+		worktreeState.historyNextOffset === null &&
+		worktreeState.historyEntries.length >= offset
+	);
+}
+
+function buildGitHistoryResultFromCache(
+	worktreeState: WorktreePollState,
+	limit: number,
+	offset: number,
+): RpcWorktreeGitHistoryResult {
+	const endOffset = Math.min(
+		offset + limit,
+		worktreeState.historyEntries.length,
+	);
+
+	return {
+		...worktreeState.history,
+		entries: worktreeState.historyEntries.slice(offset, endOffset),
+		limit,
+		nextOffset:
+			endOffset < worktreeState.historyEntries.length
+				? endOffset
+				: worktreeState.historyNextOffset,
+	};
+}
+
+async function fillGitHistoryCache(
+	worktreeState: WorktreePollState,
+	worktreePath: string,
+	offset: number,
+	limit: number,
+): Promise<void> {
+	while (
+		!hasGitHistoryCacheRange(worktreeState, offset, limit) &&
+		worktreeState.historyNextOffset !== null
+	) {
+		if (worktreeState.historyPrefetchPromise) {
+			await worktreeState.historyPrefetchPromise;
+			continue;
+		}
+
+		const expectedSignature = worktreeState.historySignature;
+		const fetchOffset = worktreeState.historyEntries.length;
+		const fetchLimit = Math.max(
+			GIT_HISTORY_PREFETCH_CHUNK_SIZE,
+			offset + limit - fetchOffset,
+		);
+		const promise = (async () => {
+			try {
+				const page = await readGitHistoryPageEntries(
+					worktreePath,
+					fetchOffset,
+					fetchLimit,
+				);
+				if (
+					worktreeState.historySignature !== expectedSignature ||
+					worktreeState.historyEntries.length !== fetchOffset
+				) {
+					return;
+				}
+				applyGitHistoryCachePage(worktreeState, fetchOffset, page);
+			} finally {
+				if (worktreeState.historyPrefetchPromise === promise) {
+					worktreeState.historyPrefetchPromise = null;
+				}
+			}
+		})();
+		worktreeState.historyPrefetchPromise = promise;
+		await promise;
+	}
+}
+
+function warmGitHistoryCache(
+	worktreeState: WorktreePollState,
+	worktreePath: string,
+): void {
+	if (
+		worktreeState.historyNextOffset === null ||
+		worktreeState.historyPrefetchPromise
+	) {
+		return;
+	}
+
+	void fillGitHistoryCache(
+		worktreeState,
+		worktreePath,
+		worktreeState.historyEntries.length,
+		DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
+	).catch((error) => {
+		console.error(`Git history prefetch failed for ${worktreePath}`, error);
+	});
 }
 
 async function readGitCommitEntry(
@@ -2011,7 +2278,10 @@ function startWorktreePolling(
 		files: [],
 		diffTimer: null,
 		filesTimer: null,
-		history: emptyGitHistoryResult(state.id, worktreePath),
+		history: emptyGitHistorySummary(state.id, worktreePath),
+		historyEntries: [],
+		historyNextOffset: null,
+		historyPrefetchPromise: null,
 		historySignature: null,
 		historyTimer: null,
 		taskInputs: new Map(),
@@ -2040,11 +2310,16 @@ function startWorktreePolling(
 	const pollGitHistory = async () => {
 		try {
 			const previousSignature = worktreeState.historySignature;
-			const { history, signature } = await readGitHistory(
+			const { history, signature } = await readGitHistorySummary(
 				state.id,
 				worktreePath,
 			);
 			worktreeState.history = history;
+			if (previousSignature !== null && previousSignature !== signature) {
+				worktreeState.historyEntries = [];
+				worktreeState.historyNextOffset = null;
+				worktreeState.historyPrefetchPromise = null;
+			}
 			worktreeState.historySignature = signature;
 			worktreeState.lastUpdatedAt = history.lastUpdatedAt;
 
@@ -2086,7 +2361,6 @@ function startWorktreePolling(
 	state.openWorktrees.set(worktreePath, worktreeState);
 	void pollDiff();
 	void pollFiles();
-	void pollGitHistory();
 
 	return worktreeState;
 }
@@ -2458,6 +2732,17 @@ export async function openWorktreeProcedure(
 	}
 
 	const worktreeState = startWorktreePolling(state, worktreePath);
+	const { history, summary, signature } = await readGitHistoryFirstPage(
+		project.id,
+		worktreePath,
+		DEFAULT_GIT_HISTORY_PAGE_SIZE,
+	);
+	worktreeState.history = summary;
+	worktreeState.historyEntries = history.entries;
+	worktreeState.historyNextOffset = history.nextOffset;
+	worktreeState.historySignature = signature;
+	worktreeState.lastUpdatedAt = summary.lastUpdatedAt;
+	warmGitHistoryCache(worktreeState, worktreePath);
 
 	return {
 		project,
@@ -2467,6 +2752,7 @@ export async function openWorktreeProcedure(
 			files: worktreeState.files,
 			lastUpdatedAt: worktreeState.lastUpdatedAt,
 		},
+		history,
 	};
 }
 
@@ -2476,16 +2762,55 @@ export async function listWorktreeGitHistoryProcedure(
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	await assertProjectWorktree(project, worktreePath);
+	const offset =
+		Number.isInteger(params.offset) && typeof params.offset === "number"
+			? Math.max(params.offset, 0)
+			: 0;
+	const limit = normalizeGitHistoryPageLimit(params.limit);
 
 	const state = startWorktreePolling(
 		ensureProjectPoller(project),
 		worktreePath,
 	);
-	const { history, signature } = await readGitHistory(project.id, worktreePath);
-	state.history = history;
-	state.historySignature = signature;
-	state.lastUpdatedAt = history.lastUpdatedAt;
-	return history;
+	if (offset === 0) {
+		const { history, summary, signature } = await readGitHistoryFirstPage(
+			project.id,
+			worktreePath,
+			limit,
+		);
+		state.history = summary;
+		state.historyEntries = history.entries;
+		state.historyNextOffset = history.nextOffset;
+		state.historySignature = signature;
+		state.lastUpdatedAt = summary.lastUpdatedAt;
+		warmGitHistoryCache(state, worktreePath);
+		return history;
+	}
+
+	let summary = state.history;
+	let signature = state.historySignature;
+	if (signature === null) {
+		const loadedSummary = await readGitHistorySummary(project.id, worktreePath);
+		summary = loadedSummary.history;
+		signature = loadedSummary.signature;
+		state.history = summary;
+		state.historyNextOffset = summary.headHash ? 0 : null;
+		state.historySignature = signature;
+		state.lastUpdatedAt = summary.lastUpdatedAt;
+	}
+
+	if (!summary.headHash) {
+		return {
+			...summary,
+			entries: [],
+			limit,
+			nextOffset: null,
+		};
+	}
+
+	await fillGitHistoryCache(state, worktreePath, offset, limit);
+	warmGitHistoryCache(state, worktreePath);
+	return buildGitHistoryResultFromCache(state, limit, offset);
 }
 
 export async function getWorktreeGitCommitDiffProcedure(
