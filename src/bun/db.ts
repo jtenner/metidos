@@ -1,6 +1,6 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = ".jt-ide";
@@ -109,7 +109,7 @@ export type ProjectWorktreePinRecord = {
 	pinnedAt: string;
 };
 
-const APP_DATA_DIR =
+const DEFAULT_APP_DATA_DIR =
 	process.platform === "darwin"
 		? join(homedir(), "Library", "Application Support", APP_NAME)
 		: process.platform === "win32"
@@ -121,6 +121,8 @@ const APP_DATA_DIR =
 					process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
 					APP_NAME,
 				);
+const TEMP_APP_DATA_DIR = join(tmpdir(), APP_NAME);
+let resolvedAppDataDir: string | null = null;
 
 function runStatement(
 	database: Database,
@@ -136,6 +138,51 @@ function ensureAppDirectory(appDataPath: string): void {
 	if (!existsSync(appDataPath)) {
 		mkdirSync(appDataPath, { recursive: true });
 	}
+}
+
+function isWritableDirectory(path: string): boolean {
+	try {
+		ensureAppDirectory(path);
+		const testFilePath = join(
+			path,
+			`.write-test-${process.pid}-${Date.now().toString(36)}`,
+		);
+		writeFileSync(testFilePath, "");
+		unlinkSync(testFilePath);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function resolveAppDataDirectory(): string {
+	if (resolvedAppDataDir) {
+		return resolvedAppDataDir;
+	}
+
+	const configuredAppDataDir = process.env.JT_IDE_APP_DATA_DIR?.trim();
+	const candidates = [
+		configuredAppDataDir || null,
+		DEFAULT_APP_DATA_DIR,
+		TEMP_APP_DATA_DIR,
+	].filter((value): value is string => Boolean(value));
+
+	for (const candidate of candidates) {
+		if (!isWritableDirectory(candidate)) {
+			continue;
+		}
+		resolvedAppDataDir = candidate;
+		return candidate;
+	}
+
+	throw new Error(
+		[
+			"Unable to find a writable application data directory.",
+			configuredAppDataDir
+				? `Checked JT_IDE_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
+				: `Checked ${DEFAULT_APP_DATA_DIR} and ${TEMP_APP_DATA_DIR}.`,
+		].join(" "),
+	);
 }
 
 function tableHasColumn(
@@ -331,7 +378,7 @@ function migrate(db: Database): void {
 }
 
 export function getAppDatabasePath(): string {
-	return resolve(APP_DATA_DIR, DB_FILE_NAME);
+	return resolve(resolveAppDataDirectory(), DB_FILE_NAME);
 }
 
 export function initAppDatabase(): Database {

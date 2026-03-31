@@ -180,7 +180,10 @@ function resolveServerPort(args: string[], envPort?: string): number {
 }
 
 const SERVER_ARGS = Bun.argv.slice(2);
+const CONFIGURED_SERVER_PORT =
+	readCliPort(SERVER_ARGS) ?? process.env.JT_IDE_PORT;
 const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JT_IDE_PORT);
+const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
 const IS_DEV_SERVER =
 	SERVER_ARGS.includes("--dev") || process.env.JT_IDE_DEV === "1";
 
@@ -252,6 +255,15 @@ function fileResponse(path: string, contentType: string): Response {
 			"cache-control": "no-store",
 		},
 	});
+}
+
+function isAddressInUseError(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		error.code === "EADDRINUSE"
+	);
 }
 
 async function htmlResponse(): Promise<Response> {
@@ -713,8 +725,8 @@ async function bootstrap(): Promise<void> {
 		broadcastGitHistoryChanged(projectId, worktreePath);
 	});
 
-	const server = Bun.serve({
-		port: SERVER_PORT,
+	let activeServerPort = SERVER_PORT;
+	const serverOptions = {
 		async fetch(request, serverInstance) {
 			const { pathname } = new URL(request.url);
 
@@ -757,7 +769,7 @@ async function bootstrap(): Promise<void> {
 					JSON.stringify({
 						devServer: IS_DEV_SERVER,
 						ok: true,
-						port: SERVER_PORT,
+						port: activeServerPort,
 					}),
 					"application/json; charset=utf-8",
 				);
@@ -873,7 +885,33 @@ async function bootstrap(): Promise<void> {
 				})();
 			},
 		},
-	});
+	} satisfies Bun.Serve.Options<undefined>;
+
+	let server: ReturnType<typeof Bun.serve>;
+	try {
+		server = Bun.serve({
+			...serverOptions,
+			port: SERVER_PORT,
+		});
+	} catch (error) {
+		if (
+			!IS_DEV_SERVER ||
+			SERVER_PORT_IS_EXPLICIT ||
+			!isAddressInUseError(error)
+		) {
+			throw error;
+		}
+
+		server = Bun.serve({
+			...serverOptions,
+			port: 0,
+		});
+		activeServerPort = server.port ?? activeServerPort;
+		console.warn(
+			`Port ${SERVER_PORT} is already in use; jt-ide dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
+		);
+	}
+	activeServerPort = server.port ?? activeServerPort;
 
 	console.log(
 		`jt-ide web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,

@@ -2647,10 +2647,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
 
 	const activePollingProjectId =
-		isDocumentVisible &&
-		selectedProject &&
-		activeSelectedWorktreePath &&
-		activeSelectedWorktreeOpened
+		isDocumentVisible && selectedProject && activeSelectedWorktreePath
 			? selectedProject.id
 			: null;
 	const activePollingWorktreePath =
@@ -4724,11 +4721,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	]);
 
 	useEffect(() => {
-		if (
-			!selectedProject ||
-			!activeSelectedWorktreePath ||
-			!activeSelectedWorktreeOpened
-		) {
+		if (!selectedProject || !activeSelectedWorktreePath) {
 			gitHistoryRequestIdRef.current += 1;
 			abortGitHistoryRequests("Git history request was cleared.");
 			setGitHistory(null);
@@ -4745,7 +4738,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		});
 	}, [
 		activeSelectedWorktreePath,
-		activeSelectedWorktreeOpened,
 		abortGitHistoryRequests,
 		loadGitHistory,
 		resetGitHistoryScrollPosition,
@@ -4797,11 +4789,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		const handleWorktreeGitHistoryChanged = (
 			event: CustomEvent<RpcWorktreeGitHistoryChanged>,
 		) => {
-			if (
-				!selectedProject ||
-				!activeSelectedWorktreePath ||
-				!activeSelectedWorktreeOpened
-			) {
+			if (!selectedProject || !activeSelectedWorktreePath) {
 				return;
 			}
 			if (
@@ -4825,12 +4813,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				handleWorktreeGitHistoryChanged,
 			);
 		};
-	}, [
-		activeSelectedWorktreePath,
-		activeSelectedWorktreeOpened,
-		loadGitHistory,
-		selectedProject,
-	]);
+	}, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
 
 	useEffect(() => {
 		if (
