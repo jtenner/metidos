@@ -710,6 +710,21 @@ function invalidateThreadDetailCache(threadId: number): void {
 	threadDetailCache.delete(threadId);
 }
 
+function clearThreadRuntimeState(threadId: number): void {
+	codexThreadMap.delete(threadId);
+	threadRunStatusMap.delete(threadId);
+	invalidateThreadDetailCache(threadId);
+}
+
+function clearProjectThreadRuntimeState(projectId: number): void {
+	for (const thread of listThreads(db)) {
+		if (thread.projectId !== projectId) {
+			continue;
+		}
+		clearThreadRuntimeState(thread.id);
+	}
+}
+
 function formatTaskPrompt(taskTitle: string, taskContent: string): string {
 	return `Your job is to perform the task: ${taskTitle}\n${taskContent.trim()}\n\nDo this now.`;
 }
@@ -3469,9 +3484,7 @@ export async function deleteThreadProcedure(
 		throw new Error("Thread is currently processing and cannot be deleted.");
 	}
 
-	codexThreadMap.delete(thread.id);
-	threadRunStatusMap.delete(thread.id);
-	invalidateThreadDetailCache(thread.id);
+	clearThreadRuntimeState(thread.id);
 	deleteThread(db, thread.id);
 	return {
 		success: true,
@@ -3668,7 +3681,20 @@ export async function deleteProjectProcedure(
 	params: AppRPCSchema["requests"]["deleteProject"]["params"],
 ): Promise<AppRPCSchema["requests"]["deleteProject"]["response"]> {
 	const project = projectByIdForPath(params.projectId);
+	const projectThreads = listThreads(db).filter(
+		(thread) => thread.projectId === project.id,
+	);
+	const workingThread = projectThreads.find(
+		(thread) => threadRunStatusFromRecord(thread).state === "working",
+	);
+	if (workingThread) {
+		throw new Error(
+			`Project cannot be deleted while thread "${workingThread.title}" is processing.`,
+		);
+	}
+
 	stopProjectPoller(project.id);
+	clearProjectThreadRuntimeState(project.id);
 	deleteProject(db, project.id);
 	return {
 		success: true,
