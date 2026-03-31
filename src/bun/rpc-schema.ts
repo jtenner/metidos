@@ -242,11 +242,28 @@ export type RpcFileChangeThreadMessage = {
 	updatedAt: string;
 };
 
+export type RpcToolCallThreadMessage = {
+	id: number;
+	threadId: number;
+	role: "assistant";
+	kind: "tool_call";
+	itemId: string;
+	text: string;
+	state: "in_progress" | "completed" | "failed" | "stopped";
+	server: string;
+	tool: string;
+	argumentsText: string;
+	output: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
 export type RpcThreadMessage =
 	| RpcChatThreadMessage
 	| RpcReasoningThreadMessage
 	| RpcCommandThreadMessage
-	| RpcFileChangeThreadMessage;
+	| RpcFileChangeThreadMessage
+	| RpcToolCallThreadMessage;
 
 export type RpcThreadDetail = {
 	thread: RpcThread;
@@ -398,6 +415,10 @@ export type AppRPCSchema = {
 			params: { threadId: number };
 			response: { success: boolean; threadId: number; message?: string };
 		};
+		discardEmptyThread: {
+			params: { threadId: number };
+			response: { threadId: number; discarded: boolean };
+		};
 	};
 };
 
@@ -517,5 +538,9 @@ export interface ProjectProcedures {
 	deleteThread: RpcProcedureCall<
 		AppRPCSchema["requests"]["deleteThread"]["params"],
 		AppRPCSchema["requests"]["deleteThread"]["response"]
+	>;
+	discardEmptyThread: RpcProcedureCall<
+		AppRPCSchema["requests"]["discardEmptyThread"]["params"],
+		AppRPCSchema["requests"]["discardEmptyThread"]["response"]
 	>;
 }

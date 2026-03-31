@@ -282,6 +282,21 @@ function commandStateLabel(
 	return exitCode === null ? "Completed" : `Completed (${exitCode})`;
 }
 
+function toolCallStateLabel(
+	state: "in_progress" | "completed" | "failed" | "stopped",
+): string {
+	if (state === "in_progress") {
+		return "Running";
+	}
+	if (state === "stopped") {
+		return "Stopped";
+	}
+	if (state === "failed") {
+		return "Failed";
+	}
+	return "Completed";
+}
+
 function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
 	const lines = parseUnifiedDiff(diffText);
 	if (lines.length === 0) {
@@ -316,6 +331,59 @@ function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
 					</div>
 				))}
 			</div>
+		</div>
+	);
+}
+
+export function ToolCallMessage({
+	server,
+	tool,
+	argumentsText,
+	output,
+	state,
+}: {
+	server: string;
+	tool: string;
+	argumentsText: string;
+	output: string;
+	state: "in_progress" | "completed" | "failed" | "stopped";
+}): JSX.Element {
+	return (
+		<div className="space-y-3 rounded-sm border border-[#2c353c] bg-[#13181b] p-4">
+			<div className="flex items-center justify-between gap-4">
+				<div className="min-w-0">
+					<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+						Tool Call
+					</div>
+					<div className="mt-1 truncate font-mono text-sm text-[#f2f0ef]">
+						{tool}
+					</div>
+					<div className="mt-1 text-[11px] text-[#8f9aa2]">{server}</div>
+				</div>
+				<div className="shrink-0 rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+					{toolCallStateLabel(state)}
+				</div>
+			</div>
+			{argumentsText.trim() ? (
+				<div className="space-y-2">
+					<div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+						Arguments
+					</div>
+					<pre className="app-scrollbar max-h-[12rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+						{argumentsText}
+					</pre>
+				</div>
+			) : null}
+			{output.trim() ? (
+				<div className="space-y-2">
+					<div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+						{state === "failed" ? "Error" : "Output"}
+					</div>
+					<pre className="app-scrollbar max-h-[16rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+						{output}
+					</pre>
+				</div>
+			) : null}
 		</div>
 	);
 }

@@ -12,6 +12,7 @@ import {
 	createWorktreeProcedure,
 	deleteProjectProcedure,
 	deleteThreadProcedure,
+	discardEmptyThreadProcedure,
 	getCodexModelCatalogProcedure,
 	getThreadProcedure,
 	getWorktreeGitCommitDiffProcedure,
@@ -222,6 +223,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	updateThreadReasoningEffort: (params) =>
 		updateThreadReasoningEffortProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
+	discardEmptyThread: (params) => discardEmptyThreadProcedure(params),
 	openWorktree: (params, context) => openWorktreeProcedure(params, context),
 	setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
 	listWorktreeGitHistory: (params, context) =>

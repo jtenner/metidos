@@ -556,6 +556,18 @@ async function runThreadMessageInBackground(
 				continue;
 			}
 
+			if (item.type === "mcp_tool_call") {
+				if (item.server === JOLT_MCP_SERVER_NAME) {
+					continue;
+				}
+				await upsertToolCallActivity(
+					threadId,
+					buildThreadTurnActivityId(startedAt, item.id),
+					item,
+				);
+				continue;
+			}
+
 			if (item.type === "file_change") {
 				await upsertFileChangeActivity(
 					threadId,
@@ -748,6 +760,82 @@ type FileChangeActivityPayload = {
 	diffText: string;
 };
 
+type ToolCallActivityPayload = {
+	server: string;
+	tool: string;
+	argumentsText: string;
+	output: string;
+};
+
+function stringifyActivityValue(value: unknown): string {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (typeof value === "undefined") {
+		return "";
+	}
+	try {
+		return JSON.stringify(value, null, 2) ?? "";
+	} catch {
+		return String(value);
+	}
+}
+
+function extractToolCallTextContent(content: unknown): string {
+	if (!Array.isArray(content)) {
+		return "";
+	}
+
+	return content
+		.flatMap((block) => {
+			if (!block || typeof block !== "object") {
+				return [];
+			}
+			const candidate = block as { type?: unknown; text?: unknown };
+			if (
+				candidate.type !== "text" ||
+				typeof candidate.text !== "string" ||
+				!candidate.text.trim()
+			) {
+				return [];
+			}
+			return [candidate.text];
+		})
+		.join("\n\n");
+}
+
+function formatToolCallOutput(
+	item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
+): string {
+	const errorMessage = item.error?.message?.trim();
+	if (errorMessage) {
+		return errorMessage;
+	}
+
+	const sections: string[] = [];
+	const textContent = extractToolCallTextContent(item.result?.content);
+	if (textContent) {
+		sections.push(textContent);
+	}
+	if (typeof item.result?.structured_content !== "undefined") {
+		const structuredContent = stringifyActivityValue(
+			item.result.structured_content,
+		);
+		if (structuredContent) {
+			sections.push(
+				textContent
+					? `Structured content\n${structuredContent}`
+					: structuredContent,
+			);
+		}
+	}
+	if (sections.length > 0) {
+		return sections.join("\n\n");
+	}
+
+	return stringifyActivityValue(item.result?.content);
+}
+
 async function upsertReasoningActivity(
 	threadId: number,
 	itemId: string,
@@ -828,6 +916,27 @@ async function upsertFileChangeActivity(
 			});
 		}),
 	);
+	invalidateThreadDetailCache(threadId);
+}
+
+async function upsertToolCallActivity(
+	threadId: number,
+	itemId: string,
+	item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
+): Promise<void> {
+	upsertThreadActivity(db, {
+		threadId,
+		itemId,
+		kind: "tool_call",
+		text: `${item.server}.${item.tool}`,
+		state: item.status,
+		payloadJson: JSON.stringify({
+			server: item.server,
+			tool: item.tool,
+			argumentsText: stringifyActivityValue(item.arguments),
+			output: formatToolCallOutput(item),
+		} satisfies ToolCallActivityPayload),
+	});
 	invalidateThreadDetailCache(threadId);
 }
 
@@ -1668,6 +1777,33 @@ export async function deleteThreadProcedure(
 		success: true,
 		threadId: thread.id,
 		message: `Deleted thread ${thread.title}`,
+	};
+}
+
+export async function discardEmptyThreadProcedure(
+	params: AppRPCSchema["requests"]["discardEmptyThread"]["params"],
+): Promise<AppRPCSchema["requests"]["discardEmptyThread"]["response"]> {
+	const thread = getThreadById(db, params.threadId);
+	if (!thread || currentThreadRunStatus(thread).state === "working") {
+		return {
+			threadId: params.threadId,
+			discarded: false,
+		};
+	}
+
+	const messages = listThreadMessages(db, thread.id);
+	if (thread.lastRunAt !== null || messages.length > 0) {
+		return {
+			threadId: thread.id,
+			discarded: false,
+		};
+	}
+
+	clearThreadRuntimeState(thread.id);
+	deleteThread(db, thread.id);
+	return {
+		threadId: thread.id,
+		discarded: true,
 	};
 }
 

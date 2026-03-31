@@ -545,6 +545,7 @@ const procedures: ProjectProcedures = {
 	updateThreadModel: createProcedure("updateThreadModel"),
 	updateThreadReasoningEffort: createProcedure("updateThreadReasoningEffort"),
 	deleteThread: createProcedure("deleteThread"),
+	discardEmptyThread: createProcedure("discardEmptyThread"),
 	openWorktree: createProcedure("openWorktree"),
 	setActiveWorktree: createProcedure("setActiveWorktree"),
 	listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),

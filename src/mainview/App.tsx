@@ -42,6 +42,7 @@ import {
 	MarkdownMessage,
 	ProcessingMessage,
 	ReasoningMessage,
+	ToolCallMessage,
 	isAssistantVisibleMessage,
 	isPlainAssistantTextMessage,
 } from "./app/message-ui";
@@ -98,12 +99,12 @@ import {
 	gitHistoryDiffCacheKey,
 	isAbortError,
 	isCodexReasoningEffort,
-	latestThreadForWorktree,
 	mergeResetGitHistory,
 	mergeThreadErrorLevel,
 	orderProjectWorktrees,
 	pickInitialThread,
 	pickPreferredThreadErrorPreview,
+	pinnedThreadForWorktree,
 	primaryWorktreePath,
 	readLruValue,
 	readPersistedMainviewState,
@@ -321,6 +322,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
+	const previousSelectedThreadIdRef = useRef<number | null>(
+		initialMainviewState.selectedThreadId,
+	);
+	const selectedProjectIdRef = useRef<number | null>(
+		initialMainviewState.selectedProjectId,
+	);
+	const selectedWorktreePathRef = useRef<string | null>(
+		initialMainviewState.selectedWorktreePath,
+	);
+	const threadCreationInFlightCountRef = useRef(0);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
 	const optimisticallyAcknowledgedThreadIdsRef = useRef(new Set<number>());
 	const threadErrorSeenRequestCacheRef = useRef(
@@ -564,11 +575,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const selectProject = useCallback(
 		(project: RpcProject, worktreePath?: string | null): void => {
-			setSelectedProjectId(project.id);
-			setSelectedWorktreePath(
+			const nextWorktreePath =
 				worktreePath ??
-					primaryWorktreePath(project, getProjectState(project.id).worktrees),
-			);
+				primaryWorktreePath(project, getProjectState(project.id).worktrees);
+			selectedProjectIdRef.current = project.id;
+			selectedWorktreePathRef.current = nextWorktreePath;
+			setSelectedProjectId(project.id);
+			setSelectedWorktreePath(nextWorktreePath);
 		},
 		[getProjectState],
 	);
@@ -1354,6 +1367,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, []);
 
 	const syncThreadContext = useCallback((thread: RpcThread) => {
+		selectedProjectIdRef.current = thread.projectId;
+		selectedWorktreePathRef.current = thread.worktreePath;
 		setSelectedProjectId(thread.projectId);
 		setSelectedWorktreePath(thread.worktreePath);
 	}, []);
@@ -1444,6 +1459,88 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[getProjectState, requestProjectWorktrees, setProjectState],
 	);
 
+	const createThreadForWorktree = useCallback(
+		async (
+			projectId: number,
+			worktreePath: string,
+			options?: {
+				requireNoSelectedThread?: boolean;
+			},
+		): Promise<RpcThreadDetail | null> => {
+			threadCreationInFlightCountRef.current += 1;
+			setIsCreatingThread(true);
+			setThreadsError("");
+			setModelControlError("");
+			setReasoningEffortControlError("");
+			setChatError("");
+			try {
+				const detail = await procedures.createThread({
+					projectId,
+					worktreePath,
+					model: activeCodexModel || defaultCodexModel || null,
+					reasoningEffort:
+						activeReasoningEffort || defaultCodexReasoningEffort || null,
+				});
+				const isActiveSelection =
+					selectedProjectIdRef.current === projectId &&
+					selectedWorktreePathRef.current === worktreePath;
+				const canApplySelection =
+					!options?.requireNoSelectedThread ||
+					(selectedThreadIdRef.current === null &&
+						threadOpenAbortControllerRef.current === null);
+				if (!isActiveSelection || !canApplySelection) {
+					void procedures
+						.discardEmptyThread({
+							threadId: detail.thread.id,
+						})
+						.catch(() => {
+							// Best effort; stale auto-created threads should not break the UI.
+						});
+					return null;
+				}
+
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				setSelectedThreadId(detail.thread.id);
+				selectedThreadIdRef.current = detail.thread.id;
+				selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+				setThreadMessages(detail.messages);
+				syncThreadContext(detail.thread);
+				setMobileProjectListOpen(false);
+				try {
+					await loadProjectWorktrees(detail.thread.projectId);
+				} catch {
+					// Best effort; thread creation should still succeed even if the worktree refresh fails.
+				}
+				return detail;
+			} catch (error) {
+				if (
+					selectedProjectIdRef.current === projectId &&
+					selectedWorktreePathRef.current === worktreePath
+				) {
+					setThreadsError(
+						error instanceof Error ? error.message : String(error),
+					);
+				}
+				return null;
+			} finally {
+				threadCreationInFlightCountRef.current = Math.max(
+					0,
+					threadCreationInFlightCountRef.current - 1,
+				);
+				setIsCreatingThread(threadCreationInFlightCountRef.current > 0);
+			}
+		},
+		[
+			activeCodexModel,
+			activeReasoningEffort,
+			defaultCodexModel,
+			defaultCodexReasoningEffort,
+			loadProjectWorktrees,
+			procedures,
+			syncThreadContext,
+		],
+	);
+
 	const abortProjectTasksRequest = useCallback((reason: string) => {
 		const controller = projectTasksAbortControllerRef.current;
 		if (!controller) {
@@ -1489,6 +1586,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadIdRef.current = null;
 		selectedThreadRunStateRef.current = "idle";
 	}, [abortThreadOpenRequest]);
+
+	const discardThreadIfEmpty = useCallback(
+		async (threadId: number): Promise<void> => {
+			try {
+				const result = await procedures.discardEmptyThread({ threadId });
+				if (!result.discarded) {
+					return;
+				}
+				setThreads((prev) => removeThreadFromList(prev, result.threadId));
+			} catch (error) {
+				console.error(`Failed to discard empty thread ${threadId}`, error);
+			}
+		},
+		[procedures],
+	);
 
 	const loadProjectTasks = useCallback(
 		async (projectId: number, worktreePath: string): Promise<void> => {
@@ -2322,10 +2434,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const restoredProjectWorktreesPromise = Promise.all(
 				restoredProjects.map(async (project) => {
 					try {
-						const worktrees = await loadProjectWorktrees(project.id, {
-							backgroundRefresh: true,
+						const result = await procedures.openProject({
+							projectPath: project.path,
+							name: project.name,
 						});
-						restoredProjectWorktrees.set(project.id, worktrees);
+						restoredProjectWorktrees.set(result.project.id, result.worktrees);
+						setProjects((prev) => upsertProjectList(prev, result.project));
+						setProjectState(result.project.id, {
+							worktrees: result.worktrees,
+							loadingWorktrees: false,
+							error: "",
+						});
 					} catch (error) {
 						setProjectState(project.id, {
 							loadingWorktrees: false,
@@ -2427,6 +2546,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								restoredProjectWorktrees.get(initialProject.id) ?? [],
 							);
 
+			selectedProjectIdRef.current = initialProject?.id ?? null;
+			selectedWorktreePathRef.current = initialWorktreePath;
 			setSelectedProjectId(initialProject?.id ?? null);
 			setSelectedWorktreePath(initialWorktreePath);
 		} catch (error) {
@@ -2440,7 +2561,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		hydrateProjectRows,
 		initialMainviewState,
 		initialTreeViewState,
-		loadProjectWorktrees,
 		openThread,
 		prefetchDirectorySuggestions,
 		procedures,
@@ -2563,13 +2683,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				if (removedProjectPath) {
 					setProjectTreeOpen(removedProjectPath, false);
 				}
-				setSelectedProjectId((current) => {
-					if (current && loaded.some((project) => project.id === current)) {
-						return current;
-					}
-					return loaded[0]?.id ?? null;
-				});
+				const nextSelectedProjectId =
+					selectedProjectId &&
+					loaded.some((project) => project.id === selectedProjectId)
+						? selectedProjectId
+						: (loaded[0]?.id ?? null);
+				selectedProjectIdRef.current = nextSelectedProjectId;
+				setSelectedProjectId(nextSelectedProjectId);
 				if (selectedProjectId === projectId) {
+					selectedWorktreePathRef.current = loaded[0]?.path ?? null;
 					setSelectedWorktreePath(loaded[0]?.path ?? null);
 				}
 				if (selectedThreadId) {
@@ -2872,8 +2994,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [hideErrorPreview, hideThreadSummaryPreview]);
 
 	useEffect(() => {
+		const previousThreadId = previousSelectedThreadIdRef.current;
 		selectedThreadIdRef.current = selectedThreadId;
-	}, [selectedThreadId]);
+		if (previousThreadId !== null && previousThreadId !== selectedThreadId) {
+			void discardThreadIfEmpty(previousThreadId);
+		}
+		previousSelectedThreadIdRef.current = selectedThreadId;
+	}, [discardThreadIfEmpty, selectedThreadId]);
+
+	useEffect(() => {
+		selectedProjectIdRef.current = selectedProjectId;
+	}, [selectedProjectId]);
+
+	useEffect(() => {
+		selectedWorktreePathRef.current = selectedWorktreePath;
+	}, [selectedWorktreePath]);
 
 	useEffect(() => {
 		const handleVisibilityChange = () => {
@@ -3186,19 +3321,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		) {
 			return;
 		}
-		const latestThread = latestThreadForWorktree(
+		const pinnedThread = pinnedThreadForWorktree(
 			threads,
 			selectedProjectId,
 			activeSelectedWorktreePath,
 		);
-		if (!latestThread) {
-			clearThreadSelection();
+		if (!pinnedThread) {
+			if (selectedThreadId !== null) {
+				clearThreadSelection();
+			}
 			return;
 		}
-		if (selectedThreadId === latestThread.id) {
+		if (selectedThreadId === pinnedThread.id) {
 			return;
 		}
-		void openThread(latestThread.id);
+		void openThread(pinnedThread.id);
 	}, [
 		activeSelectedWorktreePath,
 		activeSelectedWorktreeOpened,
@@ -3528,46 +3665,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 
-		setIsCreatingThread(true);
-		setThreadsError("");
-		setModelControlError("");
-		setReasoningEffortControlError("");
-		setChatError("");
-		try {
-			const detail = await procedures.createThread({
-				projectId: selectedProject.id,
-				worktreePath: activeSelectedWorktreePath,
-				model: activeCodexModel || defaultCodexModel || null,
-				reasoningEffort:
-					activeReasoningEffort || defaultCodexReasoningEffort || null,
-			});
-			setThreads((prev) => upsertThreadList(prev, detail.thread));
-			setSelectedThreadId(detail.thread.id);
-			selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-			setThreadMessages(detail.messages);
-			syncThreadContext(detail.thread);
-			setMobileProjectListOpen(false);
-			try {
-				await loadProjectWorktrees(detail.thread.projectId);
-			} catch {
-				// Best effort; thread creation should still succeed even if the worktree refresh fails.
-			}
-		} catch (error) {
-			setThreadsError(error instanceof Error ? error.message : String(error));
-		} finally {
-			setIsCreatingThread(false);
-		}
+		await createThreadForWorktree(
+			selectedProject.id,
+			activeSelectedWorktreePath,
+		);
 	}, [
 		activeSelectedWorktreePath,
-		activeCodexModel,
-		activeReasoningEffort,
-		defaultCodexModel,
-		defaultCodexReasoningEffort,
+		createThreadForWorktree,
 		isCreatingThread,
-		loadProjectWorktrees,
-		procedures,
 		selectedProject,
-		syncThreadContext,
 	]);
 
 	const openProjectFromInput = useCallback(
@@ -3688,6 +3794,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					// best effort
 				}
 				if (selectedProjectId === project.id) {
+					selectedWorktreePathRef.current = project.path;
 					setSelectedWorktreePath(project.path);
 				}
 				return;
@@ -3786,12 +3893,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							),
 						),
 					}));
-					setSelectedWorktreePath((current) =>
-						current === worktreePath
-							? (projects.find((project) => project.id === projectId)?.path ??
-								null)
-							: current,
-					);
+					const fallbackWorktreePath =
+						projects.find((project) => project.id === projectId)?.path ?? null;
+					if (selectedWorktreePathRef.current === worktreePath) {
+						selectedWorktreePathRef.current = fallbackWorktreePath;
+					}
+					setSelectedWorktreePath((current) => {
+						if (current !== worktreePath) {
+							return current;
+						}
+						return fallbackWorktreePath;
+					});
 				} catch (error) {
 					if (!isCurrentWorktreeToggleRequest(key, requestId)) {
 						return;
@@ -3829,6 +3941,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					loadingWorktrees: false,
 					openWorktrees: new Set([...current.openWorktrees, worktreePath]),
 				}));
+				const pinnedThread = pinnedThreadForWorktree(
+					threads,
+					projectId,
+					worktreePath,
+				);
+				if (pinnedThread) {
+					void openThread(pinnedThread.id);
+					return;
+				}
+				await createThreadForWorktree(projectId, worktreePath, {
+					requireNoSelectedThread: true,
+				});
 			} catch (error) {
 				if (!isCurrentWorktreeToggleRequest(key, requestId)) {
 					return;
@@ -3843,13 +3967,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[
 			beginWorktreeToggleRequest,
+			createThreadForWorktree,
 			getWorktreeState,
 			projects,
 			cacheGitHistoryResult,
 			finishWorktreeToggleRequest,
 			isCurrentWorktreeToggleRequest,
+			openThread,
 			procedures,
 			setWorktreeState,
+			threads,
 			updateProjectState,
 		],
 	);
@@ -4021,6 +4148,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						state: message.state,
 					};
 				}
+				if (message.kind === "tool_call") {
+					return {
+						kind: "tool_call",
+						server: message.server,
+						tool: message.tool,
+						argumentsText: message.argumentsText,
+						output: message.output,
+						state: message.state,
+					};
+				}
 				return {
 					kind: "chat",
 					speaker: message.role,
@@ -4091,6 +4228,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						exitCode={message.exitCode}
 						output={message.output}
 						state={message.state}
+					/>
+				);
+			}
+			if (message.kind === "tool_call") {
+				return (
+					<ToolCallMessage
+						argumentsText={message.argumentsText}
+						output={message.output}
+						server={message.server}
+						state={message.state}
+						tool={message.tool}
 					/>
 				);
 			}

@@ -38,6 +38,14 @@ export type VisibleMessage =
 			diffText: string;
 			changeKind: "add" | "delete" | "update";
 			state: "in_progress" | "completed" | "failed" | "stopped";
+	  }
+	| {
+			kind: "tool_call";
+			server: string;
+			tool: string;
+			argumentsText: string;
+			output: string;
+			state: "in_progress" | "completed" | "failed" | "stopped";
 	  };
 
 export type MessageGroup =
@@ -817,6 +825,23 @@ export function latestThreadForWorktree(
 				(thread) =>
 					thread.projectId === projectId &&
 					thread.worktreePath === worktreePath,
+			),
+		)[0] ?? null
+	);
+}
+
+export function pinnedThreadForWorktree(
+	threads: RpcThread[],
+	projectId: number,
+	worktreePath: string,
+): RpcThread | null {
+	return (
+		sortThreads(
+			threads.filter(
+				(thread) =>
+					thread.projectId === projectId &&
+					thread.worktreePath === worktreePath &&
+					thread.pinnedAt !== null,
 			),
 		)[0] ?? null
 	);

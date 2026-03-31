@@ -44,7 +44,12 @@ type ThreadMessageInput = {
 	text: string;
 };
 
-type ThreadActivityKind = "chat" | "reasoning" | "command" | "file_change";
+type ThreadActivityKind =
+	| "chat"
+	| "reasoning"
+	| "command"
+	| "file_change"
+	| "tool_call";
 
 type ThreadActivityInput = {
 	threadId: number;

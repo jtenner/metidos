@@ -34,6 +34,13 @@ type FileChangeActivityPayload = {
 	diffText: string;
 };
 
+type ToolCallActivityPayload = {
+	server: string;
+	tool: string;
+	argumentsText: string;
+	output: string;
+};
+
 function hasUnreadThreadError(thread: ThreadRecord): boolean {
 	return Boolean(
 		thread.lastErrorAt &&
@@ -272,6 +279,32 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
 			path: payload?.path ?? message.text,
 			changeKind: payload?.changeKind ?? "update",
 			diffText: payload?.diffText ?? "",
+			createdAt: message.createdAt,
+			updatedAt: message.updatedAt,
+		};
+	}
+
+	if (message.kind === "tool_call" && message.itemId) {
+		const payload = parseActivityPayload<ToolCallActivityPayload>(
+			message.payloadJson,
+		);
+		return {
+			id: message.id,
+			threadId: message.threadId,
+			role: "assistant",
+			kind: "tool_call",
+			itemId: message.itemId,
+			text: message.text,
+			state:
+				message.state === "in_progress" ||
+				message.state === "failed" ||
+				message.state === "stopped"
+					? message.state
+					: "completed",
+			server: payload?.server ?? "",
+			tool: payload?.tool ?? message.text,
+			argumentsText: payload?.argumentsText ?? "",
+			output: payload?.output ?? "",
 			createdAt: message.createdAt,
 			updatedAt: message.updatedAt,
 		};
