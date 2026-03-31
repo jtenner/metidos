@@ -3612,18 +3612,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	]);
 
 	const applyOpenedThreadDetail = useCallback(
-		async (detail: RpcThreadDetail) => {
+		(detail: RpcThreadDetail) => {
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);
 			selectedThreadIdRef.current = detail.thread.id;
 			selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 			setThreadMessages(detail.messages);
 			syncThreadContext(detail.thread);
-			try {
-				await loadProjectWorktrees(detail.thread.projectId);
-			} catch {
+			void loadProjectWorktrees(detail.thread.projectId).catch(() => {
 				// Best effort; thread history should still open even if worktree metadata refresh fails.
-			}
+			});
 			setMobileProjectListOpen(false);
 		},
 		[loadProjectWorktrees, syncThreadContext],
@@ -3639,7 +3637,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				const detail = prepareOpenedThreadDetail(
 					await procedures.getThread({ threadId }),
 				);
-				await applyOpenedThreadDetail(detail);
+				applyOpenedThreadDetail(detail);
 			} catch (error) {
 				setThreadsError(error instanceof Error ? error.message : String(error));
 			} finally {
@@ -3928,6 +3926,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						})
 						.catch(() => null)
 				: null;
+			const initialThreadOpenPromise = initialThread
+				? (async () => {
+						try {
+							const detail = initialThreadDetailPromise
+								? await initialThreadDetailPromise
+								: null;
+							if (detail) {
+								applyOpenedThreadDetail(prepareOpenedThreadDetail(detail));
+								return;
+							}
+						} catch {
+							// Fall through to the normal open-thread flow below.
+						}
+
+						await openThread(initialThread.id);
+					})()
+				: null;
 
 			const openProjects = loaded.filter((project) => project.isOpen === 1);
 			const restoredOpenProjectIds = new Set(
@@ -4046,19 +4061,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 
 			if (initialThread) {
-				try {
-					const detail = initialThreadDetailPromise
-						? await initialThreadDetailPromise
-						: null;
-					if (detail) {
-						await applyOpenedThreadDetail(prepareOpenedThreadDetail(detail));
-						return;
-					}
-				} catch {
-					// Fall through to the normal open-thread flow below.
-				}
-
-				await openThread(initialThread.id);
+				await initialThreadOpenPromise;
 				return;
 			}
 
