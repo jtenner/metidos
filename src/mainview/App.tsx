@@ -348,6 +348,19 @@ function orderProjectWorktrees(
 ): RpcWorktree[] {
 	const primaryPath = primaryWorktreePath(project, worktrees);
 	return [...worktrees].sort((left, right) => {
+		const leftPinnedAt = left.pinnedAt ?? "";
+		const rightPinnedAt = right.pinnedAt ?? "";
+		if (leftPinnedAt || rightPinnedAt) {
+			if (!leftPinnedAt) {
+				return 1;
+			}
+			if (!rightPinnedAt) {
+				return -1;
+			}
+			if (leftPinnedAt !== rightPinnedAt) {
+				return rightPinnedAt.localeCompare(leftPinnedAt);
+			}
+		}
 		if (left.path === primaryPath && right.path !== primaryPath) {
 			return -1;
 		}
@@ -1819,6 +1832,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState(false);
 	const [isAddingProject, setIsAddingProject] = useState(false);
 	const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
+	const [worktreePinBusyPath, setWorktreePinBusyPath] = useState<string | null>(
+		null,
+	);
 	const [threads, setThreads] = useState<RpcThread[]>([]);
 	const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
 	const [gitHistory, setGitHistory] =
@@ -3316,6 +3332,45 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		],
 	);
 
+	const toggleWorktreePinned = useCallback(
+		async (projectId: number, worktreePath: string, pinned: boolean) => {
+			if (worktreePinBusyPath || isCreatingWorktree) {
+				return;
+			}
+
+			setWorktreePinBusyPath(worktreePath);
+			setProjectActionMenuError("");
+			setProjectState(projectId, { error: "" });
+			try {
+				const result = await procedures.setWorktreePinned({
+					projectId,
+					worktreePath,
+					pinned: !pinned,
+				});
+				setProjectState(projectId, {
+					worktrees: result.worktrees,
+					loadingWorktrees: false,
+					error: "",
+				});
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				setProjectState(projectId, { error: message });
+				if (projectActionMenu?.projectId === projectId) {
+					setProjectActionMenuError(message);
+				}
+			} finally {
+				setWorktreePinBusyPath(null);
+			}
+		},
+		[
+			isCreatingWorktree,
+			procedures,
+			projectActionMenu,
+			setProjectState,
+			worktreePinBusyPath,
+		],
+	);
+
 	const submitThreadRename = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
 			event.preventDefault();
@@ -3407,7 +3462,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const submitNewWorktree = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
 			event.preventDefault();
-			if (!projectActionMenu || isCreatingWorktree) {
+			if (!projectActionMenu || isCreatingWorktree || worktreePinBusyPath) {
 				return;
 			}
 
@@ -3443,6 +3498,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			procedures,
 			projectActionMenu,
 			setProjectState,
+			worktreePinBusyPath,
 		],
 	);
 
@@ -4865,10 +4921,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</div>
 						) : null}
 						{projectActionMenuWorktrees.map((worktree) => {
-							const worktreeState = getWorktreeState(
-								projectActionMenuProject.id,
-								worktree.path,
-							);
 							const worktreeErrorLevel = worktreeThreadErrorLevel(
 								projectActionMenuProject.id,
 								worktree.path,
@@ -4957,7 +5009,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						/>
 						<button
 							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-							disabled={isCreatingWorktree}
+							disabled={isCreatingWorktree || worktreePinBusyPath !== null}
 							type="submit"
 						>
 							{isCreatingWorktree ? "Creating" : "Create"}
@@ -5252,6 +5304,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														project.id,
 														worktree.path,
 													);
+													const worktreePinned = Boolean(worktree.pinnedAt);
+													const togglingPin =
+														worktreePinBusyPath === worktree.path;
 													const activeWorktree = isActiveWorktree(
 														project.id,
 														worktree.path,
@@ -5266,84 +5321,127 @@ export default function App({ procedures }: AppProps): JSX.Element {
 															worktree.path,
 														);
 													return (
-														<button
-															type="button"
+														<div
+															className="relative"
 															key={worktree.path}
-															className={`w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors ${
-																activeWorktree
-																	? "bg-[#25233a] text-[#f2f0ef]"
-																	: wState.opened
-																		? "bg-[#1f2020] text-[#f2f0ef]"
-																		: "text-[#cfd1d4] hover:bg-[#202020]"
-															}`}
 															{...errorPreviewHandlers(
 																worktreeErrorPreviewText,
 															)}
-															onClick={() => {
-																hideErrorPreview();
-																clearThreadSelection();
-																setThreadsError("");
-																selectProject(project, worktree.path);
-																void openOrCloseWorktree(
-																	project.id,
-																	worktree.path,
-																);
-															}}
 														>
-															<div
-																className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
-																style={{
-																	gridTemplateColumns:
-																		"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
+															<button
+																type="button"
+																className={`w-full min-w-0 text-left px-3 py-2 pr-12 flex flex-col gap-0.5 transition-colors ${
+																	activeWorktree
+																		? "bg-[#25233a] text-[#f2f0ef]"
+																		: wState.opened
+																			? "bg-[#1f2020] text-[#f2f0ef]"
+																			: "text-[#cfd1d4] hover:bg-[#202020]"
+																}`}
+																onClick={() => {
+																	hideErrorPreview();
+																	clearThreadSelection();
+																	setThreadsError("");
+																	selectProject(project, worktree.path);
+																	void openOrCloseWorktree(
+																		project.id,
+																		worktree.path,
+																	);
 																}}
 															>
-																<span
-																	className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
-																	title={worktree.branch ?? "detached"}
-																>
-																	{worktree.branch ?? "detached"}
-																</span>
-																<span
-																	className="min-w-0 truncate text-sm leading-5"
-																	title={shortName(worktree.path)}
-																>
-																	{shortName(worktree.path)}
-																</span>
-																<span
-																	className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-																		worktreeErrorLevel === "unread"
-																			? "bg-[#ff304f]"
-																			: worktreeErrorLevel === "failed"
-																				? "bg-[#8f4956]"
-																				: "bg-transparent"
-																	}`}
-																/>
 																<div
-																	className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
-																	title={formatPathForDisplay(
-																		worktree.path,
-																		homeDirectory,
-																		supportsTildePath,
-																	)}
+																	className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
+																	style={{
+																		gridTemplateColumns:
+																			"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
+																	}}
 																>
-																	{formatPathForDisplay(
+																	<span
+																		className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
+																		title={worktree.branch ?? "detached"}
+																	>
+																		{worktree.branch ?? "detached"}
+																	</span>
+																	<span
+																		className="min-w-0 truncate text-sm leading-5"
+																		title={shortName(worktree.path)}
+																	>
+																		{shortName(worktree.path)}
+																	</span>
+																	<span
+																		className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+																			worktreeErrorLevel === "unread"
+																				? "bg-[#ff304f]"
+																				: worktreeErrorLevel === "failed"
+																					? "bg-[#8f4956]"
+																					: "bg-transparent"
+																		}`}
+																	/>
+																	<div
+																		className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+																		title={formatPathForDisplay(
+																			worktree.path,
+																			homeDirectory,
+																			supportsTildePath,
+																		)}
+																	>
+																		{formatPathForDisplay(
+																			worktree.path,
+																			homeDirectory,
+																			supportsTildePath,
+																		)}
+																	</div>
+																</div>
+																{wState.loading ? (
+																	<div className="text-xs text-[#8f8d8b]">
+																		Syncing diff + file state...
+																	</div>
+																) : null}
+																{wState.error ? (
+																	<div className="text-xs text-[#ff6e84]">
+																		{wState.error}
+																	</div>
+																) : null}
+															</button>
+															<button
+																type="button"
+																className={`absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+																	activeWorktree || wState.opened
+																		? "border-[#2f3150] bg-[#1a1f34] text-[#d7d3ff]"
+																		: "border-[#2b2f45] bg-[#171a28] text-[#a6abc7] hover:bg-[#202537] hover:text-[#f2f0ef]"
+																}`}
+																onClick={() => {
+																	void toggleWorktreePinned(
+																		project.id,
 																		worktree.path,
-																		homeDirectory,
-																		supportsTildePath,
-																	)}
-																</div>
-															</div>
-															{wState.loading ? (
-																<div className="text-xs text-[#8f8d8b]">
-																	Syncing diff + file state...
-																</div>
-															) : null}
-															{wState.error ? (
-																<div className="text-xs text-[#ff6e84]">
-																	{wState.error}
-																</div>
-															) : null}
-														</button>
+																		worktreePinned,
+																	);
+																}}
+																disabled={
+																	togglingPin || worktreePinBusyPath !== null
+																}
+																aria-label={
+																	worktreePinned
+																		? "Unpin worktree"
+																		: "Pin worktree"
+																}
+																title={
+																	worktreePinned
+																		? "Unpin worktree"
+																		: "Pin worktree"
+																}
+															>
+																<span
+																	className="material-symbols-outlined text-[16px]"
+																	style={{
+																		fontVariationSettings: worktreePinned
+																			? "'FILL' 1"
+																			: "'FILL' 0",
+																	}}
+																>
+																	push_pin
+																</span>
+															</button>
+														</div>
 													);
 												})}
 											</div>

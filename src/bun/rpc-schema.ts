@@ -13,6 +13,7 @@ export type RpcWorktree = {
 	branch: string | null;
 	head: string | null;
 	bare: boolean;
+	pinnedAt: string | null;
 };
 
 export type RpcWorktreeSnapshot = {
@@ -276,6 +277,10 @@ export type AppRPCSchema = {
 				worktreePath: string;
 			};
 		};
+		setWorktreePinned: {
+			params: { projectId: number; worktreePath: string; pinned: boolean };
+			response: RpcProjectWorktreesResult;
+		};
 		listThreads: {
 			params: undefined;
 			response: RpcThread[];
@@ -376,6 +381,9 @@ export interface ProjectProcedures {
 	closeWorktree: (
 		params: AppRPCSchema["requests"]["closeWorktree"]["params"],
 	) => Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]>;
+	setWorktreePinned: (
+		params: AppRPCSchema["requests"]["setWorktreePinned"]["params"],
+	) => Promise<AppRPCSchema["requests"]["setWorktreePinned"]["response"]>;
 	listThreads: (
 		params?: AppRPCSchema["requests"]["listThreads"]["params"],
 	) => Promise<AppRPCSchema["requests"]["listThreads"]["response"]>;

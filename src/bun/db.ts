@@ -103,6 +103,12 @@ export type ThreadMessageRecord = {
 	updatedAt: string;
 };
 
+export type ProjectWorktreePinRecord = {
+	projectId: number;
+	worktreePath: string;
+	pinnedAt: string;
+};
+
 const APP_DATA_DIR =
 	process.platform === "darwin"
 		? join(homedir(), "Library", "Application Support", APP_NAME)
@@ -164,6 +170,14 @@ function migrate(db: Database): void {
 			created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 			updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`);
+	db.run(`
+			CREATE TABLE IF NOT EXISTS project_worktrees (
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				pinned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				PRIMARY KEY (project_id, worktree_path)
 			);
 		`);
 	db.run(`
@@ -253,6 +267,10 @@ function migrate(db: Database): void {
 	ensureThreadMessageColumn(db, "state", "state TEXT");
 	ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
 	ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
+	db.run(`
+			CREATE INDEX IF NOT EXISTS idx_project_worktrees_project_id_pinned_at
+			ON project_worktrees(project_id, pinned_at DESC, worktree_path ASC);
+		`);
 	db.run(`
 			CREATE INDEX IF NOT EXISTS idx_threads_updated_at
 			ON threads(updated_at DESC, id DESC);
@@ -411,6 +429,62 @@ export function setProjectClosed(database: Database, projectId: number): void {
 
 export function deleteProject(database: Database, projectId: number): void {
 	database.run("DELETE FROM projects WHERE id = ?", projectId);
+}
+
+export function listProjectWorktreePins(
+	database: Database,
+	projectId: number,
+): ProjectWorktreePinRecord[] {
+	return database
+		.query<ProjectWorktreePinRecord, [number]>(
+			`
+			SELECT
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				pinned_at AS pinnedAt
+			FROM project_worktrees
+			WHERE project_id = ?
+		`,
+		)
+		.all(projectId);
+}
+
+export function setProjectWorktreePinned(
+	database: Database,
+	projectId: number,
+	worktreePath: string,
+	pinned: boolean,
+): void {
+	if (pinned) {
+		database.run(
+			`
+				INSERT INTO project_worktrees (
+					project_id,
+					worktree_path,
+					pinned_at
+				)
+				VALUES (
+					?,
+					?,
+					strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				)
+				ON CONFLICT(project_id, worktree_path) DO UPDATE SET
+					pinned_at = excluded.pinned_at
+			`,
+			projectId,
+			worktreePath,
+		);
+		return;
+	}
+
+	database.run(
+		`
+			DELETE FROM project_worktrees
+			WHERE project_id = ? AND worktree_path = ?
+		`,
+		projectId,
+		worktreePath,
+	);
 }
 
 export function listThreads(database: Database): ThreadRecord[] {

@@ -27,6 +27,7 @@ import {
 	sendThreadMessageProcedure,
 	setThreadPinnedProcedure,
 	setWorktreeGitHistoryChangeListener,
+	setWorktreePinnedProcedure,
 	setWorktreeTaskChangeListener,
 	shutdownProcedureCacheMaintenance,
 	shutdownProjectPolling,
@@ -181,6 +182,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	getWorktreeGitCommitDiff: (params) =>
 		getWorktreeGitCommitDiffProcedure(params),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
+	setWorktreePinned: (params) => setWorktreePinnedProcedure(params),
 };
 
 const rpcClients = new Set<ServerWebSocket<unknown>>();

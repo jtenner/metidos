@@ -266,6 +266,7 @@ const procedures: ProjectProcedures = {
 	getWorktreeGitCommitDiff: (params) =>
 		sendRequest("getWorktreeGitCommitDiff", params),
 	closeWorktree: (params) => sendRequest("closeWorktree", params),
+	setWorktreePinned: (params) => sendRequest("setWorktreePinned", params),
 };
 
 window.jtIdeProcedures = procedures;

@@ -14,6 +14,7 @@ import {
 	getProjectById,
 	getThreadById,
 	initAppDatabase,
+	listProjectWorktreePins,
 	listProjects,
 	listThreadMessages,
 	listThreads,
@@ -22,6 +23,7 @@ import {
 	markThreadRan,
 	renameThread,
 	setProjectClosed,
+	setProjectWorktreePinned,
 	setThreadModel,
 	setThreadPinned,
 	setThreadUsage,
@@ -1410,7 +1412,7 @@ async function readProjectWorktrees(
 		}
 	}
 
-	const worktrees = await listWorktreesForProjectPath(projectPath);
+	const worktrees = await listFreshProjectWorktrees(projectPath, projectId);
 	if (typeof projectId === "number") {
 		const state = projectPollMap.get(projectId);
 		if (state) {
@@ -1690,6 +1692,7 @@ function parseWorktreeList(raw: string): RpcWorktree[] {
 				branch: null,
 				head: null,
 				bare: false,
+				pinnedAt: null,
 			};
 			continue;
 		}
@@ -1731,6 +1734,34 @@ async function listWorktreesForProjectPath(
 		...worktree,
 		path: normalizeWorktreePath(projectPath, worktree.path),
 	}));
+}
+
+function mergeProjectWorktreePins(
+	projectId: number,
+	worktrees: RpcWorktree[],
+): RpcWorktree[] {
+	const pinnedAtByPath = new Map(
+		listProjectWorktreePins(db, projectId).map((record) => [
+			record.worktreePath,
+			record.pinnedAt,
+		]),
+	);
+
+	return worktrees.map((worktree) => ({
+		...worktree,
+		pinnedAt: pinnedAtByPath.get(worktree.path) ?? null,
+	}));
+}
+
+async function listFreshProjectWorktrees(
+	projectPath: string,
+	projectId?: number,
+): Promise<RpcWorktree[]> {
+	const worktrees = await listWorktreesForProjectPath(projectPath);
+	if (typeof projectId !== "number") {
+		return worktrees;
+	}
+	return mergeProjectWorktreePins(projectId, worktrees);
 }
 
 async function readDiff(worktreePath: string): Promise<string[]> {
@@ -1899,7 +1930,10 @@ async function refreshProjectPoll(projectId: number): Promise<void> {
 	const state = projectPollMap.get(projectId);
 	if (!state) return;
 
-	const worktrees = await listWorktreesForProjectPath(state.projectPath);
+	const worktrees = await listFreshProjectWorktrees(
+		state.projectPath,
+		state.id,
+	);
 	state.worktrees = worktrees;
 	state.worktreesLoadedAt = Date.now();
 
@@ -2203,6 +2237,26 @@ export async function createWorktreeProcedure(
 		project,
 		worktrees,
 		worktreePath,
+	};
+}
+
+export async function setWorktreePinnedProcedure(
+	params: AppRPCSchema["requests"]["setWorktreePinned"]["params"],
+): Promise<RpcProjectWorktreesResult> {
+	const project = projectByIdForPath(params.projectId);
+	const worktreePath = normalizePath(params.worktreePath);
+	await assertProjectWorktree(project, worktreePath);
+
+	setProjectWorktreePinned(db, project.id, worktreePath, params.pinned);
+
+	const state = ensureProjectPoller(project);
+	const worktrees = await listFreshProjectWorktrees(project.path, project.id);
+	state.worktrees = worktrees;
+	state.worktreesLoadedAt = Date.now();
+
+	return {
+		project,
+		worktrees,
 	};
 }
 
