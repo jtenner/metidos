@@ -48,11 +48,12 @@
 ├─ package.json
 ├─ src/
  │  ├─ bun/
- │  │  ├─ codex-sidecar-mcp.ts
- │  │  ├─ db.ts
- │  │  ├─ index.ts
- │  │  ├─ project-procedures.ts
- │  │  └─ rpc-schema.ts
+│  │  ├─ codex-sidecar-mcp.ts
+│  │  ├─ db.ts
+│  │  ├─ git.ts
+│  │  ├─ index.ts
+│  │  ├─ project-procedures.ts
+│  │  └─ rpc-schema.ts
 │  └─ mainview/
 │     ├─ App.tsx
 │     ├─ controls/
