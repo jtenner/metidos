@@ -1858,16 +1858,46 @@ async function runGitCommandResult(
 	});
 }
 
-async function tryRunGitCommand(
+function gitCommandFailureMessage(result: {
+	exitCode: number;
+	stderr: string;
+}): string {
+	return (
+		result.stderr || `git command failed with exit code ${result.exitCode}`
+	);
+}
+
+function isNoHeadGitHistoryFailure(result: {
+	exitCode: number;
+	stderr: string;
+}): boolean {
+	if (result.exitCode === 0) {
+		return false;
+	}
+
+	const normalizedError = result.stderr.toLowerCase();
+	return (
+		(normalizedError.includes("ambiguous argument 'head'") &&
+			normalizedError.includes("unknown revision or path")) ||
+		normalizedError.includes("bad revision 'head'") ||
+		normalizedError.includes("bad default revision 'head'") ||
+		normalizedError.includes("does not have any commits yet")
+	);
+}
+
+async function runGitHistoryCommand(
 	cwd: string,
 	args: string[],
 	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<string | null> {
 	const result = await runGitCommandResult(cwd, args, options);
-	if (result.exitCode !== 0) {
+	if (result.exitCode === 0) {
+		return result.stdout.trimEnd();
+	}
+	if (isNoHeadGitHistoryFailure(result)) {
 		return null;
 	}
-	return result.stdout.trimEnd();
+	throw new Error(gitCommandFailureMessage(result));
 }
 
 function normalizeGitPath(worktreePath: string, value: string): string {
@@ -2307,28 +2337,34 @@ async function readGitHistorySummary(
 }> {
 	const normalizedOptions = normalizeGitCommandOptions(options);
 	const lastUpdatedAt = getNow();
-	const rawHead =
-		(await tryRunGitCommand(
-			worktreePath,
-			[
-				"show",
-				"--no-patch",
-				"--decorate=short",
-				"--pretty=format:%H%x1f%h%x1f%D",
-				"HEAD",
-			],
-			normalizedOptions,
-		)) ?? "";
+	const rawHead = await runGitHistoryCommand(
+		worktreePath,
+		[
+			"show",
+			"--no-patch",
+			"--decorate=short",
+			"--pretty=format:%H%x1f%h%x1f%D",
+			"HEAD",
+		],
+		normalizedOptions,
+	);
 
-	if (!rawHead) {
+	if (rawHead === null) {
+		const branchResult = await runGitCommandResult(
+			worktreePath,
+			["symbolic-ref", "--quiet", "--short", "HEAD"],
+			normalizedOptions,
+		);
+		if (
+			branchResult.exitCode !== 0 &&
+			!(branchResult.exitCode === 1 && !branchResult.stderr)
+		) {
+			throw new Error(gitCommandFailureMessage(branchResult));
+		}
 		const branch =
-			(
-				await tryRunGitCommand(
-					worktreePath,
-					["symbolic-ref", "--quiet", "--short", "HEAD"],
-					normalizedOptions,
-				)
-			)?.trim() || null;
+			branchResult.exitCode === 0
+				? branchResult.stdout.trimEnd() || null
+				: null;
 		const history = emptyGitHistorySummary(projectId, worktreePath, {
 			branch,
 			lastUpdatedAt,
@@ -2365,18 +2401,23 @@ async function readGitHistoryPageEntries(
 	nextOffset: number | null;
 }> {
 	const normalizedOptions = normalizeGitCommandOptions(options);
-	const rawEntries =
-		(await tryRunGitCommand(
-			worktreePath,
-			[
-				"log",
-				`--skip=${offset}`,
-				`--max-count=${limit + 1}`,
-				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
-				"HEAD",
-			],
-			normalizedOptions,
-		)) ?? "";
+	const rawEntries = await runGitHistoryCommand(
+		worktreePath,
+		[
+			"log",
+			`--skip=${offset}`,
+			`--max-count=${limit + 1}`,
+			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
+			"HEAD",
+		],
+		normalizedOptions,
+	);
+	if (rawEntries === null) {
+		return {
+			entries: [],
+			nextOffset: null,
+		};
+	}
 	const parsedEntries = parseGitHistoryEntries(rawEntries);
 	const hasMore = parsedEntries.length > limit;
 
@@ -2398,21 +2439,18 @@ async function readGitHistoryFirstPage(
 }> {
 	const normalizedOptions = normalizeGitCommandOptions(options);
 	const lastUpdatedAt = getNow();
-	const rawEntries =
-		(await tryRunGitCommand(
-			worktreePath,
-			[
-				"log",
-				"--decorate=short",
-				`--max-count=${limit + 1}`,
-				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
-				"HEAD",
-			],
-			normalizedOptions,
-		)) ?? "";
-	const parsedEntries = parseDecoratedGitHistoryEntries(rawEntries);
-
-	if (parsedEntries.length === 0) {
+	const rawEntries = await runGitHistoryCommand(
+		worktreePath,
+		[
+			"log",
+			"--decorate=short",
+			`--max-count=${limit + 1}`,
+			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
+			"HEAD",
+		],
+		normalizedOptions,
+	);
+	if (rawEntries === null) {
 		const { history: summary, signature } = await readGitHistorySummary(
 			projectId,
 			worktreePath,
@@ -2429,6 +2467,7 @@ async function readGitHistoryFirstPage(
 			signature,
 		};
 	}
+	const parsedEntries = parseDecoratedGitHistoryEntries(rawEntries);
 
 	const firstEntry = parsedEntries[0];
 	if (!firstEntry) {

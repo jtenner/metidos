@@ -4,9 +4,6 @@
 - Address issue 3 in `docs/2026-03-31-correctness-issues.md`: stop using stale cached worktree lists for correctness-critical operations.
   Tighten the worktree validation flow in `src/bun/project-procedures.ts` so `createThreadProcedure(...)`, `runProjectTaskProcedure(...)`, `setWorktreePinnedProcedure(...)`, and explicit worktree opens do a foreground refresh or direct git validation instead of trusting stale cached worktree state.
 
-- Address issue 4 in `docs/2026-03-31-correctness-issues.md`: preserve real git-history failures instead of treating them as empty history.
-  Change the git-history helpers in `src/bun/project-procedures.ts` so only true "no HEAD yet" cases become empty history. Permission errors, corrupt repos, and other non-zero git exits should surface as actual errors.
-
 - Address issue 6 in `docs/2026-03-31-correctness-issues.md`: reduce the amount of always-on per-worktree background polling.
   Revisit the polling setup in `src/bun/project-procedures.ts` so diff, status, history, and task refresh work do not all run independently at fixed intervals for every opened worktree. Back off or suspend this work when the worktree is not actively in view.
 
