@@ -188,6 +188,7 @@ type AppIconName =
 	| "arrow_forward"
 	| "arrow_upward"
 	| "bolt"
+	| "check_circle"
 	| "checklist"
 	| "chevron_right"
 	| "code"
@@ -199,8 +200,11 @@ type AppIconName =
 	| "menu"
 	| "person"
 	| "push_pin"
+	| "radio_button_unchecked"
 	| "search"
-	| "settings";
+	| "settings"
+	| "task_alt"
+	| "terminal";
 
 const codeBlockStyle = {
 	margin: 0,
@@ -695,6 +699,13 @@ function renderIconGlyph(
 			) : (
 				<path d="M13 2 5 13h5l-1 9 8-11h-5z" />
 			);
+		case "check_circle":
+			return (
+				<>
+					<circle cx="12" cy="12" r="8" />
+					<path d="m8.75 12.25 2.15 2.15 4.35-4.65" />
+				</>
+			);
 		case "checklist":
 			return (
 				<>
@@ -768,6 +779,8 @@ function renderIconGlyph(
 					<path d="M12 12v8" />
 				</>
 			);
+		case "radio_button_unchecked":
+			return <circle cx="12" cy="12" r="7.5" />;
 		case "search":
 			return (
 				<>
@@ -787,6 +800,20 @@ function renderIconGlyph(
 					<path d="m15.9 15.9 1.4 1.4" />
 					<path d="m17.3 6.7-1.4 1.4" />
 					<path d="m8.1 15.9-1.4 1.4" />
+				</>
+			);
+		case "task_alt":
+			return (
+				<>
+					<circle cx="12" cy="12" r="8" />
+					<path d="m8.75 12.25 2.15 2.15 4.35-4.65" />
+				</>
+			);
+		case "terminal":
+			return (
+				<>
+					<path d="m6.5 8.5 3.5 3.5-3.5 3.5" />
+					<path d="M12 15.5h5.5" />
 				</>
 			);
 	}
@@ -1327,7 +1354,7 @@ function ProjectTaskSelector({
 				{materialSymbol(
 					"checklist",
 					variant === "desktop"
-						? "text-[#ff96bb] text-[16px]"
+						? "text-[#bdd5e6] text-[16px]"
 						: "text-on-surface-variant text-sm",
 				)}
 				<span
@@ -1378,7 +1405,7 @@ function ProjectTaskSelector({
 										onSelect(task);
 									}}
 								>
-									<span className="mt-0.5 shrink-0 text-[#ff96bb]">
+									<span className="mt-0.5 shrink-0 text-[#bdd5e6]">
 										{materialSymbol(
 											task.kind === "script" ? "terminal" : "task_alt",
 											"text-[16px]",
