@@ -9,9 +9,7 @@ import {
 	type ReactNode,
 	type SVGProps,
 	type UIEvent,
-	startTransition,
 	useCallback,
-	useDeferredValue,
 	useEffect,
 	useMemo,
 	useRef,
@@ -94,6 +92,11 @@ type GitHistoryModalState = {
 	diffText: string;
 	loading: boolean;
 	error: string;
+};
+
+type GitHistoryDiffCacheEntry = {
+	commit: RpcGitHistoryEntry;
+	diffText: string;
 };
 
 type ProjectNodeState = {
@@ -351,6 +354,14 @@ function worktreeKey(projectId: number, worktreePath: string): string {
 
 function clampNumber(value: number, min: number, max: number): number {
 	return Math.min(Math.max(value, min), max);
+}
+
+function gitHistoryDiffCacheKey(
+	projectId: number,
+	worktreePath: string,
+	commitHash: string,
+): string {
+	return `${projectId}::${worktreePath}::${commitHash}`;
 }
 
 function defaultProjectState(): ProjectNodeState {
@@ -1634,12 +1645,8 @@ function DiffViewer({
 	diffText: string;
 	className?: string;
 }): JSX.Element {
-	const deferredDiffText = useDeferredValue(diffText);
 	const [scrollTop, setScrollTop] = useState(0);
-	const lines = useMemo(
-		() => parseUnifiedDiff(deferredDiffText),
-		[deferredDiffText],
-	);
+	const lines = useMemo(() => parseUnifiedDiff(diffText), [diffText]);
 	const visibleLines = useMemo(() => {
 		const totalLines = lines.length;
 		const windowSize = Math.min(
@@ -1663,7 +1670,6 @@ function DiffViewer({
 			),
 		};
 	}, [lines, scrollTop]);
-	const isRenderingDeferred = deferredDiffText !== diffText;
 
 	return (
 		<div
@@ -1673,11 +1679,6 @@ function DiffViewer({
 				setScrollTop(event.currentTarget.scrollTop);
 			}}
 		>
-			{isRenderingDeferred ? (
-				<div className="sticky top-0 z-10 border-b border-[#2b343b] bg-[#12171b]/95 px-3 py-1.5 text-[11px] text-[#9aa9b5] backdrop-blur-sm">
-					Rendering diff...
-				</div>
-			) : null}
 			<div style={{ paddingTop: visibleLines.topSpacerHeight }}>
 				{visibleLines.entries.map((line) => (
 					<div
@@ -2238,7 +2239,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		new Map<number, Promise<RpcWorktree[]>>(),
 	);
 	const gitHistoryDiffCacheRef = useRef(
-		new Map<string, { commit: RpcGitHistoryEntry; diffText: string }>(),
+		new Map<string, GitHistoryDiffCacheEntry>(),
+	);
+	const gitHistoryDiffRequestCacheRef = useRef(
+		new Map<string, Promise<GitHistoryDiffCacheEntry>>(),
 	);
 	const gitHistoryCacheRef = useRef(
 		new Map<string, RpcWorktreeGitHistoryResult>(),
@@ -2556,6 +2560,74 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setGitHistoryModal(null);
 	}, []);
 
+	const loadGitHistoryDiff = useCallback(
+		(
+			projectId: number,
+			worktreePath: string,
+			entry: RpcGitHistoryEntry,
+		): Promise<GitHistoryDiffCacheEntry> => {
+			const cacheKey = gitHistoryDiffCacheKey(
+				projectId,
+				worktreePath,
+				entry.hash,
+			);
+			const cached = readLruValue(gitHistoryDiffCacheRef.current, cacheKey);
+			if (cached) {
+				return Promise.resolve(cached);
+			}
+
+			const pending = gitHistoryDiffRequestCacheRef.current.get(cacheKey);
+			if (pending) {
+				return pending;
+			}
+
+			const request = procedures
+				.getWorktreeGitCommitDiff({
+					projectId,
+					worktreePath,
+					commitHash: entry.hash,
+				})
+				.then((result) => {
+					const nextValue = {
+						commit: result.commit,
+						diffText: result.diffText,
+					};
+					writeLruValue(
+						gitHistoryDiffCacheRef.current,
+						cacheKey,
+						nextValue,
+						GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
+					);
+					return nextValue;
+				})
+				.finally(() => {
+					if (gitHistoryDiffRequestCacheRef.current.get(cacheKey) === request) {
+						gitHistoryDiffRequestCacheRef.current.delete(cacheKey);
+					}
+				});
+			gitHistoryDiffRequestCacheRef.current.set(cacheKey, request);
+			return request;
+		},
+		[procedures],
+	);
+
+	const preloadGitHistoryDiff = useCallback(
+		(entry: RpcGitHistoryEntry) => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
+			}
+
+			void loadGitHistoryDiff(
+				selectedProject.id,
+				activeSelectedWorktreePath,
+				entry,
+			).catch(() => {
+				// Hover preloads should never surface errors ahead of explicit open.
+			});
+		},
+		[activeSelectedWorktreePath, loadGitHistoryDiff, selectedProject],
+	);
+
 	const openGitHistoryDiff = useCallback(
 		async (entry: RpcGitHistoryEntry) => {
 			if (!selectedProject || !activeSelectedWorktreePath) {
@@ -2564,8 +2636,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			const projectId = selectedProject.id;
 			const worktreePath = activeSelectedWorktreePath;
-			const cacheKey = `${projectId}::${worktreePath}::${entry.hash}`;
-			const cached = gitHistoryDiffCacheRef.current.get(cacheKey);
+			const cacheKey = gitHistoryDiffCacheKey(
+				projectId,
+				worktreePath,
+				entry.hash,
+			);
+			const cached = readLruValue(gitHistoryDiffCacheRef.current, cacheKey);
 
 			setGitHistoryModal({
 				projectId,
@@ -2582,40 +2658,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			const requestId = ++gitHistoryDiffRequestIdRef.current;
 			try {
-				const result = await procedures.getWorktreeGitCommitDiff({
-					projectId,
-					worktreePath,
-					commitHash: entry.hash,
-				});
+				const result = await loadGitHistoryDiff(projectId, worktreePath, entry);
 				if (gitHistoryDiffRequestIdRef.current !== requestId) {
 					return;
 				}
 
-				writeLruValue(
-					gitHistoryDiffCacheRef.current,
-					cacheKey,
-					{
-						commit: result.commit,
-						diffText: result.diffText,
-					},
-					GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
+				setGitHistoryModal((current) =>
+					current &&
+					current.projectId === projectId &&
+					current.worktreePath === worktreePath &&
+					current.entry.hash === entry.hash
+						? {
+								...current,
+								entry: result.commit,
+								diffText: result.diffText,
+								loading: false,
+								error: "",
+							}
+						: current,
 				);
-				startTransition(() => {
-					setGitHistoryModal((current) =>
-						current &&
-						current.projectId === projectId &&
-						current.worktreePath === worktreePath &&
-						current.entry.hash === entry.hash
-							? {
-									...current,
-									entry: result.commit,
-									diffText: result.diffText,
-									loading: false,
-									error: "",
-								}
-							: current,
-					);
-				});
 			} catch (error) {
 				if (gitHistoryDiffRequestIdRef.current !== requestId) {
 					return;
@@ -2634,7 +2695,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				);
 			}
 		},
-		[activeSelectedWorktreePath, procedures, selectedProject],
+		[activeSelectedWorktreePath, loadGitHistoryDiff, selectedProject],
 	);
 
 	const normalizedSidebarSearchQuery = useMemo(
@@ -6230,6 +6291,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											key={entry.hash}
 											className="w-full rounded-sm border border-[#23282c] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1f2427]"
 											style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
+											onMouseEnter={() => {
+												preloadGitHistoryDiff(entry);
+											}}
+											onFocus={() => {
+												preloadGitHistoryDiff(entry);
+											}}
+											onPointerDown={() => {
+												preloadGitHistoryDiff(entry);
+											}}
 											onClick={() => {
 												void openGitHistoryDiff(entry);
 											}}

@@ -123,14 +123,19 @@ const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
 
+type GitCommandPriority = "foreground" | "background";
+
 type WorktreePollState = {
 	diff: string[];
+	diffPolling: boolean;
 	files: string[];
 	diffTimer: ReturnType<typeof setInterval> | null;
+	filesPolling: boolean;
 	filesTimer: ReturnType<typeof setInterval> | null;
 	history: RpcWorktreeGitHistorySummary;
 	historyEntries: RpcGitHistoryEntry[];
 	historyNextOffset: number | null;
+	historyPolling: boolean;
 	historyPrefetchPromise: Promise<void> | null;
 	historySignature: string | null;
 	historyTimer: ReturnType<typeof setInterval> | null;
@@ -165,6 +170,14 @@ const gitCommitDiffCache = new Map<string, RpcGitCommitDiffResult>();
 const gitCommitDiffRequestCache = new Map<
 	string,
 	Promise<RpcGitCommitDiffResult>
+>();
+const gitCommandQueueMap = new Map<
+	string,
+	{
+		active: boolean;
+		backgroundTasks: Array<() => void>;
+		foregroundTasks: Array<() => void>;
+	}
 >();
 let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
 	null;
@@ -1476,8 +1489,64 @@ function assertProjectDirectory(projectPath: string): void {
 	}
 }
 
-async function runGitCommand(cwd: string, args: string[]): Promise<string> {
-	const { exitCode, stderr, stdout } = await runGitCommandResult(cwd, args);
+function scheduleGitCommandQueue(cwd: string): void {
+	const queue = gitCommandQueueMap.get(cwd);
+	if (!queue || queue.active) {
+		return;
+	}
+
+	const nextTask =
+		queue.foregroundTasks.shift() ?? queue.backgroundTasks.shift() ?? null;
+	if (!nextTask) {
+		gitCommandQueueMap.delete(cwd);
+		return;
+	}
+
+	queue.active = true;
+	nextTask();
+}
+
+function enqueueGitCommand<T>(
+	cwd: string,
+	priority: GitCommandPriority,
+	run: () => Promise<T>,
+): Promise<T> {
+	const queue = gitCommandQueueMap.get(cwd) ?? {
+		active: false,
+		backgroundTasks: [],
+		foregroundTasks: [],
+	};
+	gitCommandQueueMap.set(cwd, queue);
+
+	return new Promise<T>((resolve, reject) => {
+		const execute = () => {
+			void run()
+				.then(resolve, reject)
+				.finally(() => {
+					queue.active = false;
+					scheduleGitCommandQueue(cwd);
+				});
+		};
+
+		if (priority === "foreground") {
+			queue.foregroundTasks.push(execute);
+		} else {
+			queue.backgroundTasks.push(execute);
+		}
+		scheduleGitCommandQueue(cwd);
+	});
+}
+
+async function runGitCommand(
+	cwd: string,
+	args: string[],
+	priority: GitCommandPriority = "foreground",
+): Promise<string> {
+	const { exitCode, stderr, stdout } = await runGitCommandResult(
+		cwd,
+		args,
+		priority,
+	);
 	if (exitCode !== 0) {
 		throw new Error(stderr || `git command failed with exit code ${exitCode}`);
 	}
@@ -1487,30 +1556,36 @@ async function runGitCommand(cwd: string, args: string[]): Promise<string> {
 async function runGitCommandResult(
 	cwd: string,
 	args: string[],
+	priority: GitCommandPriority = "foreground",
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> {
-	const proc = Bun.spawn({
-		cmd: ["git", ...args],
-		cwd,
-		stdout: "pipe",
-		stderr: "pipe",
+	return enqueueGitCommand(cwd, priority, async () => {
+		const proc = Bun.spawn({
+			cmd: ["git", ...args],
+			cwd,
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+
+		const [stdout, stderr, exitCode] = await Promise.all([
+			new Response(proc.stdout).text(),
+			new Response(proc.stderr).text(),
+			proc.exited,
+		]);
+
+		return {
+			exitCode,
+			stderr: stderr.trim(),
+			stdout,
+		};
 	});
-
-	const stdout = await new Response(proc.stdout).text();
-	const stderr = await new Response(proc.stderr).text();
-	const exitCode = await proc.exited;
-
-	return {
-		exitCode,
-		stderr: stderr.trim(),
-		stdout,
-	};
 }
 
 async function tryRunGitCommand(
 	cwd: string,
 	args: string[],
+	priority: GitCommandPriority = "foreground",
 ): Promise<string | null> {
-	const result = await runGitCommandResult(cwd, args);
+	const result = await runGitCommandResult(cwd, args, priority);
 	if (result.exitCode !== 0) {
 		return null;
 	}
@@ -1775,14 +1850,28 @@ async function listFreshProjectWorktrees(
 	return mergeProjectWorktreePins(projectId, worktrees);
 }
 
-async function readDiff(worktreePath: string): Promise<string[]> {
-	const raw = await runGitCommand(worktreePath, ["diff", "--name-status"]);
+async function readDiff(
+	worktreePath: string,
+	priority: GitCommandPriority = "foreground",
+): Promise<string[]> {
+	const raw = await runGitCommand(
+		worktreePath,
+		["diff", "--name-status"],
+		priority,
+	);
 	if (!raw.trim()) return [];
 	return raw.split(/\r?\n/).filter(Boolean);
 }
 
-async function readFiles(worktreePath: string): Promise<string[]> {
-	const raw = await runGitCommand(worktreePath, ["status", "--short"]);
+async function readFiles(
+	worktreePath: string,
+	priority: GitCommandPriority = "foreground",
+): Promise<string[]> {
+	const raw = await runGitCommand(
+		worktreePath,
+		["status", "--short"],
+		priority,
+	);
 	if (!raw.trim()) return [];
 	return raw.split(/\r?\n/).filter(Boolean);
 }
@@ -1906,29 +1995,33 @@ function normalizeGitHistoryPageLimit(limit?: number): number {
 async function readGitHistorySummary(
 	projectId: number,
 	worktreePath: string,
+	priority: GitCommandPriority = "foreground",
 ): Promise<{
 	history: RpcWorktreeGitHistorySummary;
 	signature: string;
 }> {
 	const lastUpdatedAt = getNow();
 	const rawHead =
-		(await tryRunGitCommand(worktreePath, [
-			"show",
-			"--no-patch",
-			"--decorate=short",
-			"--pretty=format:%H%x1f%h%x1f%D",
-			"HEAD",
-		])) ?? "";
+		(await tryRunGitCommand(
+			worktreePath,
+			[
+				"show",
+				"--no-patch",
+				"--decorate=short",
+				"--pretty=format:%H%x1f%h%x1f%D",
+				"HEAD",
+			],
+			priority,
+		)) ?? "";
 
 	if (!rawHead) {
 		const branch =
 			(
-				await tryRunGitCommand(worktreePath, [
-					"symbolic-ref",
-					"--quiet",
-					"--short",
-					"HEAD",
-				])
+				await tryRunGitCommand(
+					worktreePath,
+					["symbolic-ref", "--quiet", "--short", "HEAD"],
+					priority,
+				)
 			)?.trim() || null;
 		const history = emptyGitHistorySummary(projectId, worktreePath, {
 			branch,
@@ -1960,18 +2053,23 @@ async function readGitHistoryPageEntries(
 	worktreePath: string,
 	offset: number,
 	limit: number,
+	priority: GitCommandPriority = "foreground",
 ): Promise<{
 	entries: RpcGitHistoryEntry[];
 	nextOffset: number | null;
 }> {
 	const rawEntries =
-		(await tryRunGitCommand(worktreePath, [
-			"log",
-			`--skip=${offset}`,
-			`--max-count=${limit + 1}`,
-			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
-			"HEAD",
-		])) ?? "";
+		(await tryRunGitCommand(
+			worktreePath,
+			[
+				"log",
+				`--skip=${offset}`,
+				`--max-count=${limit + 1}`,
+				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
+				"HEAD",
+			],
+			priority,
+		)) ?? "";
 	const parsedEntries = parseGitHistoryEntries(rawEntries);
 	const hasMore = parsedEntries.length > limit;
 
@@ -1985,6 +2083,7 @@ async function readGitHistoryFirstPage(
 	projectId: number,
 	worktreePath: string,
 	limit: number,
+	priority: GitCommandPriority = "foreground",
 ): Promise<{
 	history: RpcWorktreeGitHistoryResult;
 	summary: RpcWorktreeGitHistorySummary;
@@ -1992,19 +2091,24 @@ async function readGitHistoryFirstPage(
 }> {
 	const lastUpdatedAt = getNow();
 	const rawEntries =
-		(await tryRunGitCommand(worktreePath, [
-			"log",
-			"--decorate=short",
-			`--max-count=${limit + 1}`,
-			"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
-			"HEAD",
-		])) ?? "";
+		(await tryRunGitCommand(
+			worktreePath,
+			[
+				"log",
+				"--decorate=short",
+				`--max-count=${limit + 1}`,
+				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
+				"HEAD",
+			],
+			priority,
+		)) ?? "";
 	const parsedEntries = parseDecoratedGitHistoryEntries(rawEntries);
 
 	if (parsedEntries.length === 0) {
 		const { history: summary, signature } = await readGitHistorySummary(
 			projectId,
 			worktreePath,
+			priority,
 		);
 		return {
 			history: {
@@ -2106,6 +2210,7 @@ async function fillGitHistoryCache(
 	worktreePath: string,
 	offset: number,
 	limit: number,
+	priority: GitCommandPriority = "foreground",
 ): Promise<void> {
 	while (
 		!hasGitHistoryCacheRange(worktreeState, offset, limit) &&
@@ -2129,6 +2234,7 @@ async function fillGitHistoryCache(
 					worktreePath,
 					fetchOffset,
 					fetchLimit,
+					priority,
 				);
 				if (
 					worktreeState.historySignature !== expectedSignature ||
@@ -2164,6 +2270,7 @@ function warmGitHistoryCache(
 		worktreePath,
 		worktreeState.historyEntries.length,
 		DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
+		"background",
 	).catch((error) => {
 		console.error(`Git history prefetch failed for ${worktreePath}`, error);
 	});
@@ -2342,12 +2449,15 @@ function startWorktreePolling(
 
 	const worktreeState: WorktreePollState = {
 		diff: [],
+		diffPolling: false,
 		files: [],
 		diffTimer: null,
+		filesPolling: false,
 		filesTimer: null,
 		history: emptyGitHistorySummary(state.id, worktreePath),
 		historyEntries: [],
 		historyNextOffset: null,
+		historyPolling: false,
 		historyPrefetchPromise: null,
 		historySignature: null,
 		historyTimer: null,
@@ -2357,29 +2467,46 @@ function startWorktreePolling(
 	};
 
 	const pollDiff = async () => {
+		if (worktreeState.diffPolling) {
+			return;
+		}
+		worktreeState.diffPolling = true;
 		try {
-			worktreeState.diff = await readDiff(worktreePath);
+			worktreeState.diff = await readDiff(worktreePath, "background");
 			worktreeState.lastUpdatedAt = getNow();
 		} catch (error) {
 			console.error(`Diff poll failed for ${worktreePath}`, error);
+		} finally {
+			worktreeState.diffPolling = false;
 		}
 	};
 
 	const pollFiles = async () => {
+		if (worktreeState.filesPolling) {
+			return;
+		}
+		worktreeState.filesPolling = true;
 		try {
-			worktreeState.files = await readFiles(worktreePath);
+			worktreeState.files = await readFiles(worktreePath, "background");
 			worktreeState.lastUpdatedAt = getNow();
 		} catch (error) {
 			console.error(`File poll failed for ${worktreePath}`, error);
+		} finally {
+			worktreeState.filesPolling = false;
 		}
 	};
 
 	const pollGitHistory = async () => {
+		if (worktreeState.historyPolling) {
+			return;
+		}
+		worktreeState.historyPolling = true;
 		try {
 			const previousSignature = worktreeState.historySignature;
 			const { history, signature } = await readGitHistorySummary(
 				state.id,
 				worktreePath,
+				"background",
 			);
 			worktreeState.history = history;
 			if (previousSignature !== null && previousSignature !== signature) {
@@ -2395,6 +2522,8 @@ function startWorktreePolling(
 			}
 		} catch (error) {
 			console.error(`Git history poll failed for ${worktreePath}`, error);
+		} finally {
+			worktreeState.historyPolling = false;
 		}
 	};
 
