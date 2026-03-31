@@ -15,7 +15,9 @@
 ├─ AGENTS.md
 ├─ agent-todo.md
 ├─ biome.json
+├─ bun-plugin-react-compiler.ts
 ├─ bun.lock
+├─ bunfig.toml
 ├─ docs/
 │  ├─ codex.md
 │  ├─ codex-context-management.md
@@ -48,6 +50,7 @@
 ├─ package.json
 ├─ src/
  │  ├─ bun/
+│  │  ├─ build-mainview.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
 │  │  ├─ git.ts

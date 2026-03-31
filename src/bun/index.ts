@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 
+import { MAINVIEW_BUILD_DIR, buildMainviewBundle } from "./build-mainview";
 import { initAppDatabase } from "./db";
 import {
 	closeProjectProcedure,
@@ -50,10 +51,8 @@ import type {
 
 const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
-const MAINVIEW_ENTRYPOINT = resolve(process.cwd(), "src/mainview/index.ts");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
-const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jolt-build");
 const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
 	process.cwd(),
 	"node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
@@ -495,33 +494,6 @@ function toRpcAbortMessage(
 		return `RPC request "${String(request.method)}" timed out after ${pending.timeoutMs}ms.`;
 	}
 	return toErrorMessage(error);
-}
-
-async function buildMainviewBundle(): Promise<string> {
-	const buildResult = await Bun.build({
-		entrypoints: [MAINVIEW_ENTRYPOINT],
-		format: "esm",
-		minify: false,
-		outdir: MAINVIEW_BUILD_DIR,
-		sourcemap: "external",
-		target: "browser",
-	});
-
-	if (!buildResult.success) {
-		for (const log of buildResult.logs) {
-			console.error(log);
-		}
-		throw new Error("Failed to build browser bundle");
-	}
-
-	const mainviewBundle = buildResult.outputs.find((output) =>
-		output.path.endsWith("index.js"),
-	);
-	if (!mainviewBundle) {
-		throw new Error("Mainview JavaScript bundle was not emitted");
-	}
-
-	return mainviewBundle.path;
 }
 
 function queueMainviewBundleBuild(): Promise<string> {

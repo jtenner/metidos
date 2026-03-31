@@ -10,9 +10,9 @@
 		"dev": "bun run tailwind:build && (bun run tailwind:watch & bun src/bun/index.ts)",
 		"dev:watch": "bun run dev",
 		"typecheck": "bunx tsgo --noEmit",
-		"validate": "bunx biome check src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json && bun run typecheck",
-		"build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jolt-build --target browser",
-		"format": "bunx biome format src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json --write"
+		"validate": "bunx biome check bun-plugin-react-compiler.ts src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json && bun run typecheck",
+		"build:dev": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts",
+		"format": "bunx biome format bun-plugin-react-compiler.ts src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json --write"
 	},
 	"dependencies": {
 		"@fontsource-variable/inter": "^5.2.8",
@@ -28,14 +28,17 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"@babel/core": "^7.29.0",
 		"@biomejs/biome": "^1.9.4",
 		"@tailwindcss/cli": "^4.2.2",
+		"@types/babel__core": "^7.20.5",
 		"@types/bun": "latest",
 		"@types/node": "^25.5.0",
 		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.2.3",
 		"@types/react-syntax-highlighter": "^15.5.13",
 		"@typescript/native-preview": "^7.0.0-dev.20260330.1",
+		"babel-plugin-react-compiler": "^1.0.0",
 		"tailwindcss": "^4.2.2"
 	}
 }
