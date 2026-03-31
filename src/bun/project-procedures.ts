@@ -133,10 +133,12 @@ type GitCommandOptions = {
 };
 
 type GitCommandQueueTask = {
+	abort: (reason: string) => void;
 	detachAbortListener: () => void;
+	priority: GitCommandPriority;
 	reject: (reason?: unknown) => void;
 	run: () => void;
-	signal: AbortSignal | null;
+	signal: AbortSignal;
 	started: boolean;
 };
 
@@ -196,6 +198,7 @@ const gitCommandQueueMap = new Map<
 	string,
 	{
 		active: boolean;
+		activeTask: GitCommandQueueTask | null;
 		backgroundTasks: GitCommandQueueTask[];
 		foregroundTasks: GitCommandQueueTask[];
 	}
@@ -274,6 +277,13 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
 		error.name = "AbortError";
 	}
 	return error;
+}
+
+function isAbortError(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		(error.name === "AbortError" || error.name === "TimeoutError")
+	);
 }
 
 function throwIfAborted(
@@ -1549,7 +1559,7 @@ async function readProjectWorktrees(
 				void refreshProjectPoll(projectId, {
 					priority: "background",
 				}).catch((error) => {
-					console.error(
+					logBackgroundGitFailure(
 						`Worktree refresh failed for project ${projectId}`,
 						error,
 					);
@@ -1635,6 +1645,14 @@ function removeGitCommandTask(
 	}
 }
 
+function logBackgroundGitFailure(message: string, error: unknown): void {
+	if (isAbortError(error)) {
+		return;
+	}
+
+	console.error(message, error);
+}
+
 function scheduleGitCommandQueue(cwd: string): void {
 	const queue = gitCommandQueueMap.get(cwd);
 	if (!queue || queue.active) {
@@ -1657,6 +1675,7 @@ function scheduleGitCommandQueue(cwd: string): void {
 	}
 
 	queue.active = true;
+	queue.activeTask = nextTask;
 	nextTask.run();
 }
 
@@ -1664,16 +1683,21 @@ function enqueueGitCommand<T>(
 	cwd: string,
 	priority: GitCommandPriority,
 	signal: AbortSignal | null,
-	run: () => Promise<T>,
+	run: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
 	const queue = gitCommandQueueMap.get(cwd) ?? {
 		active: false,
+		activeTask: null,
 		backgroundTasks: [],
 		foregroundTasks: [],
 	};
 	gitCommandQueueMap.set(cwd, queue);
 
 	return new Promise<T>((resolve, reject) => {
+		const taskAbortController = new AbortController();
+		const taskSignal = signal
+			? AbortSignal.any([signal, taskAbortController.signal])
+			: taskAbortController.signal;
 		let settled = false;
 		const finalize = (callback: () => void) => {
 			if (settled) {
@@ -1685,7 +1709,11 @@ function enqueueGitCommand<T>(
 		};
 
 		const task: GitCommandQueueTask = {
+			abort: (reason) => {
+				taskAbortController.abort(createAbortError(null, reason));
+			},
 			detachAbortListener: () => {},
+			priority,
 			reject: (reason) =>
 				finalize(() => {
 					reject(reason);
@@ -1694,8 +1722,8 @@ function enqueueGitCommand<T>(
 				task.started = true;
 				void Promise.resolve()
 					.then(() => {
-						throwIfAborted(signal, "Git command was aborted.");
-						return run();
+						throwIfAborted(task.signal, "Git command was aborted.");
+						return run(task.signal);
 					})
 					.then(
 						(value) => {
@@ -1710,35 +1738,42 @@ function enqueueGitCommand<T>(
 						},
 					)
 					.finally(() => {
+						if (queue.activeTask === task) {
+							queue.activeTask = null;
+						}
 						queue.active = false;
 						scheduleGitCommandQueue(cwd);
 					});
 			},
-			signal,
+			signal: taskSignal,
 			started: false,
 		};
 
-		if (signal) {
+		if (task.signal) {
 			const handleAbort = () => {
 				if (task.started) {
 					return;
 				}
 				removeGitCommandTask(queue, task);
 				finalize(() => {
-					reject(createAbortError(signal.reason, "Git command was aborted."));
+					reject(
+						createAbortError(task.signal.reason, "Git command was aborted."),
+					);
 				});
 			};
-			signal.addEventListener("abort", handleAbort, {
+			task.signal.addEventListener("abort", handleAbort, {
 				once: true,
 			});
 			task.detachAbortListener = () => {
-				signal.removeEventListener("abort", handleAbort);
+				task.signal.removeEventListener("abort", handleAbort);
 			};
 		}
 
-		if (signal?.aborted) {
+		if (task.signal.aborted) {
 			finalize(() => {
-				reject(createAbortError(signal.reason, "Git command was aborted."));
+				reject(
+					createAbortError(task.signal.reason, "Git command was aborted."),
+				);
 			});
 			return;
 		}
@@ -1747,6 +1782,15 @@ function enqueueGitCommand<T>(
 			queue.foregroundTasks.push(task);
 		} else {
 			queue.backgroundTasks.push(task);
+		}
+		if (
+			priority === "foreground" &&
+			queue.activeTask &&
+			queue.activeTask.priority === "background"
+		) {
+			queue.activeTask.abort(
+				`Foreground git command preempted background work for ${cwd}.`,
+			);
 		}
 		scheduleGitCommandQueue(cwd);
 	});
@@ -1774,14 +1818,15 @@ async function runGitCommandResult(
 	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> {
 	const { priority, signal } = normalizeGitCommandOptions(options);
-	return enqueueGitCommand(cwd, priority, signal, async () => {
+	return enqueueGitCommand(cwd, priority, signal, async (taskSignal) => {
 		throwIfAborted(signal, "Git command was aborted.");
+		throwIfAborted(taskSignal, "Git command was aborted.");
 		const proc = Bun.spawn({
 			cmd: ["git", ...args],
 			cwd,
 			stdout: "pipe",
 			stderr: "pipe",
-			...(signal ? { signal } : {}),
+			signal: taskSignal,
 		});
 
 		const [stdout, stderr, exitCode] = await Promise.all([
@@ -1790,6 +1835,7 @@ async function runGitCommandResult(
 			proc.exited,
 		]);
 		throwIfAborted(signal, "Git command was aborted.");
+		throwIfAborted(taskSignal, "Git command was aborted.");
 
 		return {
 			exitCode,
@@ -2505,7 +2551,10 @@ function warmGitHistoryCache(
 		DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
 		"background",
 	).catch((error) => {
-		console.error(`Git history prefetch failed for ${worktreePath}`, error);
+		logBackgroundGitFailure(
+			`Git history prefetch failed for ${worktreePath}`,
+			error,
+		);
 	});
 }
 
@@ -2695,7 +2744,7 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 			refreshProjectPoll(project.id, {
 				priority: "background",
 			}).catch((error) => {
-				console.error(
+				logBackgroundGitFailure(
 					`Worktree polling failed for project ${project.id}`,
 					error,
 				);
@@ -2789,7 +2838,7 @@ function startWorktreePolling(
 			worktreeState.diff = await readDiff(worktreePath, "background");
 			worktreeState.lastUpdatedAt = getNow();
 		} catch (error) {
-			console.error(`Diff poll failed for ${worktreePath}`, error);
+			logBackgroundGitFailure(`Diff poll failed for ${worktreePath}`, error);
 		} finally {
 			worktreeState.diffPolling = false;
 		}
@@ -2804,7 +2853,7 @@ function startWorktreePolling(
 			worktreeState.files = await readFiles(worktreePath, "background");
 			worktreeState.lastUpdatedAt = getNow();
 		} catch (error) {
-			console.error(`File poll failed for ${worktreePath}`, error);
+			logBackgroundGitFailure(`File poll failed for ${worktreePath}`, error);
 		} finally {
 			worktreeState.filesPolling = false;
 		}
@@ -2835,7 +2884,10 @@ function startWorktreePolling(
 				worktreeGitHistoryChangeListener?.(state.id, worktreePath);
 			}
 		} catch (error) {
-			console.error(`Git history poll failed for ${worktreePath}`, error);
+			logBackgroundGitFailure(
+				`Git history poll failed for ${worktreePath}`,
+				error,
+			);
 		} finally {
 			worktreeState.historyPolling = false;
 		}
