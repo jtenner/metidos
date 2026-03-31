@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { readFileSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { RpcProjectTask } from "../rpc-schema";
 import { safeIsDirectory, safeIsFile } from "./shared";
@@ -57,34 +57,91 @@ function isIgnoredPackageDirectory(name: string): boolean {
 	);
 }
 
-function sortDirectoryNames(values: string[]): string[] {
+function sortDirectoryEntries<
+	Entry extends {
+		name: string;
+	},
+>(values: Entry[]): Entry[] {
 	return [...values].sort((left, right) =>
-		left.localeCompare(right, undefined, {
+		left.name.localeCompare(right.name, undefined, {
 			numeric: true,
 			sensitivity: "base",
 		}),
 	);
 }
 
+function safeDirectoryRealPath(path: string): string | null {
+	if (!safeIsDirectory(path)) {
+		return null;
+	}
+
+	try {
+		return realpathSync(path);
+	} catch {
+		return null;
+	}
+}
+
+function visitDirectoryOnce(
+	path: string,
+	visitedRealPaths: Set<string>,
+	rootRealPath: string,
+): boolean {
+	const realPath = safeDirectoryRealPath(path);
+	if (!realPath) {
+		return false;
+	}
+
+	const relativeRealPath = relative(rootRealPath, realPath);
+	if (
+		relativeRealPath !== "" &&
+		(relativeRealPath.startsWith("..") || isAbsolute(relativeRealPath))
+	) {
+		return false;
+	}
+
+	if (visitedRealPaths.has(realPath)) {
+		return false;
+	}
+
+	visitedRealPaths.add(realPath);
+	return true;
+}
+
 function listProjectTaskFiles(
 	tasksDirectory: string,
 	prefix = "",
+	rootRealPath = safeDirectoryRealPath(tasksDirectory),
+	visitedRealPaths = new Set<string>(),
 ): RpcProjectTask[] {
-	if (!safeIsDirectory(tasksDirectory)) {
+	if (!rootRealPath) {
+		return [];
+	}
+
+	if (!visitDirectoryOnce(tasksDirectory, visitedRealPaths, rootRealPath)) {
 		return [];
 	}
 
 	const tasks: RpcProjectTask[] = [];
-	for (const entry of sortDirectoryNames(
-		readdirSync(tasksDirectory).filter((value) => !value.startsWith(".")),
+	for (const entry of sortDirectoryEntries(
+		readdirSync(tasksDirectory, {
+			withFileTypes: true,
+		}).filter((value) => !value.name.startsWith(".")),
 	)) {
-		const fullPath = resolve(tasksDirectory, entry);
-		const relativePath = prefix ? `${prefix}/${entry}` : entry;
-		if (safeIsDirectory(fullPath)) {
-			tasks.push(...listProjectTaskFiles(fullPath, relativePath));
+		const fullPath = resolve(tasksDirectory, entry.name);
+		const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+		if (entry.isDirectory() || safeIsDirectory(fullPath)) {
+			tasks.push(
+				...listProjectTaskFiles(
+					fullPath,
+					relativePath,
+					rootRealPath,
+					visitedRealPaths,
+				),
+			);
 			continue;
 		}
-		if (!safeIsFile(fullPath)) {
+		if (!(entry.isFile() || safeIsFile(fullPath))) {
 			continue;
 		}
 		tasks.push({
@@ -103,15 +160,28 @@ function listProjectTaskFiles(
 function listPackageJsonTasks(
 	rootDirectory: string,
 	currentDirectory = rootDirectory,
+	rootRealPath = safeDirectoryRealPath(rootDirectory),
+	visitedRealPaths = new Set<string>(),
 ): RpcProjectTask[] {
-	if (!safeIsDirectory(currentDirectory)) {
+	if (!rootRealPath) {
+		return [];
+	}
+
+	if (!visitDirectoryOnce(currentDirectory, visitedRealPaths, rootRealPath)) {
 		return [];
 	}
 
 	const tasks: RpcProjectTask[] = [];
-	const entries = sortDirectoryNames(readdirSync(currentDirectory));
+	const entries = sortDirectoryEntries(
+		readdirSync(currentDirectory, {
+			withFileTypes: true,
+		}),
+	);
 	const packageJsonPath = resolve(currentDirectory, "package.json");
-	if (entries.includes("package.json") && safeIsFile(packageJsonPath)) {
+	if (
+		entries.some((entry) => entry.name === "package.json") &&
+		safeIsFile(packageJsonPath)
+	) {
 		try {
 			const parsed = JSON.parse(
 				readFileSync(packageJsonPath, "utf8"),
@@ -149,14 +219,24 @@ function listPackageJsonTasks(
 	}
 
 	for (const entry of entries) {
-		if (entry === "package.json") {
+		if (entry.name === "package.json") {
 			continue;
 		}
-		const fullPath = resolve(currentDirectory, entry);
-		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
+		const fullPath = resolve(currentDirectory, entry.name);
+		if (
+			!(entry.isDirectory() || safeIsDirectory(fullPath)) ||
+			isIgnoredPackageDirectory(entry.name)
+		) {
 			continue;
 		}
-		tasks.push(...listPackageJsonTasks(rootDirectory, fullPath));
+		tasks.push(
+			...listPackageJsonTasks(
+				rootDirectory,
+				fullPath,
+				rootRealPath,
+				visitedRealPaths,
+			),
+		);
 	}
 
 	return tasks;
@@ -178,12 +258,18 @@ function collectTaskWatchTargets(
 	worktreePath: string,
 	currentDirectory: string,
 	watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
+	rootRealPath: string,
+	visitedRealPaths: Set<string>,
 ): void {
-	if (!safeIsDirectory(currentDirectory)) {
+	if (!visitDirectoryOnce(currentDirectory, visitedRealPaths, rootRealPath)) {
 		return;
 	}
 
-	const entries = sortDirectoryNames(readdirSync(currentDirectory));
+	const entries = sortDirectoryEntries(
+		readdirSync(currentDirectory, {
+			withFileTypes: true,
+		}),
+	);
 	const relativeDirectory =
 		relative(worktreePath, currentDirectory).replace(/\\/g, "/") || ".";
 	const insideTasksDirectory =
@@ -196,38 +282,66 @@ function collectTaskWatchTargets(
 
 	if (insideTasksDirectory) {
 		for (const entry of entries) {
-			if (entry.startsWith(".")) {
+			if (entry.name.startsWith(".")) {
 				continue;
 			}
-			const fullPath = resolve(currentDirectory, entry);
-			if (safeIsDirectory(fullPath)) {
-				collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
+			const fullPath = resolve(currentDirectory, entry.name);
+			if (entry.isDirectory() || safeIsDirectory(fullPath)) {
+				collectTaskWatchTargets(
+					worktreePath,
+					fullPath,
+					watchTargetKinds,
+					rootRealPath,
+					visitedRealPaths,
+				);
 			}
 		}
 		return;
 	}
 
 	for (const entry of entries) {
-		if (entry === ".tasks") {
+		if (entry.name === ".tasks") {
 			collectTaskWatchTargets(
 				worktreePath,
-				resolve(currentDirectory, entry),
+				resolve(currentDirectory, entry.name),
 				watchTargetKinds,
+				rootRealPath,
+				visitedRealPaths,
 			);
 			continue;
 		}
 
-		const fullPath = resolve(currentDirectory, entry);
-		if (!safeIsDirectory(fullPath) || isIgnoredPackageDirectory(entry)) {
+		const fullPath = resolve(currentDirectory, entry.name);
+		if (
+			!(entry.isDirectory() || safeIsDirectory(fullPath)) ||
+			isIgnoredPackageDirectory(entry.name)
+		) {
 			continue;
 		}
-		collectTaskWatchTargets(worktreePath, fullPath, watchTargetKinds);
+		collectTaskWatchTargets(
+			worktreePath,
+			fullPath,
+			watchTargetKinds,
+			rootRealPath,
+			visitedRealPaths,
+		);
 	}
 }
 
 export function readTaskWatchTargets(worktreePath: string): TaskWatchTarget[] {
+	const rootRealPath = safeDirectoryRealPath(worktreePath);
+	if (!rootRealPath) {
+		return [];
+	}
+
 	const watchTargetKinds = new Map<string, TaskWatchTarget["kind"]>();
-	collectTaskWatchTargets(worktreePath, worktreePath, watchTargetKinds);
+	collectTaskWatchTargets(
+		worktreePath,
+		worktreePath,
+		watchTargetKinds,
+		rootRealPath,
+		new Set<string>(),
+	);
 	return [...watchTargetKinds.entries()].map(([path, kind]) => ({
 		path,
 		kind,
