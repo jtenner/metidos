@@ -1795,12 +1795,21 @@ export async function setActiveWorktreeProcedure(
 		);
 	}
 
-	const projectId = hasProjectId ? params.projectId : null;
-	const worktreePath = hasWorktreePath
+	const requestedProjectId = hasProjectId ? params.projectId : null;
+	const requestedWorktreePath = hasWorktreePath
 		? normalizePath(params.worktreePath ?? "")
 		: null;
-	if (projectId !== null) {
-		ensureProjectPoller(projectByIdForPath(projectId));
+	let projectId: number | null = null;
+	let worktreePath: string | null = null;
+	if (requestedProjectId !== null) {
+		const project = projectByIdForPath(requestedProjectId);
+		if (project.isOpen === 1) {
+			ensureProjectPoller(project);
+			projectId = project.id;
+			worktreePath = requestedWorktreePath;
+		} else {
+			stopProjectPoller(project.id);
+		}
 	}
 
 	for (const state of projectPollMap.values()) {

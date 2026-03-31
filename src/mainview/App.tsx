@@ -573,7 +573,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [selectedProject, getProjectState]);
 
 	const activeSelectedWorktreePath = useMemo(() => {
-		if (!selectedProject) {
+		if (!selectedProject || selectedProject.isOpen !== 1) {
 			return null;
 		}
 		if (selectedWorktreePath) {
@@ -602,7 +602,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
 
 	const activePollingProjectId =
-		isDocumentVisible && selectedProject && activeSelectedWorktreePath
+		isDocumentVisible &&
+		selectedProject &&
+		selectedProject.isOpen === 1 &&
+		activeSelectedWorktreePath
 			? selectedProject.id
 			: null;
 	const activePollingWorktreePath =
@@ -3433,6 +3436,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				});
 				try {
 					await procedures.closeProject({ projectId: project.id });
+					setProjects((prev) =>
+						upsertProjectList(prev, {
+							...project,
+							isOpen: 0,
+						}),
+					);
 				} catch {
 					// best effort
 				}
@@ -3452,6 +3461,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						name: project.name,
 					})
 					.then((result) => {
+						setProjects((prev) => upsertProjectList(prev, result.project));
 						setProjectState(project.id, {
 							worktrees: result.worktrees,
 							loadingWorktrees: false,
@@ -3472,6 +3482,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					projectPath: project.path,
 					name: project.name,
 				});
+				setProjects((prev) => upsertProjectList(prev, result.project));
 				setProjectState(project.id, {
 					worktrees: result.worktrees,
 					loadingWorktrees: false,
