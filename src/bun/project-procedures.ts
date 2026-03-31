@@ -143,9 +143,7 @@ type GitCommandQueueTask = {
 };
 
 type PendingGitCommitDiffRequest = {
-	controller: AbortController;
 	promise: Promise<RpcGitCommitDiffResult>;
-	waiterCount: number;
 };
 
 type PendingGitHistoryPrefetch = {
@@ -2710,35 +2708,18 @@ async function getCachedGitCommitDiffResult(
 
 	const pending = gitCommitDiffRequestCache.get(cacheKey);
 	if (pending) {
-		pending.waiterCount += 1;
-		try {
-			return awaitAbortableResult(
-				pending.promise,
-				normalizedOptions.signal,
-				"Commit diff read was aborted.",
-			);
-		} finally {
-			pending.waiterCount = Math.max(0, pending.waiterCount - 1);
-			if (
-				pending.waiterCount === 0 &&
-				gitCommitDiffRequestCache.get(cacheKey) === pending
-			) {
-				pending.controller.abort(
-					createAbortError(null, "Commit diff read was aborted."),
-				);
-			}
-		}
+		return awaitAbortableResult(
+			pending.promise,
+			normalizedOptions.signal,
+			"Commit diff read was aborted.",
+		);
 	}
 
-	const controller = new AbortController();
 	const pendingRequest: PendingGitCommitDiffRequest = {
-		controller,
 		promise: Promise.resolve(null as never),
-		waiterCount: 1,
 	};
 	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
 		priority: normalizedOptions.priority,
-		signal: controller.signal,
 	})
 		.then((result) => {
 			writeLruValue(
@@ -2757,21 +2738,11 @@ async function getCachedGitCommitDiffResult(
 	pendingRequest.promise = promise;
 	gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
 
-	try {
-		return awaitAbortableResult(
-			promise,
-			normalizedOptions.signal,
-			"Commit diff read was aborted.",
-		);
-	} finally {
-		pendingRequest.waiterCount = Math.max(0, pendingRequest.waiterCount - 1);
-		if (
-			pendingRequest.waiterCount === 0 &&
-			gitCommitDiffRequestCache.get(cacheKey) === pendingRequest
-		) {
-			controller.abort(createAbortError(null, "Commit diff read was aborted."));
-		}
-	}
+	return awaitAbortableResult(
+		promise,
+		normalizedOptions.signal,
+		"Commit diff read was aborted.",
+	);
 }
 
 function getNow(): string {
