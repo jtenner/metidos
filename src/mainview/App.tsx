@@ -2162,6 +2162,34 @@ function upsertThreadList(items: RpcThread[], thread: RpcThread): RpcThread[] {
 	return sortThreads(next);
 }
 
+function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
+	if (!thread.runStatus.hasUnreadError) {
+		return thread;
+	}
+
+	return {
+		...thread,
+		runStatus: {
+			...thread.runStatus,
+			hasUnreadError: false,
+		},
+	};
+}
+
+function withAcknowledgedUnreadThreadDetail(
+	detail: RpcThreadDetail,
+): RpcThreadDetail {
+	const thread = withAcknowledgedUnreadThread(detail.thread);
+	if (thread === detail.thread) {
+		return detail;
+	}
+
+	return {
+		...detail,
+		thread,
+	};
+}
+
 function removeThreadFromList(
 	items: RpcThread[],
 	threadId: number,
@@ -2333,6 +2361,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
 	const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
+	const optimisticallyAcknowledgedThreadIdsRef = useRef(new Set<number>());
+	const threadErrorSeenRequestCacheRef = useRef(
+		new Map<number, Promise<RpcThreadDetail>>(),
+	);
 	const threadStatusPollInFlightRef = useRef(false);
 	const initializedRef = useRef(false);
 
@@ -3420,9 +3452,122 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[loadMoreGitHistory],
 	);
 
+	const applyOptimisticThreadErrorSeen = useCallback((thread: RpcThread) => {
+		if (!optimisticallyAcknowledgedThreadIdsRef.current.has(thread.id)) {
+			return thread;
+		}
+
+		return withAcknowledgedUnreadThread(thread);
+	}, []);
+
+	const applyOptimisticThreadErrorSeenToDetail = useCallback(
+		(detail: RpcThreadDetail) => {
+			if (
+				!optimisticallyAcknowledgedThreadIdsRef.current.has(detail.thread.id)
+			) {
+				return detail;
+			}
+
+			return withAcknowledgedUnreadThreadDetail(detail);
+		},
+		[],
+	);
+
+	const applyOptimisticThreadErrorSeenToList = useCallback(
+		(items: RpcThread[]) => {
+			if (optimisticallyAcknowledgedThreadIdsRef.current.size === 0) {
+				return items;
+			}
+
+			let changed = false;
+			const nextItems = items.map((thread) => {
+				const nextThread = applyOptimisticThreadErrorSeen(thread);
+				if (nextThread !== thread) {
+					changed = true;
+				}
+				return nextThread;
+			});
+
+			return changed ? nextItems : items;
+		},
+		[applyOptimisticThreadErrorSeen],
+	);
+
+	const requestThreadErrorSeen = useCallback(
+		(threadId: number): Promise<RpcThreadDetail> => {
+			const existing = threadErrorSeenRequestCacheRef.current.get(threadId);
+			if (existing) {
+				return existing;
+			}
+
+			const request = procedures
+				.markThreadErrorSeen({
+					threadId,
+				})
+				.finally(() => {
+					if (
+						threadErrorSeenRequestCacheRef.current.get(threadId) === request
+					) {
+						threadErrorSeenRequestCacheRef.current.delete(threadId);
+					}
+				});
+			threadErrorSeenRequestCacheRef.current.set(threadId, request);
+			return request;
+		},
+		[procedures],
+	);
+
+	const acknowledgeThreadErrorSeenInBackground = useCallback(
+		(threadId: number) => {
+			optimisticallyAcknowledgedThreadIdsRef.current.add(threadId);
+			void requestThreadErrorSeen(threadId)
+				.then((detail) => {
+					optimisticallyAcknowledgedThreadIdsRef.current.delete(threadId);
+
+					const settledDetail = applyOptimisticThreadErrorSeenToDetail(detail);
+					setThreads((prev) =>
+						prev.some((entry) => entry.id === settledDetail.thread.id)
+							? upsertThreadList(prev, settledDetail.thread)
+							: prev,
+					);
+					if (selectedThreadIdRef.current === threadId) {
+						selectedThreadRunStateRef.current =
+							settledDetail.thread.runStatus.state;
+						setThreadMessages(settledDetail.messages);
+					}
+				})
+				.catch((error) => {
+					optimisticallyAcknowledgedThreadIdsRef.current.delete(threadId);
+					console.error(
+						`Failed to acknowledge unread thread error for ${threadId}`,
+						error,
+					);
+				});
+		},
+		[applyOptimisticThreadErrorSeenToDetail, requestThreadErrorSeen],
+	);
+
+	const prepareOpenedThreadDetail = useCallback(
+		(detail: RpcThreadDetail): RpcThreadDetail => {
+			const optimisticDetail = applyOptimisticThreadErrorSeenToDetail(detail);
+			if (!optimisticDetail.thread.runStatus.hasUnreadError) {
+				return optimisticDetail;
+			}
+
+			acknowledgeThreadErrorSeenInBackground(detail.thread.id);
+			return withAcknowledgedUnreadThreadDetail(detail);
+		},
+		[
+			acknowledgeThreadErrorSeenInBackground,
+			applyOptimisticThreadErrorSeenToDetail,
+		],
+	);
+
 	const refreshThreadStatuses = useCallback(async () => {
 		const activeSelectedThreadId = selectedThreadIdRef.current;
-		const loadedThreads = sortThreads(await procedures.listThreads());
+		const loadedThreads = applyOptimisticThreadErrorSeenToList(
+			sortThreads(await procedures.listThreads()),
+		);
 		const selectedSummary =
 			activeSelectedThreadId === null
 				? null
@@ -3448,27 +3593,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			return;
 		}
 
-		let detail = await procedures.getThread({
-			threadId: selectedSummary.id,
-		});
+		const detail = prepareOpenedThreadDetail(
+			await procedures.getThread({
+				threadId: selectedSummary.id,
+			}),
+		);
 		if (selectedThreadIdRef.current !== selectedSummary.id) {
 			setThreads(loadedThreads);
 			return;
 		}
-		if (detail.thread.runStatus.hasUnreadError) {
-			detail = await procedures.markThreadErrorSeen({
-				threadId: selectedSummary.id,
-			});
-		}
 		selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 		setThreads(upsertThreadList(loadedThreads, detail.thread));
 		setThreadMessages(detail.messages);
-	}, [procedures]);
+	}, [
+		applyOptimisticThreadErrorSeenToList,
+		prepareOpenedThreadDetail,
+		procedures,
+	]);
 
 	const applyOpenedThreadDetail = useCallback(
 		async (detail: RpcThreadDetail) => {
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);
+			selectedThreadIdRef.current = detail.thread.id;
 			selectedThreadRunStateRef.current = detail.thread.runStatus.state;
 			setThreadMessages(detail.messages);
 			syncThreadContext(detail.thread);
@@ -3483,26 +3630,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const openThread = useCallback(
-		async (
-			threadId: number,
-			options?: {
-				acknowledgeUnreadError?: boolean;
-			},
-		) => {
+		async (threadId: number) => {
 			setIsThreadLoading(true);
 			setThreadsError("");
 			setChatError("");
 			setModelControlError("");
 			try {
-				let detail = options?.acknowledgeUnreadError
-					? await procedures.markThreadErrorSeen({ threadId })
-					: await procedures.getThread({ threadId });
-				if (
-					!options?.acknowledgeUnreadError &&
-					detail.thread.runStatus.hasUnreadError
-				) {
-					detail = await procedures.markThreadErrorSeen({ threadId });
-				}
+				const detail = prepareOpenedThreadDetail(
+					await procedures.getThread({ threadId }),
+				);
 				await applyOpenedThreadDetail(detail);
 			} catch (error) {
 				setThreadsError(error instanceof Error ? error.message : String(error));
@@ -3510,7 +3646,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setIsThreadLoading(false);
 			}
 		},
-		[applyOpenedThreadDetail, procedures],
+		[applyOpenedThreadDetail, prepareOpenedThreadDetail, procedures],
 	);
 
 	const resetAddProjectPath = useCallback(
@@ -3911,25 +4047,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 			if (initialThread) {
 				try {
-					let detail = initialThreadDetailPromise
+					const detail = initialThreadDetailPromise
 						? await initialThreadDetailPromise
 						: null;
-					if (detail?.thread.runStatus.hasUnreadError) {
-						detail = await procedures.markThreadErrorSeen({
-							threadId: initialThread.id,
-						});
-					}
 					if (detail) {
-						await applyOpenedThreadDetail(detail);
+						await applyOpenedThreadDetail(prepareOpenedThreadDetail(detail));
 						return;
 					}
 				} catch {
 					// Fall through to the normal open-thread flow below.
 				}
 
-				await openThread(initialThread.id, {
-					acknowledgeUnreadError: initialThread.runStatus.hasUnreadError,
-				});
+				await openThread(initialThread.id);
 				return;
 			}
 
@@ -3958,6 +4087,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setSessionStateReady(true);
 		}
 	}, [
+		prepareOpenedThreadDetail,
 		applyOpenedThreadDetail,
 		cacheGitHistoryResult,
 		getProjectState,
@@ -6441,9 +6571,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}}
 									onClick={() => {
 										hideErrorPreview();
-										void openThread(thread.id, {
-											acknowledgeUnreadError: hasUnreadError,
-										});
+										void openThread(thread.id);
 									}}
 								>
 									<div className="flex items-center justify-between gap-3">
