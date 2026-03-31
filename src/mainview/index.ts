@@ -538,6 +538,7 @@ const procedures: ProjectProcedures = {
 	getThread: createProcedure("getThread"),
 	markThreadErrorSeen: createProcedure("markThreadErrorSeen"),
 	sendThreadMessage: createProcedure("sendThreadMessage"),
+	stopThreadTurn: createProcedure("stopThreadTurn"),
 	runProjectTask: createProcedure("runProjectTask"),
 	renameThread: createProcedure("renameThread"),
 	setThreadPinned: createProcedure("setThreadPinned"),

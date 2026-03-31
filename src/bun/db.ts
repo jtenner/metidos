@@ -1048,3 +1048,24 @@ export function upsertThreadActivity(
 
 	return message;
 }
+
+export function settleInProgressThreadMessages(
+	database: Database,
+	threadId: number,
+): void {
+	runStatement(
+		database,
+		`
+			UPDATE thread_messages
+			SET
+				state = CASE
+					WHEN kind IN ('command', 'file_change') THEN 'failed'
+					ELSE 'completed'
+				END,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE thread_id = ?
+				AND state = 'in_progress'
+		`,
+		threadId,
+	);
+}

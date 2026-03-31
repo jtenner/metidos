@@ -343,6 +343,10 @@ export type AppRPCSchema = {
 			params: { threadId: number; input: string };
 			response: RpcThreadDetail;
 		};
+		stopThreadTurn: {
+			params: { threadId: number };
+			response: RpcThreadDetail;
+		};
 		runProjectTask: {
 			params: {
 				projectId: number;
@@ -460,6 +464,10 @@ export interface ProjectProcedures {
 	sendThreadMessage: RpcProcedureCall<
 		AppRPCSchema["requests"]["sendThreadMessage"]["params"],
 		AppRPCSchema["requests"]["sendThreadMessage"]["response"]
+	>;
+	stopThreadTurn: RpcProcedureCall<
+		AppRPCSchema["requests"]["stopThreadTurn"]["params"],
+		AppRPCSchema["requests"]["stopThreadTurn"]["response"]
 	>;
 	runProjectTask: RpcProcedureCall<
 		AppRPCSchema["requests"]["runProjectTask"]["params"],

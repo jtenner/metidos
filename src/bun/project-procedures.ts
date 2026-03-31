@@ -34,6 +34,7 @@ import {
 	setThreadModel,
 	setThreadPinned,
 	setThreadUsage,
+	settleInProgressThreadMessages,
 	touchThread,
 	updateThreadCodexId,
 	upsertProject,
@@ -195,6 +196,8 @@ type ProjectPollState = {
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, ReturnType<typeof codex.startThread>>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
+const threadTurnAbortControllerMap = new Map<number, AbortController>();
+const threadTurnCompletionMap = new Map<number, Promise<void>>();
 const directorySuggestionCache = new Map<
 	string,
 	{
@@ -716,6 +719,14 @@ function invalidateThreadDetailCache(threadId: number): void {
 }
 
 function clearThreadRuntimeState(threadId: number): void {
+	const activeController = threadTurnAbortControllerMap.get(threadId);
+	if (activeController && !activeController.signal.aborted) {
+		activeController.abort(
+			createAbortError(null, "Thread runtime state was cleared."),
+		);
+	}
+	threadTurnAbortControllerMap.delete(threadId);
+	threadTurnCompletionMap.delete(threadId);
 	codexThreadMap.delete(threadId);
 	threadRunStatusMap.delete(threadId);
 	invalidateThreadDetailCache(threadId);
@@ -1400,10 +1411,37 @@ function warmThreadDetailCache(threadId: number): void {
 	});
 }
 
+async function settleCanceledThreadTurn(
+	threadId: number,
+	startedAt: string,
+	lastAssistantItemId: string | null,
+	lastAssistantText: string,
+): Promise<void> {
+	if (lastAssistantItemId && lastAssistantText.trim()) {
+		await upsertAssistantChatActivity(
+			threadId,
+			lastAssistantItemId,
+			lastAssistantText.trim(),
+			"completed",
+		);
+	}
+	settleInProgressThreadMessages(db, threadId);
+	invalidateThreadDetailCache(threadId);
+	markThreadRan(db, threadId);
+	setThreadRunStatus(threadId, {
+		state: "idle",
+		startedAt,
+		updatedAt: getNow(),
+		error: null,
+		hasUnreadError: false,
+	});
+}
+
 async function runThreadMessageInBackground(
 	threadId: number,
 	input: string,
 	startedAt: string,
+	controller: AbortController,
 ): Promise<void> {
 	let lastAssistantText = "";
 	let lastAssistantItemId: string | null = null;
@@ -1413,7 +1451,9 @@ async function runThreadMessageInBackground(
 	try {
 		const thread = threadById(threadId);
 		const codexThread = await ensureCodexThread(thread);
-		const { events } = await codexThread.runStreamed(input);
+		const { events } = await codexThread.runStreamed(input, {
+			signal: controller.signal,
+		});
 
 		for await (const event of events) {
 			if (event.type === "thread.started") {
@@ -1531,6 +1571,16 @@ async function runThreadMessageInBackground(
 			hasUnreadError: false,
 		});
 	} catch (error) {
+		if (isAbortError(error) && controller.signal.aborted) {
+			await settleCanceledThreadTurn(
+				threadId,
+				startedAt,
+				lastAssistantItemId,
+				lastAssistantText,
+			);
+			return;
+		}
+
 		const message = error instanceof Error ? error.message : String(error);
 		if (lastAssistantItemId && lastAssistantText.trim()) {
 			await upsertAssistantChatActivity(
@@ -1550,6 +1600,11 @@ async function runThreadMessageInBackground(
 			hasUnreadError: true,
 		});
 		console.error(`Codex turn failed for thread ${threadId}`, error);
+	} finally {
+		if (threadTurnAbortControllerMap.get(threadId) === controller) {
+			threadTurnAbortControllerMap.delete(threadId);
+		}
+		threadTurnCompletionMap.delete(threadId);
 	}
 }
 
@@ -3373,6 +3428,8 @@ async function queueThreadMessage(
 	touchThread(db, thread.id);
 
 	const startedAt = getNow();
+	const controller = new AbortController();
+	threadTurnAbortControllerMap.set(thread.id, controller);
 	setThreadRunStatus(thread.id, {
 		state: "working",
 		startedAt,
@@ -3381,7 +3438,14 @@ async function queueThreadMessage(
 		hasUnreadError: false,
 	});
 
-	void runThreadMessageInBackground(thread.id, input, startedAt);
+	const completion = runThreadMessageInBackground(
+		thread.id,
+		input,
+		startedAt,
+		controller,
+	);
+	threadTurnCompletionMap.set(thread.id, completion);
+	void completion;
 
 	return readThreadDetailCached(thread.id);
 }
@@ -3441,6 +3505,31 @@ export async function runProjectTaskProcedure(
 	}
 
 	return queueThreadMessage(thread, taskPrompt);
+}
+
+export async function stopThreadTurnProcedure(
+	params: AppRPCSchema["requests"]["stopThreadTurn"]["params"],
+): Promise<RpcThreadDetail> {
+	const thread = threadById(params.threadId);
+	if (threadRunStatusFromRecord(thread).state !== "working") {
+		return readThreadDetailCached(thread.id);
+	}
+
+	const controller = threadTurnAbortControllerMap.get(thread.id);
+	if (!controller) {
+		throw new Error(
+			"Thread stop is unavailable because no active run was found.",
+		);
+	}
+
+	if (!controller.signal.aborted) {
+		controller.abort(
+			createAbortError(null, "Codex turn was stopped by the user."),
+		);
+	}
+
+	await threadTurnCompletionMap.get(thread.id);
+	return readThreadDetailCached(thread.id);
 }
 
 export async function renameThreadProcedure(

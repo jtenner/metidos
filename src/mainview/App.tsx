@@ -213,6 +213,7 @@ type AppIconName =
 	| "radio_button_unchecked"
 	| "search"
 	| "settings"
+	| "stop"
 	| "task_alt"
 	| "terminal";
 
@@ -891,6 +892,8 @@ function renderIconGlyph(
 					<path d="m8.1 15.9-1.4 1.4" />
 				</>
 			);
+		case "stop":
+			return <rect x="7.25" y="7.25" width="9.5" height="9.5" rx="1.5" />;
 		case "task_alt":
 			return (
 				<>
@@ -2338,6 +2341,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	>(initialMainviewState.selectedWorktreePath);
 	const [chatInput, setChatInput] = useState(initialMainviewState.chatInput);
 	const [isSending, setIsSending] = useState(false);
+	const [isStoppingThread, setIsStoppingThread] = useState(false);
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
 	const [sessionStateReady, setSessionStateReady] = useState(false);
@@ -2518,6 +2522,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadRunStatus.state === "failed"
 			? (selectedThreadRunStatus.error ?? "")
 			: "";
+	const composerActionDisabled = selectedThreadIsWorking
+		? !selectedThread || isThreadLoading || isStoppingThread
+		: !selectedThread || isSending || isThreadLoading;
+	const composerActionToneClassName = selectedThreadIsWorking
+		? "bg-[#4b2028] text-[#ffd4da]"
+		: "bg-[#bdd5e6] text-[#2e526b]";
+	const composerActionLabel = selectedThreadIsWorking
+		? "Stop current run"
+		: "Send message";
 
 	const activeChatError = chatError || selectedThreadRunError;
 
@@ -5507,12 +5520,41 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadIsWorking,
 	]);
 
+	const stopSelectedThreadTurn = useCallback(() => {
+		if (!selectedThreadId || !selectedThreadIsWorking || isStoppingThread) {
+			return;
+		}
+
+		setIsStoppingThread(true);
+		setChatError("");
+		void (async () => {
+			try {
+				const detail = await procedures.stopThreadTurn({
+					threadId: selectedThreadId,
+				});
+				setThreads((prev) => upsertThreadList(prev, detail.thread));
+				if (selectedThreadIdRef.current === detail.thread.id) {
+					selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+					setThreadMessages(detail.messages);
+				}
+			} catch (error) {
+				setChatError(error instanceof Error ? error.message : String(error));
+			} finally {
+				setIsStoppingThread(false);
+			}
+		})();
+	}, [isStoppingThread, procedures, selectedThreadId, selectedThreadIsWorking]);
+
 	const onSubmit = useCallback(
 		(event: FormEvent<HTMLFormElement>) => {
 			event.preventDefault();
+			if (selectedThreadIsWorking) {
+				stopSelectedThreadTurn();
+				return;
+			}
 			postMessage();
 		},
-		[postMessage],
+		[postMessage, selectedThreadIsWorking, stopSelectedThreadTurn],
 	);
 
 	const onChatInputChange = useCallback(
@@ -7073,15 +7115,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									/>
 									<button
 										type="submit"
-										className="w-10 h-10 flex items-center justify-center bg-[#bdd5e6] rounded-sm text-[#2e526b] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-										disabled={
-											!selectedThread ||
-											isSending ||
-											selectedThreadIsWorking ||
-											isThreadLoading
-										}
+										className={`w-10 h-10 flex items-center justify-center rounded-sm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
+										disabled={composerActionDisabled}
+										aria-label={composerActionLabel}
+										title={composerActionLabel}
 									>
-										{materialSymbol("arrow_forward")}
+										{materialSymbol(
+											selectedThreadIsWorking ? "stop" : "arrow_forward",
+										)}
 									</button>
 								</div>
 							</div>
@@ -7193,16 +7234,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}
 								/>
 								<button
-									className="bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259] p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center"
+									className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
+										selectedThreadIsWorking
+											? "bg-[#4b2028] text-[#ffd4da]"
+											: "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
+									}`}
 									type="submit"
-									disabled={
-										!selectedThread ||
-										isSending ||
-										selectedThreadIsWorking ||
-										isThreadLoading
-									}
+									disabled={composerActionDisabled}
+									aria-label={composerActionLabel}
+									title={composerActionLabel}
 								>
-									{materialSymbol("arrow_upward")}
+									{materialSymbol(
+										selectedThreadIsWorking ? "stop" : "arrow_upward",
+									)}
 								</button>
 							</div>
 						</div>
