@@ -42,6 +42,7 @@ Guidance:
 - treat `set_thread_title` and `set_active_worktree` as safe metadata updates
 - use `new_codex` and `new_worktree` sparingly
 - let `set_thread_title` run liberally whenever a short title would better match the thread focus or improve scanability
+- use the optional `summary` field on `set_thread_title` for a short desktop hover description when it adds useful context
 - pass `threadId` explicitly for thread-scoped tools; the bound thread id is exposed in tool metadata
 - attach the sidecar at client construction so every thread from that `Codex` instance can reach it
 

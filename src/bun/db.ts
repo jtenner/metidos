@@ -72,6 +72,7 @@ export type ThreadRecord = {
 	projectId: number;
 	worktreePath: string;
 	title: string;
+	summary: string | null;
 	model: string;
 	reasoningEffort: string;
 	codexThreadId: string | null;
@@ -257,6 +258,7 @@ function migrate(db: Database): void {
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 				worktree_path TEXT NOT NULL,
 				title TEXT NOT NULL,
+				summary TEXT,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
 				codex_thread_id TEXT,
@@ -312,6 +314,7 @@ function migrate(db: Database): void {
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
 	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
+	ensureThreadColumn(db, "summary", "summary TEXT");
 	ensureThreadColumn(db, "model", "model TEXT");
 	ensureThreadColumn(
 		db,
@@ -606,6 +609,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 					project_id AS projectId,
 					worktree_path AS worktreePath,
 					title,
+					summary,
 					model,
 					reasoning_effort AS reasoningEffort,
 					codex_thread_id AS codexThreadId,
@@ -649,6 +653,7 @@ export function getThreadById(
 					project_id AS projectId,
 					worktree_path AS worktreePath,
 					title,
+					summary,
 					model,
 					reasoning_effort AS reasoningEffort,
 					codex_thread_id AS codexThreadId,
@@ -739,7 +744,25 @@ export function renameThread(
 	database: Database,
 	threadId: number,
 	title: string,
+	summary?: string | null,
 ): void {
+	if (typeof summary !== "undefined") {
+		runStatement(
+			database,
+			`
+				UPDATE threads
+				SET
+					title = ?,
+					summary = ?
+				WHERE id = ?
+			`,
+			title,
+			summary,
+			threadId,
+		);
+		return;
+	}
+
 	runStatement(
 		database,
 		`

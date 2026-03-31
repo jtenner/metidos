@@ -142,6 +142,12 @@ type ErrorPreviewPopoverState = {
 	x: number;
 	y: number;
 };
+type ThreadSummaryPopoverState = {
+	title: string;
+	summary: string;
+	x: number;
+	y: number;
+};
 
 type PersistedOpenWorktree = {
 	projectId: number;
@@ -2366,6 +2372,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [threadActionMenuError, setThreadActionMenuError] = useState("");
 	const [newWorktreeName, setNewWorktreeName] = useState("");
 	const [threadRenameTitle, setThreadRenameTitle] = useState("");
+	const [threadRenameSummary, setThreadRenameSummary] = useState("");
 	const [addProjectPath, setAddProjectPath] = useState("");
 	const [addProjectError, setAddProjectError] = useState("");
 	const [hoveredDirectorySuggestion, setHoveredDirectorySuggestion] = useState<
@@ -2456,6 +2463,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState("");
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
+	const [threadSummaryPopover, setThreadSummaryPopover] =
+		useState<ThreadSummaryPopoverState | null>(null);
 	const [sessionStateReady, setSessionStateReady] = useState(false);
 	const [isDocumentVisible, setIsDocumentVisible] = useState(
 		() => document.visibilityState === "visible",
@@ -3031,6 +3040,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					matchesSearchQuery(
 						normalizedSidebarSearchQuery,
 						thread.title,
+						thread.summary,
 						thread.worktreePath,
 						shortName(thread.worktreePath),
 						formatPathForDisplay(
@@ -3070,6 +3080,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			matchesSearchQuery(
 				normalizedSidebarSearchQuery,
 				thread.title,
+				thread.summary,
 				thread.worktreePath,
 				shortName(thread.worktreePath),
 				formatPathForDisplay(
@@ -3190,6 +3201,40 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setErrorPreviewPopover(null);
 	}, []);
 
+	const showThreadSummaryPreview = useCallback(
+		(
+			event: ReactMouseEvent<HTMLElement>,
+			title: string,
+			summary: string,
+		): void => {
+			const previewSummary = summary.trim();
+			if (!previewSummary) {
+				setThreadSummaryPopover(null);
+				return;
+			}
+			const viewportWidth =
+				typeof window === "undefined" ? 1280 : window.innerWidth;
+			if (viewportWidth < 768) {
+				setThreadSummaryPopover(null);
+				return;
+			}
+			const viewportHeight =
+				typeof window === "undefined" ? 720 : window.innerHeight;
+			const rect = event.currentTarget.getBoundingClientRect();
+			setThreadSummaryPopover({
+				title,
+				summary: previewSummary,
+				x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 360),
+				y: clampProjectMenuCoordinate(rect.top, viewportHeight, 240),
+			});
+		},
+		[],
+	);
+
+	const hideThreadSummaryPreview = useCallback((): void => {
+		setThreadSummaryPopover(null);
+	}, []);
+
 	const errorPreviewHandlers = useCallback(
 		(
 			text: string | null | undefined,
@@ -3214,6 +3259,43 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			};
 		},
 		[hideErrorPreview, showErrorPreview],
+	);
+
+	const threadSummaryPreviewHandlers = useCallback(
+		(
+			title: string,
+			summary: string | null | undefined,
+		): Pick<
+			HTMLAttributes<HTMLElement>,
+			"onMouseEnter" | "onMouseMove" | "onMouseLeave"
+		> => {
+			const previewSummary = summary?.trim();
+			const viewportWidth =
+				typeof window === "undefined" ? 1280 : window.innerWidth;
+			if (!previewSummary || viewportWidth < 768) {
+				return {};
+			}
+			return {
+				onMouseEnter: (event) => {
+					showThreadSummaryPreview(
+						event as ReactMouseEvent<HTMLElement>,
+						title,
+						previewSummary,
+					);
+				},
+				onMouseMove: (event) => {
+					showThreadSummaryPreview(
+						event as ReactMouseEvent<HTMLElement>,
+						title,
+						previewSummary,
+					);
+				},
+				onMouseLeave: () => {
+					hideThreadSummaryPreview();
+				},
+			};
+		},
+		[hideThreadSummaryPreview, showThreadSummaryPreview],
 	);
 
 	const setProjectState = useCallback(
@@ -4380,6 +4462,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setThreadActionMenu(null);
 		setThreadActionMenuError("");
 		setThreadRenameTitle("");
+		setThreadRenameSummary("");
 		setThreadActionBusy(null);
 	}, []);
 
@@ -4433,10 +4516,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setThreadActionMenu({
 				threadId: thread.id,
 				x: clampProjectMenuCoordinate(x, viewportWidth, 336),
-				y: clampProjectMenuCoordinate(y, viewportHeight, 286),
+				y: clampProjectMenuCoordinate(y, viewportHeight, 396),
 			});
 			setThreadActionMenuError("");
 			setThreadRenameTitle(thread.title);
+			setThreadRenameSummary(thread.summary ?? "");
 			setThreadActionBusy(null);
 		},
 		[closeProjectActionMenu],
@@ -4563,9 +4647,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				const updatedThread = await procedures.renameThread({
 					threadId: threadActionMenuThread.id,
 					title,
+					summary: threadRenameSummary,
 				});
 				setThreads((prev) => upsertThreadList(prev, updatedThread));
 				setThreadRenameTitle(updatedThread.title);
+				setThreadRenameSummary(updatedThread.summary ?? "");
 			} catch (error) {
 				setThreadActionMenuError(
 					error instanceof Error ? error.message : String(error),
@@ -4574,7 +4660,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				setThreadActionBusy(null);
 			}
 		},
-		[procedures, threadActionBusy, threadActionMenuThread, threadRenameTitle],
+		[
+			procedures,
+			threadActionBusy,
+			threadActionMenuThread,
+			threadRenameSummary,
+			threadRenameTitle,
+		],
 	);
 
 	const toggleThreadPinned = useCallback(async () => {
@@ -4746,6 +4838,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	useEffect(() => {
 		const dismissErrorPreview = () => {
 			hideErrorPreview();
+			hideThreadSummaryPreview();
 		};
 
 		window.addEventListener("resize", dismissErrorPreview);
@@ -4756,7 +4849,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			window.removeEventListener("scroll", dismissErrorPreview, true);
 			document.removeEventListener("mousedown", dismissErrorPreview);
 		};
-	}, [hideErrorPreview]);
+	}, [hideErrorPreview, hideThreadSummaryPreview]);
 
 	useEffect(() => {
 		selectedThreadIdRef.current = selectedThreadId;
@@ -6435,6 +6528,30 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							autoCorrect="off"
 							spellCheck={false}
 						/>
+					</div>
+					<label
+						className="mt-3 block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
+						htmlFor="thread-rename-summary"
+					>
+						Thread Summary
+					</label>
+					<textarea
+						id="thread-rename-summary"
+						className="mt-2 min-h-[5.5rem] w-full rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+						placeholder="Optional desktop hover summary."
+						value={threadRenameSummary}
+						onChange={(event) => {
+							setThreadActionMenuError("");
+							setThreadRenameSummary(event.currentTarget.value);
+						}}
+						autoCapitalize="sentences"
+						autoCorrect="on"
+						spellCheck={true}
+					/>
+					<div className="mt-2 flex items-center justify-between gap-3">
+						<div className="text-[11px] text-[#828d94]">
+							Shown as a desktop hover popover. Leave blank to clear it.
+						</div>
 						<button
 							type="submit"
 							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -6893,6 +7010,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								hasUnreadError || hasRunError
 									? (thread.runStatus.error ?? "")
 									: "";
+							const threadPreviewHandlers = threadErrorPreviewText
+								? errorPreviewHandlers(threadErrorPreviewText)
+								: threadSummaryPreviewHandlers(thread.title, thread.summary);
 							return (
 								<button
 									type="button"
@@ -6902,11 +7022,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											? "bg-[#273036] text-[#f2f0ef]"
 											: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
 									}`}
-									{...errorPreviewHandlers(threadErrorPreviewText)}
+									{...threadPreviewHandlers}
 									onContextMenu={(event) => {
 										event.preventDefault();
 										event.stopPropagation();
 										hideErrorPreview();
+										hideThreadSummaryPreview();
 										openThreadActionMenu(
 											thread,
 											event.clientX + 6,
@@ -6915,6 +7036,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}}
 									onClick={() => {
 										hideErrorPreview();
+										hideThreadSummaryPreview();
 										void openThread(thread.id);
 									}}
 								>
@@ -6937,6 +7059,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											>
 												{thread.title}
 											</div>
+											{thread.summary?.trim() ? (
+												<span
+													className={`shrink-0 rounded-full border px-1.5 py-0.5 font-label text-[8px] font-bold uppercase tracking-[0.14em] ${
+														isActive
+															? "border-[#7fa1ba] bg-[#33414a] text-[#d7e7f2]"
+															: "border-[#34424b] bg-[#1b2328] text-[#8fb5cd]"
+													}`}
+													title="Thread summary available"
+												>
+													Note
+												</span>
+											) : null}
 										</div>
 										<div className="flex shrink-0 items-center gap-2">
 											{threadPinned ? (
@@ -7535,6 +7669,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 					<div className="whitespace-pre-wrap break-words">
 						{errorPreviewPopover.text}
+					</div>
+				</div>
+			) : null}
+			{threadSummaryPopover ? (
+				<div
+					className="pointer-events-none fixed z-[108] hidden max-w-[22rem] rounded-md border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
+					style={{
+						left: threadSummaryPopover.x,
+						top: threadSummaryPopover.y,
+					}}
+				>
+					<div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
+						Thread Summary
+					</div>
+					<div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
+						{threadSummaryPopover.title}
+					</div>
+					<div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
+						{threadSummaryPopover.summary}
 					</div>
 				</div>
 			) : null}

@@ -404,8 +404,21 @@ function requireThreadId(threadId?: number | null): number {
 	throw new Error("threadId is required.");
 }
 
-function renameThreadLocally(threadId: number, title: string) {
-	renameThreadRecord(db, threadId, title);
+function normalizeOptionalSummary(
+	summary: string | null | undefined,
+): string | null | undefined {
+	if (typeof summary === "undefined") {
+		return undefined;
+	}
+	return summary?.trim() || null;
+}
+
+function renameThreadLocally(
+	threadId: number,
+	title: string,
+	summary?: string | null,
+) {
+	renameThreadRecord(db, threadId, title, normalizeOptionalSummary(summary));
 	const thread = getThreadById(db, threadId);
 	if (!thread) {
 		throw new Error(`Thread not found: ${threadId}`);
@@ -413,11 +426,22 @@ function renameThreadLocally(threadId: number, title: string) {
 	return thread;
 }
 
-function refreshThreadTitleInApp(threadId: number, title: string): void {
+function refreshThreadTitleInApp(
+	threadId: number,
+	title: string,
+	summary?: string | null,
+): void {
+	const normalizedSummary = normalizeOptionalSummary(summary);
 	void rpcClient
 		.call(
 			"renameThread",
-			{ threadId, title },
+			{
+				threadId,
+				title,
+				...(typeof normalizedSummary === "undefined"
+					? {}
+					: { summary: normalizedSummary }),
+			},
 			{ priority: "background", timeoutMs: 1_500 },
 		)
 		.catch(() => {});
@@ -442,6 +466,7 @@ function threadStatusPayload(detail: RpcThreadDetail) {
 		projectId: detail.thread.projectId,
 		worktreePath: detail.thread.worktreePath,
 		title: detail.thread.title,
+		summary: detail.thread.summary,
 		status: summarizeThreadStatus(detail),
 		runState: detail.thread.runStatus.state,
 		error: detail.thread.runStatus.error,
@@ -481,6 +506,10 @@ server.registerTool(
 				.trim()
 				.min(1)
 				.describe("Short title. Update whenever the focus shifts."),
+			summary: z
+				.string()
+				.optional()
+				.describe("Optional thread summary. Empty clears it."),
 			threadId: z
 				.number()
 				.int()
@@ -490,14 +519,15 @@ server.registerTool(
 		// Treat title updates as safe UI metadata so Codex can run them freely.
 		annotations: safeMetadataAnnotations(),
 	},
-	async ({ threadId, title }) => {
+	async ({ summary, threadId, title }) => {
 		const resolvedThreadId = requireThreadId(threadId);
-		const thread = renameThreadLocally(resolvedThreadId, title);
+		const thread = renameThreadLocally(resolvedThreadId, title, summary);
 		// Refresh the live app cache without blocking the tool result.
-		refreshThreadTitleInApp(resolvedThreadId, title);
+		refreshThreadTitleInApp(resolvedThreadId, title, summary);
 		return textResult(`Renamed thread ${thread.id}.`, {
 			threadId: thread.id,
 			title: thread.title,
+			summary: thread.summary,
 		});
 	},
 );

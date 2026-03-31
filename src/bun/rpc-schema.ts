@@ -175,6 +175,7 @@ export type RpcThread = {
 	projectId: number;
 	worktreePath: string;
 	title: string;
+	summary: string | null;
 	model: string;
 	reasoningEffort: RpcCodexReasoningEffort;
 	codexThreadId: string | null;
@@ -375,7 +376,7 @@ export type AppRPCSchema = {
 			response: RpcThreadDetail;
 		};
 		renameThread: {
-			params: { threadId: number; title: string };
+			params: { threadId: number; title: string; summary?: string | null };
 			response: RpcThread;
 		};
 		setThreadPinned: {

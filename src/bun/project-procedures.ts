@@ -3677,7 +3677,11 @@ export async function renameThreadProcedure(
 		throw new Error("Thread title is required.");
 	}
 
-	renameThread(db, thread.id, title);
+	const normalizedSummary =
+		typeof params.summary === "undefined"
+			? undefined
+			: params.summary?.trim() || null;
+	renameThread(db, thread.id, title, normalizedSummary);
 	invalidateThreadDetailCache(thread.id);
 	return toRpcThread(threadById(thread.id));
 }
