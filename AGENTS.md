@@ -21,6 +21,7 @@
 ├─ docs/
 │  ├─ codex.md
 │  ├─ 2026-03-31-correctness-issues.md
+│  ├─ 2026-03-31-correctness-issues-2.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md
 │  └─ references/
