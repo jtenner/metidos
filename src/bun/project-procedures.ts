@@ -132,6 +132,10 @@ type GitCommandOptions = {
 	signal?: AbortSignal | null;
 };
 
+type ProjectWorktreeReadOptions = GitCommandOptions & {
+	forceRefresh?: boolean;
+};
+
 type GitCommandQueueTask = {
 	abort: (reason: string) => void;
 	detachAbortListener: () => void;
@@ -1557,14 +1561,14 @@ function worktreePathFromName(
 async function readProjectWorktrees(
 	projectPath: string,
 	projectId?: number,
-	options?: GitCommandOptions,
+	options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree[]> {
 	const { signal } = normalizeGitCommandOptions(options);
 	throwIfAborted(signal, "Project worktree read was aborted.");
 
 	if (typeof projectId === "number") {
 		const state = projectPollMap.get(projectId);
-		if (state && state.worktreesLoadedAt > 0) {
+		if (state && state.worktreesLoadedAt > 0 && !options?.forceRefresh) {
 			if (
 				Date.now() - state.worktreesLoadedAt >
 				PROJECT_WORKTREE_CACHE_STALE_MS
@@ -3066,7 +3070,7 @@ function projectByIdForPath(projectId: number): ProjectRecord {
 async function findProjectWorktree(
 	project: ProjectRecord,
 	worktreePath: string,
-	options?: GitCommandOptions,
+	options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree | null> {
 	const worktrees = await readProjectWorktrees(
 		project.path,
@@ -3079,7 +3083,7 @@ async function findProjectWorktree(
 async function assertProjectWorktree(
 	project: ProjectRecord,
 	worktreePath: string,
-	options?: GitCommandOptions,
+	options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree> {
 	const worktree = await findProjectWorktree(project, worktreePath, options);
 	if (!worktree) {
@@ -3101,10 +3105,10 @@ async function ensureTrackedProjectWorktree(
 	project: ProjectRecord,
 	state: ProjectPollState,
 	worktreePath: string,
-	options?: GitCommandOptions,
+	options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree> {
 	const known = trackedProjectWorktree(state, worktreePath);
-	if (known) {
+	if (known && !options?.forceRefresh) {
 		return known;
 	}
 
@@ -3123,8 +3127,12 @@ async function createThreadRecord(
 	project: ProjectRecord,
 	worktreePath: string,
 	model: string,
+	options?: ProjectWorktreeReadOptions,
 ): Promise<ThreadRecord> {
-	const worktree = await assertProjectWorktree(project, worktreePath);
+	const worktree = await assertProjectWorktree(project, worktreePath, {
+		...options,
+		forceRefresh: true,
+	});
 	const codexThread = codex.startThread(
 		codexThreadOptions(worktreePath, model),
 	);
@@ -3253,7 +3261,9 @@ export async function createWorktreeProcedure(
 		worktreePath,
 	]);
 
-	const worktrees = await readProjectWorktrees(project.path, project.id);
+	const worktrees = await readProjectWorktrees(project.path, project.id, {
+		forceRefresh: true,
+	});
 	return {
 		project,
 		worktrees,
@@ -3266,7 +3276,9 @@ export async function setWorktreePinnedProcedure(
 ): Promise<RpcProjectWorktreesResult> {
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath);
+	await assertProjectWorktree(project, worktreePath, {
+		forceRefresh: true,
+	});
 
 	setProjectWorktreePinned(db, project.id, worktreePath, params.pinned);
 
@@ -3287,7 +3299,9 @@ export async function createThreadProcedure(
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	const model = resolveCodexModel(params.model);
-	const thread = await createThreadRecord(project, worktreePath, model);
+	const thread = await createThreadRecord(project, worktreePath, model, {
+		forceRefresh: true,
+	});
 	return readThreadDetailCached(thread.id);
 }
 
@@ -3357,7 +3371,9 @@ export async function runProjectTaskProcedure(
 ): Promise<RpcThreadDetail> {
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath);
+	await assertProjectWorktree(project, worktreePath, {
+		forceRefresh: true,
+	});
 
 	let taskPrompt: string;
 	switch (params.task.kind) {
@@ -3398,6 +3414,9 @@ export async function runProjectTaskProcedure(
 			project,
 			worktreePath,
 			resolveCodexModel(params.model),
+			{
+				forceRefresh: true,
+			},
 		);
 	}
 
@@ -3468,17 +3487,11 @@ export async function openWorktreeProcedure(
 	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const state = ensureProjectPoller(project);
-	if (!state.worktrees.length) {
-		await refreshProjectPoll(project.id, requestGitOptions);
-	}
-
 	const worktreePath = normalizePath(params.worktreePath);
-	const target = state.worktrees.find((entry) => entry.path === worktreePath);
-	if (!target) {
-		throw new Error(
-			`Worktree not found for project ${project.path}: ${worktreePath}`,
-		);
-	}
+	await ensureTrackedProjectWorktree(project, state, worktreePath, {
+		...requestGitOptions,
+		forceRefresh: true,
+	});
 
 	const worktreeState = ensureWorktreePollState(state, worktreePath);
 	const historyPromise = readGitHistoryFirstPage(
