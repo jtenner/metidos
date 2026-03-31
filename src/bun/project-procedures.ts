@@ -43,6 +43,8 @@ import type {
 	RpcProject,
 	RpcProjectTask,
 	RpcProjectWorktreesResult,
+	RpcRequestContext,
+	RpcRequestPriority,
 	RpcThread,
 	RpcThreadCompaction,
 	RpcThreadDetail,
@@ -125,6 +127,25 @@ const GIT_LOG_RECORD_SEPARATOR = "\u001e";
 
 type GitCommandPriority = "foreground" | "background";
 
+type GitCommandOptions = {
+	priority?: GitCommandPriority;
+	signal?: AbortSignal | null;
+};
+
+type GitCommandQueueTask = {
+	detachAbortListener: () => void;
+	reject: (reason?: unknown) => void;
+	run: () => void;
+	signal: AbortSignal | null;
+	started: boolean;
+};
+
+type PendingGitCommitDiffRequest = {
+	controller: AbortController;
+	promise: Promise<RpcGitCommitDiffResult>;
+	waiterCount: number;
+};
+
 type WorktreePollState = {
 	diff: string[];
 	diffPolling: boolean;
@@ -169,14 +190,14 @@ const threadDetailCache = new Map<number, RpcThreadDetail>();
 const gitCommitDiffCache = new Map<string, RpcGitCommitDiffResult>();
 const gitCommitDiffRequestCache = new Map<
 	string,
-	Promise<RpcGitCommitDiffResult>
+	PendingGitCommitDiffRequest
 >();
 const gitCommandQueueMap = new Map<
 	string,
 	{
 		active: boolean;
-		backgroundTasks: Array<() => void>;
-		foregroundTasks: Array<() => void>;
+		backgroundTasks: GitCommandQueueTask[];
+		foregroundTasks: GitCommandQueueTask[];
 	}
 >();
 let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
@@ -234,6 +255,102 @@ function lruEntriesNewestFirst<Key, Value>(
 	cache: Map<Key, Value>,
 ): Array<[Key, Value]> {
 	return [...cache.entries()].reverse();
+}
+
+function createAbortError(reason: unknown, fallbackMessage: string): Error {
+	if (reason instanceof Error) {
+		return reason;
+	}
+
+	const error = new Error(
+		typeof reason === "string" && reason.trim() ? reason : fallbackMessage,
+		{
+			cause: reason,
+		},
+	);
+	if (reason instanceof DOMException && reason.name) {
+		error.name = reason.name;
+	} else {
+		error.name = "AbortError";
+	}
+	return error;
+}
+
+function throwIfAborted(
+	signal: AbortSignal | null | undefined,
+	fallbackMessage: string,
+): void {
+	if (signal?.aborted) {
+		throw createAbortError(signal.reason, fallbackMessage);
+	}
+}
+
+async function awaitAbortableResult<T>(
+	promise: Promise<T>,
+	signal: AbortSignal | null | undefined,
+	fallbackMessage: string,
+): Promise<T> {
+	if (!signal) {
+		return promise;
+	}
+	if (signal.aborted) {
+		throw createAbortError(signal.reason, fallbackMessage);
+	}
+
+	return new Promise<T>((resolve, reject) => {
+		const handleAbort = () => {
+			signal.removeEventListener("abort", handleAbort);
+			reject(createAbortError(signal.reason, fallbackMessage));
+		};
+		signal.addEventListener("abort", handleAbort, {
+			once: true,
+		});
+		void promise.then(
+			(value) => {
+				signal.removeEventListener("abort", handleAbort);
+				resolve(value);
+			},
+			(error) => {
+				signal.removeEventListener("abort", handleAbort);
+				reject(error);
+			},
+		);
+	});
+}
+
+function normalizeGitCommandOptions(
+	options?: GitCommandPriority | GitCommandOptions,
+): { priority: GitCommandPriority; signal: AbortSignal | null } {
+	if (options === "foreground" || options === "background") {
+		return {
+			priority: options,
+			signal: null,
+		};
+	}
+
+	return {
+		priority: options?.priority ?? "foreground",
+		signal: options?.signal ?? null,
+	};
+}
+
+function gitPriorityFromRpcRequest(
+	priority: RpcRequestPriority,
+): GitCommandPriority {
+	return priority === "background" ? "background" : "foreground";
+}
+
+function gitCommandOptionsFromRequest(
+	context?: RpcRequestContext,
+): GitCommandOptions | undefined {
+	if (!context) {
+		return undefined;
+	}
+
+	return {
+		priority: gitPriorityFromRpcRequest(context.priority),
+		signal: context.signal,
+	};
 }
 
 // Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
@@ -1417,7 +1534,11 @@ function worktreePathFromName(
 async function readProjectWorktrees(
 	projectPath: string,
 	projectId?: number,
+	options?: GitCommandOptions,
 ): Promise<RpcWorktree[]> {
+	const { signal } = normalizeGitCommandOptions(options);
+	throwIfAborted(signal, "Project worktree read was aborted.");
+
 	if (typeof projectId === "number") {
 		const state = projectPollMap.get(projectId);
 		if (state && state.worktreesLoadedAt > 0) {
@@ -1425,7 +1546,9 @@ async function readProjectWorktrees(
 				Date.now() - state.worktreesLoadedAt >
 				PROJECT_WORKTREE_CACHE_STALE_MS
 			) {
-				void refreshProjectPoll(projectId).catch((error) => {
+				void refreshProjectPoll(projectId, {
+					priority: "background",
+				}).catch((error) => {
 					console.error(
 						`Worktree refresh failed for project ${projectId}`,
 						error,
@@ -1436,7 +1559,11 @@ async function readProjectWorktrees(
 		}
 	}
 
-	const worktrees = await listFreshProjectWorktrees(projectPath, projectId);
+	const worktrees = await listFreshProjectWorktrees(
+		projectPath,
+		projectId,
+		options,
+	);
 	if (typeof projectId === "number") {
 		const state = projectPollMap.get(projectId);
 		if (state) {
@@ -1489,26 +1616,54 @@ function assertProjectDirectory(projectPath: string): void {
 	}
 }
 
+function removeGitCommandTask(
+	queue: {
+		backgroundTasks: GitCommandQueueTask[];
+		foregroundTasks: GitCommandQueueTask[];
+	},
+	task: GitCommandQueueTask,
+): void {
+	const foregroundIndex = queue.foregroundTasks.indexOf(task);
+	if (foregroundIndex >= 0) {
+		queue.foregroundTasks.splice(foregroundIndex, 1);
+		return;
+	}
+
+	const backgroundIndex = queue.backgroundTasks.indexOf(task);
+	if (backgroundIndex >= 0) {
+		queue.backgroundTasks.splice(backgroundIndex, 1);
+	}
+}
+
 function scheduleGitCommandQueue(cwd: string): void {
 	const queue = gitCommandQueueMap.get(cwd);
 	if (!queue || queue.active) {
 		return;
 	}
 
-	const nextTask =
+	let nextTask =
 		queue.foregroundTasks.shift() ?? queue.backgroundTasks.shift() ?? null;
+	while (nextTask?.signal?.aborted) {
+		nextTask.detachAbortListener();
+		nextTask.reject(
+			createAbortError(nextTask.signal.reason, "Git command was aborted."),
+		);
+		nextTask =
+			queue.foregroundTasks.shift() ?? queue.backgroundTasks.shift() ?? null;
+	}
 	if (!nextTask) {
 		gitCommandQueueMap.delete(cwd);
 		return;
 	}
 
 	queue.active = true;
-	nextTask();
+	nextTask.run();
 }
 
 function enqueueGitCommand<T>(
 	cwd: string,
 	priority: GitCommandPriority,
+	signal: AbortSignal | null,
 	run: () => Promise<T>,
 ): Promise<T> {
 	const queue = gitCommandQueueMap.get(cwd) ?? {
@@ -1519,19 +1674,79 @@ function enqueueGitCommand<T>(
 	gitCommandQueueMap.set(cwd, queue);
 
 	return new Promise<T>((resolve, reject) => {
-		const execute = () => {
-			void run()
-				.then(resolve, reject)
-				.finally(() => {
-					queue.active = false;
-					scheduleGitCommandQueue(cwd);
-				});
+		let settled = false;
+		const finalize = (callback: () => void) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			task.detachAbortListener();
+			callback();
 		};
 
+		const task: GitCommandQueueTask = {
+			detachAbortListener: () => {},
+			reject: (reason) =>
+				finalize(() => {
+					reject(reason);
+				}),
+			run: () => {
+				task.started = true;
+				void Promise.resolve()
+					.then(() => {
+						throwIfAborted(signal, "Git command was aborted.");
+						return run();
+					})
+					.then(
+						(value) => {
+							finalize(() => {
+								resolve(value);
+							});
+						},
+						(error) => {
+							finalize(() => {
+								reject(error);
+							});
+						},
+					)
+					.finally(() => {
+						queue.active = false;
+						scheduleGitCommandQueue(cwd);
+					});
+			},
+			signal,
+			started: false,
+		};
+
+		if (signal) {
+			const handleAbort = () => {
+				if (task.started) {
+					return;
+				}
+				removeGitCommandTask(queue, task);
+				finalize(() => {
+					reject(createAbortError(signal.reason, "Git command was aborted."));
+				});
+			};
+			signal.addEventListener("abort", handleAbort, {
+				once: true,
+			});
+			task.detachAbortListener = () => {
+				signal.removeEventListener("abort", handleAbort);
+			};
+		}
+
+		if (signal?.aborted) {
+			finalize(() => {
+				reject(createAbortError(signal.reason, "Git command was aborted."));
+			});
+			return;
+		}
+
 		if (priority === "foreground") {
-			queue.foregroundTasks.push(execute);
+			queue.foregroundTasks.push(task);
 		} else {
-			queue.backgroundTasks.push(execute);
+			queue.backgroundTasks.push(task);
 		}
 		scheduleGitCommandQueue(cwd);
 	});
@@ -1540,12 +1755,12 @@ function enqueueGitCommand<T>(
 async function runGitCommand(
 	cwd: string,
 	args: string[],
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<string> {
 	const { exitCode, stderr, stdout } = await runGitCommandResult(
 		cwd,
 		args,
-		priority,
+		options,
 	);
 	if (exitCode !== 0) {
 		throw new Error(stderr || `git command failed with exit code ${exitCode}`);
@@ -1556,14 +1771,17 @@ async function runGitCommand(
 async function runGitCommandResult(
 	cwd: string,
 	args: string[],
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<{ exitCode: number; stderr: string; stdout: string }> {
-	return enqueueGitCommand(cwd, priority, async () => {
+	const { priority, signal } = normalizeGitCommandOptions(options);
+	return enqueueGitCommand(cwd, priority, signal, async () => {
+		throwIfAborted(signal, "Git command was aborted.");
 		const proc = Bun.spawn({
 			cmd: ["git", ...args],
 			cwd,
 			stdout: "pipe",
 			stderr: "pipe",
+			...(signal ? { signal } : {}),
 		});
 
 		const [stdout, stderr, exitCode] = await Promise.all([
@@ -1571,6 +1789,7 @@ async function runGitCommandResult(
 			new Response(proc.stderr).text(),
 			proc.exited,
 		]);
+		throwIfAborted(signal, "Git command was aborted.");
 
 		return {
 			exitCode,
@@ -1583,9 +1802,9 @@ async function runGitCommandResult(
 async function tryRunGitCommand(
 	cwd: string,
 	args: string[],
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<string | null> {
-	const result = await runGitCommandResult(cwd, args, priority);
+	const result = await runGitCommandResult(cwd, args, options);
 	if (result.exitCode !== 0) {
 		return null;
 	}
@@ -1810,12 +2029,13 @@ function parseWorktreeList(raw: string): RpcWorktree[] {
 
 async function listWorktreesForProjectPath(
 	projectPath: string,
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<RpcWorktree[]> {
-	const porcelain = await runGitCommand(projectPath, [
-		"worktree",
-		"list",
-		"--porcelain",
-	]);
+	const porcelain = await runGitCommand(
+		projectPath,
+		["worktree", "list", "--porcelain"],
+		options,
+	);
 	return parseWorktreeList(porcelain).map((worktree) => ({
 		...worktree,
 		path: normalizeWorktreePath(projectPath, worktree.path),
@@ -1842,8 +2062,9 @@ function mergeProjectWorktreePins(
 async function listFreshProjectWorktrees(
 	projectPath: string,
 	projectId?: number,
+	options?: GitCommandOptions,
 ): Promise<RpcWorktree[]> {
-	const worktrees = await listWorktreesForProjectPath(projectPath);
+	const worktrees = await listWorktreesForProjectPath(projectPath, options);
 	if (typeof projectId !== "number") {
 		return worktrees;
 	}
@@ -1852,12 +2073,12 @@ async function listFreshProjectWorktrees(
 
 async function readDiff(
 	worktreePath: string,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<string[]> {
 	const raw = await runGitCommand(
 		worktreePath,
 		["diff", "--name-status"],
-		priority,
+		options,
 	);
 	if (!raw.trim()) return [];
 	return raw.split(/\r?\n/).filter(Boolean);
@@ -1865,13 +2086,9 @@ async function readDiff(
 
 async function readFiles(
 	worktreePath: string,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<string[]> {
-	const raw = await runGitCommand(
-		worktreePath,
-		["status", "--short"],
-		priority,
-	);
+	const raw = await runGitCommand(worktreePath, ["status", "--short"], options);
 	if (!raw.trim()) return [];
 	return raw.split(/\r?\n/).filter(Boolean);
 }
@@ -1995,11 +2212,12 @@ function normalizeGitHistoryPageLimit(limit?: number): number {
 async function readGitHistorySummary(
 	projectId: number,
 	worktreePath: string,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<{
 	history: RpcWorktreeGitHistorySummary;
 	signature: string;
 }> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
 	const lastUpdatedAt = getNow();
 	const rawHead =
 		(await tryRunGitCommand(
@@ -2011,7 +2229,7 @@ async function readGitHistorySummary(
 				"--pretty=format:%H%x1f%h%x1f%D",
 				"HEAD",
 			],
-			priority,
+			normalizedOptions,
 		)) ?? "";
 
 	if (!rawHead) {
@@ -2020,7 +2238,7 @@ async function readGitHistorySummary(
 				await tryRunGitCommand(
 					worktreePath,
 					["symbolic-ref", "--quiet", "--short", "HEAD"],
-					priority,
+					normalizedOptions,
 				)
 			)?.trim() || null;
 		const history = emptyGitHistorySummary(projectId, worktreePath, {
@@ -2053,11 +2271,12 @@ async function readGitHistoryPageEntries(
 	worktreePath: string,
 	offset: number,
 	limit: number,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<{
 	entries: RpcGitHistoryEntry[];
 	nextOffset: number | null;
 }> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
 	const rawEntries =
 		(await tryRunGitCommand(
 			worktreePath,
@@ -2068,7 +2287,7 @@ async function readGitHistoryPageEntries(
 				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1e",
 				"HEAD",
 			],
-			priority,
+			normalizedOptions,
 		)) ?? "";
 	const parsedEntries = parseGitHistoryEntries(rawEntries);
 	const hasMore = parsedEntries.length > limit;
@@ -2083,12 +2302,13 @@ async function readGitHistoryFirstPage(
 	projectId: number,
 	worktreePath: string,
 	limit: number,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<{
 	history: RpcWorktreeGitHistoryResult;
 	summary: RpcWorktreeGitHistorySummary;
 	signature: string;
 }> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
 	const lastUpdatedAt = getNow();
 	const rawEntries =
 		(await tryRunGitCommand(
@@ -2100,7 +2320,7 @@ async function readGitHistoryFirstPage(
 				"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%D%x1e",
 				"HEAD",
 			],
-			priority,
+			normalizedOptions,
 		)) ?? "";
 	const parsedEntries = parseDecoratedGitHistoryEntries(rawEntries);
 
@@ -2108,7 +2328,7 @@ async function readGitHistoryFirstPage(
 		const { history: summary, signature } = await readGitHistorySummary(
 			projectId,
 			worktreePath,
-			priority,
+			normalizedOptions,
 		);
 		return {
 			history: {
@@ -2210,14 +2430,23 @@ async function fillGitHistoryCache(
 	worktreePath: string,
 	offset: number,
 	limit: number,
-	priority: GitCommandPriority = "foreground",
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<void> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
 	while (
 		!hasGitHistoryCacheRange(worktreeState, offset, limit) &&
 		worktreeState.historyNextOffset !== null
 	) {
+		throwIfAborted(
+			normalizedOptions.signal,
+			"Git history cache fill was aborted.",
+		);
 		if (worktreeState.historyPrefetchPromise) {
-			await worktreeState.historyPrefetchPromise;
+			await awaitAbortableResult(
+				worktreeState.historyPrefetchPromise,
+				normalizedOptions.signal,
+				"Git history cache fill was aborted.",
+			);
 			continue;
 		}
 
@@ -2234,7 +2463,7 @@ async function fillGitHistoryCache(
 					worktreePath,
 					fetchOffset,
 					fetchLimit,
-					priority,
+					normalizedOptions,
 				);
 				if (
 					worktreeState.historySignature !== expectedSignature ||
@@ -2250,7 +2479,11 @@ async function fillGitHistoryCache(
 			}
 		})();
 		worktreeState.historyPrefetchPromise = promise;
-		await promise;
+		await awaitAbortableResult(
+			promise,
+			normalizedOptions.signal,
+			"Git history cache fill was aborted.",
+		);
 	}
 }
 
@@ -2280,16 +2513,21 @@ async function readGitCommitDiffResult(
 	projectId: number,
 	worktreePath: string,
 	commitHash: string,
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<RpcGitCommitDiffResult> {
-	const raw = await runGitCommand(worktreePath, [
-		"show",
-		"--no-ext-diff",
-		"--find-renames",
-		"--submodule=diff",
-		"--unified=3",
-		`--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI${GIT_LOG_RECORD_SEPARATOR}`,
-		commitHash,
-	]);
+	const raw = await runGitCommand(
+		worktreePath,
+		[
+			"show",
+			"--no-ext-diff",
+			"--find-renames",
+			"--submodule=diff",
+			"--unified=3",
+			`--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI${GIT_LOG_RECORD_SEPARATOR}`,
+			commitHash,
+		],
+		options,
+	);
 	const separatorIndex = raw.indexOf(GIT_LOG_RECORD_SEPARATOR);
 	if (separatorIndex < 0) {
 		throw new Error(`Unable to read commit diff: ${commitHash}`);
@@ -2332,7 +2570,9 @@ async function getCachedGitCommitDiffResult(
 	projectId: number,
 	worktreePath: string,
 	commitHash: string,
+	options?: GitCommandPriority | GitCommandOptions,
 ): Promise<RpcGitCommitDiffResult> {
+	const normalizedOptions = normalizeGitCommandOptions(options);
 	const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
 	const cached = readLruValue(gitCommitDiffCache, cacheKey);
 	if (cached) {
@@ -2341,10 +2581,36 @@ async function getCachedGitCommitDiffResult(
 
 	const pending = gitCommitDiffRequestCache.get(cacheKey);
 	if (pending) {
-		return pending;
+		pending.waiterCount += 1;
+		try {
+			return awaitAbortableResult(
+				pending.promise,
+				normalizedOptions.signal,
+				"Commit diff read was aborted.",
+			);
+		} finally {
+			pending.waiterCount = Math.max(0, pending.waiterCount - 1);
+			if (
+				pending.waiterCount === 0 &&
+				gitCommitDiffRequestCache.get(cacheKey) === pending
+			) {
+				pending.controller.abort(
+					createAbortError(null, "Commit diff read was aborted."),
+				);
+			}
+		}
 	}
 
-	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash)
+	const controller = new AbortController();
+	const pendingRequest: PendingGitCommitDiffRequest = {
+		controller,
+		promise: Promise.resolve(null as never),
+		waiterCount: 1,
+	};
+	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
+		priority: normalizedOptions.priority,
+		signal: controller.signal,
+	})
 		.then((result) => {
 			writeLruValue(
 				gitCommitDiffCache,
@@ -2355,25 +2621,45 @@ async function getCachedGitCommitDiffResult(
 			return result;
 		})
 		.finally(() => {
-			if (gitCommitDiffRequestCache.get(cacheKey) === promise) {
+			if (gitCommitDiffRequestCache.get(cacheKey) === pendingRequest) {
 				gitCommitDiffRequestCache.delete(cacheKey);
 			}
 		});
-	gitCommitDiffRequestCache.set(cacheKey, promise);
-	return promise;
+	pendingRequest.promise = promise;
+	gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
+
+	try {
+		return awaitAbortableResult(
+			promise,
+			normalizedOptions.signal,
+			"Commit diff read was aborted.",
+		);
+	} finally {
+		pendingRequest.waiterCount = Math.max(0, pendingRequest.waiterCount - 1);
+		if (
+			pendingRequest.waiterCount === 0 &&
+			gitCommitDiffRequestCache.get(cacheKey) === pendingRequest
+		) {
+			controller.abort(createAbortError(null, "Commit diff read was aborted."));
+		}
+	}
 }
 
 function getNow(): string {
 	return new Date().toISOString();
 }
 
-async function refreshProjectPoll(projectId: number): Promise<void> {
+async function refreshProjectPoll(
+	projectId: number,
+	options?: GitCommandOptions,
+): Promise<void> {
 	const state = projectPollMap.get(projectId);
 	if (!state) return;
 
 	const worktrees = await listFreshProjectWorktrees(
 		state.projectPath,
 		state.id,
+		options,
 	);
 	state.worktrees = worktrees;
 	state.worktreesLoadedAt = Date.now();
@@ -2406,7 +2692,9 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 
 	if (!state.projectTimer) {
 		state.projectTimer = setInterval(() => {
-			refreshProjectPoll(project.id).catch((error) => {
+			refreshProjectPoll(project.id, {
+				priority: "background",
+			}).catch((error) => {
 				console.error(
 					`Worktree polling failed for project ${project.id}`,
 					error,
@@ -2584,16 +2872,22 @@ function projectByIdForPath(projectId: number): ProjectRecord {
 async function findProjectWorktree(
 	project: ProjectRecord,
 	worktreePath: string,
+	options?: GitCommandOptions,
 ): Promise<RpcWorktree | null> {
-	const worktrees = await readProjectWorktrees(project.path, project.id);
+	const worktrees = await readProjectWorktrees(
+		project.path,
+		project.id,
+		options,
+	);
 	return worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
 
 async function assertProjectWorktree(
 	project: ProjectRecord,
 	worktreePath: string,
+	options?: GitCommandOptions,
 ): Promise<RpcWorktree> {
-	const worktree = await findProjectWorktree(project, worktreePath);
+	const worktree = await findProjectWorktree(project, worktreePath, options);
 	if (!worktree) {
 		throw new Error(
 			`Worktree not found for project ${project.path}: ${worktreePath}`,
@@ -2625,20 +2919,27 @@ async function createThreadRecord(
 
 export async function openProjectProcedure(
 	params: AppRPCSchema["requests"]["openProject"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const projectPath = normalizePath(params.projectPath);
 	assertProjectDirectory(projectPath);
 	const existingProject = getProject(db, projectPath);
 
 	let worktrees: RpcWorktree[];
 	try {
-		worktrees = await readProjectWorktrees(projectPath, existingProject?.id);
+		worktrees = await readProjectWorktrees(
+			projectPath,
+			existingProject?.id,
+			requestGitOptions,
+		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(
 			`Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
 		);
 	}
+	throwIfAborted(context?.signal, "Project open was aborted.");
 
 	const project = upsertProject(db, {
 		projectPath,
@@ -2656,10 +2957,16 @@ export async function openProjectProcedure(
 
 export async function listProjectWorktreesProcedure(
 	params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	ensureProjectPoller(project);
-	const worktrees = await readProjectWorktrees(project.path, project.id);
+	const worktrees = await readProjectWorktrees(
+		project.path,
+		project.id,
+		requestGitOptions,
+	);
 
 	return {
 		project,
@@ -2669,10 +2976,13 @@ export async function listProjectWorktreesProcedure(
 
 export async function listProjectTasksProcedure(
 	params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcProjectTask[]> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath);
+	await assertProjectWorktree(project, worktreePath, requestGitOptions);
+	throwIfAborted(context?.signal, "Project task read was aborted.");
 	startWorktreePolling(ensureProjectPoller(project), worktreePath);
 	return sortProjectTasks([
 		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
@@ -2912,11 +3222,13 @@ export async function deleteThreadProcedure(
 
 export async function openWorktreeProcedure(
 	params: AppRPCSchema["requests"]["openWorktree"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcOpenWorktreeResult> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const state = ensureProjectPoller(project);
 	if (!state.worktrees.length) {
-		await refreshProjectPoll(project.id);
+		await refreshProjectPoll(project.id, requestGitOptions);
 	}
 
 	const worktreePath = normalizePath(params.worktreePath);
@@ -2932,6 +3244,7 @@ export async function openWorktreeProcedure(
 		project.id,
 		worktreePath,
 		DEFAULT_GIT_HISTORY_PAGE_SIZE,
+		requestGitOptions,
 	);
 	worktreeState.history = summary;
 	worktreeState.historyEntries = history.entries;
@@ -2954,10 +3267,12 @@ export async function openWorktreeProcedure(
 
 export async function listWorktreeGitHistoryProcedure(
 	params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcWorktreeGitHistoryResult> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath);
+	await assertProjectWorktree(project, worktreePath, requestGitOptions);
 	const offset =
 		Number.isInteger(params.offset) && typeof params.offset === "number"
 			? Math.max(params.offset, 0)
@@ -2973,6 +3288,7 @@ export async function listWorktreeGitHistoryProcedure(
 			project.id,
 			worktreePath,
 			limit,
+			requestGitOptions,
 		);
 		state.history = summary;
 		state.historyEntries = history.entries;
@@ -2986,7 +3302,11 @@ export async function listWorktreeGitHistoryProcedure(
 	let summary = state.history;
 	let signature = state.historySignature;
 	if (signature === null) {
-		const loadedSummary = await readGitHistorySummary(project.id, worktreePath);
+		const loadedSummary = await readGitHistorySummary(
+			project.id,
+			worktreePath,
+			requestGitOptions,
+		);
 		summary = loadedSummary.history;
 		signature = loadedSummary.signature;
 		state.history = summary;
@@ -3004,24 +3324,33 @@ export async function listWorktreeGitHistoryProcedure(
 		};
 	}
 
-	await fillGitHistoryCache(state, worktreePath, offset, limit);
+	await fillGitHistoryCache(
+		state,
+		worktreePath,
+		offset,
+		limit,
+		requestGitOptions,
+	);
 	warmGitHistoryCache(state, worktreePath);
 	return buildGitHistoryResultFromCache(state, limit, offset);
 }
 
 export async function getWorktreeGitCommitDiffProcedure(
 	params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
+	context?: RpcRequestContext,
 ): Promise<RpcGitCommitDiffResult> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	if (!findKnownProjectWorktree(project.id, worktreePath)) {
-		await assertProjectWorktree(project, worktreePath);
+		await assertProjectWorktree(project, worktreePath, requestGitOptions);
 	}
 
 	return getCachedGitCommitDiffResult(
 		project.id,
 		worktreePath,
 		params.commitHash,
+		requestGitOptions,
 	);
 }
 

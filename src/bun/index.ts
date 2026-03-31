@@ -38,6 +38,8 @@ import {
 } from "./project-procedures";
 import type {
 	AppRPCSchema,
+	RpcRequestContext,
+	RpcRequestPriority,
 	RpcWorktreeGitHistoryChanged,
 	RpcWorktreeTasksChanged,
 } from "./rpc-schema";
@@ -71,6 +73,13 @@ type RpcRequestMessage = {
 	id: number;
 	method: RpcMethodName;
 	params: RpcRequestMap[RpcMethodName]["params"];
+	priority: RpcRequestPriority;
+	timeoutMs?: number;
+};
+
+type RpcCancelMessage = {
+	type: "cancel";
+	id: number;
 };
 
 type RpcResponseMessage =
@@ -106,10 +115,20 @@ type RpcSocketMessage =
 	| RpcTasksChangedMessage
 	| RpcGitHistoryChangedMessage;
 
+type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
+
 type RpcRequestHandlerMap = {
 	[K in keyof RpcRequestMap]: (
 		params: RpcRequestMap[K]["params"],
+		context: RpcRequestContext,
 	) => Promise<RpcRequestMap[K]["response"]>;
+};
+
+type PendingRpcRequest = {
+	controller: AbortController;
+	signal: AbortSignal;
+	timeoutMs: number | null;
+	canceledByClient: boolean;
 };
 
 function isStringInteger(value: string): boolean {
@@ -174,11 +193,13 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	getCodexModelCatalog: (params) => getCodexModelCatalogProcedure(params),
 	listProjects: (params) => listProjectsProcedure(params),
 	listThreads: (params) => listThreadsProcedure(params),
-	openProject: (params) => openProjectProcedure(params),
+	openProject: (params, context) => openProjectProcedure(params, context),
 	closeProject: (params) => closeProjectProcedure(params),
 	deleteProject: (params) => deleteProjectProcedure(params),
-	listProjectWorktrees: (params) => listProjectWorktreesProcedure(params),
-	listProjectTasks: (params) => listProjectTasksProcedure(params),
+	listProjectWorktrees: (params, context) =>
+		listProjectWorktreesProcedure(params, context),
+	listProjectTasks: (params, context) =>
+		listProjectTasksProcedure(params, context),
 	createWorktree: (params) => createWorktreeProcedure(params),
 	createThread: (params) => createThreadProcedure(params),
 	getThread: (params) => getThreadProcedure(params),
@@ -189,15 +210,20 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	setThreadPinned: (params) => setThreadPinnedProcedure(params),
 	updateThreadModel: (params) => updateThreadModelProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
-	openWorktree: (params) => openWorktreeProcedure(params),
-	listWorktreeGitHistory: (params) => listWorktreeGitHistoryProcedure(params),
-	getWorktreeGitCommitDiff: (params) =>
-		getWorktreeGitCommitDiffProcedure(params),
+	openWorktree: (params, context) => openWorktreeProcedure(params, context),
+	listWorktreeGitHistory: (params, context) =>
+		listWorktreeGitHistoryProcedure(params, context),
+	getWorktreeGitCommitDiff: (params, context) =>
+		getWorktreeGitCommitDiffProcedure(params, context),
 	closeWorktree: (params) => closeWorktreeProcedure(params),
 	setWorktreePinned: (params) => setWorktreePinnedProcedure(params),
 };
 
 const rpcClients = new Set<ServerWebSocket<unknown>>();
+const pendingRpcRequestsByClient = new WeakMap<
+	ServerWebSocket<unknown>,
+	Map<number, PendingRpcRequest>
+>();
 const pendingMainviewChanges = new Set<string>();
 
 let mainviewBundlePath = resolve(MAINVIEW_BUILD_DIR, "index.js");
@@ -255,7 +281,27 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
 		throw new Error("Invalid RPC request payload");
 	}
 
-	return parsed as RpcRequestMessage;
+	const timeoutMs = normalizeTimeoutMs(parsed.timeoutMs);
+	return {
+		...parsed,
+		type: "request",
+		id: parsed.id,
+		method: parsed.method as RpcMethodName,
+		params: parsed.params as RpcRequestMap[RpcMethodName]["params"],
+		priority: normalizeRpcRequestPriority(parsed.priority),
+		...(timeoutMs !== null ? { timeoutMs } : {}),
+	};
+}
+
+function parseRpcClientMessage(raw: string): RpcClientMessage {
+	const parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
+	if (parsed.type === "cancel" && typeof parsed.id === "number") {
+		return {
+			type: "cancel",
+			id: parsed.id,
+		};
+	}
+	return parseRpcRequestMessage(raw);
 }
 
 function toErrorMessage(error: unknown): string {
@@ -263,6 +309,169 @@ function toErrorMessage(error: unknown): string {
 		return error.message;
 	}
 	return String(error);
+}
+
+function createAbortError(reason: unknown, fallbackMessage: string): Error {
+	if (reason instanceof Error) {
+		return reason;
+	}
+
+	const error = new Error(
+		typeof reason === "string" && reason.trim() ? reason : fallbackMessage,
+		{
+			cause: reason,
+		},
+	);
+	if (reason instanceof DOMException && reason.name) {
+		error.name = reason.name;
+	} else {
+		error.name = "AbortError";
+	}
+	return error;
+}
+
+function isAbortError(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		(error.name === "AbortError" || error.name === "TimeoutError")
+	);
+}
+
+function normalizeTimeoutMs(value: unknown): number | null {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+		return null;
+	}
+	return Math.max(1, Math.floor(value));
+}
+
+function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
+	if (value === "background" || value === "default" || value === "foreground") {
+		return value;
+	}
+	return "default";
+}
+
+function getPendingRpcRequests(
+	client: ServerWebSocket<unknown>,
+): Map<number, PendingRpcRequest> {
+	const existing = pendingRpcRequestsByClient.get(client);
+	if (existing) {
+		return existing;
+	}
+
+	const created = new Map<number, PendingRpcRequest>();
+	pendingRpcRequestsByClient.set(client, created);
+	return created;
+}
+
+function abortPendingRpcRequest(
+	client: ServerWebSocket<unknown>,
+	requestId: number,
+): void {
+	const pendingRequests = pendingRpcRequestsByClient.get(client);
+	const pending = pendingRequests?.get(requestId);
+	if (!pending) {
+		return;
+	}
+
+	pending.canceledByClient = true;
+	pending.controller.abort(
+		createAbortError(
+			null,
+			`RPC request ${requestId} was canceled by the client.`,
+		),
+	);
+}
+
+function abortAllPendingRpcRequests(
+	client: ServerWebSocket<unknown>,
+	reason: string,
+): void {
+	const pendingRequests = pendingRpcRequestsByClient.get(client);
+	if (!pendingRequests) {
+		return;
+	}
+
+	for (const pending of pendingRequests.values()) {
+		pending.canceledByClient = true;
+		pending.controller.abort(createAbortError(null, reason));
+	}
+	pendingRequests.clear();
+	pendingRpcRequestsByClient.delete(client);
+}
+
+async function awaitRequestResult<T>(
+	promise: Promise<T>,
+	signal: AbortSignal,
+): Promise<T> {
+	if (signal.aborted) {
+		throw createAbortError(signal.reason, "RPC request aborted.");
+	}
+
+	return new Promise<T>((resolve, reject) => {
+		const handleAbort = () => {
+			signal.removeEventListener("abort", handleAbort);
+			reject(createAbortError(signal.reason, "RPC request aborted."));
+		};
+		signal.addEventListener("abort", handleAbort, {
+			once: true,
+		});
+		void promise.then(
+			(value) => {
+				signal.removeEventListener("abort", handleAbort);
+				resolve(value);
+			},
+			(error) => {
+				signal.removeEventListener("abort", handleAbort);
+				reject(error);
+			},
+		);
+	});
+}
+
+function parseRawSocketMessage(rawMessage: string | Buffer): string {
+	return typeof rawMessage === "string"
+		? rawMessage
+		: Buffer.from(rawMessage).toString("utf8");
+}
+
+function buildRequestSignal(timeoutMs: number | null): {
+	controller: AbortController;
+	signal: AbortSignal;
+} {
+	const controller = new AbortController();
+	if (typeof timeoutMs !== "number") {
+		return {
+			controller,
+			signal: controller.signal,
+		};
+	}
+
+	return {
+		controller,
+		signal: AbortSignal.any([
+			controller.signal,
+			AbortSignal.timeout(timeoutMs),
+		]),
+	};
+}
+
+function isTimeoutAbort(signal: AbortSignal): boolean {
+	return (
+		signal.reason instanceof DOMException &&
+		signal.reason.name === "TimeoutError"
+	);
+}
+
+function toRpcAbortMessage(
+	request: RpcRequestMessage,
+	pending: PendingRpcRequest,
+	error: unknown,
+): string {
+	if (pending.timeoutMs !== null && isTimeoutAbort(pending.signal)) {
+		return `RPC request "${String(request.method)}" timed out after ${pending.timeoutMs}ms.`;
+	}
+	return toErrorMessage(error);
 }
 
 async function buildMainviewBundle(): Promise<string> {
@@ -556,40 +765,96 @@ async function bootstrap(): Promise<void> {
 		websocket: {
 			open(ws) {
 				rpcClients.add(ws);
+				getPendingRpcRequests(ws);
 			},
 			close(ws) {
 				rpcClients.delete(ws);
+				abortAllPendingRpcRequests(ws, "RPC connection closed.");
 			},
 			message(ws, rawMessage) {
 				void (async () => {
+					const payload = parseRawSocketMessage(rawMessage);
+					let requestId = -1;
 					try {
-						const payload =
-							typeof rawMessage === "string"
-								? rawMessage
-								: Buffer.from(rawMessage).toString("utf8");
-						const request = parseRpcRequestMessage(payload);
+						const message = parseRpcClientMessage(payload);
+						if (message.type === "cancel") {
+							abortPendingRpcRequest(ws, message.id);
+							return;
+						}
+
+						const request = message;
+						requestId = request.id;
+						const pendingRequests = getPendingRpcRequests(ws);
+						if (pendingRequests.has(request.id)) {
+							throw new Error(`RPC request ${request.id} is already pending.`);
+						}
+
+						const { controller, signal } = buildRequestSignal(
+							request.timeoutMs ?? null,
+						);
+						const pending: PendingRpcRequest = {
+							controller,
+							signal,
+							timeoutMs: request.timeoutMs ?? null,
+							canceledByClient: false,
+						};
+						pendingRequests.set(request.id, pending);
+
 						const handler = rpcHandlers[request.method] as (
 							params: RpcRequestMap[RpcMethodName]["params"],
+							context: RpcRequestContext,
 						) => Promise<RpcRequestMap[RpcMethodName]["response"]>;
-						const result = await handler(request.params);
-						const response: RpcResponseMessage = {
-							id: request.id,
-							ok: true,
-							result,
-							type: "response",
-						};
-						ws.send(JSON.stringify(response satisfies RpcSocketMessage));
-					} catch (error) {
-						let requestId = -1;
 						try {
-							const parsed = JSON.parse(
-								typeof rawMessage === "string"
-									? rawMessage
-									: Buffer.from(rawMessage).toString("utf8"),
-							) as { id?: number };
-							requestId = typeof parsed.id === "number" ? parsed.id : -1;
-						} catch {
-							requestId = -1;
+							const result = await awaitRequestResult(
+								handler(request.params, {
+									signal,
+									priority: request.priority,
+									timeoutMs: pending.timeoutMs,
+								}),
+								signal,
+							);
+							if (pending.canceledByClient || signal.aborted) {
+								return;
+							}
+
+							const response: RpcResponseMessage = {
+								id: request.id,
+								ok: true,
+								result,
+								type: "response",
+							};
+							ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+						} catch (error) {
+							if (pending.canceledByClient) {
+								return;
+							}
+
+							const response: RpcResponseMessage = {
+								id: request.id,
+								ok: false,
+								error:
+									isAbortError(error) && signal.aborted
+										? toRpcAbortMessage(request, pending, error)
+										: toErrorMessage(error),
+								type: "response",
+							};
+							ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+						} finally {
+							if (pendingRequests.get(request.id) === pending) {
+								pendingRequests.delete(request.id);
+							}
+						}
+					} catch (error) {
+						if (requestId < 0) {
+							try {
+								const parsed = JSON.parse(payload) as { id?: number };
+								requestId = typeof parsed.id === "number" ? parsed.id : -1;
+							} catch {
+								requestId = -1;
+							}
+						}
+						if (requestId < 0) {
+							return;
 						}
 						const response: RpcResponseMessage = {
 							id: requestId,

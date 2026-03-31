@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import type {
 	AppRPCSchema,
 	ProjectProcedures,
+	RpcProcedureCallOptions,
+	RpcRequestPriority,
 	RpcWorktreeGitHistoryChanged,
 	RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
@@ -14,8 +16,23 @@ type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
 
 type PendingRequest = {
+	method: RpcMethodName;
 	reject: (reason?: unknown) => void;
 	resolve: (value: unknown) => void;
+};
+
+type RpcRequestMessage<K extends RpcMethodName = RpcMethodName> = {
+	type: "request";
+	id: number;
+	method: K;
+	params: RpcRequestMap[K]["params"];
+	priority: RpcRequestPriority;
+	timeoutMs?: number;
+};
+
+type RpcCancelMessage = {
+	type: "cancel";
+	id: number;
 };
 
 type RpcResponseMessage = {
@@ -44,6 +61,8 @@ type RpcSocketMessage =
 	| RpcReloadMessage
 	| RpcTasksChangedMessage
 	| RpcGitHistoryChangedMessage;
+
+type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
 type RuntimeConfig = {
 	devServer: boolean;
@@ -211,62 +230,214 @@ socket.addEventListener("error", () => {
 	console.error("jt-ide RPC socket encountered an error");
 });
 
+function createAbortError(reason: unknown, fallbackMessage: string): Error {
+	if (reason instanceof Error) {
+		return reason;
+	}
+
+	const message =
+		typeof reason === "string" && reason.trim() ? reason : fallbackMessage;
+	const error = new Error(message, {
+		cause: reason,
+	});
+	if (reason instanceof DOMException && reason.name) {
+		error.name = reason.name;
+	}
+	return error;
+}
+
+function normalizeTimeoutMs(timeoutMs?: number): number | null {
+	if (
+		typeof timeoutMs !== "number" ||
+		!Number.isFinite(timeoutMs) ||
+		timeoutMs <= 0
+	) {
+		return null;
+	}
+	return Math.max(1, Math.floor(timeoutMs));
+}
+
+function buildRequestSignal(
+	options?: RpcProcedureCallOptions,
+): AbortSignal | null {
+	const signals: AbortSignal[] = [];
+	if (options?.signal) {
+		signals.push(options.signal);
+	}
+
+	const timeoutMs = normalizeTimeoutMs(options?.timeoutMs);
+	if (timeoutMs !== null) {
+		signals.push(AbortSignal.timeout(timeoutMs));
+	}
+
+	if (signals.length === 0) {
+		return null;
+	}
+	if (signals.length === 1) {
+		return signals[0] ?? null;
+	}
+	return AbortSignal.any(signals);
+}
+
+async function waitForConnection(signal: AbortSignal | null): Promise<void> {
+	if (!signal) {
+		await connectionReady;
+		return;
+	}
+	if (signal.aborted) {
+		throw createAbortError(signal.reason, "RPC request aborted.");
+	}
+
+	await Promise.race([
+		connectionReady,
+		new Promise<never>((_, reject) => {
+			const handleAbort = () => {
+				signal.removeEventListener("abort", handleAbort);
+				reject(createAbortError(signal.reason, "RPC request aborted."));
+			};
+			signal.addEventListener("abort", handleAbort, {
+				once: true,
+			});
+		}),
+	]);
+}
+
+function sendSocketMessage(message: RpcClientMessage): void {
+	socket.send(JSON.stringify(message));
+}
+
 async function sendRequest<K extends RpcMethodName>(
 	method: K,
 	params: RpcRequestMap[K]["params"],
+	options?: RpcProcedureCallOptions,
 ): Promise<RpcRequestMap[K]["response"]> {
-	await connectionReady;
+	const signal = buildRequestSignal(options);
+	await waitForConnection(signal);
+	if (signal?.aborted) {
+		throw createAbortError(
+			signal.reason,
+			`RPC request "${String(method)}" aborted.`,
+		);
+	}
+
 	const id = nextRequestId++;
+	const timeoutMs = normalizeTimeoutMs(options?.timeoutMs);
+	const priority = options?.priority ?? "default";
+
 	const response = new Promise<RpcRequestMap[K]["response"]>(
 		(resolve, reject) => {
-			pendingRequests.set(id, {
-				reject,
-				resolve: (value) => resolve(value as RpcRequestMap[K]["response"]),
-			});
-		},
-	);
+			let settled = false;
+			let removeAbortListener = () => {};
+			const finalize = (callback: () => void) => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				pendingRequests.delete(id);
+				removeAbortListener();
+				callback();
+			};
 
-	socket.send(
-		JSON.stringify({
-			id,
-			method,
-			params,
-			type: "request",
-		}),
+			if (signal) {
+				const handleAbort = () => {
+					finalize(() => {
+						if (socket.readyState === WebSocket.OPEN) {
+							sendSocketMessage({
+								type: "cancel",
+								id,
+							});
+						}
+						reject(
+							createAbortError(
+								signal.reason,
+								`RPC request "${String(method)}" aborted.`,
+							),
+						);
+					});
+				};
+				if (signal.aborted) {
+					handleAbort();
+					return;
+				}
+				signal.addEventListener("abort", handleAbort, {
+					once: true,
+				});
+				removeAbortListener = () => {
+					signal.removeEventListener("abort", handleAbort);
+				};
+			}
+
+			pendingRequests.set(id, {
+				method,
+				reject: (reason) =>
+					finalize(() => {
+						reject(reason);
+					}),
+				resolve: (value) =>
+					finalize(() => {
+						resolve(value as RpcRequestMap[K]["response"]);
+					}),
+			});
+			try {
+				sendSocketMessage({
+					type: "request",
+					id,
+					method,
+					params,
+					priority,
+					...(timeoutMs !== null ? { timeoutMs } : {}),
+				});
+			} catch (error) {
+				finalize(() => {
+					reject(error);
+				});
+			}
+		},
 	);
 
 	return response;
 }
 
+function createProcedure<K extends RpcMethodName>(
+	method: K,
+): ProjectProcedures[K] {
+	return ((
+		params?: RpcRequestMap[K]["params"],
+		options?: RpcProcedureCallOptions,
+	) =>
+		sendRequest(
+			method,
+			params as RpcRequestMap[K]["params"],
+			options,
+		)) as ProjectProcedures[K];
+}
+
 const procedures: ProjectProcedures = {
-	getHomeDirectory: (params) => sendRequest("getHomeDirectory", params),
-	listDirectorySuggestions: (params) =>
-		sendRequest("listDirectorySuggestions", params),
-	getCodexModelCatalog: (params) => sendRequest("getCodexModelCatalog", params),
-	listProjects: (params) => sendRequest("listProjects", params),
-	listThreads: (params) => sendRequest("listThreads", params),
-	openProject: (params) => sendRequest("openProject", params),
-	closeProject: (params) => sendRequest("closeProject", params),
-	deleteProject: (params) => sendRequest("deleteProject", params),
-	listProjectWorktrees: (params) => sendRequest("listProjectWorktrees", params),
-	listProjectTasks: (params) => sendRequest("listProjectTasks", params),
-	createWorktree: (params) => sendRequest("createWorktree", params),
-	createThread: (params) => sendRequest("createThread", params),
-	getThread: (params) => sendRequest("getThread", params),
-	markThreadErrorSeen: (params) => sendRequest("markThreadErrorSeen", params),
-	sendThreadMessage: (params) => sendRequest("sendThreadMessage", params),
-	runProjectTask: (params) => sendRequest("runProjectTask", params),
-	renameThread: (params) => sendRequest("renameThread", params),
-	setThreadPinned: (params) => sendRequest("setThreadPinned", params),
-	updateThreadModel: (params) => sendRequest("updateThreadModel", params),
-	deleteThread: (params) => sendRequest("deleteThread", params),
-	openWorktree: (params) => sendRequest("openWorktree", params),
-	listWorktreeGitHistory: (params) =>
-		sendRequest("listWorktreeGitHistory", params),
-	getWorktreeGitCommitDiff: (params) =>
-		sendRequest("getWorktreeGitCommitDiff", params),
-	closeWorktree: (params) => sendRequest("closeWorktree", params),
-	setWorktreePinned: (params) => sendRequest("setWorktreePinned", params),
+	getHomeDirectory: createProcedure("getHomeDirectory"),
+	listDirectorySuggestions: createProcedure("listDirectorySuggestions"),
+	getCodexModelCatalog: createProcedure("getCodexModelCatalog"),
+	listProjects: createProcedure("listProjects"),
+	listThreads: createProcedure("listThreads"),
+	openProject: createProcedure("openProject"),
+	closeProject: createProcedure("closeProject"),
+	deleteProject: createProcedure("deleteProject"),
+	listProjectWorktrees: createProcedure("listProjectWorktrees"),
+	listProjectTasks: createProcedure("listProjectTasks"),
+	createWorktree: createProcedure("createWorktree"),
+	createThread: createProcedure("createThread"),
+	getThread: createProcedure("getThread"),
+	markThreadErrorSeen: createProcedure("markThreadErrorSeen"),
+	sendThreadMessage: createProcedure("sendThreadMessage"),
+	runProjectTask: createProcedure("runProjectTask"),
+	renameThread: createProcedure("renameThread"),
+	setThreadPinned: createProcedure("setThreadPinned"),
+	updateThreadModel: createProcedure("updateThreadModel"),
+	deleteThread: createProcedure("deleteThread"),
+	openWorktree: createProcedure("openWorktree"),
+	listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),
+	getWorktreeGitCommitDiff: createProcedure("getWorktreeGitCommitDiff"),
+	closeWorktree: createProcedure("closeWorktree"),
+	setWorktreePinned: createProcedure("setWorktreePinned"),
 };
 
 window.jtIdeProcedures = procedures;

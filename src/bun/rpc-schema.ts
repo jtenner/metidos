@@ -98,6 +98,20 @@ export type RpcGitCommitDiffResult = {
 	diffText: string;
 };
 
+export type RpcRequestPriority = "background" | "default" | "foreground";
+
+export type RpcProcedureCallOptions = {
+	signal?: AbortSignal;
+	timeoutMs?: number;
+	priority?: RpcRequestPriority;
+};
+
+export type RpcRequestContext = {
+	signal: AbortSignal;
+	priority: RpcRequestPriority;
+	timeoutMs: number | null;
+};
+
 export type RpcCodexModelOption = {
 	id: string;
 	label: string;
@@ -345,84 +359,109 @@ export type AppRPCSchema = {
 	};
 };
 
+type RpcProcedureCall<Params, Response> = undefined extends Params
+	? (params?: Params, options?: RpcProcedureCallOptions) => Promise<Response>
+	: (params: Params, options?: RpcProcedureCallOptions) => Promise<Response>;
+
 export interface ProjectProcedures {
-	getHomeDirectory: (
-		params?: AppRPCSchema["requests"]["getHomeDirectory"]["params"],
-	) => Promise<AppRPCSchema["requests"]["getHomeDirectory"]["response"]>;
-	listDirectorySuggestions: (
-		params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
-	) => Promise<
+	getHomeDirectory: RpcProcedureCall<
+		AppRPCSchema["requests"]["getHomeDirectory"]["params"],
+		AppRPCSchema["requests"]["getHomeDirectory"]["response"]
+	>;
+	listDirectorySuggestions: RpcProcedureCall<
+		AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
 		AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]
 	>;
-	getCodexModelCatalog: (
-		params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
-	) => Promise<AppRPCSchema["requests"]["getCodexModelCatalog"]["response"]>;
-	listProjects: (
-		params?: AppRPCSchema["requests"]["listProjects"]["params"],
-	) => Promise<AppRPCSchema["requests"]["listProjects"]["response"]>;
-	openProject: (
-		params: AppRPCSchema["requests"]["openProject"]["params"],
-	) => Promise<RpcProjectWorktreesResult>;
-	closeProject: (
-		params: AppRPCSchema["requests"]["closeProject"]["params"],
-	) => Promise<AppRPCSchema["requests"]["closeProject"]["response"]>;
-	deleteProject: (
-		params: AppRPCSchema["requests"]["deleteProject"]["params"],
-	) => Promise<AppRPCSchema["requests"]["deleteProject"]["response"]>;
-	listProjectWorktrees: (
-		params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
-	) => Promise<RpcProjectWorktreesResult>;
-	listProjectTasks: (
-		params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
-	) => Promise<AppRPCSchema["requests"]["listProjectTasks"]["response"]>;
-	createWorktree: (
-		params: AppRPCSchema["requests"]["createWorktree"]["params"],
-	) => Promise<RpcCreateWorktreeResult>;
-	openWorktree: (
-		params: AppRPCSchema["requests"]["openWorktree"]["params"],
-	) => Promise<RpcOpenWorktreeResult>;
-	listWorktreeGitHistory: (
-		params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
-	) => Promise<AppRPCSchema["requests"]["listWorktreeGitHistory"]["response"]>;
-	getWorktreeGitCommitDiff: (
-		params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
-	) => Promise<
+	getCodexModelCatalog: RpcProcedureCall<
+		AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
+		AppRPCSchema["requests"]["getCodexModelCatalog"]["response"]
+	>;
+	listProjects: RpcProcedureCall<
+		AppRPCSchema["requests"]["listProjects"]["params"],
+		AppRPCSchema["requests"]["listProjects"]["response"]
+	>;
+	openProject: RpcProcedureCall<
+		AppRPCSchema["requests"]["openProject"]["params"],
+		RpcProjectWorktreesResult
+	>;
+	closeProject: RpcProcedureCall<
+		AppRPCSchema["requests"]["closeProject"]["params"],
+		AppRPCSchema["requests"]["closeProject"]["response"]
+	>;
+	deleteProject: RpcProcedureCall<
+		AppRPCSchema["requests"]["deleteProject"]["params"],
+		AppRPCSchema["requests"]["deleteProject"]["response"]
+	>;
+	listProjectWorktrees: RpcProcedureCall<
+		AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
+		RpcProjectWorktreesResult
+	>;
+	listProjectTasks: RpcProcedureCall<
+		AppRPCSchema["requests"]["listProjectTasks"]["params"],
+		AppRPCSchema["requests"]["listProjectTasks"]["response"]
+	>;
+	createWorktree: RpcProcedureCall<
+		AppRPCSchema["requests"]["createWorktree"]["params"],
+		RpcCreateWorktreeResult
+	>;
+	openWorktree: RpcProcedureCall<
+		AppRPCSchema["requests"]["openWorktree"]["params"],
+		RpcOpenWorktreeResult
+	>;
+	listWorktreeGitHistory: RpcProcedureCall<
+		AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
+		AppRPCSchema["requests"]["listWorktreeGitHistory"]["response"]
+	>;
+	getWorktreeGitCommitDiff: RpcProcedureCall<
+		AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
 		AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["response"]
 	>;
-	closeWorktree: (
-		params: AppRPCSchema["requests"]["closeWorktree"]["params"],
-	) => Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]>;
-	setWorktreePinned: (
-		params: AppRPCSchema["requests"]["setWorktreePinned"]["params"],
-	) => Promise<AppRPCSchema["requests"]["setWorktreePinned"]["response"]>;
-	listThreads: (
-		params?: AppRPCSchema["requests"]["listThreads"]["params"],
-	) => Promise<AppRPCSchema["requests"]["listThreads"]["response"]>;
-	createThread: (
-		params: AppRPCSchema["requests"]["createThread"]["params"],
-	) => Promise<AppRPCSchema["requests"]["createThread"]["response"]>;
-	getThread: (
-		params: AppRPCSchema["requests"]["getThread"]["params"],
-	) => Promise<AppRPCSchema["requests"]["getThread"]["response"]>;
-	markThreadErrorSeen: (
-		params: AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
-	) => Promise<AppRPCSchema["requests"]["markThreadErrorSeen"]["response"]>;
-	sendThreadMessage: (
-		params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
-	) => Promise<AppRPCSchema["requests"]["sendThreadMessage"]["response"]>;
-	runProjectTask: (
-		params: AppRPCSchema["requests"]["runProjectTask"]["params"],
-	) => Promise<AppRPCSchema["requests"]["runProjectTask"]["response"]>;
-	renameThread: (
-		params: AppRPCSchema["requests"]["renameThread"]["params"],
-	) => Promise<AppRPCSchema["requests"]["renameThread"]["response"]>;
-	setThreadPinned: (
-		params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
-	) => Promise<AppRPCSchema["requests"]["setThreadPinned"]["response"]>;
-	updateThreadModel: (
-		params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
-	) => Promise<AppRPCSchema["requests"]["updateThreadModel"]["response"]>;
-	deleteThread: (
-		params: AppRPCSchema["requests"]["deleteThread"]["params"],
-	) => Promise<AppRPCSchema["requests"]["deleteThread"]["response"]>;
+	closeWorktree: RpcProcedureCall<
+		AppRPCSchema["requests"]["closeWorktree"]["params"],
+		AppRPCSchema["requests"]["closeWorktree"]["response"]
+	>;
+	setWorktreePinned: RpcProcedureCall<
+		AppRPCSchema["requests"]["setWorktreePinned"]["params"],
+		AppRPCSchema["requests"]["setWorktreePinned"]["response"]
+	>;
+	listThreads: RpcProcedureCall<
+		AppRPCSchema["requests"]["listThreads"]["params"],
+		AppRPCSchema["requests"]["listThreads"]["response"]
+	>;
+	createThread: RpcProcedureCall<
+		AppRPCSchema["requests"]["createThread"]["params"],
+		AppRPCSchema["requests"]["createThread"]["response"]
+	>;
+	getThread: RpcProcedureCall<
+		AppRPCSchema["requests"]["getThread"]["params"],
+		AppRPCSchema["requests"]["getThread"]["response"]
+	>;
+	markThreadErrorSeen: RpcProcedureCall<
+		AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
+		AppRPCSchema["requests"]["markThreadErrorSeen"]["response"]
+	>;
+	sendThreadMessage: RpcProcedureCall<
+		AppRPCSchema["requests"]["sendThreadMessage"]["params"],
+		AppRPCSchema["requests"]["sendThreadMessage"]["response"]
+	>;
+	runProjectTask: RpcProcedureCall<
+		AppRPCSchema["requests"]["runProjectTask"]["params"],
+		AppRPCSchema["requests"]["runProjectTask"]["response"]
+	>;
+	renameThread: RpcProcedureCall<
+		AppRPCSchema["requests"]["renameThread"]["params"],
+		AppRPCSchema["requests"]["renameThread"]["response"]
+	>;
+	setThreadPinned: RpcProcedureCall<
+		AppRPCSchema["requests"]["setThreadPinned"]["params"],
+		AppRPCSchema["requests"]["setThreadPinned"]["response"]
+	>;
+	updateThreadModel: RpcProcedureCall<
+		AppRPCSchema["requests"]["updateThreadModel"]["params"],
+		AppRPCSchema["requests"]["updateThreadModel"]["response"]
+	>;
+	deleteThread: RpcProcedureCall<
+		AppRPCSchema["requests"]["deleteThread"]["params"],
+		AppRPCSchema["requests"]["deleteThread"]["response"]
+	>;
 }
