@@ -57,7 +57,15 @@
 │  └─ mainview/
 │     ├─ App.tsx
 │     ├─ controls/
-│     │  └─ dropdown.tsx
+│     │  ├─ codex-model-selector.tsx
+│     │  ├─ codex-utils.ts
+│     │  ├─ dropdown.tsx
+│     │  ├─ icons.tsx
+│     │  ├─ project-task-selector.tsx
+│     │  ├─ reasoning-effort-selector.tsx
+│     │  ├─ search-utils.ts
+│     │  ├─ sidebar-search-control.tsx
+│     │  └─ sidebar-section-header.tsx
 │     ├─ index.css
 │     ├─ index.html
 │     ├─ index.ts
