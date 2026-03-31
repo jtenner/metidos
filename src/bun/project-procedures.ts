@@ -148,6 +148,12 @@ type PendingGitCommitDiffRequest = {
 	waiterCount: number;
 };
 
+type PendingGitHistoryPrefetch = {
+	controller: AbortController;
+	priority: GitCommandPriority;
+	promise: Promise<void>;
+};
+
 type WorktreePollState = {
 	diff: string[];
 	diffPolling: boolean;
@@ -159,7 +165,7 @@ type WorktreePollState = {
 	historyEntries: RpcGitHistoryEntry[];
 	historyNextOffset: number | null;
 	historyPolling: boolean;
-	historyPrefetchPromise: Promise<void> | null;
+	historyPrefetch: PendingGitHistoryPrefetch | null;
 	historySignature: string | null;
 	historyTimer: ReturnType<typeof setInterval> | null;
 	taskInputs: Map<string, number>;
@@ -2471,6 +2477,21 @@ function buildGitHistoryResultFromCache(
 	};
 }
 
+function abortGitHistoryPrefetch(
+	worktreeState: WorktreePollState,
+	reason: string,
+): void {
+	const prefetch = worktreeState.historyPrefetch;
+	if (!prefetch) {
+		return;
+	}
+
+	if (worktreeState.historyPrefetch === prefetch) {
+		worktreeState.historyPrefetch = null;
+	}
+	prefetch.controller.abort(createAbortError(null, reason));
+}
+
 async function fillGitHistoryCache(
 	worktreeState: WorktreePollState,
 	worktreePath: string,
@@ -2487,9 +2508,21 @@ async function fillGitHistoryCache(
 			normalizedOptions.signal,
 			"Git history cache fill was aborted.",
 		);
-		if (worktreeState.historyPrefetchPromise) {
+		const currentPrefetch = worktreeState.historyPrefetch;
+		if (
+			currentPrefetch &&
+			normalizedOptions.priority === "foreground" &&
+			currentPrefetch.priority === "background"
+		) {
+			abortGitHistoryPrefetch(
+				worktreeState,
+				`Foreground git history request replaced background warming for ${worktreePath}.`,
+			);
+			continue;
+		}
+		if (currentPrefetch) {
 			await awaitAbortableResult(
-				worktreeState.historyPrefetchPromise,
+				currentPrefetch.promise,
 				normalizedOptions.signal,
 				"Git history cache fill was aborted.",
 			);
@@ -2502,14 +2535,22 @@ async function fillGitHistoryCache(
 			GIT_HISTORY_PREFETCH_CHUNK_SIZE,
 			offset + limit - fetchOffset,
 		);
-		let promise: Promise<void> | null = null;
-		promise = (async () => {
+		const controller = new AbortController();
+		const prefetch: PendingGitHistoryPrefetch = {
+			controller,
+			priority: normalizedOptions.priority,
+			promise: Promise.resolve(),
+		};
+		const promise = (async () => {
 			try {
 				const page = await readGitHistoryPageEntries(
 					worktreePath,
 					fetchOffset,
 					fetchLimit,
-					normalizedOptions,
+					{
+						priority: normalizedOptions.priority,
+						signal: controller.signal,
+					},
 				);
 				if (
 					worktreeState.historySignature !== expectedSignature ||
@@ -2519,12 +2560,13 @@ async function fillGitHistoryCache(
 				}
 				applyGitHistoryCachePage(worktreeState, fetchOffset, page);
 			} finally {
-				if (worktreeState.historyPrefetchPromise === promise) {
-					worktreeState.historyPrefetchPromise = null;
+				if (worktreeState.historyPrefetch === prefetch) {
+					worktreeState.historyPrefetch = null;
 				}
 			}
 		})();
-		worktreeState.historyPrefetchPromise = promise;
+		prefetch.promise = promise;
+		worktreeState.historyPrefetch = prefetch;
 		await awaitAbortableResult(
 			promise,
 			normalizedOptions.signal,
@@ -2539,7 +2581,7 @@ function warmGitHistoryCache(
 ): void {
 	if (
 		worktreeState.historyNextOffset === null ||
-		worktreeState.historyPrefetchPromise
+		worktreeState.historyPrefetch
 	) {
 		return;
 	}
@@ -2774,6 +2816,10 @@ function stopWorktreePolling(
 	if (active.taskTimer) {
 		clearInterval(active.taskTimer);
 	}
+	abortGitHistoryPrefetch(
+		active,
+		`Stopped worktree polling for ${worktreePath}.`,
+	);
 	state.openWorktrees.delete(worktreePath);
 }
 
@@ -2792,7 +2838,7 @@ function createWorktreePollState(
 		historyEntries: [],
 		historyNextOffset: null,
 		historyPolling: false,
-		historyPrefetchPromise: null,
+		historyPrefetch: null,
 		historySignature: null,
 		historyTimer: null,
 		taskInputs: new Map(),
@@ -2875,7 +2921,10 @@ function startWorktreePolling(
 			if (previousSignature !== null && previousSignature !== signature) {
 				worktreeState.historyEntries = [];
 				worktreeState.historyNextOffset = null;
-				worktreeState.historyPrefetchPromise = null;
+				abortGitHistoryPrefetch(
+					worktreeState,
+					`Git history signature changed for ${worktreePath}.`,
+				);
 			}
 			worktreeState.historySignature = signature;
 			worktreeState.lastUpdatedAt = history.lastUpdatedAt;
