@@ -13,11 +13,13 @@
 ├─ .git
 ├─ .gitignore
 ├─ AGENTS.md
+├─ agent-todo.md
 ├─ biome.json
 ├─ bun.lock
 ├─ docs/
 │  ├─ codex.md
 │  ├─ codex-context-management.md
+│  ├─ data-request-priority-audit.md
 │  └─ references/
 │     ├─ ai_chat_mobile/
 │     │  ├─ code.html
@@ -50,11 +52,12 @@
  │  │  ├─ index.ts
  │  │  ├─ project-procedures.ts
  │  │  └─ rpc-schema.ts
- │  └─ mainview/
- │     ├─ App.tsx
- │     ├─ index.html
- │     ├─ index.ts
- │     └─ input.css
+│  └─ mainview/
+│     ├─ App.tsx
+│     ├─ index.css
+│     ├─ index.html
+│     ├─ index.ts
+│     └─ input.css
 ├─ tsconfig.json
 └─ stitch.zip
 ```
