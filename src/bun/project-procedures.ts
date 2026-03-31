@@ -119,6 +119,7 @@ const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
 const DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS = 5_000;
 const DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS = 90_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
+const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
 
@@ -160,6 +161,11 @@ const directorySuggestionCache = new Map<
 	}
 >();
 const threadDetailCache = new Map<number, RpcThreadDetail>();
+const gitCommitDiffCache = new Map<string, RpcGitCommitDiffResult>();
+const gitCommitDiffRequestCache = new Map<
+	string,
+	Promise<RpcGitCommitDiffResult>
+>();
 let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
 	null;
 let worktreeTaskChangeListener:
@@ -2163,36 +2169,91 @@ function warmGitHistoryCache(
 	});
 }
 
-async function readGitCommitEntry(
+async function readGitCommitDiffResult(
+	projectId: number,
 	worktreePath: string,
 	commitHash: string,
-): Promise<RpcGitHistoryEntry> {
+): Promise<RpcGitCommitDiffResult> {
 	const raw = await runGitCommand(worktreePath, [
 		"show",
-		"--no-patch",
-		"--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI",
-		commitHash,
-	]);
-	const entry = parseGitHistoryEntryRecord(raw);
-	if (!entry) {
-		throw new Error(`Unable to read commit metadata: ${commitHash}`);
-	}
-	return entry;
-}
-
-async function readGitCommitDiff(
-	worktreePath: string,
-	commitHash: string,
-): Promise<string> {
-	return runGitCommand(worktreePath, [
-		"show",
-		"--format=",
 		"--no-ext-diff",
 		"--find-renames",
 		"--submodule=diff",
 		"--unified=3",
+		`--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%cI${GIT_LOG_RECORD_SEPARATOR}`,
 		commitHash,
 	]);
+	const separatorIndex = raw.indexOf(GIT_LOG_RECORD_SEPARATOR);
+	if (separatorIndex < 0) {
+		throw new Error(`Unable to read commit diff: ${commitHash}`);
+	}
+
+	const metadataRaw = raw.slice(0, separatorIndex);
+	const diffText = raw.slice(separatorIndex + GIT_LOG_RECORD_SEPARATOR.length);
+	const commit = parseGitHistoryEntryRecord(metadataRaw);
+	if (!commit) {
+		throw new Error(`Unable to read commit metadata: ${commitHash}`);
+	}
+
+	return {
+		projectId,
+		worktreePath,
+		commit,
+		diffText: diffText.replace(/^\r?\n/, ""),
+	};
+}
+
+function gitCommitDiffCacheKey(
+	worktreePath: string,
+	commitHash: string,
+): string {
+	return `${worktreePath}\n${commitHash}`;
+}
+
+function findKnownProjectWorktree(
+	projectId: number,
+	worktreePath: string,
+): RpcWorktree | null {
+	const state = projectPollMap.get(projectId);
+	if (!state?.worktrees.length) {
+		return null;
+	}
+	return state.worktrees.find((entry) => entry.path === worktreePath) ?? null;
+}
+
+async function getCachedGitCommitDiffResult(
+	projectId: number,
+	worktreePath: string,
+	commitHash: string,
+): Promise<RpcGitCommitDiffResult> {
+	const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
+	const cached = readLruValue(gitCommitDiffCache, cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	const pending = gitCommitDiffRequestCache.get(cacheKey);
+	if (pending) {
+		return pending;
+	}
+
+	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash)
+		.then((result) => {
+			writeLruValue(
+				gitCommitDiffCache,
+				cacheKey,
+				result,
+				GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES,
+			);
+			return result;
+		})
+		.finally(() => {
+			if (gitCommitDiffRequestCache.get(cacheKey) === promise) {
+				gitCommitDiffRequestCache.delete(cacheKey);
+			}
+		});
+	gitCommitDiffRequestCache.set(cacheKey, promise);
+	return promise;
 }
 
 function getNow(): string {
@@ -2824,19 +2885,15 @@ export async function getWorktreeGitCommitDiffProcedure(
 ): Promise<RpcGitCommitDiffResult> {
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
-	await assertProjectWorktree(project, worktreePath);
+	if (!findKnownProjectWorktree(project.id, worktreePath)) {
+		await assertProjectWorktree(project, worktreePath);
+	}
 
-	const [commit, diffText] = await Promise.all([
-		readGitCommitEntry(worktreePath, params.commitHash),
-		readGitCommitDiff(worktreePath, params.commitHash),
-	]);
-
-	return {
-		projectId: project.id,
+	return getCachedGitCommitDiffResult(
+		project.id,
 		worktreePath,
-		commit,
-		diffText,
-	};
+		params.commitHash,
+	);
 }
 
 export async function closeWorktreeProcedure(

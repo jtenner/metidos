@@ -22,13 +22,13 @@
 │     ├─ ai_chat_mobile/
 │     │  ├─ code.html
 │     │  └─ screen.png
+│     ├─ codex_view/
+│     │  ├─ code.html
+│     │  └─ screen.png
 │     ├─ compact_diff_view_desktop/
 │     │  ├─ code.html
 │     │  └─ screen.png
 │     ├─ compact_diff_view_mobile/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ codex_view/
 │     │  ├─ code.html
 │     │  └─ screen.png
 │     ├─ file_editor_mobile/
@@ -52,7 +52,6 @@
  │  │  └─ rpc-schema.ts
  │  └─ mainview/
  │     ├─ App.tsx
- │     ├─ index.css
  │     ├─ index.html
  │     ├─ index.ts
  │     └─ input.css

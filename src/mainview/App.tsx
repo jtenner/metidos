@@ -9,7 +9,9 @@ import {
 	type ReactNode,
 	type SVGProps,
 	type UIEvent,
+	startTransition,
 	useCallback,
+	useDeferredValue,
 	useEffect,
 	useMemo,
 	useRef,
@@ -170,10 +172,13 @@ const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
 const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;
 const GIT_HISTORY_PAGE_SIZE = 20;
 const GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES = 8;
+const GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES = 24;
 const GIT_HISTORY_ROW_HEIGHT_PX = 66;
 const GIT_HISTORY_DOM_WINDOW_SIZE = 20;
 const GIT_HISTORY_RENDER_OVERSCAN_ROWS = 8;
 const GIT_HISTORY_LOAD_MORE_THRESHOLD_PX = GIT_HISTORY_ROW_HEIGHT_PX * 3;
+const DIFF_VIEWER_ROW_HEIGHT_PX = 24;
+const DIFF_VIEWER_RENDER_OVERSCAN_ROWS = 80;
 const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
@@ -1543,8 +1548,8 @@ function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 }
 
 function parseUnifiedDiff(diffText: string): DiffLine[] {
-	const trimmed = diffText.trim();
-	if (!trimmed) {
+	const normalized = diffText.replace(/\r/g, "");
+	if (!normalized.trim()) {
 		return [
 			{
 				kind: "meta",
@@ -1554,10 +1559,10 @@ function parseUnifiedDiff(diffText: string): DiffLine[] {
 		];
 	}
 
-	const keyCounts = new Map<string, number>();
-	return trimmed.split(/\r?\n/).map((line): DiffLine => {
-		const count = (keyCounts.get(line) ?? 0) + 1;
-		keyCounts.set(line, count);
+	const rawLines = normalized.endsWith("\n")
+		? normalized.slice(0, -1).split("\n")
+		: normalized.split("\n");
+	return rawLines.map((line, index): DiffLine => {
 		if (
 			line.startsWith("diff --git ") ||
 			line.startsWith("index ") ||
@@ -1566,41 +1571,41 @@ function parseUnifiedDiff(diffText: string): DiffLine[] {
 		) {
 			return {
 				kind: "file",
-				key: `file:${line}:${count}`,
+				key: `file:${index}`,
 				text: line,
 			};
 		}
 		if (line.startsWith("@@")) {
 			return {
 				kind: "hunk",
-				key: `hunk:${line}:${count}`,
+				key: `hunk:${index}`,
 				text: line,
 			};
 		}
 		if (line.startsWith("+")) {
 			return {
 				kind: "add",
-				key: `add:${line}:${count}`,
+				key: `add:${index}`,
 				text: line,
 			};
 		}
 		if (line.startsWith("-")) {
 			return {
 				kind: "remove",
-				key: `remove:${line}:${count}`,
+				key: `remove:${index}`,
 				text: line,
 			};
 		}
 		if (line.startsWith("\\")) {
 			return {
 				kind: "meta",
-				key: `meta:${line}:${count}`,
+				key: `meta:${index}`,
 				text: line,
 			};
 		}
 		return {
 			kind: "context",
-			key: `context:${line}:${count}`,
+			key: `context:${index}`,
 			text: line,
 		};
 	});
@@ -1629,32 +1634,76 @@ function DiffViewer({
 	diffText: string;
 	className?: string;
 }): JSX.Element {
-	const lines = parseUnifiedDiff(diffText);
+	const deferredDiffText = useDeferredValue(diffText);
+	const [scrollTop, setScrollTop] = useState(0);
+	const lines = useMemo(
+		() => parseUnifiedDiff(deferredDiffText),
+		[deferredDiffText],
+	);
+	const visibleLines = useMemo(() => {
+		const totalLines = lines.length;
+		const windowSize = Math.min(
+			totalLines,
+			Math.max(DIFF_VIEWER_RENDER_OVERSCAN_ROWS * 2, 160),
+		);
+		const maxStartIndex = Math.max(0, totalLines - windowSize);
+		const startIndex = clampNumber(
+			Math.floor(scrollTop / DIFF_VIEWER_ROW_HEIGHT_PX) -
+				DIFF_VIEWER_RENDER_OVERSCAN_ROWS,
+			0,
+			maxStartIndex,
+		);
+		const endIndex = Math.min(totalLines, startIndex + windowSize);
+		return {
+			entries: lines.slice(startIndex, endIndex),
+			topSpacerHeight: startIndex * DIFF_VIEWER_ROW_HEIGHT_PX,
+			bottomSpacerHeight: Math.max(
+				0,
+				(totalLines - endIndex) * DIFF_VIEWER_ROW_HEIGHT_PX,
+			),
+		};
+	}, [lines, scrollTop]);
+	const isRenderingDeferred = deferredDiffText !== diffText;
+
 	return (
 		<div
-			className={`app-scrollbar min-h-0 overflow-y-auto overscroll-contain border-t border-[#2b343b] bg-[#0c1018] font-mono text-[12px] leading-5 ${className}`.trim()}
+			className={`app-scrollbar min-h-0 overflow-auto overscroll-contain border-t border-[#2b343b] bg-[#0c1018] font-mono text-[12px] leading-5 ${className}`.trim()}
 			style={{ WebkitOverflowScrolling: "touch" }}
+			onScroll={(event) => {
+				setScrollTop(event.currentTarget.scrollTop);
+			}}
 		>
-			{lines.map((line) => (
-				<div
-					key={line.key}
-					className={`whitespace-pre-wrap break-all px-3 py-0.5 ${
-						line.kind === "add"
-							? "bg-[#10261d] text-[#80f2c5]"
-							: line.kind === "remove"
-								? "bg-[#31141b] text-[#ff9bb0]"
-								: line.kind === "hunk"
-									? "bg-[#1d272e] text-[#b8cede]"
-									: line.kind === "file"
-										? "bg-[#161e23] text-[#8cc5ff]"
-										: line.kind === "meta"
-											? "bg-[#12171b] text-[#8798a5]"
-											: "text-[#d9dcde]"
-					}`}
-				>
-					{line.text || " "}
+			{isRenderingDeferred ? (
+				<div className="sticky top-0 z-10 border-b border-[#2b343b] bg-[#12171b]/95 px-3 py-1.5 text-[11px] text-[#9aa9b5] backdrop-blur-sm">
+					Rendering diff...
 				</div>
-			))}
+			) : null}
+			<div style={{ paddingTop: visibleLines.topSpacerHeight }}>
+				{visibleLines.entries.map((line) => (
+					<div
+						key={line.key}
+						className={`min-w-fit whitespace-pre px-3 py-0.5 ${
+							line.kind === "add"
+								? "bg-[#10261d] text-[#80f2c5]"
+								: line.kind === "remove"
+									? "bg-[#31141b] text-[#ff9bb0]"
+									: line.kind === "hunk"
+										? "bg-[#1d272e] text-[#b8cede]"
+										: line.kind === "file"
+											? "bg-[#161e23] text-[#8cc5ff]"
+											: line.kind === "meta"
+												? "bg-[#12171b] text-[#8798a5]"
+												: "text-[#d9dcde]"
+						}`}
+						style={{ height: `${DIFF_VIEWER_ROW_HEIGHT_PX}px` }}
+					>
+						{line.text || " "}
+					</div>
+				))}
+			</div>
+			{visibleLines.bottomSpacerHeight > 0 ? (
+				<div style={{ height: `${visibleLines.bottomSpacerHeight}px` }} />
+			) : null}
 		</div>
 	);
 }
@@ -1859,8 +1908,8 @@ function GitHistoryDiffModal({
 				onClick={onClose}
 				aria-label="Close git diff"
 			/>
-			<div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
-				<div className="relative flex h-full min-h-0 w-full flex-col border border-[#283239] bg-[#0c1018] shadow-[0_24px_56px_rgba(0,0,0,0.56)] md:h-[88vh] md:max-h-[56rem] md:max-w-5xl md:overflow-hidden md:rounded-xl">
+			<div className="pointer-events-none absolute inset-0 flex items-stretch justify-center p-3 md:items-center md:p-6">
+				<div className="pointer-events-auto relative flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#283239] bg-[#0c1018] shadow-[0_24px_56px_rgba(0,0,0,0.56)] md:h-[88vh] md:max-h-[56rem]">
 					<div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#131a1f] px-4 py-4 md:px-6">
 						<div className="min-w-0">
 							<div className="flex flex-wrap items-center gap-2">
@@ -1903,7 +1952,11 @@ function GitHistoryDiffModal({
 								{state.error}
 							</div>
 						) : (
-							<DiffViewer diffText={state.diffText} className="flex-1" />
+							<DiffViewer
+								key={state.entry.hash}
+								diffText={state.diffText}
+								className="flex-1"
+							/>
 						)}
 					</div>
 				</div>
@@ -2538,24 +2591,31 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					return;
 				}
 
-				gitHistoryDiffCacheRef.current.set(cacheKey, {
-					commit: result.commit,
-					diffText: result.diffText,
-				});
-				setGitHistoryModal((current) =>
-					current &&
-					current.projectId === projectId &&
-					current.worktreePath === worktreePath &&
-					current.entry.hash === entry.hash
-						? {
-								...current,
-								entry: result.commit,
-								diffText: result.diffText,
-								loading: false,
-								error: "",
-							}
-						: current,
+				writeLruValue(
+					gitHistoryDiffCacheRef.current,
+					cacheKey,
+					{
+						commit: result.commit,
+						diffText: result.diffText,
+					},
+					GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
 				);
+				startTransition(() => {
+					setGitHistoryModal((current) =>
+						current &&
+						current.projectId === projectId &&
+						current.worktreePath === worktreePath &&
+						current.entry.hash === entry.hash
+							? {
+									...current,
+									entry: result.commit,
+									diffText: result.diffText,
+									loading: false,
+									error: "",
+								}
+							: current,
+					);
+				});
 			} catch (error) {
 				if (gitHistoryDiffRequestIdRef.current !== requestId) {
 					return;
