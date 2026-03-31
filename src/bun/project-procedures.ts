@@ -2728,21 +2728,18 @@ function stopWorktreePolling(
 	state.openWorktrees.delete(worktreePath);
 }
 
-function startWorktreePolling(
-	state: ProjectPollState,
+function createWorktreePollState(
+	projectId: number,
 	worktreePath: string,
 ): WorktreePollState {
-	const existing = state.openWorktrees.get(worktreePath);
-	if (existing) return existing;
-
-	const worktreeState: WorktreePollState = {
+	return {
 		diff: [],
 		diffPolling: false,
 		files: [],
 		diffTimer: null,
 		filesPolling: false,
 		filesTimer: null,
-		history: emptyGitHistorySummary(state.id, worktreePath),
+		history: emptyGitHistorySummary(projectId, worktreePath),
 		historyEntries: [],
 		historyNextOffset: null,
 		historyPolling: false,
@@ -2753,6 +2750,35 @@ function startWorktreePolling(
 		taskTimer: null,
 		lastUpdatedAt: getNow(),
 	};
+}
+
+function ensureWorktreePollState(
+	state: ProjectPollState,
+	worktreePath: string,
+): WorktreePollState {
+	const existing = state.openWorktrees.get(worktreePath);
+	if (existing) {
+		return existing;
+	}
+
+	const worktreeState = createWorktreePollState(state.id, worktreePath);
+	state.openWorktrees.set(worktreePath, worktreeState);
+	return worktreeState;
+}
+
+function startWorktreePolling(
+	state: ProjectPollState,
+	worktreePath: string,
+): WorktreePollState {
+	const worktreeState = ensureWorktreePollState(state, worktreePath);
+	if (
+		worktreeState.diffTimer ||
+		worktreeState.filesTimer ||
+		worktreeState.historyTimer ||
+		worktreeState.taskTimer
+	) {
+		return worktreeState;
+	}
 
 	const pollDiff = async () => {
 		if (worktreeState.diffPolling) {
@@ -2842,7 +2868,6 @@ function startWorktreePolling(
 		pollTasks();
 	}, TASK_POLL_INTERVAL_MS);
 
-	state.openWorktrees.set(worktreePath, worktreeState);
 	void pollDiff();
 	void pollFiles();
 
@@ -2983,11 +3008,12 @@ export async function listProjectTasksProcedure(
 	const worktreePath = normalizePath(params.worktreePath);
 	await assertProjectWorktree(project, worktreePath, requestGitOptions);
 	throwIfAborted(context?.signal, "Project task read was aborted.");
-	startWorktreePolling(ensureProjectPoller(project), worktreePath);
-	return sortProjectTasks([
+	const tasks = sortProjectTasks([
 		...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
 		...listPackageJsonTasks(worktreePath),
 	]);
+	startWorktreePolling(ensureProjectPoller(project), worktreePath);
+	return tasks;
 }
 
 export async function createWorktreeProcedure(
@@ -3239,7 +3265,7 @@ export async function openWorktreeProcedure(
 		);
 	}
 
-	const worktreeState = startWorktreePolling(state, worktreePath);
+	const worktreeState = ensureWorktreePollState(state, worktreePath);
 	const { history, summary, signature } = await readGitHistoryFirstPage(
 		project.id,
 		worktreePath,
@@ -3251,6 +3277,7 @@ export async function openWorktreeProcedure(
 	worktreeState.historyNextOffset = history.nextOffset;
 	worktreeState.historySignature = signature;
 	worktreeState.lastUpdatedAt = summary.lastUpdatedAt;
+	startWorktreePolling(state, worktreePath);
 	warmGitHistoryCache(worktreeState, worktreePath);
 
 	return {
@@ -3279,10 +3306,8 @@ export async function listWorktreeGitHistoryProcedure(
 			: 0;
 	const limit = normalizeGitHistoryPageLimit(params.limit);
 
-	const state = startWorktreePolling(
-		ensureProjectPoller(project),
-		worktreePath,
-	);
+	const projectState = ensureProjectPoller(project);
+	const state = ensureWorktreePollState(projectState, worktreePath);
 	if (offset === 0) {
 		const { history, summary, signature } = await readGitHistoryFirstPage(
 			project.id,
@@ -3295,6 +3320,7 @@ export async function listWorktreeGitHistoryProcedure(
 		state.historyNextOffset = history.nextOffset;
 		state.historySignature = signature;
 		state.lastUpdatedAt = summary.lastUpdatedAt;
+		startWorktreePolling(projectState, worktreePath);
 		warmGitHistoryCache(state, worktreePath);
 		return history;
 	}
@@ -3331,6 +3357,7 @@ export async function listWorktreeGitHistoryProcedure(
 		limit,
 		requestGitOptions,
 	);
+	startWorktreePolling(projectState, worktreePath);
 	warmGitHistoryCache(state, worktreePath);
 	return buildGitHistoryResultFromCache(state, limit, offset);
 }
