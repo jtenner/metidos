@@ -474,9 +474,13 @@ server.registerTool(
 	"set_thread_title",
 	{
 		title: "Set Thread Title",
-		description: `Update the Jolt thread title. Use it whenever a short title would better match the focus.${boundThreadSentence()}`,
+		description: `Update the Jolt thread title. Use it liberally whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
 		inputSchema: {
-			title: z.string().trim().min(1).describe("Short title."),
+			title: z
+				.string()
+				.trim()
+				.min(1)
+				.describe("Short title. Update whenever the focus shifts."),
 			threadId: z
 				.number()
 				.int()
