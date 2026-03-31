@@ -543,6 +543,7 @@ const procedures: ProjectProcedures = {
 	renameThread: createProcedure("renameThread"),
 	setThreadPinned: createProcedure("setThreadPinned"),
 	updateThreadModel: createProcedure("updateThreadModel"),
+	updateThreadReasoningEffort: createProcedure("updateThreadReasoningEffort"),
 	deleteThread: createProcedure("deleteThread"),
 	openWorktree: createProcedure("openWorktree"),
 	setActiveWorktree: createProcedure("setActiveWorktree"),

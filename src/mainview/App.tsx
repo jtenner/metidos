@@ -23,6 +23,8 @@ import remarkGfm from "remark-gfm";
 import type {
 	ProjectProcedures,
 	RpcCodexModelOption,
+	RpcCodexReasoningEffort,
+	RpcCodexReasoningEffortOption,
 	RpcGitHistoryEntry,
 	RpcProject,
 	RpcProjectTask,
@@ -152,6 +154,7 @@ type PersistedMainviewState = {
 	selectedWorktreePath: string | null;
 	selectedThreadId: number | null;
 	pendingThreadModel: string;
+	pendingThreadReasoningEffort: string;
 	chatInput: string;
 	sidebarCollapsed: boolean;
 	sidebarSearchQuery: string;
@@ -193,6 +196,13 @@ const MAINVIEW_STATE_STORAGE_VERSION = 1;
 const TREE_VIEW_STATE_STORAGE_KEY = "jt-ide:tree-view-state";
 const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 const APP_TITLE = "Jolt";
+const CODEX_REASONING_EFFORT_VALUES: RpcCodexReasoningEffort[] = [
+	"minimal",
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+];
 
 type AppIconName =
 	| "account_circle"
@@ -555,6 +565,7 @@ function defaultPersistedMainviewState(): PersistedMainviewState {
 		selectedWorktreePath: null,
 		selectedThreadId: null,
 		pendingThreadModel: "",
+		pendingThreadReasoningEffort: "",
 		chatInput: "",
 		sidebarCollapsed: false,
 		sidebarSearchQuery: "",
@@ -576,6 +587,15 @@ function parsePositiveInteger(value: unknown): number | null {
 	return typeof value === "number" && Number.isInteger(value) && value > 0
 		? value
 		: null;
+}
+
+function isCodexReasoningEffort(
+	value: unknown,
+): value is RpcCodexReasoningEffort {
+	return (
+		typeof value === "string" &&
+		CODEX_REASONING_EFFORT_VALUES.includes(value as RpcCodexReasoningEffort)
+	);
 }
 
 function normalizePersistedOpenWorktrees(
@@ -667,6 +687,11 @@ function readPersistedMainviewState(): PersistedMainviewState {
 				typeof parsed.pendingThreadModel === "string"
 					? parsed.pendingThreadModel
 					: "",
+			pendingThreadReasoningEffort: isCodexReasoningEffort(
+				parsed.pendingThreadReasoningEffort,
+			)
+				? parsed.pendingThreadReasoningEffort
+				: "",
 			chatInput: typeof parsed.chatInput === "string" ? parsed.chatInput : "",
 			sidebarCollapsed:
 				typeof parsed.sidebarCollapsed === "boolean"
@@ -988,6 +1013,13 @@ function findCodexModel(
 	modelId: string,
 ): RpcCodexModelOption | null {
 	return models.find((model) => model.id === modelId) ?? null;
+}
+
+function findReasoningEffortOption(
+	options: RpcCodexReasoningEffortOption[],
+	reasoningEffort: RpcCodexReasoningEffort,
+): RpcCodexReasoningEffortOption | null {
+	return options.find((option) => option.id === reasoningEffort) ?? null;
 }
 
 function formatCompactTokenCount(value: number): string {
@@ -1314,6 +1346,137 @@ function CodexModelSelector({
 								</div>
 							</div>
 						))}
+					</div>
+				</div>
+			)}
+		/>
+	);
+}
+
+function ReasoningEffortSelector({
+	options,
+	value,
+	disabled,
+	onChange,
+	variant,
+}: {
+	options: RpcCodexReasoningEffortOption[];
+	value: RpcCodexReasoningEffort;
+	disabled: boolean;
+	onChange: (value: RpcCodexReasoningEffort) => void;
+	variant: "desktop" | "mobile";
+}): JSX.Element {
+	const activeOption = findReasoningEffortOption(options, value);
+	const buttonLabel = activeOption
+		? activeOption.label
+		: options.length === 0
+			? "Loading"
+			: "Effort";
+
+	return (
+		<DropdownControl
+			canOpen={!disabled}
+			disabled={disabled}
+			title={
+				activeOption
+					? `Reasoning effort: ${activeOption.label}`
+					: "Reasoning effort"
+			}
+			renderButton={({ open, toggle }) => (
+				<button
+					type="button"
+					className={`flex w-full items-center gap-2 overflow-hidden border text-left transition-colors ${
+						variant === "desktop"
+							? "h-7 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+							: "h-10 rounded-xl border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+					} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
+						open
+							? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
+							: ""
+					}`}
+					onClick={toggle}
+					disabled={disabled}
+					aria-expanded={open}
+					aria-haspopup="menu"
+				>
+					{materialSymbol(
+						"bolt",
+						variant === "desktop"
+							? "text-[15px] text-[#bdd5e6]"
+							: "text-[16px] text-[#bdd5e6]",
+						{
+							filled: true,
+						},
+					)}
+					<span
+						className={`min-w-0 flex-1 truncate font-label font-bold uppercase text-[#f2f0ef] ${
+							variant === "desktop"
+								? "text-[10px] leading-none tracking-wider"
+								: "text-[10px] leading-none tracking-widest"
+						}`}
+					>
+						{buttonLabel}
+					</span>
+					<span
+						className={`shrink-0 text-[#8f8d8b] ${
+							variant === "desktop"
+								? "leading-none"
+								: "flex h-4 items-center leading-none"
+						}`}
+					>
+						{materialSymbol(
+							open ? "expand_less" : "expand_more",
+							variant === "desktop" ? "text-[13px]" : "text-[16px]",
+						)}
+					</span>
+				</button>
+			)}
+			renderPanel={({ close }) => (
+				<div
+					className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+						variant === "desktop"
+							? "left-0 min-w-[10rem] rounded-md border-[#3c4c58] bg-[#15191b]"
+							: "right-0 w-[12rem] rounded-2xl border-[#445058] bg-[#171b1d]"
+					}`}
+				>
+					<div className="border-b border-[#3c4c58] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
+						Reasoning Effort
+					</div>
+					<div className="py-2">
+						{options.map((option) => {
+							const selected = option.id === value;
+							return (
+								<button
+									key={option.id}
+									type="button"
+									className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
+										selected
+											? "bg-[#28353e] text-[#f8fafc]"
+											: "text-[#ebf3f8] hover:bg-[#1e2428]"
+									}`}
+									onClick={() => {
+										close();
+										if (option.id !== value) {
+											onChange(option.id);
+										}
+									}}
+								>
+									<span
+										className={`shrink-0 ${
+											selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
+										}`}
+									>
+										{materialSymbol(
+											selected ? "check_circle" : "radio_button_unchecked",
+											"text-[16px]",
+										)}
+									</span>
+									<span className="min-w-0 flex-1 font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
+										{option.label}
+									</span>
+								</button>
+							);
+						})}
 					</div>
 				</div>
 			)}
@@ -2240,10 +2403,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [gitHistoryModal, setGitHistoryModal] =
 		useState<GitHistoryModalState | null>(null);
 	const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
+	const [reasoningEfforts, setReasoningEfforts] = useState<
+		RpcCodexReasoningEffortOption[]
+	>([]);
 	const [defaultCodexModel, setDefaultCodexModel] = useState("");
+	const [defaultCodexReasoningEffort, setDefaultCodexReasoningEffort] =
+		useState<RpcCodexReasoningEffort>("medium");
 	const [pendingThreadModel, setPendingThreadModel] = useState(
 		initialMainviewState.pendingThreadModel,
 	);
+	const [pendingThreadReasoningEffort, setPendingThreadReasoningEffort] =
+		useState<RpcCodexReasoningEffort>(
+			isCodexReasoningEffort(initialMainviewState.pendingThreadReasoningEffort)
+				? initialMainviewState.pendingThreadReasoningEffort
+				: defaultCodexReasoningEffort,
+		);
 	const [selectedThreadId, setSelectedThreadId] = useState<number | null>(
 		initialMainviewState.selectedThreadId,
 	);
@@ -2260,6 +2434,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
 	const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
 	const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
+	const [isUpdatingThreadReasoningEffort, setIsUpdatingThreadReasoningEffort] =
+		useState(false);
 	const [threadActionBusy, setThreadActionBusy] = useState<
 		"rename" | "pin" | "delete" | null
 	>(null);
@@ -2276,6 +2452,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [chatInput, setChatInput] = useState(initialMainviewState.chatInput);
 	const [isSending, setIsSending] = useState(false);
 	const [isStoppingThread, setIsStoppingThread] = useState(false);
+	const [reasoningEffortControlError, setReasoningEffortControlError] =
+		useState("");
 	const [errorPreviewPopover, setErrorPreviewPopover] =
 		useState<ErrorPreviewPopoverState | null>(null);
 	const [sessionStateReady, setSessionStateReady] = useState(false);
@@ -2370,6 +2548,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[activeCodexModel, codexModels],
 	);
 
+	const activeReasoningEffort = useMemo(() => {
+		if (selectedThread?.reasoningEffort) {
+			return selectedThread.reasoningEffort;
+		}
+		return pendingThreadReasoningEffort || defaultCodexReasoningEffort;
+	}, [
+		defaultCodexReasoningEffort,
+		pendingThreadReasoningEffort,
+		selectedThread,
+	]);
+
 	const activeContextWindowTokens =
 		activeCodexModelOption?.contextWindowTokens ?? 400_000;
 	const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
@@ -2450,6 +2639,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		isThreadLoading ||
 		isSending ||
 		isUpdatingThreadModel ||
+		selectedThreadIsWorking;
+	const reasoningEffortSelectorDisabled =
+		reasoningEfforts.length === 0 ||
+		isCreatingThread ||
+		isThreadLoading ||
+		isSending ||
+		isUpdatingThreadReasoningEffort ||
 		selectedThreadIsWorking;
 
 	const selectedThreadRunError =
@@ -3944,7 +4140,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setThreads(sortedThreads);
 			setCodexModels(modelCatalog.models);
 			setDefaultCodexModel(modelCatalog.defaultModel);
+			setReasoningEfforts(modelCatalog.reasoningEfforts);
+			setDefaultCodexReasoningEffort(modelCatalog.defaultReasoningEffort);
 			setPendingThreadModel((current) => current || modelCatalog.defaultModel);
+			setPendingThreadReasoningEffort(
+				(current) => current || modelCatalog.defaultReasoningEffort,
+			);
 			hydrateProjectRows(loaded);
 			setHomeDirectory(homeDirectoryResult.homeDirectory);
 			setSupportsTildePath(homeDirectoryResult.supportsTildePath);
@@ -4594,6 +4795,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			selectedWorktreePath,
 			selectedThreadId,
 			pendingThreadModel,
+			pendingThreadReasoningEffort,
 			chatInput,
 			sidebarCollapsed,
 			sidebarSearchQuery,
@@ -4602,6 +4804,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [
 		chatInput,
 		pendingThreadModel,
+		pendingThreadReasoningEffort,
 		projectStates,
 		selectedProjectId,
 		selectedThreadId,
@@ -4644,6 +4847,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setPendingThreadModel(defaultCodexModel);
 		}
 	}, [defaultCodexModel, selectedThread]);
+
+	useEffect(() => {
+		if (selectedThread?.reasoningEffort) {
+			setPendingThreadReasoningEffort(selectedThread.reasoningEffort);
+			setReasoningEffortControlError("");
+			return;
+		}
+		if (defaultCodexReasoningEffort) {
+			setPendingThreadReasoningEffort(defaultCodexReasoningEffort);
+		}
+	}, [defaultCodexReasoningEffort, selectedThread]);
 
 	useEffect(() => {
 		if (
@@ -5068,6 +5282,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[isUpdatingThreadModel, procedures, selectedThread],
 	);
 
+	const updateActiveReasoningEffort = useCallback(
+		async (reasoningEffort: RpcCodexReasoningEffort) => {
+			setReasoningEffortControlError("");
+			if (!reasoningEffort) {
+				return;
+			}
+
+			if (!selectedThread) {
+				setPendingThreadReasoningEffort(reasoningEffort);
+				return;
+			}
+
+			if (
+				selectedThread.reasoningEffort === reasoningEffort ||
+				isUpdatingThreadReasoningEffort
+			) {
+				return;
+			}
+
+			setIsUpdatingThreadReasoningEffort(true);
+			try {
+				const updatedThread = await procedures.updateThreadReasoningEffort({
+					threadId: selectedThread.id,
+					reasoningEffort,
+				});
+				setThreads((prev) => upsertThreadList(prev, updatedThread));
+				setPendingThreadReasoningEffort(updatedThread.reasoningEffort);
+			} catch (error) {
+				setReasoningEffortControlError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				setIsUpdatingThreadReasoningEffort(false);
+			}
+		},
+		[isUpdatingThreadReasoningEffort, procedures, selectedThread],
+	);
+
 	const runSelectedTask = useCallback(
 		async (task: RpcProjectTask) => {
 			if (!selectedProject || !activeSelectedWorktreePath) {
@@ -5079,6 +5331,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			setTaskControlError("");
 			setThreadsError("");
 			setChatError("");
+			setReasoningEffortControlError("");
 			try {
 				const detail = await procedures.runProjectTask({
 					projectId: selectedProject.id,
@@ -5088,6 +5341,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					model: selectedThread
 						? null
 						: activeCodexModel || defaultCodexModel || null,
+					reasoningEffort: selectedThread
+						? null
+						: activeReasoningEffort || defaultCodexReasoningEffort || null,
 				});
 				setThreads((prev) => upsertThreadList(prev, detail.thread));
 				setSelectedThreadId(detail.thread.id);
@@ -5110,8 +5366,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		},
 		[
 			activeCodexModel,
+			activeReasoningEffort,
 			activeSelectedWorktreePath,
 			defaultCodexModel,
+			defaultCodexReasoningEffort,
 			loadProjectWorktrees,
 			procedures,
 			selectedProject,
@@ -5132,12 +5390,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setIsCreatingThread(true);
 		setThreadsError("");
 		setModelControlError("");
+		setReasoningEffortControlError("");
 		setChatError("");
 		try {
 			const detail = await procedures.createThread({
 				projectId: selectedProject.id,
 				worktreePath: activeSelectedWorktreePath,
 				model: activeCodexModel || defaultCodexModel || null,
+				reasoningEffort:
+					activeReasoningEffort || defaultCodexReasoningEffort || null,
 			});
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);
@@ -5158,7 +5419,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [
 		activeSelectedWorktreePath,
 		activeCodexModel,
+		activeReasoningEffort,
 		defaultCodexModel,
+		defaultCodexReasoningEffort,
 		isCreatingThread,
 		loadProjectWorktrees,
 		procedures,
@@ -6988,6 +7251,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											variant="desktop"
 										/>
 									</div>
+									<div className="min-w-[7.5rem] max-w-[8.5rem]">
+										<ReasoningEffortSelector
+											options={reasoningEfforts}
+											value={activeReasoningEffort}
+											disabled={reasoningEffortSelectorDisabled}
+											onChange={(value) => {
+												void updateActiveReasoningEffort(value);
+											}}
+											variant="desktop"
+										/>
+									</div>
 									<ProjectTaskSelector
 										tasks={projectTasks}
 										loading={isLoadingProjectTasks}
@@ -7016,6 +7290,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								{modelControlError ? (
 									<div className="mt-2 text-xs text-[#ff6e84]">
 										{modelControlError}
+									</div>
+								) : null}
+								{reasoningEffortControlError ? (
+									<div className="mt-2 text-xs text-[#ff6e84]">
+										{reasoningEffortControlError}
 									</div>
 								) : null}
 								{taskControlError ? (
@@ -7132,6 +7411,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											variant="mobile"
 										/>
 									</div>
+									<div className="w-[6.75rem] shrink-0">
+										<ReasoningEffortSelector
+											options={reasoningEfforts}
+											value={activeReasoningEffort}
+											disabled={reasoningEffortSelectorDisabled}
+											onChange={(value) => {
+												void updateActiveReasoningEffort(value);
+											}}
+											variant="mobile"
+										/>
+									</div>
 									<ProjectTaskSelector
 										tasks={projectTasks}
 										loading={isLoadingProjectTasks}
@@ -7186,6 +7476,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						{modelControlError ? (
 							<div className="text-xs text-[#ff6e84]">{modelControlError}</div>
+						) : null}
+						{reasoningEffortControlError ? (
+							<div className="text-xs text-[#ff6e84]">
+								{reasoningEffortControlError}
+							</div>
 						) : null}
 						{taskControlError ? (
 							<div className="text-xs text-[#ff6e84]">{taskControlError}</div>

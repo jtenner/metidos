@@ -37,6 +37,7 @@ import {
 	stopThreadTurnProcedure,
 	suspendActiveWorktreePolling,
 	updateThreadModelProcedure,
+	updateThreadReasoningEffortProcedure,
 	warmProcedureStartupCaches,
 } from "./project-procedures";
 import type {
@@ -216,6 +217,8 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	renameThread: (params) => renameThreadProcedure(params),
 	setThreadPinned: (params) => setThreadPinnedProcedure(params),
 	updateThreadModel: (params) => updateThreadModelProcedure(params),
+	updateThreadReasoningEffort: (params) =>
+		updateThreadReasoningEffortProcedure(params),
 	deleteThread: (params) => deleteThreadProcedure(params),
 	openWorktree: (params, context) => openWorktreeProcedure(params, context),
 	setActiveWorktree: (params) => setActiveWorktreeProcedure(params),

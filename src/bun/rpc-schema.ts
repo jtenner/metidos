@@ -127,9 +127,23 @@ export type RpcCodexModelOption = {
 	contextWindowTokens: number;
 };
 
+export type RpcCodexReasoningEffort =
+	| "minimal"
+	| "low"
+	| "medium"
+	| "high"
+	| "xhigh";
+
+export type RpcCodexReasoningEffortOption = {
+	id: RpcCodexReasoningEffort;
+	label: string;
+};
+
 export type RpcCodexModelCatalog = {
 	defaultModel: string;
+	defaultReasoningEffort: RpcCodexReasoningEffort;
 	models: RpcCodexModelOption[];
+	reasoningEfforts: RpcCodexReasoningEffortOption[];
 };
 
 export type RpcThreadRunStatus = {
@@ -162,6 +176,7 @@ export type RpcThread = {
 	worktreePath: string;
 	title: string;
 	model: string;
+	reasoningEffort: RpcCodexReasoningEffort;
 	codexThreadId: string | null;
 	pinnedAt: string | null;
 	createdAt: string;
@@ -328,6 +343,7 @@ export type AppRPCSchema = {
 				projectId: number;
 				worktreePath: string;
 				model?: string | null;
+				reasoningEffort?: RpcCodexReasoningEffort | null;
 			};
 			response: RpcThreadDetail;
 		};
@@ -354,6 +370,7 @@ export type AppRPCSchema = {
 				task: RpcProjectTask;
 				threadId?: number | null;
 				model?: string | null;
+				reasoningEffort?: RpcCodexReasoningEffort | null;
 			};
 			response: RpcThreadDetail;
 		};
@@ -367,6 +384,13 @@ export type AppRPCSchema = {
 		};
 		updateThreadModel: {
 			params: { threadId: number; model: string };
+			response: RpcThread;
+		};
+		updateThreadReasoningEffort: {
+			params: {
+				threadId: number;
+				reasoningEffort: RpcCodexReasoningEffort;
+			};
 			response: RpcThread;
 		};
 		deleteThread: {
@@ -484,6 +508,10 @@ export interface ProjectProcedures {
 	updateThreadModel: RpcProcedureCall<
 		AppRPCSchema["requests"]["updateThreadModel"]["params"],
 		AppRPCSchema["requests"]["updateThreadModel"]["response"]
+	>;
+	updateThreadReasoningEffort: RpcProcedureCall<
+		AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
+		AppRPCSchema["requests"]["updateThreadReasoningEffort"]["response"]
 	>;
 	deleteThread: RpcProcedureCall<
 		AppRPCSchema["requests"]["deleteThread"]["params"],

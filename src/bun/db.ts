@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 const APP_NAME = ".jt-ide";
 const DB_FILE_NAME = "app.db";
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
+export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
 let appDatabase: Database | null = null;
 
 type ProjectInput = {
@@ -18,6 +19,7 @@ type ThreadInput = {
 	worktreePath: string;
 	title: string;
 	model: string;
+	reasoningEffort: string;
 	codexThreadId?: string | null;
 };
 
@@ -71,6 +73,7 @@ export type ThreadRecord = {
 	worktreePath: string;
 	title: string;
 	model: string;
+	reasoningEffort: string;
 	codexThreadId: string | null;
 	pinnedAt: string | null;
 	createdAt: string;
@@ -255,6 +258,7 @@ function migrate(db: Database): void {
 				worktree_path TEXT NOT NULL,
 				title TEXT NOT NULL,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
+				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
 				codex_thread_id TEXT,
 				pinned_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -309,6 +313,11 @@ function migrate(db: Database): void {
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
 	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
 	ensureThreadColumn(db, "model", "model TEXT");
+	ensureThreadColumn(
+		db,
+		"reasoning_effort",
+		"reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+	);
 	runStatement(
 		db,
 		`
@@ -317,6 +326,15 @@ function migrate(db: Database): void {
 			WHERE model IS NULL OR TRIM(model) = ''
 		`,
 		DEFAULT_THREAD_MODEL,
+	);
+	runStatement(
+		db,
+		`
+			UPDATE threads
+			SET reasoning_effort = ?
+			WHERE reasoning_effort IS NULL OR TRIM(reasoning_effort) = ''
+		`,
+		DEFAULT_THREAD_REASONING_EFFORT,
 	);
 	runStatement(
 		db,
@@ -589,6 +607,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 					worktree_path AS worktreePath,
 					title,
 					model,
+					reasoning_effort AS reasoningEffort,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
@@ -631,6 +650,7 @@ export function getThreadById(
 					worktree_path AS worktreePath,
 					title,
 					model,
+					reasoning_effort AS reasoningEffort,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
@@ -667,10 +687,12 @@ export function createThread(
 				worktree_path,
 				title,
 				model,
+				reasoning_effort,
 				codex_thread_id,
 				updated_at
 			)
 			VALUES (
+				?,
 				?,
 				?,
 				?,
@@ -683,6 +705,7 @@ export function createThread(
 		input.worktreePath,
 		input.title,
 		input.model,
+		input.reasoningEffort,
 		input.codexThreadId ?? null,
 	);
 	const threadId = Number(result.lastInsertRowid);
@@ -744,6 +767,25 @@ export function setThreadModel(
 			WHERE id = ?
 		`,
 		model,
+		threadId,
+	);
+}
+
+export function setThreadReasoningEffort(
+	database: Database,
+	threadId: number,
+	reasoningEffort: string,
+): void {
+	runStatement(
+		database,
+		`
+			UPDATE threads
+			SET
+				reasoning_effort = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+		reasoningEffort,
 		threadId,
 	);
 }

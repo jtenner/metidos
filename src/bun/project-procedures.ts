@@ -8,11 +8,16 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
-import { Codex, type ThreadItem } from "@openai/codex-sdk";
+import {
+	Codex,
+	type ModelReasoningEffort,
+	type ThreadItem,
+} from "@openai/codex-sdk";
 
 import type { ProjectRecord, ThreadMessageRecord, ThreadRecord } from "./db";
 import {
 	DEFAULT_THREAD_MODEL,
+	DEFAULT_THREAD_REASONING_EFFORT,
 	createThread,
 	createThreadMessage,
 	deleteProject,
@@ -33,6 +38,7 @@ import {
 	setProjectWorktreePinned,
 	setThreadModel,
 	setThreadPinned,
+	setThreadReasoningEffort,
 	setThreadUsage,
 	settleInProgressThreadMessages,
 	touchThread,
@@ -44,6 +50,8 @@ import type {
 	AppRPCSchema,
 	RpcCodexModelCatalog,
 	RpcCodexModelOption,
+	RpcCodexReasoningEffort,
+	RpcCodexReasoningEffortOption,
 	RpcCreateWorktreeResult,
 	RpcGitCommitDiffResult,
 	RpcGitHistoryEntry,
@@ -510,10 +518,39 @@ const codexModelOptionMap = new Map(
 	CODEx_MODEL_OPTIONS.map((model) => [model.id, model]),
 );
 
+const CODEX_REASONING_EFFORT_OPTIONS: RpcCodexReasoningEffortOption[] = [
+	{
+		id: "minimal",
+		label: "Minimal",
+	},
+	{
+		id: "low",
+		label: "Low",
+	},
+	{
+		id: "medium",
+		label: "Medium",
+	},
+	{
+		id: "high",
+		label: "High",
+	},
+	{
+		id: "xhigh",
+		label: "Extra High",
+	},
+];
+
+const codexReasoningEffortOptionMap = new Map(
+	CODEX_REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
+);
+
 function buildCodexModelCatalog(): RpcCodexModelCatalog {
 	return {
 		defaultModel: DEFAULT_THREAD_MODEL,
+		defaultReasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
 		models: CODEx_MODEL_OPTIONS,
+		reasoningEfforts: CODEX_REASONING_EFFORT_OPTIONS,
 	};
 }
 
@@ -545,6 +582,33 @@ function normalizeStoredCodexModel(model: string | null | undefined): string {
 	const normalized = model?.trim();
 	if (!normalized || !codexModelOptionMap.has(normalized)) {
 		return DEFAULT_THREAD_MODEL;
+	}
+	return normalized;
+}
+
+function resolveCodexReasoningEffort(
+	reasoningEffort: string | null | undefined,
+): RpcCodexReasoningEffort {
+	const normalized = reasoningEffort?.trim() as
+		| ModelReasoningEffort
+		| undefined;
+	if (!normalized) {
+		return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
+	}
+	if (!codexReasoningEffortOptionMap.has(normalized)) {
+		throw new Error(`Unsupported reasoning effort: ${normalized}`);
+	}
+	return normalized;
+}
+
+function normalizeStoredCodexReasoningEffort(
+	reasoningEffort: string | null | undefined,
+): RpcCodexReasoningEffort {
+	const normalized = reasoningEffort?.trim() as
+		| ModelReasoningEffort
+		| undefined;
+	if (!normalized || !codexReasoningEffortOptionMap.has(normalized)) {
+		return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
 	}
 	return normalized;
 }
@@ -1107,6 +1171,9 @@ function toRpcThread(thread: ThreadRecord): RpcThread {
 	return {
 		...thread,
 		model: normalizeStoredCodexModel(thread.model),
+		reasoningEffort: normalizeStoredCodexReasoningEffort(
+			thread.reasoningEffort,
+		),
 		usage: threadUsageFromRecord(thread),
 		compaction: threadCompactionFromRecord(thread),
 		runStatus: threadRunStatusFromRecord(thread),
@@ -1327,11 +1394,15 @@ function toRpcThreadMessages(
 	return messages.map(toRpcThreadMessage);
 }
 
-function codexThreadOptions(worktreePath: string, model: string) {
+function codexThreadOptions(
+	worktreePath: string,
+	model: string,
+	reasoningEffort: RpcCodexReasoningEffort,
+) {
 	return {
 		approvalPolicy: "never" as const,
 		model,
-		modelReasoningEffort: "medium" as const,
+		modelReasoningEffort: reasoningEffort,
 		networkAccessEnabled: true,
 		sandboxMode: "workspace-write" as const,
 		workingDirectory: worktreePath,
@@ -1352,12 +1423,14 @@ async function ensureCodexThread(
 				codexThreadOptions(
 					thread.worktreePath,
 					normalizeStoredCodexModel(thread.model),
+					normalizeStoredCodexReasoningEffort(thread.reasoningEffort),
 				),
 			)
 		: codex.startThread(
 				codexThreadOptions(
 					thread.worktreePath,
 					normalizeStoredCodexModel(thread.model),
+					normalizeStoredCodexReasoningEffort(thread.reasoningEffort),
 				),
 			);
 	codexThreadMap.set(thread.id, next);
@@ -3205,6 +3278,7 @@ async function createThreadRecord(
 	project: ProjectRecord,
 	worktreePath: string,
 	model: string,
+	reasoningEffort: RpcCodexReasoningEffort,
 	options?: ProjectWorktreeReadOptions,
 ): Promise<ThreadRecord> {
 	const worktree = await assertProjectWorktree(project, worktreePath, {
@@ -3212,7 +3286,7 @@ async function createThreadRecord(
 		forceRefresh: true,
 	});
 	const codexThread = codex.startThread(
-		codexThreadOptions(worktreePath, model),
+		codexThreadOptions(worktreePath, model, reasoningEffort),
 	);
 
 	const thread = createThread(db, {
@@ -3220,6 +3294,7 @@ async function createThreadRecord(
 		worktreePath,
 		title: buildThreadTitle(worktree, worktreePath),
 		model,
+		reasoningEffort,
 		codexThreadId: codexThread.id ?? null,
 	});
 	codexThreadMap.set(thread.id, codexThread);
@@ -3374,9 +3449,16 @@ export async function createThreadProcedure(
 	const project = projectByIdForPath(params.projectId);
 	const worktreePath = normalizePath(params.worktreePath);
 	const model = resolveCodexModel(params.model);
-	const thread = await createThreadRecord(project, worktreePath, model, {
-		forceRefresh: true,
-	});
+	const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
+	const thread = await createThreadRecord(
+		project,
+		worktreePath,
+		model,
+		reasoningEffort,
+		{
+			forceRefresh: true,
+		},
+	);
 	return readThreadDetailCached(thread.id);
 }
 
@@ -3498,6 +3580,7 @@ export async function runProjectTaskProcedure(
 			project,
 			worktreePath,
 			resolveCodexModel(params.model),
+			resolveCodexReasoningEffort(params.reasoningEffort),
 			{
 				forceRefresh: true,
 			},
@@ -3565,6 +3648,23 @@ export async function updateThreadModelProcedure(
 
 	const model = resolveCodexModel(params.model);
 	setThreadModel(db, thread.id, model);
+	codexThreadMap.delete(thread.id);
+	invalidateThreadDetailCache(thread.id);
+	return toRpcThread(threadById(thread.id));
+}
+
+export async function updateThreadReasoningEffortProcedure(
+	params: AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
+): Promise<RpcThread> {
+	const thread = threadById(params.threadId);
+	if (threadRunStatusFromRecord(thread).state === "working") {
+		throw new Error(
+			"Thread reasoning effort cannot change while Codex is processing.",
+		);
+	}
+
+	const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
+	setThreadReasoningEffort(db, thread.id, reasoningEffort);
 	codexThreadMap.delete(thread.id);
 	invalidateThreadDetailCache(thread.id);
 	return toRpcThread(threadById(thread.id));
