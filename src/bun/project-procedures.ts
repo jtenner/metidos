@@ -902,6 +902,42 @@ async function refreshProjectPoll(
 	) {
 		state.activeWorktreePath = null;
 	}
+	syncProjectRefreshPolling(state);
+}
+
+function startProjectRefreshPolling(state: ProjectPollState): void {
+	if (state.projectTimer) {
+		return;
+	}
+
+	state.projectTimer = setInterval(() => {
+		refreshProjectPoll(state.id, {
+			priority: "background",
+		}).catch((error) => {
+			logBackgroundGitFailure(
+				`Worktree polling failed for project ${state.id}`,
+				error,
+			);
+		});
+	}, PROJECT_POLL_INTERVAL_MS);
+}
+
+function stopProjectRefreshPolling(state: ProjectPollState): void {
+	if (!state.projectTimer) {
+		return;
+	}
+
+	clearInterval(state.projectTimer);
+	state.projectTimer = null;
+}
+
+function syncProjectRefreshPolling(state: ProjectPollState): void {
+	if (state.activeWorktreePath !== null) {
+		startProjectRefreshPolling(state);
+		return;
+	}
+
+	stopProjectRefreshPolling(state);
 }
 
 function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
@@ -922,19 +958,7 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 
 	state.project = project;
 	state.projectPath = project.path;
-
-	if (!state.projectTimer) {
-		state.projectTimer = setInterval(() => {
-			refreshProjectPoll(project.id, {
-				priority: "background",
-			}).catch((error) => {
-				logBackgroundGitFailure(
-					`Worktree polling failed for project ${project.id}`,
-					error,
-				);
-			});
-		}, PROJECT_POLL_INTERVAL_MS);
-	}
+	syncProjectRefreshPolling(state);
 
 	return state;
 }
@@ -1841,10 +1865,12 @@ export async function setActiveWorktreeProcedure(
 	for (const state of projectPollMap.values()) {
 		const nextActiveWorktreePath = state.id === projectId ? worktreePath : null;
 		if (state.activeWorktreePath === nextActiveWorktreePath) {
+			syncProjectRefreshPolling(state);
 			continue;
 		}
 		state.activeWorktreePath = nextActiveWorktreePath;
 		syncProjectWorktreeBackgroundPolling(state);
+		syncProjectRefreshPolling(state);
 	}
 
 	return {
@@ -1860,10 +1886,11 @@ export async function closeWorktreeProcedure(
 	const state = projectPollMap.get(params.projectId);
 	if (state) {
 		const normalizedPath = normalizePath(params.worktreePath);
-		stopWorktreePolling(state, normalizedPath);
 		if (state.activeWorktreePath === normalizedPath) {
 			state.activeWorktreePath = null;
 		}
+		stopWorktreePolling(state, normalizedPath);
+		syncProjectRefreshPolling(state);
 	}
 
 	return {
