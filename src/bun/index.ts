@@ -51,6 +51,14 @@ const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
 	process.cwd(),
 	"node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
 );
+const INTER_VARIABLE_FONT_LATIN_PATH = resolve(
+	process.cwd(),
+	"node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+);
+const INTER_VARIABLE_FONT_LATIN_EXT_PATH = resolve(
+	process.cwd(),
+	"node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2",
+);
 const MAINVIEW_RELOAD_DEBOUNCE_MS = 90;
 const MAINVIEW_WATCH_INTERVAL_MS = 250;
 
@@ -214,13 +222,20 @@ function fileResponse(path: string, contentType: string): Response {
 }
 
 async function htmlResponse(): Promise<Response> {
+	const cssFile = Bun.file(MAINVIEW_CSS_PATH);
+	const inlineCss = (await cssFile.exists())
+		? `<style>${(await cssFile.text()).replaceAll("</style", "<\\/style")}</style>`
+		: "";
 	const runtimeScript = `<script>window.__jtIdeRuntime=${JSON.stringify({
 		devServer: IS_DEV_SERVER,
 	})};</script>`;
 	const template = await Bun.file(MAINVIEW_HTML_PATH).text();
 	const html = template.includes("</head>")
-		? template.replace("</head>", `${runtimeScript}\n\t</head>`)
-		: `${runtimeScript}\n${template}`;
+		? template.replace(
+				"</head>",
+				`${inlineCss ? `${inlineCss}\n\t\t` : ""}${runtimeScript}\n\t</head>`,
+			)
+		: `${inlineCss}${runtimeScript}\n${template}`;
 
 	return stringResponse(html, "text/html; charset=utf-8");
 }
@@ -511,6 +526,14 @@ async function bootstrap(): Promise<void> {
 
 			if (pathname === "/fonts/fira-code-vf.woff2") {
 				return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
+			}
+
+			if (pathname === "/fonts/inter-latin-wght-normal.woff2") {
+				return fileResponse(INTER_VARIABLE_FONT_LATIN_PATH, "font/woff2");
+			}
+
+			if (pathname === "/fonts/inter-latin-ext-wght-normal.woff2") {
+				return fileResponse(INTER_VARIABLE_FONT_LATIN_EXT_PATH, "font/woff2");
 			}
 
 			if (pathname === "/health") {

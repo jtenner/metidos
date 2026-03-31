@@ -6,6 +6,7 @@ import {
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
+	type SVGProps,
 	type UIEvent,
 	useCallback,
 	useEffect,
@@ -180,12 +181,32 @@ const MAINVIEW_STATE_STORAGE_KEY = "jt-ide:mainview-state";
 const MAINVIEW_STATE_STORAGE_VERSION = 1;
 const TREE_VIEW_STATE_STORAGE_KEY = "jt-ide:tree-view-state";
 const TREE_VIEW_STATE_STORAGE_VERSION = 1;
+const APP_TITLE = "Jolt";
+
+type AppIconName =
+	| "account_circle"
+	| "arrow_forward"
+	| "arrow_upward"
+	| "bolt"
+	| "checklist"
+	| "chevron_right"
+	| "code"
+	| "delete"
+	| "difference"
+	| "expand_less"
+	| "expand_more"
+	| "folder"
+	| "menu"
+	| "person"
+	| "push_pin"
+	| "search"
+	| "settings";
 
 const codeBlockStyle = {
 	margin: 0,
-	border: "1px solid rgba(125, 115, 255, 0.18)",
+	border: "1px solid rgba(153, 190, 217, 0.18)",
 	borderRadius: "0.5rem",
-	background: "#101114",
+	background: "#111213",
 	padding: "0.875rem 1rem",
 	fontSize: "0.8125rem",
 	lineHeight: "1.6",
@@ -246,7 +267,7 @@ const markdownComponents: Components = {
 				href={href}
 				target="_blank"
 				rel="noreferrer"
-				className="text-[#b5b0ff] underline decoration-[#6f66d8] underline-offset-2 transition-colors hover:text-[#ddd9ff]"
+				className="text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]"
 			>
 				{children}
 			</a>
@@ -274,7 +295,7 @@ const markdownComponents: Components = {
 		return (
 			<code
 				{...props}
-				className={`rounded-sm bg-[#1b1d24] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#d9d5ff] ${className ?? ""}`.trim()}
+				className={`rounded-sm bg-[#1d2022] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#e1ecf3] ${className ?? ""}`.trim()}
 			>
 				{children}
 			</code>
@@ -637,12 +658,177 @@ function writePersistedTreeViewState(state: PersistedTreeViewState): void {
 	}
 }
 
-function materialSymbol(name: string, className = ""): JSX.Element {
+function renderIconGlyph(
+	name: AppIconName,
+	filled: boolean,
+): JSX.Element | JSX.Element[] {
+	switch (name) {
+		case "account_circle":
+			return (
+				<>
+					<circle cx="12" cy="12" r="9" />
+					<circle cx="12" cy="9" r="2.5" />
+					<path d="M7.5 17c1.15-2 3.05-3 4.5-3s3.35 1 4.5 3" />
+				</>
+			);
+		case "arrow_forward":
+			return (
+				<>
+					<path d="M5 12h12.5" />
+					<path d="m13.5 7 5 5-5 5" />
+				</>
+			);
+		case "arrow_upward":
+			return (
+				<>
+					<path d="M12 18V6" />
+					<path d="m7 11 5-5 5 5" />
+				</>
+			);
+		case "bolt":
+			return filled ? (
+				<path
+					d="M13 2 5 13h5l-1 9 8-11h-5z"
+					fill="currentColor"
+					stroke="none"
+				/>
+			) : (
+				<path d="M13 2 5 13h5l-1 9 8-11h-5z" />
+			);
+		case "checklist":
+			return (
+				<>
+					<rect x="6" y="4" width="12" height="16" rx="2" />
+					<path d="m9 10 1.5 1.5L13 9" />
+					<path d="M9 15h6" />
+				</>
+			);
+		case "chevron_right":
+			return <path d="m10 7 5 5-5 5" />;
+		case "code":
+			return (
+				<>
+					<path d="m9 7-5 5 5 5" />
+					<path d="m15 7 5 5-5 5" />
+				</>
+			);
+		case "delete":
+			return (
+				<>
+					<path d="M5 7h14" />
+					<path d="M9 7V5h6v2" />
+					<path d="M8 7v11h8V7" />
+					<path d="M10 10v5" />
+					<path d="M14 10v5" />
+				</>
+			);
+		case "difference":
+			return (
+				<>
+					<rect x="5" y="5" width="8" height="8" rx="1.5" />
+					<rect x="11" y="11" width="8" height="8" rx="1.5" />
+				</>
+			);
+		case "expand_less":
+			return <path d="m7 14 5-5 5 5" />;
+		case "expand_more":
+			return <path d="m7 10 5 5 5-5" />;
+		case "folder":
+			return (
+				<>
+					<path d="M3.5 8.5h5l1.75-2h10.25v11H3.5z" />
+					<path d="M3.5 8.5v-1A2.5 2.5 0 0 1 6 5h3" />
+				</>
+			);
+		case "menu":
+			return (
+				<>
+					<path d="M4 7h16" />
+					<path d="M4 12h16" />
+					<path d="M4 17h16" />
+				</>
+			);
+		case "person":
+			return (
+				<>
+					<circle cx="12" cy="9" r="2.5" />
+					<path d="M7.5 18c1.15-2.1 3.05-3.2 4.5-3.2s3.35 1.1 4.5 3.2" />
+				</>
+			);
+		case "push_pin":
+			return filled ? (
+				<path
+					d="M9 4h6l-1.25 4L17 11v1h-4v7l-1 1-1-1v-7H7v-1l3.25-3L9 4Z"
+					fill="currentColor"
+					stroke="none"
+				/>
+			) : (
+				<>
+					<path d="M9 4h6l-1.25 4L17 11v1H7v-1l3.25-3L9 4Z" />
+					<path d="M12 12v8" />
+				</>
+			);
+		case "search":
+			return (
+				<>
+					<circle cx="11" cy="11" r="5.5" />
+					<path d="m16 16 4 4" />
+				</>
+			);
+		case "settings":
+			return (
+				<>
+					<circle cx="12" cy="12" r="2.75" />
+					<path d="M12 4.5v2" />
+					<path d="M12 17.5v2" />
+					<path d="M4.5 12h2" />
+					<path d="M17.5 12h2" />
+					<path d="m6.7 6.7 1.4 1.4" />
+					<path d="m15.9 15.9 1.4 1.4" />
+					<path d="m17.3 6.7-1.4 1.4" />
+					<path d="m8.1 15.9-1.4 1.4" />
+				</>
+			);
+	}
+
+	const exhaustiveCheck: never = name;
+	throw new Error(`Unsupported icon: ${exhaustiveCheck}`);
+}
+
+function materialSymbol(
+	name: AppIconName,
+	className = "",
+	options: {
+		filled?: boolean;
+	} = {},
+): JSX.Element {
+	const { filled = false } = options;
+	const svgProps: SVGProps<SVGSVGElement> = {
+		"aria-hidden": "true",
+		className: `inline-block shrink-0 align-middle ${className}`.trim(),
+		fill: "none",
+		focusable: false,
+		height: "1em",
+		stroke: "currentColor",
+		strokeLinecap: "round",
+		strokeLinejoin: "round",
+		strokeWidth: 1.85,
+		viewBox: "0 0 24 24",
+		width: "1em",
+	};
+
 	return (
-		<span className={`material-symbols-outlined ${className}`.trim()}>
-			{name}
-		</span>
+		<svg {...svgProps}>
+			<title>{name.replaceAll("_", " ")}</title>
+			{renderIconGlyph(name, filled)}
+		</svg>
 	);
+}
+
+function brandBoltIcon(className = ""): JSX.Element {
+	return materialSymbol("bolt", `rotate-45 ${className}`.trim(), {
+		filled: true,
+	});
 }
 
 function MarkdownMessage({ text }: { text: string }): JSX.Element {
@@ -895,17 +1081,17 @@ function CodexModelSelector({
 		<div
 			ref={rootRef}
 			className="relative"
-			title={activeModel?.summary ?? "Codex model"}
+			title={activeModel?.summary ?? `${APP_TITLE} model`}
 		>
 			<button
 				type="button"
 				className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
 					variant === "desktop"
-						? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#181a20]"
-						: "h-10 gap-2 rounded-xl border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
+						? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+						: "h-10 gap-2 rounded-xl border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
 				} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
 					open
-						? "border-[#8e86f3] shadow-[0_0_0_1px_rgba(142,134,243,0.18)]"
+						? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
 						: ""
 				}`}
 				onClick={() => {
@@ -945,16 +1131,16 @@ function CodexModelSelector({
 				<div
 					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "z-40 rounded-md border-[#3a355f] bg-[#14131d]"
-							: "z-50 rounded-2xl border-[#413e5e] bg-[#15161f]"
+							? "z-40 rounded-md border-[#3c4c58] bg-[#15191b]"
+							: "z-50 rounded-2xl border-[#445058] bg-[#171b1d]"
 					}`}
 				>
-					<div className="border-b border-[#3a355f] px-2 py-2">
-						<div className="flex items-center gap-2.5 rounded-md border border-[#3a355f] bg-[#101114] px-3 py-2">
-							{materialSymbol("search", "text-[15px] text-[#8f89df]")}
+					<div className="border-b border-[#3c4c58] px-2 py-2">
+						<div className="flex items-center gap-2.5 rounded-md border border-[#3c4c58] bg-[#111213] px-3 py-2">
+							{materialSymbol("search", "text-[15px] text-[#98b9d0]")}
 							<input
 								ref={searchInputRef}
-								className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
+								className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
 								placeholder="Search models"
 								value={searchQuery}
 								onChange={(event) => {
@@ -970,7 +1156,7 @@ function CodexModelSelector({
 							{searchQuery ? (
 								<button
 									type="button"
-									className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1b1d28] hover:text-[#f2f0ef]"
+									className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
 									onClick={() => {
 										setSearchQuery("");
 										searchInputRef.current?.focus();
@@ -984,13 +1170,13 @@ function CodexModelSelector({
 					</div>
 					<div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
 						{filteredGroups.length === 0 ? (
-							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+							<div className="px-4 py-4 text-xs text-[#8f9aa2]">
 								No matching models.
 							</div>
 						) : null}
 						{filteredGroups.map((group) => (
 							<div key={group.group} className="px-2 pb-2 last:pb-0">
-								<div className="px-2 pb-1 pt-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
+								<div className="px-2 pb-1 pt-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
 									{group.group}
 								</div>
 								<div>
@@ -1002,8 +1188,8 @@ function CodexModelSelector({
 												type="button"
 												className={`flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors ${
 													selected
-														? "bg-[#282244] text-[#f7f5ff]"
-														: "text-[#e8e4ff] hover:bg-[#1d1c2a]"
+														? "bg-[#28353e] text-[#f8fafc]"
+														: "text-[#ebf3f8] hover:bg-[#1e2428]"
 												}`}
 												onClick={() => {
 													setOpen(false);
@@ -1014,7 +1200,7 @@ function CodexModelSelector({
 											>
 												<span
 													className={`mt-0.5 shrink-0 ${
-														selected ? "text-[#aaa4ff]" : "text-[#5d5a72]"
+														selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
 													}`}
 												>
 													{materialSymbol(
@@ -1030,7 +1216,7 @@ function CodexModelSelector({
 													</span>
 													<span
 														className={`mt-1 block text-[11px] leading-4 ${
-															selected ? "text-[#cbc5ff]" : "text-[#a6a0c9]"
+															selected ? "text-[#d5e4ef]" : "text-[#a7b7c2]"
 														}`}
 													>
 														{model.summary}
@@ -1125,8 +1311,8 @@ function ProjectTaskSelector({
 							? "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5"
 							: "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5 hover:bg-[#262626]"
 						: unavailable
-							? "h-10 rounded-xl border border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-							: "h-10 rounded-xl border border-[#3c415d] bg-[#1b1d24] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#232632]"
+							? "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+							: "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
 				} ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
 				onClick={() => {
 					if (!unavailable) {
@@ -1156,7 +1342,7 @@ function ProjectTaskSelector({
 			</button>
 			{noTasksAvailable ? (
 				<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-					<div className="whitespace-nowrap rounded-md border border-[#3a355f] bg-[#14131d] px-3 py-2 text-xs text-[#d7d3ff] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+					<div className="whitespace-nowrap rounded-md border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
 						No tasks found.
 					</div>
 				</div>
@@ -1165,20 +1351,20 @@ function ProjectTaskSelector({
 				<div
 					className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "left-0 min-w-[18rem] rounded-md border-[#3a355f] bg-[#14131d]"
-							: "right-0 w-[calc(100vw-2rem)] max-w-[18rem] rounded-2xl border-[#413e5e] bg-[#15161f]"
+							? "left-0 min-w-[18rem] rounded-md border-[#3c4c58] bg-[#15191b]"
+							: "right-0 w-[calc(100vw-2rem)] max-w-[18rem] rounded-2xl border-[#445058] bg-[#171b1d]"
 					}`}
 				>
-					<div className="border-b border-[#3a355f] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
+					<div className="border-b border-[#3c4c58] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
 						Project Tasks
 					</div>
 					<div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
 						{loading ? (
-							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+							<div className="px-4 py-4 text-xs text-[#8f9aa2]">
 								Loading tasks...
 							</div>
 						) : tasks.length === 0 ? (
-							<div className="px-4 py-4 text-xs text-[#8e8aa7]">
+							<div className="px-4 py-4 text-xs text-[#8f9aa2]">
 								No project tasks found.
 							</div>
 						) : (
@@ -1186,7 +1372,7 @@ function ProjectTaskSelector({
 								<button
 									key={task.id}
 									type="button"
-									className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1d1c2a]"
+									className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1e2428]"
 									onClick={() => {
 										setOpen(false);
 										onSelect(task);
@@ -1203,7 +1389,7 @@ function ProjectTaskSelector({
 											{task.title}
 										</span>
 										{taskMetaText(task) ? (
-											<span className="mt-1 block truncate text-[11px] leading-4 text-[#a6a0c9]">
+											<span className="mt-1 block truncate text-[11px] leading-4 text-[#a7b7c2]">
 												{taskMetaText(task)}
 											</span>
 										) : null}
@@ -1309,9 +1495,9 @@ function pickPreferredThreadErrorPreview(
 
 function ProcessingMessage(): JSX.Element {
 	return (
-		<div className="flex w-full min-w-0 items-center gap-3 rounded-sm border border-[#282d48] bg-[#151926] px-3 py-3 text-[#d7d3ff]">
-			<BeatLoader color="#aaa4ff" margin={2} size={6} speedMultiplier={0.85} />
-			<span className="font-label text-[11px] uppercase tracking-[0.16em] text-[#c3beff]">
+		<div className="flex w-full min-w-0 items-center gap-3 rounded-sm border border-[#2e3a42] bg-[#181e23] px-3 py-3 text-[#dfebf3]">
+			<BeatLoader color="#bdd5e6" margin={2} size={6} speedMultiplier={0.85} />
+			<span className="font-label text-[11px] uppercase tracking-[0.16em] text-[#d0e1ed]">
 				Processing
 			</span>
 		</div>
@@ -1416,7 +1602,7 @@ function DiffViewer({
 	const lines = parseUnifiedDiff(diffText);
 	return (
 		<div
-			className={`app-scrollbar min-h-0 overflow-y-auto overscroll-contain border-t border-[#262b40] bg-[#0c1018] font-mono text-[12px] leading-5 ${className}`.trim()}
+			className={`app-scrollbar min-h-0 overflow-y-auto overscroll-contain border-t border-[#2b343b] bg-[#0c1018] font-mono text-[12px] leading-5 ${className}`.trim()}
 			style={{ WebkitOverflowScrolling: "touch" }}
 		>
 			{lines.map((line) => (
@@ -1428,12 +1614,12 @@ function DiffViewer({
 							: line.kind === "remove"
 								? "bg-[#31141b] text-[#ff9bb0]"
 								: line.kind === "hunk"
-									? "bg-[#181f33] text-[#aeb7e8]"
+									? "bg-[#1d272e] text-[#b8cede]"
 									: line.kind === "file"
-										? "bg-[#121827] text-[#8cc5ff]"
+										? "bg-[#161e23] text-[#8cc5ff]"
 										: line.kind === "meta"
-											? "bg-[#10141d] text-[#7f88ad]"
-											: "text-[#d7d8e0]"
+											? "bg-[#12171b] text-[#8798a5]"
+											: "text-[#d9dcde]"
 					}`}
 				>
 					{line.text || " "}
@@ -1455,10 +1641,10 @@ function CommandExecutionMessage({
 	state: "in_progress" | "completed" | "failed";
 }): JSX.Element {
 	return (
-		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2f3b43] bg-[#141a1e] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
 				<div className="min-w-0">
-					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+					<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#bdd5e6]">
 						Command
 					</div>
 					<div className="truncate font-mono text-[12px] text-[#f2f0ef]">
@@ -1471,14 +1657,14 @@ function CommandExecutionMessage({
 							? "border border-[#7a2030] bg-[#381018] text-[#ff8698]"
 							: state === "completed" || exitCode === 0
 								? "border border-[#284240] bg-[#102522] text-[#74f0c0]"
-								: "border border-[#3b4162] bg-[#1c2135] text-[#c8c4ff]"
+								: "border border-[#42515b] bg-[#202a31] text-[#d4e4ef]"
 					}`}
 				>
 					{commandStateLabel(state, exitCode)}
 				</span>
 			</summary>
-			<div className="border-t border-[#262b40] bg-[#0d1018] px-3 py-3">
-				<pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-[#1c2236] bg-[#090c13] px-3 py-3 font-mono text-[12px] leading-5 text-[#d6d3ec]">
+			<div className="border-t border-[#2b343b] bg-[#0f1316] px-3 py-3">
+				<pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-[#212a31] bg-[#0b0f11] px-3 py-3 font-mono text-[12px] leading-5 text-[#d7e1e8]">
 					{output || "(No output yet.)"}
 				</pre>
 			</div>
@@ -1494,16 +1680,16 @@ function ReasoningMessage({
 	text: string;
 }): JSX.Element {
 	return (
-		<div className="w-full min-w-0 rounded-sm border border-[#2a2f48] bg-[#111521] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+		<div className="w-full min-w-0 rounded-sm border border-[#2f3b43] bg-[#141a1e] px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
 			<div className="mb-2 flex items-center justify-between gap-3">
-				<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+				<div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#bdd5e6]">
 					Reasoning
 				</div>
-				<span className="rounded-full border border-[#313754] bg-[#171c2c] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#c8c4ff]">
+				<span className="rounded-full border border-[#37444e] bg-[#1b2328] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#d4e4ef]">
 					{state === "completed" ? "Ready" : "Thinking"}
 				</span>
 			</div>
-			<div className="text-sm leading-relaxed text-[#d9d7ef]">
+			<div className="text-sm leading-relaxed text-[#dbe4eb]">
 				<MarkdownMessage text={text} />
 			</div>
 		</div>
@@ -1525,15 +1711,15 @@ function FileChangeMessage({
 }): JSX.Element {
 	const fileHref = buildLocalFileHref(path, worktreePath);
 	return (
-		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2a2f48] bg-[#111521] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
+		<details className="w-full min-w-0 overflow-hidden rounded-sm border border-[#2f3b43] bg-[#141a1e] shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
 			<summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
 				<div className="min-w-0 text-sm">
-					<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#aaa4ff]">
+					<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#bdd5e6]">
 						File Change
 					</span>
-					<span className="px-1 text-[#7c82a8]">-</span>
+					<span className="px-1 text-[#8494a0]">-</span>
 					<a
-						className="font-mono text-[12px] text-[#b8b2ff] underline decoration-[#6f66d8] underline-offset-2"
+						className="font-mono text-[12px] text-[#c7dbea] underline decoration-[#7aa5c4] underline-offset-2"
 						href={fileHref}
 						onClick={(event) => event.stopPropagation()}
 						rel="noreferrer"
@@ -1639,19 +1825,19 @@ function GitHistoryDiffModal({
 		<div className="fixed inset-0 z-[120]">
 			<button
 				type="button"
-				className="absolute inset-0 bg-[#05060b]/84 backdrop-blur-sm"
+				className="absolute inset-0 bg-[#06080a]/84 backdrop-blur-sm"
 				onClick={onClose}
 				aria-label="Close git diff"
 			/>
 			<div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
-				<div className="relative flex h-full min-h-0 w-full flex-col border border-[#24293d] bg-[#0c1018] shadow-[0_24px_56px_rgba(0,0,0,0.56)] md:h-[88vh] md:max-h-[56rem] md:max-w-5xl md:overflow-hidden md:rounded-xl">
-					<div className="flex items-start justify-between gap-4 border-b border-[#262b40] bg-[#101522] px-4 py-4 md:px-6">
+				<div className="relative flex h-full min-h-0 w-full flex-col border border-[#283239] bg-[#0c1018] shadow-[0_24px_56px_rgba(0,0,0,0.56)] md:h-[88vh] md:max-h-[56rem] md:max-w-5xl md:overflow-hidden md:rounded-xl">
+					<div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#131a1f] px-4 py-4 md:px-6">
 						<div className="min-w-0">
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="rounded-full border border-[#3d4260] bg-[#171c2c] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+								<span className="rounded-full border border-[#43505a] bg-[#1b2328] px-2 py-0.5 font-mono text-[10px] text-[#bdd5e6]">
 									{state.entry.shortHash}
 								</span>
-								<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#8e95bc]">
+								<span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#96a7b4]">
 									{state.entry.authorName} ·{" "}
 									{formatGitHistoryTimestamp(state.entry.committedAt)}
 								</span>
@@ -1662,7 +1848,7 @@ function GitHistoryDiffModal({
 						</div>
 						<button
 							type="button"
-							className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#363b55] bg-[#151a29] text-[#d7d3ff] transition-colors hover:bg-[#1d2335]"
+							className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#3b4750] bg-[#182026] text-[#dfebf3] transition-colors hover:bg-[#212a31]"
 							onClick={onClose}
 							aria-label="Close git diff"
 						>
@@ -1672,9 +1858,9 @@ function GitHistoryDiffModal({
 					<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 						{state.loading ? (
 							<div className="flex h-full items-center justify-center px-6 py-10">
-								<div className="flex items-center gap-3 rounded-full border border-[#303755] bg-[#14192a] px-4 py-3 text-sm text-[#d7d3ff]">
+								<div className="flex items-center gap-3 rounded-full border border-[#36454f] bg-[#182026] px-4 py-3 text-sm text-[#dfebf3]">
 									<BeatLoader
-										color="#aaa4ff"
+										color="#bdd5e6"
 										margin={2}
 										size={6}
 										speedMultiplier={0.85}
@@ -1711,17 +1897,17 @@ function SidebarSectionHeader({
 		<div className="flex items-center gap-3">
 			<button
 				type="button"
-				className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1.5 text-left transition-colors hover:bg-[#191b24]"
+				className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1.5 text-left transition-colors hover:bg-[#1b1f22]"
 				onClick={onToggle}
 				aria-expanded={open}
 			>
-				<span className="shrink-0 text-[#b7b2ff]">
+				<span className="shrink-0 text-[#c7dbea]">
 					{materialSymbol(
 						open ? "expand_more" : "chevron_right",
 						"text-[18px]",
 					)}
 				</span>
-				<span className="font-label text-[13px] font-bold uppercase tracking-[0.18em] text-[#f4f1ff]">
+				<span className="font-label text-[13px] font-bold uppercase tracking-[0.18em] text-[#f5f9fb]">
 					{title}
 				</span>
 			</button>
@@ -4708,7 +4894,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					speaker: "assistant",
 					tone: "normal",
 					text: selectedProject
-						? "Create a thread from the Threads section to start a Codex conversation for the selected worktree."
+						? `Create a thread from the Threads section to start a ${APP_TITLE} conversation for the selected worktree.`
 						: "Add a project, choose a worktree, and create a thread to begin.",
 				},
 			];
@@ -4718,7 +4904,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					kind: "chat",
 					speaker: "assistant",
 					tone: "normal",
-					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask Codex to inspect, refactor, or debug this worktree.`,
+					text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`,
 				},
 			];
 		} else {
@@ -4856,17 +5042,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					className="group flex w-full min-w-0 items-start gap-6"
 					key={group.key}
 				>
-					<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#9c95f8]">
-						<span
-							className="material-symbols-outlined text-[#1b0a71] text-sm"
-							style={{ fontVariationSettings: "'FILL' 1" }}
-						>
-							psychology
-						</span>
+					<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#adcbe0]">
+						{brandBoltIcon("text-sm text-[#224259]")}
 					</div>
 					<div className="min-w-0 flex-1 space-y-4">
-						<div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#aaa4ff]">
-							Codex
+						<div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#bdd5e6]">
+							{APP_TITLE}
 						</div>
 						<div className="space-y-3">
 							{group.messages.map(({ message, index }) => (
@@ -4911,15 +5092,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					className="flex flex-col items-start gap-3 max-w-full"
 					key={group.key}
 				>
-					<div className="flex items-center gap-2 text-[#aaa4ff] px-1">
-						<span
-							className="material-symbols-outlined text-sm"
-							style={{ fontVariationSettings: "'FILL' 1" }}
-						>
-							hub
-						</span>
+					<div className="flex items-center gap-2 text-[#bdd5e6] px-1">
+						{brandBoltIcon("text-sm")}
 						<span className="text-[10px] font-label font-bold uppercase tracking-wider">
-							Codex
+							{APP_TITLE}
 						</span>
 					</div>
 					<div className="flex w-full flex-col gap-3">
@@ -4930,7 +5106,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								}`}
 								key={`${message.kind}-${index}`}
 							>
-								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#aaa4ff]/10 p-5">
+								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#bdd5e6]/10 p-5">
 									<div className="text-sm leading-relaxed text-[#ffffff]">
 										{renderAssistantMessageContent(message)}
 									</div>
@@ -4951,9 +5127,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<span className="font-body text-[13px] font-semibold tracking-[0.01em]">
 						{localUserLabel}
 					</span>
-					<span className="material-symbols-outlined text-sm text-[#9f9b99]">
-						account_circle
-					</span>
+					{materialSymbol("account_circle", "text-sm text-[#9f9b99]")}
 				</div>
 				<div className="bg-[#1f2020] p-4 rounded-lg rounded-tr-none text-sm leading-relaxed text-[#ffffff] shadow-sm">
 					<MarkdownMessage text={group.text} />
@@ -4978,14 +5152,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			className="space-y-2 border-b border-[#262626] bg-[#151515] px-3 py-3"
 			onSubmit={submitAddProject}
 		>
-			<label className="block text-[10px] font-label uppercase tracking-widest text-[#aaa4ff]">
+			<label className="block text-[10px] font-label uppercase tracking-widest text-[#bdd5e6]">
 				Project Folder
 				<div className="relative mt-2 space-y-2">
 					<div className="flex items-start gap-2">
 						<input
-							className={`min-w-0 flex-1 rounded-sm border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#7d73ff] ${
+							className={`min-w-0 flex-1 rounded-sm border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
 								addProjectInputIsPreviewing
-									? "border-[#8e86f3] bg-[#171a28] text-[#ffffff] shadow-[0_0_0_1px_rgba(142,134,243,0.18)]"
+									? "border-[#9fc1da] bg-[#1a2025] text-[#ffffff] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
 									: "border-[#3b3b3b] bg-[#101010] text-[#f2f0ef]"
 							}`}
 							placeholder={supportsTildePath ? "~/project" : "/path/to/project"}
@@ -5001,20 +5175,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						/>
 						<button
 							type="submit"
-							className="rounded-sm bg-[#aaa4ff] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#281d7c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="rounded-sm bg-[#bdd5e6] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#2e526b] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 							disabled={isAddingProject}
 						>
 							{isAddingProject ? "Adding" : "Add"}
 						</button>
 					</div>
 					{addProjectPath.trim() ? (
-						<div className="overflow-hidden rounded-sm border border-[#2b2753] bg-[#0f1016]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-							<div className="flex items-center justify-between border-b border-[#24263a] px-3 py-2">
-								<span className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+						<div className="overflow-hidden rounded-sm border border-[#2f3f4b] bg-[#101315]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+							<div className="flex items-center justify-between border-b border-[#283036] px-3 py-2">
+								<span className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 									Folders
 								</span>
 								{directorySuggestionsLoading ? (
-									<span className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
+									<span className="text-[10px] uppercase tracking-widest text-[#727e86]">
 										Scanning
 									</span>
 								) : null}
@@ -5037,10 +5211,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											<button
 												type="button"
 												key={directory}
-												className={`flex w-full items-center gap-3 border-t border-[#1b1d2a] px-3 py-2 text-left transition-colors ${
+												className={`flex w-full items-center gap-3 border-t border-[#1e2327] px-3 py-2 text-left transition-colors ${
 													hoveredDirectorySuggestion === directory
-														? "bg-[#1b2033]"
-														: "hover:bg-[#191b29]"
+														? "bg-[#1f282f]"
+														: "hover:bg-[#1c2226]"
 												}`}
 												disabled={isAddingProject}
 												onMouseDown={(event) => event.preventDefault()}
@@ -5067,10 +5241,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												onClick={() => selectDirectorySuggestion(directory)}
 											>
 												<div
-													className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-[#aaa4ff] ${
+													className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-[#bdd5e6] ${
 														hoveredDirectorySuggestion === directory
-															? "bg-[#241f46]"
-															: "bg-[#1a1730]"
+															? "bg-[#26353f]"
+															: "bg-[#1b252c]"
 													}`}
 												>
 													{materialSymbol("folder", "text-[18px]")}
@@ -5079,7 +5253,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 													<div className="truncate text-sm font-medium normal-case text-[#f2f0ef]">
 														{shortName(directory)}
 													</div>
-													<div className="truncate text-[11px] normal-case text-[#8e8aa7]">
+													<div className="truncate text-[11px] normal-case text-[#8f9aa2]">
 														{formattedDirectory}
 													</div>
 												</div>
@@ -5113,23 +5287,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const projectActionMenuPanel =
 		projectActionMenu && projectActionMenuProject ? (
 			<div
-				className="fixed z-[90] w-80 overflow-hidden rounded-lg border border-[#2f3150] bg-[#11131d]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				className="fixed z-[90] w-80 overflow-hidden rounded-lg border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
 				ref={projectActionMenuRef}
 				style={{
 					left: projectActionMenu.x,
 					top: projectActionMenu.y,
 				}}
 			>
-				<div className="border-b border-[#262b40] bg-[#151827] px-3 py-3">
+				<div className="border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
 					<div className="flex items-start justify-between gap-3">
 						<div className="min-w-0">
-							<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+							<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 								Project Actions
 							</div>
 							<div className="truncate text-sm font-semibold text-[#f2f0ef]">
 								{projectActionMenuProject.name}
 							</div>
-							<div className="truncate text-[11px] text-[#8e8aa7]">
+							<div className="truncate text-[11px] text-[#8f9aa2]">
 								{formatPathForDisplay(
 									projectActionMenuProject.path,
 									homeDirectory,
@@ -5147,13 +5321,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								aria-label={`Remove ${projectActionMenuProject.name}`}
 								title="Remove Project"
 							>
-								<span className="material-symbols-outlined text-[18px]">
-									delete
-								</span>
+								{materialSymbol("delete", "text-[18px]")}
 							</button>
 							<button
 								type="button"
-								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 								onClick={closeProjectActionMenu}
 								aria-label="Close project actions"
 							>
@@ -5169,11 +5341,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				) : null}
 				<div className="space-y-2 px-3 py-3">
 					<div className="flex items-center justify-between">
-						<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+						<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 							Active Worktrees
 						</div>
 						{projectActionMenuLoading ? (
-							<div className="text-[10px] uppercase tracking-widest text-[#6f6f89]">
+							<div className="text-[10px] uppercase tracking-widest text-[#727e86]">
 								Loading
 							</div>
 						) : null}
@@ -5181,7 +5353,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="max-h-56 space-y-1 overflow-y-auto">
 						{!projectActionMenuLoading &&
 						projectActionMenuWorktrees.length === 0 ? (
-							<div className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-3 text-xs text-[#8b8ea3]">
+							<div className="rounded-sm border border-[#252f36] bg-[#161c21] px-3 py-3 text-xs text-[#8f989f]">
 								No worktrees found.
 							</div>
 						) : null}
@@ -5196,7 +5368,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							);
 							return (
 								<div
-									className="rounded-sm border border-[#21253a] bg-[#131624] px-3 py-2"
+									className="rounded-sm border border-[#252f36] bg-[#161c21] px-3 py-2"
 									key={worktree.path}
 									{...errorPreviewHandlers(worktreeErrorPreviewText)}
 								>
@@ -5208,7 +5380,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										}}
 									>
 										<span
-											className="min-w-0 truncate font-mono text-[11px] leading-5 text-[#948def]"
+											className="min-w-0 truncate font-mono text-[11px] leading-5 text-[#a1c3db]"
 											title={worktree.branch ?? "detached"}
 										>
 											{worktree.branch ?? "detached"}
@@ -5229,7 +5401,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											}`}
 										/>
 										<div
-											className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+											className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8f9aa2]"
 											title={formatPathForDisplay(
 												worktree.path,
 												homeDirectory,
@@ -5249,11 +5421,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 				</div>
 				<form
-					className="border-t border-[#262b40] bg-[#141724] px-3 py-3"
+					className="border-t border-[#2b343b] bg-[#171d21] px-3 py-3"
 					onSubmit={submitNewWorktree}
 				>
 					<label
-						className="block text-[10px] font-label uppercase tracking-widest text-[#8f89df]"
+						className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
 						htmlFor="new-worktree-name"
 					>
 						New Worktree
@@ -5261,7 +5433,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="mt-2 flex items-center gap-2">
 						<input
 							id="new-worktree-name"
-							className="min-w-0 flex-1 rounded-sm border border-[#353a55] bg-[#10131d] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f89] focus:border-[#7d73ff]"
+							className="min-w-0 flex-1 rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
 							placeholder="feature/new-worktree"
 							value={newWorktreeName}
 							onChange={(event) => {
@@ -5280,7 +5452,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							{isCreatingWorktree ? "Creating" : "Create"}
 						</button>
 					</div>
-					<div className="mt-2 text-xs text-[#7f8397]">
+					<div className="mt-2 text-xs text-[#828d94]">
 						Creates a new branch and sibling worktree folder.
 					</div>
 				</form>
@@ -5290,23 +5462,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const threadActionMenuPanel =
 		threadActionMenu && threadActionMenuThread ? (
 			<div
-				className="fixed z-[95] w-80 overflow-hidden rounded-lg border border-[#2f3150] bg-[#11131d]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				className="fixed z-[95] w-80 overflow-hidden rounded-lg border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
 				ref={threadActionMenuRef}
 				style={{
 					left: threadActionMenu.x,
 					top: threadActionMenu.y,
 				}}
 			>
-				<div className="border-b border-[#262b40] bg-[#151827] px-3 py-3">
+				<div className="border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
 					<div className="flex items-start justify-between gap-3">
 						<div className="min-w-0">
-							<div className="font-label text-[10px] uppercase tracking-widest text-[#8f89df]">
+							<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 								Thread Actions
 							</div>
 							<div className="truncate text-sm font-semibold text-[#f2f0ef]">
 								{threadActionMenuThread.title}
 							</div>
-							<div className="truncate text-[11px] text-[#8e8aa7]">
+							<div className="truncate text-[11px] text-[#8f9aa2]">
 								{formatPathForDisplay(
 									threadActionMenuThread.worktreePath,
 									homeDirectory,
@@ -5316,7 +5488,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						<button
 							type="button"
-							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] text-[#a6abc7] transition-colors hover:bg-[#202537] hover:text-[#f2f0ef]"
+							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 							onClick={closeThreadActionMenu}
 						>
 							×
@@ -5329,11 +5501,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 				) : null}
 				<form
-					className="border-b border-[#262b40] bg-[#141724] px-3 py-3"
+					className="border-b border-[#2b343b] bg-[#171d21] px-3 py-3"
 					onSubmit={submitThreadRename}
 				>
 					<label
-						className="block text-[10px] font-label uppercase tracking-widest text-[#8f89df]"
+						className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
 						htmlFor="thread-rename-title"
 					>
 						Rename Thread
@@ -5341,7 +5513,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="mt-2 flex items-center gap-2">
 						<input
 							id="thread-rename-title"
-							className="min-w-0 flex-1 rounded-sm border border-[#353a55] bg-[#10131d] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#6f6f89] focus:border-[#7d73ff]"
+							className="min-w-0 flex-1 rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
 							value={threadRenameTitle}
 							onChange={(event) => {
 								setThreadActionMenuError("");
@@ -5360,10 +5532,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</button>
 					</div>
 				</form>
-				<div className="flex justify-end gap-2 border-t border-[#262b40] px-3 py-3">
+				<div className="flex justify-end gap-2 border-t border-[#2b343b] px-3 py-3">
 					<button
 						type="button"
-						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#2b3150] bg-[#141829] text-[#d7d3ff] transition-colors hover:bg-[#1a1f34] disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#31404a] bg-[#182025] text-[#dfebf3] transition-colors hover:bg-[#1f282f] disabled:cursor-not-allowed disabled:opacity-60"
 						onClick={() => {
 							void toggleThreadPinned();
 						}}
@@ -5375,16 +5547,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							threadActionMenuThread.pinnedAt ? "Unpin thread" : "Pin thread"
 						}
 					>
-						<span
-							className="material-symbols-outlined text-[18px]"
-							style={{
-								fontVariationSettings: threadActionMenuThread.pinnedAt
-									? "'FILL' 1"
-									: "'FILL' 0",
-							}}
-						>
-							push_pin
-						</span>
+						{materialSymbol("push_pin", "text-[18px]", {
+							filled: Boolean(threadActionMenuThread.pinnedAt),
+						})}
 					</button>
 					<button
 						type="button"
@@ -5396,9 +5561,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						aria-label="Delete thread"
 						title="Delete thread"
 					>
-						<span className="material-symbols-outlined text-[18px]">
-							delete
-						</span>
+						{materialSymbol("delete", "text-[18px]")}
 					</button>
 				</div>
 			</div>
@@ -5410,10 +5573,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<span className="sr-only">
 					Search projects, threads, and git history
 				</span>
-				<div className="flex items-center gap-2 rounded-sm border border-[#2f3242] bg-[#101114] px-3 py-2">
-					{materialSymbol("search", "text-[16px] text-[#8f89df]")}
+				<div className="flex items-center gap-2 rounded-sm border border-[#323a3f] bg-[#111213] px-3 py-2">
+					{materialSymbol("search", "text-[16px] text-[#98b9d0]")}
 					<input
-						className="min-w-0 flex-1 bg-transparent text-sm text-[#f2f0ef] outline-none placeholder:text-[#6f6f89]"
+						className="min-w-0 flex-1 bg-transparent text-sm text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
 						placeholder="Search projects, threads, and git..."
 						value={sidebarSearchQuery}
 						onChange={(event) => {
@@ -5426,7 +5589,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					{sidebarSearchQuery ? (
 						<button
 							type="button"
-							className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1b1d28] hover:text-[#f2f0ef]"
+							className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
 							onClick={() => setSidebarSearchQuery("")}
 							aria-label="Clear sidebar search"
 						>
@@ -5501,7 +5664,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							>
 								<button
 									type="button"
-									className={`min-w-0 flex-1 px-3 py-2 text-left ${isActive ? "text-[#aaa4ff]" : "text-[#d7d7d7]"}`}
+									className={`min-w-0 flex-1 px-3 py-2 text-left ${isActive ? "text-[#bdd5e6]" : "text-[#d7d7d7]"}`}
 									{...errorPreviewHandlers(projectErrorPreviewText)}
 									onClick={() => {
 										hideErrorPreview();
@@ -5522,7 +5685,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</button>
 								<button
 									type="button"
-									className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#2b2f45] bg-[#171a28] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#a6abc7] transition-all hover:bg-[#202537] hover:text-[#f2f0ef] ${
+									className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#acb8c1] transition-all hover:bg-[#242d33] hover:text-[#f2f0ef] ${
 										isActive
 											? "opacity-100"
 											: "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
@@ -5597,7 +5760,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																type="button"
 																className={`w-full min-w-0 text-left px-3 py-2 pr-12 flex flex-col gap-0.5 transition-colors ${
 																	activeWorktree
-																		? "bg-[#25233a] text-[#f2f0ef]"
+																		? "bg-[#273036] text-[#f2f0ef]"
 																		: wState.opened
 																			? "bg-[#1f2020] text-[#f2f0ef]"
 																			: "text-[#cfd1d4] hover:bg-[#202020]"
@@ -5621,7 +5784,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																	}}
 																>
 																	<span
-																		className="min-w-0 truncate font-mono text-xs leading-5 text-[#948def]"
+																		className="min-w-0 truncate font-mono text-xs leading-5 text-[#a1c3db]"
 																		title={worktree.branch ?? "detached"}
 																	>
 																		{worktree.branch ?? "detached"}
@@ -5642,7 +5805,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																		}`}
 																	/>
 																	<div
-																		className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8e8aa7]"
+																		className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8f9aa2]"
 																		title={formatPathForDisplay(
 																			worktree.path,
 																			homeDirectory,
@@ -5671,8 +5834,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																type="button"
 																className={`absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
 																	activeWorktree || wState.opened
-																		? "border-[#2f3150] bg-[#1a1f34] text-[#d7d3ff]"
-																		: "border-[#2b2f45] bg-[#171a28] text-[#a6abc7] hover:bg-[#202537] hover:text-[#f2f0ef]"
+																		? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
+																		: "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
 																}`}
 																onClick={() => {
 																	void toggleWorktreePinned(
@@ -5695,16 +5858,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																		: "Pin worktree"
 																}
 															>
-																<span
-																	className="material-symbols-outlined text-[16px]"
-																	style={{
-																		fontVariationSettings: worktreePinned
-																			? "'FILL' 1"
-																			: "'FILL' 0",
-																	}}
-																>
-																	push_pin
-																</span>
+																{materialSymbol("push_pin", "text-[16px]", {
+																	filled: worktreePinned,
+																})}
 															</button>
 														</div>
 													);
@@ -5732,7 +5888,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				action={
 					<button
 						type="button"
-						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff]"
+						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#99bed9]/30 bg-[#21282e] text-sm font-semibold leading-none text-[#bdd5e6] transition-colors hover:border-[#bdd5e6]/60 hover:bg-[#2c373e] hover:text-[#dfebf3]"
 						onClick={toggleAddProjectForm}
 						aria-label={addProjectOpen ? "Close add project" : "Add project"}
 					>
@@ -5755,7 +5911,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				title={
 					<>
 						<span>Threads</span>
-						<span className="font-medium normal-case text-[#85879a]">
+						<span className="font-medium normal-case text-[#879198]">
 							{" - "}
 							{selectedProject ? shortName(selectedProject.path) : "No Project"}
 						</span>
@@ -5768,7 +5924,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				action={
 					<button
 						type="button"
-						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#7d73ff]/30 bg-[#1f1d31] text-sm font-semibold leading-none text-[#aaa4ff] transition-colors hover:border-[#aaa4ff]/60 hover:bg-[#2a2743] hover:text-[#d7d3ff] disabled:cursor-not-allowed disabled:opacity-50"
+						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#99bed9]/30 bg-[#21282e] text-sm font-semibold leading-none text-[#bdd5e6] transition-colors hover:border-[#bdd5e6]/60 hover:bg-[#2c373e] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50"
 						onClick={() => {
 							void createThreadFromSelection();
 						}}
@@ -5780,7 +5936,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						}
 						title={
 							selectedProject && activeSelectedWorktreePath
-								? "Start a new Codex thread for the selected worktree"
+								? `Start a new ${APP_TITLE} thread for the selected worktree`
 								: "Select a project worktree first"
 						}
 					>
@@ -5798,7 +5954,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
 							{normalizedSidebarSearchQuery
 								? "No matching threads in this worktree."
-								: "No threads in this worktree yet. Use + to start a Codex thread for the selected worktree."}
+								: `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`}
 						</div>
 					) : (
 						filteredVisibleThreads.map((thread) => {
@@ -5831,7 +5987,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									key={thread.id}
 									className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
 										isActive
-											? "bg-[#25233a] text-[#f2f0ef]"
+											? "bg-[#273036] text-[#f2f0ef]"
 											: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
 									}`}
 									{...errorPreviewHandlers(threadErrorPreviewText)}
@@ -5861,8 +6017,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														: hasRunError
 															? "bg-[#8f4956]"
 															: isActive
-																? "bg-[#aaa4ff]"
-																: "bg-[#4f5269]"
+																? "bg-[#bdd5e6]"
+																: "bg-[#545d64]"
 												}`}
 											/>
 											<div
@@ -5874,12 +6030,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										</div>
 										<div className="flex shrink-0 items-center gap-2">
 											{threadPinned ? (
-												<span
-													className="material-symbols-outlined text-[14px] text-[#d7d3ff]"
-													style={{ fontVariationSettings: "'FILL' 1" }}
-													title="Pinned"
-												>
-													push_pin
+												<span title="Pinned">
+													{materialSymbol(
+														"push_pin",
+														"text-[14px] text-[#dfebf3]",
+														{ filled: true },
+													)}
 												</span>
 											) : null}
 											{hasUnreadError ? (
@@ -5889,7 +6045,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											) : null}
 											{isWorking ? (
 												<BeatLoader
-													color="#aaa4ff"
+													color="#bdd5e6"
 													margin={1}
 													size={5}
 													speedMultiplier={0.85}
@@ -5904,8 +6060,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										<span className="min-w-0 truncate text-[#d7d7d7]">
 											{threadBranchName}
 										</span>
-										<span className="shrink-0 text-[#6f6f89]">|</span>
-										<span className="min-w-0 truncate text-[#8e8aa7]">
+										<span className="shrink-0 text-[#727e86]">|</span>
+										<span className="min-w-0 truncate text-[#8f9aa2]">
 											{threadFolderName}
 										</span>
 									</div>
@@ -5928,7 +6084,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<>
 						<span>Git</span>
 						{gitHistory?.branch || activeSelectedWorktree?.branch ? (
-							<span className="font-medium normal-case text-[#85879a]">
+							<span className="font-medium normal-case text-[#879198]">
 								{" - "}
 								{gitHistory?.branch ?? activeSelectedWorktree?.branch}
 							</span>
@@ -5952,7 +6108,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							Select a project worktree first.
 						</div>
 					) : gitHistoryLoading ? (
-						<div className="rounded-sm border border-[#24293d] bg-[#121723] px-3 py-3 text-xs text-[#c8c4ff]">
+						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-xs text-[#d4e4ef]">
 							Loading git history...
 						</div>
 					) : gitHistoryError && filteredGitHistoryEntries.length === 0 ? (
@@ -5979,14 +6135,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										<button
 											type="button"
 											key={entry.hash}
-											className="w-full rounded-sm border border-[#20242f] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1d2029]"
+											className="w-full rounded-sm border border-[#23282c] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1f2427]"
 											style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
 											onClick={() => {
 												void openGitHistoryDiff(entry);
 											}}
 										>
 											<div className="flex items-start gap-3">
-												<span className="mt-0.5 shrink-0 rounded-full border border-[#343950] bg-[#151a29] px-2 py-0.5 font-mono text-[10px] text-[#aaa4ff]">
+												<span className="mt-0.5 shrink-0 rounded-full border border-[#39444b] bg-[#182026] px-2 py-0.5 font-mono text-[10px] text-[#bdd5e6]">
 													{entry.shortHash}
 												</span>
 												<div className="min-w-0 flex-1">
@@ -5996,7 +6152,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 													>
 														{entry.subject}
 													</div>
-													<div className="mt-1 truncate text-[11px] text-[#8e8aa7]">
+													<div className="mt-1 truncate text-[11px] text-[#8f9aa2]">
 														{entry.authorName} ·{" "}
 														{formatGitHistoryTimestamp(entry.committedAt)}
 													</div>
@@ -6015,7 +6171,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								) : null}
 							</div>
 							{gitHistoryLoadingMore ? (
-								<div className="px-1 text-[11px] text-[#8e8aa7]">
+								<div className="px-1 text-[11px] text-[#8f9aa2]">
 									Loading more commits...
 								</div>
 							) : null}
@@ -6026,7 +6182,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							) : null}
 						</div>
 					) : gitHistoryLoadingMore ? (
-						<div className="rounded-sm border border-[#24293d] bg-[#121723] px-3 py-3 text-xs text-[#c8c4ff]">
+						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-xs text-[#d4e4ef]">
 							Loading more git history...
 						</div>
 					) : (
@@ -6059,15 +6215,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			<div className="hidden h-full md:flex md:flex-col">
 				<header className="flex justify-between items-center w-full px-6 h-14 bg-[#131313] border-b border-[#262626] z-50">
 					<div className="flex items-center gap-8">
-						<h1 className="text-xl font-black tracking-tighter text-[#aaa4ff]">
-							JT_IDE
+						<h1 className="text-xl font-black tracking-tighter text-[#bdd5e6]">
+							{APP_TITLE}
 						</h1>
 						<nav className="flex items-center gap-6">
 							<button
 								type="button"
-								className="font-label text-xs uppercase tracking-wider text-[#aaa4ff] border-b-2 border-[#7c4dff] pb-1"
+								className="font-label text-xs uppercase tracking-wider text-[#bdd5e6] border-b-2 border-[#7eadce] pb-1"
 							>
-								Codex
+								Chat
 							</button>
 							<button
 								type="button"
@@ -6096,14 +6252,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</header>
 
 				<div className="h-10 bg-[#131313] flex items-center px-6 gap-2">
-					<span className="font-label text-xs font-bold text-[#aaa4ff] shrink-0">
+					<span className="font-label text-xs font-bold text-[#bdd5e6] shrink-0">
 						{selectedThread?.title ??
 							selectedProject?.name ??
 							"No project selected"}
 					</span>
 					{selectedProject ? (
 						<>
-							<span className="text-[#4f5269] text-xs shrink-0">|</span>
+							<span className="text-[#545d64] text-xs shrink-0">|</span>
 							<span className="font-label text-xs text-[#f2f0ef] truncate">
 								{activeSelectedWorktreeFolder}
 							</span>
@@ -6123,7 +6279,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="flex items-center justify-end border-b border-[#262626] px-3 py-3">
 							<button
 								type="button"
-								className="px-2 py-1 rounded-sm text-[#aaa4ff] hover:bg-[#202020]"
+								className="px-2 py-1 rounded-sm text-[#bdd5e6] hover:bg-[#202020]"
 								onClick={() => setSidebarCollapsed((value) => !value)}
 							>
 								{sidebarCollapsed ? "☰" : "⟨"}
@@ -6217,8 +6373,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										className="flex-1 overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 placeholder:text-[#adabaa]/50 resize-none font-body px-2"
 										placeholder={
 											selectedThread
-												? "Ask Codex to generate, refactor, or debug..."
-												: "Create a thread to start chatting with Codex..."
+												? `Ask ${APP_TITLE} to generate, refactor, or debug...`
+												: `Create a thread to start chatting with ${APP_TITLE}...`
 										}
 										rows={3}
 										style={{
@@ -6237,7 +6393,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									/>
 									<button
 										type="submit"
-										className="w-10 h-10 flex items-center justify-center bg-[#aaa4ff] rounded-sm text-[#281d7c] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+										className="w-10 h-10 flex items-center justify-center bg-[#bdd5e6] rounded-sm text-[#2e526b] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
 										disabled={
 											!selectedThread ||
 											isSending ||
@@ -6245,12 +6401,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											isThreadLoading
 										}
 									>
-										<span
-											className="material-symbols-outlined"
-											style={{ fontVariationSettings: "'wght' 700" }}
-										>
-											arrow_forward
-										</span>
+										{materialSymbol("arrow_forward")}
 									</button>
 								</div>
 							</div>
@@ -6264,13 +6415,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="flex items-center gap-3">
 						<button
 							type="button"
-							className="material-symbols-outlined text-[#aaa4ff]"
+							className="text-[#bdd5e6]"
 							onClick={() => setMobileProjectListOpen((value) => !value)}
 						>
-							menu
+							{materialSymbol("menu")}
 						</button>
-						<h1 className="font-headline tracking-wider uppercase text-sm font-bold text-[#aaa4ff]">
-							JT_IDE
+						<h1 className="font-headline tracking-wider uppercase text-sm font-bold text-[#bdd5e6]">
+							{APP_TITLE}
 						</h1>
 					</div>
 					<div className="flex items-center gap-3">
@@ -6312,8 +6463,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						className="max-w-2xl mx-auto flex flex-col gap-3"
 						onSubmit={onSubmit}
 					>
-						<div className="overflow-visible rounded-[1.35rem] border border-[#34384d] bg-[#17191f] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
-							<div className="border-b border-[#2d3144] px-2 py-2">
+						<div className="overflow-visible rounded-[1.35rem] border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+							<div className="border-b border-[#313a40] px-2 py-2">
 								<div className="flex items-center gap-2">
 									<div className="min-w-0 flex-1">
 										<CodexModelSelector
@@ -6337,14 +6488,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									/>
 								</div>
 							</div>
-							<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#17191f] px-2 py-2">
+							<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#181b1e] px-2 py-2">
 								<textarea
 									ref={mobileComposerRef}
-									className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#2f3347] bg-[#1d1f24] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#8e86f3] focus:outline-none"
+									className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
 									placeholder={
 										selectedThread
-											? "Ask Codex..."
-											: "Create a thread to chat with Codex..."
+											? `Ask ${APP_TITLE}...`
+											: `Create a thread to chat with ${APP_TITLE}...`
 									}
 									rows={1}
 									style={{
@@ -6362,7 +6513,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}
 								/>
 								<button
-									className="bg-gradient-to-tr from-[#aaa4ff] to-[#9c95f8] text-[#1b0a71] p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center"
+									className="bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259] p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center"
 									type="submit"
 									disabled={
 										!selectedThread ||
@@ -6386,7 +6537,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 				<div className="fixed bottom-0 left-0 w-full z-50">
 					<div className="w-full h-1 bg-[#000000]">
-						<div className="h-full bg-[#aaa4ff]/40 w-[68%] relative overflow-hidden">
+						<div className="h-full bg-[#bdd5e6]/40 w-[100%] relative overflow-hidden">
 							<div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 						</div>
 					</div>
@@ -6397,8 +6548,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								File
 							</span>
 						</div>
-						<div className="flex flex-col items-center justify-center text-[#aaa4ff] font-bold border-t-2 border-[#aaa4ff] pt-2">
-							{materialSymbol("forum", "text-sm")}
+						<div className="flex flex-col items-center justify-center text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6] pt-2">
+							{brandBoltIcon("text-sm")}
 							<span className="font-label text-[10px] uppercase tracking-widest mt-1">
 								AI Chat
 							</span>
