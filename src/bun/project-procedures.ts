@@ -272,9 +272,9 @@ function createCodexClient(
 					command: process.execPath,
 					args: [JOLT_SIDECAR_SERVER_PATH],
 					env: {
-						JOLT_ACTIVE_PROJECT_ID: String(thread.projectId),
-						JOLT_ACTIVE_THREAD_ID: String(thread.id),
-						JOLT_ACTIVE_WORKTREE_PATH: thread.worktreePath,
+						JOLT_PROJECT_ID: String(thread.projectId),
+						JOLT_THREAD_ID: String(thread.id),
+						JOLT_WORKTREE_PATH: thread.worktreePath,
 						JOLT_RPC_URL: joltRpcUrl(),
 					},
 				},

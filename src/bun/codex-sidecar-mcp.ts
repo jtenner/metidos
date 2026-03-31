@@ -4,6 +4,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 
+import {
+	getThreadById,
+	initAppDatabase,
+	renameThread as renameThreadRecord,
+} from "./db";
 import type {
 	AppRPCSchema,
 	RpcProcedureCallOptions,
@@ -48,10 +53,35 @@ type PendingRpcRequest = {
 
 type ThreadLifecycleStatus = "Turning" | "Errored" | "Stopped" | "Created";
 
-const activeThreadId = readIntegerEnv("JOLT_ACTIVE_THREAD_ID");
-const activeProjectId = readIntegerEnv("JOLT_ACTIVE_PROJECT_ID");
-const activeWorktreePath = readStringEnv("JOLT_ACTIVE_WORKTREE_PATH");
+const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
+const projectIdContext = readIntegerEnv("JOLT_PROJECT_ID");
+const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
+const db = initAppDatabase();
+
+function boundThreadSentence(): string {
+	return typeof threadIdContext === "number"
+		? ` Bound thread: ${threadIdContext}.`
+		: "";
+}
+
+function explicitThreadIdDescription(): string {
+	return typeof threadIdContext === "number"
+		? `Required. Use thread ${threadIdContext} for this Codex thread.`
+		: "Required Jolt thread id.";
+}
+
+function defaultProjectIdDescription(): string {
+	return typeof projectIdContext === "number"
+		? `Defaults to project ${projectIdContext}.`
+		: "Jolt project id.";
+}
+
+function defaultWorktreePathDescription(): string {
+	return worktreePathContext
+		? `Defaults to ${worktreePathContext}.`
+		: "Required with no worktree context.";
+}
 
 class JoltRpcClient {
 	private connecting: Promise<WebSocket> | null = null;
@@ -233,7 +263,7 @@ function canonicalPath(value: string): string {
 		throw new Error("Path is required.");
 	}
 
-	const baseDirectory = activeWorktreePath ?? process.cwd();
+	const baseDirectory = worktreePathContext ?? process.cwd();
 	const resolvedPath = isAbsolute(trimmed)
 		? resolve(trimmed)
 		: resolve(baseDirectory, trimmed);
@@ -269,8 +299,8 @@ async function resolveProjectId(params?: {
 		throw new Error(`Project not found: ${params.projectPath}`);
 	}
 
-	if (typeof activeProjectId === "number") {
-		return activeProjectId;
+	if (typeof projectIdContext === "number") {
+		return projectIdContext;
 	}
 
 	throw new Error("projectId or projectPath required with no active project.");
@@ -294,18 +324,18 @@ async function resolveProjectIdForWorktreePath(
 	}
 
 	if (
-		typeof activeProjectId === "number" &&
-		activeProjectId !== preferredProjectId
+		typeof projectIdContext === "number" &&
+		projectIdContext !== preferredProjectId
 	) {
 		const worktrees = await rpcClient.call("listProjectWorktrees", {
-			projectId: activeProjectId,
+			projectId: projectIdContext,
 		});
 		if (
 			worktrees.worktrees.some((worktree) =>
 				samePath(worktree.path, worktreePath),
 			)
 		) {
-			return activeProjectId;
+			return projectIdContext;
 		}
 	}
 
@@ -316,7 +346,10 @@ async function resolveProjectIdForWorktreePath(
 		) {
 			continue;
 		}
-		if (typeof activeProjectId === "number" && project.id === activeProjectId) {
+		if (
+			typeof projectIdContext === "number" &&
+			project.id === projectIdContext
+		) {
 			continue;
 		}
 		const worktrees = await rpcClient.call("listProjectWorktrees", {
@@ -354,24 +387,40 @@ async function resolveWorktreeTarget(params?: {
 		};
 	}
 
-	if (typeof activeProjectId === "number" && activeWorktreePath) {
+	if (typeof projectIdContext === "number" && worktreePathContext) {
 		return {
-			projectId: activeProjectId,
-			worktreePath: activeWorktreePath,
+			projectId: projectIdContext,
+			worktreePath: worktreePathContext,
 		};
 	}
 
 	throw new Error("worktreePath required with no active worktree.");
 }
 
-function resolveThreadId(threadId?: number | null): number {
+function requireThreadId(threadId?: number | null): number {
 	if (typeof threadId === "number") {
 		return threadId;
 	}
-	if (typeof activeThreadId === "number") {
-		return activeThreadId;
+	throw new Error("threadId is required.");
+}
+
+function renameThreadLocally(threadId: number, title: string) {
+	renameThreadRecord(db, threadId, title);
+	const thread = getThreadById(db, threadId);
+	if (!thread) {
+		throw new Error(`Thread not found: ${threadId}`);
 	}
-	throw new Error("threadId required with no active thread.");
+	return thread;
+}
+
+function refreshThreadTitleInApp(threadId: number, title: string): void {
+	void rpcClient
+		.call(
+			"renameThread",
+			{ threadId, title },
+			{ priority: "background", timeoutMs: 1_500 },
+		)
+		.catch(() => {});
 }
 
 function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
@@ -408,6 +457,14 @@ function textResult(text: string, structuredContent?: Record<string, unknown>) {
 	};
 }
 
+function safeMetadataAnnotations() {
+	return {
+		idempotentHint: true,
+		openWorldHint: false,
+		readOnlyHint: true,
+	};
+}
+
 const server = new McpServer({
 	name: "jolt",
 	version: "0.0.1",
@@ -417,29 +474,23 @@ server.registerTool(
 	"set_thread_title",
 	{
 		title: "Set Thread Title",
-		description:
-			"Update the current Jolt thread title. Use it whenever a short title would better match the current focus.",
+		description: `Update the Jolt thread title. Use it whenever a short title would better match the focus.${boundThreadSentence()}`,
 		inputSchema: {
 			title: z.string().trim().min(1).describe("Short title."),
 			threadId: z
 				.number()
 				.int()
 				.positive()
-				.optional()
-				.describe("Defaults to the current thread."),
+				.describe(explicitThreadIdDescription()),
 		},
-		annotations: {
-			idempotentHint: false,
-			openWorldHint: false,
-			readOnlyHint: false,
-		},
+		// Treat title updates as safe UI metadata so Codex can run them freely.
+		annotations: safeMetadataAnnotations(),
 	},
 	async ({ threadId, title }) => {
-		const resolvedThreadId = resolveThreadId(threadId);
-		const thread = await rpcClient.call("renameThread", {
-			threadId: resolvedThreadId,
-			title,
-		});
+		const resolvedThreadId = requireThreadId(threadId);
+		const thread = renameThreadLocally(resolvedThreadId, title);
+		// Refresh the live app cache without blocking the tool result.
+		refreshThreadTitleInApp(resolvedThreadId, title);
 		return textResult(`Renamed thread ${thread.id}.`, {
 			threadId: thread.id,
 			title: thread.title,
@@ -460,7 +511,7 @@ server.registerTool(
 				.int()
 				.positive()
 				.optional()
-				.describe("Jolt project id."),
+				.describe(defaultProjectIdDescription()),
 			projectPath: z
 				.string()
 				.trim()
@@ -472,7 +523,7 @@ server.registerTool(
 				.trim()
 				.min(1)
 				.optional()
-				.describe("Defaults to the current worktree."),
+				.describe(defaultWorktreePathDescription()),
 			model: z.string().trim().min(1).optional().describe("Model override."),
 			reasoningEffort: z
 				.enum(["minimal", "low", "medium", "high", "xhigh"])
@@ -529,7 +580,7 @@ server.registerTool(
 				.int()
 				.positive()
 				.optional()
-				.describe("Jolt project id."),
+				.describe(defaultProjectIdDescription()),
 			projectPath: z
 				.string()
 				.trim()
@@ -573,7 +624,7 @@ server.registerTool(
 				.int()
 				.positive()
 				.optional()
-				.describe("Jolt project id."),
+				.describe(defaultProjectIdDescription()),
 			projectPath: z
 				.string()
 				.trim()
@@ -582,11 +633,8 @@ server.registerTool(
 				.describe("Jolt project path."),
 			worktreePath: z.string().trim().min(1).describe("Worktree path."),
 		},
-		annotations: {
-			idempotentHint: true,
-			openWorldHint: false,
-			readOnlyHint: false,
-		},
+		// Treat active worktree changes as safe UI metadata, not destructive work.
+		annotations: safeMetadataAnnotations(),
 	},
 	async ({ projectId, projectPath, worktreePath }) => {
 		const target = await resolveWorktreeTarget({
@@ -606,15 +654,13 @@ server.registerTool(
 	"thread_status",
 	{
 		title: "Thread Status",
-		description:
-			"Get a Jolt thread status: Created, Turning, Stopped, or Errored.",
+		description: `Get a Jolt thread status: Created, Turning, Stopped, or Errored.${boundThreadSentence()}`,
 		inputSchema: {
 			threadId: z
 				.number()
 				.int()
 				.positive()
-				.optional()
-				.describe("Defaults to the current thread."),
+				.describe(explicitThreadIdDescription()),
 		},
 		annotations: {
 			idempotentHint: true,
@@ -624,7 +670,7 @@ server.registerTool(
 	},
 	async ({ threadId }) => {
 		const detail = await rpcClient.call("getThread", {
-			threadId: resolveThreadId(threadId),
+			threadId: requireThreadId(threadId),
 		});
 		const payload = threadStatusPayload(detail);
 		return textResult(
