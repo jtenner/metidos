@@ -56,5 +56,6 @@
  │     ├─ index.html
  │     ├─ index.ts
  │     └─ input.css
+├─ tsconfig.json
 └─ stitch.zip
 ```

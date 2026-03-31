@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { Codex, type ThreadItem } from "@openai/codex-sdk";
@@ -635,7 +635,7 @@ function listPackageJsonTasks(
 	if (entries.includes("package.json") && safeIsFile(packageJsonPath)) {
 		try {
 			const parsed = JSON.parse(
-				Bun.file(packageJsonPath).textSync(),
+				readFileSync(packageJsonPath, "utf8"),
 			) as Partial<{
 				scripts: Record<string, unknown>;
 			}>;
@@ -841,7 +841,7 @@ function resolvePackageJsonTask(
 
 	let parsed: Partial<{ scripts: Record<string, unknown> }>;
 	try {
-		parsed = JSON.parse(Bun.file(packageJsonPath).textSync()) as Partial<{
+		parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as Partial<{
 			scripts: Record<string, unknown>;
 		}>;
 	} catch {
@@ -1891,7 +1891,7 @@ function buildGitHistorySignature(
 }
 
 function normalizeGitHistoryPageLimit(limit?: number): number {
-	if (!Number.isInteger(limit)) {
+	if (typeof limit !== "number" || !Number.isInteger(limit)) {
 		return DEFAULT_GIT_HISTORY_PAGE_SIZE;
 	}
 	return Math.min(Math.max(limit, 1), DEFAULT_GIT_HISTORY_PAGE_SIZE);
@@ -2013,6 +2013,11 @@ async function readGitHistoryFirstPage(
 	}
 
 	const firstEntry = parsedEntries[0];
+	if (!firstEntry) {
+		throw new Error(
+			"Expected a first git history entry when history is not empty.",
+		);
+	}
 	const hasMore = parsedEntries.length > limit;
 	const trimmedEntries = hasMore
 		? parsedEntries.slice(0, limit)
@@ -2111,7 +2116,8 @@ async function fillGitHistoryCache(
 			GIT_HISTORY_PREFETCH_CHUNK_SIZE,
 			offset + limit - fetchOffset,
 		);
-		const promise = (async () => {
+		let promise: Promise<void> | null = null;
+		promise = (async () => {
 			try {
 				const page = await readGitHistoryPageEntries(
 					worktreePath,

@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -122,6 +122,16 @@ const APP_DATA_DIR =
 					APP_NAME,
 				);
 
+function runStatement(
+	database: Database,
+	sql: string,
+	...bindings: SQLQueryBindings[]
+): ReturnType<Database["run"]> {
+	return bindings.length === 0
+		? database.run(sql)
+		: database.run(sql, bindings);
+}
+
 function ensureAppDirectory(appDataPath: string): void {
 	if (!existsSync(appDataPath)) {
 		mkdirSync(appDataPath, { recursive: true });
@@ -134,7 +144,7 @@ function tableHasColumn(
 	columnName: string,
 ): boolean {
 	return db
-		.query<{ name: string }>(`PRAGMA table_info(${tableName})`)
+		.query<{ name: string }, []>(`PRAGMA table_info(${tableName})`)
 		.all()
 		.some((column) => column.name === columnName);
 }
@@ -145,7 +155,7 @@ function ensureThreadColumn(
 	columnDefinition: string,
 ): void {
 	if (!tableHasColumn(db, "threads", columnName)) {
-		db.run(`ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
+		runStatement(db, `ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
 	}
 }
 
@@ -155,12 +165,17 @@ function ensureThreadMessageColumn(
 	columnDefinition: string,
 ): void {
 	if (!tableHasColumn(db, "thread_messages", columnName)) {
-		db.run(`ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`);
+		runStatement(
+			db,
+			`ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`,
+		);
 	}
 }
 
 function migrate(db: Database): void {
-	db.run(`
+	runStatement(
+		db,
+		`
 			CREATE TABLE IF NOT EXISTS projects (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 			path TEXT NOT NULL UNIQUE,
@@ -171,16 +186,22 @@ function migrate(db: Database): void {
 			updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE TABLE IF NOT EXISTS project_worktrees (
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 				worktree_path TEXT NOT NULL,
 				pinned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				PRIMARY KEY (project_id, worktree_path)
 			);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE TABLE IF NOT EXISTS threads (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -205,7 +226,8 @@ function migrate(db: Database): void {
 				last_error_seen_at TEXT,
 				last_error_message TEXT
 			);
-		`);
+		`,
+	);
 	ensureThreadColumn(db, "last_input_tokens", "last_input_tokens INTEGER");
 	ensureThreadColumn(
 		db,
@@ -240,7 +262,8 @@ function migrate(db: Database): void {
 	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
 	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
 	ensureThreadColumn(db, "model", "model TEXT");
-	db.run(
+	runStatement(
+		db,
 		`
 			UPDATE threads
 			SET model = ?
@@ -248,7 +271,9 @@ function migrate(db: Database): void {
 		`,
 		DEFAULT_THREAD_MODEL,
 	);
-	db.run(`
+	runStatement(
+		db,
+		`
 			CREATE TABLE IF NOT EXISTS thread_messages (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				thread_id INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -261,32 +286,48 @@ function migrate(db: Database): void {
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
-		`);
+		`,
+	);
 	ensureThreadMessageColumn(db, "kind", "kind TEXT NOT NULL DEFAULT 'chat'");
 	ensureThreadMessageColumn(db, "item_id", "item_id TEXT");
 	ensureThreadMessageColumn(db, "state", "state TEXT");
 	ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
 	ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
-	db.run(`
+	runStatement(
+		db,
+		`
 			CREATE INDEX IF NOT EXISTS idx_project_worktrees_project_id_pinned_at
 			ON project_worktrees(project_id, pinned_at DESC, worktree_path ASC);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE INDEX IF NOT EXISTS idx_threads_updated_at
 			ON threads(updated_at DESC, id DESC);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE INDEX IF NOT EXISTS idx_threads_project_id
 			ON threads(project_id);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id
 			ON thread_messages(thread_id, id);
-		`);
-	db.run(`
+		`,
+	);
+	runStatement(
+		db,
+		`
 			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_item_id
 			ON thread_messages(thread_id, item_id);
-		`);
+		`,
+	);
 }
 
 export function getAppDatabasePath(): string {
@@ -303,7 +344,7 @@ export function initAppDatabase(): Database {
 	ensureAppDirectory(appDataPath);
 
 	const db = new Database(dbPath);
-	db.run("PRAGMA foreign_keys = ON");
+	runStatement(db, "PRAGMA foreign_keys = ON");
 	migrate(db);
 	appDatabase = db;
 	return db;
@@ -357,7 +398,7 @@ export function getProjectById(
 
 export function listProjects(database: Database): ProjectRecord[] {
 	return database
-		.query<ProjectRecord>(
+		.query<ProjectRecord, []>(
 			`
 			SELECT
 				id,
@@ -379,7 +420,8 @@ export function upsertProject(
 	database: Database,
 	input: ProjectInput,
 ): ProjectRecord {
-	database.run(
+	runStatement(
+		database,
 		`
 			INSERT INTO projects (path, name, is_open, last_opened_at, updated_at)
 			VALUES (?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -401,7 +443,7 @@ export function upsertProject(
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
 	return database
-		.query<ProjectRecord>(
+		.query<ProjectRecord, []>(
 			`
 			SELECT
 				id,
@@ -421,14 +463,15 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 }
 
 export function setProjectClosed(database: Database, projectId: number): void {
-	database.run(
+	runStatement(
+		database,
 		`UPDATE projects SET is_open = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
 		projectId,
 	);
 }
 
 export function deleteProject(database: Database, projectId: number): void {
-	database.run("DELETE FROM projects WHERE id = ?", projectId);
+	runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
 }
 
 export function listProjectWorktreePins(
@@ -456,7 +499,8 @@ export function setProjectWorktreePinned(
 	pinned: boolean,
 ): void {
 	if (pinned) {
-		database.run(
+		runStatement(
+			database,
 			`
 				INSERT INTO project_worktrees (
 					project_id,
@@ -477,7 +521,8 @@ export function setProjectWorktreePinned(
 		return;
 	}
 
-	database.run(
+	runStatement(
+		database,
 		`
 			DELETE FROM project_worktrees
 			WHERE project_id = ? AND worktree_path = ?
@@ -489,7 +534,7 @@ export function setProjectWorktreePinned(
 
 export function listThreads(database: Database): ThreadRecord[] {
 	return database
-		.query<ThreadRecord>(
+		.query<ThreadRecord, []>(
 			`
 				SELECT
 					id,
@@ -567,7 +612,8 @@ export function createThread(
 	database: Database,
 	input: ThreadInput,
 ): ThreadRecord {
-	const result = database.run(
+	const result = runStatement(
+		database,
 		`
 			INSERT INTO threads (
 				project_id,
@@ -605,7 +651,8 @@ export function updateThreadCodexId(
 	threadId: number,
 	codexThreadId: string,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -623,7 +670,8 @@ export function renameThread(
 	threadId: number,
 	title: string,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET title = ?
@@ -639,7 +687,8 @@ export function setThreadModel(
 	threadId: number,
 	model: string,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -657,7 +706,8 @@ export function setThreadPinned(
 	threadId: number,
 	pinned: boolean,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET pinned_at = CASE
@@ -672,11 +722,12 @@ export function setThreadPinned(
 }
 
 export function deleteThread(database: Database, threadId: number): void {
-	database.run("DELETE FROM threads WHERE id = ?", threadId);
+	runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
 }
 
 export function markThreadRan(database: Database, threadId: number): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -697,7 +748,8 @@ export function setThreadUsage(
 	usage: ThreadUsageInput,
 	compactionStats: ThreadCompactionStatsInput,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -731,7 +783,8 @@ export function markThreadFailed(
 	threadId: number,
 	errorMessage: string,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -750,7 +803,8 @@ export function markThreadErrorSeen(
 	database: Database,
 	threadId: number,
 ): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -765,7 +819,8 @@ export function markThreadErrorSeen(
 }
 
 export function touchThread(database: Database, threadId: number): void {
-	database.run(
+	runStatement(
+		database,
 		`
 			UPDATE threads
 			SET
@@ -806,7 +861,8 @@ export function createThreadMessage(
 	database: Database,
 	input: ThreadMessageInput,
 ): ThreadMessageRecord {
-	const result = database.run(
+	const result = runStatement(
+		database,
 		`
 			INSERT INTO thread_messages (
 				thread_id,
@@ -869,7 +925,8 @@ export function upsertThreadActivity(
 		.get(input.threadId, input.itemId);
 
 	if (existing) {
-		database.run(
+		runStatement(
+			database,
 			`
 				UPDATE thread_messages
 				SET
@@ -889,7 +946,8 @@ export function upsertThreadActivity(
 			existing.id,
 		);
 	} else {
-		database.run(
+		runStatement(
+			database,
 			`
 				INSERT INTO thread_messages (
 					thread_id,

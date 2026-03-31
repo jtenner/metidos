@@ -3,6 +3,7 @@ import {
 	type ChangeEvent,
 	type FormEvent,
 	type HTMLAttributes,
+	type JSX,
 	type KeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
@@ -103,7 +104,7 @@ type ProjectNodeState = {
 type WorktreeNodeState = {
 	loading: boolean;
 	opened: boolean;
-	snapshot?: RpcWorktreeSnapshot;
+	snapshot?: RpcWorktreeSnapshot | undefined;
 	error: string;
 };
 
@@ -483,6 +484,12 @@ function defaultPersistedTreeViewState(): PersistedTreeViewState {
 	};
 }
 
+function parsePositiveInteger(value: unknown): number | null {
+	return typeof value === "number" && Number.isInteger(value) && value > 0
+		? value
+		: null;
+}
+
 function normalizePersistedOpenWorktrees(
 	value: unknown,
 ): PersistedOpenWorktree[] {
@@ -497,9 +504,9 @@ function normalizePersistedOpenWorktrees(
 			continue;
 		}
 		const candidate = entry as Partial<PersistedOpenWorktree>;
-		const projectId = candidate.projectId;
+		const projectId = parsePositiveInteger(candidate.projectId);
 		const worktreePath = candidate.worktreePath;
-		if (!Number.isInteger(projectId) || projectId < 1) {
+		if (projectId === null) {
 			continue;
 		}
 		if (typeof worktreePath !== "string" || !worktreePath.trim()) {
@@ -561,17 +568,13 @@ function readPersistedMainviewState(): PersistedMainviewState {
 
 		return {
 			version: MAINVIEW_STATE_STORAGE_VERSION,
-			selectedProjectId: Number.isInteger(parsed.selectedProjectId)
-				? parsed.selectedProjectId
-				: null,
+			selectedProjectId: parsePositiveInteger(parsed.selectedProjectId),
 			selectedWorktreePath:
 				typeof parsed.selectedWorktreePath === "string" &&
 				parsed.selectedWorktreePath.trim()
 					? parsed.selectedWorktreePath
 					: null,
-			selectedThreadId: Number.isInteger(parsed.selectedThreadId)
-				? parsed.selectedThreadId
-				: null,
+			selectedThreadId: parsePositiveInteger(parsed.selectedThreadId),
 			pendingThreadModel:
 				typeof parsed.pendingThreadModel === "string"
 					? parsed.pendingThreadModel
@@ -1734,7 +1737,7 @@ function FileChangeMessage({
 	diffText: string;
 	path: string;
 	state: "completed" | "failed";
-	worktreePath?: string;
+	worktreePath?: string | undefined;
 }): JSX.Element {
 	const fileHref = buildLocalFileHref(path, worktreePath);
 	return (
@@ -3007,7 +3010,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				gitHistoryLoadingMoreRef.current = false;
 				setGitHistoryError("");
 				return;
-			} else if (!options?.silent) {
+			}
+			if (!options?.silent) {
 				setGitHistoryLoading(true);
 				setGitHistoryError("");
 			}
@@ -3297,7 +3301,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		async (
 			query: string,
 			options?: {
-				forceRefresh?: boolean;
+				forceRefresh?: boolean | undefined;
 			},
 		): Promise<string[]> => {
 			const normalizedQuery = query.trim();
@@ -3603,6 +3607,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [
 		applyOpenedThreadDetail,
 		cacheGitHistoryResult,
+		getProjectState,
 		hydrateProjectRows,
 		initialMainviewState,
 		initialTreeViewState,
@@ -4141,7 +4146,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	useEffect(() => {
 		resetGitHistoryScrollPosition();
-	}, [normalizedSidebarSearchQuery, resetGitHistoryScrollPosition]);
+	}, [resetGitHistoryScrollPosition]);
 
 	useEffect(() => {
 		const handleWorktreeTasksChanged = (
@@ -4411,9 +4416,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		}
 		void (async () => {
 			try {
-				const directories = await fetchDirectorySuggestions(query, {
-					forceRefresh: cached?.isStale,
-				});
+				const directories = await fetchDirectorySuggestions(
+					query,
+					cached ? { forceRefresh: cached.isStale } : undefined,
+				);
 				if (!cancelled) {
 					setDirectorySuggestions(directories);
 				}
@@ -4543,7 +4549,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const detail = await procedures.createThread({
 				projectId: selectedProject.id,
 				worktreePath: activeSelectedWorktreePath,
-				model: activeCodexModel || defaultCodexModel || undefined,
+				model: activeCodexModel || defaultCodexModel || null,
 			});
 			setThreads((prev) => upsertThreadList(prev, detail.thread));
 			setSelectedThreadId(detail.thread.id);

@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
+import type { ServerWebSocket } from "bun";
 
 import { initAppDatabase } from "./db";
 import {
@@ -118,6 +119,9 @@ function isStringInteger(value: string): boolean {
 function readCliPort(args: string[]): string | null {
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
+		if (typeof arg !== "string") {
+			continue;
+		}
 		if (arg === "--port" || arg === "-p") {
 			const nextArg = args[index + 1];
 			if (!nextArg) {
