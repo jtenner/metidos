@@ -499,13 +499,15 @@ server.registerTool(
 	"set_thread_title",
 	{
 		title: "Set Thread Title",
-		description: `Update the Jolt thread title. Use it liberally whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
+		description: `Update the Jolt thread title. Always use this tool for every thread, including quick one-off tasks, so each thread receives a title even if it is only set once. Use it again whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
 		inputSchema: {
 			title: z
 				.string()
 				.trim()
 				.min(1)
-				.describe("Short title. Update whenever the focus shifts."),
+				.describe(
+					"Short title. Required for every thread, including quick one-off tasks. Update whenever the focus shifts.",
+				),
 			summary: z
 				.string()
 				.optional()
