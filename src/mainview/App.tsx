@@ -1163,10 +1163,10 @@ function ProjectTaskSelector({
 			) : null}
 			{open ? (
 				<div
-					className={`absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[18rem] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
+					className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "rounded-md border-[#3a355f] bg-[#14131d]"
-							: "rounded-2xl border-[#413e5e] bg-[#15161f]"
+							? "left-0 min-w-[18rem] rounded-md border-[#3a355f] bg-[#14131d]"
+							: "right-0 w-[calc(100vw-2rem)] max-w-[18rem] rounded-2xl border-[#413e5e] bg-[#15161f]"
 					}`}
 				>
 					<div className="border-b border-[#3a355f] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#8e89bf]">
@@ -2265,8 +2265,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const activeScreenSubtitlePrimary = selectedProject
 		? activeSelectedWorktreeFolder
 		: "No project selected";
-	const activeScreenSubtitleSecondary =
-		activeSelectedWorktreePath ?? "No worktree selected";
+	const activeScreenSubtitleSecondary = activeSelectedWorktreePath
+		? formatPathForDisplay(
+				activeSelectedWorktreePath,
+				homeDirectory,
+				supportsTildePath,
+			)
+		: "No worktree selected";
 
 	const taskSelectorDisabled =
 		!selectedProject ||
@@ -6146,7 +6151,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									</span>
 									<span className="text-[#7f7c79]">
 										{" "}
-										~ {activeScreenSubtitleSecondary}
+										| {activeScreenSubtitleSecondary}
 									</span>
 								</p>
 							</div>
@@ -6293,7 +6298,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</span>
 							<span className="text-[#7f7c79]">
 								{" "}
-								~ {activeScreenSubtitleSecondary}
+								| {activeScreenSubtitleSecondary}
 							</span>
 						</p>
 					</div>
