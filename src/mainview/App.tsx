@@ -37,6 +37,7 @@ import type {
 	RpcWorktreeSnapshot,
 	RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
+import { DropdownControl } from "./controls/dropdown";
 
 type VisibleMessage =
 	| {
@@ -1128,9 +1129,8 @@ function CodexModelSelector({
 }): JSX.Element {
 	const groupedModels = groupCodexModels(models);
 	const activeModel = findCodexModel(models, value);
-	const [open, setOpen] = useState(false);
+	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
-	const rootRef = useRef<HTMLDivElement | null>(null);
 	const searchInputRef = useRef<HTMLInputElement | null>(null);
 	const buttonLabel = activeModel
 		? codexModelLabel(activeModel)
@@ -1158,95 +1158,62 @@ function CodexModelSelector({
 	);
 
 	useEffect(() => {
-		if (disabled && open) {
-			setOpen(false);
-		}
-	}, [disabled, open]);
-
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-
-		const handlePointerDown = (event: MouseEvent) => {
-			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-				setOpen(false);
-			}
-		};
-
-		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-			if (event.key === "Escape") {
-				setOpen(false);
-			}
-		};
-
-		document.addEventListener("mousedown", handlePointerDown);
-		document.addEventListener("keydown", handleKeyDown);
-		return () => {
-			document.removeEventListener("mousedown", handlePointerDown);
-			document.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [open]);
-
-	useEffect(() => {
-		if (!open) {
+		if (!dropdownOpen) {
 			setSearchQuery("");
 			return;
 		}
 		searchInputRef.current?.focus();
-	}, [open]);
+	}, [dropdownOpen]);
 
 	return (
-		<div
-			ref={rootRef}
-			className="relative"
+		<DropdownControl
+			canOpen={!disabled}
+			disabled={disabled}
+			onOpenChange={setDropdownOpen}
 			title={activeModel?.summary ?? `${APP_TITLE} model`}
-		>
-			<button
-				type="button"
-				className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
-					variant === "desktop"
-						? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
-						: "h-10 gap-2 rounded-xl border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
-				} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
-					open
-						? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
-						: ""
-				}`}
-				onClick={() => {
-					if (!disabled) {
-						setOpen((current) => !current);
-					}
-				}}
-				disabled={disabled}
-				aria-expanded={open}
-				aria-haspopup="menu"
-			>
-				<span className="min-w-0 flex-1">
+			renderButton={({ open, toggle }) => (
+				<button
+					type="button"
+					className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
+						variant === "desktop"
+							? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+							: "h-10 gap-2 rounded-xl border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+					} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
+						open
+							? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
+							: ""
+					}`}
+					onClick={toggle}
+					disabled={disabled}
+					aria-expanded={open}
+					aria-haspopup="menu"
+				>
+					<span className="min-w-0 flex-1">
+						<span
+							className={`block truncate font-label font-bold uppercase text-[#f2f0ef] ${
+								variant === "desktop"
+									? "text-[10px] leading-none tracking-wider"
+									: "text-[10px] leading-none tracking-widest"
+							}`}
+						>
+							{buttonLabel}
+						</span>
+					</span>
 					<span
-						className={`block truncate font-label font-bold uppercase text-[#f2f0ef] ${
+						className={`shrink-0 text-[#8f8d8b] ${
 							variant === "desktop"
-								? "text-[10px] leading-none tracking-wider"
-								: "text-[10px] leading-none tracking-widest"
+								? "leading-none"
+								: "flex h-4 items-center leading-none"
 						}`}
 					>
-						{buttonLabel}
+						{materialSymbol(
+							open ? "expand_less" : "expand_more",
+							variant === "desktop" ? "text-[13px]" : "text-[16px]",
+						)}
 					</span>
-				</span>
-				<span
-					className={`shrink-0 text-[#8f8d8b] ${
-						variant === "desktop"
-							? "leading-none"
-							: "flex h-4 items-center leading-none"
-					}`}
-				>
-					{materialSymbol(
-						open ? "expand_less" : "expand_more",
-						variant === "desktop" ? "text-[13px]" : "text-[16px]",
-					)}
-				</span>
-			</button>
-			{open ? (
+				</button>
+			)}
+			renderPanel={({ close }) => (
 				<div
 					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
@@ -1311,7 +1278,7 @@ function CodexModelSelector({
 														: "text-[#ebf3f8] hover:bg-[#1e2428]"
 												}`}
 												onClick={() => {
-													setOpen(false);
+													close();
 													if (model.id !== value) {
 														onChange(model.id);
 													}
@@ -1349,8 +1316,8 @@ function CodexModelSelector({
 						))}
 					</div>
 				</div>
-			) : null}
-		</div>
+			)}
+		/>
 	);
 }
 
@@ -1367,8 +1334,6 @@ function ProjectTaskSelector({
 	onSelect: (task: RpcProjectTask) => void;
 	variant: "desktop" | "mobile";
 }): JSX.Element {
-	const [open, setOpen] = useState(false);
-	const rootRef = useRef<HTMLDivElement | null>(null);
 	const noTasksAvailable = !loading && tasks.length === 0;
 	const unavailable = disabled || noTasksAvailable;
 	const buttonLabel = loading
@@ -1386,87 +1351,56 @@ function ProjectTaskSelector({
 		return task.path !== task.title ? task.path : null;
 	};
 
-	useEffect(() => {
-		if (unavailable && open) {
-			setOpen(false);
-		}
-	}, [open, unavailable]);
-
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-
-		const handlePointerDown = (event: MouseEvent) => {
-			if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-				setOpen(false);
-			}
-		};
-
-		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-			if (event.key === "Escape") {
-				setOpen(false);
-			}
-		};
-
-		document.addEventListener("mousedown", handlePointerDown);
-		document.addEventListener("keydown", handleKeyDown);
-		return () => {
-			document.removeEventListener("mousedown", handlePointerDown);
-			document.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [open]);
-
 	return (
-		<div
-			ref={rootRef}
-			className={noTasksAvailable ? "group relative" : "relative"}
-		>
-			<button
-				type="button"
-				className={`flex items-center gap-2 transition-colors ${
-					variant === "desktop"
-						? unavailable
-							? "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5"
-							: "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5 hover:bg-[#262626]"
-						: unavailable
-							? "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-							: "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
-				} ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
-				onClick={() => {
-					if (!unavailable) {
-						setOpen((current) => !current);
-					}
-				}}
-				disabled={disabled}
-				aria-disabled={unavailable}
-				aria-expanded={open}
-				aria-haspopup="menu"
-			>
-				{materialSymbol(
-					"checklist",
-					variant === "desktop"
-						? "text-[#bdd5e6] text-[16px]"
-						: "text-on-surface-variant text-sm",
-				)}
-				<span
-					className={`font-label uppercase ${
-						variant === "desktop"
-							? "text-[10px] font-bold leading-none text-[#f2f0ef]"
-							: "text-[10px] leading-none tracking-widest text-[#f2f0ef]"
-					}`}
-				>
-					{buttonLabel}
-				</span>
-			</button>
-			{noTasksAvailable ? (
-				<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-					<div className="whitespace-nowrap rounded-md border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-						No tasks found.
-					</div>
-				</div>
-			) : null}
-			{open ? (
+		<DropdownControl
+			canOpen={!unavailable}
+			disabled={disabled}
+			rootClassName={noTasksAvailable ? "group relative" : "relative"}
+			renderButton={({ open, toggle }) => (
+				<>
+					<button
+						type="button"
+						className={`flex items-center gap-2 transition-colors ${
+							variant === "desktop"
+								? unavailable
+									? "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5"
+									: "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5 hover:bg-[#262626]"
+								: unavailable
+									? "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+									: "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+						} ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
+						onClick={toggle}
+						disabled={disabled}
+						aria-disabled={unavailable}
+						aria-expanded={open}
+						aria-haspopup="menu"
+					>
+						{materialSymbol(
+							"checklist",
+							variant === "desktop"
+								? "text-[#bdd5e6] text-[16px]"
+								: "text-on-surface-variant text-sm",
+						)}
+						<span
+							className={`font-label uppercase ${
+								variant === "desktop"
+									? "text-[10px] font-bold leading-none text-[#f2f0ef]"
+									: "text-[10px] leading-none tracking-widest text-[#f2f0ef]"
+							}`}
+						>
+							{buttonLabel}
+						</span>
+					</button>
+					{noTasksAvailable ? (
+						<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
+							<div className="whitespace-nowrap rounded-md border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+								No tasks found.
+							</div>
+						</div>
+					) : null}
+				</>
+			)}
+			renderPanel={({ close }) => (
 				<div
 					className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
@@ -1493,7 +1427,7 @@ function ProjectTaskSelector({
 									type="button"
 									className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1e2428]"
 									onClick={() => {
-										setOpen(false);
+										close();
 										onSelect(task);
 									}}
 								>
@@ -1518,8 +1452,8 @@ function ProjectTaskSelector({
 						)}
 					</div>
 				</div>
-			) : null}
-		</div>
+			)}
+		/>
 	);
 }
 
