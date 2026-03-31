@@ -53,7 +53,7 @@ const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
 const MAINVIEW_ENTRYPOINT = resolve(process.cwd(), "src/mainview/index.ts");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
-const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jt-ide-build");
+const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jolt-build");
 const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
 	process.cwd(),
 	"node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
@@ -167,7 +167,7 @@ function resolveServerPort(args: string[], envPort?: string): number {
 	const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
 	if (!isStringInteger(configuredPort)) {
 		throw new Error(
-			`Invalid port "${configuredPort}". Expected an integer string from --port, -p, or JT_IDE_PORT.`,
+			`Invalid port "${configuredPort}". Expected an integer string from --port, -p, or JOLT_PORT.`,
 		);
 	}
 
@@ -183,11 +183,11 @@ function resolveServerPort(args: string[], envPort?: string): number {
 
 const SERVER_ARGS = Bun.argv.slice(2);
 const CONFIGURED_SERVER_PORT =
-	readCliPort(SERVER_ARGS) ?? process.env.JT_IDE_PORT;
-const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JT_IDE_PORT);
+	readCliPort(SERVER_ARGS) ?? process.env.JOLT_PORT;
+const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JOLT_PORT);
 const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
 const IS_DEV_SERVER =
-	SERVER_ARGS.includes("--dev") || process.env.JT_IDE_DEV === "1";
+	SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
 
 const rpcHandlers: RpcRequestHandlerMap = {
 	getHomeDirectory: async () => ({
@@ -276,7 +276,7 @@ async function htmlResponse(): Promise<Response> {
 	const inlineCss = (await cssFile.exists())
 		? `<style>${(await cssFile.text()).replaceAll("</style", "<\\/style")}</style>`
 		: "";
-	const runtimeScript = `<script>window.__jtIdeRuntime=${JSON.stringify({
+	const runtimeScript = `<script>window.__joltRuntime=${JSON.stringify({
 		devServer: IS_DEV_SERVER,
 	})};</script>`;
 	const template = await Bun.file(MAINVIEW_HTML_PATH).text();
@@ -913,13 +913,13 @@ async function bootstrap(): Promise<void> {
 		});
 		activeServerPort = server.port ?? activeServerPort;
 		console.warn(
-			`Port ${SERVER_PORT} is already in use; jt-ide dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
+			`Port ${SERVER_PORT} is already in use; Jolt dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
 		);
 	}
 	activeServerPort = server.port ?? activeServerPort;
 
 	console.log(
-		`jt-ide web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
+		`Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
 	);
 
 	setTimeout(() => {

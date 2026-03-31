@@ -68,26 +68,26 @@ type RuntimeConfig = {
 	devServer: boolean;
 };
 
-const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
+const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
-	"jt-ide:worktree-git-history-changed";
+	"jolt:worktree-git-history-changed";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 
 declare global {
 	interface WindowEventMap {
-		"jt-ide:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
-		"jt-ide:worktree-git-history-changed": CustomEvent<RpcWorktreeGitHistoryChanged>;
+		"jolt:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
+		"jolt:worktree-git-history-changed": CustomEvent<RpcWorktreeGitHistoryChanged>;
 	}
 
 	interface Window {
-		jtIdeProcedures: ProjectProcedures;
-		__jtIdeAppMountedAt?: number;
-		__jtIdeRuntime?: RuntimeConfig;
+		joltProcedures: ProjectProcedures;
+		__joltAppMountedAt?: number;
+		__joltRuntime?: RuntimeConfig;
 	}
 }
 
-const runtimeConfig: RuntimeConfig = window.__jtIdeRuntime ?? {
+const runtimeConfig: RuntimeConfig = window.__joltRuntime ?? {
 	devServer: false,
 };
 
@@ -140,7 +140,7 @@ function reloadWindow(reason: string): void {
 		return;
 	}
 
-	console.info(`[jt-ide] reloading dev client (${reason})`);
+	console.info(`[jolt] reloading dev client (${reason})`);
 	isPageUnloading = true;
 	clearDevRecoveryTimer();
 	window.location.reload();
@@ -174,7 +174,7 @@ function scheduleDevRecovery(reason: string): void {
 	}
 
 	devRecoveryScheduled = true;
-	console.info(`[jt-ide] waiting for dev server restart (${reason})`);
+	console.info(`[jolt] waiting for dev server restart (${reason})`);
 	clearDevRecoveryTimer();
 	devRecoveryTimer = window.setTimeout(() => {
 		void waitForDevServer();
@@ -208,7 +208,7 @@ function scheduleRpcReconnect(reason: string): void {
 		RPC_RECONNECT_MAX_DELAY_MS,
 	);
 	rpcReconnectAttempt += 1;
-	console.info(`[jt-ide] reconnecting RPC socket in ${delay}ms (${reason})`);
+	console.info(`[jolt] reconnecting RPC socket in ${delay}ms (${reason})`);
 	rpcReconnectTimer = window.setTimeout(() => {
 		rpcReconnectTimer = null;
 		connectRpcSocket("reconnect");
@@ -231,7 +231,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
 	const nextSocket = new WebSocket(socketUrl);
 	socket = nextSocket;
 	if (reason === "reconnect") {
-		console.info("[jt-ide] opening replacement RPC socket");
+		console.info("[jolt] opening replacement RPC socket");
 	}
 
 	nextSocket.addEventListener("open", () => {
@@ -319,7 +319,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
 		if (socket !== nextSocket) {
 			return;
 		}
-		console.error("jt-ide RPC socket encountered an error");
+		console.error("Jolt RPC socket encountered an error");
 	});
 }
 
@@ -553,7 +553,7 @@ const procedures: ProjectProcedures = {
 	setWorktreePinned: createProcedure("setWorktreePinned"),
 };
 
-window.jtIdeProcedures = procedures;
+window.joltProcedures = procedures;
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
@@ -566,10 +566,10 @@ if (!appRoot) {
 	const root = createRoot(appRoot);
 	try {
 		root.render(createElement(App, { procedures }));
-		window.__jtIdeAppMountedAt = Date.now();
+		window.__joltAppMountedAt = Date.now();
 	} catch (error) {
 		console.error("Failed to mount App.tsx", error);
-		window.__jtIdeAppMountedAt = Number.NaN;
+		window.__joltAppMountedAt = Number.NaN;
 		appRoot.innerHTML =
 			'<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Failed to initialize App UI. Check console for details.</main>';
 	}

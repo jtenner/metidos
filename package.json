@@ -1,5 +1,5 @@
 {
-	"name": "jt-ide",
+	"name": "jolt",
 	"private": true,
 	"type": "module",
 	"version": "0.0.1",
@@ -11,7 +11,7 @@
 		"dev:watch": "bun run dev",
 		"typecheck": "bunx tsgo --noEmit",
 		"validate": "bunx biome check src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json && bun run typecheck",
-		"build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jt-ide-build --target browser",
+		"build:dev": "bun install && bun run tailwind:build && bun build src/mainview/index.ts --outdir ./.jolt-build --target browser",
 		"format": "bunx biome format src/bun src/mainview/App.tsx src/mainview/index.ts src/mainview/input.css package.json tsconfig.json --write"
 	},
 	"dependencies": {

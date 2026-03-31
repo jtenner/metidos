@@ -1,6 +1,6 @@
 # Codex SDK Capabilities (for Bun + Browser Integration)
 
-See also: [`docs/codex-context-management.md`](/home/jtenner/Projects/jt-ide/docs/codex-context-management.md) for a focused note on how the SDK handles context, thread persistence, and where Responses API compaction fits.
+See also: [`docs/codex-context-management.md`](./codex-context-management.md) for a focused note on how the SDK handles context, thread persistence, and where Responses API compaction fits.
 
 ## What this SDK is
 

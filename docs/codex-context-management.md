@@ -25,10 +25,10 @@ The newer Responses API solves the API-side long-context problem by:
 
 This app already uses the SDK in the thread-oriented way the official docs describe:
 
-- [`src/bun/project-procedures.ts`](/home/jtenner/Projects/jt-ide/src/bun/project-procedures.ts) creates a singleton `Codex` client.
-- [`src/bun/project-procedures.ts`](/home/jtenner/Projects/jt-ide/src/bun/project-procedures.ts) uses `codex.startThread(...)` for new conversations.
-- [`src/bun/project-procedures.ts`](/home/jtenner/Projects/jt-ide/src/bun/project-procedures.ts) uses `codex.resumeThread(...)` when a stored `codexThreadId` exists.
-- [`src/bun/project-procedures.ts`](/home/jtenner/Projects/jt-ide/src/bun/project-procedures.ts) persists the emitted `thread_id` when the SDK reports `thread.started`.
+- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) creates a singleton `Codex` client.
+- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) uses `codex.startThread(...)` for new conversations.
+- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) uses `codex.resumeThread(...)` when a stored `codexThreadId` exists.
+- [`src/bun/project-procedures.ts`](../src/bun/project-procedures.ts) persists the emitted `thread_id` when the SDK reports `thread.started`.
 
 That means the app is already relying on the SDK's built-in thread/session continuity rather than manually rebuilding context on every turn.
 
@@ -39,7 +39,7 @@ The app now also keeps app-level telemetry about context growth:
 - an estimated compaction trigger
 - inferred compaction events when a near-limit turn is followed by a sharp token drop
 
-This does not mean the SDK is emitting a first-class compaction event. It means JT IDE is now inferring compaction pressure from the usage data that the SDK already exposes.
+This does not mean the SDK is emitting a first-class compaction event. It means Jolt is now inferring compaction pressure from the usage data that the SDK already exposes.
 
 ## How The SDK Handles Context
 
@@ -158,7 +158,7 @@ For this repo's architecture, the right default is:
 4. Do not design app state around reconstructing the full prompt transcript unless you need a separate audit/UI record.
 5. If you later need explicit token-window control or ZDR-friendly stateless chaining, that is a sign to evaluate a direct Responses API integration path in addition to, or instead of, the SDK.
 
-## Implications For JT IDE
+## Implications For Jolt
 
 The current implementation is aligned with the SDK's intended model:
 

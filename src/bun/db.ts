@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-const APP_NAME = ".jt-ide";
+const APP_NAME = ".jolt";
 const DB_FILE_NAME = "app.db";
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
 export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
@@ -163,7 +163,7 @@ function resolveAppDataDirectory(): string {
 		return resolvedAppDataDir;
 	}
 
-	const configuredAppDataDir = process.env.JT_IDE_APP_DATA_DIR?.trim();
+	const configuredAppDataDir = process.env.JOLT_APP_DATA_DIR?.trim();
 	const candidates = [
 		configuredAppDataDir || null,
 		DEFAULT_APP_DATA_DIR,
@@ -182,7 +182,7 @@ function resolveAppDataDirectory(): string {
 		[
 			"Unable to find a writable application data directory.",
 			configuredAppDataDir
-				? `Checked JT_IDE_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
+				? `Checked JOLT_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
 				: `Checked ${DEFAULT_APP_DATA_DIR} and ${TEMP_APP_DATA_DIR}.`,
 		].join(" "),
 	);

@@ -169,9 +169,9 @@ type PersistedTreeViewState = {
 	openProjectPaths: string[];
 };
 
-const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jt-ide:worktree-tasks-changed";
+const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
-	"jt-ide:worktree-git-history-changed";
+	"jolt:worktree-git-history-changed";
 
 const CODE_FONT_STACK =
 	'"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -191,9 +191,9 @@ const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
 const COMPOSER_MAX_HEIGHT_PX = 240;
-const MAINVIEW_STATE_STORAGE_KEY = "jt-ide:mainview-state";
+const MAINVIEW_STATE_STORAGE_KEY = "jolt:mainview-state";
 const MAINVIEW_STATE_STORAGE_VERSION = 1;
-const TREE_VIEW_STATE_STORAGE_KEY = "jt-ide:tree-view-state";
+const TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
 const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 const APP_TITLE = "Jolt";
 const CODEX_REASONING_EFFORT_VALUES: RpcCodexReasoningEffort[] = [
@@ -2334,7 +2334,7 @@ type AppProps = {
 
 declare global {
 	interface Window {
-		__jtIdeAppMountedAt?: number;
+		__joltAppMountedAt?: number;
 	}
 }
 
@@ -7125,8 +7125,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [initialize]);
 
 	useEffect(() => {
-		window.__jtIdeAppMountedAt = Date.now();
-		console.log("App.tsx mounted", window.__jtIdeAppMountedAt);
+		window.__joltAppMountedAt = Date.now();
+		console.log("App.tsx mounted", window.__joltAppMountedAt);
 	}, []);
 
 	return (

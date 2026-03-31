@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "jt-ide",
+      "name": "jolt",
       "dependencies": {
         "@fontsource-variable/inter": "^5.2.8",
         "@openai/codex-sdk": "^0.117.0",
