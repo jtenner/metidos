@@ -321,6 +321,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const threadErrorSeenRequestCacheRef = useRef(
 		new Map<number, Promise<RpcThreadDetail>>(),
 	);
+	const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
 	const threadStatusPollInFlightRef = useRef(false);
 	const initializedRef = useRef(false);
 
@@ -1120,6 +1121,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[],
 	);
 
+	const updateProjectState = useCallback(
+		(
+			projectId: number,
+			updater: (current: ProjectNodeState) => ProjectNodeState,
+		): void => {
+			setProjectStates((prev) => {
+				const current = prev[projectId] ?? defaultProjectState();
+				const nextProjectState = updater(current);
+				if (nextProjectState === current) {
+					return prev;
+				}
+				return {
+					...prev,
+					[projectId]: nextProjectState,
+				} satisfies ProjectStateMap;
+			});
+		},
+		[],
+	);
+
 	const setWorktreeState = useCallback(
 		(
 			projectId: number,
@@ -1174,6 +1195,35 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		setSelectedProjectId(thread.projectId);
 		setSelectedWorktreePath(thread.worktreePath);
 	}, []);
+
+	const beginWorktreeToggleRequest = useCallback(
+		(projectId: number, worktreePath: string) => {
+			const key = worktreeKey(projectId, worktreePath);
+			const nextRequestId =
+				(worktreeToggleRequestIdRef.current.get(key) ?? 0) + 1;
+			worktreeToggleRequestIdRef.current.set(key, nextRequestId);
+			return {
+				key,
+				requestId: nextRequestId,
+			};
+		},
+		[],
+	);
+
+	const isCurrentWorktreeToggleRequest = useCallback(
+		(key: string, requestId: number): boolean =>
+			worktreeToggleRequestIdRef.current.get(key) === requestId,
+		[],
+	);
+
+	const finishWorktreeToggleRequest = useCallback(
+		(key: string, requestId: number): void => {
+			if (worktreeToggleRequestIdRef.current.get(key) === requestId) {
+				worktreeToggleRequestIdRef.current.delete(key);
+			}
+		},
+		[],
+	);
 
 	const requestProjectWorktrees = useCallback(
 		async (projectId: number): Promise<RpcWorktree[]> => {
@@ -3512,7 +3562,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const openOrCloseWorktree = useCallback(
 		async (projectId: number, worktreePath: string) => {
 			const target = getWorktreeState(projectId, worktreePath);
-			const projectState = getProjectState(projectId);
+			if (target.loading) {
+				return;
+			}
+
+			const { key, requestId } = beginWorktreeToggleRequest(
+				projectId,
+				worktreePath,
+			);
 			setWorktreeState(projectId, worktreePath, {
 				loading: true,
 				error: "",
@@ -3521,29 +3578,41 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			if (target.opened) {
 				try {
 					await procedures.closeWorktree({ projectId, worktreePath });
+					if (!isCurrentWorktreeToggleRequest(key, requestId)) {
+						return;
+					}
 					setWorktreeState(projectId, worktreePath, {
 						opened: false,
 						snapshot: undefined,
 						loading: false,
 					});
-					setProjectState(projectId, {
+					updateProjectState(projectId, (current) => ({
+						...current,
 						openWorktrees: new Set(
-							[...projectState.openWorktrees].filter(
+							[...current.openWorktrees].filter(
 								(item) => item !== worktreePath,
 							),
 						),
-					});
-					if (selectedWorktreePath === worktreePath) {
-						setSelectedWorktreePath(
-							projects.find((project) => project.id === projectId)?.path ??
-								null,
-						);
+					}));
+					setSelectedWorktreePath((current) =>
+						current === worktreePath
+							? (projects.find((project) => project.id === projectId)?.path ??
+								null)
+							: current,
+					);
+				} catch (error) {
+					if (!isCurrentWorktreeToggleRequest(key, requestId)) {
+						return;
 					}
-				} catch {
 					setWorktreeState(projectId, worktreePath, {
 						loading: false,
-						error: "Unable to stop worktree polling.",
+						error:
+							error instanceof Error
+								? error.message
+								: "Unable to stop worktree polling.",
 					});
+				} finally {
+					finishWorktreeToggleRequest(key, requestId);
 				}
 				return;
 			}
@@ -3553,6 +3622,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					projectId,
 					worktreePath,
 				});
+				if (!isCurrentWorktreeToggleRequest(key, requestId)) {
+					return;
+				}
 				cacheGitHistoryResult(result.history);
 				setWorktreeState(projectId, worktreePath, {
 					loading: false,
@@ -3560,29 +3632,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					snapshot: result.worktree,
 					error: "",
 				});
-				setProjectState(projectId, {
+				updateProjectState(projectId, (current) => ({
+					...current,
 					loadingWorktrees: false,
-					openWorktrees: new Set([...projectState.openWorktrees, worktreePath]),
-				});
-				setSelectedProjectId(projectId);
-				setSelectedWorktreePath(worktreePath);
-				setGitHistory(result.history);
+					openWorktrees: new Set([...current.openWorktrees, worktreePath]),
+				}));
 			} catch (error) {
+				if (!isCurrentWorktreeToggleRequest(key, requestId)) {
+					return;
+				}
 				setWorktreeState(projectId, worktreePath, {
 					loading: false,
 					error: error instanceof Error ? error.message : String(error),
 				});
+			} finally {
+				finishWorktreeToggleRequest(key, requestId);
 			}
 		},
 		[
-			getProjectState,
+			beginWorktreeToggleRequest,
 			getWorktreeState,
-			procedures,
 			projects,
 			cacheGitHistoryResult,
-			selectedWorktreePath,
-			setProjectState,
+			finishWorktreeToggleRequest,
+			isCurrentWorktreeToggleRequest,
+			procedures,
 			setWorktreeState,
+			updateProjectState,
 		],
 	);
 
