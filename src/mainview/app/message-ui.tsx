@@ -102,100 +102,40 @@ export function MarkdownMessage({ text }: { text: string }): JSX.Element {
 	);
 }
 
-function formatCompactTokenCount(value: number): string {
-	if (value >= 1_000_000) {
-		return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
-	}
-	if (value >= 1_000) {
-		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
-	}
-	return String(value);
-}
-
-function formatCompactionTransition(
-	beforeTokens: number | null,
-	afterTokens: number | null,
-): string | null {
-	if (beforeTokens === null || afterTokens === null) {
-		return null;
-	}
-	return `${formatCompactTokenCount(beforeTokens)} -> ${formatCompactTokenCount(afterTokens)}`;
-}
-
 export function ContextUsageMeter({
 	inputTokens,
 	contextWindowTokens,
-	estimatedTriggerTokens,
-	estimatedTriggerSource,
-	maxObservedInputTokens,
-	inferredCount,
-	lastInferredBeforeInputTokens,
-	lastInferredAfterInputTokens,
 }: {
 	inputTokens: number;
 	contextWindowTokens: number;
-	estimatedTriggerTokens: number;
-	estimatedTriggerSource: "heuristic" | "observed";
-	maxObservedInputTokens: number | null;
-	inferredCount: number;
-	lastInferredBeforeInputTokens: number | null;
-	lastInferredAfterInputTokens: number | null;
 }): JSX.Element {
 	const safeContextWindowTokens = Math.max(1, contextWindowTokens);
-	const progress = Math.min(inputTokens / safeContextWindowTokens, 1);
-	const triggerProgress = Math.min(
-		Math.max(estimatedTriggerTokens, 1) / safeContextWindowTokens,
-		1,
+	const clampedInputTokens = Math.min(
+		Math.max(inputTokens, 0),
+		safeContextWindowTokens,
 	);
-	const triggerLabel =
-		estimatedTriggerSource === "observed"
-			? "Observed trigger"
-			: "Estimated trigger";
-	const compactionSampleLabel =
-		inferredCount > 0
-			? `${inferredCount} inferred compaction${inferredCount === 1 ? "" : "s"}`
-			: "No inferred compactions";
-	const lastCompactionLabel = formatCompactionTransition(
-		lastInferredBeforeInputTokens,
-		lastInferredAfterInputTokens,
-	);
+	const progress = clampedInputTokens / safeContextWindowTokens;
 
 	return (
-		<div className="min-w-[15rem] max-w-[18rem] shrink-0">
-			<div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-[#8ca6b9]">
-				<span>Context</span>
-				<span>
-					{formatCompactTokenCount(inputTokens)} /{" "}
-					{formatCompactTokenCount(contextWindowTokens)}
-				</span>
-			</div>
-			<div className="mt-2 space-y-2">
-				<div className="relative h-2 overflow-hidden rounded-full bg-[#1f262b]">
-					<div
-						className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#7aa5c4] to-[#bdd5e6]"
-						style={{ width: `${progress * 100}%` }}
-					/>
-					<div
-						className="absolute inset-y-[-2px] w-px bg-[#ffd580]/90"
-						style={{ left: `${triggerProgress * 100}%` }}
-					/>
-				</div>
-				<div className="flex items-center justify-between gap-3 text-[10px] text-[#8f9aa2]">
-					<span>{triggerLabel}</span>
-					<span>{formatCompactTokenCount(estimatedTriggerTokens)}</span>
-				</div>
-				<div className="flex items-center justify-between gap-3 text-[10px] text-[#8f9aa2]">
-					<span>Peak input</span>
-					<span>
-						{maxObservedInputTokens === null
-							? "n/a"
-							: formatCompactTokenCount(maxObservedInputTokens)}
-					</span>
-				</div>
-				<div className="flex items-center justify-between gap-3 text-[10px] text-[#8f9aa2]">
-					<span>{compactionSampleLabel}</span>
-					<span>{lastCompactionLabel ?? "n/a"}</span>
-				</div>
+		<div className="shrink-0">
+			<div
+				role="meter"
+				aria-label="Context usage"
+				aria-valuemin={0}
+				aria-valuemax={safeContextWindowTokens}
+				aria-valuenow={clampedInputTokens}
+				aria-valuetext={`${inputTokens.toLocaleString()} of ${contextWindowTokens.toLocaleString()} context tokens used`}
+				className="relative h-6 w-6 rounded-full border border-[#31404a]"
+			>
+				<div
+					className="absolute inset-[1px] rounded-full"
+					style={{
+						background: `conic-gradient(from -90deg, #bdd5e6 0deg ${
+							progress * 360
+						}deg, #24313a ${progress * 360}deg 360deg)`,
+					}}
+				/>
+				<div className="absolute inset-[4px] rounded-full bg-[#131313]" />
 			</div>
 		</div>
 	);

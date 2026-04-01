@@ -624,19 +624,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const activeContextWindowTokens =
 		activeCodexModelOption?.contextWindowTokens ?? 400_000;
 	const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
-	const activeCompactionTriggerTokens =
-		selectedThread?.compaction.estimatedTriggerTokens ??
-		Math.round(activeContextWindowTokens * 0.8);
-	const activeCompactionTriggerSource =
-		selectedThread?.compaction.estimatedTriggerSource ?? "heuristic";
-	const activeMaxObservedInputTokens =
-		selectedThread?.compaction.maxObservedInputTokens ?? null;
-	const activeCompactionInferenceCount =
-		selectedThread?.compaction.inferredCount ?? 0;
-	const activeLastCompactionBeforeInputTokens =
-		selectedThread?.compaction.lastInferredBeforeInputTokens ?? null;
-	const activeLastCompactionAfterInputTokens =
-		selectedThread?.compaction.lastInferredAfterInputTokens ?? null;
 
 	const isThreadStatusDismissed = useCallback(
 		(thread: RpcThread | null): boolean => {
@@ -6774,16 +6761,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											<ContextUsageMeter
 												inputTokens={activeContextInputTokens}
 												contextWindowTokens={activeContextWindowTokens}
-												estimatedTriggerTokens={activeCompactionTriggerTokens}
-												estimatedTriggerSource={activeCompactionTriggerSource}
-												maxObservedInputTokens={activeMaxObservedInputTokens}
-												inferredCount={activeCompactionInferenceCount}
-												lastInferredBeforeInputTokens={
-													activeLastCompactionBeforeInputTokens
-												}
-												lastInferredAfterInputTokens={
-													activeLastCompactionAfterInputTokens
-												}
 											/>
 										</div>
 										{modelControlError ? (
