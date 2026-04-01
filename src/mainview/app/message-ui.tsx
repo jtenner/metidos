@@ -539,64 +539,70 @@ export function FileChangeMessage({
 					: changeLabel;
 	const hasDiff = diffText.trim().length > 0;
 	const [isExpanded, setIsExpanded] = useState(false);
+	const diffRegionId = `file-change-diff-${path
+		.replaceAll(/[^a-zA-Z0-9_-]+/g, "-")
+		.replaceAll(/^-+|-+$/g, "") || "content"}`;
 	const toggleExpanded = (): void => {
 		if (!hasDiff) {
 			return;
 		}
 		setIsExpanded((current) => !current);
 	};
-	return (
-		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
-			<div
-				className={`flex items-center justify-between gap-4 px-4 py-4 ${
-					hasDiff
-						? "cursor-pointer transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
-						: ""
-				}`}
-				aria-expanded={hasDiff ? isExpanded : undefined}
-				onClick={toggleExpanded}
-				onKeyDown={(event) => {
-					if (!hasDiff) {
-						return;
-					}
-					if (event.key === "Enter" || event.key === " ") {
-						event.preventDefault();
-						toggleExpanded();
-					}
-				}}
-				role={hasDiff ? "button" : undefined}
-				tabIndex={hasDiff ? 0 : undefined}
-			>
-				<div className="min-w-0">
-					<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-						File Change
-					</div>
-					<a
-						className="mt-1 block truncate font-mono text-sm text-[#cfe0eb] underline decoration-[#516978] underline-offset-2"
-						href={buildLocalFileHref(path, worktreePath)}
-						onClick={(event) => {
-							event.stopPropagation();
-						}}
-					>
-						{path}
-					</a>
+
+	const headerContent = (
+		<>
+			<div className="min-w-0">
+				<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+					File Change
 				</div>
-				<div className="flex shrink-0 items-center gap-2">
-					<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
-						{stateLabel}
-					</div>
-					{hasDiff ? (
-						<span className="text-[#8ca6b9]">
-							{materialSymbol(
-								isExpanded ? "expand_less" : "expand_more",
-								"text-base",
-							)}
-						</span>
-					) : null}
+				<div className="mt-1 truncate font-mono text-sm text-[#cfe0eb]">
+					{path}
 				</div>
 			</div>
+			<div className="flex shrink-0 items-center gap-2">
+				<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+					{stateLabel}
+				</div>
+				{hasDiff ? (
+					<span className="text-[#8ca6b9]">
+						{materialSymbol(
+							isExpanded ? "expand_less" : "expand_more",
+							"text-base",
+						)}
+					</span>
+				) : null}
+			</div>
+		</>
+	);
+
+	return (
+		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
+			<div className="flex items-center gap-3 px-4 py-4">
+				{hasDiff ? (
+					<button
+						type="button"
+						className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
+						onClick={toggleExpanded}
+						aria-controls={diffRegionId}
+						aria-expanded={isExpanded}
+						aria-label={`${isExpanded ? "Collapse" : "Expand"} diff for ${path}`}
+					>
+						{headerContent}
+					</button>
+				) : (
+					<div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+						{headerContent}
+					</div>
+				)}
+				<a
+					className="shrink-0 rounded-sm border border-[#31404a] bg-[#182025] px-2 py-1 font-label text-[10px] uppercase tracking-widest text-[#cfe0eb] transition-colors hover:bg-[#1f282f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60"
+					href={buildLocalFileHref(path, worktreePath)}
+				>
+					Open
+				</a>
+			</div>
 			{hasDiff && isExpanded ? (
-				<div className="px-4 pb-4">
+				<div className="px-4 pb-4" id={diffRegionId}>
 					<DiffViewer diffText={diffText} />
 				</div>
 			) : null}
