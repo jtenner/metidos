@@ -81,7 +81,6 @@ import {
 	TREE_VIEW_STATE_STORAGE_VERSION,
 	type ThreadActionMenuState,
 	type ThreadErrorLevel,
-	type ThreadErrorPreview,
 	type ThreadSummaryPopoverState,
 	type VisibleMessage,
 	WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
@@ -106,7 +105,6 @@ import {
 	mergeThreadErrorLevel,
 	orderProjectWorktrees,
 	pickInitialThread,
-	pickPreferredThreadErrorPreview,
 	pinnedThreadForWorktree,
 	primaryWorktreePath,
 	readLruValue,
@@ -118,7 +116,6 @@ import {
 	shortName,
 	sortThreads,
 	threadErrorLevel,
-	threadErrorPreview,
 	threadRunStatus,
 	upsertProjectList,
 	upsertThreadList,
@@ -212,6 +209,21 @@ function formatFileSize(bytes: number): string {
 		return `${(bytes / 1024).toFixed(1)} KB`;
 	}
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function dismissibleThreadStatusKey(
+	runStatus: RpcThreadRunStatus,
+): string | null {
+	const hasDismissibleStatus =
+		runStatus.hasUnreadError ||
+		runStatus.state === "failed" ||
+		runStatus.state === "stopped";
+	const updatedAt = runStatus.updatedAt?.trim() ?? "";
+	if (!hasDismissibleStatus || !updatedAt) {
+		return null;
+	}
+
+	return `${runStatus.state}:${updatedAt}:${runStatus.error ?? ""}`;
 }
 
 function worktreeChangeStatusLabel(status: RpcWorktreeChangeStatus): string {
@@ -462,6 +474,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		useState<ErrorPreviewPopoverState | null>(null);
 	const [threadSummaryPopover, setThreadSummaryPopover] =
 		useState<ThreadSummaryPopoverState | null>(null);
+	const [dismissedThreadStatusKeys, setDismissedThreadStatusKeys] = useState<
+		Record<number, string>
+	>({});
 	const [sessionStateReady, setSessionStateReady] = useState(false);
 	const [isDocumentVisible, setIsDocumentVisible] = useState(
 		() => document.visibilityState === "visible",
@@ -622,10 +637,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const activeLastCompactionAfterInputTokens =
 		selectedThread?.compaction.lastInferredAfterInputTokens ?? null;
 
+	const isThreadStatusDismissed = useCallback(
+		(thread: RpcThread | null): boolean => {
+			if (!thread) {
+				return false;
+			}
+
+			const statusKey = dismissibleThreadStatusKey(thread.runStatus);
+			return (
+				statusKey !== null && dismissedThreadStatusKeys[thread.id] === statusKey
+			);
+		},
+		[dismissedThreadStatusKeys],
+	);
+
 	const projectThreadErrorLevels = useMemo(() => {
 		const next = new Map<number, ThreadErrorLevel>();
 		for (const thread of threads) {
-			const level = threadErrorLevel(thread);
+			const level = isThreadStatusDismissed(thread)
+				? "none"
+				: threadErrorLevel(thread);
 			if (level === "none") {
 				continue;
 			}
@@ -635,27 +666,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			);
 		}
 		return next;
-	}, [threads]);
-
-	const projectThreadErrorPreviews = useMemo(() => {
-		const next = new Map<number, ThreadErrorPreview>();
-		for (const thread of threads) {
-			const preview = threadErrorPreview(thread);
-			if (!preview) {
-				continue;
-			}
-			next.set(
-				thread.projectId,
-				pickPreferredThreadErrorPreview(next.get(thread.projectId), preview),
-			);
-		}
-		return next;
-	}, [threads]);
+	}, [isThreadStatusDismissed, threads]);
 
 	const worktreeThreadErrorLevels = useMemo(() => {
 		const next = new Map<string, ThreadErrorLevel>();
 		for (const thread of threads) {
-			const level = threadErrorLevel(thread);
+			const level = isThreadStatusDismissed(thread)
+				? "none"
+				: threadErrorLevel(thread);
 			if (level === "none") {
 				continue;
 			}
@@ -663,20 +681,42 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			next.set(key, mergeThreadErrorLevel(next.get(key) ?? "none", level));
 		}
 		return next;
+	}, [isThreadStatusDismissed, threads]);
+
+	useEffect(() => {
+		setDismissedThreadStatusKeys((prev) => {
+			const nextEntries = Object.entries(prev).filter(
+				([threadId, statusKey]) => {
+					const thread =
+						threads.find((entry) => entry.id === Number(threadId)) ?? null;
+					return thread
+						? dismissibleThreadStatusKey(thread.runStatus) === statusKey
+						: false;
+				},
+			);
+			if (nextEntries.length === Object.keys(prev).length) {
+				return prev;
+			}
+
+			return Object.fromEntries(nextEntries) as Record<number, string>;
+		});
 	}, [threads]);
 
-	const worktreeThreadErrorPreviews = useMemo(() => {
-		const next = new Map<string, ThreadErrorPreview>();
-		for (const thread of threads) {
-			const preview = threadErrorPreview(thread);
-			if (!preview) {
-				continue;
-			}
-			const key = worktreeKey(thread.projectId, thread.worktreePath);
-			next.set(key, pickPreferredThreadErrorPreview(next.get(key), preview));
+	const dismissThreadStatus = useCallback((thread: RpcThread): void => {
+		const statusKey = dismissibleThreadStatusKey(thread.runStatus);
+		if (!statusKey) {
+			return;
 		}
-		return next;
-	}, [threads]);
+
+		setDismissedThreadStatusKeys((prev) =>
+			prev[thread.id] === statusKey
+				? prev
+				: {
+						...prev,
+						[thread.id]: statusKey,
+					},
+		);
+	}, []);
 
 	const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
 	const modelSelectorDisabled =
@@ -1386,19 +1426,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[worktreeThreadErrorLevels],
 	);
 
-	const projectThreadErrorPreviewText = useCallback(
-		(projectId: number): string =>
-			projectThreadErrorPreviews.get(projectId)?.text ?? "",
-		[projectThreadErrorPreviews],
-	);
-
-	const worktreeThreadErrorPreviewText = useCallback(
-		(projectId: number, worktreePath: string): string =>
-			worktreeThreadErrorPreviews.get(worktreeKey(projectId, worktreePath))
-				?.text ?? "",
-		[worktreeThreadErrorPreviews],
-	);
-
 	const showErrorPreview = useCallback(
 		(event: ReactMouseEvent<HTMLElement>, text: string): void => {
 			const previewText = text.trim();
@@ -1408,12 +1435,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			}
 			const viewportWidth =
 				typeof window === "undefined" ? 1280 : window.innerWidth;
+			if (viewportWidth < 768) {
+				setErrorPreviewPopover(null);
+				return;
+			}
 			const viewportHeight =
 				typeof window === "undefined" ? 720 : window.innerHeight;
+			const rect = event.currentTarget.getBoundingClientRect();
 			setErrorPreviewPopover({
 				text: previewText,
-				x: clampProjectMenuCoordinate(event.clientX + 18, viewportWidth, 368),
-				y: clampProjectMenuCoordinate(event.clientY + 18, viewportHeight, 196),
+				x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 368),
+				y: clampProjectMenuCoordinate(rect.top, viewportHeight, 196),
 			});
 		},
 		[],
@@ -1460,19 +1492,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const errorPreviewHandlers = useCallback(
 		(
 			text: string | null | undefined,
-		): Pick<
-			HTMLAttributes<HTMLElement>,
-			"onMouseEnter" | "onMouseMove" | "onMouseLeave"
-		> => {
+		): Pick<HTMLAttributes<HTMLElement>, "onMouseEnter" | "onMouseLeave"> => {
 			const previewText = text?.trim();
 			if (!previewText) {
 				return {};
 			}
 			return {
 				onMouseEnter: (event) => {
-					showErrorPreview(event as ReactMouseEvent<HTMLElement>, previewText);
-				},
-				onMouseMove: (event) => {
 					showErrorPreview(event as ReactMouseEvent<HTMLElement>, previewText);
 				},
 				onMouseLeave: () => {
@@ -2414,6 +2440,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const acknowledgeThreadErrorSeenInBackground = useCallback(
 		(threadId: number) => {
 			optimisticallyAcknowledgedThreadIdsRef.current.add(threadId);
+			setThreads((prev) => applyOptimisticThreadErrorSeenToList(prev));
 			void requestThreadErrorSeen(threadId)
 				.then((detail) => {
 					optimisticallyAcknowledgedThreadIdsRef.current.delete(threadId);
@@ -2438,7 +2465,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					);
 				});
 		},
-		[applyOptimisticThreadErrorSeenToDetail, requestThreadErrorSeen],
+		[
+			applyOptimisticThreadErrorSeenToDetail,
+			applyOptimisticThreadErrorSeenToList,
+			requestThreadErrorSeen,
+		],
 	);
 
 	const prepareOpenedThreadDetail = useCallback(
@@ -5630,15 +5661,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								projectActionMenuProject.id,
 								worktree.path,
 							);
-							const worktreeErrorPreviewText = worktreeThreadErrorPreviewText(
-								projectActionMenuProject.id,
-								worktree.path,
-							);
 							return (
 								<div
 									className="rounded-sm border border-[#252f36] bg-[#161c21] px-3 py-2"
 									key={worktree.path}
-									{...errorPreviewHandlers(worktreeErrorPreviewText)}
 								>
 									<div
 										className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
@@ -5885,9 +5911,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const projectTreeOpen = isProjectTreeOpen(project.path);
 					const isActive = selectedProjectId === project.id;
 					const projectErrorLevel = projectThreadErrorLevel(project.id);
-					const projectErrorPreviewText = projectThreadErrorPreviewText(
-						project.id,
-					);
 					const visibleWorktrees = orderProjectWorktrees(
 						project,
 						state.worktrees,
@@ -5937,7 +5960,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								<button
 									type="button"
 									className={`min-w-0 flex-1 px-3 py-2 text-left ${isActive ? "text-[#bdd5e6]" : "text-[#d7d7d7]"}`}
-									{...errorPreviewHandlers(projectErrorPreviewText)}
 									onClick={() => {
 										hideErrorPreview();
 										void refreshProject(project);
@@ -6015,19 +6037,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 														project.id,
 														worktree.path,
 													);
-													const worktreeErrorPreviewText =
-														worktreeThreadErrorPreviewText(
-															project.id,
-															worktree.path,
-														);
 													return (
-														<div
-															className="relative"
-															key={worktree.path}
-															{...errorPreviewHandlers(
-																worktreeErrorPreviewText,
-															)}
-														>
+														<div className="relative" key={worktree.path}>
 															<button
 																type="button"
 																className={`w-full min-w-0 text-left px-3 py-2 pr-12 flex flex-col gap-0.5 transition-colors ${
@@ -6249,9 +6260,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							const threadPinned = Boolean(thread.pinnedAt);
 							const isActive = selectedThreadId === thread.id;
 							const isWorking = thread.runStatus.state === "working";
-							const hasRunError = thread.runStatus.state === "failed";
-							const hasRunStopped = thread.runStatus.state === "stopped";
-							const hasUnreadError = thread.runStatus.hasUnreadError;
+							const threadStatusDismissed = isThreadStatusDismissed(thread);
+							const hasRunError =
+								!threadStatusDismissed && thread.runStatus.state === "failed";
+							const hasRunStopped =
+								!threadStatusDismissed && thread.runStatus.state === "stopped";
+							const hasUnreadError =
+								!threadStatusDismissed && thread.runStatus.hasUnreadError;
 							const threadErrorPreviewText =
 								hasUnreadError || hasRunError || hasRunStopped
 									? (thread.runStatus.error ?? "")
@@ -6283,6 +6298,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									onClick={() => {
 										hideErrorPreview();
 										hideThreadSummaryPreview();
+										dismissThreadStatus(thread);
+										if (thread.runStatus.hasUnreadError) {
+											acknowledgeThreadErrorSeenInBackground(thread.id);
+										}
 										void openThread(thread.id);
 									}}
 								>
@@ -6984,9 +7003,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						top: errorPreviewPopover.y,
 					}}
 				>
-					<div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#ff8698]">
-						Error Preview
-					</div>
 					<div className="whitespace-pre-wrap break-words">
 						{errorPreviewPopover.text}
 					</div>
