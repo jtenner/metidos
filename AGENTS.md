@@ -69,8 +69,12 @@
 │  └─ mainview/
 │     ├─ App.tsx
 │     ├─ app/
+│     │  ├─ git-history-panel.tsx
 │     │  ├─ message-ui.tsx
-│     │  └─ state.ts
+│     │  ├─ projects-panel.tsx
+│     │  ├─ sidebar-panels-state.ts
+│     │  ├─ state.ts
+│     │  └─ threads-panel.tsx
 │     ├─ controls/
 │     │  ├─ chat-composer-control.tsx
 │     │  ├─ codex-model-selector.tsx

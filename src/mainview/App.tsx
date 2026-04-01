@@ -12,7 +12,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { BeatLoader } from "react-spinners";
 import type {
   ProjectProcedures,
   RpcCodexModelOption,
@@ -34,6 +33,7 @@ import type {
   RpcWorktreeSnapshot,
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
+import { GitHistoryPanel } from "./app/git-history-panel";
 import {
   ChatErrorMessage,
   ChatNoticeMessage,
@@ -48,6 +48,11 @@ import {
   isAssistantVisibleMessage,
   isPlainAssistantTextMessage,
 } from "./app/message-ui";
+import { ProjectsPanel } from "./app/projects-panel";
+import {
+  readSidebarPanelsSnapshot,
+  setProjectTreeOpen,
+} from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
   DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS,
@@ -56,12 +61,8 @@ import {
   type DirectorySuggestionResultCacheEntry,
   type ErrorPreviewPopoverState,
   GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
-  GIT_HISTORY_DOM_WINDOW_SIZE,
-  GIT_HISTORY_LOAD_MORE_THRESHOLD_PX,
   GIT_HISTORY_PAGE_SIZE,
-  GIT_HISTORY_RENDER_OVERSCAN_ROWS,
   GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
-  GIT_HISTORY_ROW_HEIGHT_PX,
   type GitHistoryDiffCacheEntry,
   type GitHistoryModalState,
   MAINVIEW_STATE_STORAGE_VERSION,
@@ -69,12 +70,10 @@ import {
   type OpenThreadOptions,
   type PendingSharedRequest,
   type PersistedMainviewState,
-  type PersistedTreeViewState,
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
   THREAD_STATUS_POLL_INTERVAL_MS,
-  TREE_VIEW_STATE_STORAGE_VERSION,
   type ThreadActionMenuState,
   type ThreadErrorLevel,
   type ThreadSummaryPopoverState,
@@ -85,14 +84,12 @@ import {
   type WorktreeStateMap,
   appendGitHistoryPage,
   awaitAbortableResult,
-  clampNumber,
   clampProjectMenuCoordinate,
   createAbortError,
   defaultProjectState,
   defaultWorktreeState,
   findPrimaryWorktree,
   formatDirectoryPathForInput,
-  formatGitHistoryTimestamp,
   formatPathForDisplay,
   gitHistoryDiffCacheKey,
   isAbortError,
@@ -106,7 +103,6 @@ import {
   primaryWorktreePath,
   readLruValue,
   readPersistedMainviewState,
-  readPersistedTreeViewState,
   removeThreadFromList,
   serializeOpenWorktrees,
   shortName,
@@ -121,8 +117,8 @@ import {
   worktreeKey,
   writeLruValue,
   writePersistedMainviewState,
-  writePersistedTreeViewState,
 } from "./app/state";
+import { ThreadsPanel } from "./app/threads-panel";
 import {
   ChatComposerControl,
   readChatComposerDraft,
@@ -138,7 +134,6 @@ import {
   normalizeSearchQuery,
 } from "./controls/search-utils";
 import { SidebarSearchControl } from "./controls/sidebar-search-control";
-import { SidebarSectionHeader } from "./controls/sidebar-section-header";
 
 type AppProps = {
   procedures: ProjectProcedures;
@@ -430,11 +425,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     initialMainviewStateRef.current = readPersistedMainviewState();
   }
   const initialMainviewState = initialMainviewStateRef.current;
-  const initialTreeViewStateRef = useRef<PersistedTreeViewState | null>(null);
-  if (!initialTreeViewStateRef.current) {
-    initialTreeViewStateRef.current = readPersistedTreeViewState();
-  }
-  const initialTreeViewState = initialTreeViewStateRef.current;
 
   const [projects, setProjects] = useState<RpcProject[]>([]);
   const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
@@ -475,18 +465,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
   const [gitHistoryLoadingMore, setGitHistoryLoadingMore] = useState(false);
   const [gitHistoryError, setGitHistoryError] = useState("");
-  const [projectsSectionOpen, setProjectsSectionOpen] = useState(
-    initialTreeViewState.projectsSectionOpen,
-  );
-  const [threadsSectionOpen, setThreadsSectionOpen] = useState(
-    initialTreeViewState.threadsSectionOpen,
-  );
-  const [gitSectionOpen, setGitSectionOpen] = useState(
-    initialTreeViewState.gitSectionOpen,
-  );
-  const [openProjectTreePaths, setOpenProjectTreePaths] = useState<Set<string>>(
-    () => new Set(initialTreeViewState.openProjectPaths),
-  );
   const [gitHistoryModal, setGitHistoryModal] =
     useState<GitHistoryModalState | null>(null);
   const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
@@ -568,14 +546,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
   >(null);
   const [diffFileContentState, setDiffFileContentState] =
     useState<DiffFileContentState>(emptyDiffFileContentState());
-  const [gitHistoryScrollTop, setGitHistoryScrollTop] = useState(0);
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
-  const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
   const desktopChatPinnedToBottomRef = useRef(true);
   const mobileChatPinnedToBottomRef = useRef(true);
   const chatScrollThreadIdRef = useRef<number | null>(
@@ -838,26 +814,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     (projectId: number): ProjectNodeState =>
       projectStates[projectId] ?? defaultProjectState(),
     [projectStates],
-  );
-
-  const isProjectTreeOpen = useCallback(
-    (projectPath: string): boolean => openProjectTreePaths.has(projectPath),
-    [openProjectTreePaths],
-  );
-
-  const setProjectTreeOpen = useCallback(
-    (projectPath: string, open: boolean): void => {
-      setOpenProjectTreePaths((prev) => {
-        const next = new Set(prev);
-        if (open) {
-          next.add(projectPath);
-        } else {
-          next.delete(projectPath);
-        }
-        return next;
-      });
-    },
-    [],
   );
 
   const getWorktreeState = useCallback(
@@ -1426,33 +1382,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
       ),
     );
   }, [activeSelectedWorktree, gitHistory, normalizedSidebarSearchQuery]);
-
-  const visibleGitHistoryEntries = useMemo(() => {
-    const totalEntries = filteredGitHistoryEntries.length;
-    if (totalEntries === 0) {
-      return {
-        entries: [] as RpcGitHistoryEntry[],
-        topSpacerHeight: 0,
-        bottomSpacerHeight: 0,
-      };
-    }
-
-    const windowSize = Math.min(GIT_HISTORY_DOM_WINDOW_SIZE, totalEntries);
-    const maxStartIndex = Math.max(0, totalEntries - windowSize);
-    const startIndex = clampNumber(
-      Math.floor(gitHistoryScrollTop / GIT_HISTORY_ROW_HEIGHT_PX) -
-        GIT_HISTORY_RENDER_OVERSCAN_ROWS,
-      0,
-      maxStartIndex,
-    );
-    const endIndex = Math.min(totalEntries, startIndex + windowSize);
-
-    return {
-      entries: filteredGitHistoryEntries.slice(startIndex, endIndex),
-      topSpacerHeight: startIndex * GIT_HISTORY_ROW_HEIGHT_PX,
-      bottomSpacerHeight: (totalEntries - endIndex) * GIT_HISTORY_ROW_HEIGHT_PX,
-    };
-  }, [filteredGitHistoryEntries, gitHistoryScrollTop]);
 
   const isActiveWorktree = useCallback(
     (projectId: number, worktreePath: string): boolean =>
@@ -2253,13 +2182,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [abortProjectTasksRequest, procedures],
   );
 
-  const resetGitHistoryScrollPosition = useCallback(() => {
-    setGitHistoryScrollTop(0);
-    if (gitHistoryListRef.current) {
-      gitHistoryListRef.current.scrollTop = 0;
-    }
-  }, []);
-
   const cacheGitHistoryResult = useCallback(
     (history: RpcWorktreeGitHistoryResult) => {
       writeLruValue(
@@ -2448,21 +2370,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     procedures,
     selectedProject,
   ]);
-
-  const handleGitHistoryScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      const container = event.currentTarget;
-      setGitHistoryScrollTop(container.scrollTop);
-
-      if (
-        container.scrollHeight - container.scrollTop - container.clientHeight <=
-        GIT_HISTORY_LOAD_MORE_THRESHOLD_PX
-      ) {
-        void loadMoreGitHistory();
-      }
-    },
-    [loadMoreGitHistory],
-  );
 
   const applyOptimisticThreadErrorSeen = useCallback((thread: RpcThread) => {
     if (!optimisticallyAcknowledgedThreadIdsRef.current.has(thread.id)) {
@@ -3058,9 +2965,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
           })
         : null;
 
-      const initiallyOpenProjectTreePaths = new Set(
-        initialTreeViewState.openProjectPaths,
-      );
+      const initiallyOpenProjectTreePaths =
+        readSidebarPanelsSnapshot().openProjectPaths;
       const restoredProjects = loaded.filter((project) =>
         restoredOpenProjectIds.has(project.id),
       );
@@ -3180,7 +3086,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     getProjectState,
     hydrateProjectRows,
     initialMainviewState,
-    initialTreeViewState,
     openThread,
     prefetchDirectorySuggestions,
     procedures,
@@ -3347,7 +3252,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectedProjectId,
       selectedThreadId,
       setProjectState,
-      setProjectTreeOpen,
     ],
   );
 
@@ -3831,29 +3735,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   ]);
 
   useEffect(() => {
-    if (!sessionStateReady) {
-      return;
-    }
-
-    writePersistedTreeViewState({
-      version: TREE_VIEW_STATE_STORAGE_VERSION,
-      projectsSectionOpen,
-      threadsSectionOpen,
-      gitSectionOpen,
-      openProjectPaths: [...openProjectTreePaths].filter((projectPath) =>
-        projects.some((project) => project.path === projectPath),
-      ),
-    });
-  }, [
-    gitSectionOpen,
-    openProjectTreePaths,
-    projects,
-    projectsSectionOpen,
-    sessionStateReady,
-    threadsSectionOpen,
-  ]);
-
-  useEffect(() => {
     if (selectedThread?.model) {
       setPendingThreadModel(selectedThread.model);
       setModelControlError("");
@@ -3906,10 +3787,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setGitHistoryLoadingMore(false);
       gitHistoryLoadingMoreRef.current = false;
       setGitHistoryError("");
-      resetGitHistoryScrollPosition();
       return;
     }
-    resetGitHistoryScrollPosition();
     void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
       preferCached: true,
     });
@@ -3917,13 +3796,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activeSelectedWorktreePath,
     abortGitHistoryRequests,
     loadGitHistory,
-    resetGitHistoryScrollPosition,
     selectedProject,
   ]);
-
-  useEffect(() => {
-    resetGitHistoryScrollPosition();
-  }, [resetGitHistoryScrollPosition]);
 
   useEffect(() => {
     const handleWorktreeTasksChanged = (
@@ -4444,6 +4318,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
     selectedProject,
   ]);
 
+  const handleCreateThreadFromSelection = useCallback(() => {
+    void createThreadFromSelection();
+  }, [createThreadFromSelection]);
+
   const openProjectFromInput = useCallback(
     async (projectPathInput: string) => {
       if (isAddingProject) {
@@ -4490,7 +4368,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
       resetAddProjectPath,
       selectProject,
       setProjectState,
-      setProjectTreeOpen,
     ],
   );
 
@@ -4508,6 +4385,30 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [homeDirectory, supportsTildePath],
   );
 
+  const handleAddProjectPathChange = useCallback((value: string) => {
+    setAddProjectError("");
+    setHoveredDirectorySuggestion(null);
+    setAddProjectPath(value);
+  }, []);
+
+  const handleDirectorySuggestionEnter = useCallback(
+    (directory: string) => {
+      setHoveredDirectorySuggestion(directory);
+      scheduleDirectorySuggestionPrefetch(directory);
+    },
+    [scheduleDirectorySuggestionPrefetch],
+  );
+
+  const handleDirectorySuggestionLeave = useCallback(
+    (directory: string) => {
+      setHoveredDirectorySuggestion((current) =>
+        current === directory ? null : current,
+      );
+      clearDirectorySuggestionPrefetchTimer();
+    },
+    [clearDirectorySuggestionPrefetchTimer],
+  );
+
   const submitAddProject = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -4516,12 +4417,35 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [addProjectPath, openProjectFromInput],
   );
 
+  const handleToggleWorktreePinned = useCallback(
+    (projectId: number, worktreePath: string, pinned: boolean) => {
+      void toggleWorktreePinned(projectId, worktreePath, pinned);
+    },
+    [toggleWorktreePinned],
+  );
+
+  const handleOpenThread = useCallback(
+    (threadId: number) => {
+      void openThread(threadId);
+    },
+    [openThread],
+  );
+
+  const handleLoadMoreGitHistory = useCallback(() => {
+    void loadMoreGitHistory();
+  }, [loadMoreGitHistory]);
+
+  const handleOpenGitHistoryDiff = useCallback(
+    (entry: RpcGitHistoryEntry) => {
+      void openGitHistoryDiff(entry);
+    },
+    [openGitHistoryDiff],
+  );
+
   const refreshProject = useCallback(
-    async (project: RpcProject) => {
+    async (project: RpcProject, expanded: boolean) => {
       const current = getProjectState(project.id);
-      const expanded = !isProjectTreeOpen(project.path);
       const hasCachedWorktrees = current.worktrees.length > 0;
-      setProjectTreeOpen(project.path, expanded);
       setProjectState(project.id, {
         loadingWorktrees: expanded && !hasCachedWorktrees,
         error: "",
@@ -4617,9 +4541,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     },
     [
       getProjectState,
-      isProjectTreeOpen,
       setProjectState,
-      setProjectTreeOpen,
       procedures,
       selectedProjectId,
       selectProject,
@@ -4746,6 +4668,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setWorktreeState,
       threads,
       updateProjectState,
+    ],
+  );
+
+  const handleProjectWorktreeClick = useCallback(
+    (project: RpcProject, worktreePath: string) => {
+      hideErrorPreview();
+      clearThreadSelection();
+      setThreadsError("");
+      selectProject(project, worktreePath);
+      void openOrCloseWorktree(project.id, worktreePath);
+    },
+    [
+      clearThreadSelection,
+      hideErrorPreview,
+      openOrCloseWorktree,
+      selectProject,
     ],
   );
 
@@ -5511,143 +5449,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     hoveredDirectorySuggestionPath || addProjectPath;
   const addProjectInputIsPreviewing = hoveredDirectorySuggestionPath.length > 0;
 
-  const addProjectForm = (
-    <form
-      className="space-y-2 border border-[#23282c] bg-[#151515] px-3 py-2.5"
-      onSubmit={submitAddProject}
-    >
-      <label className="block text-[10px] font-label uppercase tracking-widest text-[#bdd5e6]">
-        Project Folder
-        <div className="relative mt-2 space-y-2">
-          <div className="flex items-start gap-2">
-            <input
-              className={`min-w-0 flex-1 border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
-                addProjectInputIsPreviewing
-                  ? "border-[#9fc1da] bg-[#1a2025] text-[#ffffff] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
-                  : "border-[#3b3b3b] bg-[#101010] text-[#f2f0ef]"
-              }`}
-              placeholder={supportsTildePath ? "~/project" : "/path/to/project"}
-              value={displayedAddProjectPath}
-              onChange={(event) => {
-                setAddProjectError("");
-                setHoveredDirectorySuggestion(null);
-                setAddProjectPath(event.currentTarget.value);
-              }}
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-            <button
-              type="submit"
-              className="bg-[#bdd5e6] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#2e526b] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isAddingProject}
-            >
-              {isAddingProject ? "Adding" : "Add"}
-            </button>
-          </div>
-          {addProjectPath.trim() ? (
-            <div className="overflow-hidden border border-[#2f3f4b] bg-[#101315]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-[#283036] px-3 py-2">
-                <span className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-                  Folders
-                </span>
-                {directorySuggestionsLoading ? (
-                  <span className="text-[10px] uppercase tracking-widest text-[#727e86]">
-                    Scanning
-                  </span>
-                ) : null}
-              </div>
-              {directorySuggestions.length === 0 &&
-              !directorySuggestionsLoading ? (
-                <div className="px-3 py-3 text-xs text-[#7d7d8d]">
-                  No matching folders.
-                </div>
-              ) : null}
-              {directorySuggestions.length > 0 ? (
-                <div className="app-scrollbar max-h-[30rem] overflow-y-auto overscroll-contain">
-                  {directorySuggestions.map((directory) => {
-                    const formattedDirectory = formatDirectoryPathForInput(
-                      directory,
-                      homeDirectory,
-                      supportsTildePath,
-                    );
-                    return (
-                      <button
-                        type="button"
-                        key={directory}
-                        className={`flex w-full items-center gap-3 border-t border-[#1e2327] px-3 py-2 text-left transition-colors ${
-                          hoveredDirectorySuggestion === directory
-                            ? "bg-[#1f282f]"
-                            : "hover:bg-[#1c2226]"
-                        }`}
-                        disabled={isAddingProject}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onMouseEnter={() => {
-                          setHoveredDirectorySuggestion(directory);
-                          scheduleDirectorySuggestionPrefetch(directory);
-                        }}
-                        onMouseLeave={() => {
-                          setHoveredDirectorySuggestion((current) =>
-                            current === directory ? null : current,
-                          );
-                          clearDirectorySuggestionPrefetchTimer();
-                        }}
-                        onFocus={() => {
-                          setHoveredDirectorySuggestion(directory);
-                          scheduleDirectorySuggestionPrefetch(directory);
-                        }}
-                        onBlur={() => {
-                          setHoveredDirectorySuggestion((current) =>
-                            current === directory ? null : current,
-                          );
-                          clearDirectorySuggestionPrefetchTimer();
-                        }}
-                        onClick={() => selectDirectorySuggestion(directory)}
-                      >
-                        <div
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center text-[#bdd5e6] ${
-                            hoveredDirectorySuggestion === directory
-                              ? "bg-[#26353f]"
-                              : "bg-[#1b252c]"
-                          }`}
-                        >
-                          {materialSymbol("folder", "text-[18px]")}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium normal-case text-[#f2f0ef]">
-                            {shortName(directory)}
-                          </div>
-                          <div className="truncate text-[11px] normal-case text-[#8f9aa2]">
-                            {formattedDirectory}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </label>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-[#8f8d8b]">
-          Add a repo by its root folder path.
-        </p>
-        <button
-          type="button"
-          className="font-label text-[10px] uppercase tracking-widest text-[#adabaa] transition-colors hover:text-[#f2f0ef]"
-          onClick={closeAddProjectForm}
-        >
-          Cancel
-        </button>
-      </div>
-      {addProjectError ? (
-        <div className="text-xs text-[#ff6e84]">{addProjectError}</div>
-      ) : null}
-    </form>
-  );
-
   const projectActionMenuPanel =
     projectActionMenu && projectActionMenuProject ? (
       <div
@@ -5914,652 +5715,84 @@ export default function App({ procedures }: AppProps): JSX.Element {
     </div>
   );
 
-  const projectTree = (
-    <div className="space-y-1">
-      {filteredProjects.length === 0 ? (
-        <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
-          {normalizedSidebarSearchQuery
-            ? "No matching projects."
-            : "No projects in database. Use + to add a project folder."}
-        </div>
-      ) : (
-        filteredProjects.map((project) => {
-          const state = getProjectState(project.id);
-          const projectTreeOpen = isProjectTreeOpen(project.path);
-          const isActive = selectedProjectId === project.id;
-          const projectErrorLevel = projectThreadErrorLevel(project.id);
-          const visibleWorktrees = orderProjectWorktrees(
-            project,
-            state.worktrees,
-          ).filter((worktree) =>
-            matchesSearchQuery(
-              normalizedSidebarSearchQuery,
-              project.name,
-              worktree.branch,
-              worktree.path,
-              shortName(worktree.path),
-              formatPathForDisplay(
-                worktree.path,
-                homeDirectory,
-                supportsTildePath,
-              ),
-            ),
-          );
-          const showWorktrees =
-            projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
-          const projectIndicatorClass = isActive
-            ? "bg-[#7aa5c4]"
-            : projectErrorLevel === "unread"
-              ? "bg-[#ff304f]"
-              : projectErrorLevel === "failed"
-                ? "bg-[#8f4956]"
-                : projectErrorLevel === "stopped"
-                  ? "bg-[#b98a3a]"
-                  : "bg-[#5f5f5f]";
-          return (
-            <div
-              className="space-y-1"
-              key={project.id}
-              onContextMenu={(event: ReactMouseEvent<HTMLDivElement>) => {
-                event.preventDefault();
-                void openProjectActionMenu(
-                  project,
-                  event.clientX + 6,
-                  event.clientY + 6,
-                );
-              }}
-            >
-              <div className="group/project flex items-center gap-2">
-                <button
-                  type="button"
-                  className={`min-w-0 flex-1 px-3 py-2 text-left transition-colors ${
-                    isActive
-                      ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
-                      : "text-[#d7d7d7] hover:bg-[#171a1b]"
-                  }`}
-                  onClick={() => {
-                    hideErrorPreview();
-                    void refreshProject(project);
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center ${
-                        isActive
-                          ? "bg-[#1f313c] text-[#bdd5e6]"
-                          : "bg-[#151a1c] text-[#8ca6b9]"
-                      }`}
-                    >
-                      {materialSymbol("folder", "text-[16px]")}
-                    </span>
-                    <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
-                      {project.name}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span
-                        className={`h-1.5 w-1.5 ${projectIndicatorClass}`}
-                      />
-                      <span className="text-[#62737e]">
-                        {materialSymbol(
-                          projectTreeOpen ? "expand_more" : "chevron_right",
-                          "text-[17px]",
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={`${sidebarActionButtonClass} ${
-                    isActive
-                      ? "opacity-100"
-                      : "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
-                  }`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    void openProjectActionMenu(
-                      project,
-                      rect.right + 8,
-                      rect.bottom + 6,
-                    );
-                  }}
-                  aria-label={`Project actions for ${project.name}`}
-                >
-                  {materialSymbol("menu", "text-[14px]")}
-                </button>
-              </div>
-
-              {showWorktrees ? (
-                <div className="ml-4 border-l border-[#1f262a] pl-3">
-                  <div className="space-y-1">
-                    {state.loadingWorktrees ? (
-                      <div className="px-3 py-1 text-xs text-[#8f9aa2]">
-                        Loading worktrees...
-                      </div>
-                    ) : null}
-                    {state.error ? (
-                      <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
-                        {state.error}
-                      </div>
-                    ) : null}
-                    {visibleWorktrees.length === 0 ? (
-                      <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
-                        {normalizedSidebarSearchQuery
-                          ? "No matching worktrees."
-                          : "No worktrees found."}
-                      </div>
-                    ) : null}
-                    {visibleWorktrees.length > 0 ? (
-                      <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
-                        <div className="space-y-1">
-                          {visibleWorktrees.map((worktree) => {
-                            const wState = getWorktreeState(
-                              project.id,
-                              worktree.path,
-                            );
-                            const worktreePinned = Boolean(worktree.pinnedAt);
-                            const togglingPin =
-                              worktreePinBusyPath === worktree.path;
-                            const activeWorktree = isActiveWorktree(
-                              project.id,
-                              worktree.path,
-                            );
-                            const worktreeErrorLevel = worktreeThreadErrorLevel(
-                              project.id,
-                              worktree.path,
-                            );
-                            return (
-                              <div className="relative" key={worktree.path}>
-                                <button
-                                  type="button"
-                                  className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
-                                    activeWorktree
-                                      ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
-                                      : wState.opened
-                                        ? "bg-[#161c1f] text-[#f2f0ef]"
-                                        : "text-[#cfd1d4] hover:bg-[#14181a]"
-                                  }`}
-                                  onClick={() => {
-                                    hideErrorPreview();
-                                    clearThreadSelection();
-                                    setThreadsError("");
-                                    selectProject(project, worktree.path);
-                                    void openOrCloseWorktree(
-                                      project.id,
-                                      worktree.path,
-                                    );
-                                  }}
-                                >
-                                  <span
-                                    className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                                      activeWorktree
-                                        ? "bg-[#24333b] text-[#bdd5e6]"
-                                        : "bg-[#14181a] text-[#8ca6b9]"
-                                    }`}
-                                  >
-                                    {materialSymbol("folder", "text-[14px]")}
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <div
-                                      className="truncate text-[13px] font-medium leading-4"
-                                      title={shortName(worktree.path)}
-                                    >
-                                      {shortName(worktree.path)}
-                                    </div>
-                                    <div
-                                      className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]"
-                                      title={formatPathForDisplay(
-                                        worktree.path,
-                                        homeDirectory,
-                                        supportsTildePath,
-                                      )}
-                                    >
-                                      {worktree.branch ?? "Primary"} ·{" "}
-                                      {formatPathForDisplay(
-                                        worktree.path,
-                                        homeDirectory,
-                                        supportsTildePath,
-                                      )}
-                                    </div>
-                                  </div>
-                                  <span
-                                    className={`absolute right-10 top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
-                                      worktreeErrorLevel === "unread"
-                                        ? "bg-[#ff304f]"
-                                        : worktreeErrorLevel === "failed"
-                                          ? "bg-[#8f4956]"
-                                          : worktreeErrorLevel === "stopped"
-                                            ? "bg-[#b98a3a]"
-                                            : "bg-transparent"
-                                    }`}
-                                  />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                                    activeWorktree || wState.opened
-                                      ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
-                                      : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
-                                  }`}
-                                  onClick={() => {
-                                    void toggleWorktreePinned(
-                                      project.id,
-                                      worktree.path,
-                                      worktreePinned,
-                                    );
-                                  }}
-                                  disabled={
-                                    togglingPin || worktreePinBusyPath !== null
-                                  }
-                                  aria-label={
-                                    worktreePinned
-                                      ? "Unpin worktree"
-                                      : "Pin worktree"
-                                  }
-                                  title={
-                                    worktreePinned
-                                      ? "Unpin worktree"
-                                      : "Pin worktree"
-                                  }
-                                >
-                                  {materialSymbol("push_pin", "text-[13px]", {
-                                    filled: worktreePinned,
-                                  })}
-                                </button>
-                                {wState.loading ? (
-                                  <div className="px-3 pt-1 text-[11px] text-[#8f8d8b]">
-                                    Syncing diff + file state...
-                                  </div>
-                                ) : null}
-                                {wState.error ? (
-                                  <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
-                                    {wState.error}
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-
-  const projectSection = (
-    <section>
-      <SidebarSectionHeader
-        title="Projects"
-        open={projectsSectionOpen}
-        onToggle={() => {
-          setProjectsSectionOpen((current) => !current);
-        }}
-        action={
-          <button
-            type="button"
-            className={sidebarActionButtonClass}
-            onClick={toggleAddProjectForm}
-            aria-label={addProjectOpen ? "Close add project" : "Add project"}
-          >
-            +
-          </button>
-        }
-      />
-      {projectsSectionOpen ? (
-        <div className="mt-3 space-y-3">
-          {addProjectOpen ? addProjectForm : null}
-          {projectTree}
-        </div>
-      ) : null}
-    </section>
-  );
-
-  const threadSection = (
-    <section>
-      <SidebarSectionHeader
-        title="Threads"
-        open={threadsSectionOpen}
-        onToggle={() => {
-          setThreadsSectionOpen((current) => !current);
-        }}
-        action={
-          <button
-            type="button"
-            className={sidebarActionButtonClass}
-            onClick={() => {
-              void createThreadFromSelection();
-            }}
-            aria-label="Create thread"
-            disabled={
-              isCreatingThread ||
-              !selectedProject ||
-              !activeSelectedWorktreePath
-            }
-            title={
-              selectedProject && activeSelectedWorktreePath
-                ? `Start a new ${APP_TITLE} thread for the selected worktree`
-                : "Select a project worktree first"
-            }
-          >
-            +
-          </button>
-        }
-      />
-      {threadsSectionOpen ? (
-        <div className="mt-3 space-y-1">
-          {!selectedProject || !activeSelectedWorktreePath ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              Select a project worktree first.
-            </div>
-          ) : filteredVisibleThreads.length === 0 ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              {normalizedSidebarSearchQuery
-                ? "No matching threads in this worktree."
-                : `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`}
-            </div>
-          ) : (
-            filteredVisibleThreads.map((thread) => {
-              const threadProject =
-                projects.find((project) => project.id === thread.projectId) ??
-                null;
-              const threadWorktree = threadProject
-                ? (getProjectState(thread.projectId).worktrees.find(
-                    (worktree) => worktree.path === thread.worktreePath,
-                  ) ?? null)
-                : null;
-              const threadBranchName =
-                threadWorktree?.branch?.trim() ||
-                (threadProject && thread.worktreePath === threadProject.path
-                  ? "Primary"
-                  : "detached");
-              const threadWorktreeDisplayPath = formatPathForDisplay(
-                thread.worktreePath,
-                homeDirectory,
-                supportsTildePath,
-              );
-              const threadPopoverAnchorId = `thread-sidebar-row-${thread.id}`;
-              const threadPinned = Boolean(thread.pinnedAt);
-              const isActive = selectedThreadId === thread.id;
-              const isWorking = thread.runStatus.state === "working";
-              const threadStatusDismissed = isThreadStatusDismissed(thread);
-              const hasRunError =
-                !threadStatusDismissed && thread.runStatus.state === "failed";
-              const hasRunStopped =
-                !threadStatusDismissed && thread.runStatus.state === "stopped";
-              const hasUnreadError =
-                !threadStatusDismissed && thread.runStatus.hasUnreadError;
-              const threadErrorPreviewText =
-                hasUnreadError || hasRunError || hasRunStopped
-                  ? (thread.runStatus.error ?? "")
-                  : "";
-              const threadAriaLabel = [
-                thread.title,
-                threadPinned ? "Pinned." : null,
-                hasUnreadError
-                  ? "Unread error."
-                  : hasRunError
-                    ? "Error."
-                    : hasRunStopped
-                      ? "Stopped."
-                      : isWorking
-                        ? "Working."
-                        : null,
-                `Branch ${threadBranchName}.`,
-                `Worktree ${threadWorktreeDisplayPath}.`,
-              ]
-                .filter(Boolean)
-                .join(" ");
-              const threadPreviewHandlers = threadErrorPreviewText
-                ? errorPreviewHandlers(
-                    threadPopoverAnchorId,
-                    threadErrorPreviewText,
-                  )
-                : threadSummaryPreviewHandlers(
-                    threadPopoverAnchorId,
-                    thread.title,
-                    thread.summary,
-                  );
-              const threadPreviewDescriptionId =
-                errorPreviewPopover?.anchorId === threadPopoverAnchorId
-                  ? "thread-error-popover"
-                  : threadSummaryPopover?.anchorId === threadPopoverAnchorId
-                    ? "thread-summary-popover"
-                    : undefined;
-              const threadStatusLabel = hasUnreadError
-                ? "Unread error"
-                : hasRunError
-                  ? "Run failed"
-                  : hasRunStopped
-                    ? "Stopped"
-                    : isWorking
-                      ? "Working"
-                      : threadPinned
-                        ? "Pinned"
-                        : null;
-              return (
-                <button
-                  type="button"
-                  key={thread.id}
-                  aria-describedby={threadPreviewDescriptionId}
-                  aria-label={threadAriaLabel}
-                  className={`w-full px-3 py-2 text-left transition-colors ${
-                    isActive
-                      ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
-                      : "text-[#d7d7d7] hover:bg-[#171a1b]"
-                  }`}
-                  {...threadPreviewHandlers}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    hideErrorPreview();
-                    hideThreadSummaryPreview();
-                    openThreadActionMenu(
-                      thread,
-                      event.clientX + 6,
-                      event.clientY + 6,
-                    );
-                  }}
-                  onClick={() => {
-                    hideErrorPreview();
-                    hideThreadSummaryPreview();
-                    dismissThreadStatus(thread);
-                    if (thread.runStatus.hasUnreadError) {
-                      acknowledgeThreadErrorSeenInBackground(thread.id);
-                    }
-                    void openThread(thread.id);
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center ${
-                        isActive
-                          ? "bg-[#1f313c] text-[#bdd5e6]"
-                          : "bg-[#151a1c] text-[#8ca6b9]"
-                      }`}
-                    >
-                      {materialSymbol("chat_bubble", "text-[14px]")}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[14px] font-medium leading-4">
-                        {thread.title}
-                      </div>
-                      {threadStatusLabel ? (
-                        <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
-                          {threadStatusLabel}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2 pl-2">
-                      {threadPinned ? (
-                        <span className="pointer-events-none">
-                          {materialSymbol(
-                            "push_pin",
-                            "text-[14px] text-[#dfebf3]",
-                            { filled: true },
-                          )}
-                        </span>
-                      ) : null}
-                      {hasUnreadError ? (
-                        <span className="border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
-                          Unread
-                        </span>
-                      ) : null}
-                      {isWorking ? (
-                        <BeatLoader
-                          color="#bdd5e6"
-                          margin={1}
-                          size={5}
-                          speedMultiplier={0.85}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
-              );
-            })
-          )}
-          {threadsError ? (
-            <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
-              {threadsError}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
-  );
-
-  const gitSection = (
-    <section>
-      <SidebarSectionHeader
-        title="Git History"
-        open={gitSectionOpen}
-        onToggle={() => {
-          setGitSectionOpen((current) => !current);
-        }}
-      />
-      {gitSectionOpen ? (
-        <div className="mt-3 space-y-1.5">
-          {!selectedProject || !activeSelectedWorktreePath ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              Select a project worktree first.
-            </div>
-          ) : gitHistoryLoading ? (
-            <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
-              Loading git history...
-            </div>
-          ) : gitHistoryError && filteredGitHistoryEntries.length === 0 ? (
-            <div className="bg-[#2c1117] px-3 py-2.5 text-xs text-[#ff9db0]">
-              {gitHistoryError}
-            </div>
-          ) : filteredGitHistoryEntries.length > 0 ? (
-            <div className="space-y-2">
-              <div
-                ref={gitHistoryListRef}
-                className="max-h-64 overflow-y-auto pr-1 hide-scrollbar"
-                onScroll={handleGitHistoryScroll}
-              >
-                {visibleGitHistoryEntries.topSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      height: `${visibleGitHistoryEntries.topSpacerHeight}px`,
-                    }}
-                  />
-                ) : null}
-                <div>
-                  {visibleGitHistoryEntries.entries.map((entry) => (
-                    <button
-                      type="button"
-                      key={entry.hash}
-                      className="w-full px-3 py-2 text-left transition-colors hover:bg-[#171a1b]"
-                      style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
-                      onMouseEnter={() => {
-                        preloadGitHistoryDiff(entry);
-                      }}
-                      onFocus={() => {
-                        preloadGitHistoryDiff(entry);
-                      }}
-                      onBlur={() => {
-                        cancelPreloadGitHistoryDiff(entry);
-                      }}
-                      onPointerDown={() => {
-                        preloadGitHistoryDiff(entry);
-                      }}
-                      onMouseLeave={() => {
-                        cancelPreloadGitHistoryDiff(entry);
-                      }}
-                      onClick={() => {
-                        void openGitHistoryDiff(entry);
-                      }}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[#151a1c] text-[#8ca6b9]">
-                          {materialSymbol("history", "text-[14px]")}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="truncate text-[14px] leading-4 text-[#f2f0ef]"
-                            title={entry.subject}
-                          >
-                            {entry.subject}
-                          </div>
-                          <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
-                            {formatGitHistoryTimestamp(entry.committedAt)} · #
-                            {entry.shortHash}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {visibleGitHistoryEntries.bottomSpacerHeight > 0 ? (
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      height: `${visibleGitHistoryEntries.bottomSpacerHeight}px`,
-                    }}
-                  />
-                ) : null}
-              </div>
-              {gitHistoryLoadingMore ? (
-                <div className="px-1 text-[11px] text-[#8f9aa2]">
-                  Loading more commits...
-                </div>
-              ) : null}
-              {gitHistoryError ? (
-                <div className="bg-[#2c1117] px-3 py-2 text-[11px] text-[#ff9db0]">
-                  {gitHistoryError}
-                </div>
-              ) : null}
-            </div>
-          ) : gitHistoryLoadingMore ? (
-            <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
-              Loading more git history...
-            </div>
-          ) : (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              {normalizedSidebarSearchQuery
-                ? "No matching git history."
-                : "No commits found for this worktree yet."}
-            </div>
-          )}
-        </div>
-      ) : null}
-    </section>
-  );
-
   const sidebarSections = (
     <div className="space-y-5">
-      {projectSection}
-      {threadSection}
-      {gitSection}
+      <ProjectsPanel
+        addProjectError={addProjectError}
+        addProjectInputIsPreviewing={addProjectInputIsPreviewing}
+        addProjectOpen={addProjectOpen}
+        addProjectPath={addProjectPath}
+        directorySuggestions={directorySuggestions}
+        directorySuggestionsLoading={directorySuggestionsLoading}
+        displayedAddProjectPath={displayedAddProjectPath}
+        filteredProjects={filteredProjects}
+        getProjectState={getProjectState}
+        getWorktreeState={getWorktreeState}
+        homeDirectory={homeDirectory}
+        hoveredDirectorySuggestion={hoveredDirectorySuggestion}
+        isActiveWorktree={isActiveWorktree}
+        isAddingProject={isAddingProject}
+        normalizedSidebarSearchQuery={normalizedSidebarSearchQuery}
+        onAddProjectPathChange={handleAddProjectPathChange}
+        onCloseAddProjectForm={closeAddProjectForm}
+        onDirectorySuggestionEnter={handleDirectorySuggestionEnter}
+        onDirectorySuggestionLeave={handleDirectorySuggestionLeave}
+        onOpenProjectActionMenu={openProjectActionMenu}
+        onProjectWorktreeClick={handleProjectWorktreeClick}
+        onRefreshProject={refreshProject}
+        onSelectDirectorySuggestion={selectDirectorySuggestion}
+        onSubmitAddProject={submitAddProject}
+        onToggleAddProjectForm={toggleAddProjectForm}
+        onToggleWorktreePinned={handleToggleWorktreePinned}
+        projectThreadErrorLevel={projectThreadErrorLevel}
+        selectedProjectId={selectedProjectId}
+        sidebarActionButtonClass={sidebarActionButtonClass}
+        supportsTildePath={supportsTildePath}
+        worktreePinBusyPath={worktreePinBusyPath}
+        worktreeThreadErrorLevel={worktreeThreadErrorLevel}
+      />
+      <ThreadsPanel
+        acknowledgeThreadErrorSeenInBackground={
+          acknowledgeThreadErrorSeenInBackground
+        }
+        activeSelectedWorktreePath={activeSelectedWorktreePath}
+        dismissThreadStatus={dismissThreadStatus}
+        errorPreviewHandlers={errorPreviewHandlers}
+        errorPreviewPopover={errorPreviewPopover}
+        filteredVisibleThreads={filteredVisibleThreads}
+        getProjectState={getProjectState}
+        hideErrorPreview={hideErrorPreview}
+        hideThreadSummaryPreview={hideThreadSummaryPreview}
+        homeDirectory={homeDirectory}
+        isCreatingThread={isCreatingThread}
+        isThreadStatusDismissed={isThreadStatusDismissed}
+        normalizedSidebarSearchQuery={normalizedSidebarSearchQuery}
+        onCreateThread={handleCreateThreadFromSelection}
+        onOpenThread={handleOpenThread}
+        onOpenThreadActionMenu={openThreadActionMenu}
+        projects={projects}
+        selectedProject={selectedProject}
+        selectedThreadId={selectedThreadId}
+        sidebarActionButtonClass={sidebarActionButtonClass}
+        supportsTildePath={supportsTildePath}
+        threadSummaryPopover={threadSummaryPopover}
+        threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
+        threadsError={threadsError}
+      />
+      <GitHistoryPanel
+        key={`${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`}
+        activeSelectedWorktreePath={activeSelectedWorktreePath}
+        filteredGitHistoryEntries={filteredGitHistoryEntries}
+        gitHistoryError={gitHistoryError}
+        gitHistoryLoading={gitHistoryLoading}
+        gitHistoryLoadingMore={gitHistoryLoadingMore}
+        normalizedSidebarSearchQuery={normalizedSidebarSearchQuery}
+        onCancelPreloadGitHistoryDiff={cancelPreloadGitHistoryDiff}
+        onLoadMoreGitHistory={handleLoadMoreGitHistory}
+        onOpenGitHistoryDiff={handleOpenGitHistoryDiff}
+        onPreloadGitHistoryDiff={preloadGitHistoryDiff}
+        selectedProject={selectedProject}
+      />
     </div>
   );
 
