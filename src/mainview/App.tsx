@@ -6656,7 +6656,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</div>
 				</header>
 
-				<div className="h-10 bg-[#131313] flex items-center px-6 gap-2">
+				<nav
+					aria-label="Selected thread context"
+					className="h-10 bg-[#131313] flex items-center px-6 gap-2"
+				>
 					<span className="font-label text-xs font-bold text-[#bdd5e6] shrink-0">
 						{selectedThread?.title ??
 							selectedProject?.name ??
@@ -6673,7 +6676,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</span>
 						</>
 					) : null}
-				</div>
+				</nav>
 
 				<main className="flex flex-1 min-h-0 overflow-hidden">
 					<aside
