@@ -115,12 +115,14 @@ export type ThreadErrorPreview = {
 };
 
 export type ErrorPreviewPopoverState = {
+	anchorId: string;
 	text: string;
 	x: number;
 	y: number;
 };
 
 export type ThreadSummaryPopoverState = {
+	anchorId: string;
 	title: string;
 	summary: string;
 	x: number;

@@ -4,6 +4,7 @@ import {
 	type HTMLAttributes,
 	type JSX,
 	type KeyboardEvent,
+	type FocusEvent as ReactFocusEvent,
 	type MouseEvent as ReactMouseEvent,
 	type UIEvent,
 	useCallback,
@@ -1427,7 +1428,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const showErrorPreview = useCallback(
-		(event: ReactMouseEvent<HTMLElement>, text: string): void => {
+		(
+			event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
+			anchorId: string,
+			text: string,
+		): void => {
 			const previewText = text.trim();
 			if (!previewText) {
 				setErrorPreviewPopover(null);
@@ -1442,10 +1447,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			const viewportHeight =
 				typeof window === "undefined" ? 720 : window.innerHeight;
 			const rect = event.currentTarget.getBoundingClientRect();
+			const clampedTop = clampProjectMenuCoordinate(
+				rect.top + rect.height / 2 - 98,
+				viewportHeight,
+				196,
+			);
 			setErrorPreviewPopover({
+				anchorId,
 				text: previewText,
 				x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 368),
-				y: clampProjectMenuCoordinate(rect.top, viewportHeight, 196),
+				y: clampedTop + 98,
 			});
 		},
 		[],
@@ -1457,7 +1468,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const showThreadSummaryPreview = useCallback(
 		(
-			event: ReactMouseEvent<HTMLElement>,
+			event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
+			anchorId: string,
 			title: string,
 			summary: string,
 		): void => {
@@ -1476,6 +1488,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				typeof window === "undefined" ? 720 : window.innerHeight;
 			const rect = event.currentTarget.getBoundingClientRect();
 			setThreadSummaryPopover({
+				anchorId,
 				title,
 				summary: previewSummary,
 				x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 360),
@@ -1491,17 +1504,35 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const errorPreviewHandlers = useCallback(
 		(
+			anchorId: string,
 			text: string | null | undefined,
-		): Pick<HTMLAttributes<HTMLElement>, "onMouseEnter" | "onMouseLeave"> => {
+		): Pick<
+			HTMLAttributes<HTMLElement>,
+			"onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
+		> => {
 			const previewText = text?.trim();
 			if (!previewText) {
 				return {};
 			}
 			return {
 				onMouseEnter: (event) => {
-					showErrorPreview(event as ReactMouseEvent<HTMLElement>, previewText);
+					showErrorPreview(
+						event as ReactMouseEvent<HTMLElement>,
+						anchorId,
+						previewText,
+					);
+				},
+				onFocus: (event) => {
+					showErrorPreview(
+						event as ReactFocusEvent<HTMLElement>,
+						anchorId,
+						previewText,
+					);
 				},
 				onMouseLeave: () => {
+					hideErrorPreview();
+				},
+				onBlur: () => {
 					hideErrorPreview();
 				},
 			};
@@ -1511,11 +1542,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const threadSummaryPreviewHandlers = useCallback(
 		(
+			anchorId: string,
 			title: string,
 			summary: string | null | undefined,
 		): Pick<
 			HTMLAttributes<HTMLElement>,
-			"onMouseEnter" | "onMouseMove" | "onMouseLeave"
+			"onMouseEnter" | "onMouseMove" | "onMouseLeave" | "onFocus" | "onBlur"
 		> => {
 			const previewSummary = summary?.trim();
 			const viewportWidth =
@@ -1527,6 +1559,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				onMouseEnter: (event) => {
 					showThreadSummaryPreview(
 						event as ReactMouseEvent<HTMLElement>,
+						anchorId,
 						title,
 						previewSummary,
 					);
@@ -1534,11 +1567,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				onMouseMove: (event) => {
 					showThreadSummaryPreview(
 						event as ReactMouseEvent<HTMLElement>,
+						anchorId,
+						title,
+						previewSummary,
+					);
+				},
+				onFocus: (event) => {
+					showThreadSummaryPreview(
+						event as ReactFocusEvent<HTMLElement>,
+						anchorId,
 						title,
 						previewSummary,
 					);
 				},
 				onMouseLeave: () => {
+					hideThreadSummaryPreview();
+				},
+				onBlur: () => {
 					hideThreadSummaryPreview();
 				},
 			};
@@ -6257,6 +6302,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									? "Primary"
 									: "detached");
 							const threadFolderName = shortName(thread.worktreePath);
+							const threadWorktreeDisplayPath = formatPathForDisplay(
+								thread.worktreePath,
+								homeDirectory,
+								supportsTildePath,
+							);
+							const threadPopoverAnchorId = `thread-sidebar-row-${thread.id}`;
 							const threadPinned = Boolean(thread.pinnedAt);
 							const isActive = selectedThreadId === thread.id;
 							const isWorking = thread.runStatus.state === "working";
@@ -6271,13 +6322,45 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								hasUnreadError || hasRunError || hasRunStopped
 									? (thread.runStatus.error ?? "")
 									: "";
+							const threadAriaLabel = [
+								thread.title,
+								threadPinned ? "Pinned." : null,
+								hasUnreadError
+									? "Unread error."
+									: hasRunError
+										? "Error."
+										: hasRunStopped
+											? "Stopped."
+											: isWorking
+												? "Working."
+												: null,
+								`Branch ${threadBranchName}.`,
+								`Worktree ${threadWorktreeDisplayPath}.`,
+							]
+								.filter(Boolean)
+								.join(" ");
 							const threadPreviewHandlers = threadErrorPreviewText
-								? errorPreviewHandlers(threadErrorPreviewText)
-								: threadSummaryPreviewHandlers(thread.title, thread.summary);
+								? errorPreviewHandlers(
+										threadPopoverAnchorId,
+										threadErrorPreviewText,
+									)
+								: threadSummaryPreviewHandlers(
+										threadPopoverAnchorId,
+										thread.title,
+										thread.summary,
+									);
+							const threadPreviewDescriptionId =
+								errorPreviewPopover?.anchorId === threadPopoverAnchorId
+									? "thread-error-popover"
+									: threadSummaryPopover?.anchorId === threadPopoverAnchorId
+										? "thread-summary-popover"
+										: undefined;
 							return (
 								<button
 									type="button"
 									key={thread.id}
+									aria-describedby={threadPreviewDescriptionId}
+									aria-label={threadAriaLabel}
 									className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
 										isActive
 											? "bg-[#273036] text-[#f2f0ef]"
@@ -6320,16 +6403,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																	: "bg-[#545d64]"
 												}`}
 											/>
-											<div
-												className="min-w-0 truncate text-sm font-medium"
-												title={thread.title}
-											>
+											<div className="min-w-0 truncate text-sm font-medium">
 												{thread.title}
 											</div>
 										</div>
 										<div className="flex shrink-0 items-center gap-2">
 											{threadPinned ? (
-												<span title="Pinned">
+												<span className="pointer-events-none">
 													{materialSymbol(
 														"push_pin",
 														"text-[14px] text-[#dfebf3]",
@@ -6352,10 +6432,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											) : null}
 										</div>
 									</div>
-									<div
-										className="mt-1 flex min-w-0 items-center gap-1 text-[11px]"
-										title={`${threadBranchName} | ${formatPathForDisplay(thread.worktreePath, homeDirectory, supportsTildePath)}`}
-									>
+									<div className="mt-1 flex min-w-0 items-center gap-1 text-[11px]">
 										<span className="min-w-0 truncate text-[#d7d7d7]">
 											{threadBranchName}
 										</span>
@@ -6985,10 +7062,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			</div>
 			{errorPreviewPopover ? (
 				<div
+					id="thread-error-popover"
+					role="note"
 					className="pointer-events-none fixed z-[110] max-w-[22rem] rounded-md border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
 					style={{
 						left: errorPreviewPopover.x,
 						top: errorPreviewPopover.y,
+						transform: "translateY(-50%)",
 					}}
 				>
 					<div className="whitespace-pre-wrap break-words">
@@ -6998,6 +7078,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			) : null}
 			{threadSummaryPopover ? (
 				<div
+					id="thread-summary-popover"
+					role="note"
 					className="pointer-events-none fixed z-[108] hidden max-w-[22rem] rounded-md border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
 					style={{
 						left: threadSummaryPopover.x,
