@@ -166,7 +166,20 @@ body {
 
 .message-markdown ul,
 .message-markdown ol {
+  list-style-position: outside;
   padding-left: 1.25rem;
+}
+
+.message-markdown ul {
+  list-style-type: disc;
+}
+
+.message-markdown ol {
+  list-style-type: decimal;
+}
+
+.message-markdown li::marker {
+  color: #d5e4ef;
 }
 
 .message-markdown li + li {
