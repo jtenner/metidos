@@ -498,10 +498,10 @@ export function FileChangeMessage({
 		<>
 			<div className="min-w-0">
 				<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-					File Change
-				</div>
-				<div className="mt-1 truncate font-mono text-sm text-[#cfe0eb]">
-					{path}
+					File Change -{" "}
+					<span className="truncate font-mono text-[9px] text-[#f2f0ef]">
+						{path}
+					</span>
 				</div>
 			</div>
 			<div className="flex shrink-0 items-center gap-2">
@@ -539,12 +539,6 @@ export function FileChangeMessage({
 						{headerContent}
 					</div>
 				)}
-				<a
-					className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 font-label text-[10px] uppercase tracking-widest text-[#cfe0eb] transition-colors hover:bg-[#1f282f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60"
-					href={buildLocalFileHref(path, worktreePath)}
-				>
-					Open
-				</a>
 			</div>
 			{hasDiff && isExpanded ? (
 				<div className="px-4 pb-4" id={diffRegionId}>
