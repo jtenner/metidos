@@ -16,6 +16,7 @@ import {
 	getCodexModelCatalogProcedure,
 	getThreadProcedure,
 	getWorktreeGitCommitDiffProcedure,
+	getWorktreeSnapshotProcedure,
 	listDirectorySuggestionsProcedure,
 	listProjectTasksProcedure,
 	listProjectWorktreesProcedure,
@@ -25,6 +26,7 @@ import {
 	markThreadErrorSeenProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
+	readWorktreeFileContentPageProcedure,
 	recoverInterruptedThreadTurnsOnStartup,
 	renameThreadProcedure,
 	runProjectTaskProcedure,
@@ -227,6 +229,10 @@ const rpcHandlers: RpcRequestHandlerMap = {
 	deleteThread: (params) => deleteThreadProcedure(params),
 	discardEmptyThread: (params) => discardEmptyThreadProcedure(params),
 	openWorktree: (params, context) => openWorktreeProcedure(params, context),
+	getWorktreeSnapshot: (params, context) =>
+		getWorktreeSnapshotProcedure(params, context),
+	readWorktreeFileContentPage: (params, context) =>
+		readWorktreeFileContentPageProcedure(params, context),
 	setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
 	listWorktreeGitHistory: (params, context) =>
 		listWorktreeGitHistoryProcedure(params, context),

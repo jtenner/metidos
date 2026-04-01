@@ -547,6 +547,8 @@ const procedures: ProjectProcedures = {
 	deleteThread: createProcedure("deleteThread"),
 	discardEmptyThread: createProcedure("discardEmptyThread"),
 	openWorktree: createProcedure("openWorktree"),
+	getWorktreeSnapshot: createProcedure("getWorktreeSnapshot"),
+	readWorktreeFileContentPage: createProcedure("readWorktreeFileContentPage"),
 	setActiveWorktree: createProcedure("setActiveWorktree"),
 	listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),
 	getWorktreeGitCommitDiff: createProcedure("getWorktreeGitCommitDiff"),

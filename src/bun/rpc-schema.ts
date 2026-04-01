@@ -16,8 +16,25 @@ export type RpcWorktree = {
 	pinnedAt: string | null;
 };
 
+export type RpcWorktreeChangeStatus =
+	| "added"
+	| "copied"
+	| "deleted"
+	| "modified"
+	| "renamed"
+	| "unmerged"
+	| "untracked";
+
+export type RpcWorktreeChange = {
+	path: string;
+	previousPath: string | null;
+	stagedStatus: RpcWorktreeChangeStatus | null;
+	unstagedStatus: RpcWorktreeChangeStatus | null;
+};
+
 export type RpcWorktreeSnapshot = {
 	path: string;
+	changes: RpcWorktreeChange[];
 	diff: string[];
 	files: string[];
 	lastUpdatedAt: string;
@@ -102,6 +119,18 @@ export type RpcGitCommitDiffResult = {
 	worktreePath: string;
 	commit: RpcGitHistoryEntry;
 	diffText: string;
+};
+
+export type RpcWorktreeFileContentPage = {
+	projectId: number;
+	worktreePath: string;
+	path: string;
+	cursor: number;
+	nextCursor: number | null;
+	totalBytes: number;
+	chunkBase64: string;
+	isBinary: boolean;
+	isMissing: boolean;
 };
 
 export type RpcRequestPriority = "background" | "default" | "foreground";
@@ -320,6 +349,20 @@ export type AppRPCSchema = {
 			params: { projectId: number; worktreePath: string };
 			response: RpcOpenWorktreeResult;
 		};
+		getWorktreeSnapshot: {
+			params: { projectId: number; worktreePath: string };
+			response: RpcWorktreeSnapshot;
+		};
+		readWorktreeFileContentPage: {
+			params: {
+				projectId: number;
+				worktreePath: string;
+				path: string;
+				cursor?: number;
+				limitBytes?: number;
+			};
+			response: RpcWorktreeFileContentPage;
+		};
 		setActiveWorktree: {
 			params: {
 				projectId: number | null;
@@ -470,6 +513,14 @@ export interface ProjectProcedures {
 	openWorktree: RpcProcedureCall<
 		AppRPCSchema["requests"]["openWorktree"]["params"],
 		RpcOpenWorktreeResult
+	>;
+	getWorktreeSnapshot: RpcProcedureCall<
+		AppRPCSchema["requests"]["getWorktreeSnapshot"]["params"],
+		AppRPCSchema["requests"]["getWorktreeSnapshot"]["response"]
+	>;
+	readWorktreeFileContentPage: RpcProcedureCall<
+		AppRPCSchema["requests"]["readWorktreeFileContentPage"]["params"],
+		AppRPCSchema["requests"]["readWorktreeFileContentPage"]["response"]
 	>;
 	setActiveWorktree: RpcProcedureCall<
 		AppRPCSchema["requests"]["setActiveWorktree"]["params"],

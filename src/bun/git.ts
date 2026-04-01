@@ -5,6 +5,9 @@ import type {
 	RpcGitCommitDiffResult,
 	RpcGitHistoryEntry,
 	RpcWorktree,
+	RpcWorktreeChange,
+	RpcWorktreeChangeStatus,
+	RpcWorktreeFileContentPage,
 	RpcWorktreeGitHistoryResult,
 	RpcWorktreeGitHistorySummary,
 	RpcWorktreeSnapshot,
@@ -29,6 +32,8 @@ const GIT_EXECUTABLE_FALLBACK_DIRECTORIES =
 			: ["/usr/local/bin", "/usr/bin", "/bin"];
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
+const DEFAULT_WORKTREE_FILE_CONTENT_PAGE_BYTES = 64 * 1024;
+const MAX_WORKTREE_FILE_CONTENT_PAGE_BYTES = 256 * 1024;
 
 export const DEFAULT_GIT_HISTORY_PAGE_SIZE = 20;
 
@@ -613,6 +618,82 @@ async function readFiles(
 	return raw.split(/\r?\n/).filter(Boolean);
 }
 
+function normalizeWorktreeChangeStatus(
+	code: string,
+): RpcWorktreeChangeStatus | null {
+	switch (code) {
+		case "A":
+			return "added";
+		case "C":
+			return "copied";
+		case "D":
+			return "deleted";
+		case "M":
+			return "modified";
+		case "R":
+			return "renamed";
+		case "U":
+			return "unmerged";
+		case "?":
+			return "untracked";
+		default:
+			return null;
+	}
+}
+
+function parseWorktreeChanges(raw: string): RpcWorktreeChange[] {
+	if (!raw) {
+		return [];
+	}
+
+	const records = raw.split("\0");
+	const changes: RpcWorktreeChange[] = [];
+
+	for (let index = 0; index < records.length; index += 1) {
+		const record = records[index];
+		if (!record || record.length < 4) {
+			continue;
+		}
+
+		const stagedCode = record[0] ?? " ";
+		const unstagedCode = record[1] ?? " ";
+		const path = record.slice(3);
+		if (!path) {
+			continue;
+		}
+
+		let previousPath: string | null = null;
+		if (
+			(stagedCode === "R" || stagedCode === "C") &&
+			index + 1 < records.length
+		) {
+			previousPath = records[index + 1] || null;
+			index += 1;
+		}
+
+		changes.push({
+			path,
+			previousPath,
+			stagedStatus: normalizeWorktreeChangeStatus(stagedCode),
+			unstagedStatus: normalizeWorktreeChangeStatus(unstagedCode),
+		});
+	}
+
+	return changes.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function readWorktreeChanges(
+	worktreePath: string,
+	options?: GitCommandPriority | GitCommandOptions,
+): Promise<RpcWorktreeChange[]> {
+	const raw = await runGitCommand(
+		worktreePath,
+		["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+		options,
+	);
+	return parseWorktreeChanges(raw);
+}
+
 export async function readWorktreeSnapshot(
 	worktreePath: string,
 	options?: GitCommandPriority | GitCommandOptions,
@@ -627,7 +708,8 @@ export async function readWorktreeSnapshot(
 		signal,
 	};
 
-	const [diff, files] = await Promise.all([
+	const [changes, diff, files] = await Promise.all([
+		readWorktreeChanges(worktreePath, snapshotOptions),
 		readDiff(worktreePath, snapshotOptions),
 		readFiles(worktreePath, snapshotOptions),
 	]).catch((error) => {
@@ -636,9 +718,135 @@ export async function readWorktreeSnapshot(
 	});
 
 	return {
+		changes,
 		diff,
 		files,
 		lastUpdatedAt: getNow(),
+	};
+}
+
+function normalizeWorktreeFileContentCursor(value: unknown): number {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+		return 0;
+	}
+
+	return Math.floor(value);
+}
+
+function normalizeWorktreeFileContentPageSize(value: unknown): number {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+		return DEFAULT_WORKTREE_FILE_CONTENT_PAGE_BYTES;
+	}
+
+	return Math.max(
+		1,
+		Math.min(MAX_WORKTREE_FILE_CONTENT_PAGE_BYTES, Math.floor(value)),
+	);
+}
+
+function isLikelyBinaryContent(bytes: Uint8Array): boolean {
+	for (const byte of bytes) {
+		if (byte === 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+export async function readWorktreeFileContentPage(
+	worktreePath: string,
+	filePath: string,
+	options?: {
+		cursor?: number;
+		limitBytes?: number;
+		signal?: AbortSignal | null;
+	},
+): Promise<Omit<RpcWorktreeFileContentPage, "projectId" | "worktreePath">> {
+	const signal = options?.signal ?? null;
+	throwIfAborted(signal, "Worktree file content read was aborted.");
+
+	const path = normalizeGitPath(worktreePath, filePath);
+	const fullPath = resolve(worktreePath, path);
+	const cursor = normalizeWorktreeFileContentCursor(options?.cursor);
+	const limitBytes = normalizeWorktreeFileContentPageSize(options?.limitBytes);
+
+	if (!existsSync(fullPath)) {
+		return {
+			path,
+			cursor,
+			nextCursor: null,
+			totalBytes: 0,
+			chunkBase64: "",
+			isBinary: false,
+			isMissing: true,
+		};
+	}
+
+	try {
+		const stats = statSync(fullPath);
+		if (!stats.isFile()) {
+			return {
+				path,
+				cursor,
+				nextCursor: null,
+				totalBytes: 0,
+				chunkBase64: "",
+				isBinary: false,
+				isMissing: true,
+			};
+		}
+	} catch {
+		return {
+			path,
+			cursor,
+			nextCursor: null,
+			totalBytes: 0,
+			chunkBase64: "",
+			isBinary: false,
+			isMissing: true,
+		};
+	}
+
+	const file = Bun.file(fullPath);
+	const totalBytes = file.size;
+	if (!Number.isFinite(totalBytes) || totalBytes <= 0 || cursor >= totalBytes) {
+		return {
+			path,
+			cursor,
+			nextCursor: null,
+			totalBytes: Number.isFinite(totalBytes) ? totalBytes : 0,
+			chunkBase64: "",
+			isBinary: false,
+			isMissing: false,
+		};
+	}
+
+	const end = Math.min(totalBytes, cursor + limitBytes);
+	const chunkBytes = new Uint8Array(
+		await file.slice(cursor, end).arrayBuffer(),
+	);
+	throwIfAborted(signal, "Worktree file content read was aborted.");
+	if (isLikelyBinaryContent(chunkBytes)) {
+		return {
+			path,
+			cursor,
+			nextCursor: null,
+			totalBytes,
+			chunkBase64: "",
+			isBinary: true,
+			isMissing: false,
+		};
+	}
+
+	return {
+		path,
+		cursor,
+		nextCursor: end < totalBytes ? end : null,
+		totalBytes,
+		chunkBase64: Buffer.from(chunkBytes).toString("base64"),
+		isBinary: false,
+		isMissing: false,
 	};
 }
 

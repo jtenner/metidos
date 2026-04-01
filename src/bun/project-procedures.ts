@@ -49,6 +49,7 @@ import {
 	readFileChangeDiff,
 	readGitHistoryFirstPage,
 	readGitHistorySummary,
+	readWorktreeFileContentPage,
 	readWorktreeSnapshot,
 	runGitCommand,
 } from "./git";
@@ -124,6 +125,8 @@ import type {
 	RpcThreadRunStatus,
 	RpcThreadUsage,
 	RpcWorktree,
+	RpcWorktreeChange,
+	RpcWorktreeFileContentPage,
 	RpcWorktreeGitHistoryResult,
 	RpcWorktreeGitHistorySummary,
 	RpcWorktreeSnapshot,
@@ -242,6 +245,7 @@ type ProjectWorktreeReadOptions = GitCommandOptions & {
 };
 
 type WorktreePollState = {
+	changes: RpcWorktreeChange[];
 	diff: string[];
 	files: string[];
 	history: RpcWorktreeGitHistorySummary;
@@ -1155,6 +1159,7 @@ function createWorktreePollState(
 ): WorktreePollState {
 	const lastUpdatedAt = getNow();
 	return {
+		changes: [],
 		diff: [],
 		files: [],
 		history: {
@@ -1683,6 +1688,24 @@ async function queueThreadMessage(
 	return readThreadDetailCached(thread.id);
 }
 
+async function readAndStoreWorktreeSnapshot(
+	state: ProjectPollState,
+	worktreePath: string,
+	options?: GitCommandOptions,
+): Promise<RpcWorktreeSnapshot> {
+	const worktreeState = ensureWorktreePollState(state, worktreePath);
+	const snapshot = await readWorktreeSnapshot(worktreePath, options);
+	worktreeState.changes = snapshot.changes;
+	worktreeState.diff = snapshot.diff;
+	worktreeState.files = snapshot.files;
+	worktreeState.lastUpdatedAt = snapshot.lastUpdatedAt;
+
+	return {
+		path: worktreePath,
+		...snapshot,
+	};
+}
+
 export async function runProjectTaskProcedure(
 	params: AppRPCSchema["requests"]["runProjectTask"]["params"],
 ): Promise<RpcThreadDetail> {
@@ -1889,28 +1912,70 @@ export async function openWorktreeProcedure(
 		DEFAULT_GIT_HISTORY_PAGE_SIZE,
 		requestGitOptions,
 	);
-	const snapshotPromise = readWorktreeSnapshot(worktreePath, requestGitOptions);
+	const snapshotPromise = readAndStoreWorktreeSnapshot(
+		state,
+		worktreePath,
+		requestGitOptions,
+	);
 	const [{ history, summary, signature }, snapshot] = await Promise.all([
 		historyPromise,
 		snapshotPromise,
 	]);
-	worktreeState.diff = snapshot.diff;
-	worktreeState.files = snapshot.files;
 	worktreeState.history = summary;
 	worktreeState.historyEntries = history.entries;
 	worktreeState.historyNextOffset = history.nextOffset;
 	worktreeState.historySignature = signature;
-	worktreeState.lastUpdatedAt = snapshot.lastUpdatedAt;
 	syncProjectWorktreeBackgroundPolling(state);
 	warmGitHistoryCache(worktreeState, worktreePath, logBackgroundGitFailure);
 
 	return {
 		project,
-		worktree: {
-			path: worktreePath,
-			...snapshot,
-		},
+		worktree: snapshot,
 		history,
+	};
+}
+
+export async function getWorktreeSnapshotProcedure(
+	params: AppRPCSchema["requests"]["getWorktreeSnapshot"]["params"],
+	context?: RpcRequestContext,
+): Promise<RpcWorktreeSnapshot> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
+	const project = projectByIdForPath(params.projectId);
+	const state = ensureProjectPoller(project);
+	const worktreePath = normalizePath(params.worktreePath);
+	await ensureTrackedProjectWorktree(project, state, worktreePath, {
+		...requestGitOptions,
+		forceRefresh: true,
+	});
+
+	return readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions);
+}
+
+export async function readWorktreeFileContentPageProcedure(
+	params: AppRPCSchema["requests"]["readWorktreeFileContentPage"]["params"],
+	context?: RpcRequestContext,
+): Promise<RpcWorktreeFileContentPage> {
+	const requestGitOptions = gitCommandOptionsFromRequest(context);
+	const project = projectByIdForPath(params.projectId);
+	const state = ensureProjectPoller(project);
+	const worktreePath = normalizePath(params.worktreePath);
+	await ensureTrackedProjectWorktree(project, state, worktreePath, {
+		...requestGitOptions,
+		forceRefresh: true,
+	});
+
+	const page = await readWorktreeFileContentPage(worktreePath, params.path, {
+		...(typeof params.cursor === "number" ? { cursor: params.cursor } : {}),
+		...(typeof params.limitBytes === "number"
+			? { limitBytes: params.limitBytes }
+			: {}),
+		signal: context?.signal ?? null,
+	});
+
+	return {
+		projectId: project.id,
+		worktreePath,
+		...page,
 	};
 }
 
@@ -2148,6 +2213,7 @@ export function getOpenWorktreeSnapshot(
 	if (!worktreeState) return null;
 	return {
 		path: normalized,
+		changes: worktreeState.changes,
 		diff: worktreeState.diff,
 		files: worktreeState.files,
 		lastUpdatedAt: worktreeState.lastUpdatedAt,

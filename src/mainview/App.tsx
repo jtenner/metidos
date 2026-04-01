@@ -28,6 +28,8 @@ import type {
 	RpcThreadMessage,
 	RpcThreadRunStatus,
 	RpcWorktree,
+	RpcWorktreeChange,
+	RpcWorktreeChangeStatus,
 	RpcWorktreeGitHistoryChanged,
 	RpcWorktreeGitHistoryResult,
 	RpcWorktreeSnapshot,
@@ -145,6 +147,179 @@ type AppProps = {
 };
 
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
+const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
+const WORKTREE_FILE_CONTENT_PAGE_BYTES = 64 * 1024;
+const WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX = 480;
+
+type PrimaryView = "chat" | "diff";
+
+type DiffFileContentState = {
+	chunks: string[];
+	error: string;
+	isBinary: boolean;
+	isLoadingInitial: boolean;
+	isLoadingMore: boolean;
+	isMissing: boolean;
+	loadedBytes: number;
+	nextCursor: number | null;
+	path: string | null;
+	totalBytes: number;
+};
+
+type DiffFileTreeNode = {
+	change: RpcWorktreeChange | null;
+	children: DiffFileTreeNode[];
+	key: string;
+	label: string;
+	path: string | null;
+};
+
+function emptyDiffFileContentState(
+	path: string | null = null,
+): DiffFileContentState {
+	return {
+		chunks: [],
+		error: "",
+		isBinary: false,
+		isLoadingInitial: false,
+		isLoadingMore: false,
+		isMissing: false,
+		loadedBytes: 0,
+		nextCursor: null,
+		path,
+		totalBytes: 0,
+	};
+}
+
+function decodeBase64Bytes(value: string): Uint8Array {
+	if (!value) {
+		return new Uint8Array(0);
+	}
+
+	const decoded = atob(value);
+	const bytes = new Uint8Array(decoded.length);
+	for (let index = 0; index < decoded.length; index += 1) {
+		bytes[index] = decoded.charCodeAt(index);
+	}
+	return bytes;
+}
+
+function formatFileSize(bytes: number): string {
+	if (bytes < 1024) {
+		return `${bytes} B`;
+	}
+	if (bytes < 1024 * 1024) {
+		return `${(bytes / 1024).toFixed(1)} KB`;
+	}
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function worktreeChangeStatusLabel(status: RpcWorktreeChangeStatus): string {
+	switch (status) {
+		case "added":
+			return "Added";
+		case "copied":
+			return "Copied";
+		case "deleted":
+			return "Deleted";
+		case "modified":
+			return "Modified";
+		case "renamed":
+			return "Renamed";
+		case "unmerged":
+			return "Conflict";
+		case "untracked":
+			return "Untracked";
+	}
+}
+
+function worktreeChangeStatusClassName(
+	status: RpcWorktreeChangeStatus,
+): string {
+	switch (status) {
+		case "added":
+		case "copied":
+		case "untracked":
+			return "border-[#244833] bg-[#12251a] text-[#9fe2b1]";
+		case "deleted":
+			return "border-[#5c2030] bg-[#2c1117] text-[#ff9db0]";
+		case "renamed":
+			return "border-[#365062] bg-[#16212a] text-[#b7d0e1]";
+		case "unmerged":
+			return "border-[#6a4b1f] bg-[#2f2312] text-[#f0d79a]";
+		case "modified":
+			return "border-[#31404a] bg-[#182025] text-[#cfe0eb]";
+	}
+}
+
+function buildDiffFileTree(changes: RpcWorktreeChange[]): DiffFileTreeNode[] {
+	type MutableNode = {
+		change: RpcWorktreeChange | null;
+		children: Map<string, MutableNode>;
+		key: string;
+		label: string;
+		path: string | null;
+	};
+
+	const root = new Map<string, MutableNode>();
+
+	for (const change of changes) {
+		const segments = change.path.split("/").filter(Boolean);
+		if (segments.length === 0) {
+			continue;
+		}
+
+		let level = root;
+		let currentPath = "";
+		for (let index = 0; index < segments.length; index += 1) {
+			const segment = segments[index];
+			if (!segment) {
+				continue;
+			}
+			currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+			const isLeaf = index === segments.length - 1;
+			const existing = level.get(segment);
+			if (existing) {
+				if (isLeaf) {
+					existing.path = change.path;
+					existing.change = change;
+				}
+				level = existing.children;
+				continue;
+			}
+
+			const node: MutableNode = {
+				change: isLeaf ? change : null,
+				children: new Map<string, MutableNode>(),
+				key: currentPath,
+				label: segment,
+				path: isLeaf ? change.path : null,
+			};
+			level.set(segment, node);
+			level = node.children;
+		}
+	}
+
+	const materialize = (nodes: Map<string, MutableNode>): DiffFileTreeNode[] =>
+		[...nodes.values()]
+			.sort((left, right) => {
+				const leftIsDirectory = left.path === null;
+				const rightIsDirectory = right.path === null;
+				if (leftIsDirectory !== rightIsDirectory) {
+					return leftIsDirectory ? -1 : 1;
+				}
+				return left.label.localeCompare(right.label);
+			})
+			.map((node) => ({
+				change: node.change,
+				children: materialize(node.children),
+				key: node.key,
+				label: node.label,
+				path: node.path,
+			}));
+
+	return materialize(root);
+}
 
 function isScrolledToBottom(container: HTMLDivElement): boolean {
 	return (
@@ -291,6 +466,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [isDocumentVisible, setIsDocumentVisible] = useState(
 		() => document.visibilityState === "visible",
 	);
+	const [primaryView, setPrimaryView] = useState<PrimaryView>("chat");
+	const [worktreeDiffError, setWorktreeDiffError] = useState("");
+	const [isRefreshingWorktreeSnapshot, setIsRefreshingWorktreeSnapshot] =
+		useState(false);
+	const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
+		string | null
+	>(null);
+	const [diffFileContentState, setDiffFileContentState] =
+		useState<DiffFileContentState>(emptyDiffFileContentState());
 	const [gitHistoryScrollTop, setGitHistoryScrollTop] = useState(0);
 	const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -298,6 +482,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
 	const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
+	const desktopDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
+	const mobileDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
 	const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
 	const desktopChatPinnedToBottomRef = useRef(true);
 	const mobileChatPinnedToBottomRef = useRef(true);
@@ -343,6 +529,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const directorySuggestionAbortControllerRef = useRef<AbortController | null>(
 		null,
 	);
+	const diffSnapshotRequestIdRef = useRef(0);
+	const diffSnapshotAbortControllerRef = useRef<AbortController | null>(null);
+	const diffFileContentRequestIdRef = useRef(0);
+	const diffFileContentAbortControllerRef = useRef<AbortController | null>(
+		null,
+	);
+	const diffFileContentDecoderRef = useRef<TextDecoder | null>(null);
 	const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
 	const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
 	const selectedThreadIdRef = useRef<number | null>(null);
@@ -648,6 +841,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath)
 			.opened;
 	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
+
+	const activeSelectedWorktreeState = useMemo(() => {
+		if (!selectedProject || !activeSelectedWorktreePath) {
+			return null;
+		}
+		return getWorktreeState(selectedProject.id, activeSelectedWorktreePath);
+	}, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
+
+	const activeWorktreeSnapshot = activeSelectedWorktreeState?.snapshot ?? null;
+	const activeWorktreeChanges = activeWorktreeSnapshot?.changes ?? [];
+	const diffFileTree = useMemo(
+		() => buildDiffFileTree(activeWorktreeChanges),
+		[activeWorktreeChanges],
+	);
+	const selectedDiffFileChange = useMemo(
+		() =>
+			selectedDiffFilePath
+				? (activeWorktreeChanges.find(
+						(change) => change.path === selectedDiffFilePath,
+					) ?? null)
+				: null,
+		[activeWorktreeChanges, selectedDiffFilePath],
+	);
 
 	const activePollingProjectId =
 		isDocumentVisible &&
@@ -1598,6 +1814,252 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		threadOpenAbortControllerRef.current = null;
 		controller.abort(createAbortError(null, reason));
 	}, []);
+
+	const abortDiffSnapshotRequest = useCallback((reason: string) => {
+		const controller = diffSnapshotAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		diffSnapshotAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
+	}, []);
+
+	const abortDiffFileContentRequest = useCallback((reason: string) => {
+		const controller = diffFileContentAbortControllerRef.current;
+		if (!controller) {
+			return;
+		}
+
+		diffFileContentAbortControllerRef.current = null;
+		controller.abort(createAbortError(null, reason));
+	}, []);
+
+	const refreshActiveWorktreeSnapshot = useCallback(
+		async (options?: { background?: boolean }) => {
+			if (
+				!selectedProject ||
+				!activeSelectedWorktreePath ||
+				!activeSelectedWorktreeOpened
+			) {
+				return;
+			}
+
+			const requestId = ++diffSnapshotRequestIdRef.current;
+			abortDiffSnapshotRequest(
+				"Worktree diff snapshot request was superseded.",
+			);
+			const controller = new AbortController();
+			diffSnapshotAbortControllerRef.current = controller;
+			setIsRefreshingWorktreeSnapshot(true);
+			if (!options?.background) {
+				setWorktreeDiffError("");
+			}
+
+			try {
+				const snapshot = await procedures.getWorktreeSnapshot(
+					{
+						projectId: selectedProject.id,
+						worktreePath: activeSelectedWorktreePath,
+					},
+					{
+						priority: options?.background ? "background" : "foreground",
+						signal: controller.signal,
+					},
+				);
+				if (diffSnapshotRequestIdRef.current !== requestId) {
+					return;
+				}
+
+				setWorktreeState(selectedProject.id, activeSelectedWorktreePath, {
+					error: "",
+					loading: false,
+					opened: true,
+					snapshot,
+				});
+				setWorktreeDiffError("");
+			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
+				if (diffSnapshotRequestIdRef.current !== requestId) {
+					return;
+				}
+				setWorktreeDiffError(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				if (diffSnapshotAbortControllerRef.current === controller) {
+					diffSnapshotAbortControllerRef.current = null;
+				}
+				if (diffSnapshotRequestIdRef.current === requestId) {
+					setIsRefreshingWorktreeSnapshot(false);
+				}
+			}
+		},
+		[
+			abortDiffSnapshotRequest,
+			activeSelectedWorktreeOpened,
+			activeSelectedWorktreePath,
+			procedures,
+			selectedProject,
+			setWorktreeState,
+		],
+	);
+
+	const loadDiffFileContentPage = useCallback(
+		async (
+			path: string,
+			options?: {
+				cursor?: number;
+				reset?: boolean;
+			},
+		): Promise<void> => {
+			if (!selectedProject || !activeSelectedWorktreePath) {
+				return;
+			}
+
+			const requestId = ++diffFileContentRequestIdRef.current;
+			abortDiffFileContentRequest(
+				"Worktree file content request was superseded.",
+			);
+			const controller = new AbortController();
+			diffFileContentAbortControllerRef.current = controller;
+			const reset = options?.reset ?? false;
+			const cursor = reset ? 0 : Math.max(0, options?.cursor ?? 0);
+
+			if (reset) {
+				diffFileContentDecoderRef.current = new TextDecoder();
+				setDiffFileContentState({
+					...emptyDiffFileContentState(path),
+					isLoadingInitial: true,
+				});
+			} else {
+				setDiffFileContentState((current) =>
+					current.path === path
+						? {
+								...current,
+								error: "",
+								isLoadingMore: true,
+							}
+						: {
+								...emptyDiffFileContentState(path),
+								isLoadingInitial: true,
+							},
+				);
+			}
+
+			try {
+				const page = await procedures.readWorktreeFileContentPage(
+					{
+						cursor,
+						limitBytes: WORKTREE_FILE_CONTENT_PAGE_BYTES,
+						path,
+						projectId: selectedProject.id,
+						worktreePath: activeSelectedWorktreePath,
+					},
+					{
+						priority: "foreground",
+						signal: controller.signal,
+					},
+				);
+				if (diffFileContentRequestIdRef.current !== requestId) {
+					return;
+				}
+
+				let decodedChunk = "";
+				let loadedBytes = page.nextCursor ?? page.totalBytes;
+				if (!page.isBinary && !page.isMissing) {
+					const decoder =
+						reset || !diffFileContentDecoderRef.current
+							? new TextDecoder()
+							: diffFileContentDecoderRef.current;
+					diffFileContentDecoderRef.current = decoder;
+					const bytes = decodeBase64Bytes(page.chunkBase64);
+					decodedChunk = decoder.decode(bytes, {
+						stream: page.nextCursor !== null,
+					});
+					if (page.nextCursor === null) {
+						decodedChunk += decoder.decode();
+					}
+					loadedBytes = page.cursor + bytes.length;
+				}
+
+				setDiffFileContentState((current) => {
+					const base =
+						reset || current.path !== path
+							? emptyDiffFileContentState(path)
+							: current;
+					return {
+						chunks: decodedChunk ? [...base.chunks, decodedChunk] : base.chunks,
+						error: "",
+						isBinary: page.isBinary,
+						isLoadingInitial: false,
+						isLoadingMore: false,
+						isMissing: page.isMissing,
+						loadedBytes,
+						nextCursor: page.nextCursor,
+						path,
+						totalBytes: page.totalBytes,
+					};
+				});
+			} catch (error) {
+				if (isAbortError(error)) {
+					return;
+				}
+				if (diffFileContentRequestIdRef.current !== requestId) {
+					return;
+				}
+				setDiffFileContentState((current) => ({
+					...(current.path === path
+						? current
+						: emptyDiffFileContentState(path)),
+					error: error instanceof Error ? error.message : String(error),
+					isLoadingInitial: false,
+					isLoadingMore: false,
+					path,
+				}));
+			} finally {
+				if (diffFileContentAbortControllerRef.current === controller) {
+					diffFileContentAbortControllerRef.current = null;
+				}
+			}
+		},
+		[
+			abortDiffFileContentRequest,
+			activeSelectedWorktreePath,
+			procedures,
+			selectedProject,
+		],
+	);
+
+	const loadSelectedDiffFileContent = useCallback(async (): Promise<void> => {
+		if (!selectedDiffFilePath) {
+			diffFileContentDecoderRef.current = null;
+			setDiffFileContentState(emptyDiffFileContentState());
+			return;
+		}
+
+		await loadDiffFileContentPage(selectedDiffFilePath, {
+			reset: true,
+		});
+	}, [loadDiffFileContentPage, selectedDiffFilePath]);
+
+	const loadMoreDiffFileContent = useCallback(async (): Promise<void> => {
+		if (
+			!selectedDiffFilePath ||
+			diffFileContentState.path !== selectedDiffFilePath ||
+			diffFileContentState.nextCursor === null ||
+			diffFileContentState.isLoadingInitial ||
+			diffFileContentState.isLoadingMore
+		) {
+			return;
+		}
+
+		await loadDiffFileContentPage(selectedDiffFilePath, {
+			cursor: diffFileContentState.nextCursor,
+		});
+	}, [diffFileContentState, loadDiffFileContentPage, selectedDiffFilePath]);
 
 	const clearThreadSelection = useCallback(() => {
 		threadOpenRequestIdRef.current += 1;
@@ -3068,6 +3530,155 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	}, [activePollingProjectId, activePollingWorktreePath, procedures]);
 
 	useEffect(() => {
+		return () => {
+			diffSnapshotRequestIdRef.current += 1;
+			diffFileContentRequestIdRef.current += 1;
+			abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
+			abortDiffFileContentRequest("Worktree file content request was cleared.");
+		};
+	}, [abortDiffFileContentRequest, abortDiffSnapshotRequest]);
+
+	useEffect(() => {
+		if (
+			selectedProject &&
+			activeSelectedWorktreePath &&
+			activeSelectedWorktreeOpened
+		) {
+			return;
+		}
+
+		diffSnapshotRequestIdRef.current += 1;
+		diffFileContentRequestIdRef.current += 1;
+		diffFileContentDecoderRef.current = null;
+		abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
+		abortDiffFileContentRequest("Worktree file content request was cleared.");
+		setIsRefreshingWorktreeSnapshot(false);
+		setWorktreeDiffError("");
+		setSelectedDiffFilePath(null);
+		setDiffFileContentState(emptyDiffFileContentState());
+	}, [
+		abortDiffFileContentRequest,
+		abortDiffSnapshotRequest,
+		activeSelectedWorktreeOpened,
+		activeSelectedWorktreePath,
+		selectedProject,
+	]);
+
+	useEffect(() => {
+		if (
+			primaryView !== "diff" ||
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			!activeSelectedWorktreeOpened ||
+			!isDocumentVisible
+		) {
+			return;
+		}
+
+		void refreshActiveWorktreeSnapshot();
+		const timer = window.setInterval(() => {
+			void refreshActiveWorktreeSnapshot({
+				background: true,
+			});
+		}, WORKTREE_DIFF_POLL_INTERVAL_MS);
+
+		return () => {
+			window.clearInterval(timer);
+			diffSnapshotRequestIdRef.current += 1;
+			abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
+			setIsRefreshingWorktreeSnapshot(false);
+		};
+	}, [
+		abortDiffSnapshotRequest,
+		activeSelectedWorktreeOpened,
+		activeSelectedWorktreePath,
+		isDocumentVisible,
+		primaryView,
+		refreshActiveWorktreeSnapshot,
+		selectedProject,
+	]);
+
+	useEffect(() => {
+		if (activeWorktreeChanges.length === 0) {
+			setSelectedDiffFilePath(null);
+			return;
+		}
+
+		setSelectedDiffFilePath((current) => {
+			if (
+				current &&
+				activeWorktreeChanges.some((change) => change.path === current)
+			) {
+				return current;
+			}
+			return activeWorktreeChanges[0]?.path ?? null;
+		});
+	}, [activeWorktreeChanges]);
+
+	useEffect(() => {
+		if (
+			primaryView !== "diff" ||
+			!selectedProject ||
+			!activeSelectedWorktreePath ||
+			!activeSelectedWorktreeOpened ||
+			!selectedDiffFilePath
+		) {
+			diffFileContentRequestIdRef.current += 1;
+			diffFileContentDecoderRef.current = null;
+			abortDiffFileContentRequest("Worktree file content request was cleared.");
+			setDiffFileContentState(emptyDiffFileContentState(selectedDiffFilePath));
+			return;
+		}
+
+		void loadSelectedDiffFileContent();
+		return () => {
+			diffFileContentRequestIdRef.current += 1;
+			diffFileContentDecoderRef.current = null;
+			abortDiffFileContentRequest("Worktree file content request was cleared.");
+		};
+	}, [
+		abortDiffFileContentRequest,
+		activeSelectedWorktreeOpened,
+		activeSelectedWorktreePath,
+		loadSelectedDiffFileContent,
+		primaryView,
+		selectedDiffFilePath,
+		selectedProject,
+	]);
+
+	useEffect(() => {
+		if (
+			primaryView !== "diff" ||
+			diffFileContentState.isLoadingInitial ||
+			diffFileContentState.isLoadingMore ||
+			diffFileContentState.nextCursor === null
+		) {
+			return;
+		}
+
+		const containers = [
+			desktopDiffContentScrollRef.current,
+			mobileDiffContentScrollRef.current,
+		].filter((container): container is HTMLDivElement => container !== null);
+		if (
+			containers.some(
+				(container) =>
+					container.clientHeight > 0 &&
+					container.scrollHeight <=
+						container.clientHeight + WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX,
+			)
+		) {
+			void loadMoreDiffFileContent();
+		}
+	}, [
+		diffFileContentState.isLoadingInitial,
+		diffFileContentState.isLoadingMore,
+		diffFileContentState.nextCursor,
+		loadMoreDiffFileContent,
+		primaryView,
+	]);
+
+	useEffect(() => {
 		if (!sessionStateReady) {
 			return;
 		}
@@ -4335,6 +4946,111 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		[],
 	);
 
+	const handleDesktopDiffContentScroll = useCallback(
+		(event: UIEvent<HTMLDivElement>) => {
+			const container = event.currentTarget;
+			if (
+				container.scrollTop + container.clientHeight >=
+				container.scrollHeight - WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX
+			) {
+				void loadMoreDiffFileContent();
+			}
+		},
+		[loadMoreDiffFileContent],
+	);
+
+	const handleMobileDiffContentScroll = useCallback(
+		(event: UIEvent<HTMLDivElement>) => {
+			const container = event.currentTarget;
+			if (
+				container.scrollTop + container.clientHeight >=
+				container.scrollHeight - WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX
+			) {
+				void loadMoreDiffFileContent();
+			}
+		},
+		[loadMoreDiffFileContent],
+	);
+
+	const renderChangeStatusBadge = (
+		label: string,
+		status: RpcWorktreeChangeStatus | null,
+	): JSX.Element | null => {
+		if (!status) {
+			return null;
+		}
+
+		return (
+			<span
+				className={`rounded-full border px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${worktreeChangeStatusClassName(
+					status,
+				)}`}
+			>
+				{label} {worktreeChangeStatusLabel(status)}
+			</span>
+		);
+	};
+
+	const renderDiffFileTreeNodes = (
+		nodes: DiffFileTreeNode[],
+		depth = 0,
+	): JSX.Element[] =>
+		nodes.map((node) => {
+			if (node.path === null) {
+				return (
+					<div key={node.key}>
+						<div
+							className="flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#6f7b83]"
+							style={{
+								paddingLeft: `${12 + depth * 14}px`,
+							}}
+						>
+							{materialSymbol("folder", "text-sm")}
+							<span>{node.label}</span>
+						</div>
+						<div>{renderDiffFileTreeNodes(node.children, depth + 1)}</div>
+					</div>
+				);
+			}
+
+			return (
+				<button
+					type="button"
+					key={node.key}
+					className={`flex w-full items-center justify-between gap-3 border-l px-3 py-2 text-left transition-colors ${
+						selectedDiffFilePath === node.path
+							? "border-[#7eadce] bg-[#182026]"
+							: "border-transparent hover:bg-[#171d21]"
+					}`}
+					style={{
+						paddingLeft: `${12 + depth * 14}px`,
+					}}
+					onClick={() => {
+						setSelectedDiffFilePath(node.path);
+					}}
+				>
+					<div className="min-w-0">
+						<div className="truncate font-mono text-[13px] text-[#f2f0ef]">
+							{node.label}
+						</div>
+						<div className="truncate text-[11px] text-[#8f9aa2]">
+							{node.path}
+						</div>
+					</div>
+					<div className="flex shrink-0 flex-col items-end gap-1">
+						{renderChangeStatusBadge(
+							"Index",
+							node.change?.stagedStatus ?? null,
+						)}
+						{renderChangeStatusBadge(
+							"Worktree",
+							node.change?.unstagedStatus ?? null,
+						)}
+					</div>
+				</button>
+			);
+		});
+
 	useLayoutEffect(() => {
 		void visibleMessages;
 		const threadChanged = chatScrollThreadIdRef.current !== selectedThreadId;
@@ -4451,6 +5167,242 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			</div>
 		);
 	});
+
+	const renderDiffWorkspace = (options: { mobile: boolean }): JSX.Element => {
+		const selectorContent =
+			!selectedProject || !activeSelectedWorktreePath ? (
+				<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+					Select a project worktree first.
+				</div>
+			) : !activeSelectedWorktreeOpened ? (
+				<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+					Open this worktree from the Projects panel to inspect its live diff.
+				</div>
+			) : isRefreshingWorktreeSnapshot && !activeWorktreeSnapshot ? (
+				<div className="rounded-sm border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
+					Loading worktree diff...
+				</div>
+			) : worktreeDiffError && !activeWorktreeSnapshot ? (
+				<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
+					{worktreeDiffError}
+				</div>
+			) : activeWorktreeChanges.length === 0 ? (
+				<div className="rounded-sm border border-[#244833] bg-[#12251a] px-4 py-4 text-sm text-[#9fe2b1]">
+					Worktree clean. No staged or unstaged changes.
+				</div>
+			) : (
+				<div
+					className={`overflow-hidden rounded-sm border border-[#252f36] bg-[#0f1417] ${
+						options.mobile ? "" : "h-full"
+					}`}
+				>
+					<div
+						className={`overflow-y-auto py-2 hide-scrollbar ${
+							options.mobile ? "max-h-[22rem]" : "h-full"
+						}`}
+					>
+						{renderDiffFileTreeNodes(diffFileTree)}
+					</div>
+				</div>
+			);
+
+		const contentBody = !selectedDiffFileChange ? (
+			<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+				Select a changed file to inspect its current contents.
+			</div>
+		) : diffFileContentState.error ? (
+			<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
+				{diffFileContentState.error}
+			</div>
+		) : diffFileContentState.isLoadingInitial ? (
+			<div className="rounded-sm border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
+				Streaming file contents...
+			</div>
+		) : diffFileContentState.isMissing ? (
+			<div className="rounded-sm border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
+				This file no longer exists in the working tree. The diff entry is still
+				listed because the change is active.
+			</div>
+		) : diffFileContentState.isBinary ? (
+			<div className="rounded-sm border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
+				Binary file preview unavailable.
+			</div>
+		) : (
+			<div
+				className={`overflow-hidden rounded-sm border border-[#252f36] bg-[#0c1114] ${
+					options.mobile ? "" : "h-full"
+				}`}
+			>
+				<div
+					ref={
+						options.mobile
+							? mobileDiffContentScrollRef
+							: desktopDiffContentScrollRef
+					}
+					className={`app-scrollbar overflow-auto ${
+						options.mobile ? "max-h-[48vh]" : "h-full"
+					}`}
+					onScroll={
+						options.mobile
+							? handleMobileDiffContentScroll
+							: handleDesktopDiffContentScroll
+					}
+				>
+					{diffFileContentState.chunks.length > 0 ? (
+						<pre className="min-w-full px-4 py-4 font-mono text-[12px] leading-6 text-[#d4dde4] whitespace-pre-wrap break-words">
+							{diffFileContentState.chunks.map((chunk, index) => (
+								<span className="contents" key={`${index}-${chunk.length}`}>
+									{chunk}
+								</span>
+							))}
+						</pre>
+					) : (
+						<div className="px-4 py-4 text-sm text-[#8f9aa2]">Empty file.</div>
+					)}
+					{diffFileContentState.isLoadingMore ? (
+						<div className="border-t border-[#252f36] px-4 py-3 text-xs text-[#8f9aa2]">
+							Loading more...
+						</div>
+					) : diffFileContentState.nextCursor !== null ? (
+						<div className="border-t border-[#252f36] px-4 py-3 text-xs text-[#6f7b83]">
+							Scroll to load more
+						</div>
+					) : null}
+				</div>
+			</div>
+		);
+
+		return (
+			<div
+				className={
+					options.mobile
+						? "flex min-h-0 flex-1 flex-col gap-4"
+						: "flex min-h-0 flex-1 overflow-hidden"
+				}
+			>
+				<div
+					className={
+						options.mobile
+							? "shrink-0"
+							: "flex h-full w-[21rem] shrink-0 flex-col border-r border-[#262626] bg-[#121518]"
+					}
+				>
+					<div
+						className={
+							options.mobile ? "" : "border-b border-[#262626] px-4 py-4"
+						}
+					>
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<div className="font-label text-[10px] uppercase tracking-[0.18em] text-[#8fb5cd]">
+									Worktree Diff
+								</div>
+								<div className="mt-2 text-sm font-semibold text-[#f2f0ef]">
+									{activeSelectedWorktreeFolder}
+								</div>
+								<div className="mt-1 text-xs text-[#8f9aa2]">
+									{selectedProject
+										? formatPathForDisplay(
+												activeSelectedWorktreePath ?? "",
+												homeDirectory,
+												supportsTildePath,
+											)
+										: "No worktree selected"}
+								</div>
+							</div>
+							<button
+								type="button"
+								className="rounded-sm border border-[#31404a] bg-[#182025] px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#cfe0eb] transition-colors hover:bg-[#1e2a31] disabled:cursor-not-allowed disabled:opacity-60"
+								onClick={() => {
+									void refreshActiveWorktreeSnapshot();
+									void loadSelectedDiffFileContent();
+								}}
+								disabled={
+									!selectedProject ||
+									!activeSelectedWorktreePath ||
+									!activeSelectedWorktreeOpened ||
+									isRefreshingWorktreeSnapshot
+								}
+							>
+								{isRefreshingWorktreeSnapshot ? "Syncing" : "Refresh"}
+							</button>
+						</div>
+						{worktreeDiffError && activeWorktreeSnapshot ? (
+							<div className="mt-3 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+								{worktreeDiffError}
+							</div>
+						) : null}
+					</div>
+					<div
+						className={
+							options.mobile ? "" : "min-h-0 flex-1 overflow-hidden px-3 py-3"
+						}
+					>
+						{selectorContent}
+					</div>
+				</div>
+				<div
+					className={
+						options.mobile
+							? "flex min-h-0 flex-1 flex-col gap-4"
+							: "flex min-w-0 flex-1 flex-col overflow-hidden"
+					}
+				>
+					<div
+						className={
+							options.mobile
+								? "rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4"
+								: "border-b border-[#262626] bg-[#101417] px-6 py-5"
+						}
+					>
+						<div className="flex items-start justify-between gap-4">
+							<div className="min-w-0">
+								<div className="font-label text-[10px] uppercase tracking-[0.18em] text-[#8fb5cd]">
+									Selected File
+								</div>
+								<div className="mt-2 truncate font-mono text-sm text-[#f2f0ef]">
+									{selectedDiffFileChange?.path ?? "No file selected"}
+								</div>
+								{selectedDiffFileChange?.previousPath ? (
+									<div className="mt-1 truncate text-xs text-[#8f9aa2]">
+										Previously {selectedDiffFileChange.previousPath}
+									</div>
+								) : null}
+							</div>
+							<div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+								{renderChangeStatusBadge(
+									"Index",
+									selectedDiffFileChange?.stagedStatus ?? null,
+								)}
+								{renderChangeStatusBadge(
+									"Worktree",
+									selectedDiffFileChange?.unstagedStatus ?? null,
+								)}
+								{selectedDiffFileChange ? (
+									<span className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
+										{formatFileSize(diffFileContentState.totalBytes)}
+									</span>
+								) : null}
+							</div>
+						</div>
+						{selectedDiffFileChange &&
+						!diffFileContentState.isBinary &&
+						!diffFileContentState.isMissing ? (
+							<div className="mt-3 text-xs text-[#6f7b83]">
+								Loaded {formatFileSize(diffFileContentState.loadedBytes)} of{" "}
+								{formatFileSize(diffFileContentState.totalBytes)}
+							</div>
+						) : null}
+					</div>
+					<div
+						className={options.mobile ? "min-h-0" : "min-h-0 flex-1 px-6 py-6"}
+					>
+						{contentBody}
+					</div>
+				</div>
+			</div>
+		);
+	};
 
 	const hoveredDirectorySuggestionPath = hoveredDirectorySuggestion
 		? formatDirectoryPathForInput(
@@ -5576,13 +6528,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<nav className="flex items-center gap-6">
 							<button
 								type="button"
-								className="font-label text-xs uppercase tracking-wider text-[#bdd5e6] border-b-2 border-[#7eadce] pb-1"
+								className={`font-label text-xs uppercase tracking-wider pb-1 transition-colors duration-200 ${
+									primaryView === "chat"
+										? "border-b-2 border-[#7eadce] text-[#bdd5e6]"
+										: "text-[#adabaa] hover:text-[#f2f0ef]"
+								}`}
+								onClick={() => {
+									setPrimaryView("chat");
+								}}
 							>
 								Chat
 							</button>
 							<button
 								type="button"
-								className="font-label text-xs uppercase tracking-wider text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200"
+								className={`font-label text-xs uppercase tracking-wider pb-1 transition-colors duration-200 ${
+									primaryView === "diff"
+										? "border-b-2 border-[#7eadce] text-[#bdd5e6]"
+										: "text-[#adabaa] hover:text-[#f2f0ef]"
+								}`}
+								onClick={() => {
+									setPrimaryView("diff");
+								}}
 							>
 								Diff
 							</button>
@@ -5651,135 +6617,145 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</aside>
 
 					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
-						<div
-							ref={desktopChatScrollRef}
-							className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar"
-							onScroll={handleDesktopChatScroll}
-						>
-							<div className="max-w-4xl mx-auto mb-12">
-								<h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
-									{activeScreenTitle}
-								</h1>
-								<p className="max-w-2xl font-body text-sm text-[#b3afad]">
-									<span className="text-[#ddd8d5]">
-										{activeScreenSubtitlePrimary}
-									</span>
-									<span className="text-[#7f7c79]">
-										{" "}
-										| {activeScreenSubtitleSecondary}
-									</span>
-								</p>
-							</div>
-							<div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-10">
-								{renderDesktopMessages}
-							</div>
-						</div>
-						<form
-							className="bg-[#131313] border-t border-[#262626] p-6"
-							onSubmit={onSubmit}
-						>
-							<div className="max-w-4xl mx-auto">
-								<div className="flex items-center gap-2 p-2 border-b border-[#484848]/10">
-									<div className="min-w-[15rem] max-w-[22rem]">
-										<CodexModelSelector
-											models={codexModels}
-											value={activeCodexModel}
-											disabled={modelSelectorDisabled}
-											onChange={(value) => {
-												void updateActiveCodexModel(value);
-											}}
-											variant="desktop"
-										/>
+						{primaryView === "chat" ? (
+							<>
+								<div
+									ref={desktopChatScrollRef}
+									className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar"
+									onScroll={handleDesktopChatScroll}
+								>
+									<div className="max-w-4xl mx-auto mb-12">
+										<h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
+											{activeScreenTitle}
+										</h1>
+										<p className="max-w-2xl font-body text-sm text-[#b3afad]">
+											<span className="text-[#ddd8d5]">
+												{activeScreenSubtitlePrimary}
+											</span>
+											<span className="text-[#7f7c79]">
+												{" "}
+												| {activeScreenSubtitleSecondary}
+											</span>
+										</p>
 									</div>
-									<div className="min-w-[7.5rem] max-w-[8.5rem]">
-										<ReasoningEffortSelector
-											options={reasoningEfforts}
-											value={activeReasoningEffort}
-											disabled={reasoningEffortSelectorDisabled}
-											onChange={(value) => {
-												void updateActiveReasoningEffort(value);
-											}}
-											variant="desktop"
-										/>
+									<div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-10">
+										{renderDesktopMessages}
 									</div>
-									<ProjectTaskSelector
-										tasks={projectTasks}
-										loading={isLoadingProjectTasks}
-										disabled={taskSelectorDisabled}
-										onSelect={(task) => {
-											void runSelectedTask(task);
-										}}
-										variant="desktop"
-									/>
-									<div className="flex-1" />
-									<ContextUsageMeter
-										inputTokens={activeContextInputTokens}
-										contextWindowTokens={activeContextWindowTokens}
-										estimatedTriggerTokens={activeCompactionTriggerTokens}
-										estimatedTriggerSource={activeCompactionTriggerSource}
-										maxObservedInputTokens={activeMaxObservedInputTokens}
-										inferredCount={activeCompactionInferenceCount}
-										lastInferredBeforeInputTokens={
-											activeLastCompactionBeforeInputTokens
-										}
-										lastInferredAfterInputTokens={
-											activeLastCompactionAfterInputTokens
-										}
-									/>
 								</div>
-								{modelControlError ? (
-									<div className="mt-2 text-xs text-[#ff6e84]">
-										{modelControlError}
+								<form
+									className="bg-[#131313] border-t border-[#262626] p-6"
+									onSubmit={onSubmit}
+								>
+									<div className="max-w-4xl mx-auto">
+										<div className="flex items-center gap-2 p-2 border-b border-[#484848]/10">
+											<div className="min-w-[15rem] max-w-[22rem]">
+												<CodexModelSelector
+													models={codexModels}
+													value={activeCodexModel}
+													disabled={modelSelectorDisabled}
+													onChange={(value) => {
+														void updateActiveCodexModel(value);
+													}}
+													variant="desktop"
+												/>
+											</div>
+											<div className="min-w-[7.5rem] max-w-[8.5rem]">
+												<ReasoningEffortSelector
+													options={reasoningEfforts}
+													value={activeReasoningEffort}
+													disabled={reasoningEffortSelectorDisabled}
+													onChange={(value) => {
+														void updateActiveReasoningEffort(value);
+													}}
+													variant="desktop"
+												/>
+											</div>
+											<ProjectTaskSelector
+												tasks={projectTasks}
+												loading={isLoadingProjectTasks}
+												disabled={taskSelectorDisabled}
+												onSelect={(task) => {
+													void runSelectedTask(task);
+												}}
+												variant="desktop"
+											/>
+											<div className="flex-1" />
+											<ContextUsageMeter
+												inputTokens={activeContextInputTokens}
+												contextWindowTokens={activeContextWindowTokens}
+												estimatedTriggerTokens={activeCompactionTriggerTokens}
+												estimatedTriggerSource={activeCompactionTriggerSource}
+												maxObservedInputTokens={activeMaxObservedInputTokens}
+												inferredCount={activeCompactionInferenceCount}
+												lastInferredBeforeInputTokens={
+													activeLastCompactionBeforeInputTokens
+												}
+												lastInferredAfterInputTokens={
+													activeLastCompactionAfterInputTokens
+												}
+											/>
+										</div>
+										{modelControlError ? (
+											<div className="mt-2 text-xs text-[#ff6e84]">
+												{modelControlError}
+											</div>
+										) : null}
+										{reasoningEffortControlError ? (
+											<div className="mt-2 text-xs text-[#ff6e84]">
+												{reasoningEffortControlError}
+											</div>
+										) : null}
+										{taskControlError ? (
+											<div className="mt-2 text-xs text-[#ff6e84]">
+												{taskControlError}
+											</div>
+										) : null}
+										<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
+											<textarea
+												ref={desktopComposerRef}
+												className="flex-1 overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 placeholder:text-[#adabaa]/50 resize-none font-body px-2"
+												placeholder={
+													selectedThread
+														? `Ask ${APP_TITLE} to generate, refactor, or debug...`
+														: `Create a thread to start chatting with ${APP_TITLE}...`
+												}
+												rows={3}
+												style={{
+													minHeight: `${DESKTOP_COMPOSER_MIN_HEIGHT_PX}px`,
+													maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
+												}}
+												value={chatInput}
+												onChange={onChatInputChange}
+												onKeyDown={onEnter}
+												disabled={
+													!selectedThread ||
+													isSending ||
+													selectedThreadIsWorking ||
+													isThreadLoading
+												}
+											/>
+											<button
+												type="submit"
+												className={`w-10 h-10 flex items-center justify-center rounded-sm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
+												disabled={composerActionDisabled}
+												aria-label={composerActionLabel}
+												title={composerActionLabel}
+											>
+												{materialSymbol(
+													selectedThreadIsWorking ? "stop" : "arrow_forward",
+												)}
+											</button>
+										</div>
 									</div>
-								) : null}
-								{reasoningEffortControlError ? (
-									<div className="mt-2 text-xs text-[#ff6e84]">
-										{reasoningEffortControlError}
-									</div>
-								) : null}
-								{taskControlError ? (
-									<div className="mt-2 text-xs text-[#ff6e84]">
-										{taskControlError}
-									</div>
-								) : null}
-								<div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
-									<textarea
-										ref={desktopComposerRef}
-										className="flex-1 overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 placeholder:text-[#adabaa]/50 resize-none font-body px-2"
-										placeholder={
-											selectedThread
-												? `Ask ${APP_TITLE} to generate, refactor, or debug...`
-												: `Create a thread to start chatting with ${APP_TITLE}...`
-										}
-										rows={3}
-										style={{
-											minHeight: `${DESKTOP_COMPOSER_MIN_HEIGHT_PX}px`,
-											maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
-										}}
-										value={chatInput}
-										onChange={onChatInputChange}
-										onKeyDown={onEnter}
-										disabled={
-											!selectedThread ||
-											isSending ||
-											selectedThreadIsWorking ||
-											isThreadLoading
-										}
-									/>
-									<button
-										type="submit"
-										className={`w-10 h-10 flex items-center justify-center rounded-sm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
-										disabled={composerActionDisabled}
-										aria-label={composerActionLabel}
-										title={composerActionLabel}
-									>
-										{materialSymbol(
-											selectedThreadIsWorking ? "stop" : "arrow_forward",
-										)}
-									</button>
-								</div>
+								</form>
+							</>
+						) : (
+							<div className="min-h-0 flex-1 px-6 py-6">
+								{renderDiffWorkspace({
+									mobile: false,
+								})}
 							</div>
-						</form>
+						)}
 					</section>
 				</main>
 			</div>
@@ -5813,124 +6789,138 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				) : null}
 
 				<main className="mx-auto flex w-full max-w-2xl flex-1 min-h-0 flex-col gap-6 px-4 pt-14 pb-16">
-					<div className="mt-6 shrink-0">
-						<h2 className="font-headline text-[1.85rem] font-extrabold tracking-tight text-[#ffffff] leading-tight">
-							{activeScreenTitle}
-						</h2>
-						<p className="mt-2 text-xs text-[#b3afad]">
-							<span className="text-[#ddd8d5]">
-								{activeScreenSubtitlePrimary}
-							</span>
-							<span className="text-[#7f7c79]">
-								{" "}
-								| {activeScreenSubtitleSecondary}
-							</span>
-						</p>
-					</div>
-					<div
-						ref={mobileChatScrollRef}
-						className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar"
-						onScroll={handleMobileChatScroll}
-					>
-						{renderMobileMessages}
-					</div>
+					{primaryView === "chat" ? (
+						<>
+							<div className="mt-6 shrink-0">
+								<h2 className="font-headline text-[1.85rem] font-extrabold tracking-tight text-[#ffffff] leading-tight">
+									{activeScreenTitle}
+								</h2>
+								<p className="mt-2 text-xs text-[#b3afad]">
+									<span className="text-[#ddd8d5]">
+										{activeScreenSubtitlePrimary}
+									</span>
+									<span className="text-[#7f7c79]">
+										{" "}
+										| {activeScreenSubtitleSecondary}
+									</span>
+								</p>
+							</div>
+							<div
+								ref={mobileChatScrollRef}
+								className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar"
+								onScroll={handleMobileChatScroll}
+							>
+								{renderMobileMessages}
+							</div>
+						</>
+					) : (
+						<div className="flex min-h-0 flex-1 flex-col gap-4 pt-6">
+							{renderDiffWorkspace({
+								mobile: true,
+							})}
+						</div>
+					)}
 				</main>
 
-				<div className="fixed bottom-16 left-0 right-0 px-4 pb-4 z-40">
-					<form
-						className="max-w-2xl mx-auto flex flex-col gap-3"
-						onSubmit={onSubmit}
-					>
-						<div className="overflow-visible rounded-[1.35rem] border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
-							<div className="border-b border-[#313a40] px-2 py-2">
-								<div className="flex items-center gap-2">
-									<div className="min-w-0 flex-1">
-										<CodexModelSelector
-											models={codexModels}
-											value={activeCodexModel}
-											disabled={modelSelectorDisabled}
-											onChange={(value) => {
-												void updateActiveCodexModel(value);
+				{primaryView === "chat" ? (
+					<div className="fixed bottom-16 left-0 right-0 px-4 pb-4 z-40">
+						<form
+							className="max-w-2xl mx-auto flex flex-col gap-3"
+							onSubmit={onSubmit}
+						>
+							<div className="overflow-visible rounded-[1.35rem] border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+								<div className="border-b border-[#313a40] px-2 py-2">
+									<div className="flex items-center gap-2">
+										<div className="min-w-0 flex-1">
+											<CodexModelSelector
+												models={codexModels}
+												value={activeCodexModel}
+												disabled={modelSelectorDisabled}
+												onChange={(value) => {
+													void updateActiveCodexModel(value);
+												}}
+												variant="mobile"
+											/>
+										</div>
+										<div className="w-[6.75rem] shrink-0">
+											<ReasoningEffortSelector
+												options={reasoningEfforts}
+												value={activeReasoningEffort}
+												disabled={reasoningEffortSelectorDisabled}
+												onChange={(value) => {
+													void updateActiveReasoningEffort(value);
+												}}
+												variant="mobile"
+											/>
+										</div>
+										<ProjectTaskSelector
+											tasks={projectTasks}
+											loading={isLoadingProjectTasks}
+											disabled={taskSelectorDisabled}
+											onSelect={(task) => {
+												void runSelectedTask(task);
 											}}
 											variant="mobile"
 										/>
 									</div>
-									<div className="w-[6.75rem] shrink-0">
-										<ReasoningEffortSelector
-											options={reasoningEfforts}
-											value={activeReasoningEffort}
-											disabled={reasoningEffortSelectorDisabled}
-											onChange={(value) => {
-												void updateActiveReasoningEffort(value);
-											}}
-											variant="mobile"
-										/>
-									</div>
-									<ProjectTaskSelector
-										tasks={projectTasks}
-										loading={isLoadingProjectTasks}
-										disabled={taskSelectorDisabled}
-										onSelect={(task) => {
-											void runSelectedTask(task);
+								</div>
+								<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#181b1e] px-2 py-2">
+									<textarea
+										ref={mobileComposerRef}
+										className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
+										placeholder={
+											selectedThread
+												? `Ask ${APP_TITLE}...`
+												: `Create a thread to chat with ${APP_TITLE}...`
+										}
+										rows={1}
+										style={{
+											minHeight: `${MOBILE_COMPOSER_MIN_HEIGHT_PX}px`,
+											maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
 										}}
-										variant="mobile"
+										value={chatInput}
+										onChange={onChatInputChange}
+										onKeyDown={onEnter}
+										disabled={
+											!selectedThread ||
+											isSending ||
+											selectedThreadIsWorking ||
+											isThreadLoading
+										}
 									/>
+									<button
+										className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
+											selectedThreadIsWorking
+												? "bg-[#4b2028] text-[#ffd4da]"
+												: "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
+										}`}
+										type="submit"
+										disabled={composerActionDisabled}
+										aria-label={composerActionLabel}
+										title={composerActionLabel}
+									>
+										{materialSymbol(
+											selectedThreadIsWorking ? "stop" : "arrow_upward",
+										)}
+									</button>
 								</div>
 							</div>
-							<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#181b1e] px-2 py-2">
-								<textarea
-									ref={mobileComposerRef}
-									className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
-									placeholder={
-										selectedThread
-											? `Ask ${APP_TITLE}...`
-											: `Create a thread to chat with ${APP_TITLE}...`
-									}
-									rows={1}
-									style={{
-										minHeight: `${MOBILE_COMPOSER_MIN_HEIGHT_PX}px`,
-										maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
-									}}
-									value={chatInput}
-									onChange={onChatInputChange}
-									onKeyDown={onEnter}
-									disabled={
-										!selectedThread ||
-										isSending ||
-										selectedThreadIsWorking ||
-										isThreadLoading
-									}
-								/>
-								<button
-									className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
-										selectedThreadIsWorking
-											? "bg-[#4b2028] text-[#ffd4da]"
-											: "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
-									}`}
-									type="submit"
-									disabled={composerActionDisabled}
-									aria-label={composerActionLabel}
-									title={composerActionLabel}
-								>
-									{materialSymbol(
-										selectedThreadIsWorking ? "stop" : "arrow_upward",
-									)}
-								</button>
-							</div>
-						</div>
-						{modelControlError ? (
-							<div className="text-xs text-[#ff6e84]">{modelControlError}</div>
-						) : null}
-						{reasoningEffortControlError ? (
-							<div className="text-xs text-[#ff6e84]">
-								{reasoningEffortControlError}
-							</div>
-						) : null}
-						{taskControlError ? (
-							<div className="text-xs text-[#ff6e84]">{taskControlError}</div>
-						) : null}
-					</form>
-				</div>
+							{modelControlError ? (
+								<div className="text-xs text-[#ff6e84]">
+									{modelControlError}
+								</div>
+							) : null}
+							{reasoningEffortControlError ? (
+								<div className="text-xs text-[#ff6e84]">
+									{reasoningEffortControlError}
+								</div>
+							) : null}
+							{taskControlError ? (
+								<div className="text-xs text-[#ff6e84]">{taskControlError}</div>
+							) : null}
+						</form>
+					</div>
+				) : null}
 
 				<div className="fixed bottom-0 left-0 w-full z-50">
 					<div className="w-full h-1 bg-[#000000]">
@@ -5945,18 +6935,38 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								File
 							</span>
 						</div>
-						<div className="flex flex-col items-center justify-center text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6] pt-2">
+						<button
+							type="button"
+							className={`flex flex-col items-center justify-center pt-2 transition-colors ${
+								primaryView === "chat"
+									? "text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6]"
+									: "text-[#adabaa] hover:text-[#f2f0ef]"
+							}`}
+							onClick={() => {
+								setPrimaryView("chat");
+							}}
+						>
 							{brandBoltIcon("text-sm")}
 							<span className="font-label text-[10px] uppercase tracking-widest mt-1">
 								AI Chat
 							</span>
-						</div>
-						<div className="flex flex-col items-center justify-center text-[#adabaa] pt-2 hover:text-[#f2f0ef] transition-colors">
+						</button>
+						<button
+							type="button"
+							className={`flex flex-col items-center justify-center pt-2 transition-colors ${
+								primaryView === "diff"
+									? "text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6]"
+									: "text-[#adabaa] hover:text-[#f2f0ef]"
+							}`}
+							onClick={() => {
+								setPrimaryView("diff");
+							}}
+						>
 							{materialSymbol("difference")}
 							<span className="font-label text-[10px] uppercase tracking-widest mt-1">
 								Diff
 							</span>
-						</div>
+						</button>
 						<div className="flex flex-col items-center justify-center text-[#adabaa] pt-2 hover:text-[#f2f0ef] transition-colors">
 							{materialSymbol("checklist")}
 							<span className="font-label text-[10px] uppercase tracking-widest mt-1">
