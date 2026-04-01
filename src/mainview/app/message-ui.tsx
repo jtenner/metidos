@@ -309,7 +309,11 @@ function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
 
 	return (
 		<div className="overflow-hidden rounded-sm border border-[#252f36] bg-[#111518]">
-			<div className="app-scrollbar max-h-[28rem] overflow-auto text-[11px] leading-5">
+			<div
+				aria-label="Diff content"
+				className="app-scrollbar max-h-[28rem] overflow-auto text-[11px] leading-5"
+				tabIndex={0}
+			>
 				{lines.map((line) => (
 					<div
 						key={line.key}
@@ -617,31 +621,52 @@ export function GitHistoryDiffModal({
 	state: GitHistoryModalState;
 	onClose: () => void;
 }): JSX.Element {
+	const dialogTitleId = `git-history-modal-title-${state.entry.hash}`;
+	const dialogDescriptionId = `git-history-modal-description-${state.entry.hash}`;
+	const dialogBodyId = `git-history-modal-body-${state.entry.hash}`;
+
 	return (
 		<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4">
-			<div className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#35414a] bg-[#101518] shadow-[0_24px_60px_rgba(0,0,0,0.65)]">
+			<div
+				aria-describedby={dialogDescriptionId}
+				aria-labelledby={dialogTitleId}
+				aria-modal="true"
+				className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#35414a] bg-[#101518] shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
+				role="dialog"
+			>
 				<div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#141b1f] px-4 py-4">
 					<div className="min-w-0">
 						<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 							Commit Diff
 						</div>
-						<div className="mt-1 truncate text-sm font-semibold text-[#f2f0ef]">
+						<div
+							className="mt-1 truncate text-sm font-semibold text-[#f2f0ef]"
+							id={dialogTitleId}
+						>
 							{state.entry.subject}
 						</div>
-						<div className="mt-1 text-[11px] text-[#8f9aa2]">
+						<div
+							className="mt-1 text-[11px] text-[#8f9aa2]"
+							id={dialogDescriptionId}
+						>
 							{state.entry.shortHash} · {state.entry.authorName} ·{" "}
 							{formatGitHistoryTimestamp(state.entry.committedAt)}
 						</div>
 					</div>
 					<button
 						type="button"
+						aria-label="Close commit diff"
 						className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 						onClick={onClose}
 					>
 						×
 					</button>
 				</div>
-				<div className="app-scrollbar flex-1 overflow-auto px-4 py-4">
+				<div
+					className="app-scrollbar flex-1 overflow-auto px-4 py-4"
+					id={dialogBodyId}
+					tabIndex={0}
+				>
 					{state.loading ? (
 						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">
 							Loading diff...
