@@ -1,11 +1,11 @@
-import type { CSSProperties, JSX } from "react";
+import { type CSSProperties, type JSX, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { BeatLoader } from "react-spinners";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 
-import { brandBoltIcon } from "../controls/icons";
+import { brandBoltIcon, materialSymbol } from "../controls/icons";
 import type {
 	GitHistoryModalState,
 	MessageGroup,
@@ -399,25 +399,60 @@ export function CommandExecutionMessage({
 	state: "in_progress" | "completed" | "failed" | "stopped";
 	exitCode: number | null;
 }): JSX.Element {
-	return (
-		<div className="space-y-3 rounded-sm border border-[#2c353c] bg-[#13181b] p-4">
-			<div className="flex items-center justify-between gap-4">
-				<div className="min-w-0">
-					<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-						Command
-					</div>
-					<div className="mt-1 truncate font-mono text-sm text-[#f2f0ef]">
-						{command}
-					</div>
+	const hasOutput = output.trim().length > 0;
+	const [isExpanded, setIsExpanded] = useState(false);
+	const stateLabel = commandStateLabel(state, exitCode);
+	const headerContent = (
+		<>
+			<div className="min-w-0 text-left">
+				<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+					Command
 				</div>
-				<div className="shrink-0 rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
-					{commandStateLabel(state, exitCode)}
+				<div className="mt-1 truncate font-mono text-sm text-[#f2f0ef]">
+					{command}
 				</div>
 			</div>
-			{output.trim() ? (
-				<pre className="app-scrollbar max-h-[16rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4]">
-					{output}
-				</pre>
+			<div className="flex shrink-0 items-center gap-2">
+				<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+					{stateLabel}
+				</div>
+				{hasOutput ? (
+					<span className="text-[#8ca6b9]">
+						{materialSymbol(
+							isExpanded ? "expand_less" : "expand_more",
+							"text-base",
+						)}
+					</span>
+				) : null}
+			</div>
+		</>
+	);
+
+	return (
+		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
+			{hasOutput ? (
+				<button
+					type="button"
+					className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
+					onClick={() => {
+						setIsExpanded((current) => !current);
+					}}
+					aria-expanded={isExpanded}
+					aria-label={`Toggle command output for ${command}`}
+				>
+					{headerContent}
+				</button>
+			) : (
+				<div className="flex items-center justify-between gap-4 px-4 py-4">
+					{headerContent}
+				</div>
+			)}
+			{hasOutput && isExpanded ? (
+				<div className="px-4 pb-4">
+					<pre className="app-scrollbar max-h-[16rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4]">
+						{output}
+					</pre>
+				</div>
 			) : null}
 		</div>
 	);
@@ -502,9 +537,36 @@ export function FileChangeMessage({
 				: state === "in_progress"
 					? "Working"
 					: changeLabel;
+	const hasDiff = diffText.trim().length > 0;
+	const [isExpanded, setIsExpanded] = useState(false);
+	const toggleExpanded = (): void => {
+		if (!hasDiff) {
+			return;
+		}
+		setIsExpanded((current) => !current);
+	};
 	return (
-		<div className="space-y-3 rounded-sm border border-[#2c353c] bg-[#13181b] p-4">
-			<div className="flex items-center justify-between gap-4">
+		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
+			<div
+				className={`flex items-center justify-between gap-4 px-4 py-4 ${
+					hasDiff
+						? "cursor-pointer transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
+						: ""
+				}`}
+				aria-expanded={hasDiff ? isExpanded : undefined}
+				onClick={toggleExpanded}
+				onKeyDown={(event) => {
+					if (!hasDiff) {
+						return;
+					}
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						toggleExpanded();
+					}
+				}}
+				role={hasDiff ? "button" : undefined}
+				tabIndex={hasDiff ? 0 : undefined}
+			>
 				<div className="min-w-0">
 					<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 						File Change
@@ -512,15 +574,32 @@ export function FileChangeMessage({
 					<a
 						className="mt-1 block truncate font-mono text-sm text-[#cfe0eb] underline decoration-[#516978] underline-offset-2"
 						href={buildLocalFileHref(path, worktreePath)}
+						onClick={(event) => {
+							event.stopPropagation();
+						}}
 					>
 						{path}
 					</a>
 				</div>
-				<div className="shrink-0 rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
-					{stateLabel}
+				<div className="flex shrink-0 items-center gap-2">
+					<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+						{stateLabel}
+					</div>
+					{hasDiff ? (
+						<span className="text-[#8ca6b9]">
+							{materialSymbol(
+								isExpanded ? "expand_less" : "expand_more",
+								"text-base",
+							)}
+						</span>
+					) : null}
 				</div>
 			</div>
-			{diffText.trim() ? <DiffViewer diffText={diffText} /> : null}
+			{hasDiff && isExpanded ? (
+				<div className="px-4 pb-4">
+					<DiffViewer diffText={diffText} />
+				</div>
+			) : null}
 		</div>
 	);
 }

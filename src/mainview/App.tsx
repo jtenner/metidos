@@ -8,6 +8,7 @@ import {
 	type UIEvent,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -142,6 +143,22 @@ import { SidebarSectionHeader } from "./controls/sidebar-section-header";
 type AppProps = {
 	procedures: ProjectProcedures;
 };
+
+const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
+
+function isScrolledToBottom(container: HTMLDivElement): boolean {
+	return (
+		container.scrollHeight - container.scrollTop - container.clientHeight <=
+		CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX
+	);
+}
+
+function scrollContainerToBottom(container: HTMLDivElement | null): void {
+	if (!container) {
+		return;
+	}
+	container.scrollTop = container.scrollHeight;
+}
 
 declare global {
 	interface Window {
@@ -279,7 +296,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
 	const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
 	const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
+	const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
+	const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
 	const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
+	const desktopChatPinnedToBottomRef = useRef(true);
+	const mobileChatPinnedToBottomRef = useRef(true);
+	const chatScrollThreadIdRef = useRef<number | null>(
+		initialMainviewState.selectedThreadId,
+	);
 	const projectActionMenuRequestId = useRef(0);
 	const projectTasksRequestIdRef = useRef(0);
 	const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
@@ -4293,6 +4317,40 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		return groups;
 	}, [visibleMessages]);
 
+	const handleDesktopChatScroll = useCallback(
+		(event: UIEvent<HTMLDivElement>) => {
+			desktopChatPinnedToBottomRef.current = isScrolledToBottom(
+				event.currentTarget,
+			);
+		},
+		[],
+	);
+
+	const handleMobileChatScroll = useCallback(
+		(event: UIEvent<HTMLDivElement>) => {
+			mobileChatPinnedToBottomRef.current = isScrolledToBottom(
+				event.currentTarget,
+			);
+		},
+		[],
+	);
+
+	useLayoutEffect(() => {
+		void visibleMessages;
+		const threadChanged = chatScrollThreadIdRef.current !== selectedThreadId;
+		if (threadChanged) {
+			desktopChatPinnedToBottomRef.current = true;
+			mobileChatPinnedToBottomRef.current = true;
+		}
+		if (desktopChatPinnedToBottomRef.current) {
+			scrollContainerToBottom(desktopChatScrollRef.current);
+		}
+		if (mobileChatPinnedToBottomRef.current) {
+			scrollContainerToBottom(mobileChatScrollRef.current);
+		}
+		chatScrollThreadIdRef.current = selectedThreadId;
+	}, [selectedThreadId, visibleMessages]);
+
 	const renderDesktopMessages = groupedVisibleMessages.map((group) => {
 		if (group.kind === "assistant") {
 			return (
@@ -5593,7 +5651,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</aside>
 
 					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
-						<div className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar">
+						<div
+							ref={desktopChatScrollRef}
+							className="flex-1 overflow-y-auto px-6 py-8 space-y-8 hide-scrollbar"
+							onScroll={handleDesktopChatScroll}
+						>
 							<div className="max-w-4xl mx-auto mb-12">
 								<h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
 									{activeScreenTitle}
@@ -5765,7 +5827,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</span>
 						</p>
 					</div>
-					<div className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar">
+					<div
+						ref={mobileChatScrollRef}
+						className="flex flex-1 min-h-0 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar"
+						onScroll={handleMobileChatScroll}
+					>
 						{renderMobileMessages}
 					</div>
 				</main>
