@@ -102,7 +102,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   const openProjectPaths = useOpenProjectPaths();
 
   return (
-    <section>
+    <section className="select-none">
       <SidebarSectionHeader
         title="Projects"
         open={projectsOpen}
@@ -130,7 +130,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                 <div className="relative mt-2 space-y-2">
                   <div className="flex items-start gap-2">
                     <input
-                      className={`min-w-0 flex-1 border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
+                      className={`min-w-0 flex-1 select-text border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
                         addProjectInputIsPreviewing
                           ? "border-[#9fc1da] bg-[#1a2025] text-[#ffffff] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
                           : "border-[#3b3b3b] bg-[#101010] text-[#f2f0ef]"

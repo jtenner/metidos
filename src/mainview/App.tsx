@@ -5452,7 +5452,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const projectActionMenuPanel =
     projectActionMenu && projectActionMenuProject ? (
       <div
-        className="fixed z-[90] w-80 overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+        className="fixed z-[90] w-80 select-none overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
         ref={projectActionMenuRef}
         style={{
           left: projectActionMenu.x,
@@ -5517,7 +5517,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           <div className="mt-2 flex items-center gap-2">
             <input
               id="new-worktree-name"
-              className="min-w-0 flex-1 border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+              className="min-w-0 flex-1 select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
               placeholder="feature/new-worktree"
               value={newWorktreeName}
               onChange={(event) => {
@@ -5546,7 +5546,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const threadActionMenuPanel =
     threadActionMenu && threadActionMenuThread ? (
       <div
-        className="fixed z-[95] w-80 overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+        className="fixed z-[95] w-80 select-none overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
         ref={threadActionMenuRef}
         style={{
           left: threadActionMenu.x,
@@ -5598,7 +5598,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           <div className="mt-2 flex items-center gap-2">
             <input
               id="thread-rename-title"
-              className="min-w-0 flex-1 border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+              className="min-w-0 flex-1 select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
               value={threadRenameTitle}
               onChange={(event) => {
                 setThreadActionMenuError("");
@@ -5617,7 +5617,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           </label>
           <textarea
             id="thread-rename-summary"
-            className="mt-2 min-h-[5.5rem] w-full border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+            className="mt-2 min-h-[5.5rem] w-full select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
             placeholder="Optional desktop hover summary."
             value={threadRenameSummary}
             onChange={(event) => {
@@ -5696,7 +5696,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const renderSidebarHero = (
     collapseControl: JSX.Element | null,
   ): JSX.Element => (
-    <div className="border border-[#232b30] bg-[#171b1d] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="select-none border border-[#232b30] bg-[#171b1d] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="flex items-start gap-2.5">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[#1b2a34] text-[#7aa5c4] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
           {materialSymbol("folder", "text-[18px]")}
@@ -5716,7 +5716,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
 
   const sidebarSections = (
-    <div className="space-y-5">
+    <div className="select-none space-y-5">
       <ProjectsPanel
         addProjectError={addProjectError}
         addProjectInputIsPreviewing={addProjectInputIsPreviewing}

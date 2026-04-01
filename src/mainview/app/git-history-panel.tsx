@@ -96,7 +96,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
   );
 
   return (
-    <section>
+    <section className="select-none">
       <SidebarSectionHeader
         title="Git History"
         open={gitHistoryOpen}

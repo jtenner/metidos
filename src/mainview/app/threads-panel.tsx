@@ -84,7 +84,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   const threadsOpen = useThreadsPanelOpen();
 
   return (
-    <section>
+    <section className="select-none">
       <SidebarSectionHeader
         title="Threads"
         open={threadsOpen}
