@@ -138,7 +138,7 @@ body {
 .message-markdown ol,
 .message-markdown blockquote,
 .message-markdown hr {
-  margin: 0.75rem 0;
+  margin: 0.95rem 0;
 }
 
 .message-markdown h1,

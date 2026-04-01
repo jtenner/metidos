@@ -96,9 +96,14 @@ const markdownComponents: Components = {
 
 export function MarkdownMessage({ text }: { text: string }): JSX.Element {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-      {text}
-    </ReactMarkdown>
+    <div className="message-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
   );
 }
 
