@@ -1,304 +1,304 @@
 import {
-	DEFAULT_GIT_HISTORY_PAGE_SIZE,
-	type GitCommandOptions,
-	type GitCommandPriority,
-	normalizeGitCommandOptions,
-	readGitCommitDiffResult,
-	readGitHistoryPageEntries,
+  DEFAULT_GIT_HISTORY_PAGE_SIZE,
+  type GitCommandOptions,
+  type GitCommandPriority,
+  normalizeGitCommandOptions,
+  readGitCommitDiffResult,
+  readGitHistoryPageEntries,
 } from "../git";
 import type {
-	RpcGitCommitDiffResult,
-	RpcGitHistoryEntry,
-	RpcWorktreeGitHistoryResult,
-	RpcWorktreeGitHistorySummary,
+  RpcGitCommitDiffResult,
+  RpcGitHistoryEntry,
+  RpcWorktreeGitHistoryResult,
+  RpcWorktreeGitHistorySummary,
 } from "../rpc-schema";
 import {
-	awaitAbortableResult,
-	createAbortError,
-	readLruValue,
-	throwIfAborted,
-	writeLruValue,
+  awaitAbortableResult,
+  createAbortError,
+  readLruValue,
+  throwIfAborted,
+  writeLruValue,
 } from "./shared";
 
 const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
 
 export type PendingGitCommitDiffRequest = {
-	controller: AbortController;
-	promise: Promise<RpcGitCommitDiffResult>;
-	waiterCount: number;
+  controller: AbortController;
+  promise: Promise<RpcGitCommitDiffResult>;
+  waiterCount: number;
 };
 
 export type PendingGitHistoryPrefetch = {
-	controller: AbortController;
-	priority: GitCommandPriority;
-	promise: Promise<void>;
+  controller: AbortController;
+  priority: GitCommandPriority;
+  promise: Promise<void>;
 };
 
 export type WorktreeGitHistoryCacheState = {
-	history: RpcWorktreeGitHistorySummary;
-	historyEntries: RpcGitHistoryEntry[];
-	historyNextOffset: number | null;
-	historyPrefetch: PendingGitHistoryPrefetch | null;
-	historySignature: string | null;
+  history: RpcWorktreeGitHistorySummary;
+  historyEntries: RpcGitHistoryEntry[];
+  historyNextOffset: number | null;
+  historyPrefetch: PendingGitHistoryPrefetch | null;
+  historySignature: string | null;
 };
 
 export function applyGitHistoryCachePage(
-	worktreeState: WorktreeGitHistoryCacheState,
-	offset: number,
-	page: {
-		entries: RpcGitHistoryEntry[];
-		nextOffset: number | null;
-	},
+  worktreeState: WorktreeGitHistoryCacheState,
+  offset: number,
+  page: {
+    entries: RpcGitHistoryEntry[];
+    nextOffset: number | null;
+  },
 ): void {
-	const prefix = worktreeState.historyEntries.slice(0, offset);
-	worktreeState.historyEntries = [...prefix, ...page.entries];
-	worktreeState.historyNextOffset = page.nextOffset;
+  const prefix = worktreeState.historyEntries.slice(0, offset);
+  worktreeState.historyEntries = [...prefix, ...page.entries];
+  worktreeState.historyNextOffset = page.nextOffset;
 }
 
 function hasGitHistoryCacheRange(
-	worktreeState: WorktreeGitHistoryCacheState,
-	offset: number,
-	limit: number,
+  worktreeState: WorktreeGitHistoryCacheState,
+  offset: number,
+  limit: number,
 ): boolean {
-	if (worktreeState.historyEntries.length >= offset + limit) {
-		return true;
-	}
+  if (worktreeState.historyEntries.length >= offset + limit) {
+    return true;
+  }
 
-	return (
-		worktreeState.historyNextOffset === null &&
-		worktreeState.historyEntries.length >= offset
-	);
+  return (
+    worktreeState.historyNextOffset === null &&
+    worktreeState.historyEntries.length >= offset
+  );
 }
 
 export function buildGitHistoryResultFromCache(
-	worktreeState: WorktreeGitHistoryCacheState,
-	limit: number,
-	offset: number,
+  worktreeState: WorktreeGitHistoryCacheState,
+  limit: number,
+  offset: number,
 ): RpcWorktreeGitHistoryResult {
-	const endOffset = Math.min(
-		offset + limit,
-		worktreeState.historyEntries.length,
-	);
+  const endOffset = Math.min(
+    offset + limit,
+    worktreeState.historyEntries.length,
+  );
 
-	return {
-		...worktreeState.history,
-		entries: worktreeState.historyEntries.slice(offset, endOffset),
-		limit,
-		nextOffset:
-			endOffset < worktreeState.historyEntries.length
-				? endOffset
-				: worktreeState.historyNextOffset,
-	};
+  return {
+    ...worktreeState.history,
+    entries: worktreeState.historyEntries.slice(offset, endOffset),
+    limit,
+    nextOffset:
+      endOffset < worktreeState.historyEntries.length
+        ? endOffset
+        : worktreeState.historyNextOffset,
+  };
 }
 
 export function abortGitHistoryPrefetch(
-	worktreeState: WorktreeGitHistoryCacheState,
-	reason: string,
+  worktreeState: WorktreeGitHistoryCacheState,
+  reason: string,
 ): void {
-	const prefetch = worktreeState.historyPrefetch;
-	if (!prefetch) {
-		return;
-	}
+  const prefetch = worktreeState.historyPrefetch;
+  if (!prefetch) {
+    return;
+  }
 
-	if (worktreeState.historyPrefetch === prefetch) {
-		worktreeState.historyPrefetch = null;
-	}
-	prefetch.controller.abort(createAbortError(null, reason));
+  if (worktreeState.historyPrefetch === prefetch) {
+    worktreeState.historyPrefetch = null;
+  }
+  prefetch.controller.abort(createAbortError(null, reason));
 }
 
 export async function fillGitHistoryCache(
-	worktreeState: WorktreeGitHistoryCacheState,
-	worktreePath: string,
-	offset: number,
-	limit: number,
-	options?: GitCommandPriority | GitCommandOptions,
+  worktreeState: WorktreeGitHistoryCacheState,
+  worktreePath: string,
+  offset: number,
+  limit: number,
+  options?: GitCommandPriority | GitCommandOptions,
 ): Promise<void> {
-	const normalizedOptions = normalizeGitCommandOptions(options);
-	while (
-		!hasGitHistoryCacheRange(worktreeState, offset, limit) &&
-		worktreeState.historyNextOffset !== null
-	) {
-		throwIfAborted(
-			normalizedOptions.signal,
-			"Git history cache fill was aborted.",
-		);
-		const currentPrefetch = worktreeState.historyPrefetch;
-		if (
-			currentPrefetch &&
-			normalizedOptions.priority === "foreground" &&
-			currentPrefetch.priority === "background"
-		) {
-			abortGitHistoryPrefetch(
-				worktreeState,
-				`Foreground git history request replaced background warming for ${worktreePath}.`,
-			);
-			continue;
-		}
-		if (currentPrefetch) {
-			await awaitAbortableResult(
-				currentPrefetch.promise,
-				normalizedOptions.signal,
-				"Git history cache fill was aborted.",
-			);
-			continue;
-		}
+  const normalizedOptions = normalizeGitCommandOptions(options);
+  while (
+    !hasGitHistoryCacheRange(worktreeState, offset, limit) &&
+    worktreeState.historyNextOffset !== null
+  ) {
+    throwIfAborted(
+      normalizedOptions.signal,
+      "Git history cache fill was aborted.",
+    );
+    const currentPrefetch = worktreeState.historyPrefetch;
+    if (
+      currentPrefetch &&
+      normalizedOptions.priority === "foreground" &&
+      currentPrefetch.priority === "background"
+    ) {
+      abortGitHistoryPrefetch(
+        worktreeState,
+        `Foreground git history request replaced background warming for ${worktreePath}.`,
+      );
+      continue;
+    }
+    if (currentPrefetch) {
+      await awaitAbortableResult(
+        currentPrefetch.promise,
+        normalizedOptions.signal,
+        "Git history cache fill was aborted.",
+      );
+      continue;
+    }
 
-		const expectedSignature = worktreeState.historySignature;
-		const fetchOffset = worktreeState.historyEntries.length;
-		const fetchLimit = Math.max(
-			GIT_HISTORY_PREFETCH_CHUNK_SIZE,
-			offset + limit - fetchOffset,
-		);
-		const controller = new AbortController();
-		const prefetch: PendingGitHistoryPrefetch = {
-			controller,
-			priority: normalizedOptions.priority,
-			promise: Promise.resolve(),
-		};
-		const promise = (async () => {
-			try {
-				const page = await readGitHistoryPageEntries(
-					worktreePath,
-					fetchOffset,
-					fetchLimit,
-					{
-						priority: normalizedOptions.priority,
-						signal: controller.signal,
-					},
-				);
-				if (
-					worktreeState.historySignature !== expectedSignature ||
-					worktreeState.historyEntries.length !== fetchOffset
-				) {
-					return;
-				}
-				applyGitHistoryCachePage(worktreeState, fetchOffset, page);
-			} finally {
-				if (worktreeState.historyPrefetch === prefetch) {
-					worktreeState.historyPrefetch = null;
-				}
-			}
-		})();
-		prefetch.promise = promise;
-		worktreeState.historyPrefetch = prefetch;
-		await awaitAbortableResult(
-			promise,
-			normalizedOptions.signal,
-			"Git history cache fill was aborted.",
-		);
-	}
+    const expectedSignature = worktreeState.historySignature;
+    const fetchOffset = worktreeState.historyEntries.length;
+    const fetchLimit = Math.max(
+      GIT_HISTORY_PREFETCH_CHUNK_SIZE,
+      offset + limit - fetchOffset,
+    );
+    const controller = new AbortController();
+    const prefetch: PendingGitHistoryPrefetch = {
+      controller,
+      priority: normalizedOptions.priority,
+      promise: Promise.resolve(),
+    };
+    const promise = (async () => {
+      try {
+        const page = await readGitHistoryPageEntries(
+          worktreePath,
+          fetchOffset,
+          fetchLimit,
+          {
+            priority: normalizedOptions.priority,
+            signal: controller.signal,
+          },
+        );
+        if (
+          worktreeState.historySignature !== expectedSignature ||
+          worktreeState.historyEntries.length !== fetchOffset
+        ) {
+          return;
+        }
+        applyGitHistoryCachePage(worktreeState, fetchOffset, page);
+      } finally {
+        if (worktreeState.historyPrefetch === prefetch) {
+          worktreeState.historyPrefetch = null;
+        }
+      }
+    })();
+    prefetch.promise = promise;
+    worktreeState.historyPrefetch = prefetch;
+    await awaitAbortableResult(
+      promise,
+      normalizedOptions.signal,
+      "Git history cache fill was aborted.",
+    );
+  }
 }
 
 export function warmGitHistoryCache(
-	worktreeState: WorktreeGitHistoryCacheState,
-	worktreePath: string,
-	onBackgroundError: (message: string, error: unknown) => void,
+  worktreeState: WorktreeGitHistoryCacheState,
+  worktreePath: string,
+  onBackgroundError: (message: string, error: unknown) => void,
 ): void {
-	if (
-		worktreeState.historyNextOffset === null ||
-		worktreeState.historyPrefetch
-	) {
-		return;
-	}
+  if (
+    worktreeState.historyNextOffset === null ||
+    worktreeState.historyPrefetch
+  ) {
+    return;
+  }
 
-	void fillGitHistoryCache(
-		worktreeState,
-		worktreePath,
-		worktreeState.historyEntries.length,
-		DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
-		"background",
-	).catch((error) => {
-		onBackgroundError(`Git history prefetch failed for ${worktreePath}`, error);
-	});
+  void fillGitHistoryCache(
+    worktreeState,
+    worktreePath,
+    worktreeState.historyEntries.length,
+    DEFAULT_GIT_HISTORY_PAGE_SIZE + 1,
+    "background",
+  ).catch((error) => {
+    onBackgroundError(`Git history prefetch failed for ${worktreePath}`, error);
+  });
 }
 
 export function gitCommitDiffCacheKey(
-	worktreePath: string,
-	commitHash: string,
+  worktreePath: string,
+  commitHash: string,
 ): string {
-	return `${worktreePath}\n${commitHash}`;
+  return `${worktreePath}\n${commitHash}`;
 }
 
 export async function getCachedGitCommitDiffResult(
-	projectId: number,
-	worktreePath: string,
-	commitHash: string,
-	options: {
-		gitCommitDiffCache: Map<string, RpcGitCommitDiffResult>;
-		gitCommitDiffRequestCache: Map<string, PendingGitCommitDiffRequest>;
-		maxEntries: number;
-		requestOptions?: GitCommandPriority | GitCommandOptions | undefined;
-	},
+  projectId: number,
+  worktreePath: string,
+  commitHash: string,
+  options: {
+    gitCommitDiffCache: Map<string, RpcGitCommitDiffResult>;
+    gitCommitDiffRequestCache: Map<string, PendingGitCommitDiffRequest>;
+    maxEntries: number;
+    requestOptions?: GitCommandPriority | GitCommandOptions | undefined;
+  },
 ): Promise<RpcGitCommitDiffResult> {
-	const normalizedOptions = normalizeGitCommandOptions(options.requestOptions);
-	const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
-	const cached = readLruValue(options.gitCommitDiffCache, cacheKey);
-	if (cached) {
-		return cached;
-	}
+  const normalizedOptions = normalizeGitCommandOptions(options.requestOptions);
+  const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
+  const cached = readLruValue(options.gitCommitDiffCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
 
-	const pending = options.gitCommitDiffRequestCache.get(cacheKey);
-	if (pending) {
-		pending.waiterCount += 1;
-		try {
-			return await awaitAbortableResult(
-				pending.promise,
-				normalizedOptions.signal,
-				"Commit diff read was aborted.",
-			);
-		} finally {
-			pending.waiterCount = Math.max(0, pending.waiterCount - 1);
-			if (
-				pending.waiterCount === 0 &&
-				options.gitCommitDiffRequestCache.get(cacheKey) === pending
-			) {
-				pending.controller.abort(
-					createAbortError(null, "Commit diff read was aborted."),
-				);
-			}
-		}
-	}
+  const pending = options.gitCommitDiffRequestCache.get(cacheKey);
+  if (pending) {
+    pending.waiterCount += 1;
+    try {
+      return await awaitAbortableResult(
+        pending.promise,
+        normalizedOptions.signal,
+        "Commit diff read was aborted.",
+      );
+    } finally {
+      pending.waiterCount = Math.max(0, pending.waiterCount - 1);
+      if (
+        pending.waiterCount === 0 &&
+        options.gitCommitDiffRequestCache.get(cacheKey) === pending
+      ) {
+        pending.controller.abort(
+          createAbortError(null, "Commit diff read was aborted."),
+        );
+      }
+    }
+  }
 
-	const controller = new AbortController();
-	const pendingRequest: PendingGitCommitDiffRequest = {
-		controller,
-		promise: Promise.resolve(null as never),
-		waiterCount: 1,
-	};
-	const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
-		priority: normalizedOptions.priority,
-		signal: controller.signal,
-	})
-		.then((result) => {
-			writeLruValue(
-				options.gitCommitDiffCache,
-				cacheKey,
-				result,
-				options.maxEntries,
-			);
-			return result;
-		})
-		.finally(() => {
-			if (options.gitCommitDiffRequestCache.get(cacheKey) === pendingRequest) {
-				options.gitCommitDiffRequestCache.delete(cacheKey);
-			}
-		});
-	pendingRequest.promise = promise;
-	options.gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
+  const controller = new AbortController();
+  const pendingRequest: PendingGitCommitDiffRequest = {
+    controller,
+    promise: Promise.resolve(null as never),
+    waiterCount: 1,
+  };
+  const promise = readGitCommitDiffResult(projectId, worktreePath, commitHash, {
+    priority: normalizedOptions.priority,
+    signal: controller.signal,
+  })
+    .then((result) => {
+      writeLruValue(
+        options.gitCommitDiffCache,
+        cacheKey,
+        result,
+        options.maxEntries,
+      );
+      return result;
+    })
+    .finally(() => {
+      if (options.gitCommitDiffRequestCache.get(cacheKey) === pendingRequest) {
+        options.gitCommitDiffRequestCache.delete(cacheKey);
+      }
+    });
+  pendingRequest.promise = promise;
+  options.gitCommitDiffRequestCache.set(cacheKey, pendingRequest);
 
-	try {
-		return await awaitAbortableResult(
-			promise,
-			normalizedOptions.signal,
-			"Commit diff read was aborted.",
-		);
-	} finally {
-		pendingRequest.waiterCount = Math.max(0, pendingRequest.waiterCount - 1);
-		if (
-			pendingRequest.waiterCount === 0 &&
-			options.gitCommitDiffRequestCache.get(cacheKey) === pendingRequest
-		) {
-			controller.abort(createAbortError(null, "Commit diff read was aborted."));
-		}
-	}
+  try {
+    return await awaitAbortableResult(
+      promise,
+      normalizedOptions.signal,
+      "Commit diff read was aborted.",
+    );
+  } finally {
+    pendingRequest.waiterCount = Math.max(0, pendingRequest.waiterCount - 1);
+    if (
+      pendingRequest.waiterCount === 0 &&
+      options.gitCommitDiffRequestCache.get(cacheKey) === pendingRequest
+    ) {
+      controller.abort(createAbortError(null, "Commit diff read was aborted."));
+    }
+  }
 }

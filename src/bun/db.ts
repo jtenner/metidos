@@ -10,234 +10,234 @@ export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
 let appDatabase: Database | null = null;
 
 type ProjectInput = {
-	projectPath: string;
-	name?: string | null;
+  projectPath: string;
+  name?: string | null;
 };
 
 type ThreadInput = {
-	projectId: number;
-	worktreePath: string;
-	title: string;
-	model: string;
-	reasoningEffort: string;
-	codexThreadId?: string | null;
+  projectId: number;
+  worktreePath: string;
+  title: string;
+  model: string;
+  reasoningEffort: string;
+  codexThreadId?: string | null;
 };
 
 type ThreadUsageInput = {
-	inputTokens: number;
-	cachedInputTokens: number;
-	outputTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
 };
 
 type ThreadCompactionStatsInput = {
-	maxInputTokens: number;
-	estimatedCompactionTriggerTokens: number | null;
-	compactionCount: number;
-	lastCompactionAt: string | null;
-	lastCompactionBeforeInputTokens: number | null;
-	lastCompactionAfterInputTokens: number | null;
+  maxInputTokens: number;
+  estimatedCompactionTriggerTokens: number | null;
+  compactionCount: number;
+  lastCompactionAt: string | null;
+  lastCompactionBeforeInputTokens: number | null;
+  lastCompactionAfterInputTokens: number | null;
 };
 
 type ThreadMessageInput = {
-	threadId: number;
-	role: "assistant" | "user";
-	text: string;
+  threadId: number;
+  role: "assistant" | "user";
+  text: string;
 };
 
 type ThreadActivityKind =
-	| "chat"
-	| "reasoning"
-	| "command"
-	| "file_change"
-	| "tool_call";
+  | "chat"
+  | "reasoning"
+  | "command"
+  | "file_change"
+  | "tool_call";
 
 type ThreadActivityInput = {
-	threadId: number;
-	itemId: string;
-	role?: "assistant" | "user";
-	kind: ThreadActivityKind;
-	text: string;
-	state: string | null;
-	payloadJson?: string | null;
+  threadId: number;
+  itemId: string;
+  role?: "assistant" | "user";
+  kind: ThreadActivityKind;
+  text: string;
+  state: string | null;
+  payloadJson?: string | null;
 };
 
 export type ProjectRecord = {
-	id: number;
-	path: string;
-	name: string;
-	gitRemote: string | null;
-	isOpen: 1 | 0;
-	createdAt: string;
-	updatedAt: string;
-	lastOpenedAt: string;
+  id: number;
+  path: string;
+  name: string;
+  gitRemote: string | null;
+  isOpen: 1 | 0;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string;
 };
 
 export type ThreadRecord = {
-	id: number;
-	projectId: number;
-	worktreePath: string;
-	title: string;
-	summary: string | null;
-	model: string;
-	reasoningEffort: string;
-	codexThreadId: string | null;
-	pinnedAt: string | null;
-	createdAt: string;
-	updatedAt: string;
-	lastRunAt: string | null;
-	lastInputTokens: number | null;
-	lastCachedInputTokens: number | null;
-	lastOutputTokens: number | null;
-	maxInputTokens: number | null;
-	estimatedCompactionTriggerTokens: number | null;
-	compactionCount: number;
-	lastCompactionAt: string | null;
-	lastCompactionBeforeInputTokens: number | null;
-	lastCompactionAfterInputTokens: number | null;
-	activeTurnStartedAt: string | null;
-	lastErrorAt: string | null;
-	lastErrorSeenAt: string | null;
-	lastErrorMessage: string | null;
+  id: number;
+  projectId: number;
+  worktreePath: string;
+  title: string;
+  summary: string | null;
+  model: string;
+  reasoningEffort: string;
+  codexThreadId: string | null;
+  pinnedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt: string | null;
+  lastInputTokens: number | null;
+  lastCachedInputTokens: number | null;
+  lastOutputTokens: number | null;
+  maxInputTokens: number | null;
+  estimatedCompactionTriggerTokens: number | null;
+  compactionCount: number;
+  lastCompactionAt: string | null;
+  lastCompactionBeforeInputTokens: number | null;
+  lastCompactionAfterInputTokens: number | null;
+  activeTurnStartedAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorSeenAt: string | null;
+  lastErrorMessage: string | null;
 };
 
 export type ThreadMessageRecord = {
-	id: number;
-	threadId: number;
-	role: "assistant" | "user";
-	kind: ThreadActivityKind;
-	itemId: string | null;
-	text: string;
-	state: string | null;
-	payloadJson: string | null;
-	createdAt: string;
-	updatedAt: string;
+  id: number;
+  threadId: number;
+  role: "assistant" | "user";
+  kind: ThreadActivityKind;
+  itemId: string | null;
+  text: string;
+  state: string | null;
+  payloadJson: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ProjectWorktreePinRecord = {
-	projectId: number;
-	worktreePath: string;
-	pinnedAt: string;
+  projectId: number;
+  worktreePath: string;
+  pinnedAt: string;
 };
 
 export type InProgressThreadMessageRecord = {
-	threadId: number;
-	lastUpdatedAt: string;
+  threadId: number;
+  lastUpdatedAt: string;
 };
 
 const DEFAULT_APP_DATA_DIR =
-	process.platform === "darwin"
-		? join(homedir(), "Library", "Application Support", APP_NAME)
-		: process.platform === "win32"
-			? join(
-					process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
-					APP_NAME,
-				)
-			: join(
-					process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
-					APP_NAME,
-				);
+  process.platform === "darwin"
+    ? join(homedir(), "Library", "Application Support", APP_NAME)
+    : process.platform === "win32"
+      ? join(
+          process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
+          APP_NAME,
+        )
+      : join(
+          process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
+          APP_NAME,
+        );
 const TEMP_APP_DATA_DIR = join(tmpdir(), APP_NAME);
 let resolvedAppDataDir: string | null = null;
 
 function runStatement(
-	database: Database,
-	sql: string,
-	...bindings: SQLQueryBindings[]
+  database: Database,
+  sql: string,
+  ...bindings: SQLQueryBindings[]
 ): ReturnType<Database["run"]> {
-	return bindings.length === 0
-		? database.run(sql)
-		: database.run(sql, bindings);
+  return bindings.length === 0
+    ? database.run(sql)
+    : database.run(sql, bindings);
 }
 
 function ensureAppDirectory(appDataPath: string): void {
-	if (!existsSync(appDataPath)) {
-		mkdirSync(appDataPath, { recursive: true });
-	}
+  if (!existsSync(appDataPath)) {
+    mkdirSync(appDataPath, { recursive: true });
+  }
 }
 
 function isWritableDirectory(path: string): boolean {
-	try {
-		ensureAppDirectory(path);
-		const testFilePath = join(
-			path,
-			`.write-test-${process.pid}-${Date.now().toString(36)}`,
-		);
-		writeFileSync(testFilePath, "");
-		unlinkSync(testFilePath);
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    ensureAppDirectory(path);
+    const testFilePath = join(
+      path,
+      `.write-test-${process.pid}-${Date.now().toString(36)}`,
+    );
+    writeFileSync(testFilePath, "");
+    unlinkSync(testFilePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolveAppDataDirectory(): string {
-	if (resolvedAppDataDir) {
-		return resolvedAppDataDir;
-	}
+  if (resolvedAppDataDir) {
+    return resolvedAppDataDir;
+  }
 
-	const configuredAppDataDir = process.env.JOLT_APP_DATA_DIR?.trim();
-	const candidates = [
-		configuredAppDataDir || null,
-		DEFAULT_APP_DATA_DIR,
-		TEMP_APP_DATA_DIR,
-	].filter((value): value is string => Boolean(value));
+  const configuredAppDataDir = process.env.JOLT_APP_DATA_DIR?.trim();
+  const candidates = [
+    configuredAppDataDir || null,
+    DEFAULT_APP_DATA_DIR,
+    TEMP_APP_DATA_DIR,
+  ].filter((value): value is string => Boolean(value));
 
-	for (const candidate of candidates) {
-		if (!isWritableDirectory(candidate)) {
-			continue;
-		}
-		resolvedAppDataDir = candidate;
-		return candidate;
-	}
+  for (const candidate of candidates) {
+    if (!isWritableDirectory(candidate)) {
+      continue;
+    }
+    resolvedAppDataDir = candidate;
+    return candidate;
+  }
 
-	throw new Error(
-		[
-			"Unable to find a writable application data directory.",
-			configuredAppDataDir
-				? `Checked JOLT_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
-				: `Checked ${DEFAULT_APP_DATA_DIR} and ${TEMP_APP_DATA_DIR}.`,
-		].join(" "),
-	);
+  throw new Error(
+    [
+      "Unable to find a writable application data directory.",
+      configuredAppDataDir
+        ? `Checked JOLT_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
+        : `Checked ${DEFAULT_APP_DATA_DIR} and ${TEMP_APP_DATA_DIR}.`,
+    ].join(" "),
+  );
 }
 
 function tableHasColumn(
-	db: Database,
-	tableName: string,
-	columnName: string,
+  db: Database,
+  tableName: string,
+  columnName: string,
 ): boolean {
-	return db
-		.query<{ name: string }, []>(`PRAGMA table_info(${tableName})`)
-		.all()
-		.some((column) => column.name === columnName);
+  return db
+    .query<{ name: string }, []>(`PRAGMA table_info(${tableName})`)
+    .all()
+    .some((column) => column.name === columnName);
 }
 
 function ensureThreadColumn(
-	db: Database,
-	columnName: string,
-	columnDefinition: string,
+  db: Database,
+  columnName: string,
+  columnDefinition: string,
 ): void {
-	if (!tableHasColumn(db, "threads", columnName)) {
-		runStatement(db, `ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
-	}
+  if (!tableHasColumn(db, "threads", columnName)) {
+    runStatement(db, `ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
+  }
 }
 
 function ensureThreadMessageColumn(
-	db: Database,
-	columnName: string,
-	columnDefinition: string,
+  db: Database,
+  columnName: string,
+  columnDefinition: string,
 ): void {
-	if (!tableHasColumn(db, "thread_messages", columnName)) {
-		runStatement(
-			db,
-			`ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`,
-		);
-	}
+  if (!tableHasColumn(db, "thread_messages", columnName)) {
+    runStatement(
+      db,
+      `ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`,
+    );
+  }
 }
 
 function migrate(db: Database): void {
-	runStatement(
-		db,
-		`
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS projects (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 			path TEXT NOT NULL UNIQUE,
@@ -249,10 +249,10 @@ function migrate(db: Database): void {
 				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS project_worktrees (
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 				worktree_path TEXT NOT NULL,
@@ -260,10 +260,10 @@ function migrate(db: Database): void {
 				PRIMARY KEY (project_id, worktree_path)
 			);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS threads (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -292,73 +292,73 @@ function migrate(db: Database): void {
 				last_error_message TEXT
 			);
 		`,
-	);
-	ensureThreadColumn(db, "last_input_tokens", "last_input_tokens INTEGER");
-	ensureThreadColumn(
-		db,
-		"last_cached_input_tokens",
-		"last_cached_input_tokens INTEGER",
-	);
-	ensureThreadColumn(db, "last_output_tokens", "last_output_tokens INTEGER");
-	ensureThreadColumn(db, "max_input_tokens", "max_input_tokens INTEGER");
-	ensureThreadColumn(
-		db,
-		"estimated_compaction_trigger_tokens",
-		"estimated_compaction_trigger_tokens INTEGER",
-	);
-	ensureThreadColumn(
-		db,
-		"compaction_count",
-		"compaction_count INTEGER NOT NULL DEFAULT 0",
-	);
-	ensureThreadColumn(db, "last_compaction_at", "last_compaction_at TEXT");
-	ensureThreadColumn(
-		db,
-		"last_compaction_before_input_tokens",
-		"last_compaction_before_input_tokens INTEGER",
-	);
-	ensureThreadColumn(
-		db,
-		"last_compaction_after_input_tokens",
-		"last_compaction_after_input_tokens INTEGER",
-	);
-	ensureThreadColumn(
-		db,
-		"active_turn_started_at",
-		"active_turn_started_at TEXT",
-	);
-	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
-	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
-	ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
-	ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
-	ensureThreadColumn(db, "summary", "summary TEXT");
-	ensureThreadColumn(db, "model", "model TEXT");
-	ensureThreadColumn(
-		db,
-		"reasoning_effort",
-		"reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
-	);
-	runStatement(
-		db,
-		`
+  );
+  ensureThreadColumn(db, "last_input_tokens", "last_input_tokens INTEGER");
+  ensureThreadColumn(
+    db,
+    "last_cached_input_tokens",
+    "last_cached_input_tokens INTEGER",
+  );
+  ensureThreadColumn(db, "last_output_tokens", "last_output_tokens INTEGER");
+  ensureThreadColumn(db, "max_input_tokens", "max_input_tokens INTEGER");
+  ensureThreadColumn(
+    db,
+    "estimated_compaction_trigger_tokens",
+    "estimated_compaction_trigger_tokens INTEGER",
+  );
+  ensureThreadColumn(
+    db,
+    "compaction_count",
+    "compaction_count INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureThreadColumn(db, "last_compaction_at", "last_compaction_at TEXT");
+  ensureThreadColumn(
+    db,
+    "last_compaction_before_input_tokens",
+    "last_compaction_before_input_tokens INTEGER",
+  );
+  ensureThreadColumn(
+    db,
+    "last_compaction_after_input_tokens",
+    "last_compaction_after_input_tokens INTEGER",
+  );
+  ensureThreadColumn(
+    db,
+    "active_turn_started_at",
+    "active_turn_started_at TEXT",
+  );
+  ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
+  ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
+  ensureThreadColumn(db, "last_error_message", "last_error_message TEXT");
+  ensureThreadColumn(db, "pinned_at", "pinned_at TEXT");
+  ensureThreadColumn(db, "summary", "summary TEXT");
+  ensureThreadColumn(db, "model", "model TEXT");
+  ensureThreadColumn(
+    db,
+    "reasoning_effort",
+    "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+  );
+  runStatement(
+    db,
+    `
 			UPDATE threads
 			SET model = ?
 			WHERE model IS NULL OR TRIM(model) = ''
 		`,
-		DEFAULT_THREAD_MODEL,
-	);
-	runStatement(
-		db,
-		`
+    DEFAULT_THREAD_MODEL,
+  );
+  runStatement(
+    db,
+    `
 			UPDATE threads
 			SET reasoning_effort = ?
 			WHERE reasoning_effort IS NULL OR TRIM(reasoning_effort) = ''
 		`,
-		DEFAULT_THREAD_REASONING_EFFORT,
-	);
-	runStatement(
-		db,
-		`
+    DEFAULT_THREAD_REASONING_EFFORT,
+  );
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS thread_messages (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				thread_id INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -372,76 +372,76 @@ function migrate(db: Database): void {
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
 		`,
-	);
-	ensureThreadMessageColumn(db, "kind", "kind TEXT NOT NULL DEFAULT 'chat'");
-	ensureThreadMessageColumn(db, "item_id", "item_id TEXT");
-	ensureThreadMessageColumn(db, "state", "state TEXT");
-	ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
-	ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
-	runStatement(
-		db,
-		`
+  );
+  ensureThreadMessageColumn(db, "kind", "kind TEXT NOT NULL DEFAULT 'chat'");
+  ensureThreadMessageColumn(db, "item_id", "item_id TEXT");
+  ensureThreadMessageColumn(db, "state", "state TEXT");
+  ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
+  ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
+  runStatement(
+    db,
+    `
 			CREATE INDEX IF NOT EXISTS idx_project_worktrees_project_id_pinned_at
 			ON project_worktrees(project_id, pinned_at DESC, worktree_path ASC);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE INDEX IF NOT EXISTS idx_threads_updated_at
 			ON threads(updated_at DESC, id DESC);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE INDEX IF NOT EXISTS idx_threads_project_id
 			ON threads(project_id);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id
 			ON thread_messages(thread_id, id);
 		`,
-	);
-	runStatement(
-		db,
-		`
+  );
+  runStatement(
+    db,
+    `
 			CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_item_id
 			ON thread_messages(thread_id, item_id);
 		`,
-	);
+  );
 }
 
 export function getAppDatabasePath(): string {
-	return resolve(resolveAppDataDirectory(), DB_FILE_NAME);
+  return resolve(resolveAppDataDirectory(), DB_FILE_NAME);
 }
 
 export function initAppDatabase(): Database {
-	if (appDatabase) {
-		return appDatabase;
-	}
+  if (appDatabase) {
+    return appDatabase;
+  }
 
-	const dbPath = getAppDatabasePath();
-	const appDataPath = dirname(dbPath);
-	ensureAppDirectory(appDataPath);
+  const dbPath = getAppDatabasePath();
+  const appDataPath = dirname(dbPath);
+  ensureAppDirectory(appDataPath);
 
-	const db = new Database(dbPath);
-	runStatement(db, "PRAGMA foreign_keys = ON");
-	migrate(db);
-	appDatabase = db;
-	return db;
+  const db = new Database(dbPath);
+  runStatement(db, "PRAGMA foreign_keys = ON");
+  migrate(db);
+  appDatabase = db;
+  return db;
 }
 
 export function getProject(
-	database: Database,
-	projectPath: string,
+  database: Database,
+  projectPath: string,
 ): ProjectRecord | null {
-	return database
-		.query<ProjectRecord, [string]>(
-			`
+  return database
+    .query<ProjectRecord, [string]>(
+      `
 			SELECT
 				id,
 				path,
@@ -454,17 +454,17 @@ export function getProject(
 			FROM projects
 			WHERE path = ?
 		`,
-		)
-		.get(projectPath);
+    )
+    .get(projectPath);
 }
 
 export function getProjectById(
-	database: Database,
-	projectId: number,
+  database: Database,
+  projectId: number,
 ): ProjectRecord | null {
-	return database
-		.query<ProjectRecord, [number]>(
-			`
+  return database
+    .query<ProjectRecord, [number]>(
+      `
 			SELECT
 				id,
 				path,
@@ -477,14 +477,14 @@ export function getProjectById(
 			FROM projects
 			WHERE id = ?
 		`,
-		)
-		.get(projectId);
+    )
+    .get(projectId);
 }
 
 export function listProjects(database: Database): ProjectRecord[] {
-	return database
-		.query<ProjectRecord, []>(
-			`
+  return database
+    .query<ProjectRecord, []>(
+      `
 			SELECT
 				id,
 				path,
@@ -497,17 +497,17 @@ export function listProjects(database: Database): ProjectRecord[] {
 			FROM projects
 			ORDER BY last_opened_at DESC, name ASC
 		`,
-		)
-		.all();
+    )
+    .all();
 }
 
 export function upsertProject(
-	database: Database,
-	input: ProjectInput,
+  database: Database,
+  input: ProjectInput,
 ): ProjectRecord {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			INSERT INTO projects (path, name, is_open, last_opened_at, updated_at)
 			VALUES (?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(path) DO UPDATE SET
@@ -515,21 +515,21 @@ export function upsertProject(
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_opened_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		`,
-		input.projectPath,
-		input.name ?? "",
-	);
-	const project = getProject(database, input.projectPath);
-	if (!project) {
-		throw new Error(`Failed to upsert project at ${input.projectPath}`);
-	}
+    input.projectPath,
+    input.name ?? "",
+  );
+  const project = getProject(database, input.projectPath);
+  if (!project) {
+    throw new Error(`Failed to upsert project at ${input.projectPath}`);
+  }
 
-	return project;
+  return project;
 }
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
-	return database
-		.query<ProjectRecord, []>(
-			`
+  return database
+    .query<ProjectRecord, []>(
+      `
 			SELECT
 				id,
 				path,
@@ -543,29 +543,29 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 			WHERE is_open = 1
 			ORDER BY last_opened_at DESC
 		`,
-		)
-		.all();
+    )
+    .all();
 }
 
 export function setProjectClosed(database: Database, projectId: number): void {
-	runStatement(
-		database,
-		`UPDATE projects SET is_open = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
-		projectId,
-	);
+  runStatement(
+    database,
+    `UPDATE projects SET is_open = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
+    projectId,
+  );
 }
 
 export function deleteProject(database: Database, projectId: number): void {
-	runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
+  runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
 }
 
 export function listProjectWorktreePins(
-	database: Database,
-	projectId: number,
+  database: Database,
+  projectId: number,
 ): ProjectWorktreePinRecord[] {
-	return database
-		.query<ProjectWorktreePinRecord, [number]>(
-			`
+  return database
+    .query<ProjectWorktreePinRecord, [number]>(
+      `
 			SELECT
 				project_id AS projectId,
 				worktree_path AS worktreePath,
@@ -573,20 +573,20 @@ export function listProjectWorktreePins(
 			FROM project_worktrees
 			WHERE project_id = ?
 		`,
-		)
-		.all(projectId);
+    )
+    .all(projectId);
 }
 
 export function setProjectWorktreePinned(
-	database: Database,
-	projectId: number,
-	worktreePath: string,
-	pinned: boolean,
+  database: Database,
+  projectId: number,
+  worktreePath: string,
+  pinned: boolean,
 ): void {
-	if (pinned) {
-		runStatement(
-			database,
-			`
+  if (pinned) {
+    runStatement(
+      database,
+      `
 				INSERT INTO project_worktrees (
 					project_id,
 					worktree_path,
@@ -600,27 +600,27 @@ export function setProjectWorktreePinned(
 				ON CONFLICT(project_id, worktree_path) DO UPDATE SET
 					pinned_at = excluded.pinned_at
 			`,
-			projectId,
-			worktreePath,
-		);
-		return;
-	}
+      projectId,
+      worktreePath,
+    );
+    return;
+  }
 
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			DELETE FROM project_worktrees
 			WHERE project_id = ? AND worktree_path = ?
 		`,
-		projectId,
-		worktreePath,
-	);
+    projectId,
+    worktreePath,
+  );
 }
 
 export function listThreads(database: Database): ThreadRecord[] {
-	return database
-		.query<ThreadRecord, []>(
-			`
+  return database
+    .query<ThreadRecord, []>(
+      `
 				SELECT
 					id,
 					project_id AS projectId,
@@ -655,17 +655,17 @@ export function listThreads(database: Database): ThreadRecord[] {
 					created_at DESC,
 					id DESC
 			`,
-		)
-		.all();
+    )
+    .all();
 }
 
 export function getThreadById(
-	database: Database,
-	threadId: number,
+  database: Database,
+  threadId: number,
 ): ThreadRecord | null {
-	return database
-		.query<ThreadRecord, [number]>(
-			`
+  return database
+    .query<ThreadRecord, [number]>(
+      `
 				SELECT
 					id,
 					project_id AS projectId,
@@ -695,17 +695,17 @@ export function getThreadById(
 				FROM threads
 				WHERE id = ?
 			`,
-		)
-		.get(threadId);
+    )
+    .get(threadId);
 }
 
 export function createThread(
-	database: Database,
-	input: ThreadInput,
+  database: Database,
+  input: ThreadInput,
 ): ThreadRecord {
-	const result = runStatement(
-		database,
-		`
+  const result = runStatement(
+    database,
+    `
 			INSERT INTO threads (
 				project_id,
 				worktree_path,
@@ -725,121 +725,121 @@ export function createThread(
 				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			)
 		`,
-		input.projectId,
-		input.worktreePath,
-		input.title,
-		input.model,
-		input.reasoningEffort,
-		input.codexThreadId ?? null,
-	);
-	const threadId = Number(result.lastInsertRowid);
-	const thread = getThreadById(database, threadId);
-	if (!thread) {
-		throw new Error(`Failed to create thread for project ${input.projectId}`);
-	}
-	return thread;
+    input.projectId,
+    input.worktreePath,
+    input.title,
+    input.model,
+    input.reasoningEffort,
+    input.codexThreadId ?? null,
+  );
+  const threadId = Number(result.lastInsertRowid);
+  const thread = getThreadById(database, threadId);
+  if (!thread) {
+    throw new Error(`Failed to create thread for project ${input.projectId}`);
+  }
+  return thread;
 }
 
 export function updateThreadCodexId(
-	database: Database,
-	threadId: number,
-	codexThreadId: string,
+  database: Database,
+  threadId: number,
+  codexThreadId: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				codex_thread_id = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
-		codexThreadId,
-		threadId,
-	);
+    codexThreadId,
+    threadId,
+  );
 }
 
 export function renameThread(
-	database: Database,
-	threadId: number,
-	title: string,
-	summary?: string | null,
+  database: Database,
+  threadId: number,
+  title: string,
+  summary?: string | null,
 ): void {
-	if (typeof summary !== "undefined") {
-		runStatement(
-			database,
-			`
+  if (typeof summary !== "undefined") {
+    runStatement(
+      database,
+      `
 				UPDATE threads
 				SET
 					title = ?,
 					summary = ?
 				WHERE id = ?
 			`,
-			title,
-			summary,
-			threadId,
-		);
-		return;
-	}
+      title,
+      summary,
+      threadId,
+    );
+    return;
+  }
 
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET title = ?
 			WHERE id = ?
 		`,
-		title,
-		threadId,
-	);
+    title,
+    threadId,
+  );
 }
 
 export function setThreadModel(
-	database: Database,
-	threadId: number,
-	model: string,
+  database: Database,
+  threadId: number,
+  model: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				model = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
-		model,
-		threadId,
-	);
+    model,
+    threadId,
+  );
 }
 
 export function setThreadReasoningEffort(
-	database: Database,
-	threadId: number,
-	reasoningEffort: string,
+  database: Database,
+  threadId: number,
+  reasoningEffort: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				reasoning_effort = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
-		reasoningEffort,
-		threadId,
-	);
+    reasoningEffort,
+    threadId,
+  );
 }
 
 export function setThreadPinned(
-	database: Database,
-	threadId: number,
-	pinned: boolean,
+  database: Database,
+  threadId: number,
+  pinned: boolean,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET pinned_at = CASE
 				WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
@@ -847,19 +847,19 @@ export function setThreadPinned(
 			END
 			WHERE id = ?
 		`,
-		pinned ? 1 : 0,
-		threadId,
-	);
+    pinned ? 1 : 0,
+    threadId,
+  );
 }
 
 export function deleteThread(database: Database, threadId: number): void {
-	runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
+  runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
 }
 
 export function markThreadRan(database: Database, threadId: number): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
@@ -870,38 +870,38 @@ export function markThreadRan(database: Database, threadId: number): void {
 				last_error_message = NULL
 			WHERE id = ?
 		`,
-		threadId,
-	);
+    threadId,
+  );
 }
 
 export function markThreadRunStarted(
-	database: Database,
-	threadId: number,
-	startedAt: string,
+  database: Database,
+  threadId: number,
+  startedAt: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				updated_at = ?,
 				active_turn_started_at = ?
 			WHERE id = ?
 		`,
-		startedAt,
-		startedAt,
-		threadId,
-	);
+    startedAt,
+    startedAt,
+    threadId,
+  );
 }
 
 export function markThreadStopped(
-	database: Database,
-	threadId: number,
-	message: string,
+  database: Database,
+  threadId: number,
+  message: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
@@ -912,20 +912,20 @@ export function markThreadStopped(
 				last_error_message = ?
 			WHERE id = ?
 		`,
-		message,
-		threadId,
-	);
+    message,
+    threadId,
+  );
 }
 
 export function setThreadUsage(
-	database: Database,
-	threadId: number,
-	usage: ThreadUsageInput,
-	compactionStats: ThreadCompactionStatsInput,
+  database: Database,
+  threadId: number,
+  usage: ThreadUsageInput,
+  compactionStats: ThreadCompactionStatsInput,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				last_input_tokens = ?,
@@ -940,27 +940,27 @@ export function setThreadUsage(
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
-		usage.inputTokens,
-		usage.cachedInputTokens,
-		usage.outputTokens,
-		compactionStats.maxInputTokens,
-		compactionStats.estimatedCompactionTriggerTokens,
-		compactionStats.compactionCount,
-		compactionStats.lastCompactionAt,
-		compactionStats.lastCompactionBeforeInputTokens,
-		compactionStats.lastCompactionAfterInputTokens,
-		threadId,
-	);
+    usage.inputTokens,
+    usage.cachedInputTokens,
+    usage.outputTokens,
+    compactionStats.maxInputTokens,
+    compactionStats.estimatedCompactionTriggerTokens,
+    compactionStats.compactionCount,
+    compactionStats.lastCompactionAt,
+    compactionStats.lastCompactionBeforeInputTokens,
+    compactionStats.lastCompactionAfterInputTokens,
+    threadId,
+  );
 }
 
 export function markThreadFailed(
-	database: Database,
-	threadId: number,
-	errorMessage: string,
+  database: Database,
+  threadId: number,
+  errorMessage: string,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
@@ -970,18 +970,18 @@ export function markThreadFailed(
 				last_error_message = ?
 			WHERE id = ?
 		`,
-		errorMessage,
-		threadId,
-	);
+    errorMessage,
+    threadId,
+  );
 }
 
 export function markThreadErrorSeen(
-	database: Database,
-	threadId: number,
+  database: Database,
+  threadId: number,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE threads
 			SET
 				last_error_seen_at = CASE
@@ -990,16 +990,16 @@ export function markThreadErrorSeen(
 				END
 			WHERE id = ?
 		`,
-		threadId,
-	);
+    threadId,
+  );
 }
 
 export function listThreadsWithInProgressMessages(
-	database: Database,
+  database: Database,
 ): InProgressThreadMessageRecord[] {
-	return database
-		.query<InProgressThreadMessageRecord, []>(
-			`
+  return database
+    .query<InProgressThreadMessageRecord, []>(
+      `
 				SELECT
 					thread_id AS threadId,
 					MAX(COALESCE(updated_at, created_at)) AS lastUpdatedAt
@@ -1007,17 +1007,17 @@ export function listThreadsWithInProgressMessages(
 				WHERE state = 'in_progress'
 				GROUP BY thread_id
 			`,
-		)
-		.all();
+    )
+    .all();
 }
 
 export function listThreadMessages(
-	database: Database,
-	threadId: number,
+  database: Database,
+  threadId: number,
 ): ThreadMessageRecord[] {
-	return database
-		.query<ThreadMessageRecord, [number]>(
-			`
+  return database
+    .query<ThreadMessageRecord, [number]>(
+      `
 				SELECT
 					id,
 					thread_id AS threadId,
@@ -1033,17 +1033,17 @@ export function listThreadMessages(
 				WHERE thread_id = ?
 				ORDER BY id ASC
 			`,
-		)
-		.all(threadId);
+    )
+    .all(threadId);
 }
 
 export function createThreadMessage(
-	database: Database,
-	input: ThreadMessageInput,
+  database: Database,
+  input: ThreadMessageInput,
 ): ThreadMessageRecord {
-	const result = runStatement(
-		database,
-		`
+  const result = runStatement(
+    database,
+    `
 			INSERT INTO thread_messages (
 				thread_id,
 				role,
@@ -1056,14 +1056,14 @@ export function createThreadMessage(
 			)
 			VALUES (?, ?, 'chat', NULL, ?, NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		`,
-		input.threadId,
-		input.role,
-		input.text,
-	);
-	const messageId = Number(result.lastInsertRowid);
-	const message = database
-		.query<ThreadMessageRecord, [number]>(
-			`
+    input.threadId,
+    input.role,
+    input.text,
+  );
+  const messageId = Number(result.lastInsertRowid);
+  const message = database
+    .query<ThreadMessageRecord, [number]>(
+      `
 				SELECT
 					id,
 					thread_id AS threadId,
@@ -1078,36 +1078,36 @@ export function createThreadMessage(
 				FROM thread_messages
 				WHERE id = ?
 			`,
-		)
-		.get(messageId);
-	if (!message) {
-		throw new Error(
-			`Failed to create thread message for thread ${input.threadId}`,
-		);
-	}
-	return message;
+    )
+    .get(messageId);
+  if (!message) {
+    throw new Error(
+      `Failed to create thread message for thread ${input.threadId}`,
+    );
+  }
+  return message;
 }
 
 export function upsertThreadActivity(
-	database: Database,
-	input: ThreadActivityInput,
+  database: Database,
+  input: ThreadActivityInput,
 ): ThreadMessageRecord {
-	const existing = database
-		.query<{ id: number }, [number, string]>(
-			`
+  const existing = database
+    .query<{ id: number }, [number, string]>(
+      `
 				SELECT id
 				FROM thread_messages
 				WHERE thread_id = ? AND item_id = ?
 				ORDER BY id DESC
 				LIMIT 1
 			`,
-		)
-		.get(input.threadId, input.itemId);
+    )
+    .get(input.threadId, input.itemId);
 
-	if (existing) {
-		runStatement(
-			database,
-			`
+  if (existing) {
+    runStatement(
+      database,
+      `
 				UPDATE thread_messages
 				SET
 					role = ?,
@@ -1118,17 +1118,17 @@ export function upsertThreadActivity(
 					updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 				WHERE id = ?
 			`,
-			input.role ?? "assistant",
-			input.kind,
-			input.text,
-			input.state,
-			input.payloadJson ?? null,
-			existing.id,
-		);
-	} else {
-		runStatement(
-			database,
-			`
+      input.role ?? "assistant",
+      input.kind,
+      input.text,
+      input.state,
+      input.payloadJson ?? null,
+      existing.id,
+    );
+  } else {
+    runStatement(
+      database,
+      `
 				INSERT INTO thread_messages (
 					thread_id,
 					role,
@@ -1141,19 +1141,19 @@ export function upsertThreadActivity(
 				)
 				VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			`,
-			input.threadId,
-			input.role ?? "assistant",
-			input.kind,
-			input.itemId,
-			input.text,
-			input.state,
-			input.payloadJson ?? null,
-		);
-	}
+      input.threadId,
+      input.role ?? "assistant",
+      input.kind,
+      input.itemId,
+      input.text,
+      input.state,
+      input.payloadJson ?? null,
+    );
+  }
 
-	const message = database
-		.query<ThreadMessageRecord, [number, string]>(
-			`
+  const message = database
+    .query<ThreadMessageRecord, [number, string]>(
+      `
 				SELECT
 					id,
 					thread_id AS threadId,
@@ -1170,25 +1170,25 @@ export function upsertThreadActivity(
 				ORDER BY id DESC
 				LIMIT 1
 			`,
-		)
-		.get(input.threadId, input.itemId);
+    )
+    .get(input.threadId, input.itemId);
 
-	if (!message) {
-		throw new Error(
-			`Failed to upsert thread activity ${input.itemId} for thread ${input.threadId}`,
-		);
-	}
+  if (!message) {
+    throw new Error(
+      `Failed to upsert thread activity ${input.itemId} for thread ${input.threadId}`,
+    );
+  }
 
-	return message;
+  return message;
 }
 
 export function stopInProgressThreadMessages(
-	database: Database,
-	threadId: number,
+  database: Database,
+  threadId: number,
 ): void {
-	runStatement(
-		database,
-		`
+  runStatement(
+    database,
+    `
 			UPDATE thread_messages
 			SET
 				state = 'stopped',
@@ -1196,6 +1196,6 @@ export function stopInProgressThreadMessages(
 			WHERE thread_id = ?
 				AND state = 'in_progress'
 		`,
-		threadId,
-	);
+    threadId,
+  );
 }

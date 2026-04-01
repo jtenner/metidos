@@ -4,133 +4,133 @@
 html,
 body,
 #app {
-	height: 100%;
+  height: 100%;
 }
 
 body {
-	margin: 0;
-	background: #0e0e0e;
-	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-	overflow: hidden;
+  margin: 0;
+  background: #0e0e0e;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
 }
 
 :root {
-	--app-scrollbar-size: 10px;
-	--app-scrollbar-track: #131a1f;
-	--app-scrollbar-thumb-color: #51616c;
-	--app-scrollbar-thumb-start: #7aa5c4;
-	--app-scrollbar-thumb-end: #51616c;
-	--app-scrollbar-thumb-hover-start: #98b9d0;
-	--app-scrollbar-thumb-hover-end: #657886;
+  --app-scrollbar-size: 10px;
+  --app-scrollbar-track: #131a1f;
+  --app-scrollbar-thumb-color: #51616c;
+  --app-scrollbar-thumb-start: #7aa5c4;
+  --app-scrollbar-thumb-end: #51616c;
+  --app-scrollbar-thumb-hover-start: #98b9d0;
+  --app-scrollbar-thumb-hover-end: #657886;
 }
 
 @font-face {
-	font-family: "Inter";
-	src: url("/fonts/inter-latin-ext-wght-normal.woff2")
-		format("woff2-variations");
-	font-weight: 100 900;
-	font-style: normal;
-	font-display: swap;
-	unicode-range:
-		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
-		U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
-		U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-	font-family: "Inter";
-	src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
-	font-weight: 100 900;
-	font-style: normal;
-	font-display: swap;
-	unicode-range:
-		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-		U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-		U+2212, U+2215, U+FEFF, U+FFFD;
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-	font-family: "Fira Code";
-	src: url("/fonts/fira-code-vf.woff2") format("woff2-variations");
-	font-weight: 300 700;
-	font-style: normal;
-	font-display: swap;
+  font-family: "Fira Code";
+  src: url("/fonts/fira-code-vf.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
 }
 
 .glass-panel {
-	background: rgba(38, 38, 38, 0.7);
-	backdrop-filter: blur(20px);
+  background: rgba(38, 38, 38, 0.7);
+  backdrop-filter: blur(20px);
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-	display: none;
+  display: none;
 }
 .hide-scrollbar {
-	-ms-overflow-style: none;
-	scrollbar-width: none;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 * {
-	scrollbar-width: thin;
-	scrollbar-color: var(--app-scrollbar-thumb-color) var(--app-scrollbar-track);
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb-color) var(--app-scrollbar-track);
 }
 
 *::-webkit-scrollbar {
-	width: var(--app-scrollbar-size);
-	height: var(--app-scrollbar-size);
+  width: var(--app-scrollbar-size);
+  height: var(--app-scrollbar-size);
 }
 
 *::-webkit-scrollbar-track {
-	background: var(--app-scrollbar-track);
+  background: var(--app-scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb {
-	border: 2px solid var(--app-scrollbar-track);
-	border-radius: 999px;
-	background: linear-gradient(
-		180deg,
-		var(--app-scrollbar-thumb-start) 0%,
-		var(--app-scrollbar-thumb-end) 100%
-	);
+  border: 2px solid var(--app-scrollbar-track);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--app-scrollbar-thumb-start) 0%,
+    var(--app-scrollbar-thumb-end) 100%
+  );
 }
 
 *::-webkit-scrollbar-thumb:hover {
-	background: linear-gradient(
-		180deg,
-		var(--app-scrollbar-thumb-hover-start) 0%,
-		var(--app-scrollbar-thumb-hover-end) 100%
-	);
+  background: linear-gradient(
+    180deg,
+    var(--app-scrollbar-thumb-hover-start) 0%,
+    var(--app-scrollbar-thumb-hover-end) 100%
+  );
 }
 
 *::-webkit-scrollbar-corner {
-	background: var(--app-scrollbar-track);
+  background: var(--app-scrollbar-track);
 }
 
 .font-headline {
-	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 .font-body {
-	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 .font-label {
-	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-mono {
-	font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
-		Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .message-markdown {
-	overflow-wrap: anywhere;
+  overflow-wrap: anywhere;
 }
 
 .message-markdown > :first-child {
-	margin-top: 0;
+  margin-top: 0;
 }
 
 .message-markdown > :last-child {
-	margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .message-markdown p,
@@ -138,83 +138,83 @@ body {
 .message-markdown ol,
 .message-markdown blockquote,
 .message-markdown hr {
-	margin: 0.75rem 0;
+  margin: 0.75rem 0;
 }
 
 .message-markdown h1,
 .message-markdown h2,
 .message-markdown h3,
 .message-markdown h4 {
-	margin: 1rem 0 0.65rem;
-	font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-	font-weight: 800;
-	line-height: 1.2;
+  margin: 1rem 0 0.65rem;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .message-markdown h1 {
-	font-size: 1.35rem;
+  font-size: 1.35rem;
 }
 
 .message-markdown h2 {
-	font-size: 1.15rem;
+  font-size: 1.15rem;
 }
 
 .message-markdown h3,
 .message-markdown h4 {
-	font-size: 1rem;
+  font-size: 1rem;
 }
 
 .message-markdown ul,
 .message-markdown ol {
-	padding-left: 1.25rem;
+  padding-left: 1.25rem;
 }
 
 .message-markdown li + li {
-	margin-top: 0.35rem;
+  margin-top: 0.35rem;
 }
 
 .message-markdown li > p {
-	margin: 0;
+  margin: 0;
 }
 
 .message-markdown blockquote {
-	border-left: 2px solid rgba(153, 190, 217, 0.45);
-	padding-left: 0.9rem;
-	color: #d1dce3;
+  border-left: 2px solid rgba(153, 190, 217, 0.45);
+  padding-left: 0.9rem;
+  color: #d1dce3;
 }
 
 .message-markdown hr {
-	border: 0;
-	border-top: 1px solid rgba(72, 72, 72, 0.75);
+  border: 0;
+  border-top: 1px solid rgba(72, 72, 72, 0.75);
 }
 
 .message-markdown img {
-	max-width: 100%;
-	border-radius: 0.5rem;
+  max-width: 100%;
+  border-radius: 0.5rem;
 }
 
 .message-markdown input[type="checkbox"] {
-	margin-right: 0.5rem;
-	accent-color: #bdd5e6;
+  margin-right: 0.5rem;
+  accent-color: #bdd5e6;
 }
 
 .message-markdown-table {
-	width: 100%;
-	min-width: max-content;
-	border-collapse: collapse;
-	font-size: 0.8125rem;
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
 }
 
 .message-markdown-table th,
 .message-markdown-table td {
-	border: 1px solid rgba(72, 72, 72, 0.85);
-	padding: 0.55rem 0.7rem;
-	text-align: left;
-	vertical-align: top;
+  border: 1px solid rgba(72, 72, 72, 0.85);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
 }
 
 .message-markdown-table th {
-	background: rgba(31, 32, 32, 0.9);
-	color: #f2f0ef;
-	font-weight: 700;
+  background: rgba(31, 32, 32, 0.9);
+  color: #f2f0ef;
+  font-weight: 700;
 }

@@ -1,14 +1,18 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "formatter": {
-    "enabled": true
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
   },
   "files": {
     "ignore": [
       "coverage",
       "dist",
       "build",
-      "node_modules"
+      "node_modules",
+      ".jolt-build",
+      "src/mainview/index.css"
     ]
   }
 }
