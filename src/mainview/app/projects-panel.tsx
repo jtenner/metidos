@@ -520,11 +520,6 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                           },
                                         )}
                                       </button>
-                                      {worktreeState.loading ? (
-                                        <div className="px-3 pt-1 text-[11px] text-[#8f8d8b]">
-                                          Syncing diff + file state...
-                                        </div>
-                                      ) : null}
                                       {worktreeState.error ? (
                                         <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
                                           {worktreeState.error}
