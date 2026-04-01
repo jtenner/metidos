@@ -619,6 +619,20 @@ export function writePersistedMainviewState(
 	);
 }
 
+export function patchPersistedMainviewState(
+	patch: Partial<PersistedMainviewState>,
+): void {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	writePersistedMainviewState({
+		...readPersistedMainviewState(),
+		...patch,
+		version: MAINVIEW_STATE_STORAGE_VERSION,
+	});
+}
+
 export function writePersistedTreeViewState(
 	state: PersistedTreeViewState,
 ): void {

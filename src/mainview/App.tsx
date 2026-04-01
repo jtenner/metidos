@@ -105,6 +105,7 @@ import {
 	mergeResetGitHistory,
 	mergeThreadErrorLevel,
 	orderProjectWorktrees,
+	patchPersistedMainviewState,
 	pickInitialThread,
 	pinnedThreadForWorktree,
 	primaryWorktreePath,
@@ -354,6 +355,76 @@ declare global {
 	}
 }
 
+type DesktopSidebarProps = {
+	initialCollapsed: boolean;
+	onCollapsedChange: (collapsed: boolean) => void;
+	renderExpandedContent: (collapseSidebar: () => void) => JSX.Element;
+};
+
+function DesktopSidebar({
+	initialCollapsed,
+	onCollapsedChange,
+	renderExpandedContent,
+}: DesktopSidebarProps): JSX.Element {
+	const [collapsed, setCollapsed] = useState(initialCollapsed);
+
+	const updateCollapsed = useCallback(
+		(nextCollapsed: boolean): void => {
+			setCollapsed(nextCollapsed);
+			onCollapsedChange(nextCollapsed);
+		},
+		[onCollapsedChange],
+	);
+
+	const collapseSidebar = useCallback((): void => {
+		updateCollapsed(true);
+	}, [updateCollapsed]);
+
+	const expandSidebar = useCallback((): void => {
+		updateCollapsed(false);
+	}, [updateCollapsed]);
+
+	return (
+		<aside
+			className={`relative min-h-0 shrink-0 overflow-hidden border-r border-[#262626] bg-[#131313] transition-[width] duration-300 ${
+				collapsed ? "w-14" : "w-[18.5rem]"
+			}`}
+			style={{
+				willChange: "width",
+			}}
+		>
+			<div
+				aria-hidden={collapsed}
+				className={`absolute inset-y-0 left-0 flex w-[18.5rem] flex-col transition-opacity duration-150 ${
+					collapsed ? "invisible opacity-0 pointer-events-none" : "opacity-100"
+				}`}
+			>
+				{renderExpandedContent(collapseSidebar)}
+			</div>
+			<div
+				aria-hidden={!collapsed}
+				className={`absolute inset-y-0 left-0 flex w-14 flex-col transition-opacity duration-150 ${
+					collapsed ? "opacity-100" : "invisible opacity-0 pointer-events-none"
+				}`}
+			>
+				<div className="flex flex-1 flex-col items-center gap-3 px-2 py-4">
+					<button
+						type="button"
+						aria-label="Expand sidebar"
+						className="flex h-9 w-9 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
+						onClick={expandSidebar}
+					>
+						{materialSymbol("chevron_right", "text-[18px]")}
+					</button>
+					<div className="flex h-9 w-9 items-center justify-center bg-[#1b2a34] text-[#7aa5c4]">
+						{materialSymbol("folder", "text-[18px]")}
+					</div>
+				</div>
+			</div>
+		</aside>
+	);
+}
+
 export default function App({ procedures }: AppProps): JSX.Element {
 	const initialMainviewStateRef = useRef<PersistedMainviewState | null>(null);
 	if (!initialMainviewStateRef.current) {
@@ -456,9 +527,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const [threadActionBusy, setThreadActionBusy] = useState<
 		"rename" | "pin" | "delete" | null
 	>(null);
-	const [sidebarCollapsed, setSidebarCollapsed] = useState(
-		initialMainviewState.sidebarCollapsed,
-	);
+	const sidebarCollapsedRef = useRef(initialMainviewState.sidebarCollapsed);
 	const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
 	const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
 		initialMainviewState.selectedProjectId,
@@ -483,6 +552,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		() => document.visibilityState === "visible",
 	);
 	const [primaryView, setPrimaryView] = useState<PrimaryView>("chat");
+
+	const handleSidebarCollapsedChange = useCallback(
+		(collapsed: boolean): void => {
+			sidebarCollapsedRef.current = collapsed;
+			patchPersistedMainviewState({
+				sidebarCollapsed: collapsed,
+			});
+		},
+		[],
+	);
 	const [worktreeDiffError, setWorktreeDiffError] = useState("");
 	const [isRefreshingWorktreeSnapshot, setIsRefreshingWorktreeSnapshot] =
 		useState(false);
@@ -3754,7 +3833,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			pendingThreadModel,
 			pendingThreadReasoningEffort,
 			chatInput,
-			sidebarCollapsed,
+			sidebarCollapsed: sidebarCollapsedRef.current,
 			sidebarSearchQuery,
 			openWorktrees: serializeOpenWorktrees(projectStates),
 		});
@@ -3767,7 +3846,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		selectedThreadId,
 		selectedWorktreePath,
 		sessionStateReady,
-		sidebarCollapsed,
 		sidebarSearchQuery,
 	]);
 
@@ -6621,26 +6699,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</nav>
 
 				<main className="flex flex-1 min-h-0 overflow-hidden">
-					<aside
-						className={`flex min-h-0 shrink-0 flex-col border-r border-[#262626] bg-[#131313] transition-all duration-300 ${
-							sidebarCollapsed ? "w-14" : "w-[18.5rem]"
-						}`}
-					>
-						{sidebarCollapsed ? (
-							<div className="flex flex-1 flex-col items-center gap-3 px-2 py-4">
-								<button
-									type="button"
-									aria-label="Expand sidebar"
-									className="flex h-9 w-9 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
-									onClick={() => setSidebarCollapsed(false)}
-								>
-									{materialSymbol("chevron_right", "text-[18px]")}
-								</button>
-								<div className="flex h-9 w-9 items-center justify-center bg-[#1b2a34] text-[#7aa5c4]">
-									{materialSymbol("folder", "text-[18px]")}
-								</div>
-							</div>
-						) : (
+					<DesktopSidebar
+						initialCollapsed={initialMainviewState.sidebarCollapsed}
+						onCollapsedChange={handleSidebarCollapsedChange}
+						renderExpandedContent={(collapseSidebar) => (
 							<>
 								<div className="px-3 pb-3 pt-3">
 									{renderSidebarHero(
@@ -6648,7 +6710,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											type="button"
 											aria-label="Collapse sidebar"
 											className="flex h-7 w-7 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
-											onClick={() => setSidebarCollapsed(true)}
+											onClick={collapseSidebar}
 										>
 											{materialSymbol(
 												"chevron_right",
@@ -6662,7 +6724,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</div>
 							</>
 						)}
-					</aside>
+					/>
 
 					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
 						{primaryView === "chat" ? (
