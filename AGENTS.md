@@ -72,6 +72,7 @@
 │     │  ├─ message-ui.tsx
 │     │  └─ state.ts
 │     ├─ controls/
+│     │  ├─ chat-composer-control.tsx
 │     │  ├─ codex-model-selector.tsx
 │     │  ├─ codex-utils.ts
 │     │  ├─ dropdown.tsx

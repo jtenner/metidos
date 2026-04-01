@@ -1,9 +1,7 @@
 import {
-  type ChangeEvent,
   type FormEvent,
   type HTMLAttributes,
   type JSX,
-  type KeyboardEvent,
   type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent,
   type UIEvent,
@@ -52,8 +50,6 @@ import {
 } from "./app/message-ui";
 import {
   APP_TITLE,
-  COMPOSER_MAX_HEIGHT_PX,
-  DESKTOP_COMPOSER_MIN_HEIGHT_PX,
   DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS,
   DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
   DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS,
@@ -69,7 +65,6 @@ import {
   type GitHistoryDiffCacheEntry,
   type GitHistoryModalState,
   MAINVIEW_STATE_STORAGE_VERSION,
-  MOBILE_COMPOSER_MIN_HEIGHT_PX,
   type MessageGroup,
   type OpenThreadOptions,
   type PendingSharedRequest,
@@ -113,7 +108,6 @@ import {
   readPersistedMainviewState,
   readPersistedTreeViewState,
   removeThreadFromList,
-  resizeComposerTextarea,
   serializeOpenWorktrees,
   shortName,
   sortThreads,
@@ -129,6 +123,11 @@ import {
   writePersistedMainviewState,
   writePersistedTreeViewState,
 } from "./app/state";
+import {
+  ChatComposerControl,
+  readChatComposerDraft,
+  setChatComposerDraft,
+} from "./controls/chat-composer-control";
 import { CodexModelSelector } from "./controls/codex-model-selector";
 import { findCodexModel } from "./controls/codex-utils";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
@@ -535,7 +534,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [selectedWorktreePath, setSelectedWorktreePath] = useState<
     string | null
   >(initialMainviewState.selectedWorktreePath);
-  const [chatInput, setChatInput] = useState(initialMainviewState.chatInput);
   const [isSending, setIsSending] = useState(false);
   const [isStoppingThread, setIsStoppingThread] = useState(false);
   const [reasoningEffortControlError, setReasoningEffortControlError] =
@@ -573,8 +571,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [gitHistoryScrollTop, setGitHistoryScrollTop] = useState(0);
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
-  const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
-  const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
@@ -812,27 +808,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const composerActionDisabled = selectedThreadIsWorking
     ? !selectedThread || isThreadLoading || isStoppingThread
     : !selectedThread || isSending || isThreadLoading;
-  const composerActionToneClassName = selectedThreadIsWorking
-    ? "bg-[#4b2028] text-[#ffd4da]"
-    : "bg-[#bdd5e6] text-[#2e526b]";
   const composerActionLabel = selectedThreadIsWorking
     ? "Stop current run"
     : "Send message";
 
   const activeChatError = chatError || selectedThreadRunError;
   const activeChatNotice = selectedThreadRunNotice;
-
-  useEffect(() => {
-    void chatInput;
-    resizeComposerTextarea(
-      desktopComposerRef.current,
-      DESKTOP_COMPOSER_MIN_HEIGHT_PX,
-    );
-    resizeComposerTextarea(
-      mobileComposerRef.current,
-      MOBILE_COMPOSER_MIN_HEIGHT_PX,
-    );
-  }, [chatInput]);
 
   const projectActionMenuProject = useMemo(() => {
     if (!projectActionMenu) {
@@ -3832,13 +3813,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectedThreadId,
       pendingThreadModel,
       pendingThreadReasoningEffort,
-      chatInput,
+      chatInput: readChatComposerDraft(initialMainviewState.chatInput),
       sidebarCollapsed: sidebarCollapsedRef.current,
       sidebarSearchQuery,
       openWorktrees: serializeOpenWorktrees(projectStates),
     });
   }, [
-    chatInput,
+    initialMainviewState.chatInput,
     pendingThreadModel,
     pendingThreadReasoningEffort,
     projectStates,
@@ -4769,7 +4750,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
 
   const postMessage = useCallback(() => {
-    const text = chatInput.trim();
+    const text = readChatComposerDraft(initialMainviewState.chatInput).trim();
     if (!text || isSending || selectedThreadIsWorking) {
       return;
     }
@@ -4781,7 +4762,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     const pendingInput = text;
     setIsSending(true);
     setChatError("");
-    setChatInput("");
+    setChatComposerDraft("");
     void (async () => {
       try {
         const detail = await procedures.sendThreadMessage({
@@ -4793,13 +4774,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
         setThreadMessages(detail.messages);
       } catch (error) {
         setChatError(error instanceof Error ? error.message : String(error));
-        setChatInput((current) => current || pendingInput);
+        if (!readChatComposerDraft()) {
+          setChatComposerDraft(pendingInput);
+        }
       } finally {
         setIsSending(false);
       }
     })();
   }, [
-    chatInput,
+    initialMainviewState.chatInput,
     isSending,
     procedures,
     selectedThreadId,
@@ -4841,34 +4824,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
       postMessage();
     },
     [postMessage, selectedThreadIsWorking, stopSelectedThreadTurn],
-  );
-
-  const onChatInputChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => {
-      setChatInput(event.currentTarget.value);
-      resizeComposerTextarea(
-        event.currentTarget,
-        event.currentTarget === desktopComposerRef.current
-          ? DESKTOP_COMPOSER_MIN_HEIGHT_PX
-          : MOBILE_COMPOSER_MIN_HEIGHT_PX,
-      );
-    },
-    [],
-  );
-
-  const onEnter = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== "Enter" || event.nativeEvent.isComposing) {
-        return;
-      }
-      if (event.metaKey || event.ctrlKey) {
-        event.preventDefault();
-        if (!event.shiftKey && !event.altKey) {
-          postMessage();
-        }
-      }
-    },
-    [postMessage],
   );
 
   const visibleMessages = useMemo<VisibleMessage[]>(() => {
@@ -6810,42 +6765,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
                         {taskControlError}
                       </div>
                     ) : null}
-                    <div className="relative flex items-end p-4 gap-4 border border-[#2b2b2b] bg-[#262626] rounded-sm">
-                      <textarea
-                        ref={desktopComposerRef}
-                        className="flex-1 overflow-y-auto bg-transparent border-none focus:ring-0 text-sm leading-6 placeholder:text-[#adabaa]/50 resize-none font-body px-2"
-                        placeholder={
-                          selectedThread
-                            ? `Ask ${APP_TITLE} to generate, refactor, or debug...`
-                            : `Create a thread to start chatting with ${APP_TITLE}...`
-                        }
-                        rows={3}
-                        style={{
-                          minHeight: `${DESKTOP_COMPOSER_MIN_HEIGHT_PX}px`,
-                          maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
-                        }}
-                        value={chatInput}
-                        onChange={onChatInputChange}
-                        onKeyDown={onEnter}
-                        disabled={
-                          !selectedThread ||
-                          isSending ||
-                          selectedThreadIsWorking ||
-                          isThreadLoading
-                        }
-                      />
-                      <button
-                        type="submit"
-                        className={`w-10 h-10 flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
-                        disabled={composerActionDisabled}
-                        aria-label={composerActionLabel}
-                        title={composerActionLabel}
-                      >
-                        {materialSymbol(
-                          selectedThreadIsWorking ? "stop" : "arrow_forward",
-                        )}
-                      </button>
-                    </div>
+                    <ChatComposerControl
+                      actionDisabled={composerActionDisabled}
+                      actionLabel={composerActionLabel}
+                      disabled={
+                        !selectedThread ||
+                        isSending ||
+                        selectedThreadIsWorking ||
+                        isThreadLoading
+                      }
+                      hasSelectedThread={Boolean(selectedThread)}
+                      initialValue={initialMainviewState.chatInput}
+                      isWorking={selectedThreadIsWorking}
+                      onSubmitMessage={postMessage}
+                      variant="desktop"
+                    />
                   </div>
                 </form>
               </>
@@ -6976,46 +6910,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     />
                   </div>
                 </div>
-                <div className="relative flex items-end gap-2 bg-[#181b1e] px-2 py-2">
-                  <textarea
-                    ref={mobileComposerRef}
-                    className="min-h-0 flex-grow overflow-y-auto border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
-                    placeholder={
-                      selectedThread
-                        ? `Ask ${APP_TITLE}...`
-                        : `Create a thread to chat with ${APP_TITLE}...`
-                    }
-                    rows={1}
-                    style={{
-                      minHeight: `${MOBILE_COMPOSER_MIN_HEIGHT_PX}px`,
-                      maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
-                    }}
-                    value={chatInput}
-                    onChange={onChatInputChange}
-                    onKeyDown={onEnter}
-                    disabled={
-                      !selectedThread ||
-                      isSending ||
-                      selectedThreadIsWorking ||
-                      isThreadLoading
-                    }
-                  />
-                  <button
-                    className={`p-2 shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
-                      selectedThreadIsWorking
-                        ? "bg-[#4b2028] text-[#ffd4da]"
-                        : "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
-                    }`}
-                    type="submit"
-                    disabled={composerActionDisabled}
-                    aria-label={composerActionLabel}
-                    title={composerActionLabel}
-                  >
-                    {materialSymbol(
-                      selectedThreadIsWorking ? "stop" : "arrow_upward",
-                    )}
-                  </button>
-                </div>
+                <ChatComposerControl
+                  actionDisabled={composerActionDisabled}
+                  actionLabel={composerActionLabel}
+                  disabled={
+                    !selectedThread ||
+                    isSending ||
+                    selectedThreadIsWorking ||
+                    isThreadLoading
+                  }
+                  hasSelectedThread={Boolean(selectedThread)}
+                  initialValue={initialMainviewState.chatInput}
+                  isWorking={selectedThreadIsWorking}
+                  onSubmitMessage={postMessage}
+                  variant="mobile"
+                />
               </div>
               {modelControlError ? (
                 <div className="text-xs text-[#ff6e84]">
