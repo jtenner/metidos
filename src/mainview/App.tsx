@@ -6326,18 +6326,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											>
 												{thread.title}
 											</div>
-											{thread.summary?.trim() ? (
-												<span
-													className={`shrink-0 rounded-full border px-1.5 py-0.5 font-label text-[8px] font-bold uppercase tracking-[0.14em] ${
-														isActive
-															? "border-[#7fa1ba] bg-[#33414a] text-[#d7e7f2]"
-															: "border-[#34424b] bg-[#1b2328] text-[#8fb5cd]"
-													}`}
-													title="Thread summary available"
-												>
-													Note
-												</span>
-											) : null}
 										</div>
 										<div className="flex shrink-0 items-center gap-2">
 											{threadPinned ? (
