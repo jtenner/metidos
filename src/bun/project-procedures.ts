@@ -20,9 +20,11 @@ import {
 	listProjects,
 	listThreadMessages,
 	listThreads,
+	listThreadsWithInProgressMessages,
 	markThreadErrorSeen,
 	markThreadFailed,
 	markThreadRan,
+	markThreadRunStarted,
 	markThreadStopped,
 	renameThread,
 	setProjectClosed,
@@ -32,7 +34,6 @@ import {
 	setThreadReasoningEffort,
 	setThreadUsage,
 	stopInProgressThreadMessages,
-	touchThread,
 	updateThreadCodexId,
 	upsertProject,
 	upsertThreadActivity,
@@ -160,6 +161,67 @@ export function warmProcedureStartupCaches(): void {
 	const mostRecentThread = listThreads(db)[0] ?? null;
 	if (mostRecentThread) {
 		warmThreadDetailCache(mostRecentThread.id);
+	}
+}
+
+function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
+	if (thread.lastRunAt && thread.lastErrorAt) {
+		return thread.lastRunAt >= thread.lastErrorAt
+			? thread.lastRunAt
+			: thread.lastErrorAt;
+	}
+
+	return thread.lastRunAt ?? thread.lastErrorAt ?? null;
+}
+
+function shouldRecoverInterruptedThread(
+	thread: ThreadRecord,
+	lastInProgressMessageUpdatedAt: string | null,
+): boolean {
+	if (thread.activeTurnStartedAt) {
+		return true;
+	}
+
+	if (!lastInProgressMessageUpdatedAt) {
+		return false;
+	}
+
+	const lastSettledAt = latestSettledThreadTimestamp(thread);
+	if (!lastSettledAt) {
+		return true;
+	}
+
+	return lastInProgressMessageUpdatedAt >= lastSettledAt;
+}
+
+export function recoverInterruptedThreadTurnsOnStartup(): void {
+	const threads = listThreads(db);
+	if (threads.length === 0) {
+		return;
+	}
+
+	const threadsById = new Map(threads.map((thread) => [thread.id, thread]));
+	const recoveredThreadIds = new Set<number>();
+
+	for (const interrupted of listThreadsWithInProgressMessages(db)) {
+		const thread = threadsById.get(interrupted.threadId);
+		if (!thread) {
+			continue;
+		}
+
+		stopInProgressThreadMessages(db, thread.id);
+		if (shouldRecoverInterruptedThread(thread, interrupted.lastUpdatedAt)) {
+			markThreadStopped(db, thread.id, THREAD_INTERRUPTED_MESSAGE);
+			recoveredThreadIds.add(thread.id);
+		}
+	}
+
+	for (const thread of threads) {
+		if (!thread.activeTurnStartedAt || recoveredThreadIds.has(thread.id)) {
+			continue;
+		}
+
+		markThreadStopped(db, thread.id, THREAD_INTERRUPTED_MESSAGE);
 	}
 }
 
@@ -1596,9 +1658,9 @@ async function queueThreadMessage(
 		role: "user",
 		text: input,
 	});
-	touchThread(db, thread.id);
 
 	const startedAt = getNow();
+	markThreadRunStarted(db, thread.id, startedAt);
 	const controller = new AbortController();
 	threadTurnAbortControllerMap.set(thread.id, controller);
 	setThreadRunStatus(thread.id, {
@@ -2096,6 +2158,30 @@ export function shutdownProjectPolling(): void {
 	for (const projectId of projectPollMap.keys()) {
 		stopProjectPoller(projectId);
 	}
+}
+
+export async function shutdownActiveThreadTurns(): Promise<void> {
+	const activeTurns = [...threadTurnAbortControllerMap.entries()].map(
+		([threadId, controller]) => ({
+			controller,
+			promise: threadTurnCompletionMap.get(threadId) ?? null,
+			threadId,
+		}),
+	);
+
+	for (const activeTurn of activeTurns) {
+		if (!activeTurn.controller.signal.aborted) {
+			activeTurn.controller.abort(
+				createAbortError(null, THREAD_INTERRUPTED_MESSAGE),
+			);
+		}
+	}
+
+	await Promise.allSettled(
+		activeTurns.flatMap((activeTurn) =>
+			activeTurn.promise ? [activeTurn.promise] : [],
+		),
+	);
 }
 
 export function suspendActiveWorktreePolling(): void {

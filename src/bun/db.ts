@@ -94,6 +94,7 @@ export type ThreadRecord = {
 	lastCompactionAt: string | null;
 	lastCompactionBeforeInputTokens: number | null;
 	lastCompactionAfterInputTokens: number | null;
+	activeTurnStartedAt: string | null;
 	lastErrorAt: string | null;
 	lastErrorSeenAt: string | null;
 	lastErrorMessage: string | null;
@@ -116,6 +117,11 @@ export type ProjectWorktreePinRecord = {
 	projectId: number;
 	worktreePath: string;
 	pinnedAt: string;
+};
+
+export type InProgressThreadMessageRecord = {
+	threadId: number;
+	lastUpdatedAt: string;
 };
 
 const DEFAULT_APP_DATA_DIR =
@@ -280,6 +286,7 @@ function migrate(db: Database): void {
 				last_compaction_at TEXT,
 				last_compaction_before_input_tokens INTEGER,
 				last_compaction_after_input_tokens INTEGER,
+				active_turn_started_at TEXT,
 				last_error_at TEXT,
 				last_error_seen_at TEXT,
 				last_error_message TEXT
@@ -314,6 +321,11 @@ function migrate(db: Database): void {
 		db,
 		"last_compaction_after_input_tokens",
 		"last_compaction_after_input_tokens INTEGER",
+	);
+	ensureThreadColumn(
+		db,
+		"active_turn_started_at",
+		"active_turn_started_at TEXT",
 	);
 	ensureThreadColumn(db, "last_error_at", "last_error_at TEXT");
 	ensureThreadColumn(db, "last_error_seen_at", "last_error_seen_at TEXT");
@@ -631,6 +643,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 						last_compaction_at AS lastCompactionAt,
 						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
 						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+						active_turn_started_at AS activeTurnStartedAt,
 						last_error_at AS lastErrorAt,
 						last_error_seen_at AS lastErrorSeenAt,
 						last_error_message AS lastErrorMessage
@@ -675,6 +688,7 @@ export function getThreadById(
 						last_compaction_at AS lastCompactionAt,
 						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
 						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+						active_turn_started_at AS activeTurnStartedAt,
 						last_error_at AS lastErrorAt,
 						last_error_seen_at AS lastErrorSeenAt,
 						last_error_message AS lastErrorMessage
@@ -850,11 +864,32 @@ export function markThreadRan(database: Database, threadId: number): void {
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_run_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				active_turn_started_at = NULL,
 				last_error_at = NULL,
 				last_error_seen_at = NULL,
 				last_error_message = NULL
 			WHERE id = ?
 		`,
+		threadId,
+	);
+}
+
+export function markThreadRunStarted(
+	database: Database,
+	threadId: number,
+	startedAt: string,
+): void {
+	runStatement(
+		database,
+		`
+			UPDATE threads
+			SET
+				updated_at = ?,
+				active_turn_started_at = ?
+			WHERE id = ?
+		`,
+		startedAt,
+		startedAt,
 		threadId,
 	);
 }
@@ -871,6 +906,7 @@ export function markThreadStopped(
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_run_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				active_turn_started_at = NULL,
 				last_error_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_error_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_error_message = ?
@@ -928,6 +964,7 @@ export function markThreadFailed(
 			UPDATE threads
 			SET
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				active_turn_started_at = NULL,
 				last_error_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_error_seen_at = NULL,
 				last_error_message = ?
@@ -957,17 +994,21 @@ export function markThreadErrorSeen(
 	);
 }
 
-export function touchThread(database: Database, threadId: number): void {
-	runStatement(
-		database,
-		`
-			UPDATE threads
-			SET
-				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = ?
-		`,
-		threadId,
-	);
+export function listThreadsWithInProgressMessages(
+	database: Database,
+): InProgressThreadMessageRecord[] {
+	return database
+		.query<InProgressThreadMessageRecord, []>(
+			`
+				SELECT
+					thread_id AS threadId,
+					MAX(COALESCE(updated_at, created_at)) AS lastUpdatedAt
+				FROM thread_messages
+				WHERE state = 'in_progress'
+				GROUP BY thread_id
+			`,
+		)
+		.all();
 }
 
 export function listThreadMessages(

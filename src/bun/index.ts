@@ -25,6 +25,7 @@ import {
 	markThreadErrorSeenProcedure,
 	openProjectProcedure,
 	openWorktreeProcedure,
+	recoverInterruptedThreadTurnsOnStartup,
 	renameThreadProcedure,
 	runProjectTaskProcedure,
 	sendThreadMessageProcedure,
@@ -33,6 +34,7 @@ import {
 	setWorktreeGitHistoryChangeListener,
 	setWorktreePinnedProcedure,
 	setWorktreeTaskChangeListener,
+	shutdownActiveThreadTurns,
 	shutdownProcedureCacheMaintenance,
 	shutdownProjectPolling,
 	startProcedureCacheMaintenance,
@@ -732,6 +734,7 @@ function shutdownDevWatchers(): void {
 
 async function bootstrap(): Promise<void> {
 	initAppDatabase();
+	recoverInterruptedThreadTurnsOnStartup();
 	await queueMainviewBundleBuild();
 	startDevMainviewWatcher();
 	startProcedureCacheMaintenance();
@@ -939,22 +942,47 @@ async function bootstrap(): Promise<void> {
 	}, 0);
 }
 
+let shutdownPromise: Promise<void> | null = null;
+
+async function shutdownAndExit(exitCode: number): Promise<void> {
+	if (shutdownPromise) {
+		process.exit(exitCode);
+	}
+
+	shutdownPromise = (async () => {
+		shutdownDevWatchers();
+		setWorktreeGitHistoryChangeListener(null);
+		setWorktreeTaskChangeListener(null);
+		shutdownProcedureCacheMaintenance();
+		shutdownProjectPolling();
+		await shutdownActiveThreadTurns();
+	})()
+		.catch((error) => {
+			console.error("Failed to cleanly shut down Jolt", error);
+		})
+		.finally(() => {
+			process.exit(exitCode);
+		});
+
+	await shutdownPromise;
+}
+
 process.on("SIGINT", () => {
-	shutdownDevWatchers();
-	setWorktreeGitHistoryChangeListener(null);
-	setWorktreeTaskChangeListener(null);
-	shutdownProcedureCacheMaintenance();
-	shutdownProjectPolling();
-	process.exit(0);
+	void shutdownAndExit(0);
 });
 
 process.on("SIGTERM", () => {
-	shutdownDevWatchers();
-	setWorktreeGitHistoryChangeListener(null);
-	setWorktreeTaskChangeListener(null);
-	shutdownProcedureCacheMaintenance();
-	shutdownProjectPolling();
-	process.exit(0);
+	void shutdownAndExit(0);
+});
+
+process.on("uncaughtException", (error) => {
+	console.error(error);
+	void shutdownAndExit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+	console.error(reason);
+	void shutdownAndExit(1);
 });
 
 await bootstrap();
