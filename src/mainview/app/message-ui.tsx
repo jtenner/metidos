@@ -184,7 +184,7 @@ export function ContextUsageMeter({
 					<span>{triggerLabel}</span>
 					<span>{formatCompactTokenCount(estimatedTriggerTokens)}</span>
 				</div>
-				<div className="flex items-center justify-between gap-3 text-[10px] text-[#6f7c84]">
+				<div className="flex items-center justify-between gap-3 text-[10px] text-[#8f9aa2]">
 					<span>Peak input</span>
 					<span>
 						{maxObservedInputTokens === null
@@ -192,7 +192,7 @@ export function ContextUsageMeter({
 							: formatCompactTokenCount(maxObservedInputTokens)}
 					</span>
 				</div>
-				<div className="flex items-center justify-between gap-3 text-[10px] text-[#6f7c84]">
+				<div className="flex items-center justify-between gap-3 text-[10px] text-[#8f9aa2]">
 					<span>{compactionSampleLabel}</span>
 					<span>{lastCompactionLabel ?? "n/a"}</span>
 				</div>
