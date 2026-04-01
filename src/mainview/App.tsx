@@ -5831,6 +5831,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							type="button"
 							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 							onClick={closeThreadActionMenu}
+							aria-label="Close thread actions"
 						>
 							×
 						</button>
@@ -6687,6 +6688,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="flex items-center justify-end border-b border-[#262626] px-3 py-3">
 							<button
 								type="button"
+								aria-label={
+									sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+								}
 								className="px-2 py-1 rounded-sm text-[#bdd5e6] hover:bg-[#202020]"
 								onClick={() => setSidebarCollapsed((value) => !value)}
 							>
@@ -6853,6 +6857,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<button
 							type="button"
 							className="text-[#bdd5e6]"
+							aria-controls="mobile-navigation-drawer"
+							aria-expanded={mobileProjectListOpen}
+							aria-label={
+								mobileProjectListOpen ? "Close navigation" : "Open navigation"
+							}
 							onClick={() => setMobileProjectListOpen((value) => !value)}
 						>
 							{materialSymbol("menu")}
@@ -6867,7 +6876,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</header>
 
 				{mobileProjectListOpen ? (
-					<aside className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] py-2">
+					<aside
+						aria-label="Project, thread, and git navigation"
+						className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] py-2"
+						id="mobile-navigation-drawer"
+					>
 						<div className="px-3 pb-2">{sidebarSearch}</div>
 						{projectSection}
 						{threadSection}
@@ -6910,7 +6923,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				</main>
 
 				{primaryView === "chat" ? (
-					<div className="fixed bottom-16 left-0 right-0 px-4 pb-4 z-40">
+					<footer
+						aria-label="Chat composer"
+						className="fixed bottom-16 left-0 right-0 px-4 pb-4 z-40"
+					>
 						<form
 							className="max-w-2xl mx-auto flex flex-col gap-3"
 							onSubmit={onSubmit}
@@ -7006,7 +7022,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								<div className="text-xs text-[#ff6e84]">{taskControlError}</div>
 							) : null}
 						</form>
-					</div>
+					</footer>
 				) : null}
 
 				<div className="fixed bottom-0 left-0 w-full z-50">

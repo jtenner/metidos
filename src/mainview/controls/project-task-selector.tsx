@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { type JSX, useId } from "react";
 import type { RpcProjectTask } from "../../bun/rpc-schema";
 import { DropdownControl } from "./dropdown";
 import { materialSymbol } from "./icons";
@@ -20,6 +20,7 @@ export function ProjectTaskSelector({
 }: ProjectTaskSelectorProps): JSX.Element {
 	const noTasksAvailable = !loading && tasks.length === 0;
 	const unavailable = disabled || noTasksAvailable;
+	const noTasksHintId = useId();
 	const buttonLabel = loading
 		? "Loading Tasks"
 		: tasks.length > 0
@@ -56,6 +57,7 @@ export function ProjectTaskSelector({
 						onClick={toggle}
 						disabled={disabled}
 						aria-disabled={unavailable}
+						aria-describedby={noTasksAvailable ? noTasksHintId : undefined}
 						aria-expanded={open}
 						aria-haspopup="menu"
 					>
@@ -76,6 +78,11 @@ export function ProjectTaskSelector({
 						</span>
 					</button>
 					{noTasksAvailable ? (
+						<span className="sr-only" id={noTasksHintId}>
+							No project tasks found.
+						</span>
+					) : null}
+					{variant === "desktop" && noTasksAvailable ? (
 						<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 							<div className="whitespace-nowrap rounded-md border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
 								No tasks found.
