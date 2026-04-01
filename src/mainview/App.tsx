@@ -5045,7 +5045,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 		return (
 			<span
-				className={`rounded-full border px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${worktreeChangeStatusClassName(
+				className={`border px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${worktreeChangeStatusClassName(
 					status,
 				)}`}
 			>
@@ -5137,7 +5137,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					className="group flex w-full min-w-0 items-start gap-6"
 					key={group.key}
 				>
-					<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#adcbe0]">
+					<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
 						{brandBoltIcon("text-sm text-[#224259]")}
 					</div>
 					<div className="min-w-0 flex-1 space-y-4">
@@ -5201,7 +5201,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								}`}
 								key={`${message.kind}-${index}`}
 							>
-								<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#bdd5e6]/10 p-5">
+								<div className="glass-panel flex w-full flex-col gap-4 border border-[#bdd5e6]/10 p-5">
 									<div className="text-sm leading-relaxed text-[#ffffff]">
 										{renderAssistantMessageContent(message)}
 									</div>
@@ -5224,7 +5224,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</span>
 					{materialSymbol("account_circle", "text-sm text-[#9f9b99]")}
 				</div>
-				<div className="bg-[#1f2020] p-4 rounded-lg rounded-tr-none text-sm leading-relaxed text-[#ffffff] shadow-sm">
+				<div className="bg-[#1f2020] p-4 text-sm leading-relaxed text-[#ffffff] shadow-sm">
 					<MarkdownMessage text={group.text} />
 				</div>
 			</div>
@@ -5234,28 +5234,28 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const renderDiffWorkspace = (options: { mobile: boolean }): JSX.Element => {
 		const selectorContent =
 			!selectedProject || !activeSelectedWorktreePath ? (
-				<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+				<div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
 					Select a project worktree first.
 				</div>
 			) : !activeSelectedWorktreeOpened ? (
-				<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+				<div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
 					Open this worktree from the Projects panel to inspect its live diff.
 				</div>
 			) : isRefreshingWorktreeSnapshot && !activeWorktreeSnapshot ? (
-				<div className="rounded-sm border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
+				<div className="border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
 					Loading worktree diff...
 				</div>
 			) : worktreeDiffError && !activeWorktreeSnapshot ? (
-				<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
+				<div className="border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
 					{worktreeDiffError}
 				</div>
 			) : activeWorktreeChanges.length === 0 ? (
-				<div className="rounded-sm border border-[#244833] bg-[#12251a] px-4 py-4 text-sm text-[#9fe2b1]">
+				<div className="border border-[#244833] bg-[#12251a] px-4 py-4 text-sm text-[#9fe2b1]">
 					Worktree clean. No staged or unstaged changes.
 				</div>
 			) : (
 				<div
-					className={`overflow-hidden rounded-sm border border-[#252f36] bg-[#0f1417] ${
+					className={`overflow-hidden border border-[#252f36] bg-[#0f1417] ${
 						options.mobile ? "" : "h-full"
 					}`}
 				>
@@ -5270,29 +5270,29 @@ export default function App({ procedures }: AppProps): JSX.Element {
 			);
 
 		const contentBody = !selectedDiffFileChange ? (
-			<div className="rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
+			<div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
 				Select a changed file to inspect its current contents.
 			</div>
 		) : diffFileContentState.error ? (
-			<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
+			<div className="border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
 				{diffFileContentState.error}
 			</div>
 		) : diffFileContentState.isLoadingInitial ? (
-			<div className="rounded-sm border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
+			<div className="border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
 				Streaming file contents...
 			</div>
 		) : diffFileContentState.isMissing ? (
-			<div className="rounded-sm border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
+			<div className="border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
 				This file no longer exists in the working tree. The diff entry is still
 				listed because the change is active.
 			</div>
 		) : diffFileContentState.isBinary ? (
-			<div className="rounded-sm border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
+			<div className="border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
 				Binary file preview unavailable.
 			</div>
 		) : (
 			<div
-				className={`overflow-hidden rounded-sm border border-[#252f36] bg-[#0c1114] ${
+				className={`overflow-hidden border border-[#252f36] bg-[#0c1114] ${
 					options.mobile ? "" : "h-full"
 				}`}
 			>
@@ -5375,7 +5375,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</div>
 							<button
 								type="button"
-								className="rounded-sm border border-[#31404a] bg-[#182025] px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#cfe0eb] transition-colors hover:bg-[#1e2a31] disabled:cursor-not-allowed disabled:opacity-60"
+								className="border border-[#31404a] bg-[#182025] px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#cfe0eb] transition-colors hover:bg-[#1e2a31] disabled:cursor-not-allowed disabled:opacity-60"
 								onClick={() => {
 									void refreshActiveWorktreeSnapshot();
 									void loadSelectedDiffFileContent();
@@ -5391,7 +5391,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</button>
 						</div>
 						{worktreeDiffError && activeWorktreeSnapshot ? (
-							<div className="mt-3 rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+							<div className="mt-3 border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
 								{worktreeDiffError}
 							</div>
 						) : null}
@@ -5414,7 +5414,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div
 						className={
 							options.mobile
-								? "rounded-sm border border-[#252f36] bg-[#12181c] px-4 py-4"
+								? "border border-[#252f36] bg-[#12181c] px-4 py-4"
 								: "border-b border-[#262626] bg-[#101417] px-6 py-5"
 						}
 					>
@@ -5442,7 +5442,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									selectedDiffFileChange?.unstagedStatus ?? null,
 								)}
 								{selectedDiffFileChange ? (
-									<span className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
+									<span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
 										{formatFileSize(diffFileContentState.totalBytes)}
 									</span>
 								) : null}
@@ -5480,7 +5480,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
 	const addProjectForm = (
 		<form
-			className="space-y-2 border-b border-[#262626] bg-[#151515] px-3 py-3"
+			className="space-y-2 border border-[#23282c] bg-[#151515] px-3 py-2.5"
 			onSubmit={submitAddProject}
 		>
 			<label className="block text-[10px] font-label uppercase tracking-widest text-[#bdd5e6]">
@@ -5488,7 +5488,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<div className="relative mt-2 space-y-2">
 					<div className="flex items-start gap-2">
 						<input
-							className={`min-w-0 flex-1 rounded-sm border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
+							className={`min-w-0 flex-1 border px-3 py-2 text-sm outline-none transition-all placeholder:text-[#6f6f6f] focus:border-[#99bed9] ${
 								addProjectInputIsPreviewing
 									? "border-[#9fc1da] bg-[#1a2025] text-[#ffffff] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
 									: "border-[#3b3b3b] bg-[#101010] text-[#f2f0ef]"
@@ -5506,14 +5506,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						/>
 						<button
 							type="submit"
-							className="rounded-sm bg-[#bdd5e6] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#2e526b] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="bg-[#bdd5e6] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#2e526b] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 							disabled={isAddingProject}
 						>
 							{isAddingProject ? "Adding" : "Add"}
 						</button>
 					</div>
 					{addProjectPath.trim() ? (
-						<div className="overflow-hidden rounded-sm border border-[#2f3f4b] bg-[#101315]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+						<div className="overflow-hidden border border-[#2f3f4b] bg-[#101315]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
 							<div className="flex items-center justify-between border-b border-[#283036] px-3 py-2">
 								<span className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
 									Folders
@@ -5572,7 +5572,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												onClick={() => selectDirectorySuggestion(directory)}
 											>
 												<div
-													className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-[#bdd5e6] ${
+													className={`flex h-8 w-8 shrink-0 items-center justify-center text-[#bdd5e6] ${
 														hoveredDirectorySuggestion === directory
 															? "bg-[#26353f]"
 															: "bg-[#1b252c]"
@@ -5618,7 +5618,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const projectActionMenuPanel =
 		projectActionMenu && projectActionMenuProject ? (
 			<div
-				className="fixed z-[90] w-80 overflow-hidden rounded-lg border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				className="fixed z-[90] w-80 overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
 				ref={projectActionMenuRef}
 				style={{
 					left: projectActionMenu.x,
@@ -5645,7 +5645,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						<div className="flex items-center gap-1">
 							<button
 								type="button"
-								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] text-[#ff8ca0] transition-colors hover:bg-[#39161f] hover:text-[#ffd1d8]"
+								className="flex h-7 w-7 items-center justify-center border border-[#5c2030] bg-[#2c1117] text-[#ff8ca0] transition-colors hover:bg-[#39161f] hover:text-[#ffd1d8]"
 								onClick={() =>
 									void deleteTrackedProject(projectActionMenuProject.id)
 								}
@@ -5656,7 +5656,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							</button>
 							<button
 								type="button"
-								className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
+								className="flex h-7 w-7 items-center justify-center border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 								onClick={closeProjectActionMenu}
 								aria-label="Close project actions"
 							>
@@ -5670,84 +5670,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						{projectActionMenuError}
 					</div>
 				) : null}
-				<div className="space-y-2 px-3 py-3">
-					<div className="flex items-center justify-between">
-						<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-							Active Worktrees
-						</div>
-						{projectActionMenuLoading ? (
-							<div className="text-[10px] uppercase tracking-widest text-[#727e86]">
-								Loading
-							</div>
-						) : null}
-					</div>
-					<div className="max-h-56 space-y-1 overflow-y-auto">
-						{!projectActionMenuLoading &&
-						projectActionMenuWorktrees.length === 0 ? (
-							<div className="rounded-sm border border-[#252f36] bg-[#161c21] px-3 py-3 text-xs text-[#8f989f]">
-								No worktrees found.
-							</div>
-						) : null}
-						{projectActionMenuWorktrees.map((worktree) => {
-							const worktreeErrorLevel = worktreeThreadErrorLevel(
-								projectActionMenuProject.id,
-								worktree.path,
-							);
-							return (
-								<div
-									className="rounded-sm border border-[#252f36] bg-[#161c21] px-3 py-2"
-									key={worktree.path}
-								>
-									<div
-										className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
-										style={{
-											gridTemplateColumns:
-												"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
-										}}
-									>
-										<span
-											className="min-w-0 truncate font-mono text-[11px] leading-5 text-[#a1c3db]"
-											title={worktree.branch ?? "detached"}
-										>
-											{worktree.branch ?? "detached"}
-										</span>
-										<span
-											className="min-w-0 truncate text-sm leading-5 text-[#f2f0ef]"
-											title={shortName(worktree.path)}
-										>
-											{shortName(worktree.path)}
-										</span>
-										<span
-											className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
-												worktreeErrorLevel === "unread"
-													? "bg-[#ff304f]"
-													: worktreeErrorLevel === "failed"
-														? "bg-[#8f4956]"
-														: worktreeErrorLevel === "stopped"
-															? "bg-[#b98a3a]"
-															: "bg-transparent"
-											}`}
-										/>
-										<div
-											className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8f9aa2]"
-											title={formatPathForDisplay(
-												worktree.path,
-												homeDirectory,
-												supportsTildePath,
-											)}
-										>
-											{formatPathForDisplay(
-												worktree.path,
-												homeDirectory,
-												supportsTildePath,
-											)}
-										</div>
-									</div>
-								</div>
-							);
-						})}
-					</div>
-				</div>
 				<form
 					className="border-t border-[#2b343b] bg-[#171d21] px-3 py-3"
 					onSubmit={submitNewWorktree}
@@ -5761,7 +5683,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="mt-2 flex items-center gap-2">
 						<input
 							id="new-worktree-name"
-							className="min-w-0 flex-1 rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+							className="min-w-0 flex-1 border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
 							placeholder="feature/new-worktree"
 							value={newWorktreeName}
 							onChange={(event) => {
@@ -5773,7 +5695,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							spellCheck={false}
 						/>
 						<button
-							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 							disabled={isCreatingWorktree || worktreePinBusyPath !== null}
 							type="submit"
 						>
@@ -5790,7 +5712,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	const threadActionMenuPanel =
 		threadActionMenu && threadActionMenuThread ? (
 			<div
-				className="fixed z-[95] w-80 overflow-hidden rounded-lg border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+				className="fixed z-[95] w-80 overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
 				ref={threadActionMenuRef}
 				style={{
 					left: threadActionMenu.x,
@@ -5816,7 +5738,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						<button
 							type="button"
-							className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
+							className="flex h-7 w-7 items-center justify-center border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 							onClick={closeThreadActionMenu}
 							aria-label="Close thread actions"
 						>
@@ -5842,7 +5764,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					<div className="mt-2 flex items-center gap-2">
 						<input
 							id="thread-rename-title"
-							className="min-w-0 flex-1 rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+							className="min-w-0 flex-1 border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
 							value={threadRenameTitle}
 							onChange={(event) => {
 								setThreadActionMenuError("");
@@ -5861,7 +5783,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</label>
 					<textarea
 						id="thread-rename-summary"
-						className="mt-2 min-h-[5.5rem] w-full rounded-sm border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+						className="mt-2 min-h-[5.5rem] w-full border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
 						placeholder="Optional desktop hover summary."
 						value={threadRenameSummary}
 						onChange={(event) => {
@@ -5878,7 +5800,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 						</div>
 						<button
 							type="submit"
-							className="rounded-sm bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+							className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
 							disabled={threadActionBusy !== null}
 						>
 							{threadActionBusy === "rename" ? "Saving" : "Save"}
@@ -5888,7 +5810,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<div className="flex justify-end gap-2 border-t border-[#2b343b] px-3 py-3">
 					<button
 						type="button"
-						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#31404a] bg-[#182025] text-[#dfebf3] transition-colors hover:bg-[#1f282f] disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#31404a] bg-[#182025] text-[#dfebf3] transition-colors hover:bg-[#1f282f] disabled:cursor-not-allowed disabled:opacity-60"
 						onClick={() => {
 							void toggleThreadPinned();
 						}}
@@ -5906,7 +5828,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					</button>
 					<button
 						type="button"
-						className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#5c2030] bg-[#2c1117] text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
+						className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#5c2030] bg-[#2c1117] text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
 						onClick={() => {
 							void deleteSelectedThread();
 						}}
@@ -5930,10 +5852,39 @@ export default function App({ procedures }: AppProps): JSX.Element {
 		/>
 	);
 
+	const sidebarActionButtonClass =
+		"flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";
+	const activeSidebarBranchLabel =
+		activeSelectedWorktree?.branch?.trim() ||
+		(selectedProject
+			? activeSelectedWorktreeName || activeSelectedWorktreeFolder
+			: "Select a project");
+	const renderSidebarHero = (
+		collapseControl: JSX.Element | null,
+	): JSX.Element => (
+		<div className="border border-[#232b30] bg-[#171b1d] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+			<div className="flex items-start gap-2.5">
+				<div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[#1b2a34] text-[#7aa5c4] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+					{materialSymbol("folder", "text-[18px]")}
+				</div>
+				<div className="min-w-0 flex-1">
+					<div className="truncate text-[15px] font-semibold leading-5 text-[#f2f0ef]">
+						{selectedProject?.name ?? "No project selected"}
+					</div>
+					<div className="mt-0.5 truncate font-label text-[10px] font-semibold tracking-[0.16em] text-[#8ca6b9]">
+						{activeSidebarBranchLabel}
+					</div>
+				</div>
+				{collapseControl}
+			</div>
+			<div className="mt-3">{sidebarSearch}</div>
+		</div>
+	);
+
 	const projectTree = (
-		<div className="space-y-2">
+		<div className="space-y-1">
 			{filteredProjects.length === 0 ? (
-				<div className="px-3 text-sm text-[#a7a7a7]">
+				<div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
 					{normalizedSidebarSearchQuery
 						? "No matching projects."
 						: "No projects in database. Use + to add a project folder."}
@@ -5964,7 +5915,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					const showWorktrees =
 						projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
 					const projectIndicatorClass = isActive
-						? "bg-[#4fefb2]"
+						? "bg-[#7aa5c4]"
 						: projectErrorLevel === "unread"
 							? "bg-[#ff304f]"
 							: projectErrorLevel === "failed"
@@ -5985,34 +5936,48 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								);
 							}}
 						>
-							<div
-								className={`group/project flex w-full items-center gap-1 rounded-sm transition-colors ${
-									isActive ? "bg-[#262626]" : "hover:bg-[#1f2020]"
-								}`}
-							>
+							<div className="group/project flex items-center gap-2">
 								<button
 									type="button"
-									className={`min-w-0 flex-1 px-3 py-2 text-left ${isActive ? "text-[#bdd5e6]" : "text-[#d7d7d7]"}`}
+									className={`min-w-0 flex-1 px-3 py-2 text-left transition-colors ${
+										isActive
+											? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
+											: "text-[#d7d7d7] hover:bg-[#171a1b]"
+									}`}
 									onClick={() => {
 										hideErrorPreview();
 										void refreshProject(project);
 									}}
 								>
-									<div className="flex items-center gap-2">
-										<span className="text-sm">
-											{projectTreeOpen ? "▾" : "▸"}
-										</span>
+									<div className="flex items-center gap-2.5">
 										<span
-											className={`w-2 h-2 rounded-full ${projectIndicatorClass}`}
-										/>
-										<div className="font-medium text-sm truncate">
+											className={`flex h-7 w-7 shrink-0 items-center justify-center ${
+												isActive
+													? "bg-[#1f313c] text-[#bdd5e6]"
+													: "bg-[#151a1c] text-[#8ca6b9]"
+											}`}
+										>
+											{materialSymbol("folder", "text-[16px]")}
+										</span>
+										<div className="min-w-0 flex-1 truncate text-[14px] font-medium">
 											{project.name}
+										</div>
+										<div className="flex shrink-0 items-center gap-2">
+											<span
+												className={`h-1.5 w-1.5 ${projectIndicatorClass}`}
+											/>
+											<span className="text-[#62737e]">
+												{materialSymbol(
+													projectTreeOpen ? "expand_more" : "chevron_right",
+													"text-[17px]",
+												)}
+											</span>
 										</div>
 									</div>
 								</button>
 								<button
 									type="button"
-									className={`mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] px-1 text-[9px] font-semibold leading-none tracking-[-0.18em] text-[#acb8c1] transition-all hover:bg-[#242d33] hover:text-[#f2f0ef] ${
+									className={`${sidebarActionButtonClass} ${
 										isActive
 											? "opacity-100"
 											: "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
@@ -6028,91 +5993,105 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									}}
 									aria-label={`Project actions for ${project.name}`}
 								>
-									...
+									{materialSymbol("menu", "text-[14px]")}
 								</button>
 							</div>
 
 							{showWorktrees ? (
-								<div className="ml-3 space-y-1">
-									{state.loadingWorktrees ? (
-										<div className="text-xs text-[#a8a6a4] px-2 py-1">
-											Loading worktrees...
-										</div>
-									) : null}
-									{state.error ? (
-										<div className="text-xs text-[#ff6e84] px-2 py-1">
-											{state.error}
-										</div>
-									) : null}
-									{visibleWorktrees.length === 0 ? (
-										<div className="text-xs text-[#8f8d8b] px-2 py-1">
-											{normalizedSidebarSearchQuery
-												? "No matching worktrees."
-												: "No worktrees found."}
-										</div>
-									) : null}
-									{visibleWorktrees.length > 0 ? (
-										<div className="app-scrollbar max-h-[18.75rem] overflow-y-auto overscroll-contain pr-1">
-											<div className="space-y-1">
-												{visibleWorktrees.map((worktree) => {
-													const wState = getWorktreeState(
-														project.id,
-														worktree.path,
-													);
-													const worktreePinned = Boolean(worktree.pinnedAt);
-													const togglingPin =
-														worktreePinBusyPath === worktree.path;
-													const activeWorktree = isActiveWorktree(
-														project.id,
-														worktree.path,
-													);
-													const worktreeErrorLevel = worktreeThreadErrorLevel(
-														project.id,
-														worktree.path,
-													);
-													return (
-														<div className="relative" key={worktree.path}>
-															<button
-																type="button"
-																className={`w-full min-w-0 text-left px-3 py-2 pr-12 flex flex-col gap-0.5 transition-colors ${
-																	activeWorktree
-																		? "bg-[#273036] text-[#f2f0ef]"
-																		: wState.opened
-																			? "bg-[#1f2020] text-[#f2f0ef]"
-																			: "text-[#cfd1d4] hover:bg-[#202020]"
-																}`}
-																onClick={() => {
-																	hideErrorPreview();
-																	clearThreadSelection();
-																	setThreadsError("");
-																	selectProject(project, worktree.path);
-																	void openOrCloseWorktree(
-																		project.id,
-																		worktree.path,
-																	);
-																}}
-															>
-																<div
-																	className="grid min-w-0 items-center gap-x-2 gap-y-0.5"
-																	style={{
-																		gridTemplateColumns:
-																			"minmax(0, 8.75rem) minmax(0, 1.35fr) auto",
+								<div className="ml-4 border-l border-[#1f262a] pl-3">
+									<div className="space-y-1">
+										{state.loadingWorktrees ? (
+											<div className="px-3 py-1 text-xs text-[#8f9aa2]">
+												Loading worktrees...
+											</div>
+										) : null}
+										{state.error ? (
+											<div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+												{state.error}
+											</div>
+										) : null}
+										{visibleWorktrees.length === 0 ? (
+											<div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
+												{normalizedSidebarSearchQuery
+													? "No matching worktrees."
+													: "No worktrees found."}
+											</div>
+										) : null}
+										{visibleWorktrees.length > 0 ? (
+											<div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
+												<div className="space-y-1">
+													{visibleWorktrees.map((worktree) => {
+														const wState = getWorktreeState(
+															project.id,
+															worktree.path,
+														);
+														const worktreePinned = Boolean(worktree.pinnedAt);
+														const togglingPin =
+															worktreePinBusyPath === worktree.path;
+														const activeWorktree = isActiveWorktree(
+															project.id,
+															worktree.path,
+														);
+														const worktreeErrorLevel = worktreeThreadErrorLevel(
+															project.id,
+															worktree.path,
+														);
+														return (
+															<div className="relative" key={worktree.path}>
+																<button
+																	type="button"
+																	className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
+																		activeWorktree
+																			? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
+																			: wState.opened
+																				? "bg-[#161c1f] text-[#f2f0ef]"
+																				: "text-[#cfd1d4] hover:bg-[#14181a]"
+																	}`}
+																	onClick={() => {
+																		hideErrorPreview();
+																		clearThreadSelection();
+																		setThreadsError("");
+																		selectProject(project, worktree.path);
+																		void openOrCloseWorktree(
+																			project.id,
+																			worktree.path,
+																		);
 																	}}
 																>
 																	<span
-																		className="min-w-0 truncate font-mono text-xs leading-5 text-[#a1c3db]"
-																		title={worktree.branch ?? "detached"}
+																		className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+																			activeWorktree
+																				? "bg-[#24333b] text-[#bdd5e6]"
+																				: "bg-[#14181a] text-[#8ca6b9]"
+																		}`}
 																	>
-																		{worktree.branch ?? "detached"}
+																		{materialSymbol("folder", "text-[14px]")}
 																	</span>
+																	<div className="min-w-0 flex-1">
+																		<div
+																			className="truncate text-[13px] font-medium leading-4"
+																			title={shortName(worktree.path)}
+																		>
+																			{shortName(worktree.path)}
+																		</div>
+																		<div
+																			className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]"
+																			title={formatPathForDisplay(
+																				worktree.path,
+																				homeDirectory,
+																				supportsTildePath,
+																			)}
+																		>
+																			{worktree.branch ?? "Primary"} ·{" "}
+																			{formatPathForDisplay(
+																				worktree.path,
+																				homeDirectory,
+																				supportsTildePath,
+																			)}
+																		</div>
+																	</div>
 																	<span
-																		className="min-w-0 truncate text-sm leading-5"
-																		title={shortName(worktree.path)}
-																	>
-																		{shortName(worktree.path)}
-																	</span>
-																	<span
-																		className={`h-1.5 w-1.5 shrink-0 rounded-full justify-self-end ${
+																		className={`absolute right-10 top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
 																			worktreeErrorLevel === "unread"
 																				? "bg-[#ff304f]"
 																				: worktreeErrorLevel === "failed"
@@ -6122,70 +6101,56 @@ export default function App({ procedures }: AppProps): JSX.Element {
 																						: "bg-transparent"
 																		}`}
 																	/>
-																	<div
-																		className="col-span-2 min-w-0 truncate text-[11px] leading-4 text-[#8f9aa2]"
-																		title={formatPathForDisplay(
+																</button>
+																<button
+																	type="button"
+																	className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+																		activeWorktree || wState.opened
+																			? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
+																			: "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
+																	}`}
+																	onClick={() => {
+																		void toggleWorktreePinned(
+																			project.id,
 																			worktree.path,
-																			homeDirectory,
-																			supportsTildePath,
-																		)}
-																	>
-																		{formatPathForDisplay(
-																			worktree.path,
-																			homeDirectory,
-																			supportsTildePath,
-																		)}
-																	</div>
-																</div>
+																			worktreePinned,
+																		);
+																	}}
+																	disabled={
+																		togglingPin || worktreePinBusyPath !== null
+																	}
+																	aria-label={
+																		worktreePinned
+																			? "Unpin worktree"
+																			: "Pin worktree"
+																	}
+																	title={
+																		worktreePinned
+																			? "Unpin worktree"
+																			: "Pin worktree"
+																	}
+																>
+																	{materialSymbol("push_pin", "text-[13px]", {
+																		filled: worktreePinned,
+																	})}
+																</button>
 																{wState.loading ? (
-																	<div className="text-xs text-[#8f8d8b]">
+																	<div className="px-3 pt-1 text-[11px] text-[#8f8d8b]">
 																		Syncing diff + file state...
 																	</div>
 																) : null}
 																{wState.error ? (
-																	<div className="text-xs text-[#ff6e84]">
+																	<div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
 																		{wState.error}
 																	</div>
 																) : null}
-															</button>
-															<button
-																type="button"
-																className={`absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-																	activeWorktree || wState.opened
-																		? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
-																		: "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
-																}`}
-																onClick={() => {
-																	void toggleWorktreePinned(
-																		project.id,
-																		worktree.path,
-																		worktreePinned,
-																	);
-																}}
-																disabled={
-																	togglingPin || worktreePinBusyPath !== null
-																}
-																aria-label={
-																	worktreePinned
-																		? "Unpin worktree"
-																		: "Pin worktree"
-																}
-																title={
-																	worktreePinned
-																		? "Unpin worktree"
-																		: "Pin worktree"
-																}
-															>
-																{materialSymbol("push_pin", "text-[16px]", {
-																	filled: worktreePinned,
-																})}
-															</button>
-														</div>
-													);
-												})}
+															</div>
+														);
+													})}
+												</div>
 											</div>
-										</div>
-									) : null}
+										) : null}
+									</div>
 								</div>
 							) : null}
 						</div>
@@ -6196,7 +6161,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 	);
 
 	const projectSection = (
-		<div className="px-3 py-3">
+		<section>
 			<SidebarSectionHeader
 				title="Projects"
 				open={projectsSectionOpen}
@@ -6206,7 +6171,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				action={
 					<button
 						type="button"
-						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#99bed9]/30 bg-[#21282e] text-sm font-semibold leading-none text-[#bdd5e6] transition-colors hover:border-[#bdd5e6]/60 hover:bg-[#2c373e] hover:text-[#dfebf3]"
+						className={sidebarActionButtonClass}
 						onClick={toggleAddProjectForm}
 						aria-label={addProjectOpen ? "Close add project" : "Add project"}
 					>
@@ -6215,26 +6180,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			/>
 			{projectsSectionOpen ? (
-				<div className="mt-2 space-y-3">
+				<div className="mt-3 space-y-3">
 					{addProjectOpen ? addProjectForm : null}
 					{projectTree}
 				</div>
 			) : null}
-		</div>
+		</section>
 	);
 
 	const threadSection = (
-		<div className="border-t border-[#262626] px-3 py-3">
+		<section>
 			<SidebarSectionHeader
-				title={
-					<>
-						<span>Threads</span>
-						<span className="font-medium normal-case text-[#879198]">
-							{" - "}
-							{selectedProject ? shortName(selectedProject.path) : "No Project"}
-						</span>
-					</>
-				}
+				title="Threads"
 				open={threadsSectionOpen}
 				onToggle={() => {
 					setThreadsSectionOpen((current) => !current);
@@ -6242,7 +6199,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				action={
 					<button
 						type="button"
-						className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-[#99bed9]/30 bg-[#21282e] text-sm font-semibold leading-none text-[#bdd5e6] transition-colors hover:border-[#bdd5e6]/60 hover:bg-[#2c373e] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50"
+						className={sidebarActionButtonClass}
 						onClick={() => {
 							void createThreadFromSelection();
 						}}
@@ -6263,13 +6220,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				}
 			/>
 			{threadsSectionOpen ? (
-				<div className="mt-3 space-y-2">
+				<div className="mt-3 space-y-1">
 					{!selectedProject || !activeSelectedWorktreePath ? (
-						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						<div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
 							Select a project worktree first.
 						</div>
 					) : filteredVisibleThreads.length === 0 ? (
-						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						<div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
 							{normalizedSidebarSearchQuery
 								? "No matching threads in this worktree."
 								: `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`}
@@ -6289,7 +6246,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								(threadProject && thread.worktreePath === threadProject.path
 									? "Primary"
 									: "detached");
-							const threadFolderName = shortName(thread.worktreePath);
 							const threadWorktreeDisplayPath = formatPathForDisplay(
 								thread.worktreePath,
 								homeDirectory,
@@ -6343,16 +6299,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 									: threadSummaryPopover?.anchorId === threadPopoverAnchorId
 										? "thread-summary-popover"
 										: undefined;
+							const threadStatusLabel = hasUnreadError
+								? "Unread error"
+								: hasRunError
+									? "Run failed"
+									: hasRunStopped
+										? "Stopped"
+										: isWorking
+											? "Working"
+											: threadPinned
+												? "Pinned"
+												: null;
 							return (
 								<button
 									type="button"
 									key={thread.id}
 									aria-describedby={threadPreviewDescriptionId}
 									aria-label={threadAriaLabel}
-									className={`w-full rounded-sm px-3 py-2 text-left transition-colors ${
+									className={`w-full px-3 py-2 text-left transition-colors ${
 										isActive
-											? "bg-[#273036] text-[#f2f0ef]"
-											: "bg-[#151515] text-[#d7d7d7] hover:bg-[#1f2020]"
+											? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
+											: "text-[#d7d7d7] hover:bg-[#171a1b]"
 									}`}
 									{...threadPreviewHandlers}
 									onContextMenu={(event) => {
@@ -6376,26 +6343,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										void openThread(thread.id);
 									}}
 								>
-									<div className="flex items-center justify-between gap-3">
-										<div className="flex min-w-0 items-center gap-2">
-											<span
-												className={`h-2 w-2 shrink-0 rounded-full ${
-													hasUnreadError
-														? "bg-[#ff304f]"
-														: hasRunError
-															? "bg-[#8f4956]"
-															: hasRunStopped
-																? "bg-[#b98a3a]"
-																: isActive
-																	? "bg-[#bdd5e6]"
-																	: "bg-[#545d64]"
-												}`}
-											/>
-											<div className="min-w-0 truncate text-sm font-medium">
+									<div className="flex items-center gap-2.5">
+										<span
+											className={`flex h-7 w-7 shrink-0 items-center justify-center ${
+												isActive
+													? "bg-[#1f313c] text-[#bdd5e6]"
+													: "bg-[#151a1c] text-[#8ca6b9]"
+											}`}
+										>
+											{materialSymbol("chat_bubble", "text-[14px]")}
+										</span>
+										<div className="min-w-0 flex-1">
+											<div className="truncate text-[14px] font-medium leading-4">
 												{thread.title}
 											</div>
+											{threadStatusLabel ? (
+												<div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
+													{threadStatusLabel}
+												</div>
+											) : null}
 										</div>
-										<div className="flex shrink-0 items-center gap-2">
+										<div className="flex shrink-0 items-center gap-2 pl-2">
 											{threadPinned ? (
 												<span className="pointer-events-none">
 													{materialSymbol(
@@ -6406,7 +6374,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												</span>
 											) : null}
 											{hasUnreadError ? (
-												<span className="rounded-full border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
+												<span className="border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
 													Unread
 												</span>
 											) : null}
@@ -6420,63 +6388,41 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											) : null}
 										</div>
 									</div>
-									<div className="mt-1 flex min-w-0 items-center gap-1 text-[11px]">
-										<span className="min-w-0 truncate text-[#d7d7d7]">
-											{threadBranchName}
-										</span>
-										<span className="shrink-0 text-[#727e86]">|</span>
-										<span className="min-w-0 truncate text-[#8f9aa2]">
-											{threadFolderName}
-										</span>
-									</div>
 								</button>
 							);
 						})
 					)}
 					{threadsError ? (
-						<div className="text-xs text-[#ff6e84]">{threadsError}</div>
+						<div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+							{threadsError}
+						</div>
 					) : null}
 				</div>
 			) : null}
-		</div>
+		</section>
 	);
 
 	const gitSection = (
-		<div className="border-t border-[#262626] px-3 py-3">
+		<section>
 			<SidebarSectionHeader
-				title={
-					<>
-						<span>Git</span>
-						{gitHistory?.branch || activeSelectedWorktree?.branch ? (
-							<span className="font-medium normal-case text-[#879198]">
-								{" - "}
-								{gitHistory?.branch ?? activeSelectedWorktree?.branch}
-							</span>
-						) : null}
-					</>
-				}
+				title="Git History"
 				open={gitSectionOpen}
 				onToggle={() => {
 					setGitSectionOpen((current) => !current);
 				}}
 			/>
 			{gitSectionOpen ? (
-				<div className="mt-3 space-y-3">
-					<div className="px-1">
-						<span className="font-label text-[11px] tracking-[0.12em] text-[#d8d8d8]">
-							Git History
-						</span>
-					</div>
+				<div className="mt-3 space-y-1.5">
 					{!selectedProject || !activeSelectedWorktreePath ? (
-						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						<div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
 							Select a project worktree first.
 						</div>
 					) : gitHistoryLoading ? (
-						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-xs text-[#d4e4ef]">
+						<div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
 							Loading git history...
 						</div>
 					) : gitHistoryError && filteredGitHistoryEntries.length === 0 ? (
-						<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-xs text-[#ff9db0]">
+						<div className="bg-[#2c1117] px-3 py-2.5 text-xs text-[#ff9db0]">
 							{gitHistoryError}
 						</div>
 					) : filteredGitHistoryEntries.length > 0 ? (
@@ -6499,7 +6445,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										<button
 											type="button"
 											key={entry.hash}
-											className="w-full rounded-sm border border-[#23282c] bg-[#151515] px-3 py-2 text-left transition-colors hover:bg-[#1f2427]"
+											className="w-full px-3 py-2 text-left transition-colors hover:bg-[#171a1b]"
 											style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
 											onMouseEnter={() => {
 												preloadGitHistoryDiff(entry);
@@ -6520,20 +6466,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
 												void openGitHistoryDiff(entry);
 											}}
 										>
-											<div className="flex items-start gap-3">
-												<span className="mt-0.5 shrink-0 rounded-full border border-[#39444b] bg-[#182026] px-2 py-0.5 font-mono text-[10px] text-[#bdd5e6]">
-													{entry.shortHash}
+											<div className="flex items-start gap-2.5">
+												<span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[#151a1c] text-[#8ca6b9]">
+													{materialSymbol("history", "text-[14px]")}
 												</span>
 												<div className="min-w-0 flex-1">
 													<div
-														className="truncate text-sm text-[#f2f0ef]"
+														className="truncate text-[14px] leading-4 text-[#f2f0ef]"
 														title={entry.subject}
 													>
 														{entry.subject}
 													</div>
-													<div className="mt-1 truncate text-[11px] text-[#8f9aa2]">
-														{entry.authorName} ·{" "}
-														{formatGitHistoryTimestamp(entry.committedAt)}
+													<div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
+														{formatGitHistoryTimestamp(entry.committedAt)} · #
+														{entry.shortHash}
 													</div>
 												</div>
 											</div>
@@ -6555,17 +6501,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
 								</div>
 							) : null}
 							{gitHistoryError ? (
-								<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-2 text-[11px] text-[#ff9db0]">
+								<div className="bg-[#2c1117] px-3 py-2 text-[11px] text-[#ff9db0]">
 									{gitHistoryError}
 								</div>
 							) : null}
 						</div>
 					) : gitHistoryLoadingMore ? (
-						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-xs text-[#d4e4ef]">
+						<div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
 							Loading more git history...
 						</div>
 					) : (
-						<div className="rounded-sm border border-[#212121] bg-[#151515] px-3 py-3 text-xs text-[#8f8d8b]">
+						<div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
 							{normalizedSidebarSearchQuery
 								? "No matching git history."
 								: "No commits found for this worktree yet."}
@@ -6573,6 +6519,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
 					)}
 				</div>
 			) : null}
+		</section>
+	);
+
+	const sidebarSections = (
+		<div className="space-y-5">
+			{projectSection}
+			{threadSection}
+			{gitSection}
 		</div>
 	);
 
@@ -6669,29 +6623,45 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<main className="flex flex-1 min-h-0 overflow-hidden">
 					<aside
 						className={`flex min-h-0 shrink-0 flex-col border-r border-[#262626] bg-[#131313] transition-all duration-300 ${
-							sidebarCollapsed ? "w-14" : "w-80"
+							sidebarCollapsed ? "w-14" : "w-[18.5rem]"
 						}`}
 					>
-						<div className="flex items-center justify-end border-b border-[#262626] px-3 py-3">
-							<button
-								type="button"
-								aria-label={
-									sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
-								}
-								className="px-2 py-1 rounded-sm text-[#bdd5e6] hover:bg-[#202020]"
-								onClick={() => setSidebarCollapsed((value) => !value)}
-							>
-								{sidebarCollapsed ? "☰" : "⟨"}
-							</button>
-						</div>
-						<div className="flex-1 overflow-y-auto py-2">
-							{!sidebarCollapsed ? (
-								<div className="px-3 pb-2">{sidebarSearch}</div>
-							) : null}
-							{!sidebarCollapsed ? projectSection : null}
-							{!sidebarCollapsed ? threadSection : null}
-							{!sidebarCollapsed ? gitSection : null}
-						</div>
+						{sidebarCollapsed ? (
+							<div className="flex flex-1 flex-col items-center gap-3 px-2 py-4">
+								<button
+									type="button"
+									aria-label="Expand sidebar"
+									className="flex h-9 w-9 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
+									onClick={() => setSidebarCollapsed(false)}
+								>
+									{materialSymbol("chevron_right", "text-[18px]")}
+								</button>
+								<div className="flex h-9 w-9 items-center justify-center bg-[#1b2a34] text-[#7aa5c4]">
+									{materialSymbol("folder", "text-[18px]")}
+								</div>
+							</div>
+						) : (
+							<>
+								<div className="px-3 pb-3 pt-3">
+									{renderSidebarHero(
+										<button
+											type="button"
+											aria-label="Collapse sidebar"
+											className="flex h-7 w-7 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
+											onClick={() => setSidebarCollapsed(true)}
+										>
+											{materialSymbol(
+												"chevron_right",
+												"rotate-180 text-[17px]",
+											)}
+										</button>,
+									)}
+								</div>
+								<div className="app-scrollbar flex-1 overflow-y-auto px-3 pb-5 pt-1.5">
+									{sidebarSections}
+								</div>
+							</>
+						)}
 					</aside>
 
 					<section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
@@ -6804,7 +6774,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 											/>
 											<button
 												type="submit"
-												className={`w-10 h-10 flex items-center justify-center rounded-sm hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
+												className={`w-10 h-10 flex items-center justify-center hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${composerActionToneClassName}`}
 												disabled={composerActionDisabled}
 												aria-label={composerActionLabel}
 												title={composerActionLabel}
@@ -6855,13 +6825,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				{mobileProjectListOpen ? (
 					<aside
 						aria-label="Project, thread, and git navigation"
-						className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto bg-[#191a1a] border-b border-[#3f3f3f] py-2"
+						className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto border-b border-[#3f3f3f] bg-[#131313] px-3 py-3"
 						id="mobile-navigation-drawer"
 					>
-						<div className="px-3 pb-2">{sidebarSearch}</div>
-						{projectSection}
-						{threadSection}
-						{gitSection}
+						<div className="space-y-6">
+							{renderSidebarHero(null)}
+							{sidebarSections}
+						</div>
 					</aside>
 				) : null}
 
@@ -6908,7 +6878,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 							className="max-w-2xl mx-auto flex flex-col gap-3"
 							onSubmit={onSubmit}
 						>
-							<div className="overflow-visible rounded-[1.35rem] border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+							<div className="overflow-visible border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
 								<div className="border-b border-[#313a40] px-2 py-2">
 									<div className="flex items-center gap-2">
 										<div className="min-w-0 flex-1">
@@ -6944,10 +6914,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										/>
 									</div>
 								</div>
-								<div className="relative flex items-end gap-2 rounded-b-[1.35rem] bg-[#181b1e] px-2 py-2">
+								<div className="relative flex items-end gap-2 bg-[#181b1e] px-2 py-2">
 									<textarea
 										ref={mobileComposerRef}
-										className="min-h-0 flex-grow overflow-y-auto rounded-[1rem] border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
+										className="min-h-0 flex-grow overflow-y-auto border border-[#333c43] bg-[#1e2123] px-3 py-2 text-[#ffffff] text-sm leading-6 resize-none placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
 										placeholder={
 											selectedThread
 												? `Ask ${APP_TITLE}...`
@@ -6969,7 +6939,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 										}
 									/>
 									<button
-										className={`p-2 rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
+										className={`p-2 shadow-lg active:scale-95 transition-transform flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-60 ${
 											selectedThreadIsWorking
 												? "bg-[#4b2028] text-[#ffd4da]"
 												: "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
@@ -7060,7 +7030,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<div
 					id="thread-error-popover"
 					role="note"
-					className="pointer-events-none fixed z-[110] max-w-[22rem] rounded-md border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+					className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
 					style={{
 						left: errorPreviewPopover.x,
 						top: errorPreviewPopover.y,
@@ -7076,7 +7046,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 				<div
 					id="thread-summary-popover"
 					role="note"
-					className="pointer-events-none fixed z-[108] hidden max-w-[22rem] rounded-md border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
+					className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
 					style={{
 						left: threadSummaryPopover.x,
 						top: threadSummaryPopover.y,

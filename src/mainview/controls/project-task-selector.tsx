@@ -48,11 +48,11 @@ export function ProjectTaskSelector({
 						className={`flex items-center gap-2 transition-colors ${
 							variant === "desktop"
 								? unavailable
-									? "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5"
-									: "h-7 gap-1.5 rounded-sm bg-[#191a1a] px-2.5 hover:bg-[#262626]"
+									? "h-7 gap-1.5 bg-[#191a1a] px-2.5"
+									: "h-7 gap-1.5 bg-[#191a1a] px-2.5 hover:bg-[#262626]"
 								: unavailable
-									? "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-									: "h-10 rounded-xl border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+									? "h-10 border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+									: "h-10 border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
 						} ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
 						onClick={toggle}
 						disabled={disabled}
@@ -84,7 +84,7 @@ export function ProjectTaskSelector({
 					) : null}
 					{variant === "desktop" && noTasksAvailable ? (
 						<div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
-							<div className="whitespace-nowrap rounded-md border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+							<div className="whitespace-nowrap border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
 								No tasks found.
 							</div>
 						</div>
@@ -95,8 +95,8 @@ export function ProjectTaskSelector({
 				<div
 					className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "left-0 min-w-[18rem] rounded-md border-[#3c4c58] bg-[#15191b]"
-							: "right-0 w-[calc(100vw-2rem)] max-w-[18rem] rounded-2xl border-[#445058] bg-[#171b1d]"
+							? "left-0 min-w-[18rem] border-[#3c4c58] bg-[#15191b]"
+							: "right-0 w-[calc(100vw-2rem)] max-w-[18rem] border-[#445058] bg-[#171b1d]"
 					}`}
 				>
 					<div className="border-b border-[#3c4c58] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">

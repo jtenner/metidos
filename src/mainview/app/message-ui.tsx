@@ -76,7 +76,7 @@ const markdownComponents: Components = {
 		return (
 			<code
 				{...props}
-				className={`rounded-sm bg-[#1d2022] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#e1ecf3] ${className ?? ""}`.trim()}
+				className={`bg-[#1d2022] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#e1ecf3] ${className ?? ""}`.trim()}
 			>
 				{children}
 			</code>
@@ -157,7 +157,7 @@ export function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
 
 export function ProcessingMessage(): JSX.Element {
 	return (
-		<div className="inline-flex items-center gap-3 rounded-sm border border-[#31404a] bg-[#182025] px-3 py-2 text-sm text-[#dfebf3]">
+		<div className="inline-flex items-center gap-3 border border-[#31404a] bg-[#182025] px-3 py-2 text-sm text-[#dfebf3]">
 			<BeatLoader color="#bdd5e6" margin={1} size={5} speedMultiplier={0.85} />
 			<span>Processing</span>
 		</div>
@@ -166,7 +166,7 @@ export function ProcessingMessage(): JSX.Element {
 
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 	return (
-		<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+		<div className="border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
 			{text}
 		</div>
 	);
@@ -174,7 +174,7 @@ export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 
 export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
 	return (
-		<div className="rounded-sm border border-[#6d5930] bg-[#261f12] px-3 py-3 text-sm text-[#f2d79b]">
+		<div className="border border-[#6d5930] bg-[#261f12] px-3 py-3 text-sm text-[#f2d79b]">
 			{text}
 		</div>
 	);
@@ -241,14 +241,14 @@ function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
 	const lines = parseUnifiedDiff(diffText);
 	if (lines.length === 0) {
 		return (
-			<div className="rounded-sm border border-[#252f36] bg-[#111518] px-3 py-3 text-xs text-[#7f8c95]">
+			<div className="border border-[#252f36] bg-[#111518] px-3 py-3 text-xs text-[#7f8c95]">
 				No diff available.
 			</div>
 		);
 	}
 
 	return (
-		<div className="overflow-hidden rounded-sm border border-[#252f36] bg-[#111518]">
+		<div className="overflow-hidden border border-[#252f36] bg-[#111518]">
 			<div
 				aria-label="Diff content"
 				className="app-scrollbar max-h-[28rem] overflow-auto text-[11px] leading-5"
@@ -293,7 +293,7 @@ export function ToolCallMessage({
 	state: "in_progress" | "completed" | "failed" | "stopped";
 }): JSX.Element {
 	return (
-		<div className="space-y-3 rounded-sm border border-[#2c353c] bg-[#13181b] p-4">
+		<div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
 			<div className="flex items-center justify-between gap-4">
 				<div className="min-w-0">
 					<div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
@@ -304,7 +304,7 @@ export function ToolCallMessage({
 					</div>
 					<div className="mt-1 text-[11px] text-[#8f9aa2]">{server}</div>
 				</div>
-				<div className="shrink-0 rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+				<div className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
 					{toolCallStateLabel(state)}
 				</div>
 			</div>
@@ -313,7 +313,7 @@ export function ToolCallMessage({
 					<div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
 						Arguments
 					</div>
-					<pre className="app-scrollbar max-h-[12rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+					<pre className="app-scrollbar max-h-[12rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
 						{argumentsText}
 					</pre>
 				</div>
@@ -323,7 +323,7 @@ export function ToolCallMessage({
 					<div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
 						{state === "failed" ? "Error" : "Output"}
 					</div>
-					<pre className="app-scrollbar max-h-[16rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+					<pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
 						{output}
 					</pre>
 				</div>
@@ -357,7 +357,7 @@ export function CommandExecutionMessage({
 				</div>
 			</div>
 			<div className="flex shrink-0 items-center gap-2">
-				<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+				<div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
 					{stateLabel}
 				</div>
 				{hasOutput ? (
@@ -373,7 +373,7 @@ export function CommandExecutionMessage({
 	);
 
 	return (
-		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
+		<div className="overflow-hidden border border-[#2c353c] bg-[#13181b]">
 			{hasOutput ? (
 				<button
 					type="button"
@@ -393,7 +393,7 @@ export function CommandExecutionMessage({
 			)}
 			{hasOutput && isExpanded ? (
 				<div className="px-4 pb-4">
-					<pre className="app-scrollbar max-h-[16rem] overflow-auto rounded-sm border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4]">
+					<pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4]">
 						{output}
 					</pre>
 				</div>
@@ -410,7 +410,7 @@ export function ReasoningMessage({
 	text: string;
 }): JSX.Element {
 	return (
-		<div className="rounded-sm border border-[#2a3339] bg-[#11171a] px-4 py-3">
+		<div className="border border-[#2a3339] bg-[#11171a] px-4 py-3">
 			<div className="flex items-center justify-between gap-4">
 				<div className="font-label text-[10px] uppercase tracking-widest text-[#8fb5cd]">
 					Reasoning
@@ -483,9 +483,10 @@ export function FileChangeMessage({
 					: changeLabel;
 	const hasDiff = diffText.trim().length > 0;
 	const [isExpanded, setIsExpanded] = useState(false);
-	const diffRegionId = `file-change-diff-${path
-		.replaceAll(/[^a-zA-Z0-9_-]+/g, "-")
-		.replaceAll(/^-+|-+$/g, "") || "content"}`;
+	const diffRegionId = `file-change-diff-${
+		path.replaceAll(/[^a-zA-Z0-9_-]+/g, "-").replaceAll(/^-+|-+$/g, "") ||
+		"content"
+	}`;
 	const toggleExpanded = (): void => {
 		if (!hasDiff) {
 			return;
@@ -504,7 +505,7 @@ export function FileChangeMessage({
 				</div>
 			</div>
 			<div className="flex shrink-0 items-center gap-2">
-				<div className="rounded-full border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+				<div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
 					{stateLabel}
 				</div>
 				{hasDiff ? (
@@ -520,7 +521,7 @@ export function FileChangeMessage({
 	);
 
 	return (
-		<div className="overflow-hidden rounded-sm border border-[#2c353c] bg-[#13181b]">
+		<div className="overflow-hidden border border-[#2c353c] bg-[#13181b]">
 			<div className="flex items-center gap-3 px-4 py-4">
 				{hasDiff ? (
 					<button
@@ -539,7 +540,7 @@ export function FileChangeMessage({
 					</div>
 				)}
 				<a
-					className="shrink-0 rounded-sm border border-[#31404a] bg-[#182025] px-2 py-1 font-label text-[10px] uppercase tracking-widest text-[#cfe0eb] transition-colors hover:bg-[#1f282f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60"
+					className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 font-label text-[10px] uppercase tracking-widest text-[#cfe0eb] transition-colors hover:bg-[#1f282f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60"
 					href={buildLocalFileHref(path, worktreePath)}
 				>
 					Open
@@ -571,7 +572,7 @@ export function GitHistoryDiffModal({
 				aria-describedby={dialogDescriptionId}
 				aria-labelledby={dialogTitleId}
 				aria-modal="true"
-				className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#35414a] bg-[#101518] shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
+				className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden border border-[#35414a] bg-[#101518] shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
 				role="dialog"
 			>
 				<div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#141b1f] px-4 py-4">
@@ -596,7 +597,7 @@ export function GitHistoryDiffModal({
 					<button
 						type="button"
 						aria-label="Close commit diff"
-						className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
+						className="flex h-8 w-8 shrink-0 items-center justify-center border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
 						onClick={onClose}
 					>
 						×
@@ -608,11 +609,11 @@ export function GitHistoryDiffModal({
 					tabIndex={0}
 				>
 					{state.loading ? (
-						<div className="rounded-sm border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">
+						<div className="border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">
 							Loading diff...
 						</div>
 					) : state.error ? (
-						<div className="rounded-sm border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+						<div className="border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
 							{state.error}
 						</div>
 					) : (
@@ -642,7 +643,7 @@ export function DesktopMessageGroups({
 							className="group flex w-full min-w-0 items-start gap-6"
 							key={group.key}
 						>
-							<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#adcbe0]">
+							<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
 								{brandBoltIcon("text-sm text-[#224259]")}
 							</div>
 							<div className="min-w-0 flex-1 space-y-4">
@@ -677,11 +678,11 @@ export function DesktopMessageGroups({
 							<div className="font-body text-[13px] font-semibold tracking-[0.01em] text-[#b7b3b1]">
 								{localUserLabel}
 							</div>
-							<div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
+							<div className="ml-auto max-w-full overflow-hidden bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
 								<MarkdownMessage text={group.text} />
 							</div>
 						</div>
-						<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#262626]">
+						<div className="flex h-8 w-8 shrink-0 items-center justify-center bg-[#262626]">
 							<span className="material-symbols-outlined text-[18px] text-[#b7b3b1]">
 								person
 							</span>
@@ -725,7 +726,7 @@ export function MobileMessageGroups({
 										}`}
 										key={`${message.kind}-${index}`}
 									>
-										<div className="glass-panel flex w-full flex-col gap-4 rounded-lg border border-[#bdd5e6]/10 p-5">
+										<div className="glass-panel flex w-full flex-col gap-4 border border-[#bdd5e6]/10 p-5">
 											<div className="text-sm leading-relaxed text-[#ffffff]">
 												{renderAssistantMessageContent(message)}
 											</div>
@@ -750,7 +751,7 @@ export function MobileMessageGroups({
 								account_circle
 							</span>
 						</div>
-						<div className="rounded-lg rounded-tr-none bg-[#1f2020] p-4 text-sm leading-relaxed text-[#ffffff] shadow-sm">
+						<div className="rounded-tr-none bg-[#1f2020] p-4 text-sm leading-relaxed text-[#ffffff] shadow-sm">
 							<MarkdownMessage text={group.text} />
 						</div>
 					</div>

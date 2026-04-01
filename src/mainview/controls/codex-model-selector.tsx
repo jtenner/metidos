@@ -75,8 +75,8 @@ export function CodexModelSelector({
 					type="button"
 					className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
 						variant === "desktop"
-							? "h-7 gap-1 rounded-sm border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
-							: "h-10 gap-2 rounded-xl border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+							? "h-7 gap-1 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+							: "h-10 gap-2 border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
 					} ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
 						open
 							? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
@@ -116,12 +116,12 @@ export function CodexModelSelector({
 				<div
 					className={`absolute left-0 right-0 bottom-[calc(100%+0.5rem)] overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
 						variant === "desktop"
-							? "z-40 rounded-md border-[#3c4c58] bg-[#15191b]"
-							: "z-50 rounded-2xl border-[#445058] bg-[#171b1d]"
+							? "z-40 border-[#3c4c58] bg-[#15191b]"
+							: "z-50 border-[#445058] bg-[#171b1d]"
 					}`}
 				>
 					<div className="border-b border-[#3c4c58] px-2 py-2">
-						<div className="flex items-center gap-2.5 rounded-md border border-[#3c4c58] bg-[#111213] px-3 py-2">
+						<div className="flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
 							{materialSymbol("search", "text-[15px] text-[#98b9d0]")}
 							<input
 								ref={searchInputRef}
@@ -141,7 +141,7 @@ export function CodexModelSelector({
 							{searchQuery ? (
 								<button
 									type="button"
-									className="flex h-5 w-5 items-center justify-center rounded-sm text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
+									className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
 									onClick={() => {
 										setSearchQuery("");
 										searchInputRef.current?.focus();
@@ -171,7 +171,7 @@ export function CodexModelSelector({
 											<button
 												key={model.id}
 												type="button"
-												className={`flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors ${
+												className={`flex w-full items-start gap-3 px-2 py-2 text-left transition-colors ${
 													selected
 														? "bg-[#28353e] text-[#f8fafc]"
 														: "text-[#ebf3f8] hover:bg-[#1e2428]"

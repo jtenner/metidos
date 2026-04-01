@@ -5,6 +5,7 @@ export type AppIconName =
 	| "arrow_forward"
 	| "arrow_upward"
 	| "bolt"
+	| "chat_bubble"
 	| "check_circle"
 	| "checklist"
 	| "chevron_right"
@@ -14,6 +15,7 @@ export type AppIconName =
 	| "expand_less"
 	| "expand_more"
 	| "folder"
+	| "history"
 	| "menu"
 	| "person"
 	| "push_pin"
@@ -60,6 +62,13 @@ function renderIconGlyph(
 				/>
 			) : (
 				<path d="M13 2 5 13h5l-1 9 8-11h-5z" />
+			);
+		case "chat_bubble":
+			return (
+				<>
+					<path d="M6 7.5h12A2.5 2.5 0 0 1 20.5 10v6A2.5 2.5 0 0 1 18 18.5H10l-4.5 3v-3H6A2.5 2.5 0 0 1 3.5 16v-6A2.5 2.5 0 0 1 6 7.5Z" />
+					<path d="M8 12h8" />
+				</>
 			);
 		case "check_circle":
 			return (
@@ -111,6 +120,14 @@ function renderIconGlyph(
 				<>
 					<path d="M3.5 8.5h5l1.75-2h10.25v11H3.5z" />
 					<path d="M3.5 8.5v-1A2.5 2.5 0 0 1 6 5h3" />
+				</>
+			);
+		case "history":
+			return (
+				<>
+					<path d="M5 12a7 7 0 1 0 2.05-4.95" />
+					<path d="M5 7v5h5" />
+					<path d="M5 4v3h3" />
 				</>
 			);
 		case "menu":
