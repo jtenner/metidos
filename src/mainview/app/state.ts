@@ -151,6 +151,7 @@ export type PersistedMainviewState = {
 export type PersistedTreeViewState = {
   version: number;
   workspaceSectionOpen: boolean;
+  workspaceActiveSectionOpen: boolean;
   projectsSectionOpen: boolean;
   threadsSectionOpen: boolean;
   gitSectionOpen: boolean;
@@ -461,6 +462,7 @@ export function defaultPersistedTreeViewState(): PersistedTreeViewState {
   return {
     version: TREE_VIEW_STATE_STORAGE_VERSION,
     workspaceSectionOpen: true,
+    workspaceActiveSectionOpen: true,
     projectsSectionOpen: true,
     threadsSectionOpen: true,
     gitSectionOpen: true,
@@ -605,6 +607,7 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
     return {
       version: TREE_VIEW_STATE_STORAGE_VERSION,
       workspaceSectionOpen: parsed.workspaceSectionOpen !== false,
+      workspaceActiveSectionOpen: parsed.workspaceActiveSectionOpen !== false,
       projectsSectionOpen: parsed.projectsSectionOpen !== false,
       threadsSectionOpen: parsed.threadsSectionOpen !== false,
       gitSectionOpen: parsed.gitSectionOpen !== false,
