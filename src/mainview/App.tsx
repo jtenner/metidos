@@ -435,6 +435,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     filteredGitHistoryEntries,
     filteredProjects,
     filteredVisibleThreads,
+    filteredWorkspaceActiveThreads,
+    filteredWorkspacePinnedThreads,
     hasWorkingThreads,
     isActiveWorktree,
     isThreadStatusDismissed,
@@ -3678,6 +3680,28 @@ export default function App({ procedures }: AppProps): JSX.Element {
                   }}
                   selectedProjectName={selectedProject?.name ?? null}
                   sidebarSearchQuery={sidebarSearchQuery}
+                  workspacePanelProps={{
+                    acknowledgeThreadErrorSeenInBackground,
+                    dismissThreadStatus,
+                    errorPreviewHandlers,
+                    errorPreviewPopover,
+                    getProjectState,
+                    hideErrorPreview,
+                    hideThreadSummaryPreview,
+                    homeDirectory,
+                    isThreadStatusDismissed,
+                    normalizedSidebarSearchQuery,
+                    onOpenThread: handleOpenThread,
+                    onOpenThreadActionMenu: openThreadActionMenu,
+                    projects,
+                    selectedThreadId,
+                    supportsTildePath,
+                    threadSummaryPopover,
+                    threadSummaryPreviewHandlers,
+                    threadsError,
+                    workspaceActiveThreads: filteredWorkspaceActiveThreads,
+                    workspacePinnedThreads: filteredWorkspacePinnedThreads,
+                  }}
                   threadsPanelProps={{
                     acknowledgeThreadErrorSeenInBackground,
                     activeSelectedWorktreePath,
@@ -3894,6 +3918,28 @@ export default function App({ procedures }: AppProps): JSX.Element {
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}
+              workspacePanelProps={{
+                acknowledgeThreadErrorSeenInBackground,
+                dismissThreadStatus,
+                errorPreviewHandlers,
+                errorPreviewPopover,
+                getProjectState,
+                hideErrorPreview,
+                hideThreadSummaryPreview,
+                homeDirectory,
+                isThreadStatusDismissed,
+                normalizedSidebarSearchQuery,
+                onOpenThread: handleOpenThread,
+                onOpenThreadActionMenu: openThreadActionMenu,
+                projects,
+                selectedThreadId,
+                supportsTildePath,
+                threadSummaryPopover,
+                threadSummaryPreviewHandlers,
+                threadsError,
+                workspaceActiveThreads: filteredWorkspaceActiveThreads,
+                workspacePinnedThreads: filteredWorkspacePinnedThreads,
+              }}
               threadsPanelProps={{
                 acknowledgeThreadErrorSeenInBackground,
                 activeSelectedWorktreePath,

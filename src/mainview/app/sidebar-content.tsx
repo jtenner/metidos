@@ -4,6 +4,7 @@ import { SidebarSearchControl } from "../controls/sidebar-search-control";
 import { GitHistoryPanel } from "./git-history-panel";
 import { ProjectsPanel } from "./projects-panel";
 import { ThreadsPanel } from "./threads-panel";
+import { WorkspacePanel } from "./workspace-panel";
 
 type SidebarContentProps = {
   activeSidebarBranchLabel: string;
@@ -15,6 +16,7 @@ type SidebarContentProps = {
   selectedProjectName: string | null;
   sidebarSearchQuery: string;
   threadsPanelProps: ComponentProps<typeof ThreadsPanel>;
+  workspacePanelProps: ComponentProps<typeof WorkspacePanel>;
 };
 
 export function SidebarContent({
@@ -27,6 +29,7 @@ export function SidebarContent({
   selectedProjectName,
   sidebarSearchQuery,
   threadsPanelProps,
+  workspacePanelProps,
 }: SidebarContentProps): JSX.Element {
   return (
     <div className="space-y-6">
@@ -59,8 +62,9 @@ export function SidebarContent({
       </div>
 
       <div className="select-none space-y-5">
-        <ProjectsPanel {...projectsPanelProps} />
+        <WorkspacePanel {...workspacePanelProps} />
         <ThreadsPanel {...threadsPanelProps} />
+        <ProjectsPanel {...projectsPanelProps} />
         <GitHistoryPanel key={gitHistoryPanelKey} {...gitHistoryPanelProps} />
       </div>
     </div>

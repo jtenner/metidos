@@ -10,6 +10,7 @@ type SidebarPanelsSnapshot = {
   openProjectPaths: Set<string>;
   projectsOpen: boolean;
   threadsOpen: boolean;
+  workspaceOpen: boolean;
 };
 
 const listeners = new Set<() => void>();
@@ -27,6 +28,7 @@ function ensureSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
     openProjectPaths: new Set(persistedState.openProjectPaths),
     projectsOpen: persistedState.projectsSectionOpen,
     threadsOpen: persistedState.threadsSectionOpen,
+    workspaceOpen: persistedState.workspaceSectionOpen,
   };
   return sidebarPanelsSnapshot;
 }
@@ -40,6 +42,7 @@ function emitSidebarPanelsChange(): void {
 function persistSidebarPanelsSnapshot(snapshot: SidebarPanelsSnapshot): void {
   writePersistedTreeViewState({
     version: TREE_VIEW_STATE_STORAGE_VERSION,
+    workspaceSectionOpen: snapshot.workspaceOpen,
     projectsSectionOpen: snapshot.projectsOpen,
     threadsSectionOpen: snapshot.threadsOpen,
     gitSectionOpen: snapshot.gitHistoryOpen,
@@ -108,6 +111,13 @@ export function toggleProjectsPanelOpen(): void {
   }));
 }
 
+export function toggleWorkspacePanelOpen(): void {
+  updateSidebarPanelsSnapshot((current) => ({
+    ...current,
+    workspaceOpen: !current.workspaceOpen,
+  }));
+}
+
 export function toggleThreadsPanelOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -127,6 +137,14 @@ export function useProjectsPanelOpen(): boolean {
     subscribeToSidebarPanels,
     () => ensureSidebarPanelsSnapshot().projectsOpen,
     () => ensureSidebarPanelsSnapshot().projectsOpen,
+  );
+}
+
+export function useWorkspacePanelOpen(): boolean {
+  return useSyncExternalStore(
+    subscribeToSidebarPanels,
+    () => ensureSidebarPanelsSnapshot().workspaceOpen,
+    () => ensureSidebarPanelsSnapshot().workspaceOpen,
   );
 }
 

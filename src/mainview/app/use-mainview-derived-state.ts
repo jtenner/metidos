@@ -28,6 +28,7 @@ import {
   pinnedThreadForWorktree,
   primaryWorktreePath,
   shortName,
+  sortThreads,
   threadErrorLevel,
   threadRunStatus,
   worktreeDisplayName,
@@ -545,6 +546,72 @@ export function useMainviewDerivedState({
     visibleThreads,
   ]);
 
+  const filteredWorkspacePinnedThreads = useMemo(() => {
+    const pinnedThreads = sortThreads(
+      threads.filter((thread) => thread.pinnedAt !== null),
+    );
+    if (!normalizedSidebarSearchQuery) {
+      return pinnedThreads;
+    }
+
+    return pinnedThreads.filter((thread) => {
+      const threadProject =
+        projects.find((project) => project.id === thread.projectId) ?? null;
+      return matchesSearchQuery(
+        normalizedSidebarSearchQuery,
+        thread.title,
+        thread.summary,
+        threadProject?.name,
+        thread.worktreePath,
+        shortName(thread.worktreePath),
+        formatPathForDisplay(
+          thread.worktreePath,
+          homeDirectory,
+          supportsTildePath,
+        ),
+      );
+    });
+  }, [
+    homeDirectory,
+    normalizedSidebarSearchQuery,
+    projects,
+    supportsTildePath,
+    threads,
+  ]);
+
+  const filteredWorkspaceActiveThreads = useMemo(() => {
+    const activeThreads = sortThreads(
+      threads.filter((thread) => thread.pinnedAt === null),
+    );
+    if (!normalizedSidebarSearchQuery) {
+      return activeThreads;
+    }
+
+    return activeThreads.filter((thread) => {
+      const threadProject =
+        projects.find((project) => project.id === thread.projectId) ?? null;
+      return matchesSearchQuery(
+        normalizedSidebarSearchQuery,
+        thread.title,
+        thread.summary,
+        threadProject?.name,
+        thread.worktreePath,
+        shortName(thread.worktreePath),
+        formatPathForDisplay(
+          thread.worktreePath,
+          homeDirectory,
+          supportsTildePath,
+        ),
+      );
+    });
+  }, [
+    homeDirectory,
+    normalizedSidebarSearchQuery,
+    projects,
+    supportsTildePath,
+    threads,
+  ]);
+
   const filteredGitHistoryEntries = useMemo(() => {
     const entries = gitHistory?.entries ?? [];
     if (!normalizedSidebarSearchQuery) {
@@ -613,6 +680,8 @@ export function useMainviewDerivedState({
     filteredGitHistoryEntries,
     filteredProjects,
     filteredVisibleThreads,
+    filteredWorkspaceActiveThreads,
+    filteredWorkspacePinnedThreads,
     hasWorkingThreads,
     isActiveWorktree,
     isThreadStatusDismissed,
