@@ -1,9 +1,6 @@
 import {
   type FormEvent,
-  type HTMLAttributes,
   type JSX,
-  type FocusEvent as ReactFocusEvent,
-  type MouseEvent as ReactMouseEvent,
   type UIEvent,
   useCallback,
   useEffect,
@@ -26,23 +23,14 @@ import type {
   RpcThreadMessage,
   RpcThreadRunStatus,
   RpcWorktree,
-  RpcWorktreeChange,
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeGitHistoryResult,
-  RpcWorktreeSnapshot,
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import { ProjectActionMenu, ThreadActionMenu } from "./app/action-menus";
 import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
-import {
-  type DiffFileContentState,
-  type DiffFileTreeNode,
-  DiffWorkspace,
-  buildDiffFileTree,
-  decodeBase64Bytes,
-  emptyDiffFileContentState,
-} from "./app/diff-workspace";
+import { DiffWorkspace } from "./app/diff-workspace";
 import { GitHistoryDiffModal } from "./app/message-ui";
 import { SidebarContent } from "./app/sidebar-content";
 import {
@@ -51,11 +39,6 @@ import {
 } from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
-  DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS,
-  DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
-  DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS,
-  type DirectorySuggestionResultCacheEntry,
-  type ErrorPreviewPopoverState,
   GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
   GIT_HISTORY_PAGE_SIZE,
   GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
@@ -70,8 +53,6 @@ import {
   type ProjectStateMap,
   THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
-  type ThreadErrorLevel,
-  type ThreadSummaryPopoverState,
   type VisibleMessage,
   WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
   WORKTREE_TASKS_CHANGED_EVENT_NAME,
@@ -83,15 +64,11 @@ import {
   createAbortError,
   defaultProjectState,
   defaultWorktreeState,
-  findPrimaryWorktree,
   formatDirectoryPathForInput,
-  formatPathForDisplay,
   gitHistoryDiffCacheKey,
   isAbortError,
   isCodexReasoningEffort,
   mergeResetGitHistory,
-  mergeThreadErrorLevel,
-  orderProjectWorktrees,
   patchPersistedMainviewState,
   pickInitialThread,
   pinnedThreadForWorktree,
@@ -100,55 +77,33 @@ import {
   readPersistedMainviewState,
   removeThreadFromList,
   serializeOpenWorktrees,
-  shortName,
   sortThreads,
-  threadErrorLevel,
-  threadRunStatus,
   upsertProjectList,
   upsertThreadList,
   withAcknowledgedUnreadThread,
   withAcknowledgedUnreadThreadDetail,
-  worktreeDisplayName,
   worktreeKey,
   writeLruValue,
   writePersistedMainviewState,
 } from "./app/state";
+import { useAddProjectForm } from "./app/use-add-project-form";
+import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
+import { useThreadPreviews } from "./app/use-thread-previews";
+import { useWorktreeDiff } from "./app/use-worktree-diff";
 import {
   readChatComposerDraft,
   setChatComposerDraft,
 } from "./controls/chat-composer-control";
-import { findCodexModel } from "./controls/codex-utils";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
-import {
-  matchesSearchQuery,
-  normalizeSearchQuery,
-} from "./controls/search-utils";
 
 type AppProps = {
   procedures: ProjectProcedures;
 };
 
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
-const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
-const WORKTREE_FILE_CONTENT_PAGE_BYTES = 64 * 1024;
 const WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX = 480;
 
 type PrimaryView = "chat" | "diff";
-
-function dismissibleThreadStatusKey(
-  runStatus: RpcThreadRunStatus,
-): string | null {
-  const hasDismissibleStatus =
-    runStatus.hasUnreadError ||
-    runStatus.state === "failed" ||
-    runStatus.state === "stopped";
-  const updatedAt = runStatus.updatedAt?.trim() ?? "";
-  if (!hasDismissibleStatus || !updatedAt) {
-    return null;
-  }
-
-  return `${runStatus.state}:${updatedAt}:${runStatus.error ?? ""}`;
-}
 
 function isScrolledToBottom(container: HTMLDivElement): boolean {
   return (
@@ -182,29 +137,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [worktreeStates, setWorktreeStates] = useState<WorktreeStateMap>({});
   const [homeDirectory, setHomeDirectory] = useState("");
   const [supportsTildePath, setSupportsTildePath] = useState(false);
-  const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [projectActionMenu, setProjectActionMenu] =
     useState<ProjectActionMenuState | null>(null);
   const [threadActionMenu, setThreadActionMenu] =
     useState<ThreadActionMenuState | null>(null);
-  const [projectActionMenuLoading, setProjectActionMenuLoading] =
-    useState(false);
   const [projectActionMenuError, setProjectActionMenuError] = useState("");
   const [threadActionMenuError, setThreadActionMenuError] = useState("");
   const [newWorktreeName, setNewWorktreeName] = useState("");
   const [threadRenameTitle, setThreadRenameTitle] = useState("");
   const [threadRenameSummary, setThreadRenameSummary] = useState("");
-  const [addProjectPath, setAddProjectPath] = useState("");
-  const [addProjectError, setAddProjectError] = useState("");
-  const [hoveredDirectorySuggestion, setHoveredDirectorySuggestion] = useState<
-    string | null
-  >(null);
-  const [directorySuggestions, setDirectorySuggestions] = useState<string[]>(
-    [],
-  );
-  const [directorySuggestionsLoading, setDirectorySuggestionsLoading] =
-    useState(false);
-  const [isAddingProject, setIsAddingProject] = useState(false);
   const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
   const [worktreePinBusyPath, setWorktreePinBusyPath] = useState<string | null>(
     null,
@@ -267,18 +208,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [isStoppingThread, setIsStoppingThread] = useState(false);
   const [reasoningEffortControlError, setReasoningEffortControlError] =
     useState("");
-  const [errorPreviewPopover, setErrorPreviewPopover] =
-    useState<ErrorPreviewPopoverState | null>(null);
-  const [threadSummaryPopover, setThreadSummaryPopover] =
-    useState<ThreadSummaryPopoverState | null>(null);
-  const [dismissedThreadStatusKeys, setDismissedThreadStatusKeys] = useState<
-    Record<number, string>
-  >({});
   const [sessionStateReady, setSessionStateReady] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     () => document.visibilityState === "visible",
   );
   const [primaryView, setPrimaryView] = useState<PrimaryView>("chat");
+  const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
+    string | null
+  >(null);
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
@@ -289,14 +226,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     },
     [],
   );
-  const [worktreeDiffError, setWorktreeDiffError] = useState("");
-  const [isRefreshingWorktreeSnapshot, setIsRefreshingWorktreeSnapshot] =
-    useState(false);
-  const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
-    string | null
-  >(null);
-  const [diffFileContentState, setDiffFileContentState] =
-    useState<DiffFileContentState>(emptyDiffFileContentState());
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -336,25 +265,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const gitHistoryCacheRef = useRef(
     new Map<string, RpcWorktreeGitHistoryResult>(),
   );
-  const directorySuggestionPrefetchTimerRef = useRef<number | null>(null);
-  const directorySuggestionResultCacheRef = useRef(
-    new Map<string, DirectorySuggestionResultCacheEntry>(),
-  );
-  const directorySuggestionRequestCacheRef = useRef(
-    new Map<string, PendingSharedRequest<string[]>>(),
-  );
-  const directorySuggestionRequestIdRef = useRef(0);
-  const directorySuggestionAbortControllerRef = useRef<AbortController | null>(
-    null,
-  );
-  const diffSnapshotRequestIdRef = useRef(0);
-  const diffSnapshotAbortControllerRef = useRef<AbortController | null>(null);
-  const diffFileContentRequestIdRef = useRef(0);
-  const diffFileContentAbortControllerRef = useRef<AbortController | null>(
-    null,
-  );
-  const diffFileContentDecoderRef = useRef<TextDecoder | null>(null);
-  const prefetchedDirectorySuggestionQueriesRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const previousSelectedThreadIdRef = useRef<number | null>(
@@ -375,192 +285,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
   const threadStatusPollInFlightRef = useRef(false);
   const initializedRef = useRef(false);
-
-  const selectedProject = useMemo(() => {
-    if (!selectedProjectId) {
-      return null;
-    }
-    return projects.find((entry) => entry.id === selectedProjectId) ?? null;
-  }, [projects, selectedProjectId]);
-
-  const selectedThread = useMemo(() => {
-    if (!selectedThreadId) {
-      return null;
-    }
-    return threads.find((entry) => entry.id === selectedThreadId) ?? null;
-  }, [selectedThreadId, threads]);
-
-  const selectedThreadRunStatus = useMemo(
-    () => threadRunStatus(selectedThread),
-    [selectedThread],
-  );
-
-  const hasWorkingThreads = useMemo(
-    () => threads.some((thread) => thread.runStatus.state === "working"),
-    [threads],
-  );
-
-  const activeCodexModel = useMemo(() => {
-    if (selectedThread?.model) {
-      return selectedThread.model;
-    }
-    return pendingThreadModel || defaultCodexModel;
-  }, [defaultCodexModel, pendingThreadModel, selectedThread]);
-
-  const activeCodexModelOption = useMemo(
-    () => findCodexModel(codexModels, activeCodexModel),
-    [activeCodexModel, codexModels],
-  );
-
-  const activeReasoningEffort = useMemo(() => {
-    if (selectedThread?.reasoningEffort) {
-      return selectedThread.reasoningEffort;
-    }
-    return pendingThreadReasoningEffort || defaultCodexReasoningEffort;
-  }, [
-    defaultCodexReasoningEffort,
-    pendingThreadReasoningEffort,
-    selectedThread,
-  ]);
-
-  const activeContextWindowTokens =
-    activeCodexModelOption?.contextWindowTokens ?? 400_000;
-  const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
-
-  const isThreadStatusDismissed = useCallback(
-    (thread: RpcThread | null): boolean => {
-      if (!thread) {
-        return false;
-      }
-
-      const statusKey = dismissibleThreadStatusKey(thread.runStatus);
-      return (
-        statusKey !== null && dismissedThreadStatusKeys[thread.id] === statusKey
-      );
-    },
-    [dismissedThreadStatusKeys],
-  );
-
-  const projectThreadErrorLevels = useMemo(() => {
-    const next = new Map<number, ThreadErrorLevel>();
-    for (const thread of threads) {
-      const level = isThreadStatusDismissed(thread)
-        ? "none"
-        : threadErrorLevel(thread);
-      if (level === "none") {
-        continue;
-      }
-      next.set(
-        thread.projectId,
-        mergeThreadErrorLevel(next.get(thread.projectId) ?? "none", level),
-      );
-    }
-    return next;
-  }, [isThreadStatusDismissed, threads]);
-
-  const worktreeThreadErrorLevels = useMemo(() => {
-    const next = new Map<string, ThreadErrorLevel>();
-    for (const thread of threads) {
-      const level = isThreadStatusDismissed(thread)
-        ? "none"
-        : threadErrorLevel(thread);
-      if (level === "none") {
-        continue;
-      }
-      const key = worktreeKey(thread.projectId, thread.worktreePath);
-      next.set(key, mergeThreadErrorLevel(next.get(key) ?? "none", level));
-    }
-    return next;
-  }, [isThreadStatusDismissed, threads]);
-
-  useEffect(() => {
-    setDismissedThreadStatusKeys((prev) => {
-      const nextEntries = Object.entries(prev).filter(
-        ([threadId, statusKey]) => {
-          const thread =
-            threads.find((entry) => entry.id === Number(threadId)) ?? null;
-          return thread
-            ? dismissibleThreadStatusKey(thread.runStatus) === statusKey
-            : false;
-        },
-      );
-      if (nextEntries.length === Object.keys(prev).length) {
-        return prev;
-      }
-
-      return Object.fromEntries(nextEntries) as Record<number, string>;
-    });
-  }, [threads]);
-
-  const dismissThreadStatus = useCallback((thread: RpcThread): void => {
-    const statusKey = dismissibleThreadStatusKey(thread.runStatus);
-    if (!statusKey) {
-      return;
-    }
-
-    setDismissedThreadStatusKeys((prev) =>
-      prev[thread.id] === statusKey
-        ? prev
-        : {
-            ...prev,
-            [thread.id]: statusKey,
-          },
-    );
-  }, []);
-
-  const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
-  const modelSelectorDisabled =
-    codexModels.length === 0 ||
-    isCreatingThread ||
-    isThreadLoading ||
-    isSending ||
-    isUpdatingThreadModel ||
-    selectedThreadIsWorking;
-  const reasoningEffortSelectorDisabled =
-    reasoningEfforts.length === 0 ||
-    isCreatingThread ||
-    isThreadLoading ||
-    isSending ||
-    isUpdatingThreadReasoningEffort ||
-    selectedThreadIsWorking;
-
-  const selectedThreadRunError =
-    selectedThreadRunStatus.state === "failed"
-      ? (selectedThreadRunStatus.error ?? "")
-      : "";
-  const selectedThreadRunNotice =
-    selectedThreadRunStatus.state === "stopped"
-      ? (selectedThreadRunStatus.error ?? "")
-      : "";
-  const composerActionDisabled = selectedThreadIsWorking
-    ? !selectedThread || isThreadLoading || isStoppingThread
-    : !selectedThread || isSending || isThreadLoading;
-  const composerActionLabel = selectedThreadIsWorking
-    ? "Stop current run"
-    : "Send message";
-
-  const activeChatError = chatError || selectedThreadRunError;
-  const activeChatNotice = selectedThreadRunNotice;
-
-  const projectActionMenuProject = useMemo(() => {
-    if (!projectActionMenu) {
-      return null;
-    }
-    return (
-      projects.find((project) => project.id === projectActionMenu.projectId) ??
-      null
-    );
-  }, [projectActionMenu, projects]);
-
-  const threadActionMenuThread = useMemo(() => {
-    if (!threadActionMenu) {
-      return null;
-    }
-    return (
-      threads.find((thread) => thread.id === threadActionMenu.threadId) ?? null
-    );
-  }, [threadActionMenu, threads]);
-
   const getProjectState = useCallback(
     (projectId: number): ProjectNodeState =>
       projectStates[projectId] ?? defaultProjectState(),
@@ -575,16 +299,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [worktreeStates],
   );
 
-  const projectActionMenuWorktrees = useMemo(() => {
-    if (!projectActionMenuProject) {
-      return [];
-    }
-    return orderProjectWorktrees(
-      projectActionMenuProject,
-      getProjectState(projectActionMenuProject.id).worktrees,
-    );
-  }, [getProjectState, projectActionMenuProject]);
-
   const selectProject = useCallback(
     (project: RpcProject, worktreePath?: string | null): void => {
       const nextWorktreePath =
@@ -598,128 +312,93 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [getProjectState],
   );
 
-  const selectedProjectWorktrees = useMemo(() => {
-    if (!selectedProject) {
-      return [];
-    }
-    return orderProjectWorktrees(
-      selectedProject,
-      getProjectState(selectedProject.id).worktrees,
-    );
-  }, [selectedProject, getProjectState]);
+  const {
+    activeChatError,
+    activeChatNotice,
+    activeCodexModel,
+    activeContextInputTokens,
+    activeContextWindowTokens,
+    activePollingProjectId,
+    activePollingWorktreePath,
+    activeReasoningEffort,
+    activeScreenSubtitlePrimary,
+    activeScreenSubtitleSecondary,
+    activeScreenTitle,
+    activeSelectedWorktree,
+    activeSelectedWorktreeFolder,
+    activeSelectedWorktreeName,
+    activeSelectedWorktreeOpened,
+    activeSelectedWorktreePath,
+    activeSelectedWorktreeState,
+    activeWorktreeChanges,
+    activeWorktreeSnapshot,
+    composerActionDisabled,
+    composerActionLabel,
+    diffFileTree,
+    dismissThreadStatus,
+    filteredGitHistoryEntries,
+    filteredProjects,
+    filteredVisibleThreads,
+    hasWorkingThreads,
+    isActiveWorktree,
+    isThreadStatusDismissed,
+    localUserLabel,
+    modelSelectorDisabled,
+    normalizedSidebarSearchQuery,
+    projectActionMenuProject,
+    projectThreadErrorLevel,
+    reasoningEffortSelectorDisabled,
+    selectedDiffFileChange,
+    selectedProject,
+    selectedProjectWorktrees,
+    selectedThread,
+    selectedThreadIsWorking,
+    selectedThreadRunStatus,
+    taskSelectorDisabled,
+    threadActionMenuThread,
+    visibleThreads,
+    worktreeThreadErrorLevel,
+  } = useMainviewDerivedState({
+    chatError,
+    codexModels,
+    defaultCodexModel,
+    defaultCodexReasoningEffort,
+    getProjectState,
+    getWorktreeState,
+    gitHistory,
+    homeDirectory,
+    isCreatingThread,
+    isDocumentVisible,
+    isLoadingProjectTasks,
+    isRunningProjectTask,
+    isSending,
+    isStoppingThread,
+    isThreadLoading,
+    isUpdatingThreadModel,
+    isUpdatingThreadReasoningEffort,
+    pendingThreadModel,
+    pendingThreadReasoningEffort,
+    projectActionMenu,
+    projects,
+    reasoningEfforts,
+    selectedDiffFilePath,
+    selectedProjectId,
+    selectedThreadId,
+    selectedWorktreePath,
+    sidebarSearchQuery,
+    supportsTildePath,
+    threadActionMenu,
+    threads,
+  });
 
-  const activeSelectedWorktreePath = useMemo(() => {
-    if (!selectedProject || selectedProject.isOpen !== 1) {
-      return null;
-    }
-    if (selectedWorktreePath) {
-      return selectedWorktreePath;
-    }
-    return primaryWorktreePath(selectedProject, selectedProjectWorktrees);
-  }, [selectedProject, selectedProjectWorktrees, selectedWorktreePath]);
-
-  const activeSelectedWorktree = useMemo(() => {
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      return null;
-    }
-    return (
-      selectedProjectWorktrees.find(
-        (worktree) => worktree.path === activeSelectedWorktreePath,
-      ) ?? findPrimaryWorktree(selectedProject, selectedProjectWorktrees)
-    );
-  }, [activeSelectedWorktreePath, selectedProject, selectedProjectWorktrees]);
-
-  const activeSelectedWorktreeOpened = useMemo(() => {
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      return false;
-    }
-    return getWorktreeState(selectedProject.id, activeSelectedWorktreePath)
-      .opened;
-  }, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
-
-  const activeSelectedWorktreeState = useMemo(() => {
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      return null;
-    }
-    return getWorktreeState(selectedProject.id, activeSelectedWorktreePath);
-  }, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
-
-  const activeWorktreeSnapshot = activeSelectedWorktreeState?.snapshot ?? null;
-  const activeWorktreeChanges = activeWorktreeSnapshot?.changes ?? [];
-  const diffFileTree = useMemo(
-    () => buildDiffFileTree(activeWorktreeChanges),
-    [activeWorktreeChanges],
-  );
-  const selectedDiffFileChange = useMemo(
-    () =>
-      selectedDiffFilePath
-        ? (activeWorktreeChanges.find(
-            (change) => change.path === selectedDiffFilePath,
-          ) ?? null)
-        : null,
-    [activeWorktreeChanges, selectedDiffFilePath],
-  );
-
-  const activePollingProjectId =
-    isDocumentVisible &&
-    selectedProject &&
-    selectedProject.isOpen === 1 &&
-    activeSelectedWorktreePath
-      ? selectedProject.id
-      : null;
-  const activePollingWorktreePath =
-    activePollingProjectId !== null ? activeSelectedWorktreePath : null;
-
-  const activeSelectedWorktreeFolder = useMemo(() => {
-    if (!activeSelectedWorktreePath) {
-      return "No worktree selected";
-    }
-    return shortName(activeSelectedWorktreePath);
-  }, [activeSelectedWorktreePath]);
-
-  const activeSelectedWorktreeName = useMemo(() => {
-    if (!selectedProject) {
-      return "";
-    }
-    if (!activeSelectedWorktree && selectedThread) {
-      return selectedThread.title;
-    }
-    return worktreeDisplayName(activeSelectedWorktree);
-  }, [activeSelectedWorktree, selectedProject, selectedThread]);
-
-  const localUserLabel = useMemo(() => {
-    const normalizedHomeDirectory = homeDirectory.replace(/[\\/]+$/, "");
-    if (!normalizedHomeDirectory) {
-      return "User";
-    }
-    const label = shortName(normalizedHomeDirectory);
-    if (!label || label === "/" || /^[A-Za-z]:$/.test(label)) {
-      return "User";
-    }
-    return label;
-  }, [homeDirectory]);
-
-  const activeScreenTitle = selectedThread?.title ?? "No thread selected";
-  const activeScreenSubtitlePrimary = selectedProject
-    ? activeSelectedWorktreeFolder
-    : "No project selected";
-  const activeScreenSubtitleSecondary = activeSelectedWorktreePath
-    ? formatPathForDisplay(
-        activeSelectedWorktreePath,
-        homeDirectory,
-        supportsTildePath,
-      )
-    : "No worktree selected";
-
-  const taskSelectorDisabled =
-    !selectedProject ||
-    !activeSelectedWorktreePath ||
-    !activeSelectedWorktreeOpened ||
-    isLoadingProjectTasks ||
-    isRunningProjectTask ||
-    isSending ||
-    selectedThreadIsWorking ||
-    isThreadLoading;
+  const {
+    errorPreviewHandlers,
+    errorPreviewPopover,
+    hideErrorPreview,
+    hideThreadSummaryPreview,
+    threadSummaryPopover,
+    threadSummaryPreviewHandlers,
+  } = useThreadPreviews();
 
   const abortGitHistoryDiffRequest = useCallback((reason: string) => {
     const controller = gitHistoryDiffAbortControllerRef.current;
@@ -1015,309 +694,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
-  const normalizedSidebarSearchQuery = useMemo(
-    () => normalizeSearchQuery(sidebarSearchQuery),
-    [sidebarSearchQuery],
-  );
-
-  const visibleThreads = useMemo(() => {
-    if (!selectedProjectId || !activeSelectedWorktreePath) {
-      return [];
-    }
-    return threads.filter(
-      (thread) =>
-        thread.projectId === selectedProjectId &&
-        thread.worktreePath === activeSelectedWorktreePath,
-    );
-  }, [activeSelectedWorktreePath, selectedProjectId, threads]);
-
-  const filteredProjects = useMemo(() => {
-    if (!normalizedSidebarSearchQuery) {
-      return projects;
-    }
-
-    return projects.filter((project) => {
-      const projectState = getProjectState(project.id);
-      const matchingWorktree = projectState.worktrees.some((worktree) =>
-        matchesSearchQuery(
-          normalizedSidebarSearchQuery,
-          project.name,
-          project.path,
-          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
-          worktree.branch,
-          worktree.path,
-          shortName(worktree.path),
-          formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
-        ),
-      );
-
-      const matchingThread = threads.some(
-        (thread) =>
-          thread.projectId === project.id &&
-          matchesSearchQuery(
-            normalizedSidebarSearchQuery,
-            thread.title,
-            thread.summary,
-            thread.worktreePath,
-            shortName(thread.worktreePath),
-            formatPathForDisplay(
-              thread.worktreePath,
-              homeDirectory,
-              supportsTildePath,
-            ),
-          ),
-      );
-
-      return (
-        matchesSearchQuery(
-          normalizedSidebarSearchQuery,
-          project.name,
-          project.path,
-          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
-        ) ||
-        matchingWorktree ||
-        matchingThread
-      );
-    });
-  }, [
-    getProjectState,
-    homeDirectory,
-    normalizedSidebarSearchQuery,
-    projects,
-    supportsTildePath,
-    threads,
-  ]);
-
-  const filteredVisibleThreads = useMemo(() => {
-    if (!normalizedSidebarSearchQuery) {
-      return visibleThreads;
-    }
-
-    return visibleThreads.filter((thread) =>
-      matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        thread.title,
-        thread.summary,
-        thread.worktreePath,
-        shortName(thread.worktreePath),
-        formatPathForDisplay(
-          thread.worktreePath,
-          homeDirectory,
-          supportsTildePath,
-        ),
-      ),
-    );
-  }, [
-    homeDirectory,
-    normalizedSidebarSearchQuery,
-    supportsTildePath,
-    visibleThreads,
-  ]);
-
-  const filteredGitHistoryEntries = useMemo(() => {
-    const entries = gitHistory?.entries ?? [];
-    if (!normalizedSidebarSearchQuery) {
-      return entries;
-    }
-
-    return entries.filter((entry) =>
-      matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        entry.hash,
-        entry.shortHash,
-        entry.subject,
-        entry.authorName,
-        entry.committedAt,
-        gitHistory?.branch,
-        activeSelectedWorktree?.branch,
-      ),
-    );
-  }, [activeSelectedWorktree, gitHistory, normalizedSidebarSearchQuery]);
-
-  const isActiveWorktree = useCallback(
-    (projectId: number, worktreePath: string): boolean =>
-      selectedProjectId === projectId &&
-      activeSelectedWorktreePath === worktreePath,
-    [activeSelectedWorktreePath, selectedProjectId],
-  );
-
-  const projectThreadErrorLevel = useCallback(
-    (projectId: number): ThreadErrorLevel =>
-      projectThreadErrorLevels.get(projectId) ?? "none",
-    [projectThreadErrorLevels],
-  );
-
-  const worktreeThreadErrorLevel = useCallback(
-    (projectId: number, worktreePath: string): ThreadErrorLevel =>
-      worktreeThreadErrorLevels.get(worktreeKey(projectId, worktreePath)) ??
-      "none",
-    [worktreeThreadErrorLevels],
-  );
-
-  const showErrorPreview = useCallback(
-    (
-      event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
-      anchorId: string,
-      text: string,
-    ): void => {
-      const previewText = text.trim();
-      if (!previewText) {
-        setErrorPreviewPopover(null);
-        return;
-      }
-      const viewportWidth =
-        typeof window === "undefined" ? 1280 : window.innerWidth;
-      if (viewportWidth < 768) {
-        setErrorPreviewPopover(null);
-        return;
-      }
-      const viewportHeight =
-        typeof window === "undefined" ? 720 : window.innerHeight;
-      const rect = event.currentTarget.getBoundingClientRect();
-      const clampedTop = clampProjectMenuCoordinate(
-        rect.top + rect.height / 2 - 98,
-        viewportHeight,
-        196,
-      );
-      setErrorPreviewPopover({
-        anchorId,
-        text: previewText,
-        x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 368),
-        y: clampedTop + 98,
-      });
-    },
-    [],
-  );
-
-  const hideErrorPreview = useCallback((): void => {
-    setErrorPreviewPopover(null);
-  }, []);
-
-  const showThreadSummaryPreview = useCallback(
-    (
-      event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
-      anchorId: string,
-      title: string,
-      summary: string,
-    ): void => {
-      const previewSummary = summary.trim();
-      if (!previewSummary) {
-        setThreadSummaryPopover(null);
-        return;
-      }
-      const viewportWidth =
-        typeof window === "undefined" ? 1280 : window.innerWidth;
-      if (viewportWidth < 768) {
-        setThreadSummaryPopover(null);
-        return;
-      }
-      const viewportHeight =
-        typeof window === "undefined" ? 720 : window.innerHeight;
-      const rect = event.currentTarget.getBoundingClientRect();
-      setThreadSummaryPopover({
-        anchorId,
-        title,
-        summary: previewSummary,
-        x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 360),
-        y: clampProjectMenuCoordinate(rect.top, viewportHeight, 240),
-      });
-    },
-    [],
-  );
-
-  const hideThreadSummaryPreview = useCallback((): void => {
-    setThreadSummaryPopover(null);
-  }, []);
-
-  const errorPreviewHandlers = useCallback(
-    (
-      anchorId: string,
-      text: string | null | undefined,
-    ): Pick<
-      HTMLAttributes<HTMLElement>,
-      "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
-    > => {
-      const previewText = text?.trim();
-      if (!previewText) {
-        return {};
-      }
-      return {
-        onMouseEnter: (event) => {
-          showErrorPreview(
-            event as ReactMouseEvent<HTMLElement>,
-            anchorId,
-            previewText,
-          );
-        },
-        onFocus: (event) => {
-          showErrorPreview(
-            event as ReactFocusEvent<HTMLElement>,
-            anchorId,
-            previewText,
-          );
-        },
-        onMouseLeave: () => {
-          hideErrorPreview();
-        },
-        onBlur: () => {
-          hideErrorPreview();
-        },
-      };
-    },
-    [hideErrorPreview, showErrorPreview],
-  );
-
-  const threadSummaryPreviewHandlers = useCallback(
-    (
-      anchorId: string,
-      title: string,
-      summary: string | null | undefined,
-    ): Pick<
-      HTMLAttributes<HTMLElement>,
-      "onMouseEnter" | "onMouseMove" | "onMouseLeave" | "onFocus" | "onBlur"
-    > => {
-      const previewSummary = summary?.trim();
-      const viewportWidth =
-        typeof window === "undefined" ? 1280 : window.innerWidth;
-      if (!previewSummary || viewportWidth < 768) {
-        return {};
-      }
-      return {
-        onMouseEnter: (event) => {
-          showThreadSummaryPreview(
-            event as ReactMouseEvent<HTMLElement>,
-            anchorId,
-            title,
-            previewSummary,
-          );
-        },
-        onMouseMove: (event) => {
-          showThreadSummaryPreview(
-            event as ReactMouseEvent<HTMLElement>,
-            anchorId,
-            title,
-            previewSummary,
-          );
-        },
-        onFocus: (event) => {
-          showThreadSummaryPreview(
-            event as ReactFocusEvent<HTMLElement>,
-            anchorId,
-            title,
-            previewSummary,
-          );
-        },
-        onMouseLeave: () => {
-          hideThreadSummaryPreview();
-        },
-        onBlur: () => {
-          hideThreadSummaryPreview();
-        },
-      };
-    },
-    [hideThreadSummaryPreview, showThreadSummaryPreview],
-  );
-
   const setProjectState = useCallback(
     (projectId: number, update: Partial<ProjectNodeState>): void => {
       setProjectStates((prev) => {
@@ -1386,6 +762,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
       return next;
     });
   }, []);
+
+  const {
+    addProjectError,
+    addProjectInputIsPreviewing,
+    addProjectOpen,
+    addProjectPath,
+    closeAddProjectForm,
+    directorySuggestions,
+    directorySuggestionsLoading,
+    displayedAddProjectPath,
+    handleAddProjectPathChange,
+    handleDirectorySuggestionEnter,
+    handleDirectorySuggestionLeave,
+    hoveredDirectorySuggestion,
+    isAddingProject,
+    prefetchDirectorySuggestions,
+    seedAddProjectPath,
+    selectDirectorySuggestion,
+    submitAddProject,
+    toggleAddProjectForm,
+  } = useAddProjectForm({
+    getProjectState,
+    homeDirectory,
+    hydrateProjectRows,
+    procedures,
+    selectProject,
+    setMobileProjectListOpen,
+    setProjects,
+    setProjectState,
+    supportsTildePath,
+  });
 
   const clearProjectState = useCallback((projectId: number) => {
     setProjectStates((prev) => {
@@ -1579,6 +986,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
+  const {
+    diffFileContentState,
+    isRefreshingWorktreeSnapshot,
+    loadMoreDiffFileContent,
+    loadSelectedDiffFileContent,
+    refreshActiveWorktreeSnapshot,
+    worktreeDiffError,
+  } = useWorktreeDiff({
+    activeSelectedWorktreeOpened,
+    activeSelectedWorktreePath,
+    activeWorktreeChanges,
+    isDocumentVisible,
+    primaryView,
+    procedures,
+    selectedDiffFilePath,
+    selectedProject,
+    setSelectedDiffFilePath,
+    setWorktreeState,
+  });
+
   const abortProjectTasksRequest = useCallback((reason: string) => {
     const controller = projectTasksAbortControllerRef.current;
     if (!controller) {
@@ -1612,252 +1039,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     threadOpenAbortControllerRef.current = null;
     controller.abort(createAbortError(null, reason));
   }, []);
-
-  const abortDiffSnapshotRequest = useCallback((reason: string) => {
-    const controller = diffSnapshotAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    diffSnapshotAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
-
-  const abortDiffFileContentRequest = useCallback((reason: string) => {
-    const controller = diffFileContentAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    diffFileContentAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
-
-  const refreshActiveWorktreeSnapshot = useCallback(
-    async (options?: { background?: boolean }) => {
-      if (
-        !selectedProject ||
-        !activeSelectedWorktreePath ||
-        !activeSelectedWorktreeOpened
-      ) {
-        return;
-      }
-
-      const requestId = ++diffSnapshotRequestIdRef.current;
-      abortDiffSnapshotRequest(
-        "Worktree diff snapshot request was superseded.",
-      );
-      const controller = new AbortController();
-      diffSnapshotAbortControllerRef.current = controller;
-      setIsRefreshingWorktreeSnapshot(true);
-      if (!options?.background) {
-        setWorktreeDiffError("");
-      }
-
-      try {
-        const snapshot = await procedures.getWorktreeSnapshot(
-          {
-            projectId: selectedProject.id,
-            worktreePath: activeSelectedWorktreePath,
-          },
-          {
-            priority: options?.background ? "background" : "foreground",
-            signal: controller.signal,
-          },
-        );
-        if (diffSnapshotRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        setWorktreeState(selectedProject.id, activeSelectedWorktreePath, {
-          error: "",
-          loading: false,
-          opened: true,
-          snapshot,
-        });
-        setWorktreeDiffError("");
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (diffSnapshotRequestIdRef.current !== requestId) {
-          return;
-        }
-        setWorktreeDiffError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        if (diffSnapshotAbortControllerRef.current === controller) {
-          diffSnapshotAbortControllerRef.current = null;
-        }
-        if (diffSnapshotRequestIdRef.current === requestId) {
-          setIsRefreshingWorktreeSnapshot(false);
-        }
-      }
-    },
-    [
-      abortDiffSnapshotRequest,
-      activeSelectedWorktreeOpened,
-      activeSelectedWorktreePath,
-      procedures,
-      selectedProject,
-      setWorktreeState,
-    ],
-  );
-
-  const loadDiffFileContentPage = useCallback(
-    async (
-      path: string,
-      options?: {
-        cursor?: number;
-        reset?: boolean;
-      },
-    ): Promise<void> => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-
-      const requestId = ++diffFileContentRequestIdRef.current;
-      abortDiffFileContentRequest(
-        "Worktree file content request was superseded.",
-      );
-      const controller = new AbortController();
-      diffFileContentAbortControllerRef.current = controller;
-      const reset = options?.reset ?? false;
-      const cursor = reset ? 0 : Math.max(0, options?.cursor ?? 0);
-
-      if (reset) {
-        diffFileContentDecoderRef.current = new TextDecoder();
-        setDiffFileContentState({
-          ...emptyDiffFileContentState(path),
-          isLoadingInitial: true,
-        });
-      } else {
-        setDiffFileContentState((current) =>
-          current.path === path
-            ? {
-                ...current,
-                error: "",
-                isLoadingMore: true,
-              }
-            : {
-                ...emptyDiffFileContentState(path),
-                isLoadingInitial: true,
-              },
-        );
-      }
-
-      try {
-        const page = await procedures.readWorktreeFileContentPage(
-          {
-            cursor,
-            limitBytes: WORKTREE_FILE_CONTENT_PAGE_BYTES,
-            path,
-            projectId: selectedProject.id,
-            worktreePath: activeSelectedWorktreePath,
-          },
-          {
-            priority: "foreground",
-            signal: controller.signal,
-          },
-        );
-        if (diffFileContentRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        let decodedChunk = "";
-        let loadedBytes = page.nextCursor ?? page.totalBytes;
-        if (!page.isBinary && !page.isMissing) {
-          const decoder =
-            reset || !diffFileContentDecoderRef.current
-              ? new TextDecoder()
-              : diffFileContentDecoderRef.current;
-          diffFileContentDecoderRef.current = decoder;
-          const bytes = decodeBase64Bytes(page.chunkBase64);
-          decodedChunk = decoder.decode(bytes, {
-            stream: page.nextCursor !== null,
-          });
-          if (page.nextCursor === null) {
-            decodedChunk += decoder.decode();
-          }
-          loadedBytes = page.cursor + bytes.length;
-        }
-
-        setDiffFileContentState((current) => {
-          const base =
-            reset || current.path !== path
-              ? emptyDiffFileContentState(path)
-              : current;
-          return {
-            chunks: decodedChunk ? [...base.chunks, decodedChunk] : base.chunks,
-            error: "",
-            isBinary: page.isBinary,
-            isLoadingInitial: false,
-            isLoadingMore: false,
-            isMissing: page.isMissing,
-            loadedBytes,
-            nextCursor: page.nextCursor,
-            path,
-            totalBytes: page.totalBytes,
-          };
-        });
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (diffFileContentRequestIdRef.current !== requestId) {
-          return;
-        }
-        setDiffFileContentState((current) => ({
-          ...(current.path === path
-            ? current
-            : emptyDiffFileContentState(path)),
-          error: error instanceof Error ? error.message : String(error),
-          isLoadingInitial: false,
-          isLoadingMore: false,
-          path,
-        }));
-      } finally {
-        if (diffFileContentAbortControllerRef.current === controller) {
-          diffFileContentAbortControllerRef.current = null;
-        }
-      }
-    },
-    [
-      abortDiffFileContentRequest,
-      activeSelectedWorktreePath,
-      procedures,
-      selectedProject,
-    ],
-  );
-
-  const loadSelectedDiffFileContent = useCallback(async (): Promise<void> => {
-    if (!selectedDiffFilePath) {
-      diffFileContentDecoderRef.current = null;
-      setDiffFileContentState(emptyDiffFileContentState());
-      return;
-    }
-
-    await loadDiffFileContentPage(selectedDiffFilePath, {
-      reset: true,
-    });
-  }, [loadDiffFileContentPage, selectedDiffFilePath]);
-
-  const loadMoreDiffFileContent = useCallback(async (): Promise<void> => {
-    if (
-      !selectedDiffFilePath ||
-      diffFileContentState.path !== selectedDiffFilePath ||
-      diffFileContentState.nextCursor === null ||
-      diffFileContentState.isLoadingInitial ||
-      diffFileContentState.isLoadingMore
-    ) {
-      return;
-    }
-
-    await loadDiffFileContentPage(selectedDiffFilePath, {
-      cursor: diffFileContentState.nextCursor,
-    });
-  }, [diffFileContentState, loadDiffFileContentPage, selectedDiffFilePath]);
 
   const clearThreadSelection = useCallback(() => {
     threadOpenRequestIdRef.current += 1;
@@ -2375,235 +1556,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
-  const resetAddProjectPath = useCallback(
-    (nextPath?: string) => {
-      setAddProjectPath(
-        formatDirectoryPathForInput(
-          nextPath ?? homeDirectory,
-          homeDirectory,
-          supportsTildePath,
-        ),
-      );
-    },
-    [homeDirectory, supportsTildePath],
-  );
-
-  const clearDirectorySuggestionPrefetchTimer = useCallback(() => {
-    if (directorySuggestionPrefetchTimerRef.current !== null) {
-      window.clearTimeout(directorySuggestionPrefetchTimerRef.current);
-      directorySuggestionPrefetchTimerRef.current = null;
-    }
-  }, []);
-
-  const readCachedDirectorySuggestions = useCallback((query: string) => {
-    const normalizedQuery = query.trim();
-    if (!normalizedQuery) {
-      return null;
-    }
-
-    const cached = readLruValue(
-      directorySuggestionResultCacheRef.current,
-      normalizedQuery,
-    );
-    if (!cached) {
-      return null;
-    }
-
-    return {
-      directories: cached.directories,
-      isStale:
-        cached.loadedAt + DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS < Date.now(),
-    };
-  }, []);
-
-  const cacheDirectorySuggestions = useCallback(
-    (query: string, directories: string[]) => {
-      const normalizedQuery = query.trim();
-      if (!normalizedQuery) {
-        return;
-      }
-
-      writeLruValue(
-        directorySuggestionResultCacheRef.current,
-        normalizedQuery,
-        {
-          directories,
-          loadedAt: Date.now(),
-        },
-        DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
-      );
-      prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
-    },
-    [],
-  );
-
-  const abortDirectorySuggestionRequest = useCallback((reason: string) => {
-    const controller = directorySuggestionAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    directorySuggestionAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
-
-  const fetchDirectorySuggestions = useCallback(
-    async (
-      query: string,
-      options?: {
-        forceRefresh?: boolean | undefined;
-        priority?: RpcRequestPriority;
-        signal?: AbortSignal;
-      },
-    ): Promise<string[]> => {
-      const normalizedQuery = query.trim();
-      if (!normalizedQuery) {
-        return [];
-      }
-
-      const cached = readCachedDirectorySuggestions(normalizedQuery);
-      if (cached && !cached.isStale && !options?.forceRefresh) {
-        return cached.directories;
-      }
-
-      const inFlight =
-        directorySuggestionRequestCacheRef.current.get(normalizedQuery);
-      if (inFlight) {
-        inFlight.waiterCount += 1;
-        try {
-          return await awaitAbortableResult(
-            inFlight.promise,
-            options?.signal,
-            "Directory suggestion request was aborted.",
-          );
-        } finally {
-          inFlight.waiterCount = Math.max(0, inFlight.waiterCount - 1);
-          if (
-            inFlight.waiterCount === 0 &&
-            directorySuggestionRequestCacheRef.current.get(normalizedQuery) ===
-              inFlight
-          ) {
-            inFlight.controller.abort(
-              createAbortError(
-                null,
-                "Directory suggestion request was aborted.",
-              ),
-            );
-          }
-        }
-      }
-
-      const controller = new AbortController();
-      const pendingRequest: PendingSharedRequest<string[]> = {
-        controller,
-        promise: Promise.resolve([]),
-        waiterCount: 1,
-      };
-      const request = procedures
-        .listDirectorySuggestions(
-          { query: normalizedQuery },
-          {
-            priority: options?.priority ?? "foreground",
-            signal: controller.signal,
-          },
-        )
-        .then((result) => {
-          cacheDirectorySuggestions(normalizedQuery, result.directories);
-          return result.directories;
-        })
-        .finally(() => {
-          directorySuggestionRequestCacheRef.current.delete(normalizedQuery);
-        });
-      pendingRequest.promise = request;
-      directorySuggestionRequestCacheRef.current.set(
-        normalizedQuery,
-        pendingRequest,
-      );
-
-      try {
-        return await awaitAbortableResult(
-          request,
-          options?.signal,
-          "Directory suggestion request was aborted.",
-        );
-      } finally {
-        pendingRequest.waiterCount = Math.max(
-          0,
-          pendingRequest.waiterCount - 1,
-        );
-        if (
-          pendingRequest.waiterCount === 0 &&
-          directorySuggestionRequestCacheRef.current.get(normalizedQuery) ===
-            pendingRequest
-        ) {
-          controller.abort(
-            createAbortError(null, "Directory suggestion request was aborted."),
-          );
-        }
-      }
-    },
-    [cacheDirectorySuggestions, procedures, readCachedDirectorySuggestions],
-  );
-
-  const prefetchDirectorySuggestions = useCallback(
-    async (query: string) => {
-      const normalizedQuery = query.trim();
-      if (!normalizedQuery) {
-        return;
-      }
-      if (
-        prefetchedDirectorySuggestionQueriesRef.current.has(normalizedQuery)
-      ) {
-        return;
-      }
-
-      prefetchedDirectorySuggestionQueriesRef.current.add(normalizedQuery);
-      try {
-        await fetchDirectorySuggestions(normalizedQuery, {
-          priority: "background",
-        });
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        prefetchedDirectorySuggestionQueriesRef.current.delete(normalizedQuery);
-      }
-    },
-    [fetchDirectorySuggestions],
-  );
-
-  const scheduleDirectorySuggestionPrefetch = useCallback(
-    (directory: string) => {
-      const prefetchQuery = formatDirectoryPathForInput(
-        directory,
-        homeDirectory,
-        supportsTildePath,
-      );
-      if (!prefetchQuery.trim()) {
-        return;
-      }
-      if (
-        prefetchedDirectorySuggestionQueriesRef.current.has(
-          prefetchQuery.trim(),
-        )
-      ) {
-        return;
-      }
-
-      clearDirectorySuggestionPrefetchTimer();
-      directorySuggestionPrefetchTimerRef.current = window.setTimeout(() => {
-        directorySuggestionPrefetchTimerRef.current = null;
-        void prefetchDirectorySuggestions(prefetchQuery);
-      }, DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS);
-    },
-    [
-      clearDirectorySuggestionPrefetchTimer,
-      homeDirectory,
-      prefetchDirectorySuggestions,
-      supportsTildePath,
-    ],
-  );
-
   const initialize = useCallback(async () => {
     const persistedState = initialMainviewState;
 
@@ -2673,14 +1625,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
       hydrateProjectRows(loaded);
       setHomeDirectory(homeDirectoryResult.homeDirectory);
       setSupportsTildePath(homeDirectoryResult.supportsTildePath);
-      setAddProjectPath(
-        (current) =>
-          current ||
-          formatDirectoryPathForInput(
-            homeDirectoryResult.homeDirectory,
-            homeDirectoryResult.homeDirectory,
-            homeDirectoryResult.supportsTildePath,
-          ),
+      seedAddProjectPath(
+        homeDirectoryResult.homeDirectory,
+        homeDirectoryResult.supportsTildePath,
       );
       selectedProjectIdRef.current = initialProject?.id ?? null;
       selectedWorktreePathRef.current = initialWorktreePath;
@@ -2840,37 +1787,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
     openThread,
     prefetchDirectorySuggestions,
     procedures,
+    seedAddProjectPath,
     setProjectState,
     setWorktreeState,
   ]);
 
-  const closeAddProjectForm = useCallback(() => {
-    setAddProjectOpen(false);
-    setAddProjectError("");
-    resetAddProjectPath();
-  }, [resetAddProjectPath]);
-
-  const toggleAddProjectForm = useCallback(() => {
-    setAddProjectError("");
-    setAddProjectOpen((current) => {
-      const nextOpen = !current;
-      if (nextOpen && !addProjectPath && homeDirectory) {
-        setAddProjectPath(
-          formatDirectoryPathForInput(
-            homeDirectory,
-            homeDirectory,
-            supportsTildePath,
-          ),
-        );
-      }
-      return nextOpen;
-    });
-  }, [addProjectPath, homeDirectory, supportsTildePath]);
-
   const closeProjectActionMenu = useCallback(() => {
     setProjectActionMenu(null);
     setProjectActionMenuError("");
-    setProjectActionMenuLoading(false);
     setNewWorktreeName("");
   }, []);
 
@@ -2897,28 +1821,21 @@ export default function App({ procedures }: AppProps): JSX.Element {
         y: clampProjectMenuCoordinate(y, viewportHeight, 420),
       });
       setProjectActionMenuError("");
-      setProjectActionMenuLoading(
-        getProjectState(project.id).worktrees.length === 0,
-      );
       setNewWorktreeName("");
 
       try {
         await loadProjectWorktrees(project.id, {
           backgroundRefresh: true,
         });
-        if (projectActionMenuRequestId.current === requestId) {
-          setProjectActionMenuLoading(false);
-        }
       } catch (error) {
         if (projectActionMenuRequestId.current === requestId) {
           setProjectActionMenuError(
             error instanceof Error ? error.message : String(error),
           );
-          setProjectActionMenuLoading(false);
         }
       }
     },
-    [closeThreadActionMenu, getProjectState, loadProjectWorktrees],
+    [closeThreadActionMenu, loadProjectWorktrees],
   );
 
   const openThreadActionMenu = useCallback(
@@ -3306,123 +2223,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
         // Best effort; active worktree polling will resync on the next selection or visibility change.
       });
   }, [activePollingProjectId, activePollingWorktreePath, procedures]);
-
-  useEffect(() => {
-    return () => {
-      diffSnapshotRequestIdRef.current += 1;
-      diffFileContentRequestIdRef.current += 1;
-      abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
-    };
-  }, [abortDiffFileContentRequest, abortDiffSnapshotRequest]);
-
-  useEffect(() => {
-    if (
-      selectedProject &&
-      activeSelectedWorktreePath &&
-      activeSelectedWorktreeOpened
-    ) {
-      return;
-    }
-
-    diffSnapshotRequestIdRef.current += 1;
-    diffFileContentRequestIdRef.current += 1;
-    diffFileContentDecoderRef.current = null;
-    abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
-    abortDiffFileContentRequest("Worktree file content request was cleared.");
-    setIsRefreshingWorktreeSnapshot(false);
-    setWorktreeDiffError("");
-    setSelectedDiffFilePath(null);
-    setDiffFileContentState(emptyDiffFileContentState());
-  }, [
-    abortDiffFileContentRequest,
-    abortDiffSnapshotRequest,
-    activeSelectedWorktreeOpened,
-    activeSelectedWorktreePath,
-    selectedProject,
-  ]);
-
-  useEffect(() => {
-    if (
-      primaryView !== "diff" ||
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened ||
-      !isDocumentVisible
-    ) {
-      return;
-    }
-
-    void refreshActiveWorktreeSnapshot();
-    const timer = window.setInterval(() => {
-      void refreshActiveWorktreeSnapshot({
-        background: true,
-      });
-    }, WORKTREE_DIFF_POLL_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(timer);
-      diffSnapshotRequestIdRef.current += 1;
-      abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
-      setIsRefreshingWorktreeSnapshot(false);
-    };
-  }, [
-    abortDiffSnapshotRequest,
-    activeSelectedWorktreeOpened,
-    activeSelectedWorktreePath,
-    isDocumentVisible,
-    primaryView,
-    refreshActiveWorktreeSnapshot,
-    selectedProject,
-  ]);
-
-  useEffect(() => {
-    if (activeWorktreeChanges.length === 0) {
-      setSelectedDiffFilePath(null);
-      return;
-    }
-
-    setSelectedDiffFilePath((current) => {
-      if (
-        current &&
-        activeWorktreeChanges.some((change) => change.path === current)
-      ) {
-        return current;
-      }
-      return activeWorktreeChanges[0]?.path ?? null;
-    });
-  }, [activeWorktreeChanges]);
-
-  useEffect(() => {
-    if (
-      primaryView !== "diff" ||
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened ||
-      !selectedDiffFilePath
-    ) {
-      diffFileContentRequestIdRef.current += 1;
-      diffFileContentDecoderRef.current = null;
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
-      setDiffFileContentState(emptyDiffFileContentState(selectedDiffFilePath));
-      return;
-    }
-
-    void loadSelectedDiffFileContent();
-    return () => {
-      diffFileContentRequestIdRef.current += 1;
-      diffFileContentDecoderRef.current = null;
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
-    };
-  }, [
-    abortDiffFileContentRequest,
-    activeSelectedWorktreeOpened,
-    activeSelectedWorktreePath,
-    loadSelectedDiffFileContent,
-    primaryView,
-    selectedDiffFilePath,
-    selectedProject,
-  ]);
 
   useEffect(() => {
     if (
@@ -3816,107 +2616,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
   useEffect(() => {
     return () => {
-      clearDirectorySuggestionPrefetchTimer();
-    };
-  }, [clearDirectorySuggestionPrefetchTimer]);
-
-  useEffect(() => {
-    return () => {
       abortProjectTasksRequest("Project task request was canceled.");
       abortGitHistoryRequests("Git history request was canceled.");
-      abortDirectorySuggestionRequest(
-        "Directory suggestion request was canceled.",
-      );
     };
-  }, [
-    abortDirectorySuggestionRequest,
-    abortGitHistoryRequests,
-    abortProjectTasksRequest,
-  ]);
-
-  useEffect(() => {
-    if (!addProjectOpen) {
-      directorySuggestionRequestIdRef.current += 1;
-      abortDirectorySuggestionRequest(
-        "Directory suggestion request was cleared.",
-      );
-      setDirectorySuggestions([]);
-      setDirectorySuggestionsLoading(false);
-      setHoveredDirectorySuggestion(null);
-      clearDirectorySuggestionPrefetchTimer();
-      return;
-    }
-
-    const query = addProjectPath.trim();
-    if (!query) {
-      directorySuggestionRequestIdRef.current += 1;
-      abortDirectorySuggestionRequest(
-        "Directory suggestion request was cleared.",
-      );
-      setDirectorySuggestions([]);
-      setDirectorySuggestionsLoading(false);
-      clearDirectorySuggestionPrefetchTimer();
-      return;
-    }
-
-    const requestId = ++directorySuggestionRequestIdRef.current;
-    abortDirectorySuggestionRequest(
-      "Directory suggestion request was superseded.",
-    );
-    const controller = new AbortController();
-    directorySuggestionAbortControllerRef.current = controller;
-    const cached = readCachedDirectorySuggestions(query);
-    if (cached) {
-      setDirectorySuggestions(cached.directories);
-      setDirectorySuggestionsLoading(cached.isStale);
-    } else {
-      setDirectorySuggestions([]);
-      setDirectorySuggestionsLoading(true);
-    }
-    void (async () => {
-      try {
-        const directories = await fetchDirectorySuggestions(query, {
-          ...(cached ? { forceRefresh: cached.isStale } : {}),
-          priority: "foreground",
-          signal: controller.signal,
-        });
-        if (directorySuggestionRequestIdRef.current === requestId) {
-          setDirectorySuggestions(directories);
-        }
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (directorySuggestionRequestIdRef.current === requestId) {
-          setDirectorySuggestions([]);
-        }
-      } finally {
-        if (directorySuggestionAbortControllerRef.current === controller) {
-          directorySuggestionAbortControllerRef.current = null;
-        }
-        if (directorySuggestionRequestIdRef.current === requestId) {
-          setDirectorySuggestionsLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      directorySuggestionRequestIdRef.current += 1;
-      if (directorySuggestionAbortControllerRef.current === controller) {
-        directorySuggestionAbortControllerRef.current = null;
-      }
-      controller.abort(
-        createAbortError(null, "Directory suggestion request was superseded."),
-      );
-    };
-  }, [
-    addProjectOpen,
-    addProjectPath,
-    abortDirectorySuggestionRequest,
-    clearDirectorySuggestionPrefetchTimer,
-    fetchDirectorySuggestions,
-    readCachedDirectorySuggestions,
-  ]);
+  }, [abortGitHistoryRequests, abortProjectTasksRequest]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
@@ -4072,101 +2775,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const handleCreateThreadFromSelection = useCallback(() => {
     void createThreadFromSelection();
   }, [createThreadFromSelection]);
-
-  const openProjectFromInput = useCallback(
-    async (projectPathInput: string) => {
-      if (isAddingProject) {
-        return;
-      }
-
-      const projectPath = projectPathInput.trim();
-      if (!projectPath) {
-        setAddProjectError("Enter the project folder path.");
-        return;
-      }
-
-      setIsAddingProject(true);
-      setAddProjectError("");
-      try {
-        const result = await procedures.openProject({ projectPath });
-        const existingState = getProjectState(result.project.id);
-        setProjects((prev) => upsertProjectList(prev, result.project));
-        hydrateProjectRows([result.project]);
-        setProjectState(result.project.id, {
-          loadingWorktrees: false,
-          error: "",
-          worktrees: result.worktrees,
-          openWorktrees: existingState.openWorktrees,
-        });
-        setProjectTreeOpen(result.project.path, true);
-        selectProject(result.project, result.project.path);
-        resetAddProjectPath();
-        setAddProjectOpen(false);
-        setMobileProjectListOpen(false);
-      } catch (error) {
-        setAddProjectError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        setIsAddingProject(false);
-      }
-    },
-    [
-      getProjectState,
-      hydrateProjectRows,
-      isAddingProject,
-      procedures,
-      resetAddProjectPath,
-      selectProject,
-      setProjectState,
-    ],
-  );
-
-  const selectDirectorySuggestion = useCallback(
-    (directory: string) => {
-      const formattedDirectory = formatDirectoryPathForInput(
-        directory,
-        homeDirectory,
-        supportsTildePath,
-      );
-      setAddProjectError("");
-      setHoveredDirectorySuggestion(null);
-      setAddProjectPath(formattedDirectory);
-    },
-    [homeDirectory, supportsTildePath],
-  );
-
-  const handleAddProjectPathChange = useCallback((value: string) => {
-    setAddProjectError("");
-    setHoveredDirectorySuggestion(null);
-    setAddProjectPath(value);
-  }, []);
-
-  const handleDirectorySuggestionEnter = useCallback(
-    (directory: string) => {
-      setHoveredDirectorySuggestion(directory);
-      scheduleDirectorySuggestionPrefetch(directory);
-    },
-    [scheduleDirectorySuggestionPrefetch],
-  );
-
-  const handleDirectorySuggestionLeave = useCallback(
-    (directory: string) => {
-      setHoveredDirectorySuggestion((current) =>
-        current === directory ? null : current,
-      );
-      clearDirectorySuggestionPrefetchTimer();
-    },
-    [clearDirectorySuggestionPrefetchTimer],
-  );
-
-  const submitAddProject = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      await openProjectFromInput(addProjectPath);
-    },
-    [addProjectPath, openProjectFromInput],
-  );
 
   const handleToggleWorktreePinned = useCallback(
     (projectId: number, worktreePath: string, pinned: boolean) => {
@@ -4694,17 +3302,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     }
     chatScrollThreadIdRef.current = selectedThreadId;
   }, [selectedThreadId, visibleMessages]);
-
-  const hoveredDirectorySuggestionPath = hoveredDirectorySuggestion
-    ? formatDirectoryPathForInput(
-        hoveredDirectorySuggestion,
-        homeDirectory,
-        supportsTildePath,
-      )
-    : "";
-  const displayedAddProjectPath =
-    hoveredDirectorySuggestionPath || addProjectPath;
-  const addProjectInputIsPreviewing = hoveredDirectorySuggestionPath.length > 0;
 
   const sidebarActionButtonClass =
     "flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";

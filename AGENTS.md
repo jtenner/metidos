@@ -79,7 +79,11 @@
 │     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts
 │     │  ├─ state.ts
-│     │  └─ threads-panel.tsx
+│     │  ├─ threads-panel.tsx
+│     │  ├─ use-add-project-form.ts
+│     │  ├─ use-mainview-derived-state.ts
+│     │  ├─ use-thread-previews.ts
+│     │  └─ use-worktree-diff.ts
 │     ├─ controls/
 │     │  ├─ chat-composer-control.tsx
 │     │  ├─ codex-model-selector.tsx
