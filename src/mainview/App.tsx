@@ -68,6 +68,7 @@ import {
   gitHistoryDiffCacheKey,
   isAbortError,
   isCodexReasoningEffort,
+  latestThreadForWorktree,
   mergeResetGitHistory,
   patchPersistedMainviewState,
   pickInitialThread,
@@ -248,6 +249,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
     new Map<string, AbortController>(),
   );
   const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
+    null,
+  );
+  const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
     null,
   );
   const threadOpenRequestIdRef = useRef(0);
@@ -1530,6 +1534,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
         if (threadOpenRequestIdRef.current !== requestId) {
           return;
         }
+        if (
+          options?.selectionGuard &&
+          (selectedProjectIdRef.current !== options.selectionGuard.projectId ||
+            selectedWorktreePathRef.current !==
+              options.selectionGuard.worktreePath)
+        ) {
+          setThreads((prev) => upsertThreadList(prev, detail.thread));
+          return;
+        }
         applyOpenedThreadDetail(detail);
       } catch (error) {
         if (isAbortError(error)) {
@@ -2214,14 +2227,44 @@ export default function App({ procedures }: AppProps): JSX.Element {
   }, []);
 
   useEffect(() => {
+    activeWorktreeSyncAbortControllerRef.current?.abort(
+      createAbortError(
+        null,
+        "Active worktree synchronization request was superseded.",
+      ),
+    );
+
+    const controller = new AbortController();
+    activeWorktreeSyncAbortControllerRef.current = controller;
     void procedures
-      .setActiveWorktree({
-        projectId: activePollingProjectId,
-        worktreePath: activePollingWorktreePath,
-      })
-      .catch(() => {
+      .setActiveWorktree(
+        {
+          projectId: activePollingProjectId,
+          worktreePath: activePollingWorktreePath,
+        },
+        {
+          priority: "background",
+          signal: controller.signal,
+        },
+      )
+      .catch((error) => {
+        if (isAbortError(error)) {
+          return;
+        }
         // Best effort; active worktree polling will resync on the next selection or visibility change.
       });
+
+    return () => {
+      if (activeWorktreeSyncAbortControllerRef.current === controller) {
+        activeWorktreeSyncAbortControllerRef.current = null;
+      }
+      controller.abort(
+        createAbortError(
+          null,
+          "Active worktree synchronization request was superseded.",
+        ),
+      );
+    };
   }, [activePollingProjectId, activePollingWorktreePath, procedures]);
 
   useEffect(() => {
@@ -2514,21 +2557,32 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ) {
       return;
     }
-    const pinnedThread = pinnedThreadForWorktree(
-      threads,
-      selectedProjectId,
-      activeSelectedWorktreePath,
-    );
-    if (!pinnedThread) {
+    const preferredThread =
+      pinnedThreadForWorktree(
+        threads,
+        selectedProjectId,
+        activeSelectedWorktreePath,
+      ) ??
+      latestThreadForWorktree(
+        threads,
+        selectedProjectId,
+        activeSelectedWorktreePath,
+      );
+    if (!preferredThread) {
       if (selectedThreadId !== null) {
         clearThreadSelection();
       }
       return;
     }
-    if (selectedThreadId === pinnedThread.id) {
+    if (selectedThreadId === preferredThread.id) {
       return;
     }
-    void openThread(pinnedThread.id);
+    void openThread(preferredThread.id, {
+      selectionGuard: {
+        projectId: selectedProjectId,
+        worktreePath: activeSelectedWorktreePath,
+      },
+    });
   }, [
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
@@ -2701,6 +2755,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
         return;
       }
 
+      const requestedProjectId = selectedProject.id;
+      const requestedWorktreePath = activeSelectedWorktreePath;
       setIsRunningProjectTask(true);
       setTaskControlError("");
       setThreadsError("");
@@ -2708,8 +2764,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setReasoningEffortControlError("");
       try {
         const detail = await procedures.runProjectTask({
-          projectId: selectedProject.id,
-          worktreePath: activeSelectedWorktreePath,
+          projectId: requestedProjectId,
+          worktreePath: requestedWorktreePath,
           task,
           threadId: selectedThread?.id ?? null,
           model: selectedThread
@@ -2720,6 +2776,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
             : activeReasoningEffort || defaultCodexReasoningEffort || null,
         });
         setThreads((prev) => upsertThreadList(prev, detail.thread));
+        if (
+          selectedProjectIdRef.current !== requestedProjectId ||
+          selectedWorktreePathRef.current !== requestedWorktreePath
+        ) {
+          return;
+        }
         setSelectedThreadId(detail.thread.id);
         selectedThreadRunStateRef.current = detail.thread.runStatus.state;
         setThreadMessages(detail.messages);
@@ -2907,10 +2969,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
-  const openOrCloseWorktree = useCallback(
+  const ensureWorktreeOpen = useCallback(
     async (projectId: number, worktreePath: string) => {
       const target = getWorktreeState(projectId, worktreePath);
-      if (target.loading) {
+      if (target.loading || target.opened) {
         return;
       }
 
@@ -2922,53 +2984,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
         loading: true,
         error: "",
       });
-
-      if (target.opened) {
-        try {
-          await procedures.closeWorktree({ projectId, worktreePath });
-          if (!isCurrentWorktreeToggleRequest(key, requestId)) {
-            return;
-          }
-          setWorktreeState(projectId, worktreePath, {
-            opened: false,
-            snapshot: undefined,
-            loading: false,
-          });
-          updateProjectState(projectId, (current) => ({
-            ...current,
-            openWorktrees: new Set(
-              [...current.openWorktrees].filter(
-                (item) => item !== worktreePath,
-              ),
-            ),
-          }));
-          const fallbackWorktreePath =
-            projects.find((project) => project.id === projectId)?.path ?? null;
-          if (selectedWorktreePathRef.current === worktreePath) {
-            selectedWorktreePathRef.current = fallbackWorktreePath;
-          }
-          setSelectedWorktreePath((current) => {
-            if (current !== worktreePath) {
-              return current;
-            }
-            return fallbackWorktreePath;
-          });
-        } catch (error) {
-          if (!isCurrentWorktreeToggleRequest(key, requestId)) {
-            return;
-          }
-          setWorktreeState(projectId, worktreePath, {
-            loading: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Unable to stop worktree polling.",
-          });
-        } finally {
-          finishWorktreeToggleRequest(key, requestId);
-        }
-        return;
-      }
 
       try {
         const result = await procedures.openWorktree({
@@ -2990,13 +3005,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
           loadingWorktrees: false,
           openWorktrees: new Set([...current.openWorktrees, worktreePath]),
         }));
-        const pinnedThread = pinnedThreadForWorktree(
-          threads,
-          projectId,
-          worktreePath,
-        );
-        if (pinnedThread) {
-          void openThread(pinnedThread.id);
+        const existingThread =
+          pinnedThreadForWorktree(threads, projectId, worktreePath) ??
+          latestThreadForWorktree(threads, projectId, worktreePath);
+        if (
+          existingThread ||
+          selectedProjectIdRef.current !== projectId ||
+          selectedWorktreePathRef.current !== worktreePath
+        ) {
           return;
         }
         await createThreadForWorktree(projectId, worktreePath, {
@@ -3018,11 +3034,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
       beginWorktreeToggleRequest,
       createThreadForWorktree,
       getWorktreeState,
-      projects,
       cacheGitHistoryResult,
       finishWorktreeToggleRequest,
       isCurrentWorktreeToggleRequest,
-      openThread,
       procedures,
       setWorktreeState,
       threads,
@@ -3033,15 +3047,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const handleProjectWorktreeClick = useCallback(
     (project: RpcProject, worktreePath: string) => {
       hideErrorPreview();
-      clearThreadSelection();
       setThreadsError("");
+      const target = getWorktreeState(project.id, worktreePath);
+      const alreadySelected =
+        selectedProjectIdRef.current === project.id &&
+        selectedWorktreePathRef.current === worktreePath;
+      if (alreadySelected) {
+        if (!target.opened && !target.loading) {
+          clearThreadSelection();
+          void ensureWorktreeOpen(project.id, worktreePath);
+        }
+        return;
+      }
+      clearThreadSelection();
       selectProject(project, worktreePath);
-      void openOrCloseWorktree(project.id, worktreePath);
+      void ensureWorktreeOpen(project.id, worktreePath);
     },
     [
       clearThreadSelection,
+      ensureWorktreeOpen,
+      getWorktreeState,
       hideErrorPreview,
-      openOrCloseWorktree,
       selectProject,
     ],
   );

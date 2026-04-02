@@ -168,6 +168,10 @@ export type PendingSharedRequest<T> = {
 
 export type OpenThreadOptions = {
   detailPromise?: Promise<RpcThreadDetail> | null;
+  selectionGuard?: {
+    projectId: number;
+    worktreePath: string;
+  } | null;
 };
 
 export const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
