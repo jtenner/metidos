@@ -335,14 +335,32 @@ export function useMainviewDerivedState({
   }, [getProjectState, selectedProject]);
 
   const activeSelectedWorktreePath = useMemo(() => {
-    if (!selectedProject || selectedProject.isOpen !== 1) {
+    if (!selectedProject) {
+      return null;
+    }
+    const threadSelectedWorktreePath =
+      selectedThread?.projectId === selectedProject.id
+        ? selectedThread.worktreePath
+        : null;
+    if (
+      threadSelectedWorktreePath &&
+      selectedWorktreePath === threadSelectedWorktreePath
+    ) {
+      return threadSelectedWorktreePath;
+    }
+    if (selectedProject.isOpen !== 1) {
       return null;
     }
     if (selectedWorktreePath) {
       return selectedWorktreePath;
     }
     return primaryWorktreePath(selectedProject, selectedProjectWorktrees);
-  }, [selectedProject, selectedProjectWorktrees, selectedWorktreePath]);
+  }, [
+    selectedProject,
+    selectedProjectWorktrees,
+    selectedThread,
+    selectedWorktreePath,
+  ]);
 
   const activeSelectedWorktree = useMemo(() => {
     if (!selectedProject || !activeSelectedWorktreePath) {
