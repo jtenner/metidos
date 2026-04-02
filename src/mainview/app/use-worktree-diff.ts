@@ -220,7 +220,9 @@ export function useWorktreeDiff({
       );
       const controller = new AbortController();
       diffSnapshotAbortControllerRef.current = controller;
-      setIsRefreshingWorktreeSnapshot(true);
+      if (!options?.background) {
+        setIsRefreshingWorktreeSnapshot(true);
+      }
       if (!options?.background) {
         setWorktreeDiffError("");
       }
@@ -267,7 +269,10 @@ export function useWorktreeDiff({
         if (diffSnapshotAbortControllerRef.current === controller) {
           diffSnapshotAbortControllerRef.current = null;
         }
-        if (diffSnapshotRequestIdRef.current === requestId) {
+        if (
+          diffSnapshotRequestIdRef.current === requestId &&
+          !options?.background
+        ) {
           setIsRefreshingWorktreeSnapshot(false);
         }
       }
