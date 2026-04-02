@@ -704,6 +704,24 @@ async function runThreadMessageInBackground(
         continue;
       }
 
+      if (item.type === "error") {
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        const state =
+          event.type === "item.completed" ? "completed" : "in_progress";
+        const message =
+          item.message.trim() || "Codex reported a non-fatal error.";
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          `${state}\u0000${message}`,
+          () => upsertErrorActivity(threadId, activityItemId, item, state),
+          {
+            force: state !== "in_progress",
+            terminal: state !== "in_progress",
+          },
+        );
+        continue;
+      }
+
       if (item.type === "file_change") {
         const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
         await bufferedActivityWriter.queue(
@@ -1255,6 +1273,22 @@ async function upsertWebSearchActivity(
     itemId,
     kind: "web_search",
     text: item.query.trim() || "Web search",
+    state,
+  });
+  invalidateThreadDetailCache(threadId);
+}
+
+async function upsertErrorActivity(
+  threadId: number,
+  itemId: string,
+  item: Extract<ThreadItem, { type: "error" }>,
+  state: "in_progress" | "completed" | "stopped",
+): Promise<void> {
+  upsertThreadActivity(db, {
+    threadId,
+    itemId,
+    kind: "error",
+    text: item.message.trim() || "Codex reported a non-fatal error.",
     state,
   });
   invalidateThreadDetailCache(threadId);

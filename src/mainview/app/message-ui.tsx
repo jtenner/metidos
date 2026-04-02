@@ -254,6 +254,18 @@ function webSearchStateLabel(
   return "Completed";
 }
 
+function errorItemStateLabel(
+  state: "in_progress" | "completed" | "stopped",
+): string {
+  if (state === "in_progress") {
+    return "Working";
+  }
+  if (state === "stopped") {
+    return "Stopped";
+  }
+  return "Noted";
+}
+
 export function DiffViewer({
   className,
   diffText,
@@ -380,6 +392,30 @@ export function WebSearchMessage({
           {webSearchStateLabel(state)}
         </div>
       </div>
+    </div>
+  );
+}
+
+export function ErrorItemMessage({
+  text,
+  state,
+}: {
+  text: string;
+  state: "in_progress" | "completed" | "stopped";
+}): JSX.Element {
+  return (
+    <div className="space-y-3 border border-[#6d5930] bg-[#261f12] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-label text-[10px] uppercase tracking-widest text-[#f2d79b]">
+            Error
+          </div>
+        </div>
+        <div className="shrink-0 border border-[#8f7341] bg-[#342914] px-2 py-1 text-[10px] uppercase tracking-widest text-[#f2d79b]">
+          {errorItemStateLabel(state)}
+        </div>
+      </div>
+      <div className="text-sm leading-6 text-[#f2d79b]">{text}</div>
     </div>
   );
 }

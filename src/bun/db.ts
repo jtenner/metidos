@@ -51,7 +51,8 @@ type ThreadActivityKind =
   | "command"
   | "file_change"
   | "tool_call"
-  | "web_search";
+  | "web_search"
+  | "error";
 
 type ThreadActivityInput = {
   threadId: number;

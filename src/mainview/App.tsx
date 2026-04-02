@@ -3677,6 +3677,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
             state: message.state,
           };
         }
+        if (message.kind === "error") {
+          return {
+            kind: "error",
+            text: message.text,
+            state: message.state,
+          };
+        }
         return {
           kind: "chat",
           speaker: message.role,

@@ -25,6 +25,7 @@ import {
   ChatNoticeMessage,
   CommandExecutionMessage,
   ContextUsageMeter,
+  ErrorItemMessage,
   FileChangeMessage,
   MarkdownMessage,
   ProcessingMessage,
@@ -189,6 +190,9 @@ function ChatTranscript({
     }
     if (message.kind === "web_search") {
       return <WebSearchMessage query={message.query} state={message.state} />;
+    }
+    if (message.kind === "error") {
+      return <ErrorItemMessage state={message.state} text={message.text} />;
     }
     return (
       <FileChangeMessage
