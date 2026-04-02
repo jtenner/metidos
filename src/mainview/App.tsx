@@ -120,6 +120,39 @@ function scrollContainerToBottom(container: HTMLDivElement | null): void {
   container.scrollTop = container.scrollHeight;
 }
 
+function observeChatScrollContent(
+  container: HTMLDivElement,
+  onContentResize: () => void,
+): () => void {
+  const resizeObserver = new ResizeObserver(() => {
+    onContentResize();
+  });
+
+  const observeDirectChildren = (): void => {
+    resizeObserver.disconnect();
+    for (const child of Array.from(container.children)) {
+      if (child instanceof Element) {
+        resizeObserver.observe(child);
+      }
+    }
+  };
+
+  observeDirectChildren();
+
+  const mutationObserver = new MutationObserver(() => {
+    observeDirectChildren();
+    onContentResize();
+  });
+  mutationObserver.observe(container, {
+    childList: true,
+  });
+
+  return () => {
+    mutationObserver.disconnect();
+    resizeObserver.disconnect();
+  };
+}
+
 function areWorktreeChangesEqual(
   left: RpcWorktreeChange[],
   right: RpcWorktreeChange[],
@@ -294,6 +327,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const chatScrollThreadIdRef = useRef<number | null>(
     initialMainviewState.selectedThreadId,
   );
+  const chatAutoScrollFrameRef = useRef<number | null>(null);
   const projectActionMenuRequestId = useRef(0);
   const projectTasksRequestIdRef = useRef(0);
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
@@ -3384,6 +3418,26 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [],
   );
 
+  const syncPinnedChatScroll = useCallback(() => {
+    if (desktopChatPinnedToBottomRef.current) {
+      scrollContainerToBottom(desktopChatScrollRef.current);
+    }
+    if (mobileChatPinnedToBottomRef.current) {
+      scrollContainerToBottom(mobileChatScrollRef.current);
+    }
+  }, []);
+
+  const schedulePinnedChatScroll = useCallback(() => {
+    if (chatAutoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(chatAutoScrollFrameRef.current);
+    }
+
+    chatAutoScrollFrameRef.current = requestAnimationFrame(() => {
+      chatAutoScrollFrameRef.current = null;
+      syncPinnedChatScroll();
+    });
+  }, [syncPinnedChatScroll]);
+
   useLayoutEffect(() => {
     void visibleMessages;
     const threadChanged = chatScrollThreadIdRef.current !== selectedThreadId;
@@ -3391,14 +3445,39 @@ export default function App({ procedures }: AppProps): JSX.Element {
       desktopChatPinnedToBottomRef.current = true;
       mobileChatPinnedToBottomRef.current = true;
     }
-    if (desktopChatPinnedToBottomRef.current) {
-      scrollContainerToBottom(desktopChatScrollRef.current);
-    }
-    if (mobileChatPinnedToBottomRef.current) {
-      scrollContainerToBottom(mobileChatScrollRef.current);
-    }
+    syncPinnedChatScroll();
     chatScrollThreadIdRef.current = selectedThreadId;
-  }, [selectedThreadId, visibleMessages]);
+  }, [selectedThreadId, syncPinnedChatScroll, visibleMessages]);
+
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    const desktopChatContainer = desktopChatScrollRef.current;
+    const mobileChatContainer = mobileChatScrollRef.current;
+
+    if (desktopChatContainer) {
+      cleanups.push(
+        observeChatScrollContent(
+          desktopChatContainer,
+          schedulePinnedChatScroll,
+        ),
+      );
+    }
+    if (mobileChatContainer) {
+      cleanups.push(
+        observeChatScrollContent(mobileChatContainer, schedulePinnedChatScroll),
+      );
+    }
+
+    return () => {
+      for (const cleanup of cleanups) {
+        cleanup();
+      }
+      if (chatAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(chatAutoScrollFrameRef.current);
+        chatAutoScrollFrameRef.current = null;
+      }
+    };
+  }, [schedulePinnedChatScroll]);
 
   const sidebarActionButtonClass =
     "flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";
