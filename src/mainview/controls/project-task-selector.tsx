@@ -23,7 +23,7 @@ export function ProjectTaskSelector({
   const noTasksHintId = useId();
   const buttonLabel = loading
     ? "Loading Tasks"
-    : tasks.length > 0
+    : variant === "desktop" && tasks.length > 0
       ? `Tasks (${tasks.length})`
       : "Tasks";
 

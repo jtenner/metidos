@@ -295,10 +295,7 @@ export function CodexModelSelector({
                               {model.summary}
                             </span>
                           </span>
-                          <span className="mt-0.5 flex shrink-0 items-center gap-1.5 pl-1">
-                            <span className="font-label text-[9px] font-bold uppercase tracking-[0.18em] text-[#8ea0ad]">
-                              {reasoningLabel}
-                            </span>
+                          <span className="mt-0.5 flex shrink-0 items-center pl-1">
                             <span
                               className={`${
                                 expanded ? "text-[#bdd5e6]" : "text-[#5e676e]"
