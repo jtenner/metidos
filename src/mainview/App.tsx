@@ -357,7 +357,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
+  const desktopSidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileSidebarScrollRef = useRef<HTMLElement | null>(null);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopChatPinnedToBottomRef = useRef(true);
   const mobileChatPinnedToBottomRef = useRef(true);
@@ -550,6 +552,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
         supportsTildePath,
       )
     : "";
+  const dismissWorktreeThreadPopover = useCallback((): void => {
+    setWorktreeThreadPopover(null);
+  }, []);
   const selectedWorktreeThreads = useMemo(() => {
     if (!selectedProject || !activeSelectedWorktreePath) {
       return [];
@@ -655,10 +660,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
     updatePopoverPosition();
     window.addEventListener("resize", updatePopoverPosition);
-    window.addEventListener("scroll", updatePopoverPosition, true);
     return () => {
       window.removeEventListener("resize", updatePopoverPosition);
-      window.removeEventListener("scroll", updatePopoverPosition, true);
       if (frameId !== null) {
         cancelAnimationFrame(frameId);
       }
@@ -671,6 +674,30 @@ export default function App({ procedures }: AppProps): JSX.Element {
     selectedProject,
     sidebarCollapsed,
   ]);
+
+  useEffect(() => {
+    if (!worktreeThreadPopover) {
+      return;
+    }
+
+    const containers = [
+      desktopSidebarScrollRef.current,
+      mobileSidebarScrollRef.current,
+    ].filter((container): container is HTMLElement => container !== null);
+    for (const container of containers) {
+      container.addEventListener("scroll", dismissWorktreeThreadPopover, true);
+    }
+
+    return () => {
+      for (const container of containers) {
+        container.removeEventListener(
+          "scroll",
+          dismissWorktreeThreadPopover,
+          true,
+        );
+      }
+    };
+  }, [dismissWorktreeThreadPopover, worktreeThreadPopover]);
 
   useEffect(() => {
     if (worktreeThreadPopover) {
@@ -3899,7 +3926,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
             initialCollapsed={initialMainviewState.sidebarCollapsed}
             onCollapsedChange={handleSidebarCollapsedChange}
             renderExpandedContent={(collapseSidebar) => (
-              <div className="app-scrollbar flex-1 overflow-y-auto px-3 pb-5 pt-3">
+              <div
+                ref={desktopSidebarScrollRef}
+                className="app-scrollbar flex-1 overflow-y-auto px-3 pb-5 pt-3"
+              >
                 <SidebarContent
                   activeSidebarBranchLabel={activeSidebarBranchLabel}
                   collapseControl={
@@ -4121,6 +4151,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             aria-label="Project, thread, and git navigation"
             className="fixed inset-x-0 top-14 z-40 h-[68vh] overflow-y-auto border-b border-[#3f3f3f] bg-[#131313] px-3 py-3"
             id="mobile-navigation-drawer"
+            ref={mobileSidebarScrollRef}
           >
             <SidebarContent
               activeSidebarBranchLabel={activeSidebarBranchLabel}
