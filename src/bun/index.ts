@@ -30,6 +30,7 @@ import {
   readWorktreeFileDiffProcedure,
   recoverInterruptedThreadTurnsOnStartup,
   renameThreadProcedure,
+  requestThreadStartProcedure,
   runProjectTaskProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
@@ -52,6 +53,7 @@ import type {
   AppRPCSchema,
   RpcRequestContext,
   RpcRequestPriority,
+  RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeTasksChanged,
 } from "./rpc-schema";
@@ -119,11 +121,16 @@ type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
 
+type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
+  type: "thread-start-request-created";
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcTasksChangedMessage
-  | RpcGitHistoryChangedMessage;
+  | RpcGitHistoryChangedMessage
+  | RpcThreadStartRequestCreatedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -218,6 +225,11 @@ const rpcHandlers: RpcRequestHandlerMap = {
     listProjectTasksProcedure(params, context),
   createWorktree: (params) => createWorktreeProcedure(params),
   createThread: (params) => createThreadProcedure(params),
+  requestThreadStart: async (params) => {
+    const request = await requestThreadStartProcedure(params);
+    broadcastThreadStartRequestCreated(request);
+    return request;
+  },
   getThread: (params) => getThreadProcedure(params),
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
   sendThreadMessage: (params) => sendThreadMessageProcedure(params),
@@ -584,6 +596,27 @@ function broadcastGitHistoryChanged(
     type: "git-history-changed",
     projectId,
     worktreePath,
+  };
+  const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  for (const client of rpcClients) {
+    try {
+      client.send(raw);
+    } catch {
+      rpcClients.delete(client);
+    }
+  }
+}
+
+function broadcastThreadStartRequestCreated(
+  request: RpcThreadStartRequest,
+): void {
+  if (rpcClients.size === 0) {
+    return;
+  }
+
+  const payload: RpcThreadStartRequestCreatedMessage = {
+    type: "thread-start-request-created",
+    ...request,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
   for (const client of rpcClients) {

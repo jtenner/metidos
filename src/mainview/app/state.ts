@@ -180,6 +180,8 @@ export type OpenThreadOptions = {
 export const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
 export const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
   "jolt:worktree-git-history-changed";
+export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
+  "jolt:thread-start-request-created";
 export const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;

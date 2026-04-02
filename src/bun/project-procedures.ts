@@ -124,6 +124,7 @@ import type {
   RpcThread,
   RpcThreadDetail,
   RpcThreadRunStatus,
+  RpcThreadStartRequest,
   RpcThreadUsage,
   RpcWorktree,
   RpcWorktreeChange,
@@ -1840,6 +1841,41 @@ export async function createThreadProcedure(
     },
   );
   return readThreadDetailCached(thread.id);
+}
+
+export async function requestThreadStartProcedure(
+  params: AppRPCSchema["requests"]["requestThreadStart"]["params"],
+): Promise<RpcThreadStartRequest> {
+  const project = projectByIdForPath(params.projectId);
+  const worktreePath = normalizePath(params.worktreePath);
+  const input = params.input.trim();
+  if (!input) {
+    throw new Error("Thread input is required.");
+  }
+
+  await assertProjectWorktree(project, worktreePath, {
+    forceRefresh: true,
+  });
+
+  return {
+    requestId: crypto.randomUUID(),
+    projectId: project.id,
+    projectPath: project.path,
+    worktreePath,
+    input,
+    model: params.model?.trim() ? resolveCodexModel(params.model) : null,
+    reasoningEffort: params.reasoningEffort?.trim()
+      ? resolveCodexReasoningEffort(params.reasoningEffort)
+      : null,
+    unsafeMode: params.unsafeMode ?? null,
+    autoStart: params.autoStart ?? null,
+    threadId: null,
+    title: null,
+    summary: null,
+    pinned: null,
+    pinnedAt: null,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export async function getThreadProcedure(

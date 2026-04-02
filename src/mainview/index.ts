@@ -7,6 +7,7 @@ import type {
   ProjectProcedures,
   RpcProcedureCallOptions,
   RpcRequestPriority,
+  RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
@@ -56,11 +57,16 @@ type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
 
+type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
+  type: "thread-start-request-created";
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcTasksChangedMessage
-  | RpcGitHistoryChangedMessage;
+  | RpcGitHistoryChangedMessage
+  | RpcThreadStartRequestCreatedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -71,6 +77,8 @@ type RuntimeConfig = {
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
   "jolt:worktree-git-history-changed";
+const THREAD_START_REQUEST_CREATED_EVENT_NAME =
+  "jolt:thread-start-request-created";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 
@@ -78,6 +86,7 @@ declare global {
   interface WindowEventMap {
     "jolt:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
     "jolt:worktree-git-history-changed": CustomEvent<RpcWorktreeGitHistoryChanged>;
+    "jolt:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
   }
 
   interface Window {
@@ -276,6 +285,17 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
               projectId: payload.projectId,
               worktreePath: payload.worktreePath,
             },
+          },
+        ),
+      );
+      return;
+    }
+    if (payload.type === "thread-start-request-created") {
+      window.dispatchEvent(
+        new CustomEvent<RpcThreadStartRequest>(
+          THREAD_START_REQUEST_CREATED_EVENT_NAME,
+          {
+            detail: payload,
           },
         ),
       );
@@ -535,6 +555,7 @@ const procedures: ProjectProcedures = {
   listProjectTasks: createProcedure("listProjectTasks"),
   createWorktree: createProcedure("createWorktree"),
   createThread: createProcedure("createThread"),
+  requestThreadStart: createProcedure("requestThreadStart"),
   getThread: createProcedure("getThread"),
   markThreadErrorSeen: createProcedure("markThreadErrorSeen"),
   sendThreadMessage: createProcedure("sendThreadMessage"),

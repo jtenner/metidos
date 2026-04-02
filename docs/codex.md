@@ -38,6 +38,7 @@ Guidance:
 
 - treat `modify_thread` as a safe metadata update
 - use `new_thread` sparingly
+- use `new_thread.autoStart` to ask the UI for permission before creating a separate thread; when `unsafeMode` is true, the thread starts immediately instead of waiting for the popup
 - let `modify_thread` run liberally whenever a better title, a short summary, or pinning and unpinning would improve scanability
 - use the optional `summary` field on `modify_thread` for a short desktop hover description when it adds useful context
 - use the optional `pinned` field on `modify_thread` to pin important threads and unpin them when that organization no longer helps

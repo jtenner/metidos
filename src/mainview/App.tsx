@@ -22,6 +22,7 @@ import type {
   RpcThreadDetail,
   RpcThreadMessage,
   RpcThreadRunStatus,
+  RpcThreadStartRequest,
   RpcWorktree,
   RpcWorktreeChange,
   RpcWorktreeGitHistoryChanged,
@@ -53,6 +54,7 @@ import {
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
+  THREAD_START_REQUEST_CREATED_EVENT_NAME,
   THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
   type VisibleMessage,
@@ -278,11 +280,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [modelControlError, setModelControlError] = useState("");
   const [taskControlError, setTaskControlError] = useState("");
   const [chatError, setChatError] = useState("");
+  const [pendingThreadStartRequests, setPendingThreadStartRequests] = useState<
+    RpcThreadStartRequest[]
+  >([]);
+  const [threadStartRequestError, setThreadStartRequestError] = useState("");
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState(
     initialMainviewState.sidebarSearchQuery,
   );
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
+  const [isApprovingThreadStartRequest, setIsApprovingThreadStartRequest] =
+    useState(false);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
   const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
@@ -505,6 +513,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
     threadSummaryPopover,
     threadSummaryPreviewHandlers,
   } = useThreadPreviews();
+  const currentThreadStartRequest = pendingThreadStartRequests[0] ?? null;
+  const currentThreadStartRequestProject =
+    currentThreadStartRequest === null
+      ? null
+      : (projects.find(
+          (project) => project.id === currentThreadStartRequest.projectId,
+        ) ?? null);
+  const currentThreadStartRequestWorkspace = currentThreadStartRequest
+    ? formatDirectoryPathForInput(
+        currentThreadStartRequest.worktreePath,
+        homeDirectory,
+        supportsTildePath,
+      )
+    : "";
 
   const abortGitHistoryDiffRequest = useCallback((reason: string) => {
     const controller = gitHistoryDiffAbortControllerRef.current;
@@ -1114,6 +1136,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
+  const dismissThreadStartRequest = useCallback((requestId: string) => {
+    setPendingThreadStartRequests((current) =>
+      current.filter((request) => request.requestId !== requestId),
+    );
+    setThreadStartRequestError("");
+  }, []);
+
   const {
     diffFilePatchState,
     isRefreshingWorktreeSnapshot,
@@ -1610,6 +1639,66 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setMobileProjectListOpen(false);
     },
     [loadProjectWorktrees, syncThreadContext],
+  );
+
+  const approveThreadStartRequest = useCallback(
+    async (request: RpcThreadStartRequest) => {
+      if (isApprovingThreadStartRequest) {
+        return;
+      }
+
+      threadCreationInFlightCountRef.current += 1;
+      setIsCreatingThread(true);
+      setIsApprovingThreadStartRequest(true);
+      setThreadStartRequestError("");
+      setThreadsError("");
+      setModelControlError("");
+      setReasoningEffortControlError("");
+      setUnsafeModeControlError("");
+      setChatError("");
+
+      let createdDetail: RpcThreadDetail | null = null;
+      try {
+        createdDetail = await procedures.createThread({
+          projectId: request.projectId,
+          worktreePath: request.worktreePath,
+          model: request.model,
+          reasoningEffort: request.reasoningEffort,
+          unsafeMode: request.unsafeMode,
+        });
+
+        const finalDetail =
+          request.input.trim().length > 0
+            ? await procedures.sendThreadMessage({
+                threadId: createdDetail.thread.id,
+                input: request.input,
+              })
+            : createdDetail;
+
+        applyOpenedThreadDetail(finalDetail);
+        dismissThreadStartRequest(request.requestId);
+      } catch (error) {
+        if (createdDetail) {
+          applyOpenedThreadDetail(createdDetail);
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        setThreadStartRequestError(message);
+        setThreadsError(message);
+      } finally {
+        setIsApprovingThreadStartRequest(false);
+        threadCreationInFlightCountRef.current = Math.max(
+          0,
+          threadCreationInFlightCountRef.current - 1,
+        );
+        setIsCreatingThread(threadCreationInFlightCountRef.current > 0);
+      }
+    },
+    [
+      applyOpenedThreadDetail,
+      dismissThreadStartRequest,
+      isApprovingThreadStartRequest,
+      procedures,
+    ],
   );
 
   const loadThreadDetailForOpen = useCallback(
@@ -2579,6 +2668,35 @@ export default function App({ procedures }: AppProps): JSX.Element {
       );
     };
   }, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
+
+  useEffect(() => {
+    const handleThreadStartRequestCreated = (
+      event: CustomEvent<RpcThreadStartRequest>,
+    ) => {
+      setPendingThreadStartRequests((current) => {
+        if (
+          current.some(
+            (request) => request.requestId === event.detail.requestId,
+          )
+        ) {
+          return current;
+        }
+        return [...current, event.detail];
+      });
+      setThreadStartRequestError("");
+    };
+
+    window.addEventListener(
+      THREAD_START_REQUEST_CREATED_EVENT_NAME,
+      handleThreadStartRequestCreated,
+    );
+    return () => {
+      window.removeEventListener(
+        THREAD_START_REQUEST_CREATED_EVENT_NAME,
+        handleThreadStartRequestCreated,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -4213,6 +4331,93 @@ export default function App({ procedures }: AppProps): JSX.Element {
           </div>
           <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
             {threadSummaryPopover.summary}
+          </div>
+        </div>
+      ) : null}
+      {currentThreadStartRequest ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4 py-6">
+          <div className="w-full max-w-xl rounded-2xl border border-[#3a4751] bg-[#151718] p-5 shadow-2xl shadow-black/50">
+            <div className="mb-2 font-label text-[11px] uppercase tracking-[0.18em] text-[#8fb5cd]">
+              New Thread Request
+            </div>
+            <div className="mb-2 text-lg font-semibold text-[#f2f0ef]">
+              Create a thread for this workspace?
+            </div>
+            <div className="mb-4 text-sm text-[#bfd1dc]">
+              {currentThreadStartRequestProject?.name ??
+                currentThreadStartRequest.projectPath}
+            </div>
+            <div className="mb-4 rounded-xl border border-[#2b343b] bg-[#0e1011] px-4 py-3">
+              <div className="mb-1 font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                Workspace
+              </div>
+              <div className="break-all font-mono text-sm text-[#d8e5ee]">
+                {currentThreadStartRequestWorkspace}
+              </div>
+            </div>
+            <div className="mb-4 rounded-xl border border-[#2b343b] bg-[#0e1011] px-4 py-3">
+              <div className="mb-1 font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                Initial Prompt
+              </div>
+              <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-sm text-[#d8e5ee]">
+                {currentThreadStartRequest.input}
+              </div>
+            </div>
+            <div className="mb-4 flex flex-wrap gap-2 text-xs text-[#9db4c2]">
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Model: {currentThreadStartRequest.model ?? "default"}
+              </span>
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Reasoning:{" "}
+                {currentThreadStartRequest.reasoningEffort ?? "default"}
+              </span>
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Unsafe:{" "}
+                {currentThreadStartRequest.unsafeMode === null
+                  ? "default"
+                  : currentThreadStartRequest.unsafeMode
+                    ? "on"
+                    : "off"}
+              </span>
+            </div>
+            {threadStartRequestError ? (
+              <div className="mb-4 rounded-xl border border-[#6b3a3a] bg-[#2a1717] px-4 py-3 text-sm text-[#ffb9b9]">
+                {threadStartRequestError}
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-[#7f959f]">
+                {pendingThreadStartRequests.length > 1
+                  ? `${pendingThreadStartRequests.length} requests queued`
+                  : "Approve to create and open the requested thread."}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-[#46535c] px-4 py-2 text-sm text-[#d4dee5] transition hover:border-[#6d7b85] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isApprovingThreadStartRequest}
+                  onClick={() => {
+                    dismissThreadStartRequest(
+                      currentThreadStartRequest.requestId,
+                    );
+                  }}
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[#bdd5e6] px-4 py-2 text-sm font-semibold text-[#0f1418] transition hover:bg-[#d8e6f0] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isApprovingThreadStartRequest}
+                  onClick={() => {
+                    void approveThreadStartRequest(currentThreadStartRequest);
+                  }}
+                >
+                  {isApprovingThreadStartRequest
+                    ? "Creating..."
+                    : "Create Thread"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

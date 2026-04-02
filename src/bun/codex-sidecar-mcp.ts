@@ -16,6 +16,7 @@ import type {
   RpcProcedureCallOptions,
   RpcRequestPriority,
   RpcThreadDetail,
+  RpcThreadStartRequest,
 } from "./rpc-schema";
 
 const DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
@@ -373,25 +374,38 @@ async function resolveWorktreeTarget(params?: {
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
   worktreePath?: string | null | undefined;
-}): Promise<{ projectId: number; worktreePath: string }> {
+}): Promise<{
+  projectId: number;
+  projectPath: string | null;
+  worktreePath: string;
+}> {
   if (params?.worktreePath?.trim()) {
     const worktreePath = canonicalPath(params.worktreePath);
     const explicitProjectId = await resolveProjectId({
       projectId: params.projectId ?? null,
       projectPath: params.projectPath ?? null,
     }).catch(() => null);
+    const projectId = await resolveProjectIdForWorktreePath(
+      worktreePath,
+      explicitProjectId,
+    );
     return {
-      projectId: await resolveProjectIdForWorktreePath(
-        worktreePath,
-        explicitProjectId,
-      ),
+      projectId,
+      projectPath:
+        (await listKnownProjects()).find((project) => project.id === projectId)
+          ?.path ?? null,
       worktreePath,
     };
   }
 
   if (typeof projectIdContext === "number" && worktreePathContext) {
+    const projectPath =
+      (await listKnownProjects()).find(
+        (project) => project.id === projectIdContext,
+      )?.path ?? null;
     return {
       projectId: projectIdContext,
+      projectPath,
       worktreePath: worktreePathContext,
     };
   }
@@ -500,18 +514,64 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
   }
 }
 
-function threadStatusPayload(detail: RpcThreadDetail) {
+function threadMetadataPayload(
+  thread:
+    | RpcThreadDetail["thread"]
+    | Pick<
+        ThreadRecord,
+        "id" | "projectId" | "worktreePath" | "title" | "summary" | "pinnedAt"
+      >,
+) {
   return {
-    threadId: detail.thread.id,
-    projectId: detail.thread.projectId,
-    worktreePath: detail.thread.worktreePath,
-    title: detail.thread.title,
-    summary: detail.thread.summary,
+    threadId: thread.id,
+    projectId: thread.projectId,
+    worktreePath: thread.worktreePath,
+    title: thread.title,
+    summary: thread.summary,
+    pinned: thread.pinnedAt !== null,
+    pinnedAt: thread.pinnedAt,
+  };
+}
+
+function threadStatusPayload(
+  detail: RpcThreadDetail,
+  metadata: {
+    input: string;
+    model: string | null;
+    reasoningEffort:
+      | AppRPCSchema["requests"]["createThread"]["params"]["reasoningEffort"]
+      | null;
+    unsafeMode: boolean | null;
+    autoStart: boolean | null;
+    projectPath: string | null;
+  },
+) {
+  return {
+    ...threadMetadataPayload(detail.thread),
+    projectPath: metadata.projectPath,
+    input: metadata.input,
+    model: metadata.model,
+    reasoningEffort: metadata.reasoningEffort,
+    unsafeMode: metadata.unsafeMode,
+    autoStart: metadata.autoStart,
+    requestId: null,
+    createdAt: null,
     status: summarizeThreadStatus(detail),
     runState: detail.thread.runStatus.state,
     error: detail.thread.runStatus.error,
     hasUnreadError: detail.thread.runStatus.hasUnreadError,
     lastRunAt: detail.thread.lastRunAt,
+  };
+}
+
+function threadStartRequestPayload(request: RpcThreadStartRequest) {
+  return {
+    ...request,
+    status: null,
+    runState: null,
+    error: null,
+    hasUnreadError: null,
+    lastRunAt: null,
   };
 }
 
@@ -603,7 +663,7 @@ server.registerTool(
   {
     title: "New Thread",
     description:
-      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree.",
+      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree. Set autoStart to true to ask the UI for permission before creating the thread; if unsafeMode is true, the thread starts immediately instead of waiting for a popup.",
     inputSchema: {
       input: z.string().trim().min(1).describe("Initial prompt."),
       projectId: z
@@ -611,28 +671,45 @@ server.registerTool(
         .int()
         .positive()
         .optional()
-        .describe(defaultProjectIdDescription()),
+        .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
       projectPath: z
         .string()
         .trim()
         .min(1)
         .optional()
-        .describe("Project path if projectId is unknown."),
+        .describe(
+          "Project path if projectId is unknown. Omit for null metadata.",
+        ),
       worktreePath: z
         .string()
         .trim()
         .min(1)
         .optional()
-        .describe(defaultWorktreePathDescription()),
-      model: z.string().trim().min(1).optional().describe("Model override."),
+        .describe(
+          `${defaultWorktreePathDescription()} Omit for null metadata.`,
+        ),
+      model: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Model override. Omit for null metadata."),
       reasoningEffort: z
         .enum(["minimal", "low", "medium", "high", "xhigh"])
         .optional()
-        .describe("Reasoning override."),
+        .describe("Reasoning override. Omit for null metadata."),
       unsafeMode: z
         .boolean()
         .optional()
-        .describe("Use the danger-full-access sandbox for the new thread."),
+        .describe(
+          "Use the danger-full-access sandbox for the new thread. Omit for null metadata.",
+        ),
+      autoStart: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, request permission in the UI before creating the thread. If unsafeMode is true, the thread starts immediately. Omit for null metadata.",
+        ),
     },
     annotations: {
       idempotentHint: false,
@@ -641,6 +718,7 @@ server.registerTool(
     },
   },
   async ({
+    autoStart,
     input,
     model,
     projectId,
@@ -654,18 +732,44 @@ server.registerTool(
       projectPath,
       worktreePath,
     });
-    const created = await rpcClient.call("createThread", {
-      projectId: target.projectId,
-      worktreePath: target.worktreePath,
+    const metadata = {
+      input,
       model: model ?? null,
       reasoningEffort: reasoningEffort ?? null,
       unsafeMode: unsafeMode ?? null,
+      autoStart: autoStart ?? null,
+      projectPath: target.projectPath,
+    };
+
+    if (autoStart === true && unsafeMode !== true) {
+      const request = await rpcClient.call("requestThreadStart", {
+        projectId: target.projectId,
+        worktreePath: target.worktreePath,
+        input,
+        model: metadata.model,
+        reasoningEffort: metadata.reasoningEffort,
+        unsafeMode: metadata.unsafeMode,
+        autoStart: metadata.autoStart,
+      });
+      const payload = threadStartRequestPayload(request);
+      return textResult(
+        `Requested permission to start a thread for ${target.worktreePath}.`,
+        payload,
+      );
+    }
+
+    const created = await rpcClient.call("createThread", {
+      projectId: target.projectId,
+      worktreePath: target.worktreePath,
+      model: metadata.model,
+      reasoningEffort: metadata.reasoningEffort,
+      unsafeMode: metadata.unsafeMode,
     });
     const started = await rpcClient.call("sendThreadMessage", {
       threadId: created.thread.id,
       input,
     });
-    const payload = threadStatusPayload(started);
+    const payload = threadStatusPayload(started, metadata);
     return textResult(
       `Started thread ${payload.threadId} (${payload.status}).`,
       payload,

@@ -98,6 +98,24 @@ export type RpcWorktreeGitHistoryChanged = {
   worktreePath: string;
 };
 
+export type RpcThreadStartRequest = {
+  requestId: string;
+  projectId: number;
+  projectPath: string;
+  worktreePath: string;
+  input: string;
+  model: string | null;
+  reasoningEffort: RpcCodexReasoningEffort | null;
+  unsafeMode: boolean | null;
+  autoStart: boolean | null;
+  threadId: number | null;
+  title: string | null;
+  summary: string | null;
+  pinned: boolean | null;
+  pinnedAt: string | null;
+  createdAt: string;
+};
+
 export type RpcGitHistoryEntry = {
   hash: string;
   shortHash: string;
@@ -425,6 +443,18 @@ export type AppRPCSchema = {
       };
       response: RpcThreadDetail;
     };
+    requestThreadStart: {
+      params: {
+        projectId: number;
+        worktreePath: string;
+        input: string;
+        model: string | null;
+        reasoningEffort: RpcCodexReasoningEffort | null;
+        unsafeMode: boolean | null;
+        autoStart: boolean | null;
+      };
+      response: RpcThreadStartRequest;
+    };
     getThread: {
       params: { threadId: number };
       response: RpcThreadDetail;
@@ -578,6 +608,10 @@ export interface ProjectProcedures {
   createThread: RpcProcedureCall<
     AppRPCSchema["requests"]["createThread"]["params"],
     AppRPCSchema["requests"]["createThread"]["response"]
+  >;
+  requestThreadStart: RpcProcedureCall<
+    AppRPCSchema["requests"]["requestThreadStart"]["params"],
+    AppRPCSchema["requests"]["requestThreadStart"]["response"]
   >;
   getThread: RpcProcedureCall<
     AppRPCSchema["requests"]["getThread"]["params"],
