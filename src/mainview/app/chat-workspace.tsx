@@ -585,7 +585,7 @@ export function MobileChatView({
 
   return (
     <>
-      <div className="mt-6 shrink-0">
+      <div className="mt-2 shrink-0">
         <h2 className="font-headline text-[1.85rem] font-extrabold leading-tight tracking-tight text-[#ffffff]">
           {activeScreenTitle}
         </h2>
