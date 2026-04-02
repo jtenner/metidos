@@ -11,7 +11,6 @@ import {
 import { type SharedThreadListProps, ThreadListRow } from "./thread-list-row";
 
 type WorkspacePanelProps = SharedThreadListProps & {
-  normalizedSidebarSearchQuery: string;
   threadsError: string;
   workspaceActiveThreads: RpcThread[];
   workspacePinnedThreads: RpcThread[];
@@ -27,7 +26,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   hideThreadSummaryPreview,
   homeDirectory,
   isThreadStatusDismissed,
-  normalizedSidebarSearchQuery,
   onOpenThread,
   onOpenThreadActionMenu,
   projects,
@@ -47,7 +45,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   return (
     <section className="select-none">
       <SidebarSectionHeader
-        title="Workspace"
+        title="Threads"
         open={workspaceOpen}
         onToggle={toggleWorkspacePanelOpen}
       />
@@ -55,9 +53,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
         <div className="mt-3 space-y-4">
           {!hasThreads ? (
             <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              {normalizedSidebarSearchQuery
-                ? "No matching workspace threads."
-                : "No pinned or active threads yet."}
+              No pinned or recent threads yet.
             </div>
           ) : null}
           {workspacePinnedThreads.length > 0 ? (
@@ -102,7 +98,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 aria-expanded={workspaceActiveOpen}
               >
                 <span className="font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
-                  Active
+                  Recent
                 </span>
                 <span className="ml-auto shrink-0 text-[#62737e] transition-colors group-hover:text-[#bdd5e6]">
                   {materialSymbol(

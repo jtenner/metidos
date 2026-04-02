@@ -3,7 +3,7 @@ import type {
   FocusEvent as ReactFocusEvent,
   MouseEvent as ReactMouseEvent,
 } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type ErrorPreviewPopoverState,
   type ThreadSummaryPopoverState,
@@ -28,11 +28,23 @@ function anchorStillActive(anchorId: string): boolean {
   );
 }
 
-export function useThreadPreviews() {
+export function useThreadPreviews(options?: {
+  disabled?: boolean;
+}) {
+  const previewsDisabled = options?.disabled === true;
   const [errorPreviewPopover, setErrorPreviewPopover] =
     useState<ErrorPreviewPopoverState | null>(null);
   const [threadSummaryPopover, setThreadSummaryPopover] =
     useState<ThreadSummaryPopoverState | null>(null);
+
+  useEffect(() => {
+    if (!previewsDisabled) {
+      return;
+    }
+
+    setErrorPreviewPopover(null);
+    setThreadSummaryPopover(null);
+  }, [previewsDisabled]);
 
   const showErrorPreview = useCallback(
     (
@@ -40,6 +52,10 @@ export function useThreadPreviews() {
       anchorId: string,
       text: string,
     ): void => {
+      if (previewsDisabled) {
+        setErrorPreviewPopover(null);
+        return;
+      }
       const previewText = text.trim();
       if (!previewText) {
         setErrorPreviewPopover(null);
@@ -66,7 +82,7 @@ export function useThreadPreviews() {
         y: clampedTop + 98,
       });
     },
-    [],
+    [previewsDisabled],
   );
 
   const hideErrorPreview = useCallback((): void => {
@@ -80,6 +96,10 @@ export function useThreadPreviews() {
       title: string,
       summary: string,
     ): void => {
+      if (previewsDisabled) {
+        setThreadSummaryPopover(null);
+        return;
+      }
       const previewSummary = summary.trim();
       if (!previewSummary) {
         setThreadSummaryPopover(null);
@@ -102,7 +122,7 @@ export function useThreadPreviews() {
         y: clampProjectMenuCoordinate(rect.top, viewportHeight, 240),
       });
     },
-    [],
+    [previewsDisabled],
   );
 
   const hideThreadSummaryPreview = useCallback((): void => {
@@ -135,7 +155,7 @@ export function useThreadPreviews() {
       "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
     > => {
       const previewText = text?.trim();
-      if (!previewText) {
+      if (!previewText || previewsDisabled) {
         return {};
       }
       return {
@@ -161,7 +181,7 @@ export function useThreadPreviews() {
         },
       };
     },
-    [deferHidePreview, hideErrorPreview, showErrorPreview],
+    [deferHidePreview, hideErrorPreview, previewsDisabled, showErrorPreview],
   );
 
   const threadSummaryPreviewHandlers = useCallback(
@@ -176,7 +196,7 @@ export function useThreadPreviews() {
       const previewSummary = summary?.trim();
       const viewportWidth =
         typeof window === "undefined" ? 1280 : window.innerWidth;
-      if (!previewSummary || viewportWidth < 768) {
+      if (!previewSummary || previewsDisabled || viewportWidth < 768) {
         return {};
       }
       return {
@@ -212,7 +232,12 @@ export function useThreadPreviews() {
         },
       };
     },
-    [deferHidePreview, hideThreadSummaryPreview, showThreadSummaryPreview],
+    [
+      deferHidePreview,
+      hideThreadSummaryPreview,
+      previewsDisabled,
+      showThreadSummaryPreview,
+    ],
   );
 
   return {

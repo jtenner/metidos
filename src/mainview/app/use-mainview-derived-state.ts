@@ -452,17 +452,6 @@ export function useMainviewDerivedState({
     [sidebarSearchQuery],
   );
 
-  const visibleThreads = useMemo(() => {
-    if (!selectedProjectId || !activeSelectedWorktreePath) {
-      return [];
-    }
-    return threads.filter(
-      (thread) =>
-        thread.projectId === selectedProjectId &&
-        thread.worktreePath === activeSelectedWorktreePath,
-    );
-  }, [activeSelectedWorktreePath, selectedProjectId, threads]);
-
   const filteredProjects = useMemo(() => {
     if (!normalizedSidebarSearchQuery) {
       return projects;
@@ -483,32 +472,13 @@ export function useMainviewDerivedState({
         ),
       );
 
-      const matchingThread = threads.some(
-        (thread) =>
-          thread.projectId === project.id &&
-          matchesSearchQuery(
-            normalizedSidebarSearchQuery,
-            thread.title,
-            thread.summary,
-            thread.worktreePath,
-            shortName(thread.worktreePath),
-            formatPathForDisplay(
-              thread.worktreePath,
-              homeDirectory,
-              supportsTildePath,
-            ),
-          ),
-      );
-
       return (
         matchesSearchQuery(
           normalizedSidebarSearchQuery,
           project.name,
           project.path,
           formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
-        ) ||
-        matchingWorktree ||
-        matchingThread
+        ) || matchingWorktree
       );
     });
   }, [
@@ -517,120 +487,19 @@ export function useMainviewDerivedState({
     normalizedSidebarSearchQuery,
     projects,
     supportsTildePath,
-    threads,
-  ]);
-
-  const filteredVisibleThreads = useMemo(() => {
-    if (!normalizedSidebarSearchQuery) {
-      return visibleThreads;
-    }
-
-    return visibleThreads.filter((thread) =>
-      matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        thread.title,
-        thread.summary,
-        thread.worktreePath,
-        shortName(thread.worktreePath),
-        formatPathForDisplay(
-          thread.worktreePath,
-          homeDirectory,
-          supportsTildePath,
-        ),
-      ),
-    );
-  }, [
-    homeDirectory,
-    normalizedSidebarSearchQuery,
-    supportsTildePath,
-    visibleThreads,
   ]);
 
   const filteredWorkspacePinnedThreads = useMemo(() => {
-    const pinnedThreads = sortThreads(
-      threads.filter((thread) => thread.pinnedAt !== null),
-    );
-    if (!normalizedSidebarSearchQuery) {
-      return pinnedThreads;
-    }
-
-    return pinnedThreads.filter((thread) => {
-      const threadProject =
-        projects.find((project) => project.id === thread.projectId) ?? null;
-      return matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        thread.title,
-        thread.summary,
-        threadProject?.name,
-        thread.worktreePath,
-        shortName(thread.worktreePath),
-        formatPathForDisplay(
-          thread.worktreePath,
-          homeDirectory,
-          supportsTildePath,
-        ),
-      );
-    });
-  }, [
-    homeDirectory,
-    normalizedSidebarSearchQuery,
-    projects,
-    supportsTildePath,
-    threads,
-  ]);
+    return sortThreads(threads.filter((thread) => thread.pinnedAt !== null));
+  }, [threads]);
 
   const filteredWorkspaceActiveThreads = useMemo(() => {
-    const activeThreads = sortThreads(
-      threads.filter((thread) => thread.pinnedAt === null),
-    );
-    if (!normalizedSidebarSearchQuery) {
-      return activeThreads;
-    }
-
-    return activeThreads.filter((thread) => {
-      const threadProject =
-        projects.find((project) => project.id === thread.projectId) ?? null;
-      return matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        thread.title,
-        thread.summary,
-        threadProject?.name,
-        thread.worktreePath,
-        shortName(thread.worktreePath),
-        formatPathForDisplay(
-          thread.worktreePath,
-          homeDirectory,
-          supportsTildePath,
-        ),
-      );
-    });
-  }, [
-    homeDirectory,
-    normalizedSidebarSearchQuery,
-    projects,
-    supportsTildePath,
-    threads,
-  ]);
+    return sortThreads(threads.filter((thread) => thread.pinnedAt === null));
+  }, [threads]);
 
   const filteredGitHistoryEntries = useMemo(() => {
-    const entries = gitHistory?.entries ?? [];
-    if (!normalizedSidebarSearchQuery) {
-      return entries;
-    }
-
-    return entries.filter((entry) =>
-      matchesSearchQuery(
-        normalizedSidebarSearchQuery,
-        entry.hash,
-        entry.shortHash,
-        entry.subject,
-        entry.authorName,
-        entry.committedAt,
-        gitHistory?.branch,
-        activeSelectedWorktree?.branch,
-      ),
-    );
-  }, [activeSelectedWorktree, gitHistory, normalizedSidebarSearchQuery]);
+    return gitHistory?.entries ?? [];
+  }, [gitHistory]);
 
   const isActiveWorktree = useCallback(
     (projectId: number, worktreePath: string): boolean =>
@@ -679,7 +548,6 @@ export function useMainviewDerivedState({
     dismissThreadStatus,
     filteredGitHistoryEntries,
     filteredProjects,
-    filteredVisibleThreads,
     filteredWorkspaceActiveThreads,
     filteredWorkspacePinnedThreads,
     hasWorkingThreads,
@@ -700,7 +568,6 @@ export function useMainviewDerivedState({
     taskSelectorDisabled,
     threadActionMenuThread,
     unsafeModeToggleDisabled,
-    visibleThreads,
     worktreeThreadErrorLevel,
   };
 }

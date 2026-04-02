@@ -14,12 +14,12 @@ export function SidebarSearchControl({
 }: SidebarSearchControlProps): JSX.Element {
   return (
     <label className="block">
-      <span className="sr-only">Search projects, threads, and git history</span>
+      <span className="sr-only">Search projects and worktrees</span>
       <div className="flex items-center gap-2 border border-[#2c363c] bg-[#101214] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         {materialSymbol("search", "text-[16px] text-[#98b9d0]")}
         <input
           className="min-w-0 flex-1 select-text bg-transparent text-[13px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
-          placeholder="Search projects, threads, and git..."
+          placeholder="Search projects and worktrees..."
           value={value}
           onChange={onChange}
           autoCapitalize="none"

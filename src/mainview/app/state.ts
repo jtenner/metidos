@@ -444,6 +444,13 @@ export function worktreeDisplayName(worktree: RpcWorktree | null): string {
   return worktree?.branch ?? "Primary";
 }
 
+export function worktreeThreadPopoverAnchorId(
+  projectId: number,
+  worktreePath: string,
+): string {
+  return `worktree-thread-anchor-${projectId}-${encodeURIComponent(worktreePath).replaceAll("%", "_")}`;
+}
+
 export function defaultPersistedMainviewState(): PersistedMainviewState {
   return {
     version: MAINVIEW_STATE_STORAGE_VERSION,

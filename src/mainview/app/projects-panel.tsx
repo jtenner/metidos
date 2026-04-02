@@ -17,6 +17,7 @@ import {
   formatPathForDisplay,
   orderProjectWorktrees,
   shortName,
+  worktreeThreadPopoverAnchorId,
 } from "./state";
 
 type ProjectsPanelProps = {
@@ -55,8 +56,8 @@ type ProjectsPanelProps = {
   ) => void;
   projectThreadErrorLevel: (projectId: number) => ThreadErrorLevel;
   selectedProjectId: number | null;
-  sidebarActionButtonClass: string;
   supportsTildePath: boolean;
+  sidebarActionButtonClass: string;
   worktreePinBusyPath: string | null;
   worktreeThreadErrorLevel: (
     projectId: number,
@@ -421,6 +422,10 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                     >
                                       <button
                                         type="button"
+                                        id={worktreeThreadPopoverAnchorId(
+                                          project.id,
+                                          worktree.path,
+                                        )}
                                         className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
                                           activeWorktree
                                             ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"

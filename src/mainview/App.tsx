@@ -88,10 +88,12 @@ import {
   withAcknowledgedUnreadThread,
   withAcknowledgedUnreadThreadDetail,
   worktreeKey,
+  worktreeThreadPopoverAnchorId,
   writeLruValue,
   writePersistedMainviewState,
 } from "./app/state";
 import { TasksWorkspace } from "./app/tasks-workspace";
+import { ThreadListRow } from "./app/thread-list-row";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useThreadPreviews } from "./app/use-thread-previews";
@@ -107,7 +109,22 @@ type AppProps = {
 };
 
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
+const WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX = 360;
+const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
+const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
 type PrimaryView = "chat" | "diff" | "tasks";
+type WorktreeThreadPopoverState = {
+  maxHeight: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
+  return [...items].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
+  );
+}
 
 function isScrolledToBottom(container: HTMLDivElement): boolean {
   return (
@@ -301,6 +318,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [threadActionBusy, setThreadActionBusy] = useState<
     "rename" | "pin" | "delete" | null
   >(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    initialMainviewState.sidebarCollapsed,
+  );
   const sidebarCollapsedRef = useRef(initialMainviewState.sidebarCollapsed);
   const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -322,10 +342,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
     string | null
   >(null);
+  const [worktreeThreadPopover, setWorktreeThreadPopover] =
+    useState<WorktreeThreadPopoverState | null>(null);
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
       sidebarCollapsedRef.current = collapsed;
+      setSidebarCollapsed(collapsed);
       patchPersistedMainviewState({
         sidebarCollapsed: collapsed,
       });
@@ -447,7 +470,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     dismissThreadStatus,
     filteredGitHistoryEntries,
     filteredProjects,
-    filteredVisibleThreads,
     filteredWorkspaceActiveThreads,
     filteredWorkspacePinnedThreads,
     hasWorkingThreads,
@@ -468,7 +490,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     taskSelectorDisabled,
     threadActionMenuThread,
     unsafeModeToggleDisabled,
-    visibleThreads,
     worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
     chatError,
@@ -512,7 +533,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
     hideThreadSummaryPreview,
     threadSummaryPopover,
     threadSummaryPreviewHandlers,
-  } = useThreadPreviews();
+  } = useThreadPreviews({
+    disabled: threadActionMenu !== null,
+  });
   const currentThreadStartRequest = pendingThreadStartRequests[0] ?? null;
   const currentThreadStartRequestProject =
     currentThreadStartRequest === null
@@ -527,6 +550,135 @@ export default function App({ procedures }: AppProps): JSX.Element {
         supportsTildePath,
       )
     : "";
+  const selectedWorktreeThreads = useMemo(() => {
+    if (!selectedProject || !activeSelectedWorktreePath) {
+      return [];
+    }
+
+    return sortThreadsByUpdatedAt(
+      threads.filter(
+        (thread) =>
+          thread.projectId === selectedProject.id &&
+          thread.worktreePath === activeSelectedWorktreePath,
+      ),
+    );
+  }, [activeSelectedWorktreePath, selectedProject, threads]);
+
+  useLayoutEffect(() => {
+    void mobileProjectListOpen;
+    void normalizedSidebarSearchQuery;
+    void projectStates;
+
+    if (
+      !selectedProject ||
+      !activeSelectedWorktreePath ||
+      sidebarCollapsed ||
+      typeof window === "undefined"
+    ) {
+      setWorktreeThreadPopover(null);
+      return;
+    }
+
+    const anchorId = worktreeThreadPopoverAnchorId(
+      selectedProject.id,
+      activeSelectedWorktreePath,
+    );
+    let frameId: number | null = null;
+
+    const updatePopoverPosition = (): void => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        const anchor = document.getElementById(anchorId);
+        if (!(anchor instanceof HTMLElement)) {
+          setWorktreeThreadPopover(null);
+          return;
+        }
+        if (anchor.closest('[aria-hidden="true"]')) {
+          setWorktreeThreadPopover(null);
+          return;
+        }
+
+        const rect = anchor.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+          setWorktreeThreadPopover(null);
+          return;
+        }
+
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const preferredWidth =
+          viewportWidth >= 768
+            ? WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX
+            : WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX;
+        const width = Math.min(preferredWidth, Math.max(0, viewportWidth - 16));
+        const left = clampProjectMenuCoordinate(
+          rect.right + 14,
+          viewportWidth,
+          width,
+        );
+        const top = clampProjectMenuCoordinate(
+          rect.top,
+          viewportHeight,
+          WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX,
+        );
+        const maxHeight = Math.max(
+          180,
+          Math.min(
+            WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX,
+            viewportHeight - top - 12,
+          ),
+        );
+
+        setWorktreeThreadPopover((current) => {
+          if (
+            current &&
+            current.x === left &&
+            current.y === top &&
+            current.width === width &&
+            current.maxHeight === maxHeight
+          ) {
+            return current;
+          }
+          return {
+            maxHeight,
+            width,
+            x: left,
+            y: top,
+          };
+        });
+      });
+    };
+
+    updatePopoverPosition();
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [
+    activeSelectedWorktreePath,
+    mobileProjectListOpen,
+    normalizedSidebarSearchQuery,
+    projectStates,
+    selectedProject,
+    sidebarCollapsed,
+  ]);
+
+  useEffect(() => {
+    if (worktreeThreadPopover) {
+      return;
+    }
+    hideErrorPreview();
+    hideThreadSummaryPreview();
+  }, [hideErrorPreview, hideThreadSummaryPreview, worktreeThreadPopover]);
 
   const abortGitHistoryDiffRequest = useCallback((reason: string) => {
     const controller = gitHistoryDiffAbortControllerRef.current;
@@ -2699,29 +2851,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (
-      !normalizedSidebarSearchQuery ||
-      !gitHistory ||
-      gitHistory.nextOffset === null ||
-      gitHistoryLoading ||
-      gitHistoryLoadingMore
-    ) {
-      return;
-    }
-    if (filteredGitHistoryEntries.length >= GIT_HISTORY_PAGE_SIZE) {
-      return;
-    }
-    void loadMoreGitHistory();
-  }, [
-    filteredGitHistoryEntries.length,
-    gitHistory,
-    gitHistoryLoading,
-    gitHistoryLoadingMore,
-    loadMoreGitHistory,
-    normalizedSidebarSearchQuery,
-  ]);
-
-  useEffect(() => {
     if (!gitHistoryModal) {
       return;
     }
@@ -3090,29 +3219,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
-  const createThreadFromSelection = useCallback(async () => {
-    if (isCreatingThread) {
-      return;
-    }
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      setThreadsError("Select a project worktree before creating a thread.");
-      return;
-    }
-
-    await createThreadForWorktree(
-      selectedProject.id,
-      activeSelectedWorktreePath,
-    );
-  }, [
-    activeSelectedWorktreePath,
-    createThreadForWorktree,
-    isCreatingThread,
-    selectedProject,
-  ]);
-
-  const handleCreateThreadFromSelection = useCallback(() => {
-    void createThreadFromSelection();
-  }, [createThreadFromSelection]);
+  const handleCreateThreadForWorktree = useCallback(
+    (projectId: number, worktreePath: string) => {
+      void createThreadForWorktree(projectId, worktreePath);
+    },
+    [createThreadForWorktree],
+  );
 
   const handleToggleWorktreePinned = useCallback(
     (projectId: number, worktreePath: string, pinned: boolean) => {
@@ -3481,7 +3593,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           speaker: "assistant",
           tone: "normal",
           text: selectedProject
-            ? `Create a thread from the Threads section to start a ${APP_TITLE} conversation for the selected worktree.`
+            ? `Use the Threads panel or the selected worktree popover in the sidebar to create or open a ${APP_TITLE} thread.`
             : "Add a project, choose a worktree, and create a thread to begin.",
         },
       ];
@@ -3810,7 +3922,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     gitHistoryError,
                     gitHistoryLoading,
                     gitHistoryLoadingMore,
-                    normalizedSidebarSearchQuery,
                     onCancelPreloadGitHistoryDiff: cancelPreloadGitHistoryDiff,
                     onLoadMoreGitHistory: handleLoadMoreGitHistory,
                     onOpenGitHistoryDiff: handleOpenGitHistoryDiff,
@@ -3864,7 +3975,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     hideThreadSummaryPreview,
                     homeDirectory,
                     isThreadStatusDismissed,
-                    normalizedSidebarSearchQuery,
                     onOpenThread: handleOpenThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
                     projects,
@@ -3875,32 +3985,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     threadsError,
                     workspaceActiveThreads: filteredWorkspaceActiveThreads,
                     workspacePinnedThreads: filteredWorkspacePinnedThreads,
-                  }}
-                  threadsPanelProps={{
-                    acknowledgeThreadErrorSeenInBackground,
-                    activeSelectedWorktreePath,
-                    dismissThreadStatus,
-                    errorPreviewHandlers,
-                    errorPreviewPopover,
-                    filteredVisibleThreads,
-                    getProjectState,
-                    hideErrorPreview,
-                    hideThreadSummaryPreview,
-                    homeDirectory,
-                    isCreatingThread,
-                    isThreadStatusDismissed,
-                    normalizedSidebarSearchQuery,
-                    onCreateThread: handleCreateThreadFromSelection,
-                    onOpenThread: handleOpenThread,
-                    onOpenThreadActionMenu: openThreadActionMenu,
-                    projects,
-                    selectedProject,
-                    selectedThreadId,
-                    sidebarActionButtonClass,
-                    supportsTildePath,
-                    threadSummaryPopover,
-                    threadSummaryPreviewHandlers,
-                    threadsError,
                   }}
                 />
               </div>
@@ -4048,7 +4132,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 gitHistoryError,
                 gitHistoryLoading,
                 gitHistoryLoadingMore,
-                normalizedSidebarSearchQuery,
                 onCancelPreloadGitHistoryDiff: cancelPreloadGitHistoryDiff,
                 onLoadMoreGitHistory: handleLoadMoreGitHistory,
                 onOpenGitHistoryDiff: handleOpenGitHistoryDiff,
@@ -4102,7 +4185,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 hideThreadSummaryPreview,
                 homeDirectory,
                 isThreadStatusDismissed,
-                normalizedSidebarSearchQuery,
                 onOpenThread: handleOpenThread,
                 onOpenThreadActionMenu: openThreadActionMenu,
                 projects,
@@ -4113,32 +4195,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 threadsError,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
-              }}
-              threadsPanelProps={{
-                acknowledgeThreadErrorSeenInBackground,
-                activeSelectedWorktreePath,
-                dismissThreadStatus,
-                errorPreviewHandlers,
-                errorPreviewPopover,
-                filteredVisibleThreads,
-                getProjectState,
-                hideErrorPreview,
-                hideThreadSummaryPreview,
-                homeDirectory,
-                isCreatingThread,
-                isThreadStatusDismissed,
-                normalizedSidebarSearchQuery,
-                onCreateThread: handleCreateThreadFromSelection,
-                onOpenThread: handleOpenThread,
-                onOpenThreadActionMenu: openThreadActionMenu,
-                projects,
-                selectedProject,
-                selectedThreadId,
-                sidebarActionButtonClass,
-                supportsTildePath,
-                threadSummaryPopover,
-                threadSummaryPreviewHandlers,
-                threadsError,
               }}
             />
           </aside>
@@ -4297,6 +4353,90 @@ export default function App({ procedures }: AppProps): JSX.Element {
           </nav>
         </div>
       </div>
+      {worktreeThreadPopover &&
+      selectedProject &&
+      activeSelectedWorktreePath ? (
+        <div
+          className="fixed z-[85] flex select-none flex-col overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+          style={{
+            left: worktreeThreadPopover.x,
+            maxHeight: worktreeThreadPopover.maxHeight,
+            top: worktreeThreadPopover.y,
+            width: worktreeThreadPopover.width,
+          }}
+        >
+          <div className="border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+                  Threads
+                </div>
+                <div className="truncate text-sm font-semibold text-[#f2f0ef]">
+                  {activeSelectedWorktreeName || activeSelectedWorktreeFolder}
+                </div>
+                <div className="truncate text-[11px] text-[#8f9aa2]">
+                  {activeScreenSubtitleSecondary}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={sidebarActionButtonClass}
+                onClick={() => {
+                  handleCreateThreadForWorktree(
+                    selectedProject.id,
+                    activeSelectedWorktreePath,
+                  );
+                }}
+                disabled={isCreatingThread}
+                aria-label="Create thread for selected worktree"
+                title="Create thread"
+              >
+                {isCreatingThread ? "…" : "+"}
+              </button>
+            </div>
+          </div>
+          <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
+            {selectedWorktreeThreads.length > 0 ? (
+              selectedWorktreeThreads.map((thread) => (
+                <ThreadListRow
+                  key={thread.id}
+                  acknowledgeThreadErrorSeenInBackground={
+                    acknowledgeThreadErrorSeenInBackground
+                  }
+                  anchorIdPrefix="worktree-thread"
+                  dismissThreadStatus={dismissThreadStatus}
+                  errorPreviewHandlers={errorPreviewHandlers}
+                  errorPreviewPopover={errorPreviewPopover}
+                  getProjectState={getProjectState}
+                  hideErrorPreview={hideErrorPreview}
+                  hideThreadSummaryPreview={hideThreadSummaryPreview}
+                  homeDirectory={homeDirectory}
+                  isThreadStatusDismissed={isThreadStatusDismissed}
+                  onOpenThread={handleOpenThread}
+                  onOpenThreadActionMenu={openThreadActionMenu}
+                  projects={projects}
+                  selectedThreadId={selectedThreadId}
+                  supportsTildePath={supportsTildePath}
+                  thread={thread}
+                  threadSummaryPopover={threadSummaryPopover}
+                  threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
+                />
+              ))
+            ) : (
+              <div className="px-3 py-3 text-xs text-[#8f8d8b]">
+                {isCreatingThread
+                  ? "Creating thread..."
+                  : `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread.`}
+              </div>
+            )}
+          </div>
+          {threadsError ? (
+            <div className="border-t border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff9db0]">
+              {threadsError}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {errorPreviewPopover ? (
         <div
           id="thread-error-popover"

@@ -28,7 +28,6 @@ type GitHistoryPanelProps = {
   gitHistoryError: string;
   gitHistoryLoading: boolean;
   gitHistoryLoadingMore: boolean;
-  normalizedSidebarSearchQuery: string;
   onCancelPreloadGitHistoryDiff: (entry: RpcGitHistoryEntry) => void;
   onLoadMoreGitHistory: () => void;
   onOpenGitHistoryDiff: (entry: RpcGitHistoryEntry) => void;
@@ -42,7 +41,6 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
   gitHistoryError,
   gitHistoryLoading,
   gitHistoryLoadingMore,
-  normalizedSidebarSearchQuery,
   onCancelPreloadGitHistoryDiff,
   onLoadMoreGitHistory,
   onOpenGitHistoryDiff,
@@ -203,9 +201,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
             </div>
           ) : (
             <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
-              {normalizedSidebarSearchQuery
-                ? "No matching git history."
-                : "No commits found for this worktree yet."}
+              No commits found for this worktree yet.
             </div>
           )}
         </div>

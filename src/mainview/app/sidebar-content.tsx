@@ -3,7 +3,6 @@ import { materialSymbol } from "../controls/icons";
 import { SidebarSearchControl } from "../controls/sidebar-search-control";
 import { GitHistoryPanel } from "./git-history-panel";
 import { ProjectsPanel } from "./projects-panel";
-import { ThreadsPanel } from "./threads-panel";
 import { WorkspacePanel } from "./workspace-panel";
 
 type SidebarContentProps = {
@@ -15,7 +14,6 @@ type SidebarContentProps = {
   projectsPanelProps: ComponentProps<typeof ProjectsPanel>;
   selectedProjectName: string | null;
   sidebarSearchQuery: string;
-  threadsPanelProps: ComponentProps<typeof ThreadsPanel>;
   workspacePanelProps: ComponentProps<typeof WorkspacePanel>;
 };
 
@@ -28,7 +26,6 @@ export function SidebarContent({
   projectsPanelProps,
   selectedProjectName,
   sidebarSearchQuery,
-  threadsPanelProps,
   workspacePanelProps,
 }: SidebarContentProps): JSX.Element {
   return (
@@ -63,7 +60,6 @@ export function SidebarContent({
 
       <div className="select-none space-y-5">
         <WorkspacePanel {...workspacePanelProps} />
-        <ThreadsPanel {...threadsPanelProps} />
         <ProjectsPanel {...projectsPanelProps} />
         <GitHistoryPanel key={gitHistoryPanelKey} {...gitHistoryPanelProps} />
       </div>
