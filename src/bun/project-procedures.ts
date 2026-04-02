@@ -80,7 +80,6 @@ import {
 } from "./project-procedures/git-history";
 import {
   type TaskWatchTarget,
-  formatPackageScriptTaskPrompt,
   formatTaskPrompt,
   readProjectTasksFromDisk,
   readTaskWatchTargets,
@@ -242,6 +241,7 @@ const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
 const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
+const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 150;
 
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
@@ -952,16 +952,31 @@ async function upsertCommandActivity(
   itemId: string,
   item: Extract<ThreadItem, { type: "command_execution" }>,
 ): Promise<void> {
+  await upsertCommandActivityPayload(threadId, itemId, {
+    command: item.command,
+    exitCode: item.exit_code ?? null,
+    output: item.aggregated_output,
+    state: item.status,
+  });
+}
+
+async function upsertCommandActivityPayload(
+  threadId: number,
+  itemId: string,
+  payload: CommandActivityPayload & {
+    state: "in_progress" | "completed" | "failed" | "stopped";
+  },
+): Promise<void> {
   upsertThreadActivity(db, {
     threadId,
     itemId,
     kind: "command",
-    text: item.command,
-    state: item.status,
+    text: payload.command,
+    state: payload.state,
     payloadJson: JSON.stringify({
-      command: item.command,
-      output: item.aggregated_output,
-      exitCode: item.exit_code ?? null,
+      command: payload.command,
+      output: payload.output,
+      exitCode: payload.exitCode,
     } satisfies CommandActivityPayload),
   });
   invalidateThreadDetailCache(threadId);
@@ -1704,6 +1719,253 @@ async function queueThreadMessage(
   return readThreadDetailCached(thread.id);
 }
 
+function packageScriptDisplayCommand(task: {
+  packageDirectory: string;
+  scriptName: string;
+}): string {
+  return task.packageDirectory === "."
+    ? `bun run ${task.scriptName}`
+    : `cd ${task.packageDirectory} && bun run ${task.scriptName}`;
+}
+
+async function readProcessOutputStream(
+  stream: ReadableStream<Uint8Array> | null | undefined,
+  onChunk: (chunk: string) => Promise<void>,
+  signal: AbortSignal,
+): Promise<void> {
+  if (!stream) {
+    return;
+  }
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value || value.length === 0) {
+        continue;
+      }
+      const chunk = decoder.decode(value, {
+        stream: true,
+      });
+      if (chunk) {
+        await onChunk(chunk);
+      }
+      if (signal.aborted) {
+        return;
+      }
+    }
+
+    const trailing = decoder.decode();
+    if (trailing) {
+      await onChunk(trailing);
+    }
+  } catch (error) {
+    if (!signal.aborted) {
+      throw error;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function queuePackageScriptTask(
+  thread: ThreadRecord,
+  task: {
+    packageDirectory: string;
+    scriptName: string;
+    command: string;
+  },
+): Promise<RpcThreadDetail> {
+  if (currentThreadRunStatus(thread).state === "working") {
+    throw new Error("Thread is already processing a message.");
+  }
+
+  markThreadErrorSeen(db, thread.id);
+
+  const startedAt = getNow();
+  markThreadRunStarted(db, thread.id, startedAt);
+  const controller = new AbortController();
+  threadTurnAbortControllerMap.set(thread.id, controller);
+  setThreadRunStatus(thread.id, {
+    state: "working",
+    startedAt,
+    updatedAt: startedAt,
+    error: null,
+    hasUnreadError: false,
+  });
+
+  const completion = runPackageScriptTaskInBackground(
+    thread.id,
+    thread.worktreePath,
+    task,
+    startedAt,
+    controller,
+  );
+  threadTurnCompletionMap.set(thread.id, completion);
+  void completion;
+
+  return readThreadDetailCached(thread.id);
+}
+
+async function runPackageScriptTaskInBackground(
+  threadId: number,
+  worktreePath: string,
+  task: {
+    packageDirectory: string;
+    scriptName: string;
+    command: string;
+  },
+  startedAt: string,
+  controller: AbortController,
+): Promise<void> {
+  const command = packageScriptDisplayCommand(task);
+  const activityItemId = buildThreadTurnActivityId(
+    startedAt,
+    `project-task:${task.packageDirectory}:${task.scriptName}`,
+  );
+  const cwd = resolve(worktreePath, task.packageDirectory);
+  let output = "";
+  let exitCode: number | null = null;
+  let lastPersistedAt = 0;
+  let lastPersistedOutput = "";
+  let lastPersistedExitCode: number | null = null;
+
+  const persistCommandActivity = async (
+    state: "in_progress" | "completed" | "failed" | "stopped",
+    force = false,
+  ): Promise<void> => {
+    const now = Date.now();
+    if (
+      !force &&
+      state === "in_progress" &&
+      now - lastPersistedAt < COMMAND_ACTIVITY_FLUSH_INTERVAL_MS
+    ) {
+      return;
+    }
+    if (
+      !force &&
+      state === "in_progress" &&
+      output === lastPersistedOutput &&
+      exitCode === lastPersistedExitCode
+    ) {
+      return;
+    }
+
+    await upsertCommandActivityPayload(threadId, activityItemId, {
+      command,
+      exitCode,
+      output,
+      state,
+    });
+    lastPersistedAt = now;
+    lastPersistedOutput = output;
+    lastPersistedExitCode = exitCode;
+  };
+
+  try {
+    await persistCommandActivity("in_progress", true);
+
+    const proc = Bun.spawn({
+      cmd: [process.execPath, "run", task.scriptName],
+      cwd,
+      stdout: "pipe",
+      stderr: "pipe",
+      signal: controller.signal,
+    });
+
+    const appendOutput = async (chunk: string) => {
+      output += chunk;
+      await persistCommandActivity("in_progress");
+    };
+
+    const [settledExitCode] = await Promise.all([
+      proc.exited,
+      readProcessOutputStream(proc.stdout, appendOutput, controller.signal),
+      readProcessOutputStream(proc.stderr, appendOutput, controller.signal),
+    ]);
+    exitCode = settledExitCode;
+
+    if (controller.signal.aborted) {
+      await persistCommandActivity("stopped", true);
+      markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
+      setThreadRunStatus(threadId, {
+        state: "stopped",
+        startedAt,
+        updatedAt: getNow(),
+        error: THREAD_STOPPED_MESSAGE,
+        hasUnreadError: false,
+      });
+      return;
+    }
+
+    if (exitCode === 0) {
+      await persistCommandActivity("completed", true);
+      markThreadRan(db, threadId);
+      setThreadRunStatus(threadId, {
+        state: "idle",
+        startedAt,
+        updatedAt: getNow(),
+        error: null,
+        hasUnreadError: false,
+      });
+      return;
+    }
+
+    if (!output.trim()) {
+      output = `Command exited with code ${exitCode}.`;
+    }
+    await persistCommandActivity("failed", true);
+    const errorMessage = `${command} failed with exit code ${exitCode}.`;
+    markThreadFailed(db, threadId, errorMessage);
+    setThreadRunStatus(threadId, {
+      state: "failed",
+      startedAt,
+      updatedAt: getNow(),
+      error: errorMessage,
+      hasUnreadError: true,
+    });
+  } catch (error) {
+    if (isAbortError(error) && controller.signal.aborted) {
+      await persistCommandActivity("stopped", true);
+      markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
+      setThreadRunStatus(threadId, {
+        state: "stopped",
+        startedAt,
+        updatedAt: getNow(),
+        error: THREAD_STOPPED_MESSAGE,
+        hasUnreadError: false,
+      });
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    if (!output.trim()) {
+      output = message;
+    }
+    await persistCommandActivity("failed", true);
+    const errorMessage = `${command} failed: ${message}`;
+    markThreadFailed(db, threadId, errorMessage);
+    setThreadRunStatus(threadId, {
+      state: "failed",
+      startedAt,
+      updatedAt: getNow(),
+      error: errorMessage,
+      hasUnreadError: true,
+    });
+    console.error(`Project task command failed for thread ${threadId}`, error);
+  } finally {
+    if (threadTurnAbortControllerMap.get(threadId) === controller) {
+      threadTurnAbortControllerMap.delete(threadId);
+    }
+    threadTurnCompletionMap.delete(threadId);
+  }
+}
+
 async function readAndStoreWorktreeSnapshot(
   state: ProjectPollState,
   worktreePath: string,
@@ -1731,32 +1993,6 @@ export async function runProjectTaskProcedure(
     forceRefresh: true,
   });
 
-  let taskPrompt: string;
-  switch (params.task.kind) {
-    case "script":
-      taskPrompt = formatPackageScriptTaskPrompt(
-        resolvePackageJsonTask(worktreePath, params.task),
-      );
-      break;
-    case "file": {
-      const taskFilePath = resolveProjectTaskFilePath(
-        worktreePath,
-        params.task.path,
-      );
-      const taskContent = await Bun.file(taskFilePath).text();
-      if (!taskContent.trim()) {
-        throw new Error(`Task file is empty: ${params.task.path}`);
-      }
-      taskPrompt = formatTaskPrompt(
-        taskTitleFromPath(params.task.path),
-        taskContent,
-      );
-      break;
-    }
-    default:
-      throw new Error(`Unsupported project task kind: ${params.task.kind}`);
-  }
-
   let thread = params.threadId ? threadById(params.threadId) : null;
   if (thread) {
     if (
@@ -1778,7 +2014,29 @@ export async function runProjectTaskProcedure(
     );
   }
 
-  return queueThreadMessage(thread, taskPrompt);
+  switch (params.task.kind) {
+    case "script":
+      return queuePackageScriptTask(
+        thread,
+        resolvePackageJsonTask(worktreePath, params.task),
+      );
+    case "file": {
+      const taskFilePath = resolveProjectTaskFilePath(
+        worktreePath,
+        params.task.path,
+      );
+      const taskContent = await Bun.file(taskFilePath).text();
+      if (!taskContent.trim()) {
+        throw new Error(`Task file is empty: ${params.task.path}`);
+      }
+      return queueThreadMessage(
+        thread,
+        formatTaskPrompt(taskTitleFromPath(params.task.path), taskContent),
+      );
+    }
+    default:
+      throw new Error(`Unsupported project task kind: ${params.task.kind}`);
+  }
 }
 
 export async function stopThreadTurnProcedure(
@@ -1797,9 +2055,7 @@ export async function stopThreadTurnProcedure(
   }
 
   if (!controller.signal.aborted) {
-    controller.abort(
-      createAbortError(null, "Codex turn was stopped by the user."),
-    );
+    controller.abort(createAbortError(null, THREAD_STOPPED_MESSAGE));
   }
 
   await threadTurnCompletionMap.get(thread.id);

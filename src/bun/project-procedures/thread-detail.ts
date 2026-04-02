@@ -14,9 +14,13 @@ import {
 } from "./codex-catalog";
 import { shortName } from "./shared";
 
-export const THREAD_STOPPED_MESSAGE = "Codex turn was stopped by the user.";
-export const THREAD_INTERRUPTED_MESSAGE =
+const LEGACY_THREAD_STOPPED_MESSAGE = "Codex turn was stopped by the user.";
+const LEGACY_THREAD_INTERRUPTED_MESSAGE =
   "Codex turn was interrupted before completion.";
+
+export const THREAD_STOPPED_MESSAGE = "Thread run was stopped by the user.";
+export const THREAD_INTERRUPTED_MESSAGE =
+  "Thread run was interrupted before completion.";
 
 const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
 const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
@@ -50,7 +54,10 @@ function hasUnreadThreadError(thread: ThreadRecord): boolean {
 
 export function isStoppedThreadMessage(message: string | null): boolean {
   return (
-    message === THREAD_STOPPED_MESSAGE || message === THREAD_INTERRUPTED_MESSAGE
+    message === THREAD_STOPPED_MESSAGE ||
+    message === THREAD_INTERRUPTED_MESSAGE ||
+    message === LEGACY_THREAD_STOPPED_MESSAGE ||
+    message === LEGACY_THREAD_INTERRUPTED_MESSAGE
   );
 }
 
