@@ -154,6 +154,11 @@ function observeChatScrollContent(
   };
 }
 
+function isThreadNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.startsWith("Thread not found:");
+}
+
 function areWorktreeChangesEqual(
   left: RpcWorktreeChange[],
   right: RpcWorktreeChange[],
@@ -1698,8 +1703,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
           procedures.listThreads(),
           procedures.getCodexModelCatalog(),
         ]);
-      const sortedThreads = sortThreads(loadedThreads);
-      const initialThread = pickInitialThread(sortedThreads, persistedState);
+      let startupThreads = sortThreads(loadedThreads);
+      let initialThread = pickInitialThread(startupThreads, persistedState);
+      let initialThreadDetailPromise: Promise<RpcThreadDetail> | null = null;
+      if (initialThread) {
+        try {
+          const initialThreadDetail = await procedures.getThread(
+            {
+              threadId: initialThread.id,
+            },
+            {
+              priority: "foreground",
+            },
+          );
+          initialThreadDetailPromise = Promise.resolve(initialThreadDetail);
+        } catch (error) {
+          if (!isThreadNotFoundError(error)) {
+            throw error;
+          }
+          startupThreads = startupThreads.filter(
+            (thread) => thread.id !== initialThread?.id,
+          );
+          initialThread = pickInitialThread(startupThreads, {
+            ...persistedState,
+            selectedThreadId:
+              persistedState.selectedThreadId === initialThread.id
+                ? null
+                : persistedState.selectedThreadId,
+          });
+          initialThreadDetailPromise = null;
+        }
+      }
       const openProjects = loaded.filter((project) => project.isOpen === 1);
       const restoredOpenProjectIds = new Set(
         openProjects.map((project) => project.id),
@@ -1744,7 +1778,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             : initialProject.path);
 
       setProjects(optimisticProjects);
-      setThreads(sortedThreads);
+      setThreads(startupThreads);
       setCodexModels(modelCatalog.models);
       setDefaultCodexModel(modelCatalog.defaultModel);
       setReasoningEfforts(modelCatalog.reasoningEfforts);
@@ -1778,16 +1812,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
       await Promise.resolve();
 
-      const initialThreadDetailPromise = initialThread
-        ? procedures.getThread(
-            {
-              threadId: initialThread.id,
-            },
-            {
-              priority: "foreground",
-            },
-          )
-        : null;
       const initialThreadOpenPromise = initialThread
         ? openThread(initialThread.id, {
             detailPromise: initialThreadDetailPromise,
