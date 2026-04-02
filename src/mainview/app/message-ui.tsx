@@ -242,6 +242,18 @@ function toolCallStateLabel(
   return "Completed";
 }
 
+function webSearchStateLabel(
+  state: "in_progress" | "completed" | "stopped",
+): string {
+  if (state === "in_progress") {
+    return "Searching";
+  }
+  if (state === "stopped") {
+    return "Stopped";
+  }
+  return "Completed";
+}
+
 export function DiffViewer({
   className,
   diffText,
@@ -344,6 +356,30 @@ export function ToolCallMessage({
           </pre>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function WebSearchMessage({
+  query,
+  state,
+}: {
+  query: string;
+  state: "in_progress" | "completed" | "stopped";
+}): JSX.Element {
+  return (
+    <div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+            Web Search
+          </div>
+          <div className="mt-1 text-sm leading-6 text-[#f2f0ef]">{query}</div>
+        </div>
+        <div className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+          {webSearchStateLabel(state)}
+        </div>
+      </div>
     </div>
   );
 }

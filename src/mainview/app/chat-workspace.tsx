@@ -30,6 +30,7 @@ import {
   ProcessingMessage,
   ReasoningMessage,
   ToolCallMessage,
+  WebSearchMessage,
   isAssistantVisibleMessage,
   isPlainAssistantTextMessage,
 } from "./message-ui";
@@ -185,6 +186,9 @@ function ChatTranscript({
           tool={message.tool}
         />
       );
+    }
+    if (message.kind === "web_search") {
+      return <WebSearchMessage query={message.query} state={message.state} />;
     }
     return (
       <FileChangeMessage

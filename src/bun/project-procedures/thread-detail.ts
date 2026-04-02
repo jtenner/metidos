@@ -318,6 +318,24 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
     };
   }
 
+  if (message.kind === "web_search" && message.itemId) {
+    return {
+      id: message.id,
+      threadId: message.threadId,
+      role: "assistant",
+      kind: "web_search",
+      itemId: message.itemId,
+      text: message.text,
+      state:
+        message.state === "completed" || message.state === "stopped"
+          ? message.state
+          : "in_progress",
+      query: message.text,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+    };
+  }
+
   if (message.kind === "reasoning" && message.itemId) {
     return {
       id: message.id,

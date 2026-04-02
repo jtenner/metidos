@@ -46,6 +46,11 @@ export type VisibleMessage =
       argumentsText: string;
       output: string;
       state: "in_progress" | "completed" | "failed" | "stopped";
+    }
+  | {
+      kind: "web_search";
+      query: string;
+      state: "in_progress" | "completed" | "stopped";
     };
 
 export type MessageGroup =

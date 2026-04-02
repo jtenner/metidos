@@ -50,7 +50,8 @@ type ThreadActivityKind =
   | "reasoning"
   | "command"
   | "file_change"
-  | "tool_call";
+  | "tool_call"
+  | "web_search";
 
 type ThreadActivityInput = {
   threadId: number;

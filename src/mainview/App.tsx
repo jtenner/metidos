@@ -3670,6 +3670,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
             state: message.state,
           };
         }
+        if (message.kind === "web_search") {
+          return {
+            kind: "web_search",
+            query: message.query,
+            state: message.state,
+          };
+        }
         return {
           kind: "chat",
           speaker: message.role,

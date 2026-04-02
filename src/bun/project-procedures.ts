@@ -687,6 +687,23 @@ async function runThreadMessageInBackground(
         continue;
       }
 
+      if (item.type === "web_search") {
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        const state =
+          event.type === "item.completed" ? "completed" : "in_progress";
+        const query = item.query.trim() || "Web search";
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          `${state}\u0000${query}`,
+          () => upsertWebSearchActivity(threadId, activityItemId, item, state),
+          {
+            force: state !== "in_progress",
+            terminal: state !== "in_progress",
+          },
+        );
+        continue;
+      }
+
       if (item.type === "file_change") {
         const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
         await bufferedActivityWriter.queue(
@@ -1223,6 +1240,22 @@ async function upsertToolCallActivity(
       argumentsText: stringifyActivityValue(item.arguments),
       output: formatToolCallOutput(item),
     } satisfies ToolCallActivityPayload),
+  });
+  invalidateThreadDetailCache(threadId);
+}
+
+async function upsertWebSearchActivity(
+  threadId: number,
+  itemId: string,
+  item: Extract<ThreadItem, { type: "web_search" }>,
+  state: "in_progress" | "completed" | "stopped",
+): Promise<void> {
+  upsertThreadActivity(db, {
+    threadId,
+    itemId,
+    kind: "web_search",
+    text: item.query.trim() || "Web search",
+    state,
   });
   invalidateThreadDetailCache(threadId);
 }

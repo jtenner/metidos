@@ -313,12 +313,26 @@ export type RpcToolCallThreadMessage = {
   updatedAt: string;
 };
 
+export type RpcWebSearchThreadMessage = {
+  id: number;
+  threadId: number;
+  role: "assistant";
+  kind: "web_search";
+  itemId: string;
+  text: string;
+  state: "in_progress" | "completed" | "stopped";
+  query: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RpcThreadMessage =
   | RpcChatThreadMessage
   | RpcReasoningThreadMessage
   | RpcCommandThreadMessage
   | RpcFileChangeThreadMessage
-  | RpcToolCallThreadMessage;
+  | RpcToolCallThreadMessage
+  | RpcWebSearchThreadMessage;
 
 export type RpcThreadDetail = {
   thread: RpcThread;
