@@ -153,6 +153,7 @@ export function ThreadListRow({
   return (
     <button
       type="button"
+      id={threadPopoverAnchorId}
       aria-describedby={threadPreviewDescriptionId}
       aria-label={threadAriaLabel}
       className={`w-full px-3 py-2 text-left transition-colors ${

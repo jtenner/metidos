@@ -10,6 +10,24 @@ import {
   clampProjectMenuCoordinate,
 } from "./state";
 
+function anchorStillActive(anchorId: string): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const anchor = document.getElementById(anchorId);
+  if (!(anchor instanceof HTMLElement)) {
+    return false;
+  }
+
+  const activeElement = document.activeElement;
+  return (
+    anchor.matches(":hover") ||
+    anchor === activeElement ||
+    anchor.contains(activeElement)
+  );
+}
+
 export function useThreadPreviews() {
   const [errorPreviewPopover, setErrorPreviewPopover] =
     useState<ErrorPreviewPopoverState | null>(null);
@@ -91,6 +109,23 @@ export function useThreadPreviews() {
     setThreadSummaryPopover(null);
   }, []);
 
+  const deferHidePreview = useCallback(
+    (anchorId: string, hidePreview: () => void): void => {
+      if (typeof window === "undefined") {
+        hidePreview();
+        return;
+      }
+
+      window.requestAnimationFrame(() => {
+        if (anchorStillActive(anchorId)) {
+          return;
+        }
+        hidePreview();
+      });
+    },
+    [],
+  );
+
   const errorPreviewHandlers = useCallback(
     (
       anchorId: string,
@@ -119,14 +154,14 @@ export function useThreadPreviews() {
           );
         },
         onMouseLeave: () => {
-          hideErrorPreview();
+          deferHidePreview(anchorId, hideErrorPreview);
         },
         onBlur: () => {
-          hideErrorPreview();
+          deferHidePreview(anchorId, hideErrorPreview);
         },
       };
     },
-    [hideErrorPreview, showErrorPreview],
+    [deferHidePreview, hideErrorPreview, showErrorPreview],
   );
 
   const threadSummaryPreviewHandlers = useCallback(
@@ -170,14 +205,14 @@ export function useThreadPreviews() {
           );
         },
         onMouseLeave: () => {
-          hideThreadSummaryPreview();
+          deferHidePreview(anchorId, hideThreadSummaryPreview);
         },
         onBlur: () => {
-          hideThreadSummaryPreview();
+          deferHidePreview(anchorId, hideThreadSummaryPreview);
         },
       };
     },
-    [hideThreadSummaryPreview, showThreadSummaryPreview],
+    [deferHidePreview, hideThreadSummaryPreview, showThreadSummaryPreview],
   );
 
   return {
