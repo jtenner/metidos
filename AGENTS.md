@@ -69,9 +69,14 @@
 │  └─ mainview/
 │     ├─ App.tsx
 │     ├─ app/
+│     │  ├─ action-menus.tsx
+│     │  ├─ chat-workspace.tsx
+│     │  ├─ desktop-sidebar.tsx
+│     │  ├─ diff-workspace.tsx
 │     │  ├─ git-history-panel.tsx
 │     │  ├─ message-ui.tsx
 │     │  ├─ projects-panel.tsx
+│     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts
 │     │  ├─ state.ts
 │     │  └─ threads-panel.tsx

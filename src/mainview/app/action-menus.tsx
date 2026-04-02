@@ -1,0 +1,296 @@
+import type { FormEvent, JSX, RefObject } from "react";
+import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
+import { materialSymbol } from "../controls/icons";
+import {
+  type ProjectActionMenuState,
+  type ThreadActionMenuState,
+  formatPathForDisplay,
+} from "./state";
+
+type ProjectActionMenuProps = {
+  error: string;
+  homeDirectory: string;
+  isCreatingWorktree: boolean;
+  menu: ProjectActionMenuState | null;
+  newWorktreeName: string;
+  onClose: () => void;
+  onDeleteProject: () => void;
+  onNewWorktreeNameChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  project: RpcProject | null;
+  projectActionMenuRef: RefObject<HTMLDivElement | null>;
+  supportsTildePath: boolean;
+  worktreePinBusyPath: string | null;
+};
+
+export function ProjectActionMenu({
+  error,
+  homeDirectory,
+  isCreatingWorktree,
+  menu,
+  newWorktreeName,
+  onClose,
+  onDeleteProject,
+  onNewWorktreeNameChange,
+  onSubmit,
+  project,
+  projectActionMenuRef,
+  supportsTildePath,
+  worktreePinBusyPath,
+}: ProjectActionMenuProps): JSX.Element | null {
+  if (!menu || !project) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed z-[90] w-80 select-none overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+      ref={projectActionMenuRef}
+      style={{
+        left: menu.x,
+        top: menu.y,
+      }}
+    >
+      <div className="border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+              Project Actions
+            </div>
+            <div className="truncate text-sm font-semibold text-[#f2f0ef]">
+              {project.name}
+            </div>
+            <div className="truncate text-[11px] text-[#8f9aa2]">
+              {formatPathForDisplay(
+                project.path,
+                homeDirectory,
+                supportsTildePath,
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center border border-[#5c2030] bg-[#2c1117] text-[#ff8ca0] transition-colors hover:bg-[#39161f] hover:text-[#ffd1d8]"
+              onClick={onDeleteProject}
+              aria-label={`Remove ${project.name}`}
+              title="Remove Project"
+            >
+              {materialSymbol("delete", "text-[18px]")}
+            </button>
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
+              onClick={onClose}
+              aria-label="Close project actions"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      </div>
+      {error ? (
+        <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+          {error}
+        </div>
+      ) : null}
+      <form
+        className="border-t border-[#2b343b] bg-[#171d21] px-3 py-3"
+        onSubmit={onSubmit}
+      >
+        <label
+          className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
+          htmlFor="new-worktree-name"
+        >
+          New Worktree
+        </label>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            id="new-worktree-name"
+            className="min-w-0 flex-1 select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+            placeholder="feature/new-worktree"
+            value={newWorktreeName}
+            onChange={(event) => {
+              onNewWorktreeNameChange(event.currentTarget.value);
+            }}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <button
+            className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isCreatingWorktree || worktreePinBusyPath !== null}
+            type="submit"
+          >
+            {isCreatingWorktree ? "Creating" : "Create"}
+          </button>
+        </div>
+        <div className="mt-2 text-xs text-[#828d94]">
+          Creates a new branch and sibling worktree folder.
+        </div>
+      </form>
+    </div>
+  );
+}
+
+type ThreadActionMenuProps = {
+  error: string;
+  homeDirectory: string;
+  menu: ThreadActionMenuState | null;
+  onClose: () => void;
+  onDeleteThread: () => void;
+  onSummaryChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTitleChange: (value: string) => void;
+  onTogglePinned: () => void;
+  supportsTildePath: boolean;
+  thread: RpcThread | null;
+  threadActionBusy: "rename" | "pin" | "delete" | null;
+  threadActionMenuRef: RefObject<HTMLDivElement | null>;
+  threadRenameSummary: string;
+  threadRenameTitle: string;
+};
+
+export function ThreadActionMenu({
+  error,
+  homeDirectory,
+  menu,
+  onClose,
+  onDeleteThread,
+  onSummaryChange,
+  onSubmit,
+  onTitleChange,
+  onTogglePinned,
+  supportsTildePath,
+  thread,
+  threadActionBusy,
+  threadActionMenuRef,
+  threadRenameSummary,
+  threadRenameTitle,
+}: ThreadActionMenuProps): JSX.Element | null {
+  if (!menu || !thread) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed z-[95] w-80 select-none overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+      ref={threadActionMenuRef}
+      style={{
+        left: menu.x,
+        top: menu.y,
+      }}
+    >
+      <div className="border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+              Thread Actions
+            </div>
+            <div className="truncate text-sm font-semibold text-[#f2f0ef]">
+              {thread.title}
+            </div>
+            <div className="truncate text-[11px] text-[#8f9aa2]">
+              {formatPathForDisplay(
+                thread.worktreePath,
+                homeDirectory,
+                supportsTildePath,
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="flex h-7 w-7 items-center justify-center border border-[#303940] bg-[#1a2025] text-[#acb8c1] transition-colors hover:bg-[#242d33] hover:text-[#f2f0ef]"
+            onClick={onClose}
+            aria-label="Close thread actions"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      {error ? (
+        <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+          {error}
+        </div>
+      ) : null}
+      <form
+        className="border-b border-[#2b343b] bg-[#171d21] px-3 py-3"
+        onSubmit={onSubmit}
+      >
+        <label
+          className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
+          htmlFor="thread-rename-title"
+        >
+          Rename Thread
+        </label>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            id="thread-rename-title"
+            className="min-w-0 flex-1 select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+            value={threadRenameTitle}
+            onChange={(event) => {
+              onTitleChange(event.currentTarget.value);
+            }}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </div>
+        <label
+          className="mt-3 block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
+          htmlFor="thread-rename-summary"
+        >
+          Thread Summary
+        </label>
+        <textarea
+          id="thread-rename-summary"
+          className="mt-2 min-h-[5.5rem] w-full select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm leading-6 text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
+          placeholder="Optional desktop hover summary."
+          value={threadRenameSummary}
+          onChange={(event) => {
+            onSummaryChange(event.currentTarget.value);
+          }}
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck={true}
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="text-[11px] text-[#828d94]">
+            Shown as a desktop hover popover. Leave blank to clear it.
+          </div>
+          <button
+            type="submit"
+            className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={threadActionBusy !== null}
+          >
+            {threadActionBusy === "rename" ? "Saving" : "Save"}
+          </button>
+        </div>
+      </form>
+      <div className="flex justify-end gap-2 border-t border-[#2b343b] px-3 py-3">
+        <button
+          type="button"
+          className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#31404a] bg-[#182025] text-[#dfebf3] transition-colors hover:bg-[#1f282f] disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onTogglePinned}
+          disabled={threadActionBusy !== null}
+          aria-label={thread.pinnedAt ? "Unpin thread" : "Pin thread"}
+          title={thread.pinnedAt ? "Unpin thread" : "Pin thread"}
+        >
+          {materialSymbol("push_pin", "text-[18px]", {
+            filled: Boolean(thread.pinnedAt),
+          })}
+        </button>
+        <button
+          type="button"
+          className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#5c2030] bg-[#2c1117] text-[#ff9db0] transition-colors hover:bg-[#39161f] disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onDeleteThread}
+          disabled={threadActionBusy !== null}
+          aria-label="Delete thread"
+          title="Delete thread"
+        >
+          {materialSymbol("delete", "text-[18px]")}
+        </button>
+      </div>
+    </div>
+  );
+}
