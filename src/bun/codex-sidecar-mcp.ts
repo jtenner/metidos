@@ -5,9 +5,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as z from "zod/v4";
 
 import {
+  type ThreadRecord,
   getThreadById,
   initAppDatabase,
   renameThread as renameThreadRecord,
+  setThreadPinned as setThreadPinnedRecord,
 } from "./db";
 import type {
   AppRPCSchema,
@@ -413,12 +415,34 @@ function normalizeOptionalSummary(
   return summary?.trim() || null;
 }
 
-function renameThreadLocally(
+function updateThreadMetadataLocally(
   threadId: number,
-  title: string,
+  title?: string,
   summary?: string | null,
+  pinned?: boolean,
 ) {
-  renameThreadRecord(db, threadId, title, normalizeOptionalSummary(summary));
+  const existingThread = getThreadById(db, threadId);
+  if (!existingThread) {
+    throw new Error(`Thread not found: ${threadId}`);
+  }
+
+  const normalizedSummary = normalizeOptionalSummary(summary);
+  if (
+    typeof title !== "undefined" ||
+    typeof normalizedSummary !== "undefined"
+  ) {
+    renameThreadRecord(
+      db,
+      threadId,
+      title ?? existingThread.title,
+      normalizedSummary,
+    );
+  }
+
+  if (typeof pinned === "boolean") {
+    setThreadPinnedRecord(db, threadId, pinned);
+  }
+
   const thread = getThreadById(db, threadId);
   if (!thread) {
     throw new Error(`Thread not found: ${threadId}`);
@@ -426,25 +450,41 @@ function renameThreadLocally(
   return thread;
 }
 
-function refreshThreadTitleInApp(
-  threadId: number,
-  title: string,
+function refreshThreadMetadataInApp(
+  thread: ThreadRecord,
+  title?: string,
   summary?: string | null,
+  pinned?: boolean,
 ): void {
   const normalizedSummary = normalizeOptionalSummary(summary);
-  void rpcClient
-    .call(
-      "renameThread",
-      {
-        threadId,
-        title,
-        ...(typeof normalizedSummary === "undefined"
-          ? {}
-          : { summary: normalizedSummary }),
-      },
-      { priority: "background", timeoutMs: 1_500 },
-    )
-    .catch(() => {});
+  if (
+    typeof title !== "undefined" ||
+    typeof normalizedSummary !== "undefined"
+  ) {
+    void rpcClient
+      .call(
+        "renameThread",
+        {
+          threadId: thread.id,
+          title: thread.title,
+          ...(typeof normalizedSummary === "undefined"
+            ? {}
+            : { summary: thread.summary }),
+        },
+        { priority: "background", timeoutMs: 1_500 },
+      )
+      .catch(() => {});
+  }
+
+  if (typeof pinned === "boolean") {
+    void rpcClient
+      .call(
+        "setThreadPinned",
+        { threadId: thread.id, pinned },
+        { priority: "background", timeoutMs: 1_500 },
+      )
+      .catch(() => {});
+  }
 }
 
 function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
@@ -499,37 +539,61 @@ server.registerTool(
   "modify_thread",
   {
     title: "Modify Thread",
-    description: `Update Jolt thread metadata. Always use this tool for every thread, including quick one-off tasks, so each thread receives a title even if it is only set once. Use it again whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
+    description: `Update Jolt thread metadata. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning and unpinning would make the thread easier to scan.${boundThreadSentence()}`,
     inputSchema: {
       title: z
         .string()
         .trim()
         .min(1)
+        .optional()
         .describe(
-          "Short title. Required for every thread, including quick one-off tasks. Update whenever the focus shifts.",
+          "Short title. Supply one for every thread, including quick one-off tasks. Omit only when updating other metadata without changing the title.",
         ),
       summary: z
         .string()
         .optional()
-        .describe("Optional thread summary. Empty clears it."),
+        .describe(
+          "Optional thread summary. Empty clears it. Omit to leave unchanged.",
+        ),
+      pinned: z
+        .boolean()
+        .optional()
+        .describe(
+          "Optional pinned state. Set true to pin, false to unpin, or omit to leave the pinned state unchanged.",
+        ),
       threadId: z
         .number()
         .int()
         .positive()
         .describe(explicitThreadIdDescription()),
     },
-    // Treat title updates as safe UI metadata so Codex can run them freely.
+    // Treat metadata updates as safe UI changes so Codex can run them freely.
     annotations: safeMetadataAnnotations(),
   },
-  async ({ summary, threadId, title }) => {
+  async ({ pinned, summary, threadId, title }) => {
     const resolvedThreadId = requireThreadId(threadId);
-    const thread = renameThreadLocally(resolvedThreadId, title, summary);
+    if (
+      typeof title === "undefined" &&
+      typeof summary === "undefined" &&
+      typeof pinned === "undefined"
+    ) {
+      throw new Error("At least one of title, summary, or pinned is required.");
+    }
+
+    const thread = updateThreadMetadataLocally(
+      resolvedThreadId,
+      title,
+      summary,
+      pinned,
+    );
     // Refresh the live app cache without blocking the tool result.
-    refreshThreadTitleInApp(resolvedThreadId, title, summary);
-    return textResult(`Renamed thread ${thread.id}.`, {
+    refreshThreadMetadataInApp(thread, title, summary, pinned);
+    return textResult(`Updated thread ${thread.id}.`, {
       threadId: thread.id,
       title: thread.title,
       summary: thread.summary,
+      pinned: thread.pinnedAt !== null,
+      pinnedAt: thread.pinnedAt,
     });
   },
 );

@@ -38,8 +38,9 @@ Guidance:
 
 - treat `modify_thread` as a safe metadata update
 - use `new_thread` sparingly
-- let `modify_thread` run liberally whenever a short title would better match the thread focus or improve scanability
+- let `modify_thread` run liberally whenever a better title, a short summary, or pinning and unpinning would improve scanability
 - use the optional `summary` field on `modify_thread` for a short desktop hover description when it adds useful context
+- use the optional `pinned` field on `modify_thread` to pin important threads and unpin them when that organization no longer helps
 - pass `threadId` explicitly for thread-scoped tools; the bound thread id is exposed in tool metadata
 - attach the sidecar at client construction so every thread from that `Codex` instance can reach it
 
