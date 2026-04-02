@@ -1,9 +1,5 @@
 import type { JSX } from "react";
-import type {
-  RpcProject,
-  RpcWorktreeChange,
-  RpcWorktreeChangeStatus,
-} from "../../bun/rpc-schema";
+import type { RpcProject, RpcWorktreeChange } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import { DiffViewer } from "./message-ui";
 import { formatPathForDisplay } from "./state";
@@ -138,66 +134,6 @@ function summarizeDiffText(diffText: string): {
   };
 }
 
-function worktreeChangeStatusLabel(status: RpcWorktreeChangeStatus): string {
-  switch (status) {
-    case "added":
-      return "Added";
-    case "copied":
-      return "Copied";
-    case "deleted":
-      return "Deleted";
-    case "modified":
-      return "Modified";
-    case "renamed":
-      return "Renamed";
-    case "unmerged":
-      return "Conflict";
-    case "untracked":
-      return "Untracked";
-  }
-}
-
-function worktreeChangeStatusClassName(
-  status: RpcWorktreeChangeStatus,
-): string {
-  switch (status) {
-    case "added":
-    case "copied":
-    case "untracked":
-      return "border-[#244833] bg-[#12251a] text-[#9fe2b1]";
-    case "deleted":
-      return "border-[#5c2030] bg-[#2c1117] text-[#ff9db0]";
-    case "renamed":
-      return "border-[#365062] bg-[#16212a] text-[#b7d0e1]";
-    case "unmerged":
-      return "border-[#6a4b1f] bg-[#2f2312] text-[#f0d79a]";
-    case "modified":
-      return "border-[#31404a] bg-[#182025] text-[#cfe0eb]";
-  }
-}
-
-function ChangeStatusBadge({
-  label,
-  status,
-}: {
-  label: string;
-  status: RpcWorktreeChangeStatus | null;
-}): JSX.Element | null {
-  if (!status) {
-    return null;
-  }
-
-  return (
-    <span
-      className={`border px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] ${worktreeChangeStatusClassName(
-        status,
-      )}`}
-    >
-      {label} {worktreeChangeStatusLabel(status)}
-    </span>
-  );
-}
-
 function DiffFileTree({
   nodes,
   onSelectedDiffFilePathChange,
@@ -252,16 +188,6 @@ function DiffFileTree({
               {node.label}
             </div>
             <div className="truncate text-[11px] text-[#8f9aa2]">{path}</div>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <ChangeStatusBadge
-              label="Index"
-              status={node.change?.stagedStatus ?? null}
-            />
-            <ChangeStatusBadge
-              label="Worktree"
-              status={node.change?.unstagedStatus ?? null}
-            />
           </div>
         </button>
       );
@@ -463,14 +389,6 @@ export function DiffWorkspace({
               ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <ChangeStatusBadge
-                label="Index"
-                status={selectedDiffFileChange?.stagedStatus ?? null}
-              />
-              <ChangeStatusBadge
-                label="Worktree"
-                status={selectedDiffFileChange?.unstagedStatus ?? null}
-              />
               {selectedDiffFileChange && diffFilePatchState.diffText.trim() ? (
                 <span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
                   {diffStats.hunks} {diffStats.hunks === 1 ? "Hunk" : "Hunks"}
