@@ -552,6 +552,7 @@ async function runThreadMessageInBackground(
   let lastAssistantItemId: string | null = null;
   let terminalError: string | null = null;
   let usage: RpcThreadUsage | null = null;
+  const bufferedActivityWriter = createBufferedThreadActivityWriter();
 
   try {
     const thread = threadById(threadId);
@@ -605,31 +606,59 @@ async function runThreadMessageInBackground(
           lastAssistantItemId = activityItemId;
         }
         if (nextAssistantText) {
-          await upsertAssistantChatActivity(
-            threadId,
+          const state =
+            event.type === "item.completed" ? "completed" : "in_progress";
+          await bufferedActivityWriter.queue(
             activityItemId,
-            nextAssistantText,
-            event.type === "item.completed" ? "completed" : "in_progress",
+            `${state}\u0000${nextAssistantText}`,
+            () =>
+              upsertAssistantChatActivity(
+                threadId,
+                activityItemId,
+                nextAssistantText,
+                state,
+              ),
+            {
+              force: state !== "in_progress",
+              terminal: state !== "in_progress",
+            },
           );
         }
         continue;
       }
 
       if (item.type === "reasoning") {
-        await upsertReasoningActivity(
-          threadId,
-          buildThreadTurnActivityId(startedAt, item.id),
-          item,
-          event.type === "item.completed" ? "completed" : "in_progress",
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        const state =
+          event.type === "item.completed" ? "completed" : "in_progress";
+        const text = item.text.trim() || "Reasoning";
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          `${state}\u0000${text}`,
+          () => upsertReasoningActivity(threadId, activityItemId, item, state),
+          {
+            force: state !== "in_progress",
+            terminal: state !== "in_progress",
+          },
         );
         continue;
       }
 
       if (item.type === "command_execution") {
-        await upsertCommandActivity(
-          threadId,
-          buildThreadTurnActivityId(startedAt, item.id),
-          item,
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          [
+            item.status,
+            item.command,
+            String(item.exit_code ?? ""),
+            item.aggregated_output,
+          ].join("\u0000"),
+          () => upsertCommandActivity(threadId, activityItemId, item),
+          {
+            force: item.status !== "in_progress",
+            terminal: item.status !== "in_progress",
+          },
         );
         continue;
       }
@@ -638,23 +667,49 @@ async function runThreadMessageInBackground(
         if (item.server === JOLT_MCP_SERVER_NAME) {
           continue;
         }
-        await upsertToolCallActivity(
-          threadId,
-          buildThreadTurnActivityId(startedAt, item.id),
-          item,
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          [
+            item.status,
+            item.server,
+            item.tool,
+            stringifyActivityValue(item.arguments),
+            formatToolCallOutput(item),
+          ].join("\u0000"),
+          () => upsertToolCallActivity(threadId, activityItemId, item),
+          {
+            force: item.status !== "in_progress",
+            terminal: item.status !== "in_progress",
+          },
         );
         continue;
       }
 
       if (item.type === "file_change") {
-        await upsertFileChangeActivity(
-          threadId,
-          buildThreadTurnActivityId(startedAt, item.id),
-          thread.worktreePath,
-          item,
+        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
+        await bufferedActivityWriter.queue(
+          activityItemId,
+          [
+            item.status,
+            ...item.changes.map((change) => `${change.kind}:${change.path}`),
+          ].join("\u0000"),
+          () =>
+            upsertFileChangeActivity(
+              threadId,
+              activityItemId,
+              thread.worktreePath,
+              item,
+            ),
+          {
+            force: event.type === "item.completed",
+            terminal: event.type === "item.completed",
+          },
         );
       }
     }
+
+    await bufferedActivityWriter.flushAll();
 
     if (terminalError) {
       throw new Error(terminalError);
@@ -704,6 +759,14 @@ async function runThreadMessageInBackground(
       hasUnreadError: false,
     });
   } catch (error) {
+    try {
+      await bufferedActivityWriter.flushAll();
+    } catch (flushError) {
+      console.error(
+        `Failed to flush buffered Codex activity for thread ${threadId}`,
+        flushError,
+      );
+    }
     if (isAbortError(error) && controller.signal.aborted) {
       await settleCanceledThreadTurn(
         threadId,
@@ -845,6 +908,15 @@ type ToolCallActivityPayload = {
   output: string;
 };
 
+type BufferedThreadActivityWrite = {
+  lastPersistedAt: number;
+  lastPersistedSignature: string | null;
+  persist: () => Promise<void>;
+  persisted: boolean;
+  signature: string;
+  terminal: boolean;
+};
+
 function stringifyActivityValue(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -912,6 +984,127 @@ function formatToolCallOutput(
   }
 
   return stringifyActivityValue(item.result?.content);
+}
+
+function createBufferedThreadActivityWriter(): {
+  flushAll: () => Promise<void>;
+  queue: (
+    activityId: string,
+    signature: string,
+    persist: () => Promise<void>,
+    options?: {
+      force?: boolean;
+      terminal?: boolean;
+    },
+  ) => Promise<void>;
+} {
+  const entries = new Map<string, BufferedThreadActivityWrite>();
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  let flushChain = Promise.resolve();
+
+  const clearFlushTimer = (): void => {
+    if (!flushTimer) {
+      return;
+    }
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  };
+
+  const scheduleFlush = (): void => {
+    if (flushTimer || entries.size === 0) {
+      return;
+    }
+
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      void enqueueFlush(false);
+    }, COMMAND_ACTIVITY_FLUSH_INTERVAL_MS);
+  };
+
+  const flushEntries = async (force: boolean): Promise<void> => {
+    const now = Date.now();
+    let needsReschedule = false;
+
+    for (const [activityId, entry] of entries) {
+      const dueToFlush =
+        force ||
+        !entry.persisted ||
+        entry.terminal ||
+        now - entry.lastPersistedAt >= COMMAND_ACTIVITY_FLUSH_INTERVAL_MS;
+      if (!dueToFlush) {
+        needsReschedule = true;
+        continue;
+      }
+
+      const signatureChanged =
+        !entry.persisted || entry.lastPersistedSignature !== entry.signature;
+      if (signatureChanged) {
+        await entry.persist();
+        entry.lastPersistedSignature = entry.signature;
+      }
+      entry.lastPersistedAt = Date.now();
+      entry.persisted = true;
+
+      if (entry.terminal) {
+        entries.delete(activityId);
+      }
+    }
+
+    if (needsReschedule || entries.size > 0) {
+      scheduleFlush();
+    }
+  };
+
+  const enqueueFlush = (force: boolean): Promise<void> => {
+    flushChain = flushChain.then(() => flushEntries(force));
+    return flushChain;
+  };
+
+  return {
+    flushAll: async (): Promise<void> => {
+      clearFlushTimer();
+      try {
+        await enqueueFlush(true);
+      } finally {
+        clearFlushTimer();
+      }
+    },
+    queue: async (
+      activityId: string,
+      signature: string,
+      persist: () => Promise<void>,
+      options?: {
+        force?: boolean;
+        terminal?: boolean;
+      },
+    ): Promise<void> => {
+      const entry = entries.get(activityId) ?? {
+        lastPersistedAt: 0,
+        lastPersistedSignature: null,
+        persist,
+        persisted: false,
+        signature,
+        terminal: false,
+      };
+      entry.persist = persist;
+      entry.signature = signature;
+      entry.terminal = options?.terminal === true;
+      entries.set(activityId, entry);
+
+      const shouldFlushNow =
+        options?.force === true ||
+        !entry.persisted ||
+        Date.now() - entry.lastPersistedAt >=
+          COMMAND_ACTIVITY_FLUSH_INTERVAL_MS;
+      if (shouldFlushNow) {
+        clearFlushTimer();
+        await enqueueFlush(options?.force === true);
+        return;
+      }
+
+      scheduleFlush();
+    },
+  };
 }
 
 async function upsertReasoningActivity(

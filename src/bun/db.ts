@@ -1131,7 +1131,7 @@ export function createThreadMessage(
 export function upsertThreadActivity(
   database: Database,
   input: ThreadActivityInput,
-): ThreadMessageRecord {
+): void {
   const existing = database
     .query<{ id: number }, [number, string]>(
       `
@@ -1190,36 +1190,6 @@ export function upsertThreadActivity(
       input.payloadJson ?? null,
     );
   }
-
-  const message = database
-    .query<ThreadMessageRecord, [number, string]>(
-      `
-				SELECT
-					id,
-					thread_id AS threadId,
-					role,
-					kind,
-					item_id AS itemId,
-					text,
-					state,
-					payload_json AS payloadJson,
-					created_at AS createdAt,
-					COALESCE(updated_at, created_at) AS updatedAt
-				FROM thread_messages
-				WHERE thread_id = ? AND item_id = ?
-				ORDER BY id DESC
-				LIMIT 1
-			`,
-    )
-    .get(input.threadId, input.itemId);
-
-  if (!message) {
-    throw new Error(
-      `Failed to upsert thread activity ${input.itemId} for thread ${input.threadId}`,
-    );
-  }
-
-  return message;
 }
 
 export function stopInProgressThreadMessages(
