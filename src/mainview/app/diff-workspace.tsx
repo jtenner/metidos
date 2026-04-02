@@ -1,23 +1,18 @@
-import type { JSX, RefObject, UIEvent } from "react";
+import type { JSX } from "react";
 import type {
   RpcProject,
   RpcWorktreeChange,
   RpcWorktreeChangeStatus,
 } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
+import { DiffViewer } from "./message-ui";
 import { formatPathForDisplay } from "./state";
 
-export type DiffFileContentState = {
-  chunks: string[];
+export type DiffFilePatchState = {
+  diffText: string;
   error: string;
-  isBinary: boolean;
-  isLoadingInitial: boolean;
-  isLoadingMore: boolean;
-  isMissing: boolean;
-  loadedBytes: number;
-  nextCursor: number | null;
+  isLoading: boolean;
   path: string | null;
-  totalBytes: number;
 };
 
 export type DiffFileTreeNode = {
@@ -28,34 +23,15 @@ export type DiffFileTreeNode = {
   path: string | null;
 };
 
-export function emptyDiffFileContentState(
+export function emptyDiffFilePatchState(
   path: string | null = null,
-): DiffFileContentState {
+): DiffFilePatchState {
   return {
-    chunks: [],
+    diffText: "",
     error: "",
-    isBinary: false,
-    isLoadingInitial: false,
-    isLoadingMore: false,
-    isMissing: false,
-    loadedBytes: 0,
-    nextCursor: null,
+    isLoading: false,
     path,
-    totalBytes: 0,
   };
-}
-
-export function decodeBase64Bytes(value: string): Uint8Array {
-  if (!value) {
-    return new Uint8Array(0);
-  }
-
-  const decoded = atob(value);
-  const bytes = new Uint8Array(decoded.length);
-  for (let index = 0; index < decoded.length; index += 1) {
-    bytes[index] = decoded.charCodeAt(index);
-  }
-  return bytes;
 }
 
 export function buildDiffFileTree(
@@ -129,14 +105,37 @@ export function buildDiffFileTree(
   return materialize(root);
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
+function summarizeDiffText(diffText: string): {
+  additions: number;
+  deletions: number;
+  hunks: number;
+} {
+  let additions = 0;
+  let deletions = 0;
+  let hunks = 0;
+
+  for (const line of diffText.split(/\r?\n/)) {
+    if (line.startsWith("@@")) {
+      hunks += 1;
+      continue;
+    }
+    if (line.startsWith("+++ ") || line.startsWith("--- ")) {
+      continue;
+    }
+    if (line.startsWith("+")) {
+      additions += 1;
+      continue;
+    }
+    if (line.startsWith("-")) {
+      deletions += 1;
+    }
   }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+  return {
+    additions,
+    deletions,
+    hunks,
+  };
 }
 
 function worktreeChangeStatusLabel(status: RpcWorktreeChangeStatus): string {
@@ -276,15 +275,11 @@ type DiffWorkspaceProps = {
   activeSelectedWorktreeOpened: boolean;
   activeSelectedWorktreePath: string | null;
   activeWorktreeChanges: RpcWorktreeChange[];
-  desktopDiffContentScrollRef: RefObject<HTMLDivElement | null>;
-  diffFileContentState: DiffFileContentState;
+  diffFilePatchState: DiffFilePatchState;
   diffFileTree: DiffFileTreeNode[];
   hasActiveWorktreeSnapshot: boolean;
   homeDirectory: string;
   isRefreshingWorktreeSnapshot: boolean;
-  mobileDiffContentScrollRef: RefObject<HTMLDivElement | null>;
-  onDesktopDiffContentScroll: (event: UIEvent<HTMLDivElement>) => void;
-  onMobileDiffContentScroll: (event: UIEvent<HTMLDivElement>) => void;
   onRefresh: () => void;
   onSelectedDiffFilePathChange: (path: string) => void;
   refreshDisabled: boolean;
@@ -301,15 +296,11 @@ export function DiffWorkspace({
   activeSelectedWorktreeOpened,
   activeSelectedWorktreePath,
   activeWorktreeChanges,
-  desktopDiffContentScrollRef,
-  diffFileContentState,
+  diffFilePatchState,
   diffFileTree,
   hasActiveWorktreeSnapshot,
   homeDirectory,
   isRefreshingWorktreeSnapshot,
-  mobileDiffContentScrollRef,
-  onDesktopDiffContentScroll,
-  onMobileDiffContentScroll,
   onRefresh,
   onSelectedDiffFilePathChange,
   refreshDisabled,
@@ -321,6 +312,7 @@ export function DiffWorkspace({
   worktreeDiffError,
 }: DiffWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
+  const diffStats = summarizeDiffText(diffFilePatchState.diffText);
 
   const selectorContent =
     !selectedProject || !activeSelectedWorktreePath ? (
@@ -350,7 +342,7 @@ export function DiffWorkspace({
         }`}
       >
         <div
-          className={`overflow-y-auto py-2 hide-scrollbar ${
+          className={`app-scrollbar overflow-y-auto py-2 ${
             mobile ? "max-h-[22rem]" : "h-full"
           }`}
         >
@@ -365,62 +357,26 @@ export function DiffWorkspace({
 
   const contentBody = !selectedDiffFileChange ? (
     <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
-      Select a changed file to inspect its current contents.
+      Select a changed file to inspect its focused diff.
     </div>
-  ) : diffFileContentState.error ? (
+  ) : diffFilePatchState.error ? (
     <div className="border border-[#5c2030] bg-[#2c1117] px-4 py-4 text-sm text-[#ff9db0]">
-      {diffFileContentState.error}
+      {diffFilePatchState.error}
     </div>
-  ) : diffFileContentState.isLoadingInitial ? (
+  ) : diffFilePatchState.isLoading ? (
     <div className="border border-[#283239] bg-[#151b20] px-4 py-4 text-sm text-[#d4e4ef]">
-      Streaming file contents...
+      Loading focused diff...
     </div>
-  ) : diffFileContentState.isMissing ? (
+  ) : !diffFilePatchState.diffText.trim() ? (
     <div className="border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
-      This file no longer exists in the working tree. The diff entry is still
-      listed because the change is active.
-    </div>
-  ) : diffFileContentState.isBinary ? (
-    <div className="border border-[#31404a] bg-[#12181c] px-4 py-4 text-sm text-[#cfe0eb]">
-      Binary file preview unavailable.
+      No focused diff is available for this change right now.
     </div>
   ) : (
-    <div
-      className={`overflow-hidden border border-[#252f36] bg-[#0c1114] ${
-        mobile ? "" : "h-full"
-      }`}
-    >
-      <div
-        ref={mobile ? mobileDiffContentScrollRef : desktopDiffContentScrollRef}
-        className={`app-scrollbar overflow-auto ${
-          mobile ? "max-h-[48vh]" : "h-full"
-        }`}
-        onScroll={
-          mobile ? onMobileDiffContentScroll : onDesktopDiffContentScroll
-        }
-      >
-        {diffFileContentState.chunks.length > 0 ? (
-          <pre className="min-w-full whitespace-pre-wrap break-words px-4 py-4 font-mono text-[12px] leading-6 text-[#d4dde4]">
-            {diffFileContentState.chunks.map((chunk, index) => (
-              <span className="contents" key={`${index}-${chunk.length}`}>
-                {chunk}
-              </span>
-            ))}
-          </pre>
-        ) : (
-          <div className="px-4 py-4 text-sm text-[#8f9aa2]">Empty file.</div>
-        )}
-        {diffFileContentState.isLoadingMore ? (
-          <div className="border-t border-[#252f36] px-4 py-3 text-xs text-[#8f9aa2]">
-            Loading more...
-          </div>
-        ) : diffFileContentState.nextCursor !== null ? (
-          <div className="border-t border-[#252f36] px-4 py-3 text-xs text-[#6f7b83]">
-            Scroll to load more
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <DiffViewer
+      className={mobile ? "" : "h-full"}
+      diffText={diffFilePatchState.diffText}
+      viewportClassName={mobile ? "max-h-[48vh]" : "h-full"}
+    />
   );
 
   return (
@@ -515,19 +471,16 @@ export function DiffWorkspace({
                 label="Worktree"
                 status={selectedDiffFileChange?.unstagedStatus ?? null}
               />
-              {selectedDiffFileChange ? (
+              {selectedDiffFileChange && diffFilePatchState.diffText.trim() ? (
                 <span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
-                  {formatFileSize(diffFileContentState.totalBytes)}
+                  {diffStats.hunks} {diffStats.hunks === 1 ? "Hunk" : "Hunks"}
                 </span>
               ) : null}
             </div>
           </div>
-          {selectedDiffFileChange &&
-          !diffFileContentState.isBinary &&
-          !diffFileContentState.isMissing ? (
+          {selectedDiffFileChange && diffFilePatchState.diffText.trim() ? (
             <div className="mt-3 text-xs text-[#6f7b83]">
-              Loaded {formatFileSize(diffFileContentState.loadedBytes)} of{" "}
-              {formatFileSize(diffFileContentState.totalBytes)}
+              {diffStats.additions} additions · {diffStats.deletions} deletions
             </div>
           ) : null}
         </div>

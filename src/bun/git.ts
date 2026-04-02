@@ -479,6 +479,28 @@ async function readTextFile(path: string): Promise<string> {
   return Bun.file(path).text();
 }
 
+async function runGitDiffCommandAllowNoHead(
+  cwd: string,
+  args: string[],
+  options?: GitCommandPriority | GitCommandOptions,
+): Promise<string | null> {
+  const result = await runGitCommandResult(cwd, args, options);
+  if (result.exitCode === 0) {
+    return result.stdout.trimEnd();
+  }
+  if (isNoHeadGitHistoryFailure(result)) {
+    return null;
+  }
+  throw new Error(gitCommandFailureMessage(result));
+}
+
+function joinDiffSections(sections: Array<string | null | undefined>): string {
+  return sections
+    .map((section) => section?.trim())
+    .filter((section): section is string => Boolean(section))
+    .join("\n\n");
+}
+
 export async function readFileChangeDiff(
   worktreePath: string,
   changePath: string,
@@ -521,6 +543,90 @@ export async function readFileChangeDiff(
       return buildSyntheticDeleteDiff(gitPath, previous);
     } catch {
       return `--- a/${gitPath}\n-[file deleted]`;
+    }
+  }
+
+  return "";
+}
+
+export async function readWorktreeChangeDiff(
+  worktreePath: string,
+  change: RpcWorktreeChange,
+  options?: GitCommandPriority | GitCommandOptions,
+): Promise<string> {
+  const path = normalizeGitPath(worktreePath, change.path);
+  const previousPath = change.previousPath
+    ? normalizeGitPath(worktreePath, change.previousPath)
+    : null;
+  const pathspecs = [
+    ...new Set(
+      [path, previousPath].filter(
+        (candidate): candidate is string => typeof candidate === "string",
+      ),
+    ),
+  ];
+  const diffArgs = [
+    "--no-ext-diff",
+    "--unified=3",
+    "--find-renames",
+    "--find-copies",
+    "--binary",
+    "--",
+    ...pathspecs,
+  ];
+
+  const combinedTrackedDiff = await runGitDiffCommandAllowNoHead(
+    worktreePath,
+    ["diff", "HEAD", ...diffArgs],
+    options,
+  );
+  if (combinedTrackedDiff?.trim()) {
+    return combinedTrackedDiff;
+  }
+
+  const [stagedDiff, unstagedDiff] = await Promise.all([
+    runGitDiffCommandAllowNoHead(
+      worktreePath,
+      ["diff", "--cached", ...diffArgs],
+      options,
+    ),
+    runGitCommand(worktreePath, ["diff", ...diffArgs], options),
+  ]);
+  const fallbackDiff = joinDiffSections([stagedDiff, unstagedDiff]);
+  if (fallbackDiff) {
+    return fallbackDiff;
+  }
+
+  const fullPath = resolve(worktreePath, path);
+  if (
+    change.unstagedStatus === "untracked" ||
+    change.stagedStatus === "added" ||
+    change.unstagedStatus === "added"
+  ) {
+    if (existsSync(fullPath)) {
+      try {
+        return buildSyntheticAddDiff(path, await readTextFile(fullPath));
+      } catch {
+        return `+++ b/${path}\n+[binary or unreadable file added]`;
+      }
+    }
+    return `+++ b/${path}\n+[file added]`;
+  }
+
+  if (
+    change.stagedStatus === "deleted" ||
+    change.unstagedStatus === "deleted"
+  ) {
+    const deletedPath = previousPath ?? path;
+    try {
+      const previous = await runGitCommand(
+        worktreePath,
+        ["show", `HEAD:${deletedPath}`],
+        options,
+      );
+      return buildSyntheticDeleteDiff(deletedPath, previous);
+    } catch {
+      return `--- a/${deletedPath}\n-[file deleted]`;
     }
   }
 

@@ -6,15 +6,13 @@ import type {
   RpcWorktreeChange,
 } from "../../bun/rpc-schema";
 import {
-  type DiffFileContentState,
-  decodeBase64Bytes,
-  emptyDiffFileContentState,
+  type DiffFilePatchState,
+  emptyDiffFilePatchState,
 } from "./diff-workspace";
 import type { WorktreeNodeState } from "./state";
 import { createAbortError, isAbortError } from "./state";
 
 const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
-const WORKTREE_FILE_CONTENT_PAGE_BYTES = 64 * 1024;
 
 type UseWorktreeDiffParams = {
   activeSelectedWorktreeOpened: boolean;
@@ -23,6 +21,7 @@ type UseWorktreeDiffParams = {
   isDocumentVisible: boolean;
   primaryView: "chat" | "diff";
   procedures: ProjectProcedures;
+  selectedDiffFileChange: RpcWorktreeChange | null;
   selectedDiffFilePath: string | null;
   selectedProject: RpcProject | null;
   setSelectedDiffFilePath: Dispatch<SetStateAction<string | null>>;
@@ -40,6 +39,7 @@ export function useWorktreeDiff({
   isDocumentVisible,
   primaryView,
   procedures,
+  selectedDiffFileChange,
   selectedDiffFilePath,
   selectedProject,
   setSelectedDiffFilePath,
@@ -48,16 +48,25 @@ export function useWorktreeDiff({
   const [worktreeDiffError, setWorktreeDiffError] = useState("");
   const [isRefreshingWorktreeSnapshot, setIsRefreshingWorktreeSnapshot] =
     useState(false);
-  const [diffFileContentState, setDiffFileContentState] =
-    useState<DiffFileContentState>(emptyDiffFileContentState());
+  const [diffFilePatchState, setDiffFilePatchState] =
+    useState<DiffFilePatchState>(emptyDiffFilePatchState());
 
   const diffSnapshotRequestIdRef = useRef(0);
   const diffSnapshotAbortControllerRef = useRef<AbortController | null>(null);
-  const diffFileContentRequestIdRef = useRef(0);
-  const diffFileContentAbortControllerRef = useRef<AbortController | null>(
-    null,
-  );
-  const diffFileContentDecoderRef = useRef<TextDecoder | null>(null);
+  const diffFilePatchRequestIdRef = useRef(0);
+  const diffFilePatchAbortControllerRef = useRef<AbortController | null>(null);
+  const diffFilePatchStateRef = useRef(diffFilePatchState);
+  const selectedDiffFileChangePath = selectedDiffFileChange?.path ?? null;
+  const selectedDiffFilePreviousPath =
+    selectedDiffFileChange?.previousPath ?? null;
+  const selectedDiffFileStagedStatus =
+    selectedDiffFileChange?.stagedStatus ?? null;
+  const selectedDiffFileUnstagedStatus =
+    selectedDiffFileChange?.unstagedStatus ?? null;
+
+  useEffect(() => {
+    diffFilePatchStateRef.current = diffFilePatchState;
+  }, [diffFilePatchState]);
 
   const abortDiffSnapshotRequest = useCallback((reason: string) => {
     const controller = diffSnapshotAbortControllerRef.current;
@@ -69,15 +78,131 @@ export function useWorktreeDiff({
     controller.abort(createAbortError(null, reason));
   }, []);
 
-  const abortDiffFileContentRequest = useCallback((reason: string) => {
-    const controller = diffFileContentAbortControllerRef.current;
+  const abortDiffFilePatchRequest = useCallback((reason: string) => {
+    const controller = diffFilePatchAbortControllerRef.current;
     if (!controller) {
       return;
     }
 
-    diffFileContentAbortControllerRef.current = null;
+    diffFilePatchAbortControllerRef.current = null;
     controller.abort(createAbortError(null, reason));
   }, []);
+
+  const loadSelectedDiffFilePatch = useCallback(
+    async (options?: {
+      background?: boolean;
+    }): Promise<void> => {
+      if (
+        !selectedProject ||
+        !activeSelectedWorktreePath ||
+        !selectedDiffFileChangePath
+      ) {
+        setDiffFilePatchState((current) => {
+          const next = emptyDiffFilePatchState(selectedDiffFilePath ?? null);
+          return current.path === next.path &&
+            current.diffText === next.diffText &&
+            current.error === next.error &&
+            current.isLoading === next.isLoading
+            ? current
+            : next;
+        });
+        return;
+      }
+
+      const requestId = ++diffFilePatchRequestIdRef.current;
+      abortDiffFilePatchRequest("Worktree file diff request was superseded.");
+      const controller = new AbortController();
+      diffFilePatchAbortControllerRef.current = controller;
+      const currentState = diffFilePatchStateRef.current;
+      const selectedChange: RpcWorktreeChange = {
+        path: selectedDiffFileChangePath,
+        previousPath: selectedDiffFilePreviousPath,
+        stagedStatus: selectedDiffFileStagedStatus,
+        unstagedStatus: selectedDiffFileUnstagedStatus,
+      };
+      const preserveVisiblePatch =
+        options?.background &&
+        currentState.path === selectedDiffFileChangePath &&
+        currentState.diffText.trim().length > 0 &&
+        !currentState.error;
+      if (!preserveVisiblePatch) {
+        setDiffFilePatchState((current) => {
+          const next = {
+            ...emptyDiffFilePatchState(selectedDiffFileChangePath),
+            isLoading: true,
+          };
+          return current.path === next.path &&
+            current.diffText === next.diffText &&
+            current.error === next.error &&
+            current.isLoading === next.isLoading
+            ? current
+            : next;
+        });
+      }
+
+      try {
+        const result = await procedures.readWorktreeFileDiff(
+          {
+            change: selectedChange,
+            projectId: selectedProject.id,
+            worktreePath: activeSelectedWorktreePath,
+          },
+          {
+            priority: "foreground",
+            signal: controller.signal,
+          },
+        );
+        if (diffFilePatchRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setDiffFilePatchState((current) => {
+          const next = {
+            diffText: result.diffText,
+            error: "",
+            isLoading: false,
+            path: result.path,
+          };
+          return current.path === next.path &&
+            current.diffText === next.diffText &&
+            current.error === next.error &&
+            current.isLoading === next.isLoading
+            ? current
+            : next;
+        });
+      } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
+        if (diffFilePatchRequestIdRef.current !== requestId) {
+          return;
+        }
+        setDiffFilePatchState((current) => ({
+          ...(current.path === selectedDiffFileChangePath
+            ? current
+            : emptyDiffFilePatchState(selectedDiffFileChangePath)),
+          error: error instanceof Error ? error.message : String(error),
+          isLoading: false,
+          path: selectedDiffFileChangePath,
+        }));
+      } finally {
+        if (diffFilePatchAbortControllerRef.current === controller) {
+          diffFilePatchAbortControllerRef.current = null;
+        }
+      }
+    },
+    [
+      abortDiffFilePatchRequest,
+      activeSelectedWorktreePath,
+      procedures,
+      selectedDiffFileChangePath,
+      selectedDiffFilePreviousPath,
+      selectedDiffFileStagedStatus,
+      selectedDiffFileUnstagedStatus,
+      selectedDiffFilePath,
+      selectedProject,
+    ],
+  );
 
   const refreshActiveWorktreeSnapshot = useCallback(
     async (options?: { background?: boolean }) => {
@@ -122,6 +247,12 @@ export function useWorktreeDiff({
           snapshot,
         });
         setWorktreeDiffError("");
+
+        if (options?.background && selectedDiffFileChangePath) {
+          void loadSelectedDiffFilePatch({
+            background: true,
+          });
+        }
       } catch (error) {
         if (isAbortError(error)) {
           return;
@@ -145,174 +276,22 @@ export function useWorktreeDiff({
       abortDiffSnapshotRequest,
       activeSelectedWorktreeOpened,
       activeSelectedWorktreePath,
+      loadSelectedDiffFilePatch,
       procedures,
+      selectedDiffFileChangePath,
       selectedProject,
       setWorktreeState,
     ],
   );
 
-  const loadDiffFileContentPage = useCallback(
-    async (
-      path: string,
-      options?: {
-        cursor?: number;
-        reset?: boolean;
-      },
-    ): Promise<void> => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-
-      const requestId = ++diffFileContentRequestIdRef.current;
-      abortDiffFileContentRequest(
-        "Worktree file content request was superseded.",
-      );
-      const controller = new AbortController();
-      diffFileContentAbortControllerRef.current = controller;
-      const reset = options?.reset ?? false;
-      const cursor = reset ? 0 : Math.max(0, options?.cursor ?? 0);
-
-      if (reset) {
-        diffFileContentDecoderRef.current = new TextDecoder();
-        setDiffFileContentState({
-          ...emptyDiffFileContentState(path),
-          isLoadingInitial: true,
-        });
-      } else {
-        setDiffFileContentState((current) =>
-          current.path === path
-            ? {
-                ...current,
-                error: "",
-                isLoadingMore: true,
-              }
-            : {
-                ...emptyDiffFileContentState(path),
-                isLoadingInitial: true,
-              },
-        );
-      }
-
-      try {
-        const page = await procedures.readWorktreeFileContentPage(
-          {
-            cursor,
-            limitBytes: WORKTREE_FILE_CONTENT_PAGE_BYTES,
-            path,
-            projectId: selectedProject.id,
-            worktreePath: activeSelectedWorktreePath,
-          },
-          {
-            priority: "foreground",
-            signal: controller.signal,
-          },
-        );
-        if (diffFileContentRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        let decodedChunk = "";
-        let loadedBytes = page.nextCursor ?? page.totalBytes;
-        if (!page.isBinary && !page.isMissing) {
-          const decoder =
-            reset || !diffFileContentDecoderRef.current
-              ? new TextDecoder()
-              : diffFileContentDecoderRef.current;
-          diffFileContentDecoderRef.current = decoder;
-          const bytes = decodeBase64Bytes(page.chunkBase64);
-          decodedChunk = decoder.decode(bytes, {
-            stream: page.nextCursor !== null,
-          });
-          if (page.nextCursor === null) {
-            decodedChunk += decoder.decode();
-          }
-          loadedBytes = page.cursor + bytes.length;
-        }
-
-        setDiffFileContentState((current) => {
-          const base =
-            reset || current.path !== path
-              ? emptyDiffFileContentState(path)
-              : current;
-          return {
-            chunks: decodedChunk ? [...base.chunks, decodedChunk] : base.chunks,
-            error: "",
-            isBinary: page.isBinary,
-            isLoadingInitial: false,
-            isLoadingMore: false,
-            isMissing: page.isMissing,
-            loadedBytes,
-            nextCursor: page.nextCursor,
-            path,
-            totalBytes: page.totalBytes,
-          };
-        });
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (diffFileContentRequestIdRef.current !== requestId) {
-          return;
-        }
-        setDiffFileContentState((current) => ({
-          ...(current.path === path
-            ? current
-            : emptyDiffFileContentState(path)),
-          error: error instanceof Error ? error.message : String(error),
-          isLoadingInitial: false,
-          isLoadingMore: false,
-          path,
-        }));
-      } finally {
-        if (diffFileContentAbortControllerRef.current === controller) {
-          diffFileContentAbortControllerRef.current = null;
-        }
-      }
-    },
-    [
-      abortDiffFileContentRequest,
-      activeSelectedWorktreePath,
-      procedures,
-      selectedProject,
-    ],
-  );
-
-  const loadSelectedDiffFileContent = useCallback(async (): Promise<void> => {
-    if (!selectedDiffFilePath) {
-      diffFileContentDecoderRef.current = null;
-      setDiffFileContentState(emptyDiffFileContentState());
-      return;
-    }
-
-    await loadDiffFileContentPage(selectedDiffFilePath, {
-      reset: true,
-    });
-  }, [loadDiffFileContentPage, selectedDiffFilePath]);
-
-  const loadMoreDiffFileContent = useCallback(async (): Promise<void> => {
-    if (
-      !selectedDiffFilePath ||
-      diffFileContentState.path !== selectedDiffFilePath ||
-      diffFileContentState.nextCursor === null ||
-      diffFileContentState.isLoadingInitial ||
-      diffFileContentState.isLoadingMore
-    ) {
-      return;
-    }
-
-    await loadDiffFileContentPage(selectedDiffFilePath, {
-      cursor: diffFileContentState.nextCursor,
-    });
-  }, [diffFileContentState, loadDiffFileContentPage, selectedDiffFilePath]);
-
   useEffect(() => {
     return () => {
       diffSnapshotRequestIdRef.current += 1;
-      diffFileContentRequestIdRef.current += 1;
+      diffFilePatchRequestIdRef.current += 1;
       abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
+      abortDiffFilePatchRequest("Worktree file diff request was cleared.");
     };
-  }, [abortDiffFileContentRequest, abortDiffSnapshotRequest]);
+  }, [abortDiffFilePatchRequest, abortDiffSnapshotRequest]);
 
   useEffect(() => {
     if (
@@ -324,16 +303,15 @@ export function useWorktreeDiff({
     }
 
     diffSnapshotRequestIdRef.current += 1;
-    diffFileContentRequestIdRef.current += 1;
-    diffFileContentDecoderRef.current = null;
+    diffFilePatchRequestIdRef.current += 1;
     abortDiffSnapshotRequest("Worktree diff snapshot request was cleared.");
-    abortDiffFileContentRequest("Worktree file content request was cleared.");
+    abortDiffFilePatchRequest("Worktree file diff request was cleared.");
     setIsRefreshingWorktreeSnapshot(false);
     setWorktreeDiffError("");
     setSelectedDiffFilePath(null);
-    setDiffFileContentState(emptyDiffFileContentState());
+    setDiffFilePatchState(emptyDiffFilePatchState());
   }, [
-    abortDiffFileContentRequest,
+    abortDiffFilePatchRequest,
     abortDiffSnapshotRequest,
     activeSelectedWorktreeOpened,
     activeSelectedWorktreePath,
@@ -398,36 +376,42 @@ export function useWorktreeDiff({
       !selectedProject ||
       !activeSelectedWorktreePath ||
       !activeSelectedWorktreeOpened ||
-      !selectedDiffFilePath
+      !selectedDiffFileChangePath
     ) {
-      diffFileContentRequestIdRef.current += 1;
-      diffFileContentDecoderRef.current = null;
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
-      setDiffFileContentState(emptyDiffFileContentState(selectedDiffFilePath));
+      diffFilePatchRequestIdRef.current += 1;
+      abortDiffFilePatchRequest("Worktree file diff request was cleared.");
+      setDiffFilePatchState((current) => {
+        const next = emptyDiffFilePatchState(selectedDiffFilePath);
+        return current.path === next.path &&
+          current.diffText === next.diffText &&
+          current.error === next.error &&
+          current.isLoading === next.isLoading
+          ? current
+          : next;
+      });
       return;
     }
 
-    void loadSelectedDiffFileContent();
+    void loadSelectedDiffFilePatch();
     return () => {
-      diffFileContentRequestIdRef.current += 1;
-      diffFileContentDecoderRef.current = null;
-      abortDiffFileContentRequest("Worktree file content request was cleared.");
+      diffFilePatchRequestIdRef.current += 1;
+      abortDiffFilePatchRequest("Worktree file diff request was cleared.");
     };
   }, [
-    abortDiffFileContentRequest,
+    abortDiffFilePatchRequest,
     activeSelectedWorktreeOpened,
     activeSelectedWorktreePath,
-    loadSelectedDiffFileContent,
+    loadSelectedDiffFilePatch,
     primaryView,
+    selectedDiffFileChangePath,
     selectedDiffFilePath,
     selectedProject,
   ]);
 
   return {
-    diffFileContentState,
+    diffFilePatchState,
     isRefreshingWorktreeSnapshot,
-    loadMoreDiffFileContent,
-    loadSelectedDiffFileContent,
+    loadSelectedDiffFilePatch,
     refreshActiveWorktreeSnapshot,
     worktreeDiffError,
   };

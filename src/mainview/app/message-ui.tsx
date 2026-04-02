@@ -242,7 +242,15 @@ function toolCallStateLabel(
   return "Completed";
 }
 
-function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
+export function DiffViewer({
+  className,
+  diffText,
+  viewportClassName,
+}: {
+  className?: string;
+  diffText: string;
+  viewportClassName?: string;
+}): JSX.Element {
   const lines = parseUnifiedDiff(diffText);
   if (lines.length === 0) {
     return (
@@ -253,10 +261,14 @@ function DiffViewer({ diffText }: { diffText: string }): JSX.Element {
   }
 
   return (
-    <div className="overflow-hidden border border-[#252f36] bg-[#111518]">
+    <div
+      className={`overflow-hidden border border-[#252f36] bg-[#111518] ${className ?? ""}`.trim()}
+    >
       <section
         aria-label="Diff content"
-        className="app-scrollbar max-h-[28rem] overflow-auto text-[11px] leading-5"
+        className={`app-scrollbar overflow-auto text-[11px] leading-5 ${
+          viewportClassName ?? "max-h-[28rem]"
+        }`.trim()}
       >
         {lines.map((line) => (
           <div
@@ -563,6 +575,7 @@ export function GitHistoryDiffModal({
   const dialogTitleId = `git-history-modal-title-${state.entry.hash}`;
   const dialogDescriptionId = `git-history-modal-description-${state.entry.hash}`;
   const dialogBodyId = `git-history-modal-body-${state.entry.hash}`;
+  const dialogBodyResetKey = `${state.projectId}:${state.worktreePath}:${state.entry.hash}:${state.loading ? "loading" : state.error ? "error" : "ready"}:${state.diffText.length}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4">
@@ -570,7 +583,7 @@ export function GitHistoryDiffModal({
         aria-describedby={dialogDescriptionId}
         aria-labelledby={dialogTitleId}
         aria-modal="true"
-        className="m-0 flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden border border-[#35414a] bg-[#101518] p-0 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
+        className="mx-auto my-auto flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden border border-[#35414a] bg-[#101518] p-0 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
         open
       >
         <div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#141b1f] px-4 py-4">
@@ -604,6 +617,7 @@ export function GitHistoryDiffModal({
         <div
           className="app-scrollbar flex-1 overflow-auto px-4 py-4"
           id={dialogBodyId}
+          key={dialogBodyResetKey}
         >
           {state.loading ? (
             <div className="border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">

@@ -49,6 +49,7 @@ import {
   readFileChangeDiff,
   readGitHistoryFirstPage,
   readGitHistorySummary,
+  readWorktreeChangeDiff,
   readWorktreeFileContentPage,
   readWorktreeSnapshot,
   runGitCommand,
@@ -127,6 +128,7 @@ import type {
   RpcWorktree,
   RpcWorktreeChange,
   RpcWorktreeFileContentPage,
+  RpcWorktreeFileDiff,
   RpcWorktreeGitHistoryResult,
   RpcWorktreeGitHistorySummary,
   RpcWorktreeSnapshot,
@@ -1976,6 +1978,33 @@ export async function readWorktreeFileContentPageProcedure(
     projectId: project.id,
     worktreePath,
     ...page,
+  };
+}
+
+export async function readWorktreeFileDiffProcedure(
+  params: AppRPCSchema["requests"]["readWorktreeFileDiff"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcWorktreeFileDiff> {
+  const requestGitOptions = gitCommandOptionsFromRequest(context);
+  const project = projectByIdForPath(params.projectId);
+  const state = ensureProjectPoller(project);
+  const worktreePath = normalizePath(params.worktreePath);
+  await ensureTrackedProjectWorktree(project, state, worktreePath, {
+    ...requestGitOptions,
+    forceRefresh: true,
+  });
+
+  const diffText = await readWorktreeChangeDiff(
+    worktreePath,
+    params.change,
+    requestGitOptions,
+  );
+
+  return {
+    projectId: project.id,
+    worktreePath,
+    path: normalizeGitPath(worktreePath, params.change.path),
+    diffText,
   };
 }
 

@@ -40,6 +40,13 @@ export type RpcWorktreeSnapshot = {
   lastUpdatedAt: string;
 };
 
+export type RpcWorktreeFileDiff = {
+  projectId: number;
+  worktreePath: string;
+  path: string;
+  diffText: string;
+};
+
 export type RpcProjectWorktreesResult = {
   project: RpcProject;
   worktrees: RpcWorktree[];
@@ -363,6 +370,14 @@ export type AppRPCSchema = {
       };
       response: RpcWorktreeFileContentPage;
     };
+    readWorktreeFileDiff: {
+      params: {
+        projectId: number;
+        worktreePath: string;
+        change: RpcWorktreeChange;
+      };
+      response: RpcWorktreeFileDiff;
+    };
     setActiveWorktree: {
       params: {
         projectId: number | null;
@@ -521,6 +536,10 @@ export interface ProjectProcedures {
   readWorktreeFileContentPage: RpcProcedureCall<
     AppRPCSchema["requests"]["readWorktreeFileContentPage"]["params"],
     AppRPCSchema["requests"]["readWorktreeFileContentPage"]["response"]
+  >;
+  readWorktreeFileDiff: RpcProcedureCall<
+    AppRPCSchema["requests"]["readWorktreeFileDiff"]["params"],
+    AppRPCSchema["requests"]["readWorktreeFileDiff"]["response"]
   >;
   setActiveWorktree: RpcProcedureCall<
     AppRPCSchema["requests"]["setActiveWorktree"]["params"],

@@ -424,9 +424,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                         className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
                                           activeWorktree
                                             ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
-                                            : worktreeState.opened
-                                              ? "bg-[#161c1f] text-[#f2f0ef]"
-                                              : "text-[#cfd1d4] hover:bg-[#14181a]"
+                                            : "text-[#cfd1d4] hover:bg-[#14181a]"
                                         }`}
                                         onClick={() => {
                                           onProjectWorktreeClick(
@@ -486,7 +484,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                       <button
                                         type="button"
                                         className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                                          activeWorktree || worktreeState.opened
+                                          activeWorktree
                                             ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
                                             : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
                                         }`}

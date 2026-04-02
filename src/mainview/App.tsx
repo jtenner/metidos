@@ -23,8 +23,10 @@ import type {
   RpcThreadMessage,
   RpcThreadRunStatus,
   RpcWorktree,
+  RpcWorktreeChange,
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeGitHistoryResult,
+  RpcWorktreeSnapshot,
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import { ProjectActionMenu, ThreadActionMenu } from "./app/action-menus";
@@ -102,8 +104,6 @@ type AppProps = {
 };
 
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
-const WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX = 480;
-
 type PrimaryView = "chat" | "diff";
 
 function isScrolledToBottom(container: HTMLDivElement): boolean {
@@ -118,6 +118,58 @@ function scrollContainerToBottom(container: HTMLDivElement | null): void {
     return;
   }
   container.scrollTop = container.scrollHeight;
+}
+
+function areWorktreeChangesEqual(
+  left: RpcWorktreeChange[],
+  right: RpcWorktreeChange[],
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((change, index) => {
+    const other = right[index];
+    return (
+      change.path === other?.path &&
+      change.previousPath === other.previousPath &&
+      change.stagedStatus === other.stagedStatus &&
+      change.unstagedStatus === other.unstagedStatus
+    );
+  });
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+}
+
+function areWorktreeSnapshotsEquivalent(
+  left: RpcWorktreeSnapshot | undefined,
+  right: RpcWorktreeSnapshot | undefined,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+
+  return (
+    left.path === right.path &&
+    areWorktreeChangesEqual(left.changes, right.changes) &&
+    areStringArraysEqual(left.diff, right.diff) &&
+    areStringArraysEqual(left.files, right.files)
+  );
 }
 
 declare global {
@@ -231,8 +283,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
-  const desktopDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
-  const mobileDiffContentScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopChatPinnedToBottomRef = useRef(true);
   const mobileChatPinnedToBottomRef = useRef(true);
   const chatScrollThreadIdRef = useRef<number | null>(
@@ -742,14 +792,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ): void => {
       const key = worktreeKey(projectId, worktreePath);
       setWorktreeStates((prev) => {
-        const next = {
-          ...prev,
-        } as WorktreeStateMap;
-        next[key] = {
-          ...(next[key] ?? defaultWorktreeState()),
+        const current = prev[key] ?? defaultWorktreeState();
+        const nextSnapshot =
+          "snapshot" in update
+            ? areWorktreeSnapshotsEquivalent(current.snapshot, update.snapshot)
+              ? current.snapshot
+              : update.snapshot
+            : current.snapshot;
+        const nextState: WorktreeNodeState = {
+          ...current,
           ...update,
+          ...(typeof nextSnapshot === "undefined"
+            ? {}
+            : { snapshot: nextSnapshot }),
         };
-        return next;
+        if (
+          current.loading === nextState.loading &&
+          current.opened === nextState.opened &&
+          current.error === nextState.error &&
+          current.snapshot === nextState.snapshot
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [key]: nextState,
+        } satisfies WorktreeStateMap;
       });
     },
     [],
@@ -991,10 +1060,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
 
   const {
-    diffFileContentState,
+    diffFilePatchState,
     isRefreshingWorktreeSnapshot,
-    loadMoreDiffFileContent,
-    loadSelectedDiffFileContent,
     refreshActiveWorktreeSnapshot,
     worktreeDiffError,
   } = useWorktreeDiff({
@@ -1004,6 +1071,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     isDocumentVisible,
     primaryView,
     procedures,
+    selectedDiffFileChange,
     selectedDiffFilePath,
     selectedProject,
     setSelectedDiffFilePath,
@@ -2268,38 +2336,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   }, [activePollingProjectId, activePollingWorktreePath, procedures]);
 
   useEffect(() => {
-    if (
-      primaryView !== "diff" ||
-      diffFileContentState.isLoadingInitial ||
-      diffFileContentState.isLoadingMore ||
-      diffFileContentState.nextCursor === null
-    ) {
-      return;
-    }
-
-    const containers = [
-      desktopDiffContentScrollRef.current,
-      mobileDiffContentScrollRef.current,
-    ].filter((container): container is HTMLDivElement => container !== null);
-    if (
-      containers.some(
-        (container) =>
-          container.clientHeight > 0 &&
-          container.scrollHeight <=
-            container.clientHeight + WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX,
-      )
-    ) {
-      void loadMoreDiffFileContent();
-    }
-  }, [
-    diffFileContentState.isLoadingInitial,
-    diffFileContentState.isLoadingMore,
-    diffFileContentState.nextCursor,
-    loadMoreDiffFileContent,
-    primaryView,
-  ]);
-
-  useEffect(() => {
     if (!sessionStateReady) {
       return;
     }
@@ -3287,32 +3323,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [],
   );
 
-  const handleDesktopDiffContentScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      const container = event.currentTarget;
-      if (
-        container.scrollTop + container.clientHeight >=
-        container.scrollHeight - WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX
-      ) {
-        void loadMoreDiffFileContent();
-      }
-    },
-    [loadMoreDiffFileContent],
-  );
-
-  const handleMobileDiffContentScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      const container = event.currentTarget;
-      if (
-        container.scrollTop + container.clientHeight >=
-        container.scrollHeight - WORKTREE_FILE_CONTENT_LOAD_THRESHOLD_PX
-      ) {
-        void loadMoreDiffFileContent();
-      }
-    },
-    [loadMoreDiffFileContent],
-  );
-
   useLayoutEffect(() => {
     void visibleMessages;
     const threadChanged = chatScrollThreadIdRef.current !== selectedThreadId;
@@ -3341,8 +3351,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
   const handleRefreshActiveDiff = useCallback(() => {
     void refreshActiveWorktreeSnapshot();
-    void loadSelectedDiffFileContent();
-  }, [loadSelectedDiffFileContent, refreshActiveWorktreeSnapshot]);
+  }, [refreshActiveWorktreeSnapshot]);
 
   const handleNewWorktreeNameChange = useCallback((value: string) => {
     setProjectActionMenuError("");
@@ -3552,7 +3561,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             )}
           />
 
-          <section className="flex min-w-0 flex-1 flex-col bg-[#0e0e0e]">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#0e0e0e]">
             {primaryView === "chat" ? (
               <DesktopChatView
                 activeCodexModel={activeCodexModel}
@@ -3599,21 +3608,17 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 taskSelectorDisabled={taskSelectorDisabled}
               />
             ) : (
-              <div className="min-h-0 flex-1 px-6 py-6">
+              <div className="flex min-h-0 flex-1 px-6 py-6">
                 <DiffWorkspace
                   activeSelectedWorktreeFolder={activeSelectedWorktreeFolder}
                   activeSelectedWorktreeOpened={activeSelectedWorktreeOpened}
                   activeSelectedWorktreePath={activeSelectedWorktreePath}
                   activeWorktreeChanges={activeWorktreeChanges}
-                  desktopDiffContentScrollRef={desktopDiffContentScrollRef}
-                  diffFileContentState={diffFileContentState}
+                  diffFilePatchState={diffFilePatchState}
                   diffFileTree={diffFileTree}
                   hasActiveWorktreeSnapshot={Boolean(activeWorktreeSnapshot)}
                   homeDirectory={homeDirectory}
                   isRefreshingWorktreeSnapshot={isRefreshingWorktreeSnapshot}
-                  mobileDiffContentScrollRef={mobileDiffContentScrollRef}
-                  onDesktopDiffContentScroll={handleDesktopDiffContentScroll}
-                  onMobileDiffContentScroll={handleMobileDiffContentScroll}
                   onRefresh={handleRefreshActiveDiff}
                   onSelectedDiffFilePathChange={setSelectedDiffFilePath}
                   refreshDisabled={
@@ -3798,15 +3803,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 activeSelectedWorktreeOpened={activeSelectedWorktreeOpened}
                 activeSelectedWorktreePath={activeSelectedWorktreePath}
                 activeWorktreeChanges={activeWorktreeChanges}
-                desktopDiffContentScrollRef={desktopDiffContentScrollRef}
-                diffFileContentState={diffFileContentState}
+                diffFilePatchState={diffFilePatchState}
                 diffFileTree={diffFileTree}
                 hasActiveWorktreeSnapshot={Boolean(activeWorktreeSnapshot)}
                 homeDirectory={homeDirectory}
                 isRefreshingWorktreeSnapshot={isRefreshingWorktreeSnapshot}
-                mobileDiffContentScrollRef={mobileDiffContentScrollRef}
-                onDesktopDiffContentScroll={handleDesktopDiffContentScroll}
-                onMobileDiffContentScroll={handleMobileDiffContentScroll}
                 onRefresh={handleRefreshActiveDiff}
                 onSelectedDiffFilePathChange={setSelectedDiffFilePath}
                 refreshDisabled={

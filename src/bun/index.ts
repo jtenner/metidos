@@ -27,6 +27,7 @@ import {
   openProjectProcedure,
   openWorktreeProcedure,
   readWorktreeFileContentPageProcedure,
+  readWorktreeFileDiffProcedure,
   recoverInterruptedThreadTurnsOnStartup,
   renameThreadProcedure,
   runProjectTaskProcedure,
@@ -233,6 +234,8 @@ const rpcHandlers: RpcRequestHandlerMap = {
     getWorktreeSnapshotProcedure(params, context),
   readWorktreeFileContentPage: (params, context) =>
     readWorktreeFileContentPageProcedure(params, context),
+  readWorktreeFileDiff: (params, context) =>
+    readWorktreeFileDiffProcedure(params, context),
   setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
   listWorktreeGitHistory: (params, context) =>
     listWorktreeGitHistoryProcedure(params, context),
