@@ -629,15 +629,10 @@ export function MobileChatView({
                       value={activeCodexModel}
                       disabled={modelSelectorDisabled}
                       onChange={onChangeModel}
-                      variant="mobile"
-                    />
-                  </div>
-                  <div className="w-[6.75rem] shrink-0">
-                    <ReasoningEffortSelector
-                      options={reasoningEfforts}
-                      value={activeReasoningEffort}
-                      disabled={reasoningEffortSelectorDisabled}
-                      onChange={onChangeReasoningEffort}
+                      onChangeReasoningEffort={onChangeReasoningEffort}
+                      reasoningDisabled={reasoningEffortSelectorDisabled}
+                      reasoningOptions={reasoningEfforts}
+                      reasoningValue={activeReasoningEffort}
                       variant="mobile"
                     />
                   </div>
