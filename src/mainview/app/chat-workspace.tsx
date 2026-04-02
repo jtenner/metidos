@@ -492,7 +492,7 @@ type MobileChatViewProps = SharedChatControlsProps & {
   selectedWorktreePath: string | null;
 };
 
-const MOBILE_CHAT_COMPOSER_GAP_PX = 24;
+const MOBILE_CHAT_COMPOSER_GAP_PX = 34;
 const MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX = 224;
 const MOBILE_CHAT_ITEM_GAP_PX = 10;
 const MOBILE_CHAT_SIDE_INSET_PX = 10;
