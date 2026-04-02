@@ -19,11 +19,10 @@ export function ProjectTaskSelector({
   variant,
 }: ProjectTaskSelectorProps): JSX.Element {
   const noTasksAvailable = !loading && tasks.length === 0;
-  const unavailable = disabled || noTasksAvailable;
+  const unavailable = disabled || loading || noTasksAvailable;
   const noTasksHintId = useId();
-  const buttonLabel = loading
-    ? "Loading Tasks"
-    : variant === "desktop" && tasks.length > 0
+  const buttonLabel =
+    variant === "desktop" && tasks.length > 0
       ? `Tasks (${tasks.length})`
       : "Tasks";
 
@@ -55,7 +54,7 @@ export function ProjectTaskSelector({
                   : "h-10 w-full justify-between border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
             } ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
             onClick={toggle}
-            disabled={disabled}
+            disabled={disabled || loading}
             aria-disabled={unavailable}
             aria-describedby={noTasksAvailable ? noTasksHintId : undefined}
             aria-expanded={open}
