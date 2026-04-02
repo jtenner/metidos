@@ -621,30 +621,30 @@ export function MobileChatView({
         >
           <div className="overflow-visible border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
             <div className="border-b border-[#313a40] px-2 py-2">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <CodexModelSelector
-                      models={codexModels}
-                      value={activeCodexModel}
-                      disabled={modelSelectorDisabled}
-                      onChange={onChangeModel}
-                      onChangeReasoningEffort={onChangeReasoningEffort}
-                      reasoningDisabled={reasoningEffortSelectorDisabled}
-                      reasoningOptions={reasoningEfforts}
-                      reasoningValue={activeReasoningEffort}
-                      variant="mobile"
-                    />
-                  </div>
-                  <ProjectTaskSelector
-                    tasks={projectTasks}
-                    loading={isLoadingProjectTasks}
-                    disabled={taskSelectorDisabled}
-                    onSelect={onSelectTask}
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 w-1/2">
+                  <CodexModelSelector
+                    models={codexModels}
+                    value={activeCodexModel}
+                    disabled={modelSelectorDisabled}
+                    onChange={onChangeModel}
+                    onChangeReasoningEffort={onChangeReasoningEffort}
+                    reasoningDisabled={reasoningEffortSelectorDisabled}
+                    reasoningOptions={reasoningEfforts}
+                    reasoningValue={activeReasoningEffort}
                     variant="mobile"
                   />
                 </div>
-                <div className="flex items-center justify-end">
+                <div className="flex min-w-0 w-1/2 items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ProjectTaskSelector
+                      tasks={projectTasks}
+                      loading={isLoadingProjectTasks}
+                      disabled={taskSelectorDisabled}
+                      onSelect={onSelectTask}
+                      variant="mobile"
+                    />
+                  </div>
                   <UnsafeModeToggle
                     checked={activeUnsafeMode}
                     disabled={unsafeModeToggleDisabled}
