@@ -34,6 +34,7 @@ import { APP_TITLE, type MessageGroup, type VisibleMessage } from "./state";
 type SharedChatControlsProps = {
   activeCodexModel: string;
   activeReasoningEffort: RpcCodexReasoningEffort;
+  activeUnsafeMode: boolean;
   composerActionDisabled: boolean;
   composerActionLabel: string;
   composerDisabled: boolean;
@@ -45,6 +46,7 @@ type SharedChatControlsProps = {
   modelSelectorDisabled: boolean;
   onChangeModel: (value: string) => void;
   onChangeReasoningEffort: (value: RpcCodexReasoningEffort) => void;
+  onChangeUnsafeMode: (value: boolean) => void;
   onSelectTask: (task: RpcProjectTask) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmitMessage: () => void;
@@ -54,6 +56,8 @@ type SharedChatControlsProps = {
   reasoningEfforts: RpcCodexReasoningEffortOption[];
   taskControlError: string;
   taskSelectorDisabled: boolean;
+  unsafeModeControlError: string;
+  unsafeModeToggleDisabled: boolean;
   codexModels: RpcCodexModelOption[];
 };
 
@@ -63,6 +67,46 @@ type TranscriptProps = {
   selectedWorktreePath: string | null;
   variant: "desktop" | "mobile";
 };
+
+type UnsafeModeToggleProps = {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+  variant: "desktop" | "mobile";
+};
+
+function UnsafeModeToggle({
+  checked,
+  disabled,
+  onChange,
+  variant,
+}: UnsafeModeToggleProps): JSX.Element {
+  const compact = variant === "mobile";
+  return (
+    <label
+      className={[
+        "inline-flex items-center gap-2 rounded-full border transition-colors",
+        compact ? "px-2.5 py-1.5" : "px-3 py-1.5",
+        checked
+          ? "border-[#d89256] bg-[#2d1d12] text-[#ffd3a6]"
+          : "border-[#3d3d3d] bg-[#171717] text-[#b3afad]",
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+      ].join(" ")}
+      title="Uses the danger-full-access sandbox for this thread. This app applies it per thread, not per message."
+    >
+      <input
+        checked={checked}
+        className="h-3.5 w-3.5 accent-[#d89256]"
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        type="checkbox"
+      />
+      <span className="font-body text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
+        Unsafe
+      </span>
+    </label>
+  );
+}
 
 function ChatTranscript({
   localUserLabel,
@@ -282,6 +326,7 @@ export function DesktopChatView({
   activeContextInputTokens,
   activeContextWindowTokens,
   activeReasoningEffort,
+  activeUnsafeMode,
   activeScreenSubtitlePrimary,
   activeScreenSubtitleSecondary,
   activeScreenTitle,
@@ -299,6 +344,7 @@ export function DesktopChatView({
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
+  onChangeUnsafeMode,
   onChatScroll,
   onSelectTask,
   onSubmit,
@@ -311,6 +357,8 @@ export function DesktopChatView({
   selectedWorktreePath,
   taskControlError,
   taskSelectorDisabled,
+  unsafeModeControlError,
+  unsafeModeToggleDisabled,
   messages,
 }: DesktopChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
   return (
@@ -372,6 +420,12 @@ export function DesktopChatView({
               onSelect={onSelectTask}
               variant="desktop"
             />
+            <UnsafeModeToggle
+              checked={activeUnsafeMode}
+              disabled={unsafeModeToggleDisabled}
+              onChange={onChangeUnsafeMode}
+              variant="desktop"
+            />
             <div className="flex-1" />
             <ContextUsageMeter
               inputTokens={activeContextInputTokens}
@@ -391,6 +445,11 @@ export function DesktopChatView({
           {taskControlError ? (
             <div className="mt-2 text-xs text-[#ff6e84]">
               {taskControlError}
+            </div>
+          ) : null}
+          {unsafeModeControlError ? (
+            <div className="mt-2 text-xs text-[#ff6e84]">
+              {unsafeModeControlError}
             </div>
           ) : null}
           <ChatComposerControl
@@ -423,6 +482,7 @@ type MobileChatViewProps = SharedChatControlsProps & {
 export function MobileChatView({
   activeCodexModel,
   activeReasoningEffort,
+  activeUnsafeMode,
   activeScreenSubtitlePrimary,
   activeScreenSubtitleSecondary,
   activeScreenTitle,
@@ -440,6 +500,7 @@ export function MobileChatView({
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
+  onChangeUnsafeMode,
   onChatScroll,
   onSelectTask,
   onSubmit,
@@ -452,6 +513,8 @@ export function MobileChatView({
   selectedWorktreePath,
   taskControlError,
   taskSelectorDisabled,
+  unsafeModeControlError,
+  unsafeModeToggleDisabled,
   messages,
 }: MobileChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
   return (
@@ -490,32 +553,42 @@ export function MobileChatView({
         >
           <div className="overflow-visible border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
             <div className="border-b border-[#313a40] px-2 py-2">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <CodexModelSelector
-                    models={codexModels}
-                    value={activeCodexModel}
-                    disabled={modelSelectorDisabled}
-                    onChange={onChangeModel}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <CodexModelSelector
+                      models={codexModels}
+                      value={activeCodexModel}
+                      disabled={modelSelectorDisabled}
+                      onChange={onChangeModel}
+                      variant="mobile"
+                    />
+                  </div>
+                  <div className="w-[6.75rem] shrink-0">
+                    <ReasoningEffortSelector
+                      options={reasoningEfforts}
+                      value={activeReasoningEffort}
+                      disabled={reasoningEffortSelectorDisabled}
+                      onChange={onChangeReasoningEffort}
+                      variant="mobile"
+                    />
+                  </div>
+                  <ProjectTaskSelector
+                    tasks={projectTasks}
+                    loading={isLoadingProjectTasks}
+                    disabled={taskSelectorDisabled}
+                    onSelect={onSelectTask}
                     variant="mobile"
                   />
                 </div>
-                <div className="w-[6.75rem] shrink-0">
-                  <ReasoningEffortSelector
-                    options={reasoningEfforts}
-                    value={activeReasoningEffort}
-                    disabled={reasoningEffortSelectorDisabled}
-                    onChange={onChangeReasoningEffort}
+                <div className="flex items-center justify-end">
+                  <UnsafeModeToggle
+                    checked={activeUnsafeMode}
+                    disabled={unsafeModeToggleDisabled}
+                    onChange={onChangeUnsafeMode}
                     variant="mobile"
                   />
                 </div>
-                <ProjectTaskSelector
-                  tasks={projectTasks}
-                  loading={isLoadingProjectTasks}
-                  disabled={taskSelectorDisabled}
-                  onSelect={onSelectTask}
-                  variant="mobile"
-                />
               </div>
             </div>
             <ChatComposerControl
@@ -539,6 +612,11 @@ export function MobileChatView({
           ) : null}
           {taskControlError ? (
             <div className="text-xs text-[#ff6e84]">{taskControlError}</div>
+          ) : null}
+          {unsafeModeControlError ? (
+            <div className="text-xs text-[#ff6e84]">
+              {unsafeModeControlError}
+            </div>
           ) : null}
         </form>
       </footer>

@@ -20,6 +20,7 @@ type ThreadInput = {
   title: string;
   model: string;
   reasoningEffort: string;
+  unsafeMode: boolean;
   codexThreadId?: string | null;
 };
 
@@ -80,6 +81,7 @@ export type ThreadRecord = {
   summary: string | null;
   model: string;
   reasoningEffort: string;
+  unsafeMode: 0 | 1;
   codexThreadId: string | null;
   pinnedAt: string | null;
   createdAt: string;
@@ -272,6 +274,7 @@ function migrate(db: Database): void {
 				summary TEXT,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				codex_thread_id TEXT,
 				pinned_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -338,6 +341,11 @@ function migrate(db: Database): void {
     "reasoning_effort",
     "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
   );
+  ensureThreadColumn(
+    db,
+    "unsafe_mode",
+    "unsafe_mode INTEGER NOT NULL DEFAULT 0",
+  );
   runStatement(
     db,
     `
@@ -355,6 +363,14 @@ function migrate(db: Database): void {
 			WHERE reasoning_effort IS NULL OR TRIM(reasoning_effort) = ''
 		`,
     DEFAULT_THREAD_REASONING_EFFORT,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE threads
+			SET unsafe_mode = 0
+			WHERE unsafe_mode IS NULL
+		`,
   );
   runStatement(
     db,
@@ -629,6 +645,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 					summary,
 					model,
 					reasoning_effort AS reasoningEffort,
+					unsafe_mode AS unsafeMode,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
@@ -674,6 +691,7 @@ export function getThreadById(
 					summary,
 					model,
 					reasoning_effort AS reasoningEffort,
+					unsafe_mode AS unsafeMode,
 					codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
@@ -712,10 +730,12 @@ export function createThread(
 				title,
 				model,
 				reasoning_effort,
+				unsafe_mode,
 				codex_thread_id,
 				updated_at
 			)
 			VALUES (
+				?,
 				?,
 				?,
 				?,
@@ -730,6 +750,7 @@ export function createThread(
     input.title,
     input.model,
     input.reasoningEffort,
+    input.unsafeMode ? 1 : 0,
     input.codexThreadId ?? null,
   );
   const threadId = Number(result.lastInsertRowid);
@@ -828,6 +849,25 @@ export function setThreadReasoningEffort(
 			WHERE id = ?
 		`,
     reasoningEffort,
+    threadId,
+  );
+}
+
+export function setThreadUnsafeMode(
+  database: Database,
+  threadId: number,
+  unsafeMode: boolean,
+): void {
+  runStatement(
+    database,
+    `
+			UPDATE threads
+			SET
+				unsafe_mode = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    unsafeMode ? 1 : 0,
     threadId,
   );
 }

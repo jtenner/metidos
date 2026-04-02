@@ -70,8 +70,10 @@ type UseMainviewDerivedStateParams = {
   isThreadLoading: boolean;
   isUpdatingThreadModel: boolean;
   isUpdatingThreadReasoningEffort: boolean;
+  isUpdatingThreadUnsafeMode: boolean;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: RpcCodexReasoningEffort;
+  pendingThreadUnsafeMode: boolean;
   projectActionMenu: ProjectActionMenuState | null;
   projects: RpcProject[];
   reasoningEfforts: RpcCodexReasoningEffortOption[];
@@ -103,8 +105,10 @@ export function useMainviewDerivedState({
   isThreadLoading,
   isUpdatingThreadModel,
   isUpdatingThreadReasoningEffort,
+  isUpdatingThreadUnsafeMode,
   pendingThreadModel,
   pendingThreadReasoningEffort,
+  pendingThreadUnsafeMode,
   projectActionMenu,
   projects,
   reasoningEfforts,
@@ -167,6 +171,13 @@ export function useMainviewDerivedState({
     pendingThreadReasoningEffort,
     selectedThread,
   ]);
+
+  const activeUnsafeMode = useMemo(() => {
+    if (selectedThread) {
+      return selectedThread.unsafeMode;
+    }
+    return pendingThreadUnsafeMode;
+  }, [pendingThreadUnsafeMode, selectedThread]);
 
   const activeContextWindowTokens =
     activeCodexModelOption?.contextWindowTokens ?? 400_000;
@@ -267,6 +278,12 @@ export function useMainviewDerivedState({
     isThreadLoading ||
     isSending ||
     isUpdatingThreadReasoningEffort ||
+    selectedThreadIsWorking;
+  const unsafeModeToggleDisabled =
+    isCreatingThread ||
+    isThreadLoading ||
+    isSending ||
+    isUpdatingThreadUnsafeMode ||
     selectedThreadIsWorking;
 
   const selectedThreadRunError =
@@ -577,6 +594,7 @@ export function useMainviewDerivedState({
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,
+    activeUnsafeMode,
     activeScreenSubtitlePrimary,
     activeScreenSubtitleSecondary,
     activeScreenTitle,
@@ -612,6 +630,7 @@ export function useMainviewDerivedState({
     selectedThreadRunStatus,
     taskSelectorDisabled,
     threadActionMenuThread,
+    unsafeModeToggleDisabled,
     visibleThreads,
     worktreeThreadErrorLevel,
   };

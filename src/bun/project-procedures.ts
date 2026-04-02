@@ -32,6 +32,7 @@ import {
   setThreadModel,
   setThreadPinned,
   setThreadReasoningEffort,
+  setThreadUnsafeMode,
   setThreadUsage,
   stopInProgressThreadMessages,
   updateThreadCodexId,
@@ -385,17 +386,24 @@ function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
   return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
 
+function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
+  return unsafeMode === true;
+}
+
 function codexThreadOptions(
   worktreePath: string,
   model: string,
   reasoningEffort: RpcCodexReasoningEffort,
+  unsafeMode: boolean,
 ) {
   return {
     approvalPolicy: "never" as const,
     model,
     modelReasoningEffort: reasoningEffort,
     networkAccessEnabled: true,
-    sandboxMode: "workspace-write" as const,
+    sandboxMode: unsafeMode
+      ? ("danger-full-access" as const)
+      : ("workspace-write" as const),
     workingDirectory: worktreePath,
   };
 }
@@ -414,6 +422,7 @@ function createManagedCodexThread(thread: ThreadRecord): CodexThread {
           thread.worktreePath,
           model,
           normalizedReasoningEffort,
+          thread.unsafeMode === 1,
         ),
       )
     : client.startThread(
@@ -421,6 +430,7 @@ function createManagedCodexThread(thread: ThreadRecord): CodexThread {
           thread.worktreePath,
           model,
           normalizedReasoningEffort,
+          thread.unsafeMode === 1,
         ),
       );
 }
@@ -1433,6 +1443,7 @@ async function createThreadRecord(
   worktreePath: string,
   model: string,
   reasoningEffort: RpcCodexReasoningEffort,
+  unsafeMode: boolean,
   options?: ProjectWorktreeReadOptions,
 ): Promise<ThreadRecord> {
   const worktree = await assertProjectWorktree(project, worktreePath, {
@@ -1446,6 +1457,7 @@ async function createThreadRecord(
     title: buildThreadTitle(worktree, worktreePath),
     model,
     reasoningEffort,
+    unsafeMode,
     codexThreadId: null,
   });
   try {
@@ -1608,11 +1620,13 @@ export async function createThreadProcedure(
   const worktreePath = normalizePath(params.worktreePath);
   const model = resolveCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
+  const unsafeMode = resolveUnsafeMode(params.unsafeMode);
   const thread = await createThreadRecord(
     project,
     worktreePath,
     model,
     reasoningEffort,
+    unsafeMode,
     {
       forceRefresh: true,
     },
@@ -1757,6 +1771,7 @@ export async function runProjectTaskProcedure(
       worktreePath,
       resolveCodexModel(params.model),
       resolveCodexReasoningEffort(params.reasoningEffort),
+      resolveUnsafeMode(params.unsafeMode),
       {
         forceRefresh: true,
       },
@@ -1845,6 +1860,23 @@ export async function updateThreadReasoningEffortProcedure(
 
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   setThreadReasoningEffort(db, thread.id, reasoningEffort);
+  codexThreadMap.delete(thread.id);
+  invalidateThreadDetailCache(thread.id);
+  return rpcThreadById(thread.id);
+}
+
+export async function updateThreadUnsafeModeProcedure(
+  params: AppRPCSchema["requests"]["updateThreadUnsafeMode"]["params"],
+): Promise<RpcThread> {
+  const thread = threadById(params.threadId);
+  if (currentThreadRunStatus(thread).state === "working") {
+    throw new Error(
+      "Thread unsafe mode cannot change while Codex is processing.",
+    );
+  }
+
+  const unsafeMode = resolveUnsafeMode(params.unsafeMode);
+  setThreadUnsafeMode(db, thread.id, unsafeMode);
   codexThreadMap.delete(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);

@@ -214,6 +214,7 @@ export type RpcThread = {
   summary: string | null;
   model: string;
   reasoningEffort: RpcCodexReasoningEffort;
+  unsafeMode: boolean;
   codexThreadId: string | null;
   pinnedAt: string | null;
   createdAt: string;
@@ -420,6 +421,7 @@ export type AppRPCSchema = {
         worktreePath: string;
         model?: string | null;
         reasoningEffort?: RpcCodexReasoningEffort | null;
+        unsafeMode?: boolean | null;
       };
       response: RpcThreadDetail;
     };
@@ -447,6 +449,7 @@ export type AppRPCSchema = {
         threadId?: number | null;
         model?: string | null;
         reasoningEffort?: RpcCodexReasoningEffort | null;
+        unsafeMode?: boolean | null;
       };
       response: RpcThreadDetail;
     };
@@ -466,6 +469,13 @@ export type AppRPCSchema = {
       params: {
         threadId: number;
         reasoningEffort: RpcCodexReasoningEffort;
+      };
+      response: RpcThread;
+    };
+    updateThreadUnsafeMode: {
+      params: {
+        threadId: number;
+        unsafeMode: boolean;
       };
       response: RpcThread;
     };
@@ -604,6 +614,10 @@ export interface ProjectProcedures {
   updateThreadReasoningEffort: RpcProcedureCall<
     AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
     AppRPCSchema["requests"]["updateThreadReasoningEffort"]["response"]
+  >;
+  updateThreadUnsafeMode: RpcProcedureCall<
+    AppRPCSchema["requests"]["updateThreadUnsafeMode"]["params"],
+    AppRPCSchema["requests"]["updateThreadUnsafeMode"]["response"]
   >;
   deleteThread: RpcProcedureCall<
     AppRPCSchema["requests"]["deleteThread"]["params"],

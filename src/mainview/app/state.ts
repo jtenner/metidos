@@ -141,6 +141,7 @@ export type PersistedMainviewState = {
   selectedThreadId: number | null;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: string;
+  pendingThreadUnsafeMode: boolean;
   chatInput: string;
   sidebarCollapsed: boolean;
   sidebarSearchQuery: string;
@@ -447,6 +448,7 @@ export function defaultPersistedMainviewState(): PersistedMainviewState {
     selectedThreadId: null,
     pendingThreadModel: "",
     pendingThreadReasoningEffort: "",
+    pendingThreadUnsafeMode: false,
     chatInput: "",
     sidebarCollapsed: false,
     sidebarSearchQuery: "",
@@ -570,6 +572,7 @@ export function readPersistedMainviewState(): PersistedMainviewState {
         typeof parsed.pendingThreadReasoningEffort === "string"
           ? parsed.pendingThreadReasoningEffort
           : "",
+      pendingThreadUnsafeMode: parsed.pendingThreadUnsafeMode === true,
       chatInput: typeof parsed.chatInput === "string" ? parsed.chatInput : "",
       sidebarCollapsed: parsed.sidebarCollapsed === true,
       sidebarSearchQuery:

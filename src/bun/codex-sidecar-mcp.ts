@@ -565,6 +565,10 @@ server.registerTool(
         .enum(["minimal", "low", "medium", "high", "xhigh"])
         .optional()
         .describe("Reasoning override."),
+      unsafeMode: z
+        .boolean()
+        .optional()
+        .describe("Use the danger-full-access sandbox for the new thread."),
     },
     annotations: {
       idempotentHint: false,
@@ -578,6 +582,7 @@ server.registerTool(
     projectId,
     projectPath,
     reasoningEffort,
+    unsafeMode,
     worktreePath,
   }) => {
     const target = await resolveWorktreeTarget({
@@ -590,6 +595,7 @@ server.registerTool(
       worktreePath: target.worktreePath,
       model: model ?? null,
       reasoningEffort: reasoningEffort ?? null,
+      unsafeMode: unsafeMode ?? null,
     });
     const started = await rpcClient.call("sendThreadMessage", {
       threadId: created.thread.id,

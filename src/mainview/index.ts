@@ -544,6 +544,7 @@ const procedures: ProjectProcedures = {
   setThreadPinned: createProcedure("setThreadPinned"),
   updateThreadModel: createProcedure("updateThreadModel"),
   updateThreadReasoningEffort: createProcedure("updateThreadReasoningEffort"),
+  updateThreadUnsafeMode: createProcedure("updateThreadUnsafeMode"),
   deleteThread: createProcedure("deleteThread"),
   discardEmptyThread: createProcedure("discardEmptyThread"),
   openWorktree: createProcedure("openWorktree"),

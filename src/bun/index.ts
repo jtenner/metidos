@@ -45,6 +45,7 @@ import {
   suspendActiveWorktreePolling,
   updateThreadModelProcedure,
   updateThreadReasoningEffortProcedure,
+  updateThreadUnsafeModeProcedure,
   warmProcedureStartupCaches,
 } from "./project-procedures";
 import type {
@@ -227,6 +228,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
   updateThreadModel: (params) => updateThreadModelProcedure(params),
   updateThreadReasoningEffort: (params) =>
     updateThreadReasoningEffortProcedure(params),
+  updateThreadUnsafeMode: (params) => updateThreadUnsafeModeProcedure(params),
   deleteThread: (params) => deleteThreadProcedure(params),
   discardEmptyThread: (params) => discardEmptyThreadProcedure(params),
   openWorktree: (params, context) => openWorktreeProcedure(params, context),

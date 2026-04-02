@@ -228,6 +228,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
         ? initialMainviewState.pendingThreadReasoningEffort
         : defaultCodexReasoningEffort,
     );
+  const [pendingThreadUnsafeMode, setPendingThreadUnsafeMode] = useState(
+    initialMainviewState.pendingThreadUnsafeMode === true,
+  );
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(
     initialMainviewState.selectedThreadId,
   );
@@ -246,6 +249,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
   const [isUpdatingThreadReasoningEffort, setIsUpdatingThreadReasoningEffort] =
     useState(false);
+  const [isUpdatingThreadUnsafeMode, setIsUpdatingThreadUnsafeMode] =
+    useState(false);
   const [threadActionBusy, setThreadActionBusy] = useState<
     "rename" | "pin" | "delete" | null
   >(null);
@@ -261,6 +266,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [isStoppingThread, setIsStoppingThread] = useState(false);
   const [reasoningEffortControlError, setReasoningEffortControlError] =
     useState("");
+  const [unsafeModeControlError, setUnsafeModeControlError] = useState("");
   const [sessionStateReady, setSessionStateReady] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     () => document.visibilityState === "visible",
@@ -375,6 +381,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,
+    activeUnsafeMode,
     activeScreenSubtitlePrimary,
     activeScreenSubtitleSecondary,
     activeScreenTitle,
@@ -410,6 +417,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     selectedThreadRunStatus,
     taskSelectorDisabled,
     threadActionMenuThread,
+    unsafeModeToggleDisabled,
     visibleThreads,
     worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
@@ -430,8 +438,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
     isThreadLoading,
     isUpdatingThreadModel,
     isUpdatingThreadReasoningEffort,
+    isUpdatingThreadUnsafeMode,
     pendingThreadModel,
     pendingThreadReasoningEffort,
+    pendingThreadUnsafeMode,
     projectActionMenu,
     projects,
     reasoningEfforts,
@@ -990,6 +1000,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setThreadsError("");
       setModelControlError("");
       setReasoningEffortControlError("");
+      setUnsafeModeControlError("");
       setChatError("");
       try {
         const detail = await procedures.createThread({
@@ -998,6 +1009,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           model: activeCodexModel || defaultCodexModel || null,
           reasoningEffort:
             activeReasoningEffort || defaultCodexReasoningEffort || null,
+          unsafeMode: activeUnsafeMode,
         });
         const isActiveSelection =
           selectedProjectIdRef.current === projectId &&
@@ -1051,6 +1063,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [
       activeCodexModel,
       activeReasoningEffort,
+      activeUnsafeMode,
       defaultCodexModel,
       defaultCodexReasoningEffort,
       loadProjectWorktrees,
@@ -2347,6 +2360,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectedThreadId,
       pendingThreadModel,
       pendingThreadReasoningEffort,
+      pendingThreadUnsafeMode,
       chatInput: readChatComposerDraft(initialMainviewState.chatInput),
       sidebarCollapsed: sidebarCollapsedRef.current,
       sidebarSearchQuery,
@@ -2356,6 +2370,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     initialMainviewState.chatInput,
     pendingThreadModel,
     pendingThreadReasoningEffort,
+    pendingThreadUnsafeMode,
     projectStates,
     selectedProjectId,
     selectedThreadId,
@@ -2385,6 +2400,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setPendingThreadReasoningEffort(defaultCodexReasoningEffort);
     }
   }, [defaultCodexReasoningEffort, selectedThread]);
+
+  useEffect(() => {
+    if (!selectedThread) {
+      return;
+    }
+    setPendingThreadUnsafeMode(selectedThread.unsafeMode);
+    setUnsafeModeControlError("");
+  }, [selectedThread]);
 
   useEffect(() => {
     if (
@@ -2784,6 +2807,41 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [isUpdatingThreadReasoningEffort, procedures, selectedThread],
   );
 
+  const updateActiveUnsafeMode = useCallback(
+    async (unsafeMode: boolean) => {
+      setUnsafeModeControlError("");
+
+      if (!selectedThread) {
+        setPendingThreadUnsafeMode(unsafeMode);
+        return;
+      }
+
+      if (
+        selectedThread.unsafeMode === unsafeMode ||
+        isUpdatingThreadUnsafeMode
+      ) {
+        return;
+      }
+
+      setIsUpdatingThreadUnsafeMode(true);
+      try {
+        const updatedThread = await procedures.updateThreadUnsafeMode({
+          threadId: selectedThread.id,
+          unsafeMode,
+        });
+        setThreads((prev) => upsertThreadList(prev, updatedThread));
+        setPendingThreadUnsafeMode(updatedThread.unsafeMode);
+      } catch (error) {
+        setUnsafeModeControlError(
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        setIsUpdatingThreadUnsafeMode(false);
+      }
+    },
+    [isUpdatingThreadUnsafeMode, procedures, selectedThread],
+  );
+
   const runSelectedTask = useCallback(
     async (task: RpcProjectTask) => {
       if (!selectedProject || !activeSelectedWorktreePath) {
@@ -2798,6 +2856,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setThreadsError("");
       setChatError("");
       setReasoningEffortControlError("");
+      setUnsafeModeControlError("");
       try {
         const detail = await procedures.runProjectTask({
           projectId: requestedProjectId,
@@ -2810,6 +2869,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           reasoningEffort: selectedThread
             ? null
             : activeReasoningEffort || defaultCodexReasoningEffort || null,
+          unsafeMode: selectedThread ? null : activeUnsafeMode,
         });
         setThreads((prev) => upsertThreadList(prev, detail.thread));
         if (
@@ -2839,6 +2899,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [
       activeCodexModel,
       activeReasoningEffort,
+      activeUnsafeMode,
       activeSelectedWorktreePath,
       defaultCodexModel,
       defaultCodexReasoningEffort,
@@ -3568,6 +3629,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 activeContextInputTokens={activeContextInputTokens}
                 activeContextWindowTokens={activeContextWindowTokens}
                 activeReasoningEffort={activeReasoningEffort}
+                activeUnsafeMode={activeUnsafeMode}
                 activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
                 activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
                 activeScreenTitle={activeScreenTitle}
@@ -3590,6 +3652,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 onChangeReasoningEffort={(value) => {
                   void updateActiveReasoningEffort(value);
                 }}
+                onChangeUnsafeMode={(value) => {
+                  void updateActiveUnsafeMode(value);
+                }}
                 onChatScroll={handleDesktopChatScroll}
                 onSelectTask={(task) => {
                   void runSelectedTask(task);
@@ -3606,6 +3671,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 selectedWorktreePath={activeSelectedWorktreePath}
                 taskControlError={taskControlError}
                 taskSelectorDisabled={taskSelectorDisabled}
+                unsafeModeControlError={unsafeModeControlError}
+                unsafeModeToggleDisabled={unsafeModeToggleDisabled}
               />
             ) : (
               <div className="flex min-h-0 flex-1 px-6 py-6">
@@ -3759,6 +3826,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             <MobileChatView
               activeCodexModel={activeCodexModel}
               activeReasoningEffort={activeReasoningEffort}
+              activeUnsafeMode={activeUnsafeMode}
               activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
               activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
               activeScreenTitle={activeScreenTitle}
@@ -3781,6 +3849,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
               onChangeReasoningEffort={(value) => {
                 void updateActiveReasoningEffort(value);
               }}
+              onChangeUnsafeMode={(value) => {
+                void updateActiveUnsafeMode(value);
+              }}
               onChatScroll={handleMobileChatScroll}
               onSelectTask={(task) => {
                 void runSelectedTask(task);
@@ -3795,6 +3866,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
               selectedWorktreePath={activeSelectedWorktreePath}
               taskControlError={taskControlError}
               taskSelectorDisabled={taskSelectorDisabled}
+              unsafeModeControlError={unsafeModeControlError}
+              unsafeModeToggleDisabled={unsafeModeToggleDisabled}
             />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-4 pt-6">

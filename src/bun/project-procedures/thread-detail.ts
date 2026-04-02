@@ -138,6 +138,7 @@ export function toRpcThread(
     reasoningEffort: normalizeStoredCodexReasoningEffort(
       thread.reasoningEffort,
     ),
+    unsafeMode: thread.unsafeMode === 1,
     usage: threadUsageFromRecord(thread),
     compaction: threadCompactionFromRecord(thread),
     runStatus: threadRunStatusFromRecord(thread, activeStatus),
