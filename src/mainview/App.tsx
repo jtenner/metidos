@@ -89,6 +89,7 @@ import {
   writeLruValue,
   writePersistedMainviewState,
 } from "./app/state";
+import { TasksWorkspace } from "./app/tasks-workspace";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useThreadPreviews } from "./app/use-thread-previews";
@@ -104,7 +105,7 @@ type AppProps = {
 };
 
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
-type PrimaryView = "chat" | "diff";
+type PrimaryView = "chat" | "diff" | "tasks";
 
 function isScrolledToBottom(container: HTMLDivElement): boolean {
   return (
@@ -3558,7 +3559,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
               </button>
               <button
                 type="button"
-                className="font-label text-xs uppercase tracking-wider text-[#adabaa] hover:text-[#f2f0ef] transition-colors duration-200"
+                className={`font-label text-xs uppercase tracking-wider pb-1 transition-colors duration-200 ${
+                  primaryView === "tasks"
+                    ? "border-b-2 border-[#7eadce] text-[#bdd5e6]"
+                    : "text-[#adabaa] hover:text-[#f2f0ef]"
+                }`}
+                onClick={() => {
+                  setPrimaryView("tasks");
+                }}
               >
                 Tasks
               </button>
@@ -3753,7 +3761,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 unsafeModeControlError={unsafeModeControlError}
                 unsafeModeToggleDisabled={unsafeModeToggleDisabled}
               />
-            ) : (
+            ) : primaryView === "diff" ? (
               <div className="flex min-h-0 flex-1 px-6 py-6">
                 <DiffWorkspace
                   activeSelectedWorktreeFolder={activeSelectedWorktreeFolder}
@@ -3781,6 +3789,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
                   worktreeDiffError={worktreeDiffError}
                 />
               </div>
+            ) : (
+              <TasksWorkspace
+                activeSelectedWorktreeOpened={activeSelectedWorktreeOpened}
+                activeSelectedWorktreePath={activeSelectedWorktreePath}
+                homeDirectory={homeDirectory}
+                isLoadingProjectTasks={isLoadingProjectTasks}
+                onRunTask={(task) => {
+                  void runSelectedTask(task);
+                }}
+                runDisabled={taskSelectorDisabled}
+                selectedProject={selectedProject}
+                supportsTildePath={supportsTildePath}
+                taskControlError={taskControlError}
+                tasks={projectTasks}
+                variant="desktop"
+              />
             )}
           </section>
         </main>
@@ -3948,7 +3972,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
               unsafeModeControlError={unsafeModeControlError}
               unsafeModeToggleDisabled={unsafeModeToggleDisabled}
             />
-          ) : (
+          ) : primaryView === "diff" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 pt-6">
               <DiffWorkspace
                 activeSelectedWorktreeFolder={activeSelectedWorktreeFolder}
@@ -3976,6 +4000,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 worktreeDiffError={worktreeDiffError}
               />
             </div>
+          ) : (
+            <TasksWorkspace
+              activeSelectedWorktreeOpened={activeSelectedWorktreeOpened}
+              activeSelectedWorktreePath={activeSelectedWorktreePath}
+              homeDirectory={homeDirectory}
+              isLoadingProjectTasks={isLoadingProjectTasks}
+              onRunTask={(task) => {
+                void runSelectedTask(task);
+              }}
+              runDisabled={taskSelectorDisabled}
+              selectedProject={selectedProject}
+              supportsTildePath={supportsTildePath}
+              taskControlError={taskControlError}
+              tasks={projectTasks}
+              variant="mobile"
+            />
           )}
         </main>
 
@@ -3985,16 +4025,42 @@ export default function App({ procedures }: AppProps): JSX.Element {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             </div>
           </div>
-          <nav className="bg-[#0e0e0e] flex justify-around items-center h-16">
-            <div className="flex flex-col items-center justify-center text-[#adabaa] pt-2 hover:text-[#f2f0ef] transition-colors">
-              {materialSymbol("code", "pt-1")}
-              <span className="font-label text-[10px] uppercase tracking-widest mt-1">
-                File
-              </span>
-            </div>
+          <nav className="grid h-16 grid-cols-3 items-center bg-[#0e0e0e]">
             <button
               type="button"
-              className={`flex flex-col items-center justify-center pt-2 transition-colors ${
+              className={`flex h-full flex-col items-center justify-center pt-2 transition-colors ${
+                primaryView === "tasks"
+                  ? "border-t-2 border-[#bdd5e6] font-bold text-[#bdd5e6]"
+                  : "text-[#adabaa] hover:text-[#f2f0ef]"
+              }`}
+              onClick={() => {
+                setPrimaryView("tasks");
+              }}
+            >
+              {materialSymbol("checklist")}
+              <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
+                Tasks
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`flex h-full flex-col items-center justify-center pt-2 transition-colors ${
+                primaryView === "diff"
+                  ? "border-t-2 border-[#bdd5e6] font-bold text-[#bdd5e6]"
+                  : "text-[#adabaa] hover:text-[#f2f0ef]"
+              }`}
+              onClick={() => {
+                setPrimaryView("diff");
+              }}
+            >
+              {materialSymbol("difference")}
+              <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
+                Diff
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`flex h-full flex-col items-center justify-center pt-2 transition-colors ${
                 primaryView === "chat"
                   ? "text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6]"
                   : "text-[#adabaa] hover:text-[#f2f0ef]"
@@ -4004,32 +4070,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
               }}
             >
               {brandBoltIcon("text-sm")}
-              <span className="font-label text-[10px] uppercase tracking-widest mt-1">
-                AI Chat
+              <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
+                Chat
               </span>
             </button>
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center pt-2 transition-colors ${
-                primaryView === "diff"
-                  ? "text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6]"
-                  : "text-[#adabaa] hover:text-[#f2f0ef]"
-              }`}
-              onClick={() => {
-                setPrimaryView("diff");
-              }}
-            >
-              {materialSymbol("difference")}
-              <span className="font-label text-[10px] uppercase tracking-widest mt-1">
-                Diff
-              </span>
-            </button>
-            <div className="flex flex-col items-center justify-center text-[#adabaa] pt-2 hover:text-[#f2f0ef] transition-colors">
-              {materialSymbol("checklist")}
-              <span className="font-label text-[10px] uppercase tracking-widest mt-1">
-                Tasks
-              </span>
-            </div>
           </nav>
         </div>
       </div>

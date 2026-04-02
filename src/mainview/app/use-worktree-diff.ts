@@ -19,7 +19,7 @@ type UseWorktreeDiffParams = {
   activeSelectedWorktreePath: string | null;
   activeWorktreeChanges: RpcWorktreeChange[];
   isDocumentVisible: boolean;
-  primaryView: "chat" | "diff";
+  primaryView: "chat" | "diff" | "tasks";
   procedures: ProjectProcedures;
   selectedDiffFileChange: RpcWorktreeChange | null;
   selectedDiffFilePath: string | null;
