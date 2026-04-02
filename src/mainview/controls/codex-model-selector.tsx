@@ -256,9 +256,7 @@ export function CodexModelSelector({
                                 : "text-[#ebf3f8] hover:bg-[#1e2428]"
                           }`}
                           onClick={() => {
-                            setExpandedModelId((current) =>
-                              current === model.id ? null : model.id,
-                            );
+                            setExpandedModelId(model.id);
                           }}
                           onFocus={() => {
                             setExpandedModelId(model.id);
