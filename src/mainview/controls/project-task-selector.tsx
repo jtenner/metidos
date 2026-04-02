@@ -50,8 +50,8 @@ export function ProjectTaskSelector({
                   ? "h-7 gap-1.5 bg-[#191a1a] px-2.5"
                   : "h-7 gap-1.5 bg-[#191a1a] px-2.5 hover:bg-[#262626]"
                 : unavailable
-                  ? "h-10 w-full justify-between border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                  : "h-10 w-full justify-between border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+                  ? "h-10 w-full border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                  : "h-10 w-full border border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
             } ${unavailable ? "cursor-not-allowed opacity-60" : ""}`}
             onClick={toggle}
             disabled={disabled || loading}
