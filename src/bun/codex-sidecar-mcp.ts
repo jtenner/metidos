@@ -496,10 +496,10 @@ const server = new McpServer({
 });
 
 server.registerTool(
-  "set_thread_title",
+  "modify_thread",
   {
-    title: "Set Thread Title",
-    description: `Update the Jolt thread title. Always use this tool for every thread, including quick one-off tasks, so each thread receives a title even if it is only set once. Use it again whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
+    title: "Modify Thread",
+    description: `Update Jolt thread metadata. Always use this tool for every thread, including quick one-off tasks, so each thread receives a title even if it is only set once. Use it again whenever a short title would better match the focus or make the thread easier to scan. Prefer concise titles.${boundThreadSentence()}`,
     inputSchema: {
       title: z
         .string()
@@ -535,11 +535,11 @@ server.registerTool(
 );
 
 server.registerTool(
-  "new_codex",
+  "new_thread",
   {
-    title: "New Codex",
+    title: "New Thread",
     description:
-      "Start a separate Jolt Codex thread. Use sparingly for distinct work or a different worktree.",
+      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree.",
     inputSchema: {
       input: z.string().trim().min(1).describe("Initial prompt."),
       projectId: z
@@ -604,119 +604,6 @@ server.registerTool(
     const payload = threadStatusPayload(started);
     return textResult(
       `Started thread ${payload.threadId} (${payload.status}).`,
-      payload,
-    );
-  },
-);
-
-server.registerTool(
-  "new_worktree",
-  {
-    title: "New Worktree",
-    description:
-      "Create a Jolt worktree. Use sparingly; this creates a branch and worktree.",
-    inputSchema: {
-      name: z.string().trim().min(1).describe("Branch/worktree name."),
-      projectId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(defaultProjectIdDescription()),
-      projectPath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Jolt project path."),
-    },
-    annotations: {
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  async ({ name, projectId, projectPath }) => {
-    const resolvedProjectId = await resolveProjectId({
-      projectId,
-      projectPath,
-    });
-    const result = await rpcClient.call("createWorktree", {
-      projectId: resolvedProjectId,
-      name,
-    });
-    return textResult(`Created worktree ${result.worktreePath}.`, {
-      projectId: result.project.id,
-      projectPath: result.project.path,
-      worktreePath: result.worktreePath,
-    });
-  },
-);
-
-server.registerTool(
-  "set_active_worktree",
-  {
-    title: "Set Active Worktree",
-    description:
-      "Set the active Jolt worktree. Use sparingly when work clearly moves.",
-    inputSchema: {
-      projectId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(defaultProjectIdDescription()),
-      projectPath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Jolt project path."),
-      worktreePath: z.string().trim().min(1).describe("Worktree path."),
-    },
-    // Treat active worktree changes as safe UI metadata, not destructive work.
-    annotations: safeMetadataAnnotations(),
-  },
-  async ({ projectId, projectPath, worktreePath }) => {
-    const target = await resolveWorktreeTarget({
-      projectId,
-      projectPath,
-      worktreePath,
-    });
-    await rpcClient.call("setActiveWorktree", {
-      projectId: target.projectId,
-      worktreePath: target.worktreePath,
-    });
-    return textResult("Set active worktree.", target);
-  },
-);
-
-server.registerTool(
-  "thread_status",
-  {
-    title: "Thread Status",
-    description: `Get a Jolt thread status: Created, Turning, Stopped, or Errored.${boundThreadSentence()}`,
-    inputSchema: {
-      threadId: z
-        .number()
-        .int()
-        .positive()
-        .describe(explicitThreadIdDescription()),
-    },
-    annotations: {
-      idempotentHint: true,
-      openWorldHint: false,
-      readOnlyHint: true,
-    },
-  },
-  async ({ threadId }) => {
-    const detail = await rpcClient.call("getThread", {
-      threadId: requireThreadId(threadId),
-    });
-    const payload = threadStatusPayload(detail);
-    return textResult(
-      `Thread ${payload.threadId}: ${payload.status}.`,
       payload,
     );
   },
