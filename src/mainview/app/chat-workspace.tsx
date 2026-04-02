@@ -1,9 +1,13 @@
 import {
+  type CSSProperties,
   type FormEvent,
   type JSX,
   type RefObject,
   type UIEvent,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
 } from "react";
 import type {
   RpcCodexModelOption,
@@ -258,30 +262,39 @@ function ChatTranscript({
         if (group.kind === "assistant") {
           return (
             <div
-              className="flex max-w-full flex-col items-start gap-3"
+              className="flex w-full max-w-full flex-col items-start gap-1.5"
               key={group.key}
             >
-              <div className="flex items-center gap-2 px-1 text-[#bdd5e6]">
+              <div className="flex items-center gap-2 px-[2px] text-[#bdd5e6]">
                 {brandBoltIcon("text-sm")}
                 <span className="text-[10px] font-label font-bold uppercase tracking-wider">
                   {APP_TITLE}
                 </span>
               </div>
-              <div className="flex w-full flex-col gap-3">
-                {group.messages.map(({ message, index }) => (
-                  <div
-                    className={`w-full ${
-                      isPlainAssistantTextMessage(message) ? "py-3" : ""
-                    }`}
-                    key={`${message.kind}-${index}`}
-                  >
-                    <div className="glass-panel flex w-full flex-col gap-4 border border-[#bdd5e6]/10 p-5">
-                      <div className="text-sm leading-relaxed text-[#ffffff]">
-                        {renderAssistantMessageContent(message)}
+              <div
+                className="flex w-full flex-col"
+                style={{ gap: `${MOBILE_CHAT_ITEM_GAP_PX}px` }}
+              >
+                {group.messages.map(({ message, index }) => {
+                  if (isPlainAssistantTextMessage(message)) {
+                    return (
+                      <div
+                        className="w-full bg-[#262a2d] px-[10px] py-[10px]"
+                        key={`${message.kind}-${index}`}
+                      >
+                        <div className="text-sm leading-relaxed text-[#ffffff]">
+                          {renderAssistantMessageContent(message)}
+                        </div>
                       </div>
+                    );
+                  }
+
+                  return (
+                    <div className="w-full" key={`${message.kind}-${index}`}>
+                      {renderAssistantMessageContent(message)}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -289,16 +302,16 @@ function ChatTranscript({
 
         return (
           <div
-            className="flex max-w-[90%] self-end flex-col items-end gap-2"
+            className="flex max-w-[92%] self-end flex-col items-end gap-1.5"
             key={group.key}
           >
-            <div className="flex items-center gap-2 px-1 text-[#b7b3b1]">
+            <div className="flex items-center gap-2 px-[2px] text-[#b7b3b1]">
               <span className="font-body text-[13px] font-semibold tracking-[0.01em]">
                 {localUserLabel}
               </span>
               {materialSymbol("account_circle", "text-sm text-[#9f9b99]")}
             </div>
-            <div className="bg-[#1f2020] p-4 text-sm leading-relaxed text-[#ffffff] shadow-sm">
+            <div className="w-fit max-w-full bg-[#30353a] px-[10px] py-[10px] text-sm leading-relaxed text-[#ffffff] shadow-sm">
               <MarkdownMessage text={group.text} />
             </div>
           </div>
@@ -479,6 +492,14 @@ type MobileChatViewProps = SharedChatControlsProps & {
   selectedWorktreePath: string | null;
 };
 
+const MOBILE_CHAT_COMPOSER_GAP_PX = 24;
+const MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX = 224;
+const MOBILE_CHAT_ITEM_GAP_PX = 10;
+const MOBILE_CHAT_SIDE_INSET_PX = 10;
+const MOBILE_CHAT_PARENT_SIDE_PADDING_PX = 16;
+const MOBILE_CHAT_SIDE_BLEED_PX =
+  MOBILE_CHAT_PARENT_SIDE_PADDING_PX - MOBILE_CHAT_SIDE_INSET_PX;
+
 export function MobileChatView({
   activeCodexModel,
   activeReasoningEffort,
@@ -517,6 +538,51 @@ export function MobileChatView({
   unsafeModeToggleDisabled,
   messages,
 }: MobileChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
+  const footerRef = useRef<HTMLElement | null>(null);
+  const [composerInsetPx, setComposerInsetPx] = useState(
+    MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX,
+  );
+
+  useEffect(() => {
+    const footer = footerRef.current;
+    if (!footer) {
+      return;
+    }
+
+    const updateComposerInset = (): void => {
+      setComposerInsetPx(
+        Math.max(
+          MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX,
+          Math.ceil(footer.getBoundingClientRect().height) +
+            MOBILE_CHAT_COMPOSER_GAP_PX,
+        ),
+      );
+    };
+
+    updateComposerInset();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateComposerInset();
+    });
+    resizeObserver.observe(footer);
+    window.addEventListener("resize", updateComposerInset);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateComposerInset);
+    };
+  }, []);
+
+  const chatScrollStyle: CSSProperties = {
+    marginLeft: `-${MOBILE_CHAT_SIDE_BLEED_PX}px`,
+    marginRight: `-${MOBILE_CHAT_SIDE_BLEED_PX}px`,
+    paddingLeft: `${MOBILE_CHAT_SIDE_INSET_PX}px`,
+    paddingRight: `${MOBILE_CHAT_SIDE_INSET_PX}px`,
+    paddingTop: `${MOBILE_CHAT_ITEM_GAP_PX}px`,
+    paddingBottom: `${composerInsetPx}px`,
+    scrollPaddingBottom: `${composerInsetPx}px`,
+  };
+
   return (
     <>
       <div className="mt-6 shrink-0">
@@ -533,8 +599,9 @@ export function MobileChatView({
       </div>
       <div
         ref={chatScrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto pb-40 hide-scrollbar"
+        className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto hide-scrollbar"
         onScroll={onChatScroll}
+        style={chatScrollStyle}
       >
         <ChatTranscript
           localUserLabel={localUserLabel}
@@ -545,7 +612,8 @@ export function MobileChatView({
       </div>
       <footer
         aria-label="Chat composer"
-        className="fixed bottom-16 left-0 right-0 z-40 px-4 pb-4"
+        className="fixed bottom-16 left-0 right-0 z-40 px-[10px] pb-[10px]"
+        ref={footerRef}
       >
         <form
           className="mx-auto flex max-w-2xl flex-col gap-3"
