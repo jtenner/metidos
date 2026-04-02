@@ -3206,6 +3206,38 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
+  useEffect(() => {
+    if (
+      !selectedThread ||
+      !selectedProject ||
+      selectedProject.id !== selectedThread.projectId ||
+      selectedProject.isOpen !== 1 ||
+      !activeSelectedWorktreePath ||
+      activeSelectedWorktreePath !== selectedThread.worktreePath
+    ) {
+      return;
+    }
+
+    const target = getWorktreeState(
+      selectedThread.projectId,
+      selectedThread.worktreePath,
+    );
+    if (target.loading || target.opened) {
+      return;
+    }
+
+    void ensureWorktreeOpen(
+      selectedThread.projectId,
+      selectedThread.worktreePath,
+    );
+  }, [
+    activeSelectedWorktreePath,
+    ensureWorktreeOpen,
+    getWorktreeState,
+    selectedProject,
+    selectedThread,
+  ]);
+
   const postMessage = useCallback(() => {
     const text = readChatComposerDraft(initialMainviewState.chatInput).trim();
     if (!text || isSending || selectedThreadIsWorking) {
