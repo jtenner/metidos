@@ -15,6 +15,7 @@ export type AppIconName =
   | "expand_less"
   | "expand_more"
   | "folder"
+  | "folder_open"
   | "history"
   | "menu"
   | "person"
@@ -120,6 +121,14 @@ function renderIconGlyph(
         <>
           <path d="M3.5 8.5h5l1.75-2h10.25v11H3.5z" />
           <path d="M3.5 8.5v-1A2.5 2.5 0 0 1 6 5h3" />
+        </>
+      );
+    case "folder_open":
+      return (
+        <>
+          <path d="M3.5 9.5h6.25l1.75-2H20.5" />
+          <path d="M4.75 9.5h15L17.75 19h-15z" />
+          <path d="M4.75 9.5V8A2.5 2.5 0 0 1 7.25 5.5h2.5" />
         </>
       );
     case "history":

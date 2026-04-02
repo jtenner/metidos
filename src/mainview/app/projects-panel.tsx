@@ -329,7 +329,10 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                 : "bg-[#151a1c] text-[#8ca6b9]"
                             }`}
                           >
-                            {materialSymbol("folder", "text-[16px]")}
+                            {materialSymbol(
+                              showWorktrees ? "folder_open" : "folder",
+                              "text-[16px]",
+                            )}
                           </span>
                           <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
                             {project.name}
@@ -446,7 +449,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                           }`}
                                         >
                                           {materialSymbol(
-                                            "folder",
+                                            activeWorktree
+                                              ? "folder_open"
+                                              : "folder",
                                             "text-[14px]",
                                           )}
                                         </span>
