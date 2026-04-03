@@ -69,6 +69,9 @@ type SharedChatControlsProps = {
   codexModels: RpcCodexModelOption[];
 };
 
+/**
+ * Shared props for both desktop and mobile chat views.
+ */
 type TranscriptProps = {
   activeThreadId: number | null;
   expandedItemIds: ReadonlySet<string>;
@@ -83,8 +86,12 @@ type TranscriptProps = {
   variant: "desktop" | "mobile";
 };
 
+/** Renders the content portion for a single assistant-visible message. */
 type AssistantMessageRenderer = (message: VisibleMessage) => JSX.Element;
 
+/**
+ * Properties needed to render one grouped row in the transcript.
+ */
 type GroupRowProps = {
   group: MessageGroup;
   isLast: boolean;
@@ -92,6 +99,9 @@ type GroupRowProps = {
   renderAssistantMessageContent: AssistantMessageRenderer;
 };
 
+/**
+ * Props for the unsafe mode toggle control.
+ */
 type UnsafeModeToggleProps = {
   checked: boolean;
   disabled: boolean;
@@ -107,6 +117,10 @@ const DESKTOP_CHAT_TRANSCRIPT_OVERSCAN = 6;
 const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
 const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
 
+/**
+ * Group assistant-visible messages into adjacent assistant-only rows to render as
+ * conversational turns; user messages stay as one-row entries.
+ */
 function groupVisibleMessages(messages: VisibleMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
 
@@ -141,6 +155,7 @@ function UnsafeModeToggle({
   onChange,
   variant,
 }: UnsafeModeToggleProps): JSX.Element {
+  // Compact mode reduces horizontal space on narrow viewports and keeps controls readable.
   const compact = variant === "mobile";
   return (
     <label
@@ -174,6 +189,7 @@ function DesktopTranscriptGroupRow({
   localUserLabel,
   renderAssistantMessageContent,
 }: GroupRowProps): JSX.Element {
+  // Desktop rows separate assistant and user turns into distinct alignment/typography paths.
   return (
     <div
       className="mx-auto w-full max-w-4xl min-w-0"
@@ -231,6 +247,7 @@ function MobileTranscriptGroupRow({
   localUserLabel,
   renderAssistantMessageContent,
 }: GroupRowProps): JSX.Element {
+  // Mobile keeps cards narrower with larger spacing tuned for touch and small screens.
   return (
     <div
       className="w-full"
@@ -302,6 +319,11 @@ const ChatTranscript = memo(function ChatTranscript({
   topContent = null,
   variant,
 }: TranscriptProps): JSX.Element {
+  /**
+   * Manages virtualized transcript rendering with optional header content while
+   * keeping scroll-position and grouping logic local to the message stream.
+   */
+  // Memoize grouped rows so expensive message mapping is not repeated across renders.
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
   const previousThreadIdRef = useRef<number | null>(activeThreadId);
@@ -379,6 +401,7 @@ const ChatTranscript = memo(function ChatTranscript({
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: rowCount,
     estimateSize: (index) => {
+      // Keep top content and row estimates separate because header height differs from messages.
       if (hasTopContent && index === 0) {
         return 140;
       }
@@ -387,6 +410,7 @@ const ChatTranscript = memo(function ChatTranscript({
         : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX;
     },
     getItemKey: (index) => {
+      // Row 0 may be header; otherwise map to groupedMessages with offset.
       if (hasTopContent && index === 0) {
         return `chat-header:${activeThreadId ?? "none"}`;
       }
@@ -410,6 +434,8 @@ const ChatTranscript = memo(function ChatTranscript({
 
   const updatePinnedToBottom = useCallback(
     (container: HTMLDivElement): void => {
+      // Update auto-scroll state only when transcript is near bottom; avoids fighting
+      // manual user scrolling while new messages stream in.
       pinnedToBottomRef.current =
         container.scrollHeight - container.scrollTop - container.clientHeight <=
         CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
@@ -429,6 +455,7 @@ const ChatTranscript = memo(function ChatTranscript({
 
   useLayoutEffect(() => {
     void totalSize;
+    // On thread change, force pin-to-bottom behavior so new thread opens scrolled to latest.
     const threadChanged = previousThreadIdRef.current !== activeThreadId;
     if (threadChanged) {
       pinnedToBottomRef.current = true;
@@ -476,6 +503,7 @@ const ChatTranscript = memo(function ChatTranscript({
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
+              {/* Map virtual rows either to header content or assistant/user group component. */}
               {isHeaderRow ? (
                 topContent
               ) : group ? (
@@ -520,6 +548,9 @@ type DesktopChatViewProps = SharedChatControlsProps & {
   selectedThreadIsWorking: boolean;
 };
 
+/**
+ * Main desktop chat experience: transcript, model/reasoning/task controls, and composer.
+ */
 export function DesktopChatView({
   activeCodexModel,
   activeContextInputTokens,
@@ -560,6 +591,7 @@ export function DesktopChatView({
   unsafeModeControlError,
   unsafeModeToggleDisabled,
 }: DesktopChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
+  // Header is passed as topContent into virtualized transcript for stable positioning.
   const headerContent = (
     <div className="mx-auto w-full max-w-4xl pb-12">
       <h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
@@ -679,14 +711,24 @@ type MobileChatViewProps = SharedChatControlsProps & {
   selectedThreadIsWorking: boolean;
 };
 
+/**
+ * Mobile chat view with a fixed composer footer and dynamic bottom inset handling.
+ */
+
 const MOBILE_CHAT_COMPOSER_GAP_PX = 34;
 const MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX = 224;
 const MOBILE_CHAT_ITEM_GAP_PX = 10;
+/**
+ * Inset constants that counterbalance left/right frame bleed in mobile layouts.
+ */
 const MOBILE_CHAT_SIDE_INSET_PX = 10;
 const MOBILE_CHAT_PARENT_SIDE_PADDING_PX = 16;
 const MOBILE_CHAT_SIDE_BLEED_PX =
   MOBILE_CHAT_PARENT_SIDE_PADDING_PX - MOBILE_CHAT_SIDE_INSET_PX;
 
+/**
+ * Shared state/actions differ from desktop only in spacing and control layout.
+ */
 export function MobileChatView({
   activeCodexModel,
   activeReasoningEffort,
@@ -746,6 +788,9 @@ export function MobileChatView({
       );
     };
 
+    // Track composer height directly from DOM so transcript avoids overlapping controls.
+    // This keeps input always visible when soft keyboard/keyboard-safe areas change.
+
     updateComposerInset();
 
     const resizeObserver = new ResizeObserver(() => {
@@ -761,6 +806,7 @@ export function MobileChatView({
   }, []);
 
   const chatScrollStyle: CSSProperties = {
+    // Apply mirrored side bleed so content stretches edge-to-edge on narrow screens.
     marginLeft: `-${MOBILE_CHAT_SIDE_BLEED_PX}px`,
     marginRight: `-${MOBILE_CHAT_SIDE_BLEED_PX}px`,
     paddingLeft: `${MOBILE_CHAT_SIDE_INSET_PX}px`,

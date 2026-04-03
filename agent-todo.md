@@ -2,7 +2,6 @@
 
 ## Code file tasks
 
-- [ ] Add comments to file `src/mainview/app/chat-workspace.tsx`.
 - [ ] Add comments to file `src/mainview/app/desktop-sidebar.tsx`.
 - [ ] Add comments to file `src/mainview/app/diff-workspace.tsx`.
 - [ ] Add comments to file `src/mainview/app/git-history-panel.tsx`.
