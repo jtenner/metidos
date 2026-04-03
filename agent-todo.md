@@ -4,7 +4,6 @@
 
 ## Folder tasks
 
-- [ ] Add a README.md for folder `.` (repository root).
 - [ ] Add a README.md for folder `src`.
 - [ ] Add a README.md for folder `src/bun`.
 - [ ] Add a README.md for folder `src/bun/project-procedures`.

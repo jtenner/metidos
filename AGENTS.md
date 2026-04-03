@@ -13,6 +13,7 @@
 │  └─ research.md
 ├─ .git
 ├─ .gitignore
+├─ README.md
 ├─ AGENTS.md
 ├─ agent-todo.md
 ├─ biome.json
