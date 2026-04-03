@@ -2,6 +2,18 @@ import { readdirSync, realpathSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 
+import {
+  AuthServiceError,
+  buildClearedSessionCookieHeader,
+  buildSessionCookieHeader,
+  getAuthStatus,
+  issueWebSocketTicket,
+  login,
+  logout,
+  prepareTotpEnrollment,
+  readSessionCookie,
+  setupAuth,
+} from "./auth-service";
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
 import { initAppDatabase } from "./db";
 import { getGitSchedulerStats } from "./git";
@@ -93,6 +105,7 @@ const SERVER_MONITOR_INTERVAL_MS = 1_000;
 const SERVER_OVERLOAD_LOG_INTERVAL_MS = 10_000;
 const EVENT_LOOP_LAG_WARN_MS = 150;
 const PENDING_RPC_WARN_COUNT = 8;
+const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -322,6 +335,20 @@ function stringResponse(body: string, contentType: string): Response {
   });
 }
 
+function jsonResponse(
+  value: unknown,
+  status = 200,
+  headers?: HeadersInit,
+): Response {
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("cache-control", "no-store");
+  responseHeaders.set("content-type", JSON_CONTENT_TYPE);
+  return new Response(JSON.stringify(value), {
+    headers: responseHeaders,
+    status,
+  });
+}
+
 /**
  * Build a file-backed HTTP response with explicit no-cache header.
  */
@@ -332,6 +359,359 @@ function fileResponse(path: string, contentType: string): Response {
       "cache-control": "no-store",
     },
   });
+}
+
+function currentNowMs(): number {
+  return Date.now();
+}
+
+class RequestValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RequestValidationError";
+  }
+}
+
+function isSecureRequest(request: Request): boolean {
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  if (forwardedProto === "https") {
+    return true;
+  }
+  if (forwardedProto === "http") {
+    return false;
+  }
+  return new URL(request.url).protocol === "https:";
+}
+
+function sessionCookieMaxAgeSeconds(expiresAt: string, nowMs: number): number {
+  return Math.max(0, Math.floor((Date.parse(expiresAt) - nowMs) / 1000));
+}
+
+async function readJsonBody(
+  request: Request,
+): Promise<Record<string, unknown>> {
+  const rawBody = await request.text();
+  if (!rawBody.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody) as unknown;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new RequestValidationError("JSON request bodies must be objects.");
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new RequestValidationError(
+      error instanceof Error ? error.message : "Invalid JSON request body.",
+    );
+  }
+}
+
+function readRequiredString(
+  body: Record<string, unknown>,
+  fieldName: string,
+): string {
+  const value = body[fieldName];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new RequestValidationError(
+      `Expected "${fieldName}" to be a non-empty string.`,
+    );
+  }
+  return value;
+}
+
+function readOptionalString(
+  body: Record<string, unknown>,
+  fieldName: string,
+): string | undefined {
+  const value = body[fieldName];
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new RequestValidationError(`Expected "${fieldName}" to be a string.`);
+  }
+  return value;
+}
+
+function readOptionalInteger(
+  body: Record<string, unknown>,
+  fieldName: string,
+): number | undefined {
+  const value = body[fieldName];
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+  if (!Number.isInteger(value)) {
+    throw new RequestValidationError(
+      `Expected "${fieldName}" to be an integer.`,
+    );
+  }
+  return value;
+}
+
+function readOptionalSessionLifetimeDays(
+  body: Record<string, unknown>,
+): number | undefined {
+  const value = readOptionalInteger(body, "sessionLifetimeDays");
+  if (typeof value === "undefined") {
+    return undefined;
+  }
+  if (value < 1 || value > 30) {
+    throw new RequestValidationError(
+      'Expected "sessionLifetimeDays" to be between 1 and 30.',
+    );
+  }
+  return value;
+}
+
+function readPrimaryFactorType(
+  body: Record<string, unknown>,
+): "pin" | "password" {
+  const value = body.primaryFactorType;
+  if (value !== "pin" && value !== "password") {
+    throw new RequestValidationError(
+      'Expected "primaryFactorType" to be either "pin" or "password".',
+    );
+  }
+  return value;
+}
+
+function authErrorResponse(
+  request: Request,
+  error: unknown,
+  options?: {
+    clearSessionCookie?: boolean;
+  },
+): Response {
+  const headers = new Headers();
+  if (options?.clearSessionCookie) {
+    headers.set(
+      "set-cookie",
+      buildClearedSessionCookieHeader(isSecureRequest(request)),
+    );
+  }
+
+  if (error instanceof AuthServiceError) {
+    return jsonResponse(
+      {
+        error: {
+          code: error.code,
+          details: error.details ?? null,
+          message: error.message,
+        },
+        ok: false,
+      },
+      error.status,
+      headers,
+    );
+  }
+
+  if (error instanceof RequestValidationError) {
+    return jsonResponse(
+      {
+        error: {
+          code: "invalid_request",
+          details: null,
+          message: error.message,
+        },
+        ok: false,
+      },
+      400,
+      headers,
+    );
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  console.error("Unhandled auth route failure", error);
+  return jsonResponse(
+    {
+      error: {
+        code: "internal_error",
+        details: null,
+        message:
+          message.trim() || "The auth backend encountered an unexpected error.",
+      },
+      ok: false,
+    },
+    500,
+    headers,
+  );
+}
+
+async function handleAuthRequest(request: Request): Promise<Response | null> {
+  const { pathname } = new URL(request.url);
+  if (!pathname.startsWith("/auth/")) {
+    return null;
+  }
+
+  const database = initAppDatabase();
+  const secureCookie = isSecureRequest(request);
+  const sessionId = readSessionCookie(request.headers.get("cookie"));
+  const nowMs = currentNowMs();
+
+  try {
+    if (pathname === "/auth/status" && request.method === "GET") {
+      const status = getAuthStatus(database, sessionId, {
+        nowMs,
+      });
+      return jsonResponse(
+        {
+          ok: true,
+          status,
+        },
+        200,
+        sessionId && !status.authenticated
+          ? {
+              "set-cookie": buildClearedSessionCookieHeader(secureCookie),
+            }
+          : undefined,
+      );
+    }
+
+    if (pathname === "/auth/setup/start" && request.method === "POST") {
+      if (getAuthStatus(database, null, { nowMs }).configured) {
+        throw new AuthServiceError(
+          "auth_already_configured",
+          "Authentication has already been configured.",
+          409,
+        );
+      }
+      const body = await readJsonBody(request);
+      const enrollment = prepareTotpEnrollment({
+        accountName: readOptionalString(body, "accountName") || "local-user",
+        issuer: readOptionalString(body, "issuer"),
+      });
+      return jsonResponse({
+        enrollment,
+        ok: true,
+      });
+    }
+
+    if (pathname === "/auth/setup" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const result = await setupAuth(database, {
+        nowMs,
+        primaryFactor: readRequiredString(body, "primaryFactor"),
+        primaryFactorType: readPrimaryFactorType(body),
+        sessionLifetimeDays: readOptionalSessionLifetimeDays(body),
+        totpCode: readRequiredString(body, "totpCode"),
+        totpSecret: readRequiredString(body, "totpSecret"),
+      });
+
+      return jsonResponse(
+        {
+          ok: true,
+          recoveryCodes: result.recoveryCodes,
+          status: getAuthStatus(database, result.session.id, {
+            nowMs,
+          }),
+        },
+        200,
+        {
+          "set-cookie": buildSessionCookieHeader(result.session.id, {
+            maxAgeSeconds: sessionCookieMaxAgeSeconds(
+              result.session.expiresAt,
+              nowMs,
+            ),
+            secure: secureCookie,
+          }),
+        },
+      );
+    }
+
+    if (pathname === "/auth/login" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const result = await login(database, {
+        nowMs,
+        primaryFactor: readRequiredString(body, "primaryFactor"),
+        totpCode: readRequiredString(body, "totpCode"),
+      });
+
+      return jsonResponse(
+        {
+          ok: true,
+          status: getAuthStatus(database, result.session.id, {
+            nowMs,
+          }),
+        },
+        200,
+        {
+          "set-cookie": buildSessionCookieHeader(result.session.id, {
+            maxAgeSeconds: sessionCookieMaxAgeSeconds(
+              result.session.expiresAt,
+              nowMs,
+            ),
+            secure: secureCookie,
+          }),
+        },
+      );
+    }
+
+    if (pathname === "/auth/logout" && request.method === "POST") {
+      logout(database, sessionId);
+      return jsonResponse(
+        {
+          ok: true,
+          status: getAuthStatus(database, null, {
+            nowMs,
+          }),
+        },
+        200,
+        {
+          "set-cookie": buildClearedSessionCookieHeader(secureCookie),
+        },
+      );
+    }
+
+    if (pathname === "/auth/ws-ticket" && request.method === "POST") {
+      if (!sessionId) {
+        throw new AuthServiceError(
+          "session_required",
+          "A valid authenticated session is required.",
+          401,
+        );
+      }
+
+      const ticket = issueWebSocketTicket(database, {
+        nowMs,
+        sessionId,
+      });
+      return jsonResponse({
+        ok: true,
+        ticket,
+      });
+    }
+
+    return jsonResponse(
+      {
+        error: {
+          code: "method_not_allowed",
+          details: null,
+          message: `No auth route is available for ${request.method} ${pathname}.`,
+        },
+        ok: false,
+      },
+      405,
+    );
+  } catch (error) {
+    const clearSessionCookie =
+      error instanceof AuthServiceError &&
+      (error.code === "session_required" ||
+        error.code === "invalid_credentials");
+    return authErrorResponse(request, error, {
+      clearSessionCookie,
+    });
+  }
 }
 
 /**
@@ -1028,6 +1408,11 @@ async function bootstrap(): Promise<void> {
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
+
+      const authResponse = await handleAuthRequest(request);
+      if (authResponse) {
+        return authResponse;
+      }
 
       // Upgrade websocket requests before falling through to HTTP routes.
       if (pathname === "/rpc") {

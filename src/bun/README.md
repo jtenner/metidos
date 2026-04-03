@@ -14,6 +14,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `static-server.ts`
   - Runs the static/public HTTP server for the frontend app when not using the unified mode.
   - Serves bundled frontend assets (`index.html`, `index.js`, `index.css`, fonts) and injects runtime config via `window.__joltRuntime`.
+  - Proxies `/auth/*` requests to the backend so browser auth flows stay same-origin even when the UI and RPC server are split across ports.
   - Includes a minimal `/health` endpoint that reports only liveness and proxies backend readiness without exposing backend internals.
   - Resolves and validates CLI args/env values for public and RPC ports.
 

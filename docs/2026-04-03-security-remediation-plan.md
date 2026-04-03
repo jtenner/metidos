@@ -231,10 +231,11 @@ Work:
 - Add auth tables to `src/bun/db.ts`
 - Add new backend modules:
   - `src/bun/auth.ts`
-  - `src/bun/auth-session.ts`
-  - `src/bun/auth-totp.ts`
+  - `src/bun/auth-secrets.ts`
+  - `src/bun/auth-service.ts`
 - Add HTTP auth routes:
   - `GET /auth/status`
+  - `POST /auth/setup/start`
   - `POST /auth/setup`
   - `POST /auth/login`
   - `POST /auth/logout`

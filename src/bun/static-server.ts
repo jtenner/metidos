@@ -215,6 +215,32 @@ const RPC_WEBSOCKET_URL =
 const BACKEND_HEALTH_URL =
   process.env.JOLT_RPC_HEALTH_URL?.trim() || `${RPC_HTTP_ORIGIN}/health`;
 
+async function proxyBackendAuthRequest(request: Request): Promise<Response> {
+  const requestUrl = new URL(request.url);
+  const targetUrl = new URL(
+    `${requestUrl.pathname}${requestUrl.search}`,
+    RPC_HTTP_ORIGIN,
+  );
+  const headers = new Headers(request.headers);
+  headers.set("x-forwarded-host", requestUrl.host);
+  headers.set("x-forwarded-proto", requestUrl.protocol.replace(":", ""));
+
+  const method = request.method.toUpperCase();
+  const response = await fetch(targetUrl, {
+    body:
+      method === "GET" || method === "HEAD"
+        ? undefined
+        : await request.arrayBuffer(),
+    headers,
+    method,
+  });
+
+  return new Response(response.body, {
+    headers: new Headers(response.headers),
+    status: response.status,
+  });
+}
+
 const mainviewBundlePath = await buildMainviewBundle();
 const runtimeConfig: RuntimeConfig = {
   devServer: false,
@@ -231,6 +257,22 @@ server = Bun.serve({
   async fetch(request): Promise<Response> {
     // Route only what the frontend requires and leave unknown paths as 404.
     const { pathname } = new URL(request.url);
+
+    if (pathname.startsWith("/auth/")) {
+      try {
+        return await proxyBackendAuthRequest(request);
+      } catch (error) {
+        console.error("Failed to proxy auth request to backend", error);
+        return stringResponse(
+          JSON.stringify({
+            error: "Auth backend unavailable.",
+            ok: false,
+          }),
+          "application/json; charset=utf-8",
+          502,
+        );
+      }
+    }
 
     if (pathname === "/" || pathname === "/index.html") {
       return buildHtmlResponse(runtimeConfig);
