@@ -2211,6 +2211,32 @@ export default function App({ procedures }: AppProps): JSX.Element {
       homeDirectoryPrefetchQueryRef.current = startupDirectoryPrefetchQuery;
       void prefetchDirectorySuggestions(startupDirectoryPrefetchQuery);
 
+      const startupWorktreesToOpen = new Map<
+        string,
+        {
+          projectId: number;
+          worktreePath: string;
+        }
+      >();
+      for (const entry of persistedState.openWorktrees) {
+        if (!restoredOpenProjectIds.has(entry.projectId)) {
+          continue;
+        }
+        startupWorktreesToOpen.set(
+          worktreeKey(entry.projectId, entry.worktreePath),
+          entry,
+        );
+      }
+      if (initialThread) {
+        startupWorktreesToOpen.set(
+          worktreeKey(initialThread.projectId, initialThread.worktreePath),
+          {
+            projectId: initialThread.projectId,
+            worktreePath: initialThread.worktreePath,
+          },
+        );
+      }
+
       await Promise.resolve();
 
       const initialThreadOpenPromise = initialThread
@@ -2265,9 +2291,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
       const restoredOpenWorktrees = await procedures.openWorktreesBatch(
         {
-          worktrees: persistedState.openWorktrees.filter(({ projectId }) =>
-            restoredOpenProjectIds.has(projectId),
-          ),
+          worktrees: [...startupWorktreesToOpen.values()],
         },
         {
           priority: "foreground",
@@ -3688,6 +3712,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
 
   useEffect(() => {
+    if (!sessionStateReady) {
+      return;
+    }
     if (
       !selectedThread ||
       !selectedProject ||
@@ -3715,6 +3742,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activeSelectedWorktreePath,
     ensureWorktreeOpen,
     getWorktreeState,
+    sessionStateReady,
     selectedProject,
     selectedThread,
   ]);
