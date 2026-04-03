@@ -6,7 +6,7 @@ import {
   useThreadsPanelOpen,
 } from "./sidebar-panels-state";
 import { APP_TITLE } from "./state";
-import { type SharedThreadListProps, ThreadListRow } from "./thread-list-row";
+import { type SharedThreadListProps, ThreadList } from "./thread-list-row";
 
 type ThreadsPanelProps = SharedThreadListProps & {
   activeSelectedWorktreePath: string | null;
@@ -16,6 +16,7 @@ type ThreadsPanelProps = SharedThreadListProps & {
   onCreateThread: () => void;
   selectedProject: RpcProject | null;
   sidebarActionButtonClass: string;
+  threadPreviewsDisabled: boolean;
   threadsError: string;
 };
 
@@ -24,12 +25,8 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   activeSelectedWorktreePath,
   clearCompletedThreadIndicator,
   dismissThreadStatus,
-  errorPreviewHandlers,
-  errorPreviewPopover,
   filteredVisibleThreads,
   getProjectState,
-  hideErrorPreview,
-  hideThreadSummaryPreview,
   homeDirectory,
   isCreatingThread,
   isThreadStatusDismissed,
@@ -42,9 +39,8 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   selectedThreadId,
   sidebarActionButtonClass,
   supportsTildePath,
+  threadPreviewsDisabled,
   threadActivityIndicator,
-  threadSummaryPopover,
-  threadSummaryPreviewHandlers,
   threadsError,
 }: ThreadsPanelProps) {
   const threadsOpen = useThreadsPanelOpen();
@@ -89,35 +85,25 @@ export const ThreadsPanel = memo(function ThreadsPanel({
                 : `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`}
             </div>
           ) : (
-            filteredVisibleThreads.map((thread) => {
-              return (
-                <ThreadListRow
-                  key={thread.id}
-                  acknowledgeThreadErrorSeenInBackground={
-                    acknowledgeThreadErrorSeenInBackground
-                  }
-                  anchorIdPrefix="threads-thread"
-                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
-                  dismissThreadStatus={dismissThreadStatus}
-                  errorPreviewHandlers={errorPreviewHandlers}
-                  errorPreviewPopover={errorPreviewPopover}
-                  getProjectState={getProjectState}
-                  hideErrorPreview={hideErrorPreview}
-                  hideThreadSummaryPreview={hideThreadSummaryPreview}
-                  homeDirectory={homeDirectory}
-                  isThreadStatusDismissed={isThreadStatusDismissed}
-                  onOpenThread={onOpenThread}
-                  onOpenThreadActionMenu={onOpenThreadActionMenu}
-                  projects={projects}
-                  selectedThreadId={selectedThreadId}
-                  supportsTildePath={supportsTildePath}
-                  thread={thread}
-                  threadActivityIndicator={threadActivityIndicator}
-                  threadSummaryPopover={threadSummaryPopover}
-                  threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
-                />
-              );
-            })
+            <ThreadList
+              acknowledgeThreadErrorSeenInBackground={
+                acknowledgeThreadErrorSeenInBackground
+              }
+              anchorIdPrefix="threads-thread"
+              clearCompletedThreadIndicator={clearCompletedThreadIndicator}
+              dismissThreadStatus={dismissThreadStatus}
+              getProjectState={getProjectState}
+              homeDirectory={homeDirectory}
+              isThreadStatusDismissed={isThreadStatusDismissed}
+              onOpenThread={onOpenThread}
+              onOpenThreadActionMenu={onOpenThreadActionMenu}
+              previewDisabled={threadPreviewsDisabled}
+              projects={projects}
+              selectedThreadId={selectedThreadId}
+              supportsTildePath={supportsTildePath}
+              threadActivityIndicator={threadActivityIndicator}
+              threads={filteredVisibleThreads}
+            />
           )}
           {threadsError ? (
             <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">

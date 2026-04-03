@@ -1,4 +1,4 @@
-import type { HTMLAttributes, JSX } from "react";
+import { type HTMLAttributes, type JSX, memo } from "react";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
@@ -7,22 +7,13 @@ import {
   type ThreadSummaryPopoverState,
   formatPathForDisplay,
 } from "./state";
+import { useThreadPreviews } from "./use-thread-previews";
 
 export type SharedThreadListProps = {
   acknowledgeThreadErrorSeenInBackground: (threadId: number) => void;
   clearCompletedThreadIndicator: (threadId: number) => void;
   dismissThreadStatus: (thread: RpcThread) => void;
-  errorPreviewHandlers: (
-    anchorId: string,
-    text: string | null | undefined,
-  ) => Pick<
-    HTMLAttributes<HTMLElement>,
-    "onBlur" | "onFocus" | "onMouseEnter" | "onMouseLeave"
-  >;
-  errorPreviewPopover: ErrorPreviewPopoverState | null;
   getProjectState: (projectId: number) => ProjectNodeState;
-  hideErrorPreview: () => void;
-  hideThreadSummaryPreview: () => void;
   homeDirectory: string;
   isThreadStatusDismissed: (thread: RpcThread | null) => boolean;
   onOpenThread: (threadId: number) => void;
@@ -33,6 +24,19 @@ export type SharedThreadListProps = {
   threadActivityIndicator: (
     threadId: number,
   ) => "none" | "working" | "completed";
+};
+
+type ThreadListPreviewProps = {
+  errorPreviewHandlers: (
+    anchorId: string,
+    text: string | null | undefined,
+  ) => Pick<
+    HTMLAttributes<HTMLElement>,
+    "onBlur" | "onFocus" | "onMouseEnter" | "onMouseLeave"
+  >;
+  errorPreviewPopover: ErrorPreviewPopoverState | null;
+  hideErrorPreview: () => void;
+  hideThreadSummaryPreview: () => void;
   threadSummaryPopover: ThreadSummaryPopoverState | null;
   threadSummaryPreviewHandlers: (
     anchorId: string,
@@ -44,33 +48,155 @@ export type SharedThreadListProps = {
   >;
 };
 
-type ThreadListRowProps = SharedThreadListProps & {
+type ThreadListRowProps = Omit<
+  SharedThreadListProps,
+  "isThreadStatusDismissed" | "selectedThreadId" | "threadActivityIndicator"
+> &
+  ThreadListPreviewProps & {
+    activityIndicator: "none" | "working" | "completed";
+    anchorIdPrefix?: string;
+    errorPreviewPopoverId: string;
+    isActive: boolean;
+    showLocation?: boolean;
+    thread: RpcThread;
+    threadStatusDismissed: boolean;
+    threadSummaryPopoverId: string;
+  };
+
+type ThreadListProps = SharedThreadListProps & {
   anchorIdPrefix?: string;
+  previewDisabled?: boolean;
   showLocation?: boolean;
-  thread: RpcThread;
+  threads: RpcThread[];
 };
 
-export function ThreadListRow({
+export const ThreadList = memo(function ThreadList({
   acknowledgeThreadErrorSeenInBackground,
+  anchorIdPrefix = "thread",
+  clearCompletedThreadIndicator,
+  dismissThreadStatus,
+  getProjectState,
+  homeDirectory,
+  isThreadStatusDismissed,
+  onOpenThread,
+  onOpenThreadActionMenu,
+  previewDisabled = false,
+  projects,
+  selectedThreadId,
+  showLocation = false,
+  supportsTildePath,
+  threadActivityIndicator,
+  threads,
+}: ThreadListProps): JSX.Element {
+  const errorPreviewPopoverId = `${anchorIdPrefix}-error-popover`;
+  const threadSummaryPopoverId = `${anchorIdPrefix}-summary-popover`;
+  const {
+    errorPreviewHandlers,
+    errorPreviewPopover,
+    hideErrorPreview,
+    hideThreadSummaryPreview,
+    threadSummaryPopover,
+    threadSummaryPreviewHandlers,
+  } = useThreadPreviews({
+    disabled: previewDisabled,
+  });
+
+  return (
+    <>
+      {threads.map((thread) => (
+        <ThreadListRow
+          key={thread.id}
+          acknowledgeThreadErrorSeenInBackground={
+            acknowledgeThreadErrorSeenInBackground
+          }
+          activityIndicator={threadActivityIndicator(thread.id)}
+          anchorIdPrefix={anchorIdPrefix}
+          clearCompletedThreadIndicator={clearCompletedThreadIndicator}
+          dismissThreadStatus={dismissThreadStatus}
+          errorPreviewHandlers={errorPreviewHandlers}
+          errorPreviewPopover={errorPreviewPopover}
+          errorPreviewPopoverId={errorPreviewPopoverId}
+          getProjectState={getProjectState}
+          hideErrorPreview={hideErrorPreview}
+          hideThreadSummaryPreview={hideThreadSummaryPreview}
+          homeDirectory={homeDirectory}
+          isActive={selectedThreadId === thread.id}
+          onOpenThread={onOpenThread}
+          onOpenThreadActionMenu={onOpenThreadActionMenu}
+          projects={projects}
+          showLocation={showLocation}
+          supportsTildePath={supportsTildePath}
+          thread={thread}
+          threadStatusDismissed={isThreadStatusDismissed(thread)}
+          threadSummaryPopover={threadSummaryPopover}
+          threadSummaryPopoverId={threadSummaryPopoverId}
+          threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
+        />
+      ))}
+      {errorPreviewPopover ? (
+        <div
+          id={errorPreviewPopoverId}
+          role="note"
+          className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+          style={{
+            left: errorPreviewPopover.x,
+            top: errorPreviewPopover.y,
+            transform: "translateY(-50%)",
+          }}
+        >
+          <div className="whitespace-pre-wrap break-words">
+            {errorPreviewPopover.text}
+          </div>
+        </div>
+      ) : null}
+      {threadSummaryPopover ? (
+        <div
+          id={threadSummaryPopoverId}
+          role="note"
+          className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
+          style={{
+            left: threadSummaryPopover.x,
+            top: threadSummaryPopover.y,
+          }}
+        >
+          <div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
+            Thread Summary
+          </div>
+          <div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
+            {threadSummaryPopover.title}
+          </div>
+          <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
+            {threadSummaryPopover.summary}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+});
+
+const ThreadListRow = memo(function ThreadListRow({
+  acknowledgeThreadErrorSeenInBackground,
+  activityIndicator,
   anchorIdPrefix = "thread",
   clearCompletedThreadIndicator,
   dismissThreadStatus,
   errorPreviewHandlers,
   errorPreviewPopover,
+  errorPreviewPopoverId,
   getProjectState,
   hideErrorPreview,
   hideThreadSummaryPreview,
   homeDirectory,
-  isThreadStatusDismissed,
+  isActive,
   onOpenThread,
   onOpenThreadActionMenu,
   projects,
-  selectedThreadId,
   showLocation = false,
   supportsTildePath,
   thread,
-  threadActivityIndicator,
+  threadStatusDismissed,
   threadSummaryPopover,
+  threadSummaryPopoverId,
   threadSummaryPreviewHandlers,
 }: ThreadListRowProps): JSX.Element {
   const threadProject =
@@ -92,11 +218,8 @@ export function ThreadListRow({
   );
   const threadPopoverAnchorId = `${anchorIdPrefix}-sidebar-row-${thread.id}`;
   const threadPinned = Boolean(thread.pinnedAt);
-  const isActive = selectedThreadId === thread.id;
-  const activityIndicator = threadActivityIndicator(thread.id);
   const isWorking = activityIndicator === "working";
   const hasCompletedActivity = activityIndicator === "completed";
-  const threadStatusDismissed = isThreadStatusDismissed(thread);
   const hasRunError =
     !threadStatusDismissed && thread.runStatus.state === "failed";
   const hasRunStopped =
@@ -135,9 +258,9 @@ export function ThreadListRow({
       );
   const threadPreviewDescriptionId =
     errorPreviewPopover?.anchorId === threadPopoverAnchorId
-      ? "thread-error-popover"
+      ? errorPreviewPopoverId
       : threadSummaryPopover?.anchorId === threadPopoverAnchorId
-        ? "thread-summary-popover"
+        ? threadSummaryPopoverId
         : undefined;
   const threadStatusLabel = hasUnreadError
     ? "Unread error"
@@ -239,5 +362,53 @@ export function ThreadListRow({
         </div>
       </div>
     </button>
+  );
+}, areThreadListRowPropsEqual);
+
+function isPreviewAnchorActive(
+  anchorId: string,
+  popover: ErrorPreviewPopoverState | ThreadSummaryPopoverState | null,
+): boolean {
+  return popover?.anchorId === anchorId;
+}
+
+function areThreadListRowPropsEqual(
+  previous: ThreadListRowProps,
+  next: ThreadListRowProps,
+): boolean {
+  if (
+    previous.thread !== next.thread ||
+    previous.activityIndicator !== next.activityIndicator ||
+    previous.isActive !== next.isActive ||
+    previous.threadStatusDismissed !== next.threadStatusDismissed ||
+    previous.anchorIdPrefix !== next.anchorIdPrefix ||
+    previous.errorPreviewPopoverId !== next.errorPreviewPopoverId ||
+    previous.showLocation !== next.showLocation ||
+    previous.projects !== next.projects ||
+    previous.getProjectState !== next.getProjectState ||
+    previous.homeDirectory !== next.homeDirectory ||
+    previous.supportsTildePath !== next.supportsTildePath ||
+    previous.threadSummaryPopoverId !== next.threadSummaryPopoverId ||
+    previous.acknowledgeThreadErrorSeenInBackground !==
+      next.acknowledgeThreadErrorSeenInBackground ||
+    previous.clearCompletedThreadIndicator !==
+      next.clearCompletedThreadIndicator ||
+    previous.dismissThreadStatus !== next.dismissThreadStatus ||
+    previous.hideErrorPreview !== next.hideErrorPreview ||
+    previous.hideThreadSummaryPreview !== next.hideThreadSummaryPreview ||
+    previous.onOpenThread !== next.onOpenThread ||
+    previous.onOpenThreadActionMenu !== next.onOpenThreadActionMenu ||
+    previous.errorPreviewHandlers !== next.errorPreviewHandlers ||
+    previous.threadSummaryPreviewHandlers !== next.threadSummaryPreviewHandlers
+  ) {
+    return false;
+  }
+
+  const anchorId = `${next.anchorIdPrefix ?? "thread"}-sidebar-row-${next.thread.id}`;
+  return (
+    isPreviewAnchorActive(anchorId, previous.errorPreviewPopover) ===
+      isPreviewAnchorActive(anchorId, next.errorPreviewPopover) &&
+    isPreviewAnchorActive(anchorId, previous.threadSummaryPopover) ===
+      isPreviewAnchorActive(anchorId, next.threadSummaryPopover)
   );
 }

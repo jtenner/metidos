@@ -4,6 +4,7 @@ import {
   type JSX,
   type RefObject,
   type UIEvent,
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -114,7 +115,7 @@ function UnsafeModeToggle({
   );
 }
 
-function ChatTranscript({
+const ChatTranscript = memo(function ChatTranscript({
   localUserLabel,
   messages,
   selectedWorktreePath,
@@ -327,7 +328,7 @@ function ChatTranscript({
       })}
     </>
   );
-}
+});
 
 type DesktopChatViewProps = SharedChatControlsProps & {
   activeContextInputTokens: number;

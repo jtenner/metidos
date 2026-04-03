@@ -93,10 +93,9 @@ import {
   writePersistedMainviewState,
 } from "./app/state";
 import { TasksWorkspace } from "./app/tasks-workspace";
-import { ThreadListRow } from "./app/thread-list-row";
+import { ThreadList } from "./app/thread-list-row";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
-import { useThreadPreviews } from "./app/use-thread-previews";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
 import {
   readChatComposerDraft,
@@ -537,16 +536,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     threads,
   });
 
-  const {
-    errorPreviewHandlers,
-    errorPreviewPopover,
-    hideErrorPreview,
-    hideThreadSummaryPreview,
-    threadSummaryPopover,
-    threadSummaryPreviewHandlers,
-  } = useThreadPreviews({
-    disabled: threadActionMenu !== null,
-  });
   const currentThreadStartRequest = pendingThreadStartRequests[0] ?? null;
   const currentThreadStartRequestProject =
     currentThreadStartRequest === null
@@ -773,14 +762,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     selectedProject,
     worktreeThreadPopover,
   ]);
-
-  useEffect(() => {
-    if (worktreeThreadPopover) {
-      return;
-    }
-    hideErrorPreview();
-    hideThreadSummaryPreview();
-  }, [hideErrorPreview, hideThreadSummaryPreview, worktreeThreadPopover]);
 
   const abortGitHistoryDiffRequest = useCallback((reason: string) => {
     const controller = gitHistoryDiffAbortControllerRef.current;
@@ -2668,22 +2649,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
   }, [closeThreadActionMenu, threadActionMenu, threadActionMenuThread]);
 
   useEffect(() => {
-    const dismissErrorPreview = () => {
-      hideErrorPreview();
-      hideThreadSummaryPreview();
-    };
-
-    window.addEventListener("resize", dismissErrorPreview);
-    window.addEventListener("scroll", dismissErrorPreview, true);
-    document.addEventListener("mousedown", dismissErrorPreview);
-    return () => {
-      window.removeEventListener("resize", dismissErrorPreview);
-      window.removeEventListener("scroll", dismissErrorPreview, true);
-      document.removeEventListener("mousedown", dismissErrorPreview);
-    };
-  }, [hideErrorPreview, hideThreadSummaryPreview]);
-
-  useEffect(() => {
     const previousThreadId = previousSelectedThreadIdRef.current;
     selectedThreadIdRef.current = selectedThreadId;
     if (previousThreadId !== null && previousThreadId !== selectedThreadId) {
@@ -3601,7 +3566,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
   const handleProjectWorktreeClick = useCallback(
     (project: RpcProject, worktreePath: string) => {
-      hideErrorPreview();
       setThreadsError("");
       const target = getWorktreeState(project.id, worktreePath);
       const alreadySelected =
@@ -3618,13 +3582,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectProject(project, worktreePath);
       void ensureWorktreeOpen(project.id, worktreePath);
     },
-    [
-      clearThreadSelection,
-      ensureWorktreeOpen,
-      getWorktreeState,
-      hideErrorPreview,
-      selectProject,
-    ],
+    [clearThreadSelection, ensureWorktreeOpen, getWorktreeState, selectProject],
   );
 
   useEffect(() => {
@@ -4153,11 +4111,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     acknowledgeThreadErrorSeenInBackground,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
-                    errorPreviewHandlers,
-                    errorPreviewPopover,
                     getProjectState,
-                    hideErrorPreview,
-                    hideThreadSummaryPreview,
                     homeDirectory,
                     isThreadStatusDismissed,
                     onOpenThread: handleOpenThread,
@@ -4165,9 +4119,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     projects,
                     selectedThreadId,
                     supportsTildePath,
+                    threadPreviewsDisabled: threadActionMenu !== null,
                     threadActivityIndicator,
-                    threadSummaryPopover,
-                    threadSummaryPreviewHandlers,
                     threadsError,
                     workspaceActiveThreads: filteredWorkspaceActiveThreads,
                     workspacePinnedThreads: filteredWorkspacePinnedThreads,
@@ -4376,11 +4329,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 acknowledgeThreadErrorSeenInBackground,
                 clearCompletedThreadIndicator,
                 dismissThreadStatus,
-                errorPreviewHandlers,
-                errorPreviewPopover,
                 getProjectState,
-                hideErrorPreview,
-                hideThreadSummaryPreview,
                 homeDirectory,
                 isThreadStatusDismissed,
                 onOpenThread: handleOpenThread,
@@ -4388,9 +4337,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 projects,
                 selectedThreadId,
                 supportsTildePath,
+                threadPreviewsDisabled: threadActionMenu !== null,
                 threadActivityIndicator,
-                threadSummaryPopover,
-                threadSummaryPreviewHandlers,
                 threadsError,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
@@ -4597,33 +4545,25 @@ export default function App({ procedures }: AppProps): JSX.Element {
           </div>
           <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
             {selectedWorktreeThreads.length > 0 ? (
-              selectedWorktreeThreads.map((thread) => (
-                <ThreadListRow
-                  key={thread.id}
-                  acknowledgeThreadErrorSeenInBackground={
-                    acknowledgeThreadErrorSeenInBackground
-                  }
-                  anchorIdPrefix="worktree-thread"
-                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
-                  dismissThreadStatus={dismissThreadStatus}
-                  errorPreviewHandlers={errorPreviewHandlers}
-                  errorPreviewPopover={errorPreviewPopover}
-                  getProjectState={getProjectState}
-                  hideErrorPreview={hideErrorPreview}
-                  hideThreadSummaryPreview={hideThreadSummaryPreview}
-                  homeDirectory={homeDirectory}
-                  isThreadStatusDismissed={isThreadStatusDismissed}
-                  onOpenThread={handleOpenThread}
-                  onOpenThreadActionMenu={openThreadActionMenu}
-                  projects={projects}
-                  selectedThreadId={selectedThreadId}
-                  supportsTildePath={supportsTildePath}
-                  thread={thread}
-                  threadActivityIndicator={threadActivityIndicator}
-                  threadSummaryPopover={threadSummaryPopover}
-                  threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
-                />
-              ))
+              <ThreadList
+                acknowledgeThreadErrorSeenInBackground={
+                  acknowledgeThreadErrorSeenInBackground
+                }
+                anchorIdPrefix="worktree-thread"
+                clearCompletedThreadIndicator={clearCompletedThreadIndicator}
+                dismissThreadStatus={dismissThreadStatus}
+                getProjectState={getProjectState}
+                homeDirectory={homeDirectory}
+                isThreadStatusDismissed={isThreadStatusDismissed}
+                onOpenThread={handleOpenThread}
+                onOpenThreadActionMenu={openThreadActionMenu}
+                previewDisabled={threadActionMenu !== null}
+                projects={projects}
+                selectedThreadId={selectedThreadId}
+                supportsTildePath={supportsTildePath}
+                threadActivityIndicator={threadActivityIndicator}
+                threads={selectedWorktreeThreads}
+              />
             ) : (
               <div className="px-3 py-3 text-xs text-[#8f8d8b]">
                 {isCreatingThread
@@ -4637,43 +4577,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
               {threadsError}
             </div>
           ) : null}
-        </div>
-      ) : null}
-      {errorPreviewPopover ? (
-        <div
-          id="thread-error-popover"
-          role="note"
-          className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
-          style={{
-            left: errorPreviewPopover.x,
-            top: errorPreviewPopover.y,
-            transform: "translateY(-50%)",
-          }}
-        >
-          <div className="whitespace-pre-wrap break-words">
-            {errorPreviewPopover.text}
-          </div>
-        </div>
-      ) : null}
-      {threadSummaryPopover ? (
-        <div
-          id="thread-summary-popover"
-          role="note"
-          className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
-          style={{
-            left: threadSummaryPopover.x,
-            top: threadSummaryPopover.y,
-          }}
-        >
-          <div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
-            Thread Summary
-          </div>
-          <div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
-            {threadSummaryPopover.title}
-          </div>
-          <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
-            {threadSummaryPopover.summary}
-          </div>
         </div>
       ) : null}
       {currentThreadStartRequest ? (

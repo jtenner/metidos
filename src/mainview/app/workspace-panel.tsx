@@ -8,9 +8,10 @@ import {
   useWorkspaceActiveSectionOpen,
   useWorkspacePanelOpen,
 } from "./sidebar-panels-state";
-import { type SharedThreadListProps, ThreadListRow } from "./thread-list-row";
+import { type SharedThreadListProps, ThreadList } from "./thread-list-row";
 
 type WorkspacePanelProps = SharedThreadListProps & {
+  threadPreviewsDisabled: boolean;
   threadsError: string;
   workspaceActiveThreads: RpcThread[];
   workspacePinnedThreads: RpcThread[];
@@ -20,11 +21,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   acknowledgeThreadErrorSeenInBackground,
   clearCompletedThreadIndicator,
   dismissThreadStatus,
-  errorPreviewHandlers,
-  errorPreviewPopover,
   getProjectState,
-  hideErrorPreview,
-  hideThreadSummaryPreview,
   homeDirectory,
   isThreadStatusDismissed,
   onOpenThread,
@@ -32,9 +29,8 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   projects,
   selectedThreadId,
   supportsTildePath,
+  threadPreviewsDisabled,
   threadActivityIndicator,
-  threadSummaryPopover,
-  threadSummaryPreviewHandlers,
   threadsError,
   workspaceActiveThreads,
   workspacePinnedThreads,
@@ -63,34 +59,26 @@ export const WorkspacePanel = memo(function WorkspacePanel({
               <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
                 Pinned
               </div>
-              {workspacePinnedThreads.map((thread) => (
-                <ThreadListRow
-                  key={thread.id}
-                  acknowledgeThreadErrorSeenInBackground={
-                    acknowledgeThreadErrorSeenInBackground
-                  }
-                  anchorIdPrefix="workspace-thread"
-                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
-                  dismissThreadStatus={dismissThreadStatus}
-                  errorPreviewHandlers={errorPreviewHandlers}
-                  errorPreviewPopover={errorPreviewPopover}
-                  getProjectState={getProjectState}
-                  hideErrorPreview={hideErrorPreview}
-                  hideThreadSummaryPreview={hideThreadSummaryPreview}
-                  homeDirectory={homeDirectory}
-                  isThreadStatusDismissed={isThreadStatusDismissed}
-                  onOpenThread={onOpenThread}
-                  onOpenThreadActionMenu={onOpenThreadActionMenu}
-                  projects={projects}
-                  selectedThreadId={selectedThreadId}
-                  showLocation
-                  supportsTildePath={supportsTildePath}
-                  thread={thread}
-                  threadActivityIndicator={threadActivityIndicator}
-                  threadSummaryPopover={threadSummaryPopover}
-                  threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
-                />
-              ))}
+              <ThreadList
+                acknowledgeThreadErrorSeenInBackground={
+                  acknowledgeThreadErrorSeenInBackground
+                }
+                anchorIdPrefix="workspace-thread"
+                clearCompletedThreadIndicator={clearCompletedThreadIndicator}
+                dismissThreadStatus={dismissThreadStatus}
+                getProjectState={getProjectState}
+                homeDirectory={homeDirectory}
+                isThreadStatusDismissed={isThreadStatusDismissed}
+                onOpenThread={onOpenThread}
+                onOpenThreadActionMenu={onOpenThreadActionMenu}
+                previewDisabled={threadPreviewsDisabled}
+                projects={projects}
+                selectedThreadId={selectedThreadId}
+                showLocation
+                supportsTildePath={supportsTildePath}
+                threadActivityIndicator={threadActivityIndicator}
+                threads={workspacePinnedThreads}
+              />
             </div>
           ) : null}
           {workspaceActiveThreads.length > 0 ? (
@@ -111,40 +99,28 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   )}
                 </span>
               </button>
-              {workspaceActiveOpen
-                ? workspaceActiveThreads.map((thread) => (
-                    <ThreadListRow
-                      key={thread.id}
-                      acknowledgeThreadErrorSeenInBackground={
-                        acknowledgeThreadErrorSeenInBackground
-                      }
-                      anchorIdPrefix="workspace-thread"
-                      clearCompletedThreadIndicator={
-                        clearCompletedThreadIndicator
-                      }
-                      dismissThreadStatus={dismissThreadStatus}
-                      errorPreviewHandlers={errorPreviewHandlers}
-                      errorPreviewPopover={errorPreviewPopover}
-                      getProjectState={getProjectState}
-                      hideErrorPreview={hideErrorPreview}
-                      hideThreadSummaryPreview={hideThreadSummaryPreview}
-                      homeDirectory={homeDirectory}
-                      isThreadStatusDismissed={isThreadStatusDismissed}
-                      onOpenThread={onOpenThread}
-                      onOpenThreadActionMenu={onOpenThreadActionMenu}
-                      projects={projects}
-                      selectedThreadId={selectedThreadId}
-                      showLocation
-                      supportsTildePath={supportsTildePath}
-                      thread={thread}
-                      threadActivityIndicator={threadActivityIndicator}
-                      threadSummaryPopover={threadSummaryPopover}
-                      threadSummaryPreviewHandlers={
-                        threadSummaryPreviewHandlers
-                      }
-                    />
-                  ))
-                : null}
+              {workspaceActiveOpen ? (
+                <ThreadList
+                  acknowledgeThreadErrorSeenInBackground={
+                    acknowledgeThreadErrorSeenInBackground
+                  }
+                  anchorIdPrefix="workspace-thread"
+                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
+                  dismissThreadStatus={dismissThreadStatus}
+                  getProjectState={getProjectState}
+                  homeDirectory={homeDirectory}
+                  isThreadStatusDismissed={isThreadStatusDismissed}
+                  onOpenThread={onOpenThread}
+                  onOpenThreadActionMenu={onOpenThreadActionMenu}
+                  previewDisabled={threadPreviewsDisabled}
+                  projects={projects}
+                  selectedThreadId={selectedThreadId}
+                  showLocation
+                  supportsTildePath={supportsTildePath}
+                  threadActivityIndicator={threadActivityIndicator}
+                  threads={workspaceActiveThreads}
+                />
+              ) : null}
             </div>
           ) : null}
           {threadsError ? (
