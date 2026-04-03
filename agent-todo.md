@@ -19,7 +19,7 @@
 - [ ] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
 - [ ] Add comments to file `src/mainview/app/workspace-panel.tsx`.
 - [x] Add comments to file `src/mainview/controls/chat-composer-control.tsx`.
-- [ ] Add comments to file `src/mainview/controls/codex-model-selector.tsx`.
+- [x] Add comments to file `src/mainview/controls/codex-model-selector.tsx`.
 - [x] Add comments to file `src/mainview/controls/codex-utils.ts`.
 - [x] Add comments to file `src/mainview/controls/icons.tsx`.
 - [x] Add comments to file `src/mainview/controls/project-task-selector.tsx`.
