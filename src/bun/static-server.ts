@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 import { buildMainviewBundle } from "./build-mainview";
 
+// Runtime defaults and well-known paths used by the local static server.
 const DEFAULT_PUBLIC_PORT = "7599";
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
@@ -20,16 +21,27 @@ const INTER_VARIABLE_FONT_LATIN_EXT_PATH = resolve(
 const SERVER_IDLE_TIMEOUT_SECONDS = 30;
 const BACKEND_HEALTH_TIMEOUT_MS = 1_500;
 
+/**
+ * Runtime config passed to the browser so the client can discover RPC endpoints and
+ * health route details without additional round trips.
+ */
 type RuntimeConfig = {
   devServer: boolean;
   healthUrl: string;
   rpcWebSocketUrl: string;
 };
 
+/**
+ * Returns true when a CLI string value is an unsigned decimal integer.
+ */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
 }
 
+/**
+ * Reads a string flag from `bun` CLI args. Supports both `--flag value` and
+ * `--flag=value` forms and returns null if not provided.
+ */
 function readCliValue(args: string[], flag: string): string | null {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -51,6 +63,10 @@ function readCliValue(args: string[], flag: string): string | null {
   return null;
 }
 
+/**
+ * Resolves a validated port number from CLI arg, environment variable, and a fallback.
+ * Throws if the resolved value is missing or outside the TCP port range.
+ */
 function resolvePort(
   args: string[],
   flag: string,
@@ -70,6 +86,9 @@ function resolvePort(
   return parsedPort;
 }
 
+/**
+ * Creates an HTTP response with a plain text body and explicit content type.
+ */
 function stringResponse(body: string, contentType: string): Response {
   return new Response(body, {
     headers: {
@@ -79,6 +98,10 @@ function stringResponse(body: string, contentType: string): Response {
   });
 }
 
+/**
+ * Creates an HTTP response by streaming the file at `path` and forcing no-cache
+ * behavior to ensure UI updates are immediately visible during development.
+ */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
     headers: {
@@ -88,6 +111,10 @@ function fileResponse(path: string, contentType: string): Response {
   });
 }
 
+/**
+ * Converts an HTTP origin URL into a WebSocket URL targeting `/rpc`,
+ * preserving host/port and selecting `ws` vs `wss` by request scheme.
+ */
 function websocketUrlFromOrigin(origin: string): string {
   const url = new URL(origin);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -97,6 +124,10 @@ function websocketUrlFromOrigin(origin: string): string {
   return url.toString();
 }
 
+/**
+ * Builds the application HTML response by injecting runtime state and inline CSS if the
+ * CSS asset exists on disk.
+ */
 async function buildHtmlResponse(
   runtimeConfig: RuntimeConfig,
 ): Promise<Response> {
@@ -116,10 +147,15 @@ async function buildHtmlResponse(
   return stringResponse(html, "text/html; charset=utf-8");
 }
 
+/**
+ * Probes the backend health endpoint with a short timeout.
+ * Returns a normalized shape for health aggregation in the static server `/health` endpoint.
+ */
 async function readBackendHealthSnapshot(
   backendHealthUrl: string,
 ): Promise<unknown> {
   const controller = new AbortController();
+  // Use AbortController so a stalled backend does not block /health forever.
   const timeout = setTimeout(() => {
     controller.abort(new Error("Backend health probe timed out."));
   }, BACKEND_HEALTH_TIMEOUT_MS);
@@ -159,6 +195,7 @@ async function readBackendHealthSnapshot(
   }
 }
 
+// Top-level CLI parsing and environment-derived defaults for all static-server ports/URLs.
 const SERVER_ARGS = Bun.argv.slice(2);
 const PUBLIC_PORT = resolvePort(
   SERVER_ARGS,
@@ -192,6 +229,7 @@ server = Bun.serve({
   idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   port: PUBLIC_PORT,
   async fetch(request): Promise<Response> {
+    // Route only what the frontend requires and leave unknown paths as 404.
     const { pathname } = new URL(request.url);
 
     if (pathname === "/" || pathname === "/index.html") {
@@ -250,8 +288,12 @@ console.log(
   `Jolt static server listening on http://localhost:${server.port} (RPC ${RPC_WEBSOCKET_URL})`,
 );
 
+/**
+ * Stops the Bun server and exits the process.
+ */
 function shutdownAndExit(exitCode: number): void {
   try {
+    // `server.stop(true)` may throw during early startup or repeated shutdown signals.
     server.stop(true);
   } catch {
     // Ignore stop failures during shutdown.
