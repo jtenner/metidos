@@ -240,7 +240,7 @@ const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
 const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
-const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 150;
+const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 500;
 
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
@@ -1126,13 +1126,10 @@ function createBufferedThreadActivityWriter(): {
       entries.set(activityId, entry);
 
       const shouldFlushNow =
-        options?.force === true ||
-        !entry.persisted ||
-        Date.now() - entry.lastPersistedAt >=
-          COMMAND_ACTIVITY_FLUSH_INTERVAL_MS;
+        options?.force === true || options?.terminal === true;
       if (shouldFlushNow) {
         clearFlushTimer();
-        await enqueueFlush(options?.force === true);
+        await enqueueFlush(true);
         return;
       }
 
@@ -2125,44 +2122,38 @@ async function runPackageScriptTaskInBackground(
   const cwd = resolve(worktreePath, task.packageDirectory);
   let output = "";
   let exitCode: number | null = null;
-  let lastPersistedAt = 0;
-  let lastPersistedOutput = "";
-  let lastPersistedExitCode: number | null = null;
+  const bufferedActivityWriter = createBufferedThreadActivityWriter();
 
-  const persistCommandActivity = async (
+  const queueCommandActivity = async (
     state: "in_progress" | "completed" | "failed" | "stopped",
-    force = false,
+    options?: {
+      force?: boolean;
+      terminal?: boolean;
+    },
   ): Promise<void> => {
-    const now = Date.now();
-    if (
-      !force &&
-      state === "in_progress" &&
-      now - lastPersistedAt < COMMAND_ACTIVITY_FLUSH_INTERVAL_MS
-    ) {
-      return;
-    }
-    if (
-      !force &&
-      state === "in_progress" &&
-      output === lastPersistedOutput &&
-      exitCode === lastPersistedExitCode
-    ) {
-      return;
-    }
-
-    await upsertCommandActivityPayload(threadId, activityItemId, {
-      command,
-      exitCode,
-      output,
-      state,
-    });
-    lastPersistedAt = now;
-    lastPersistedOutput = output;
-    lastPersistedExitCode = exitCode;
+    await bufferedActivityWriter.queue(
+      activityItemId,
+      [state, command, String(exitCode ?? ""), output].join("\u0000"),
+      () =>
+        upsertCommandActivityPayload(threadId, activityItemId, {
+          command,
+          exitCode,
+          output,
+          state,
+        }),
+      {
+        ...(typeof options?.force === "boolean"
+          ? { force: options.force }
+          : {}),
+        ...(typeof options?.terminal === "boolean"
+          ? { terminal: options.terminal }
+          : {}),
+      },
+    );
   };
 
   try {
-    await persistCommandActivity("in_progress", true);
+    await queueCommandActivity("in_progress");
 
     const proc = Bun.spawn({
       cmd: [process.execPath, "run", task.scriptName],
@@ -2174,7 +2165,7 @@ async function runPackageScriptTaskInBackground(
 
     const appendOutput = async (chunk: string) => {
       output += chunk;
-      await persistCommandActivity("in_progress");
+      await queueCommandActivity("in_progress");
     };
 
     const [settledExitCode] = await Promise.all([
@@ -2185,7 +2176,10 @@ async function runPackageScriptTaskInBackground(
     exitCode = settledExitCode;
 
     if (controller.signal.aborted) {
-      await persistCommandActivity("stopped", true);
+      await queueCommandActivity("stopped", {
+        force: true,
+        terminal: true,
+      });
       markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
       setThreadRunStatus(threadId, {
         state: "stopped",
@@ -2198,7 +2192,10 @@ async function runPackageScriptTaskInBackground(
     }
 
     if (exitCode === 0) {
-      await persistCommandActivity("completed", true);
+      await queueCommandActivity("completed", {
+        force: true,
+        terminal: true,
+      });
       markThreadRan(db, threadId);
       setThreadRunStatus(threadId, {
         state: "idle",
@@ -2213,7 +2210,10 @@ async function runPackageScriptTaskInBackground(
     if (!output.trim()) {
       output = `Command exited with code ${exitCode}.`;
     }
-    await persistCommandActivity("failed", true);
+    await queueCommandActivity("failed", {
+      force: true,
+      terminal: true,
+    });
     const errorMessage = `${command} failed with exit code ${exitCode}.`;
     markThreadFailed(db, threadId, errorMessage);
     setThreadRunStatus(threadId, {
@@ -2225,7 +2225,10 @@ async function runPackageScriptTaskInBackground(
     });
   } catch (error) {
     if (isAbortError(error) && controller.signal.aborted) {
-      await persistCommandActivity("stopped", true);
+      await queueCommandActivity("stopped", {
+        force: true,
+        terminal: true,
+      });
       markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
       setThreadRunStatus(threadId, {
         state: "stopped",
@@ -2241,7 +2244,10 @@ async function runPackageScriptTaskInBackground(
     if (!output.trim()) {
       output = message;
     }
-    await persistCommandActivity("failed", true);
+    await queueCommandActivity("failed", {
+      force: true,
+      terminal: true,
+    });
     const errorMessage = `${command} failed: ${message}`;
     markThreadFailed(db, threadId, errorMessage);
     setThreadRunStatus(threadId, {

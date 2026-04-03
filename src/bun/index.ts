@@ -76,6 +76,7 @@ const INTER_VARIABLE_FONT_LATIN_EXT_PATH = resolve(
 );
 const MAINVIEW_RELOAD_DEBOUNCE_MS = 90;
 const MAINVIEW_WATCH_INTERVAL_MS = 250;
+const SERVER_IDLE_TIMEOUT_SECONDS = 30;
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -791,6 +792,7 @@ async function bootstrap(): Promise<void> {
 
   let activeServerPort = SERVER_PORT;
   const serverOptions = {
+    idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 

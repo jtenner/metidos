@@ -1442,7 +1442,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
 
   const loadProjectTasks = useCallback(
-    async (projectId: number, worktreePath: string): Promise<void> => {
+    async (
+      projectId: number,
+      worktreePath: string,
+      options?: {
+        priority?: RpcRequestPriority;
+      },
+    ): Promise<void> => {
       const requestId = ++projectTasksRequestIdRef.current;
       abortProjectTasksRequest("Project task request was superseded.");
       const controller = new AbortController();
@@ -1457,7 +1463,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             worktreePath,
           },
           {
-            priority: "foreground",
+            priority: options?.priority ?? "default",
             signal: controller.signal,
           },
         );
@@ -2001,6 +2007,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
   const initialize = useCallback(async () => {
     const persistedState = initialMainviewState;
+    const initiallyOpenProjectTreePaths =
+      readSidebarPanelsSnapshot().openProjectPaths;
 
     try {
       const [loaded, homeDirectoryResult, loadedThreads, modelCatalog] =
@@ -2041,10 +2049,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
           initialThreadDetailPromise = null;
         }
       }
-      const openProjects = loaded.filter((project) => project.isOpen === 1);
-      const restoredOpenProjectIds = new Set(
-        openProjects.map((project) => project.id),
-      );
+      const restoredOpenProjectIds = new Set<number>();
+      for (const project of loaded) {
+        if (initiallyOpenProjectTreePaths.has(project.path)) {
+          restoredOpenProjectIds.add(project.id);
+        }
+      }
       for (const entry of persistedState.openWorktrees) {
         restoredOpenProjectIds.add(entry.projectId);
       }
@@ -2054,14 +2064,19 @@ export default function App({ procedures }: AppProps): JSX.Element {
       if (initialThread) {
         restoredOpenProjectIds.add(initialThread.projectId);
       }
-      const optimisticProjects = loaded.map((project) =>
-        restoredOpenProjectIds.has(project.id)
-          ? {
-              ...project,
-              isOpen: 1 as const,
-            }
-          : project,
-      );
+      const initialProjectId =
+        initialThread?.projectId ?? persistedState.selectedProjectId ?? null;
+      if (initialProjectId !== null) {
+        restoredOpenProjectIds.add(initialProjectId);
+      } else if (loaded[0]) {
+        restoredOpenProjectIds.add(loaded[0].id);
+      }
+      const optimisticProjects = loaded.map((project) => ({
+        ...project,
+        isOpen: restoredOpenProjectIds.has(project.id)
+          ? (1 as const)
+          : (0 as const),
+      }));
       const initialThreadProject =
         initialThread === null
           ? undefined
@@ -2125,9 +2140,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           })
         : null;
 
-      const initiallyOpenProjectTreePaths =
-        readSidebarPanelsSnapshot().openProjectPaths;
-      const restoredProjects = loaded.filter((project) =>
+      const restoredProjects = optimisticProjects.filter((project) =>
         restoredOpenProjectIds.has(project.id),
       );
 
@@ -2140,57 +2153,67 @@ export default function App({ procedures }: AppProps): JSX.Element {
         });
       }
 
-      const restoredProjectWorktreesPromise = Promise.all(
-        restoredProjects.map(async (project) => {
-          try {
-            const result = await procedures.openProject({
-              projectPath: project.path,
-              name: project.name,
-            });
-            setProjects((prev) => upsertProjectList(prev, result.project));
-            setProjectState(result.project.id, {
-              worktrees: result.worktrees,
-              loadingWorktrees: false,
-              error: "",
-            });
-          } catch (error) {
-            setProjectState(project.id, {
-              loadingWorktrees: false,
-              error: error instanceof Error ? error.message : String(error),
-            });
+      for (const project of restoredProjects) {
+        try {
+          const result = await procedures.openProject({
+            projectPath: project.path,
+            name: project.name,
+          });
+          setProjects((prev) => upsertProjectList(prev, result.project));
+          setProjectState(result.project.id, {
+            worktrees: result.worktrees,
+            loadingWorktrees: false,
+            error: "",
+          });
+        } catch (error) {
+          setProjectState(project.id, {
+            loadingWorktrees: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      const restoredOpenWorktrees: Array<
+        | {
+            ok: true;
+            history: RpcWorktreeGitHistoryResult;
+            projectId: number;
+            snapshot: RpcWorktreeSnapshot;
+            worktreePath: string;
           }
-        }),
-      );
+        | {
+            ok: false;
+            projectId: number;
+            error: string;
+            worktreePath: string;
+          }
+      > = [];
+      for (const { projectId, worktreePath } of persistedState.openWorktrees) {
+        if (!restoredOpenProjectIds.has(projectId)) {
+          continue;
+        }
 
-      const restoredOpenWorktreesPromise = Promise.all(
-        persistedState.openWorktrees
-          .filter(({ projectId }) => restoredOpenProjectIds.has(projectId))
-          .map(async ({ projectId, worktreePath }) => {
-            try {
-              const result = await procedures.openWorktree({
-                projectId,
-                worktreePath,
-              });
-              return {
-                ok: true as const,
-                history: result.history,
-                projectId,
-                snapshot: result.worktree,
-                worktreePath,
-              };
-            } catch (error) {
-              return {
-                ok: false as const,
-                projectId,
-                error: error instanceof Error ? error.message : String(error),
-                worktreePath,
-              };
-            }
-          }),
-      );
-
-      await restoredProjectWorktreesPromise;
-      const restoredOpenWorktrees = await restoredOpenWorktreesPromise;
+        try {
+          const result = await procedures.openWorktree({
+            projectId,
+            worktreePath,
+          });
+          restoredOpenWorktrees.push({
+            ok: true,
+            history: result.history,
+            projectId,
+            snapshot: result.worktree,
+            worktreePath,
+          });
+        } catch (error) {
+          restoredOpenWorktrees.push({
+            ok: false,
+            projectId,
+            error: error instanceof Error ? error.message : String(error),
+            worktreePath,
+          });
+        }
+      }
 
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
@@ -2762,6 +2785,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   }, [selectedThread]);
 
   useEffect(() => {
+    if (!sessionStateReady) {
+      return;
+    }
     if (
       !selectedProject ||
       !activeSelectedWorktreePath ||
@@ -2774,12 +2800,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setTaskControlError("");
       return;
     }
-    void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath);
+    void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath, {
+      priority: "default",
+    });
   }, [
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
     abortProjectTasksRequest,
     loadProjectTasks,
+    sessionStateReady,
     selectedProject,
   ]);
 
@@ -2808,6 +2837,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
     const handleWorktreeTasksChanged = (
       event: CustomEvent<RpcWorktreeTasksChanged>,
     ) => {
+      if (!sessionStateReady) {
+        return;
+      }
       if (
         !selectedProject ||
         !activeSelectedWorktreePath ||
@@ -2821,7 +2853,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
       ) {
         return;
       }
-      void loadProjectTasks(event.detail.projectId, event.detail.worktreePath);
+      void loadProjectTasks(event.detail.projectId, event.detail.worktreePath, {
+        priority: "default",
+      });
     };
 
     window.addEventListener(
@@ -2838,6 +2872,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
     loadProjectTasks,
+    sessionStateReady,
     selectedProject,
   ]);
 
