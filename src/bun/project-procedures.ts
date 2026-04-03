@@ -140,14 +140,33 @@ import type {
   RpcWorktreeSnapshot,
 } from "./rpc-schema";
 
+/**
+ * Shared DB handle for all RPC procedures in this process.
+ */
 const db = initAppDatabase();
+
+/**
+ * Default RPC websocket URL used when no MCP override is supplied.
+ */
 const JOLT_DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
+
+/**
+ * Stable MCP server identity for Codex sidecar integration.
+ */
 const JOLT_MCP_SERVER_NAME = "jolt";
+
+/**
+ * Entry point used by procedures that launch/connect to the MCP wrapper script.
+ */
 const JOLT_SIDECAR_SERVER_PATH = resolve(
   process.cwd(),
   "src/bun/codex-sidecar-mcp.ts",
 );
 
+/**
+ * RPC procedure: returns OS home directory and whether shell-like `~` expansion
+ * is supported on this platform.
+ */
 export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResult> {
   return {
     homeDirectory: homedir(),
@@ -156,12 +175,18 @@ export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResul
   };
 }
 
+/**
+ * RPC procedure: fetch all known projects from the local DB.
+ */
 export async function listProjectsProcedure(
   _params?: AppRPCSchema["requests"]["listProjects"]["params"],
 ): Promise<RpcProject[]> {
   return listProjects(db);
 }
 
+/**
+ * RPC procedure: list threads with a live run-status snapshot for each thread.
+ */
 export async function listThreadsProcedure(
   _params?: AppRPCSchema["requests"]["listThreads"]["params"],
 ): Promise<RpcThread[]> {
@@ -170,10 +195,16 @@ export async function listThreadsProcedure(
   );
 }
 
+/**
+ * Start shared background cache warmup/maintenance tasks.
+ */
 export function startProcedureCacheMaintenance(): void {
   startDirectorySuggestionCacheMaintenance();
 }
 
+/**
+ * Warm likely-on-startup caches so early UI requests avoid first-hit latency.
+ */
 export function warmProcedureStartupCaches(): void {
   warmDirectorySuggestionCache();
 
@@ -183,6 +214,9 @@ export function warmProcedureStartupCaches(): void {
   }
 }
 
+/**
+ * Return the latest terminal timestamp from a thread (run or error), if any.
+ */
 function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
   if (thread.lastRunAt && thread.lastErrorAt) {
     return thread.lastRunAt >= thread.lastErrorAt
@@ -193,6 +227,9 @@ function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
   return thread.lastRunAt ?? thread.lastErrorAt ?? null;
 }
 
+/**
+ * Detect threads that should be marked interrupted after a crash/restart.
+ */
 function shouldRecoverInterruptedThread(
   thread: ThreadRecord,
   lastInProgressMessageUpdatedAt: string | null,
@@ -213,6 +250,11 @@ function shouldRecoverInterruptedThread(
   return lastInProgressMessageUpdatedAt >= lastSettledAt;
 }
 
+/**
+ * Select bootstrap thread from hints:
+ * - explicit `threadIdHint`
+ * - project + worktree match
+ */
 function pickBootstrapThreadRecord(
   threads: ThreadRecord[],
   params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
@@ -246,6 +288,9 @@ function pickBootstrapThreadRecord(
   return null;
 }
 
+/**
+ * On startup, recover threads left mid-turn by previous shutdown/crash.
+ */
 export function recoverInterruptedThreadTurnsOnStartup(): void {
   const threads = listThreads(db);
   if (threads.length === 0) {
@@ -277,12 +322,19 @@ export function recoverInterruptedThreadTurnsOnStartup(): void {
   }
 }
 
+/**
+ * RPC procedure: return the current codex model catalog.
+ */
 export async function getCodexModelCatalogProcedure(
   _params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
 ): Promise<RpcCodexModelCatalog> {
   return buildCodexModelCatalog();
 }
 
+/**
+ * Compose startup bootstrap payload (home, model catalog, projects, and thread detail).
+ * Thread detail errors are non-fatal to allow UI to continue booting.
+ */
 export async function getAppBootstrapProcedure(
   params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
 ): Promise<RpcAppBootstrapResult> {
@@ -308,6 +360,9 @@ export async function getAppBootstrapProcedure(
   };
 }
 
+/**
+ * Polling/caching/ticker constants for project/worktree refresh loops.
+ */
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
@@ -319,10 +374,16 @@ const GIT_HISTORY_READ_CONCURRENCY = 2;
 const TASK_CACHE_REFRESH_CONCURRENCY = 1;
 const DIFF_LOAD_CONCURRENCY = 2;
 
+/**
+ * Per-worktree command options, including an explicit refresh override.
+ */
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
 };
 
+/**
+ * Mutable per-worktree polling/caching state while worktree details are open.
+ */
 type WorktreePollState = {
   changes: RpcWorktreeChange[];
   diff: string[];
@@ -342,6 +403,9 @@ type WorktreePollState = {
   lastUpdatedAt: string;
 };
 
+/**
+ * Mutable per-project polling/caching state while project is active in UI.
+ */
 type ProjectPollState = {
   id: number;
   project: ProjectRecord;
@@ -353,6 +417,9 @@ type ProjectPollState = {
   openWorktrees: Map<string, WorktreePollState>;
 };
 
+/**
+ * Process-local caches shared by multiple procedure calls.
+ */
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, CodexThread>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
