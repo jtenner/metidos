@@ -5,7 +5,7 @@
 - [x] Add comments to file `bun-plugin-react-compiler.ts`.
 - [ ] Add comments to file `package.json`.
 - [x] Add comments to file `src/bun/build-mainview.ts`.
-- [ ] Add comments to file `src/bun/codex-sidecar-mcp.ts`.
+- [x] Add comments to file `src/bun/codex-sidecar-mcp.ts`.
 - [ ] Add comments to file `src/bun/db.ts`.
 - [ ] Add comments to file `src/bun/git.ts`.
 - [ ] Add comments to file `src/bun/index.ts`.

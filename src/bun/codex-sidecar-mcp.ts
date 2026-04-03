@@ -20,9 +20,12 @@ import type {
 } from "./rpc-schema";
 
 const DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
+/** Default request timeout in milliseconds when no timeout override is supplied. */
 const DEFAULT_RPC_TIMEOUT_MS = 30_000;
 
+/** RPC request mapping from the shared schema, used for typed method dispatch. */
 type RpcRequestMap = AppRPCSchema["requests"];
+/** Known RPC method names supported by the sidecar client. */
 type RpcMethodName = keyof RpcRequestMap;
 
 type RpcRequestMessage<K extends RpcMethodName = RpcMethodName> = {
@@ -34,6 +37,7 @@ type RpcRequestMessage<K extends RpcMethodName = RpcMethodName> = {
   timeoutMs?: number;
 };
 
+/** Response message shapes emitted by RPC for successful and failed calls. */
 type RpcResponseMessage =
   | {
       type: "response";
@@ -48,12 +52,14 @@ type RpcResponseMessage =
       error: string;
     };
 
+/** Internal metadata for a pending request awaiting a socket response. */
 type PendingRpcRequest = {
   reject: (reason?: unknown) => void;
   resolve: (value: unknown) => void;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 
+/** Localized lifecycle label used by tool-facing payloads. */
 type ThreadLifecycleStatus = "Turning" | "Errored" | "Stopped" | "Created";
 
 const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
@@ -62,24 +68,28 @@ const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
 const db = initAppDatabase();
 
+/** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {
   return typeof threadIdContext === "number"
     ? ` Bound thread: ${threadIdContext}.`
     : "";
 }
 
+/** Input description for thread id with explicit context fallback text. */
 function explicitThreadIdDescription(): string {
   return typeof threadIdContext === "number"
     ? `Required. Use thread ${threadIdContext} for this Codex thread.`
     : "Required Jolt thread id.";
 }
 
+/** Description text for project id defaults in generated tool schemas. */
 function defaultProjectIdDescription(): string {
   return typeof projectIdContext === "number"
     ? `Defaults to project ${projectIdContext}.`
     : "Jolt project id.";
 }
 
+/** Description text for worktree path defaults in generated tool schemas. */
 function defaultWorktreePathDescription(): string {
   return worktreePathContext
     ? `Defaults to ${worktreePathContext}.`
@@ -92,8 +102,15 @@ class JoltRpcClient {
   private pendingRequests = new Map<number, PendingRpcRequest>();
   private socket: WebSocket | null = null;
 
+  /** Create a websocket-backed RPC client for a specific endpoint. */
   constructor(private readonly url: string) {}
 
+  /**
+   * Send a typed request and await typed result.
+   *
+   * Serializes the payload, tracks the request for response correlation, and
+   * enforces an optional timeout per request.
+   */
   async call<K extends RpcMethodName>(
     method: K,
     params: RpcRequestMap[K]["params"],
@@ -107,6 +124,7 @@ class JoltRpcClient {
     const timeoutMs = normalizeTimeoutMs(options?.timeoutMs);
     return new Promise<RpcRequestMap[K]["response"]>(
       (resolveRequest, reject) => {
+        // Track each request by id so the response handler can resolve/reject it.
         const timeoutId =
           timeoutMs === null
             ? null
@@ -137,6 +155,7 @@ class JoltRpcClient {
         };
 
         try {
+          // Marshal minimal JSON payload to keep request handling side-effect free.
           socket.send(JSON.stringify(message));
         } catch (error) {
           this.clearPendingRequest(requestId);
@@ -146,6 +165,9 @@ class JoltRpcClient {
     );
   }
 
+  /**
+   * Remove one pending request from tracking and cancel any pending timeout timer.
+   */
   private clearPendingRequest(requestId: number): PendingRpcRequest | null {
     const pending = this.pendingRequests.get(requestId) ?? null;
     if (!pending) {
@@ -158,6 +180,9 @@ class JoltRpcClient {
     return pending;
   }
 
+  /**
+   * Reuse one shared websocket when open, otherwise connect once and fan-in callers.
+   */
   private async waitForOpenSocket(): Promise<WebSocket> {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       return this.socket;
@@ -170,6 +195,7 @@ class JoltRpcClient {
       const nextSocket = new WebSocket(this.url);
 
       const resetSocket = (reason: unknown) => {
+        // Centralized reset path so callers awaiting open/requests fail consistently.
         if (this.socket === nextSocket) {
           this.socket = null;
         }
@@ -180,12 +206,14 @@ class JoltRpcClient {
       };
 
       nextSocket.addEventListener("open", () => {
+        // Cache the live socket and clear the shared in-flight connect promise.
         this.socket = nextSocket;
         this.connecting = null;
         resolveSocket(nextSocket);
       });
 
       nextSocket.addEventListener("message", (event) => {
+        // Ignore non-response frames; this socket may carry unrelated payload types.
         const message = JSON.parse(String(event.data)) as RpcResponseMessage;
         if (message.type !== "response") {
           return;
@@ -202,6 +230,7 @@ class JoltRpcClient {
       });
 
       nextSocket.addEventListener("close", () => {
+        // On socket close, reject all pending calls so callers don’t hang forever.
         if (this.socket === nextSocket) {
           this.socket = null;
         }
@@ -227,6 +256,9 @@ class JoltRpcClient {
 
 const rpcClient = new JoltRpcClient(rpcUrl);
 
+/**
+ * Read and parse an environment variable as an integer project/thread id.
+ */
 function readIntegerEnv(name: string): number | null {
   const raw = process.env[name]?.trim();
   if (!raw || !/^\d+$/.test(raw)) {
@@ -235,11 +267,17 @@ function readIntegerEnv(name: string): number | null {
   return Number.parseInt(raw, 10);
 }
 
+/**
+ * Read and trim an environment variable, returning null for missing/empty values.
+ */
 function readStringEnv(name: string): string | null {
   const raw = process.env[name]?.trim();
   return raw ? raw : null;
 }
 
+/**
+ * Normalize RPC timeout values with fallback to default for invalid/empty input.
+ */
 function normalizeTimeoutMs(value: number | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return DEFAULT_RPC_TIMEOUT_MS;
@@ -247,6 +285,9 @@ function normalizeTimeoutMs(value: number | undefined): number | null {
   return Math.max(1, Math.floor(value));
 }
 
+/**
+ * Ensure outgoing priority is one of the accepted enum values.
+ */
 function normalizeRpcRequestPriority(
   value: RpcRequestPriority | undefined,
 ): RpcRequestPriority {
@@ -266,6 +307,7 @@ function canonicalPath(value: string): string {
     throw new Error("Path is required.");
   }
 
+  // Resolve relative inputs against the active worktree when available.
   const baseDirectory = worktreePathContext ?? process.cwd();
   const resolvedPath = isAbsolute(trimmed)
     ? resolve(trimmed)
@@ -274,18 +316,24 @@ function canonicalPath(value: string): string {
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
+/** Compare two paths after canonical normalization for robust equality checks. */
 function samePath(left: string, right: string): boolean {
   return canonicalPath(left) === canonicalPath(right);
 }
 
+/** List all known projects including closed ones for robust resolution fallback. */
 async function listKnownProjects() {
   return rpcClient.call("listProjects", { includeClosed: true });
 }
 
+/**
+ * Resolve a project id from explicit inputs, env context, or project path lookup.
+ */
 async function resolveProjectId(params?: {
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
 }): Promise<number> {
+  // explicit ids are authoritative; skip all other resolution paths.
   if (typeof params?.projectId === "number") {
     return params.projectId;
   }
@@ -309,10 +357,16 @@ async function resolveProjectId(params?: {
   throw new Error("projectId or projectPath required with no active project.");
 }
 
+/**
+ * Resolve a project id that owns a given worktree path.
+ *
+ * Checks explicit project preference first, then active project context, then all projects.
+ */
 async function resolveProjectIdForWorktreePath(
   worktreePath: string,
   preferredProjectId?: number | null,
 ): Promise<number> {
+  // prefer caller-provided project candidate to avoid expensive global scans.
   if (typeof preferredProjectId === "number") {
     const worktrees = await rpcClient.call("listProjectWorktrees", {
       projectId: preferredProjectId,
@@ -343,6 +397,7 @@ async function resolveProjectIdForWorktreePath(
   }
 
   for (const project of await listKnownProjects()) {
+    // skip candidates already checked above for deterministic preference ordering.
     if (
       typeof preferredProjectId === "number" &&
       project.id === preferredProjectId
@@ -370,6 +425,9 @@ async function resolveProjectIdForWorktreePath(
   throw new Error(`Worktree not found: ${worktreePath}`);
 }
 
+/**
+ * Resolve worktree target used by thread operations, using explicit args or context.
+ */
 async function resolveWorktreeTarget(params?: {
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
@@ -420,6 +478,9 @@ function requireThreadId(threadId?: number | null): number {
   throw new Error("threadId is required.");
 }
 
+/**
+ * Normalize summary values so callers can clear with blank input.
+ */
 function normalizeOptionalSummary(
   summary: string | null | undefined,
 ): string | null | undefined {
@@ -429,12 +490,16 @@ function normalizeOptionalSummary(
   return summary?.trim() || null;
 }
 
+/**
+ * Apply thread updates directly to local sqlite metadata as a local-first step.
+ */
 function updateThreadMetadataLocally(
   threadId: number,
   title?: string,
   summary?: string | null,
   pinned?: boolean,
 ) {
+  // Local cache must exist before updates so we can preserve unchanged fields.
   const existingThread = getThreadById(db, threadId);
   if (!existingThread) {
     throw new Error(`Thread not found: ${threadId}`);
@@ -457,6 +522,7 @@ function updateThreadMetadataLocally(
     setThreadPinnedRecord(db, threadId, pinned);
   }
 
+  // Re-fetch after writes so caller always receives the current record.
   const thread = getThreadById(db, threadId);
   if (!thread) {
     throw new Error(`Thread not found: ${threadId}`);
@@ -464,6 +530,9 @@ function updateThreadMetadataLocally(
   return thread;
 }
 
+/**
+ * Schedule non-blocking background RPC updates for thread metadata changes.
+ */
 function refreshThreadMetadataInApp(
   thread: ThreadRecord,
   title?: string,
@@ -501,6 +570,7 @@ function refreshThreadMetadataInApp(
   }
 }
 
+/** Map low-level run state into a concise, UI-oriented label. */
 function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
   switch (detail.thread.runStatus.state) {
     case "working":
@@ -514,6 +584,7 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
   }
 }
 
+/** Build metadata payload for thread details from db rows or rpc thread objects. */
 function threadMetadataPayload(
   thread:
     | RpcThreadDetail["thread"]
@@ -533,6 +604,9 @@ function threadMetadataPayload(
   };
 }
 
+/**
+ * Build a detailed thread payload for new threads and send-message status responses.
+ */
 function threadStatusPayload(
   detail: RpcThreadDetail,
   metadata: {
@@ -564,6 +638,7 @@ function threadStatusPayload(
   };
 }
 
+/** Convert request payload into status-neutral thread-start output structure. */
 function threadStartRequestPayload(request: RpcThreadStartRequest) {
   return {
     ...request,
@@ -575,6 +650,9 @@ function threadStartRequestPayload(request: RpcThreadStartRequest) {
   };
 }
 
+/**
+ * Build MCP text output with optional structured payload for downstream clients.
+ */
 function textResult(text: string, structuredContent?: Record<string, unknown>) {
   return {
     content: [{ type: "text" as const, text }],
@@ -582,6 +660,7 @@ function textResult(text: string, structuredContent?: Record<string, unknown>) {
   };
 }
 
+/** Shared MCP annotations used by read-modify metadata operations. */
 function safeMetadataAnnotations() {
   return {
     idempotentHint: true,
@@ -595,6 +674,7 @@ const server = new McpServer({
   version: "0.0.1",
 });
 
+/** Tool: update existing thread metadata (title, summary, pinned). */
 server.registerTool(
   "modify_thread",
   {
@@ -658,6 +738,9 @@ server.registerTool(
   },
 );
 
+/**
+ * Tool: create threads with optional start/request workflow for deferred approval.
+ */
 server.registerTool(
   "new_thread",
   {
@@ -742,6 +825,7 @@ server.registerTool(
     };
 
     if (autoStart === true && unsafeMode !== true) {
+      // For approved flow, request permission first instead of creating immediately.
       const request = await rpcClient.call("requestThreadStart", {
         projectId: target.projectId,
         worktreePath: target.worktreePath,
@@ -758,6 +842,7 @@ server.registerTool(
       );
     }
 
+    // Default path: create thread and send first message in one end-to-end operation.
     const created = await rpcClient.call("createThread", {
       projectId: target.projectId,
       worktreePath: target.worktreePath,
@@ -777,6 +862,7 @@ server.registerTool(
   },
 );
 
+/** Start MCP stdio server and begin listening for tool invocations. */
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
