@@ -3,7 +3,6 @@
 ## Code file tasks
 
 - [x] Add comments to file `bun-plugin-react-compiler.ts`.
-- [ ] Add comments to file `package.json`.
 - [x] Add comments to file `src/bun/build-mainview.ts`.
 - [x] Add comments to file `src/bun/codex-sidecar-mcp.ts`.
 - [x] Add comments to file `src/bun/db.ts`.
