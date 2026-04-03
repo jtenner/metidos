@@ -15,6 +15,10 @@ type ReasoningEffortSelectorProps = {
   variant: "desktop" | "mobile";
 };
 
+/**
+ * Selects a model reasoning effort level (for example "low", "medium", "high").
+ * Renders a compact button + popover menu with clear label fallbacks while data loads.
+ */
 export function ReasoningEffortSelector({
   disabled,
   onChange,
@@ -22,7 +26,11 @@ export function ReasoningEffortSelector({
   value,
   variant,
 }: ReasoningEffortSelectorProps): JSX.Element {
+  // Derive the active option once so the button and title can always show a
+  // human-readable label without separate defensive checks.
   const activeOption = findReasoningEffortOption(options, value);
+
+  // Keep the trigger label resilient to empty options and loading states.
   const buttonLabel = activeOption
     ? activeOption.label
     : options.length === 0
@@ -88,6 +96,8 @@ export function ReasoningEffortSelector({
         </button>
       )}
       renderPanel={({ close }) => (
+        // Keep the options list as an absolute overlay so it can escape panel
+        // clipping and appear above the trigger.
         <div
           className={`absolute bottom-[calc(100%+0.5rem)] z-40 overflow-hidden border shadow-[0_18px_38px_rgba(0,0,0,0.42)] ${
             variant === "desktop"
@@ -111,6 +121,8 @@ export function ReasoningEffortSelector({
                       : "text-[#ebf3f8] hover:bg-[#1e2428]"
                   }`}
                   onClick={() => {
+                    // Always close before notifying parent state to avoid
+                    // layout flicker while the parent reconciles the selection.
                     close();
                     if (option.id !== value) {
                       onChange(option.id);
