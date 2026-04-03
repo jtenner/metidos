@@ -136,7 +136,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                     }}
                   />
                 ) : null}
-                  <div>
+                <div>
                   {visibleGitHistoryEntries.entries.map((entry) => (
                     <button
                       type="button"

@@ -147,8 +147,8 @@ export function ProjectTaskSelector({
                     <span className="block truncate font-label text-[10px] font-bold uppercase tracking-wider text-[#f2f0ef]">
                       {task.title}
                     </span>
-                      {taskMetaText(task) ? (
-                        // Additional metadata is shown only when distinct from the title.
+                    {taskMetaText(task) ? (
+                      // Additional metadata is shown only when distinct from the title.
                       <span className="mt-1 block truncate text-[11px] leading-4 text-[#a7b7c2]">
                         {taskMetaText(task)}
                       </span>

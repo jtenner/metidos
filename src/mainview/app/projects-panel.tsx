@@ -515,9 +515,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
             </div>
           ) : null}
           <div className="space-y-1">
-          {filteredProjects.length === 0 ? (
-            // Empty states vary between search miss and empty project list.
-            <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
+            {filteredProjects.length === 0 ? (
+              // Empty states vary between search miss and empty project list.
+              <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
                 {normalizedSidebarSearchQuery
                   ? "No matching projects."
                   : "No projects in database. Use + to add a project folder."}

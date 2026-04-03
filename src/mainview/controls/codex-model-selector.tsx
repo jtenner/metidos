@@ -193,10 +193,10 @@ export function CodexModelSelector({
             aria-expanded={open}
             aria-haspopup="menu"
           >
-                <span className="min-w-0 flex-1 overflow-hidden">
-                  <span className="block truncate text-[11px] leading-none">
-                    <span className="text-[#f2f0ef]">{mobileButtonLabel}</span>
-                    <span className="text-[#8ea0ad]">{` - ${reasoningLabel}`}</span>
+            <span className="min-w-0 flex-1 overflow-hidden">
+              <span className="block truncate text-[11px] leading-none">
+                <span className="text-[#f2f0ef]">{mobileButtonLabel}</span>
+                <span className="text-[#8ea0ad]">{` - ${reasoningLabel}`}</span>
               </span>
             </span>
             <span className="flex h-4 shrink-0 items-center leading-none text-[#8f8d8b]">
@@ -355,10 +355,10 @@ export function CodexModelSelector({
                   </div>
                 </div>
                 <div className="py-2">
-                          {reasoningOptions.map((option) => {
-                            const selected = option.id === reasoningValue;
-                            return (
-                              <button
+                  {reasoningOptions.map((option) => {
+                    const selected = option.id === reasoningValue;
+                    return (
+                      <button
                         key={option.id}
                         type="button"
                         className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
@@ -366,12 +366,12 @@ export function CodexModelSelector({
                             ? "bg-[#28353e] text-[#f8fafc]"
                             : "text-[#ebf3f8] hover:bg-[#1e2428]"
                         }`}
-                                onClick={() => {
-                                  // Close first so any parent overlays collapse before the
-                                  // app-level state updates run.
-                                  close();
-                                  if (expandedModel.id !== value) {
-                                    onChange(expandedModel.id);
+                        onClick={() => {
+                          // Close first so any parent overlays collapse before the
+                          // app-level state updates run.
+                          close();
+                          if (expandedModel.id !== value) {
+                            onChange(expandedModel.id);
                           }
                           if (option.id !== reasoningValue) {
                             onChangeReasoningEffort(option.id);
@@ -513,17 +513,17 @@ export function CodexModelSelector({
                         key={model.id}
                         type="button"
                         className={`flex w-full items-start gap-3 px-2 py-2 text-left transition-colors ${
-                                      selected
-                                        ? "bg-[#28353e] text-[#f8fafc]"
-                                        : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                          selected
+                            ? "bg-[#28353e] text-[#f8fafc]"
+                            : "text-[#ebf3f8] hover:bg-[#1e2428]"
                         }`}
-                            onClick={() => {
-                              // Desktop path changes only the model and closes immediately.
-                              close();
-                              if (model.id !== value) {
-                                onChange(model.id);
-                              }
-                            }}
+                        onClick={() => {
+                          // Desktop path changes only the model and closes immediately.
+                          close();
+                          if (model.id !== value) {
+                            onChange(model.id);
+                          }
+                        }}
                       >
                         <span
                           className={`mt-0.5 shrink-0 ${

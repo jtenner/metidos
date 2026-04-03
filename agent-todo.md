@@ -2,15 +2,6 @@
 
 ## Code file tasks
 
-- [x] Add comments to file `src/mainview/app/sidebar-content.tsx`.
-- [x] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
-- [x] Add comments to file `src/mainview/app/state.ts`.
-- [x] Add comments to file `src/mainview/app/use-mainview-derived-state.ts`.
-- [x] Add comments to file `src/mainview/app/use-thread-previews.ts`.
-- [x] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
-- [x] Add comments to file `src/mainview/app/workspace-panel.tsx`.
-- [x] Add comments to file `src/mainview/index.ts`.
-
 ## Folder tasks
 
 - [ ] Add a README.md for folder `.` (repository root).
