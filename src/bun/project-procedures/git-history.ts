@@ -22,18 +22,31 @@ import {
 
 const GIT_HISTORY_PREFETCH_CHUNK_SIZE = DEFAULT_GIT_HISTORY_PAGE_SIZE * 4;
 
+/**
+ * A request in-flight for a commit diff, shared between waiters.
+ */
 export type PendingGitCommitDiffRequest = {
   controller: AbortController;
   promise: Promise<RpcGitCommitDiffResult>;
   waiterCount: number;
 };
 
+/**
+ * A request in-flight for paginated git-history prefetch.
+ */
 export type PendingGitHistoryPrefetch = {
   controller: AbortController;
   priority: GitCommandPriority;
   promise: Promise<void>;
 };
 
+/**
+ * Cache envelope for a worktree's git history:
+ * - loaded entries
+ * - next pagination offset
+ * - active prefetch request
+ * - signature to invalidate stale fills
+ */
 export type WorktreeGitHistoryCacheState = {
   history: RpcWorktreeGitHistorySummary;
   historyEntries: RpcGitHistoryEntry[];
@@ -55,6 +68,10 @@ export function applyGitHistoryCachePage(
   worktreeState.historyNextOffset = page.nextOffset;
 }
 
+/**
+ * Whether cached entries already satisfy the requested window.
+ * True also when history is fully loaded but short of requested offset.
+ */
 function hasGitHistoryCacheRange(
   worktreeState: WorktreeGitHistoryCacheState,
   offset: number,
@@ -70,6 +87,9 @@ function hasGitHistoryCacheRange(
   );
 }
 
+/**
+ * Build a page result from cache only (no disk access).
+ */
 export function buildGitHistoryResultFromCache(
   worktreeState: WorktreeGitHistoryCacheState,
   limit: number,
@@ -91,6 +111,9 @@ export function buildGitHistoryResultFromCache(
   };
 }
 
+/**
+ * Cancel active prefetch for a worktree and clear marker so future callers can start fresh.
+ */
 export function abortGitHistoryPrefetch(
   worktreeState: WorktreeGitHistoryCacheState,
   reason: string,
@@ -106,6 +129,10 @@ export function abortGitHistoryPrefetch(
   prefetch.controller.abort(createAbortError(null, reason));
 }
 
+/**
+ * Ensure cache has enough entries for the requested offset/limit.
+ * Handles background/foreground prioritization and request coalescing.
+ */
 export async function fillGitHistoryCache(
   worktreeState: WorktreeGitHistoryCacheState,
   worktreePath: string,
@@ -189,6 +216,10 @@ export async function fillGitHistoryCache(
   }
 }
 
+/**
+ * Kick off non-blocking background prefetch for one additional page.
+ * No-op when history is exhausted or prefetch already in-flight.
+ */
 export function warmGitHistoryCache(
   worktreeState: WorktreeGitHistoryCacheState,
   worktreePath: string,
@@ -212,6 +243,9 @@ export function warmGitHistoryCache(
   });
 }
 
+/**
+ * Build stable cache key for per-(worktree,commit) diff lookups.
+ */
 export function gitCommitDiffCacheKey(
   worktreePath: string,
   commitHash: string,
@@ -219,6 +253,10 @@ export function gitCommitDiffCacheKey(
   return `${worktreePath}\n${commitHash}`;
 }
 
+/**
+ * Read commit diff from LRU cache when possible.
+ * Coalesces concurrent misses, and aborts pending request if nobody is waiting.
+ */
 export async function getCachedGitCommitDiffResult(
   projectId: number,
   worktreePath: string,
