@@ -2953,7 +2953,16 @@ export async function openWorktreeProcedure(
     });
 
     const worktreeState = ensureWorktreePollState(state, worktreePath);
-    const [{ history, summary, signature }, snapshot] =
+    const tasksPromise = refreshWorktreeTaskCache(state, worktreePath, {
+      startWatching: true,
+    }).catch((error) => {
+      logBackgroundTaskFailure(
+        `Task cache warm failed for ${worktreePath}`,
+        error,
+      );
+      return worktreeState.tasks ?? [];
+    });
+    const [{ history, summary, signature }, snapshot, tasks] =
       await runWorktreeOpenLimited(
         () =>
           Promise.all([
@@ -2968,6 +2977,7 @@ export async function openWorktreeProcedure(
               worktreePath,
               requestGitOptions,
             ),
+            tasksPromise,
           ]),
         context?.signal,
       );
@@ -2975,6 +2985,7 @@ export async function openWorktreeProcedure(
     worktreeState.historyEntries = history.entries;
     worktreeState.historyNextOffset = history.nextOffset;
     worktreeState.historySignature = signature;
+    startWorktreeTaskPolling(state, worktreePath);
     syncProjectWorktreeBackgroundPolling(state);
     queueBackgroundWorkWhenIdle(
       `git-history-warm:${project.id}:${worktreePath}`,
@@ -2986,19 +2997,9 @@ export async function openWorktreeProcedure(
         );
       },
     );
-    queueBackgroundWorkWhenIdle(
-      `task-cache-warm:${project.id}:${worktreePath}`,
-      () => {
-        void refreshWorktreeTaskCache(state, worktreePath).catch((error) => {
-          logBackgroundTaskFailure(
-            `Task cache warm failed for ${worktreePath}`,
-            error,
-          );
-        });
-      },
-    );
 
     return {
+      tasks,
       project,
       worktree: snapshot,
       history,

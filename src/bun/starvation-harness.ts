@@ -724,23 +724,6 @@ async function measureStartupSequence(
     };
   }
 
-  const followUpCalls = await Promise.all([
-    measureRpc(
-      client,
-      "listProjectTasks",
-      "listProjectTasks",
-      {
-        projectId: context.project.id,
-        worktreePath: context.worktree.path,
-      },
-      {
-        priority: "foreground",
-        timeoutMs: options.rpcBudgetMs,
-      },
-    ),
-  ]);
-  rpc.push(...followUpCalls.map((entry) => entry.timing));
-
   return {
     http,
     rpc,

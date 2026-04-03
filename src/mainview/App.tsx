@@ -62,6 +62,7 @@ import {
   type OpenThreadOptions,
   type PendingSharedRequest,
   type PersistedMainviewState,
+  PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
@@ -373,7 +374,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const gitHistoryCacheRef = useRef(
     new Map<string, RpcWorktreeGitHistoryResult>(),
   );
+  const projectTaskCacheRef = useRef(new Map<string, RpcProjectTask[]>());
   const skipFreshGitHistoryRefreshRef = useRef(new Set<string>());
+  const skipFreshProjectTaskRefreshRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const previousSelectedThreadIdRef = useRef<number | null>(
@@ -1447,15 +1450,37 @@ export default function App({ procedures }: AppProps): JSX.Element {
       projectId: number,
       worktreePath: string,
       options?: {
+        preferCached?: boolean;
         priority?: RpcRequestPriority;
+        skipRefreshWhenCached?: boolean;
       },
     ): Promise<void> => {
       const requestId = ++projectTasksRequestIdRef.current;
       abortProjectTasksRequest("Project task request was superseded.");
+      const cacheKey = worktreeKey(projectId, worktreePath);
+      const cachedTasks = readLruValue(projectTaskCacheRef.current, cacheKey);
+      const serveCachedTasks = Boolean(options?.preferCached && cachedTasks);
+      const skipRefreshWhenCached = Boolean(
+        serveCachedTasks && options?.skipRefreshWhenCached,
+      );
+      const silentRefresh = serveCachedTasks;
+
+      if (serveCachedTasks && cachedTasks) {
+        setProjectTasks(cachedTasks);
+        setIsLoadingProjectTasks(false);
+        setTaskControlError("");
+      }
+      if (skipRefreshWhenCached) {
+        projectTasksAbortControllerRef.current = null;
+        return;
+      }
+
       const controller = new AbortController();
       projectTasksAbortControllerRef.current = controller;
-      setIsLoadingProjectTasks(true);
-      setTaskControlError("");
+      if (!silentRefresh) {
+        setIsLoadingProjectTasks(true);
+        setTaskControlError("");
+      }
 
       try {
         const tasks = await procedures.listProjectTasks(
@@ -1471,6 +1496,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
         if (projectTasksRequestIdRef.current !== requestId) {
           return;
         }
+        writeLruValue(
+          projectTaskCacheRef.current,
+          cacheKey,
+          tasks,
+          PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
+        );
         setProjectTasks(tasks);
       } catch (error) {
         if (isAbortError(error)) {
@@ -1479,10 +1510,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
         if (projectTasksRequestIdRef.current !== requestId) {
           return;
         }
-        setProjectTasks([]);
-        setTaskControlError(
-          error instanceof Error ? error.message : String(error),
-        );
+        if (!silentRefresh || !cachedTasks) {
+          setProjectTasks([]);
+          setTaskControlError(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       } finally {
         if (projectTasksAbortControllerRef.current === controller) {
           projectTasksAbortControllerRef.current = null;
@@ -1493,6 +1526,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
       }
     },
     [abortProjectTasksRequest, procedures],
+  );
+
+  const primeProjectTasks = useCallback(
+    (projectId: number, worktreePath: string, tasks: RpcProjectTask[]) => {
+      const cacheKey = worktreeKey(projectId, worktreePath);
+      writeLruValue(
+        projectTaskCacheRef.current,
+        cacheKey,
+        tasks,
+        PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
+      );
+      skipFreshProjectTaskRefreshRef.current.add(cacheKey);
+    },
+    [],
   );
 
   const cacheGitHistoryResult = useCallback(
@@ -2199,6 +2246,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             ok: true;
             history: RpcWorktreeGitHistoryResult;
             projectId: number;
+            tasks: RpcProjectTask[];
             snapshot: RpcWorktreeSnapshot;
             worktreePath: string;
           }
@@ -2223,6 +2271,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
             ok: true,
             history: result.history,
             projectId,
+            tasks: result.tasks,
             snapshot: result.worktree,
             worktreePath,
           });
@@ -2239,6 +2288,11 @@ export default function App({ procedures }: AppProps): JSX.Element {
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
           primeGitHistoryResult(result.history);
+          primeProjectTasks(
+            result.projectId,
+            result.worktreePath,
+            result.tasks,
+          );
           setWorktreeState(result.projectId, result.worktreePath, {
             loading: false,
             opened: true,
@@ -2291,6 +2345,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     initialMainviewState,
     openThread,
     prefetchDirectorySuggestions,
+    primeProjectTasks,
     primeGitHistoryResult,
     procedures,
     seedAddProjectPath,
@@ -2821,8 +2876,15 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setTaskControlError("");
       return;
     }
+    const cacheKey = worktreeKey(
+      selectedProject.id,
+      activeSelectedWorktreePath,
+    );
     void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath, {
+      preferCached: true,
       priority: "default",
+      skipRefreshWhenCached:
+        skipFreshProjectTaskRefreshRef.current.delete(cacheKey),
     });
   }, [
     activeSelectedWorktreePath,
@@ -3563,6 +3625,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           return;
         }
         primeGitHistoryResult(result.history);
+        primeProjectTasks(projectId, worktreePath, result.tasks);
         setWorktreeState(projectId, worktreePath, {
           loading: false,
           opened: true,
@@ -3605,6 +3668,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       getWorktreeState,
       finishWorktreeToggleRequest,
       isCurrentWorktreeToggleRequest,
+      primeProjectTasks,
       primeGitHistoryResult,
       procedures,
       setWorktreeState,

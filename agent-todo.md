@@ -30,3 +30,4 @@ Source: startup latency follow-up
 
 - [x] Startup bootstrap bundling: Collapse the app's initial home-directory, project list, thread list, and model catalog reads into one foreground bootstrap RPC so client startup does less work under load.
 - [x] Startup history reuse: Reuse the history already fetched by `openWorktree(...)` during startup and skip the redundant first `listWorktreeGitHistory(...)` refresh after session restore.
+- [x] Startup task reuse: Reuse the tasks fetched by `openWorktree(...)` during startup and skip the redundant first `listProjectTasks(...)` refresh for freshly opened worktrees.

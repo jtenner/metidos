@@ -54,6 +54,7 @@ export type RpcProjectWorktreesResult = {
 
 export type RpcOpenWorktreeResult = {
   project: RpcProject;
+  tasks: RpcProjectTask[];
   worktree: RpcWorktreeSnapshot;
   history: RpcWorktreeGitHistoryResult;
 };
