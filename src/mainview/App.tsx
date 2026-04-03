@@ -373,6 +373,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const gitHistoryCacheRef = useRef(
     new Map<string, RpcWorktreeGitHistoryResult>(),
   );
+  const skipFreshGitHistoryRefreshRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const previousSelectedThreadIdRef = useRef<number | null>(
@@ -1506,6 +1507,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [],
   );
 
+  const primeGitHistoryResult = useCallback(
+    (history: RpcWorktreeGitHistoryResult) => {
+      cacheGitHistoryResult(history);
+      skipFreshGitHistoryRefreshRef.current.add(
+        worktreeKey(history.projectId, history.worktreePath),
+      );
+    },
+    [cacheGitHistoryResult],
+  );
+
   const loadGitHistory = useCallback(
     async (
       projectId: number,
@@ -1513,16 +1524,18 @@ export default function App({ procedures }: AppProps): JSX.Element {
       options?: {
         silent?: boolean;
         preferCached?: boolean;
+        skipRefreshWhenCached?: boolean;
       },
     ): Promise<void> => {
       const requestId = ++gitHistoryRequestIdRef.current;
       abortGitHistoryRequests("Git history request was superseded.");
-      const controller = new AbortController();
-      gitHistoryAbortControllerRef.current = controller;
       const cacheKey = worktreeKey(projectId, worktreePath);
       const cachedHistory = readLruValue(gitHistoryCacheRef.current, cacheKey);
       const serveCachedHistory = Boolean(
         options?.preferCached && cachedHistory,
+      );
+      const skipRefreshWhenCached = Boolean(
+        serveCachedHistory && options?.skipRefreshWhenCached,
       );
       const silentRefresh = options?.silent || serveCachedHistory;
       if (serveCachedHistory && cachedHistory) {
@@ -1532,6 +1545,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
         gitHistoryLoadingMoreRef.current = false;
         setGitHistoryError("");
       }
+      if (skipRefreshWhenCached) {
+        gitHistoryAbortControllerRef.current = null;
+        return;
+      }
+
+      const controller = new AbortController();
+      gitHistoryAbortControllerRef.current = controller;
       if (!silentRefresh) {
         setGitHistoryLoading(true);
         setGitHistoryError("");
@@ -2011,13 +2031,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
       readSidebarPanelsSnapshot().openProjectPaths;
 
     try {
-      const [loaded, homeDirectoryResult, loadedThreads, modelCatalog] =
-        await Promise.all([
-          procedures.listProjects({ includeClosed: true }),
-          procedures.getHomeDirectory(),
-          procedures.listThreads(),
-          procedures.getCodexModelCatalog(),
-        ]);
+      const {
+        homeDirectory: homeDirectoryResult,
+        modelCatalog,
+        projects: loadedProjects,
+        threads: loadedThreads,
+      } = await procedures.getAppBootstrap(undefined, {
+        priority: "foreground",
+      });
       let startupThreads = sortThreads(loadedThreads);
       let initialThread = pickInitialThread(startupThreads, persistedState);
       let initialThreadDetailPromise: Promise<RpcThreadDetail> | null = null;
@@ -2050,7 +2071,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
       }
       const restoredOpenProjectIds = new Set<number>();
-      for (const project of loaded) {
+      for (const project of loadedProjects) {
         if (initiallyOpenProjectTreePaths.has(project.path)) {
           restoredOpenProjectIds.add(project.id);
         }
@@ -2068,10 +2089,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
         initialThread?.projectId ?? persistedState.selectedProjectId ?? null;
       if (initialProjectId !== null) {
         restoredOpenProjectIds.add(initialProjectId);
-      } else if (loaded[0]) {
-        restoredOpenProjectIds.add(loaded[0].id);
+      } else if (loadedProjects[0]) {
+        restoredOpenProjectIds.add(loadedProjects[0].id);
       }
-      const optimisticProjects = loaded.map((project) => ({
+      const optimisticProjects = loadedProjects.map((project) => ({
         ...project,
         isOpen: restoredOpenProjectIds.has(project.id)
           ? (1 as const)
@@ -2109,7 +2130,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setPendingThreadReasoningEffort(
         (current) => current || modelCatalog.defaultReasoningEffort,
       );
-      hydrateProjectRows(loaded);
+      hydrateProjectRows(loadedProjects);
       setHomeDirectory(homeDirectoryResult.homeDirectory);
       setSupportsTildePath(homeDirectoryResult.supportsTildePath);
       seedAddProjectPath(
@@ -2217,7 +2238,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
-          cacheGitHistoryResult(result.history);
+          primeGitHistoryResult(result.history);
           setWorktreeState(result.projectId, result.worktreePath, {
             loading: false,
             opened: true,
@@ -2265,12 +2286,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setSessionStateReady(true);
     }
   }, [
-    cacheGitHistoryResult,
     getProjectState,
     hydrateProjectRows,
     initialMainviewState,
     openThread,
     prefetchDirectorySuggestions,
+    primeGitHistoryResult,
     procedures,
     seedAddProjectPath,
     setProjectState,
@@ -2813,6 +2834,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   ]);
 
   useEffect(() => {
+    if (!sessionStateReady) {
+      return;
+    }
     if (!selectedProject || !activeSelectedWorktreePath) {
       gitHistoryRequestIdRef.current += 1;
       abortGitHistoryRequests("Git history request was cleared.");
@@ -2823,13 +2847,20 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setGitHistoryError("");
       return;
     }
+    const cacheKey = worktreeKey(
+      selectedProject.id,
+      activeSelectedWorktreePath,
+    );
     void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
       preferCached: true,
+      skipRefreshWhenCached:
+        skipFreshGitHistoryRefreshRef.current.delete(cacheKey),
     });
   }, [
     activeSelectedWorktreePath,
     abortGitHistoryRequests,
     loadGitHistory,
+    sessionStateReady,
     selectedProject,
   ]);
 
@@ -3531,7 +3562,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         if (!isCurrentWorktreeToggleRequest(key, requestId)) {
           return;
         }
-        cacheGitHistoryResult(result.history);
+        primeGitHistoryResult(result.history);
         setWorktreeState(projectId, worktreePath, {
           loading: false,
           opened: true,
@@ -3572,9 +3603,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
       beginWorktreeToggleRequest,
       createThreadForWorktree,
       getWorktreeState,
-      cacheGitHistoryResult,
       finishWorktreeToggleRequest,
       isCurrentWorktreeToggleRequest,
+      primeGitHistoryResult,
       procedures,
       setWorktreeState,
       threads,

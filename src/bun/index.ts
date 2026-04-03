@@ -1,5 +1,4 @@
 import { readdirSync, realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 
@@ -14,7 +13,9 @@ import {
   deleteProjectProcedure,
   deleteThreadProcedure,
   discardEmptyThreadProcedure,
+  getAppBootstrapProcedure,
   getCodexModelCatalogProcedure,
+  getHomeDirectoryProcedure,
   getProcedureRuntimeStats,
   getThreadProcedure,
   getWorktreeGitCommitDiffProcedure,
@@ -216,14 +217,11 @@ process.env.JOLT_PORT = String(SERVER_PORT);
 process.env.JOLT_RPC_URL = `ws://127.0.0.1:${SERVER_PORT}/rpc`;
 
 const rpcHandlers: RpcRequestHandlerMap = {
-  getHomeDirectory: async () => ({
-    homeDirectory: homedir(),
-    supportsTildePath:
-      process.platform === "darwin" || process.platform === "linux",
-  }),
+  getHomeDirectory: () => getHomeDirectoryProcedure(),
   listDirectorySuggestions: (params) =>
     listDirectorySuggestionsProcedure(params),
   getCodexModelCatalog: (params) => getCodexModelCatalogProcedure(params),
+  getAppBootstrap: () => getAppBootstrapProcedure(),
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),
   openProject: (params, context) => openProjectProcedure(params, context),

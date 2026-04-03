@@ -553,6 +553,7 @@ const procedures: ProjectProcedures = {
   getHomeDirectory: createProcedure("getHomeDirectory"),
   listDirectorySuggestions: createProcedure("listDirectorySuggestions"),
   getCodexModelCatalog: createProcedure("getCodexModelCatalog"),
+  getAppBootstrap: createProcedure("getAppBootstrap"),
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),
   openProject: createProcedure("openProject"),

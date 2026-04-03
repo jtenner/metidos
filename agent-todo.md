@@ -25,3 +25,8 @@ Source: server request starvation follow-up
 Source: isolated topology follow-up
 
 - [x] Split-topology starvation harness: Teach the starvation harness to discover or override the RPC endpoint separately from the public HTTP port so it validates the default isolated `start` path.
+
+Source: startup latency follow-up
+
+- [x] Startup bootstrap bundling: Collapse the app's initial home-directory, project list, thread list, and model catalog reads into one foreground bootstrap RPC so client startup does less work under load.
+- [x] Startup history reuse: Reuse the history already fetched by `openWorktree(...)` during startup and skip the redundant first `listWorktreeGitHistory(...)` refresh after session restore.

@@ -200,6 +200,13 @@ export type RpcCodexModelCatalog = {
   reasoningEfforts: RpcCodexReasoningEffortOption[];
 };
 
+export type RpcAppBootstrapResult = {
+  homeDirectory: RpcHomeDirectoryResult;
+  modelCatalog: RpcCodexModelCatalog;
+  projects: RpcProject[];
+  threads: RpcThread[];
+};
+
 export type RpcThreadRunStatus = {
   state: "idle" | "working" | "failed" | "stopped";
   startedAt: string | null;
@@ -365,6 +372,10 @@ export type AppRPCSchema = {
     getCodexModelCatalog: {
       params: undefined;
       response: RpcCodexModelCatalog;
+    };
+    getAppBootstrap: {
+      params: undefined;
+      response: RpcAppBootstrapResult;
     };
     listProjects: {
       params:
@@ -563,6 +574,10 @@ export interface ProjectProcedures {
   getCodexModelCatalog: RpcProcedureCall<
     AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
     AppRPCSchema["requests"]["getCodexModelCatalog"]["response"]
+  >;
+  getAppBootstrap: RpcProcedureCall<
+    AppRPCSchema["requests"]["getAppBootstrap"]["params"],
+    AppRPCSchema["requests"]["getAppBootstrap"]["response"]
   >;
   listProjects: RpcProcedureCall<
     AppRPCSchema["requests"]["listProjects"]["params"],

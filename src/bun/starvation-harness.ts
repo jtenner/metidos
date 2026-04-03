@@ -690,31 +690,17 @@ async function measureStartupSequence(
 
   const rpc: TimedResult[] = [];
 
-  const initialCalls = await Promise.all([
-    measureRpc(client, "getHomeDirectory", "getHomeDirectory", undefined, {
+  const bootstrap = await measureRpc(
+    client,
+    "getAppBootstrap",
+    "getAppBootstrap",
+    undefined,
+    {
       priority: "foreground",
       timeoutMs: options.rpcBudgetMs,
-    }),
-    measureRpc(client, "listProjects", "listProjects", undefined, {
-      priority: "foreground",
-      timeoutMs: options.rpcBudgetMs,
-    }),
-    measureRpc(client, "listThreads", "listThreads", undefined, {
-      priority: "foreground",
-      timeoutMs: options.rpcBudgetMs,
-    }),
-    measureRpc(
-      client,
-      "getCodexModelCatalog",
-      "getCodexModelCatalog",
-      undefined,
-      {
-        priority: "foreground",
-        timeoutMs: options.rpcBudgetMs,
-      },
-    ),
-  ]);
-  rpc.push(...initialCalls.map((entry) => entry.timing));
+    },
+  );
+  rpc.push(bootstrap.timing);
 
   const opened = await measureRpc(
     client,
@@ -744,20 +730,6 @@ async function measureStartupSequence(
       "listProjectTasks",
       "listProjectTasks",
       {
-        projectId: context.project.id,
-        worktreePath: context.worktree.path,
-      },
-      {
-        priority: "foreground",
-        timeoutMs: options.rpcBudgetMs,
-      },
-    ),
-    measureRpc(
-      client,
-      "listWorktreeGitHistory",
-      "listWorktreeGitHistory",
-      {
-        limit: 20,
         projectId: context.project.id,
         worktreePath: context.worktree.path,
       },

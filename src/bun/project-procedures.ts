@@ -1,4 +1,5 @@
 import { existsSync, type FSWatcher, watch } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import {
   Codex,
@@ -110,11 +111,13 @@ import {
 } from "./project-procedures/thread-detail";
 import type {
   AppRPCSchema,
+  RpcAppBootstrapResult,
   RpcCodexModelCatalog,
   RpcCodexReasoningEffort,
   RpcCreateWorktreeResult,
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
+  RpcHomeDirectoryResult,
   RpcOpenWorktreeResult,
   RpcProject,
   RpcProjectTask,
@@ -142,6 +145,14 @@ const JOLT_SIDECAR_SERVER_PATH = resolve(
   process.cwd(),
   "src/bun/codex-sidecar-mcp.ts",
 );
+
+export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResult> {
+  return {
+    homeDirectory: homedir(),
+    supportsTildePath:
+      process.platform === "darwin" || process.platform === "linux",
+  };
+}
 
 export async function listProjectsProcedure(
   _params?: AppRPCSchema["requests"]["listProjects"]["params"],
@@ -235,6 +246,22 @@ export async function getCodexModelCatalogProcedure(
   _params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
 ): Promise<RpcCodexModelCatalog> {
   return buildCodexModelCatalog();
+}
+
+export async function getAppBootstrapProcedure(): Promise<RpcAppBootstrapResult> {
+  const [homeDirectory, modelCatalog] = await Promise.all([
+    getHomeDirectoryProcedure(),
+    getCodexModelCatalogProcedure(),
+  ]);
+
+  return {
+    homeDirectory,
+    modelCatalog,
+    projects: listProjects(db),
+    threads: listThreads(db).map((thread) =>
+      toRpcThread(thread, currentThreadRunStatus(thread)),
+    ),
+  };
 }
 
 const PROJECT_POLL_INTERVAL_MS = 4_000;
