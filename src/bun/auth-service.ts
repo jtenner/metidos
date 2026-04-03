@@ -314,6 +314,39 @@ function recordAuthAuditEvent(
   });
 }
 
+function recordInvalidAuthAttempt(
+  database: Database,
+  input: {
+    lockedUntil: string | null;
+    method: "recovery_code" | "totp";
+    primaryFactorType: AuthPrimaryFactorType;
+  },
+): void {
+  if (input.lockedUntil) {
+    recordAuthAuditEvent(database, {
+      eventType: "auth_lockout_started",
+      payload: {
+        lockedUntil: input.lockedUntil,
+        method: input.method,
+        primaryFactorType: input.primaryFactorType,
+      },
+      summaryText:
+        "Authentication lockout started after repeated invalid credentials.",
+    });
+    return;
+  }
+
+  recordAuthAuditEvent(database, {
+    eventType: "auth_invalid_credentials",
+    payload: {
+      method: input.method,
+      primaryFactorType: input.primaryFactorType,
+    },
+    summaryText:
+      "Authentication failed because the provided credentials were invalid.",
+  });
+}
+
 function parseCookieHeaderValue(
   cookieHeader: string,
   name: string,
@@ -453,6 +486,11 @@ export async function verifyPrimaryFactorAndTotp(
       settings.failedPrimaryFactorAttempts,
       now,
     );
+    recordInvalidAuthAttempt(database, {
+      lockedUntil: failure.lockedUntil,
+      method: "totp",
+      primaryFactorType: settings.primaryFactorType,
+    });
 
     if (failure.lockedUntil) {
       throw new AuthServiceError(
@@ -509,6 +547,11 @@ export async function verifyPrimaryFactorAndRecoveryCode(
       settings.failedPrimaryFactorAttempts,
       now,
     );
+    recordInvalidAuthAttempt(database, {
+      lockedUntil: failure.lockedUntil,
+      method: "recovery_code",
+      primaryFactorType: settings.primaryFactorType,
+    });
 
     if (failure.lockedUntil) {
       throw new AuthServiceError(

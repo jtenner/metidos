@@ -220,6 +220,22 @@ describe("auth service", () => {
         totpCode: successCode,
       });
       expect(loginResult.session.id.length).toBeGreaterThan(10);
+      const failureEvents = listSecurityAuditEvents(database).filter(
+        (event) =>
+          event.eventType === "auth_invalid_credentials" ||
+          event.eventType === "auth_lockout_started",
+      );
+      expect(
+        failureEvents.filter(
+          (event) => event.eventType === "auth_invalid_credentials",
+        ),
+      ).toHaveLength(2);
+      expect(
+        failureEvents.filter(
+          (event) => event.eventType === "auth_lockout_started",
+        ),
+      ).toHaveLength(1);
+      expect(failureEvents[0]?.payloadJson).toContain('"method":"totp"');
     });
   }
 
@@ -308,6 +324,11 @@ describe("auth service", () => {
         recoveryCode,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
+    expect(
+      listSecurityAuditEvents(database).find(
+        (event) => event.eventType === "auth_invalid_credentials",
+      )?.payloadJson,
+    ).toContain('"method":"recovery_code"');
   });
 
   it("records setup, TOTP login, step-up, and logout audit events", async () => {

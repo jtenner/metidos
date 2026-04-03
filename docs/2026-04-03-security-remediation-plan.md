@@ -560,7 +560,7 @@ Unit and integration coverage should include:
 
 Current implementation coverage:
 
-- `src/bun/auth-service.test.ts` covers setup, TOTP login, recovery-code login, auth lifecycle audit events, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
+- `src/bun/auth-service.test.ts` covers setup, TOTP login, recovery-code login, auth lifecycle audit events, invalid-credential lockout auditing, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
 - `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow
