@@ -143,13 +143,11 @@ export function CodexModelSelector({
 
   if (combinedMobileSelectorEnabled) {
     const reasoningLabel = activeReasoningOption?.label ?? "Loading";
-    const mobileButtonLabel =
-      activeModel?.summary?.trim() ||
-      (activeModel
-        ? codexModelLabel(activeModel)
-        : models.length === 0
-          ? "Loading models"
-          : "Select model");
+    const mobileButtonLabel = activeModel
+      ? codexModelLabel(activeModel)
+      : models.length === 0
+        ? "Loading models"
+        : "Select model";
 
     return (
       <DropdownControl
@@ -177,13 +175,9 @@ export function CodexModelSelector({
             aria-haspopup="menu"
           >
             <span className="min-w-0 flex-1 overflow-hidden">
-              <span className="flex min-w-0 items-baseline gap-1 overflow-hidden text-[11px] leading-none">
-                <span className="min-w-0 flex-1 truncate text-[#f2f0ef]">
-                  {mobileButtonLabel}
-                </span>
-                <span className="shrink-0 text-[#8ea0ad]">
-                  {` - ${reasoningLabel}`}
-                </span>
+              <span className="block truncate text-[11px] leading-none">
+                <span className="text-[#f2f0ef]">{mobileButtonLabel}</span>
+                <span className="text-[#8ea0ad]">{` - ${reasoningLabel}`}</span>
               </span>
             </span>
             <span className="flex h-4 shrink-0 items-center leading-none text-[#8f8d8b]">
