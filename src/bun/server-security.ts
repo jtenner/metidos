@@ -12,7 +12,7 @@ export const LOOPBACK_HOSTNAME = "127.0.0.1";
 function normalizeBrowserOrigin(origin: string): string | null {
   try {
     const url = new URL(origin);
-    if (!LOCAL_APP_PROTOCOLS.includes(url.protocol)) {
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
       return null;
     }
     if (url.username || url.password) {

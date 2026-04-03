@@ -226,14 +226,14 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   headers.set("x-forwarded-proto", requestUrl.protocol.replace(":", ""));
 
   const method = request.method.toUpperCase();
-  const response = await fetch(targetUrl, {
-    body:
-      method === "GET" || method === "HEAD"
-        ? undefined
-        : await request.arrayBuffer(),
+  const init: RequestInit = {
     headers,
     method,
-  });
+  };
+  if (method !== "GET" && method !== "HEAD") {
+    init.body = await request.arrayBuffer();
+  }
+  const response = await fetch(targetUrl, init);
 
   return new Response(response.body, {
     headers: new Headers(response.headers),

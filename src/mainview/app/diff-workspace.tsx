@@ -336,8 +336,8 @@ export function DiffWorkspace({
           : "flex min-h-0 flex-1 overflow-hidden"
       }
     >
+      {/* Desktop layout fixes the tree column width to keep diff text from reflowing. */}
       <div
-        {/* Desktop layout fixes the tree column width to keep diff text from reflowing. */}
         className={
           mobile
             ? "shrink-0"

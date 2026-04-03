@@ -97,10 +97,12 @@ export function ProjectActionMenu({
         </div>
       </div>
       {error ? (
-        {/* Render a compact error strip so failed worktree actions stay visible without replacing controls. */}
-        <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
-          {error}
-        </div>
+        <>
+          {/* Render a compact error strip so failed worktree actions stay visible without replacing controls. */}
+          <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+            {error}
+          </div>
+        </>
       ) : null}
       <form
         className="border-t border-[#2b343b] bg-[#171d21] px-3 py-3"
@@ -225,10 +227,12 @@ export function ThreadActionMenu({
         </div>
       </div>
       {error ? (
-        {/* Thread-level errors are shown inline so retry actions stay available. */}
-        <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
-          {error}
-        </div>
+        <>
+          {/* Thread-level errors are shown inline so retry actions stay available. */}
+          <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
+            {error}
+          </div>
+        </>
       ) : null}
       <form
         className="border-b border-[#2b343b] bg-[#171d21] px-3 py-3"

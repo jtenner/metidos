@@ -100,6 +100,12 @@ function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function generateRandomToken(length = 32): string {
   return Buffer.from(randomBytes(length)).toString("base64url");
 }
@@ -211,7 +217,7 @@ async function hotp(
 
   const key = await crypto.subtle.importKey(
     "raw",
-    decodeBase32(secret),
+    toArrayBuffer(decodeBase32(secret)),
     {
       name: "HMAC",
       hash: "SHA-1",
@@ -220,14 +226,31 @@ async function hotp(
     ["sign"],
   );
   const signature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, counterBytes),
+    await crypto.subtle.sign("HMAC", key, toArrayBuffer(counterBytes)),
   );
-  const offset = signature[signature.length - 1] & 15;
+  const offsetByte = signature.at(-1);
+  if (typeof offsetByte !== "number") {
+    throw new Error("Failed to compute TOTP offset.");
+  }
+  const offset = offsetByte & 15;
+  const chunk = signature.slice(offset, offset + 4);
+  const first = chunk[0];
+  const second = chunk[1];
+  const third = chunk[2];
+  const fourth = chunk[3];
+  if (
+    typeof first !== "number" ||
+    typeof second !== "number" ||
+    typeof third !== "number" ||
+    typeof fourth !== "number"
+  ) {
+    throw new Error("Failed to compute TOTP code.");
+  }
   const binary =
-    ((signature[offset] & 127) << 24) |
-    ((signature[offset + 1] & 255) << 16) |
-    ((signature[offset + 2] & 255) << 8) |
-    (signature[offset + 3] & 255);
+    ((first & 127) << 24) |
+    ((second & 255) << 16) |
+    ((third & 255) << 8) |
+    (fourth & 255);
 
   return String(binary % 10 ** digits).padStart(digits, "0");
 }

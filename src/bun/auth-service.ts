@@ -153,6 +153,14 @@ function normalizeSessionLifetimeDays(value?: number): number {
   return value;
 }
 
+function buildTimestampOptions(nowMs?: number): TimestampOptions {
+  return typeof nowMs === "number" ? { nowMs } : {};
+}
+
+function buildAuthSecretOptions(appDataDir?: string): AuthSecretOptions {
+  return typeof appDataDir === "string" ? { appDataDir } : {};
+}
+
 function buildSession(
   sessionLifetimeDays: number,
   now = new Date(),
@@ -345,8 +353,8 @@ export function getAuthStatus(
   const settings = readCurrentAuthSettings(database, nowDate(options.nowMs));
   const session = sessionId
     ? resolveSession(database, {
-        nowMs: options.nowMs,
         sessionId,
+        ...buildTimestampOptions(options.nowMs),
       })
     : null;
 
@@ -390,9 +398,10 @@ export async function setupAuth(
     input.primaryFactorType,
     input.primaryFactor,
   );
-  const totpSecretCiphertext = await encryptAuthSecret(input.totpSecret, {
-    appDataDir: input.appDataDir,
-  });
+  const totpSecretCiphertext = await encryptAuthSecret(
+    input.totpSecret,
+    buildAuthSecretOptions(input.appDataDir),
+  );
   const sessionLifetimeDays = normalizeSessionLifetimeDays(
     input.sessionLifetimeDays,
   );
@@ -431,9 +440,10 @@ export async function login(
     settings.primaryFactorHash,
   );
   const totpSecret = primaryFactorValid
-    ? await decryptAuthSecret(settings.totpSecretCiphertext, {
-        appDataDir: input.appDataDir,
-      })
+    ? await decryptAuthSecret(
+        settings.totpSecretCiphertext,
+        buildAuthSecretOptions(input.appDataDir),
+      )
     : null;
   const totpValid =
     totpSecret === null

@@ -921,9 +921,13 @@ function readRuntimeConfigFromHtml(html: string): unknown {
   if (!match) {
     return null;
   }
+  const runtimeJson = match[1];
+  if (!runtimeJson) {
+    return null;
+  }
 
   try {
-    return JSON.parse(match[1]);
+    return JSON.parse(runtimeJson);
   } catch {
     return null;
   }

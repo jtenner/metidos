@@ -105,7 +105,10 @@ describe("auth helpers", () => {
   });
 
   it("hashes and verifies recovery codes", async () => {
-    const [code] = generateRecoveryCodes(1);
+    const code = generateRecoveryCodes(1).at(0);
+    if (!code) {
+      throw new Error("Expected a recovery code.");
+    }
     const hash = await hashRecoveryCode(code);
 
     expect(await verifyRecoveryCode(code, hash)).toBeTrue();

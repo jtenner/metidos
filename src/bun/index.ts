@@ -456,7 +456,7 @@ function readOptionalInteger(
       `Expected "${fieldName}" to be an integer.`,
     );
   }
-  return value;
+  return value as number;
 }
 
 function readOptionalSessionLifetimeDays(
@@ -587,10 +587,19 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         );
       }
       const body = await readJsonBody(request);
-      const enrollment = prepareTotpEnrollment({
-        accountName: readOptionalString(body, "accountName") || "local-user",
-        issuer: readOptionalString(body, "issuer"),
-      });
+      const accountName =
+        readOptionalString(body, "accountName") || "local-user";
+      const issuer = readOptionalString(body, "issuer");
+      const enrollment = prepareTotpEnrollment(
+        issuer
+          ? {
+              accountName,
+              issuer,
+            }
+          : {
+              accountName,
+            },
+      );
       return jsonResponse({
         enrollment,
         ok: true,
@@ -599,13 +608,18 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/setup" && request.method === "POST") {
       const body = await readJsonBody(request);
+      const sessionLifetimeDays = readOptionalSessionLifetimeDays(body);
       const result = await setupAuth(database, {
         nowMs,
         primaryFactor: readRequiredString(body, "primaryFactor"),
         primaryFactorType: readPrimaryFactorType(body),
-        sessionLifetimeDays: readOptionalSessionLifetimeDays(body),
         totpCode: readRequiredString(body, "totpCode"),
         totpSecret: readRequiredString(body, "totpSecret"),
+        ...(typeof sessionLifetimeDays === "number"
+          ? {
+              sessionLifetimeDays,
+            }
+          : {}),
       });
 
       return jsonResponse(

@@ -148,9 +148,9 @@ describe("auth service", () => {
         primaryFactor: "000000",
         totpCode: firstAttemptCode,
       }),
-    ).rejects.toMatchObject<AuthServiceError>({
+    ).rejects.toMatchObject({
       code: "auth_locked",
-    });
+    } satisfies Partial<AuthServiceError>);
 
     await expect(
       login(database, {
@@ -159,9 +159,9 @@ describe("auth service", () => {
         primaryFactor: "123456",
         totpCode: firstAttemptCode,
       }),
-    ).rejects.toMatchObject<AuthServiceError>({
+    ).rejects.toMatchObject({
       code: "auth_locked",
-    });
+    } satisfies Partial<AuthServiceError>);
 
     const successCode = await generateTotpCode(
       enrollment.totpSecret,

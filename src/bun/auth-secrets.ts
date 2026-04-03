@@ -53,6 +53,12 @@ function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   const directory = authSecretDirectory(options);
   ensureDirectory(directory);
@@ -82,7 +88,7 @@ async function importSecretKey(
   const rawKey = loadOrCreateRawKey(options);
   return crypto.subtle.importKey(
     "raw",
-    rawKey,
+    toArrayBuffer(rawKey),
     {
       name: "AES-GCM",
     },
@@ -104,10 +110,10 @@ export async function encryptAuthSecret(
     await crypto.subtle.encrypt(
       {
         name: "AES-GCM",
-        iv,
+        iv: toArrayBuffer(iv),
       },
       key,
-      new TextEncoder().encode(plaintext),
+      toArrayBuffer(new TextEncoder().encode(plaintext)),
     ),
   );
   return [
@@ -138,10 +144,10 @@ export async function decryptAuthSecret(
   const plaintext = await crypto.subtle.decrypt(
     {
       name: "AES-GCM",
-      iv: base64UrlDecode(ivEncoded),
+      iv: toArrayBuffer(base64UrlDecode(ivEncoded)),
     },
     key,
-    base64UrlDecode(payloadEncoded),
+    toArrayBuffer(base64UrlDecode(payloadEncoded)),
   );
   return new TextDecoder().decode(plaintext);
 }
