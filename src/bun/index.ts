@@ -89,8 +89,11 @@ import {
   type RpcWebSocketSocketData,
 } from "./rpc-websocket-auth";
 import {
+  applySecurityHeaders,
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
+  buildRuntimeConfigElement,
+  type InjectedRuntimeConfig,
   isWebSocketOriginAllowed,
   LOOPBACK_HOSTNAME,
   parseAllowedBrowserOrigins,
@@ -394,12 +397,25 @@ let lastEventLoopLagMs = 0;
 let peakEventLoopLagMs = 0;
 let lastOverloadLogAt = 0;
 
-function stringResponse(body: string, contentType: string): Response {
+function buildResponseHeaders(
+  contentType: string,
+  headers?: HeadersInit,
+): Headers {
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("cache-control", "no-store");
+  responseHeaders.set("content-type", contentType);
+  return applySecurityHeaders(responseHeaders);
+}
+
+function stringResponse(
+  body: string,
+  contentType: string,
+  status = 200,
+  headers?: HeadersInit,
+): Response {
   return new Response(body, {
-    headers: {
-      "content-type": contentType,
-      "cache-control": "no-store",
-    },
+    headers: buildResponseHeaders(contentType, headers),
+    status,
   });
 }
 
@@ -408,11 +424,8 @@ function jsonResponse(
   status = 200,
   headers?: HeadersInit,
 ): Response {
-  const responseHeaders = new Headers(headers);
-  responseHeaders.set("cache-control", "no-store");
-  responseHeaders.set("content-type", JSON_CONTENT_TYPE);
   return new Response(JSON.stringify(value), {
-    headers: responseHeaders,
+    headers: buildResponseHeaders(JSON_CONTENT_TYPE, headers),
     status,
   });
 }
@@ -422,10 +435,7 @@ function jsonResponse(
  */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
-    headers: {
-      "content-type": contentType,
-      "cache-control": "no-store",
-    },
+    headers: buildResponseHeaders(contentType),
   });
 }
 
@@ -961,20 +971,15 @@ function isAddressInUseError(error: unknown): boolean {
  * Render the HTML entrypoint and inject runtime flags.
  */
 async function htmlResponse(): Promise<Response> {
-  const cssFile = Bun.file(MAINVIEW_CSS_PATH);
-  const inlineCss = (await cssFile.exists())
-    ? `<style>${(await cssFile.text()).replaceAll("</style", "<\\/style")}</style>`
-    : "";
-  const runtimeScript = `<script>window.__joltRuntime=${JSON.stringify({
+  const runtimeConfig: InjectedRuntimeConfig = {
     devServer: IS_DEV_SERVER,
-  })};</script>`;
+    healthUrl: "/health",
+  };
+  const runtimeConfigElement = buildRuntimeConfigElement(runtimeConfig);
   const template = await Bun.file(MAINVIEW_HTML_PATH).text();
   const html = template.includes("</head>")
-    ? template.replace(
-        "</head>",
-        `${inlineCss ? `${inlineCss}\n\t\t` : ""}${runtimeScript}\n\t</head>`,
-      )
-    : `${inlineCss}${runtimeScript}\n${template}`;
+    ? template.replace("</head>", `${runtimeConfigElement}\n\t</head>`)
+    : `${runtimeConfigElement}\n${template}`;
 
   return stringResponse(html, "text/html; charset=utf-8");
 }
@@ -1591,9 +1596,11 @@ async function bootstrap(): Promise<void> {
             allowedOrigins,
           )
         ) {
-          return new Response("WebSocket origin not allowed", {
-            status: 403,
-          });
+          return stringResponse(
+            "WebSocket origin not allowed",
+            "text/plain; charset=utf-8",
+            403,
+          );
         }
         const websocketAuth = authorizeRpcWebSocketUpgrade({
           authBypass: DEV_FLOW_MODE.authBypass,
@@ -1611,6 +1618,7 @@ async function bootstrap(): Promise<void> {
             });
           }
           return new Response(websocketAuth.failure.body, {
+            headers: buildResponseHeaders("text/plain; charset=utf-8"),
             status: websocketAuth.failure.status,
           });
         }
@@ -1622,7 +1630,11 @@ async function bootstrap(): Promise<void> {
         ) {
           return;
         }
-        return new Response("WebSocket upgrade failed", { status: 400 });
+        return stringResponse(
+          "WebSocket upgrade failed",
+          "text/plain; charset=utf-8",
+          400,
+        );
       }
 
       if (!BACKEND_ONLY && (pathname === "/" || pathname === "/index.html")) {
@@ -1665,7 +1677,7 @@ async function bootstrap(): Promise<void> {
         );
       }
 
-      return new Response("Not found", { status: 404 });
+      return stringResponse("Not found", "text/plain; charset=utf-8", 404);
     },
     websocket: {
       open(ws) {

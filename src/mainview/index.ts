@@ -12,6 +12,10 @@ import type {
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import {
+  type InjectedRuntimeConfig,
+  RUNTIME_CONFIG_ELEMENT_ID,
+} from "../bun/server-security";
+import {
   AuthApiError,
   dispatchAuthRequired,
   isAuthRequiredError,
@@ -80,11 +84,7 @@ type RpcSocketMessage =
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
-type RuntimeConfig = {
-  devServer: boolean;
-  healthUrl?: string;
-  rpcWebSocketUrl?: string;
-};
+type RuntimeConfig = InjectedRuntimeConfig;
 
 /** Mainview event names that bridge websocket worktree/thread updates into DOM events. */
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
@@ -109,9 +109,64 @@ declare global {
   }
 }
 
-const runtimeConfig: RuntimeConfig = window.__joltRuntime ?? {
-  devServer: false,
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readInjectedRuntimeConfig(): RuntimeConfig | null {
+  const element = document.getElementById(RUNTIME_CONFIG_ELEMENT_ID);
+  const raw = element?.textContent?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed) || parsed.devServer !== true) {
+      return {
+        devServer: false,
+        ...(typeof parsed === "object" &&
+        parsed !== null &&
+        "healthUrl" in parsed &&
+        typeof parsed.healthUrl === "string"
+          ? {
+              healthUrl: parsed.healthUrl,
+            }
+          : {}),
+        ...(typeof parsed === "object" &&
+        parsed !== null &&
+        "rpcWebSocketUrl" in parsed &&
+        typeof parsed.rpcWebSocketUrl === "string"
+          ? {
+              rpcWebSocketUrl: parsed.rpcWebSocketUrl,
+            }
+          : {}),
+      };
+    }
+
+    return {
+      devServer: true,
+      ...(typeof parsed.healthUrl === "string"
+        ? {
+            healthUrl: parsed.healthUrl,
+          }
+        : {}),
+      ...(typeof parsed.rpcWebSocketUrl === "string"
+        ? {
+            rpcWebSocketUrl: parsed.rpcWebSocketUrl,
+          }
+        : {}),
+    };
+  } catch (error) {
+    console.error("Failed to parse injected runtime config", error);
+    return null;
+  }
+}
+
+const runtimeConfig: RuntimeConfig = readInjectedRuntimeConfig() ??
+  window.__joltRuntime ?? {
+    devServer: false,
+  };
 
 const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const socketBaseUrl =

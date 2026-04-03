@@ -1,7 +1,13 @@
 import { resolve } from "node:path";
 
 import { buildMainviewBundle } from "./build-mainview";
-import { buildLivenessPayload, LOOPBACK_HOSTNAME } from "./server-security";
+import {
+  applySecurityHeaders,
+  buildLivenessPayload,
+  buildRuntimeConfigElement,
+  type InjectedRuntimeConfig,
+  LOOPBACK_HOSTNAME,
+} from "./server-security";
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
@@ -31,8 +37,7 @@ const BACKEND_HEALTH_TIMEOUT_MS = 1_500;
  * Runtime config passed to the browser so the client can discover RPC endpoints and
  * health route details without additional round trips.
  */
-type RuntimeConfig = {
-  devServer: boolean;
+type RuntimeConfig = InjectedRuntimeConfig & {
   healthUrl: string;
   rpcWebSocketUrl: string;
 };
@@ -102,12 +107,16 @@ function stringResponse(
   contentType: string,
   status = 200,
 ): Response {
+  const headers = new Headers({
+    "cache-control": "no-store",
+    "content-type": contentType,
+  });
+  applySecurityHeaders(headers, {
+    connectUrls: [RPC_WEBSOCKET_URL],
+  });
   return new Response(body, {
     status,
-    headers: {
-      "cache-control": "no-store",
-      "content-type": contentType,
-    },
+    headers,
   });
 }
 
@@ -116,33 +125,29 @@ function stringResponse(
  * behavior to ensure UI updates are immediately visible during development.
  */
 function fileResponse(path: string, contentType: string): Response {
+  const headers = new Headers({
+    "cache-control": "no-store",
+    "content-type": contentType,
+  });
+  applySecurityHeaders(headers, {
+    connectUrls: [RPC_WEBSOCKET_URL],
+  });
   return new Response(Bun.file(path), {
-    headers: {
-      "cache-control": "no-store",
-      "content-type": contentType,
-    },
+    headers,
   });
 }
 
 /**
- * Builds the application HTML response by injecting runtime state and inline CSS if the
- * CSS asset exists on disk.
+ * Builds the application HTML response by injecting inert runtime bootstrap data.
  */
 async function buildHtmlResponse(
   runtimeConfig: RuntimeConfig,
 ): Promise<Response> {
-  const cssFile = Bun.file(MAINVIEW_CSS_PATH);
-  const inlineCss = (await cssFile.exists())
-    ? `<style>${(await cssFile.text()).replaceAll("</style", "<\\/style")}</style>`
-    : "";
-  const runtimeScript = `<script>window.__joltRuntime=${JSON.stringify(runtimeConfig)};</script>`;
+  const runtimeConfigElement = buildRuntimeConfigElement(runtimeConfig);
   const template = await Bun.file(MAINVIEW_HTML_PATH).text();
   const html = template.includes("</head>")
-    ? template.replace(
-        "</head>",
-        `${inlineCss ? `${inlineCss}\n\t\t` : ""}${runtimeScript}\n\t</head>`,
-      )
-    : `${inlineCss}${runtimeScript}\n${template}`;
+    ? template.replace("</head>", `${runtimeConfigElement}\n\t</head>`)
+    : `${runtimeConfigElement}\n${template}`;
 
   return stringResponse(html, "text/html; charset=utf-8");
 }
@@ -253,9 +258,13 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
     init.body = await request.arrayBuffer();
   }
   const response = await fetch(targetUrl, init);
+  const responseHeaders = new Headers(response.headers);
+  applySecurityHeaders(responseHeaders, {
+    connectUrls: [RPC_WEBSOCKET_URL],
+  });
 
   return new Response(response.body, {
-    headers: new Headers(response.headers),
+    headers: responseHeaders,
     status: response.status,
   });
 }
@@ -337,7 +346,7 @@ server = Bun.serve({
       );
     }
 
-    return new Response("Not found", { status: 404 });
+    return stringResponse("Not found", "text/plain; charset=utf-8", 404);
   },
 });
 

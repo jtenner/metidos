@@ -14,9 +14,9 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 
-`index.ts` is the JS entry point that wires runtime initialization and React mounting.
+`index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.
 
-`index.html` provides the host document, mount point, and static metadata required by the frontend bundle.
+`index.html` provides the host document, mount point, static stylesheet/script tags, and static metadata required by the frontend bundle.
 
 `index.css` contains shared component and layout styles used across the top-level views.
 

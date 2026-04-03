@@ -365,6 +365,7 @@ Acceptance criteria:
 - users can recover from lost 2FA device with recovery codes
 - three failed login attempts trigger a 10-minute lockout
 - privileged actions are auditable
+- HTML and JSON responses send browser hardening headers, including CSP, frame restrictions, and referrer policy
 - command-line reset requires OTP verification
 - dev bypass/reset is impossible unless explicitly enabled
 
@@ -558,7 +559,7 @@ Current implementation coverage:
 
 - `src/bun/auth-service.test.ts` covers setup, login, session issuance, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
-- `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting
+- `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
 - `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow
 - `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
 - `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows

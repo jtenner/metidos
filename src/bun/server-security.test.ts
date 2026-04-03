@@ -1,10 +1,14 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  applySecurityHeaders,
+  buildContentSecurityPolicy,
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
+  buildRuntimeConfigElement,
   isWebSocketOriginAllowed,
   parseAllowedBrowserOrigins,
+  RUNTIME_CONFIG_ELEMENT_ID,
 } from "./server-security";
 
 describe("server security helpers", () => {
@@ -59,5 +63,47 @@ describe("server security helpers", () => {
     expect(buildLivenessPayload(false)).toEqual({
       ok: false,
     });
+  });
+
+  it("builds a content security policy with explicit websocket connect sources", () => {
+    expect(
+      buildContentSecurityPolicy([
+        "/health",
+        "wss://127.0.0.1:7600/rpc",
+        "ws://127.0.0.1:7600/rpc",
+      ]),
+    ).toContain("connect-src 'self' wss://127.0.0.1:7600 ws://127.0.0.1:7600");
+  });
+
+  it("applies browser security headers to outgoing responses", () => {
+    const headers = applySecurityHeaders(new Headers(), {
+      connectUrls: ["wss://127.0.0.1:7600/rpc"],
+    });
+
+    expect(headers.get("content-security-policy")).toContain(
+      "frame-ancestors 'none'",
+    );
+    expect(headers.get("permissions-policy")).toBe(
+      "camera=(), geolocation=(), microphone=()",
+    );
+    expect(headers.get("referrer-policy")).toBe("no-referrer");
+    expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.get("x-frame-options")).toBe("DENY");
+  });
+
+  it("serializes the runtime config into an inert JSON script tag", () => {
+    expect(
+      buildRuntimeConfigElement({
+        devServer: true,
+        healthUrl: "/health",
+        rpcWebSocketUrl: "wss://127.0.0.1:7600/rpc",
+      }),
+    ).toContain(`id="${RUNTIME_CONFIG_ELEMENT_ID}"`);
+    expect(
+      buildRuntimeConfigElement({
+        devServer: false,
+        healthUrl: "</script><script>alert(1)</script>",
+      }),
+    ).not.toContain("</script><script>alert(1)</script>");
   });
 });

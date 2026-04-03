@@ -1,10 +1,18 @@
 const LOOPBACK_BROWSER_HOSTS = ["127.0.0.1", "localhost"] as const;
 const LOCAL_APP_PROTOCOLS = ["http:", "https:"] as const;
+const RUNTIME_CONFIG_SCRIPT_TYPE = "application/json";
 
 /**
  * Canonical loopback bind target for local-only Bun listeners.
  */
 export const LOOPBACK_HOSTNAME = "127.0.0.1";
+export const RUNTIME_CONFIG_ELEMENT_ID = "jolt-runtime-config";
+
+export type InjectedRuntimeConfig = {
+  devServer: boolean;
+  healthUrl?: string;
+  rpcWebSocketUrl?: string;
+};
 
 /**
  * Normalize a browser origin for exact allowlist comparison.
@@ -79,6 +87,77 @@ export function isWebSocketOriginAllowed(
 
   const allowed = new Set(allowedOrigins);
   return allowed.has(normalizedOrigin);
+}
+
+function normalizeConnectSource(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed || trimmed.startsWith("/")) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:" &&
+      parsed.protocol !== "ws:" &&
+      parsed.protocol !== "wss:"
+    ) {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
+  const connectSources = new Set<string>(["'self'"]);
+  for (const url of connectUrls) {
+    const source = normalizeConnectSource(url);
+    if (source) {
+      connectSources.add(source);
+    }
+  }
+
+  return [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "frame-src 'none'",
+    `connect-src ${[...connectSources].join(" ")}`,
+    "font-src 'self' data:",
+    "form-action 'self'",
+    "img-src 'self' data: blob:",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+  ].join("; ");
+}
+
+export function applySecurityHeaders(
+  headers: Headers,
+  options?: {
+    connectUrls?: string[];
+  },
+): Headers {
+  headers.set(
+    "content-security-policy",
+    buildContentSecurityPolicy(options?.connectUrls ?? []),
+  );
+  headers.set("permissions-policy", "camera=(), geolocation=(), microphone=()");
+  headers.set("referrer-policy", "no-referrer");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("x-frame-options", "DENY");
+  return headers;
+}
+
+export function buildRuntimeConfigElement(
+  runtimeConfig: InjectedRuntimeConfig,
+): string {
+  return `<script id="${RUNTIME_CONFIG_ELEMENT_ID}" type="${RUNTIME_CONFIG_SCRIPT_TYPE}">${JSON.stringify(
+    runtimeConfig,
+  ).replaceAll("</script", "<\\/script")}</script>`;
 }
 
 /**
