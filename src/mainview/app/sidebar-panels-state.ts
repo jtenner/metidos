@@ -5,6 +5,9 @@ import {
   writePersistedTreeViewState,
 } from "./state";
 
+/**
+ * Serialized sidebar UI state exposed to components and persisted for session restore.
+ */
 type SidebarPanelsSnapshot = {
   gitHistoryOpen: boolean;
   openProjectPaths: Set<string>;
@@ -18,6 +21,9 @@ const listeners = new Set<() => void>();
 
 let sidebarPanelsSnapshot: SidebarPanelsSnapshot | null = null;
 
+/**
+ * Load the sidebar snapshot lazily from cache or persisted storage.
+ */
 function ensureSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
   if (sidebarPanelsSnapshot) {
     return sidebarPanelsSnapshot;
@@ -35,12 +41,18 @@ function ensureSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
   return sidebarPanelsSnapshot;
 }
 
+/**
+ * Notify all mounted subscribers that sidebar panel state has changed.
+ */
 function emitSidebarPanelsChange(): void {
   for (const listener of listeners) {
     listener();
   }
 }
 
+/**
+ * Persist snapshot to storage so expanded/collapsed state survives reloads.
+ */
 function persistSidebarPanelsSnapshot(snapshot: SidebarPanelsSnapshot): void {
   writePersistedTreeViewState({
     version: TREE_VIEW_STATE_STORAGE_VERSION,
@@ -53,6 +65,9 @@ function persistSidebarPanelsSnapshot(snapshot: SidebarPanelsSnapshot): void {
   });
 }
 
+/**
+ * Subscribe/unsubscribe a store listener for external-store updates.
+ */
 function subscribeToSidebarPanels(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
@@ -60,6 +75,9 @@ function subscribeToSidebarPanels(listener: () => void): () => void {
   };
 }
 
+/**
+ * Update shared snapshot immutably, skip updates when no real change occurred.
+ */
 function updateSidebarPanelsSnapshot(
   updater: (current: SidebarPanelsSnapshot) => SidebarPanelsSnapshot,
 ): void {
@@ -74,14 +92,23 @@ function updateSidebarPanelsSnapshot(
   emitSidebarPanelsChange();
 }
 
+/**
+ * Read the current sidebar panel snapshot (initialized from persisted storage as needed).
+ */
 export function readSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
   return ensureSidebarPanelsSnapshot();
 }
 
+/**
+ * Check whether a project row is currently expanded in sidebar state.
+ */
 export function isProjectTreeOpen(projectPath: string): boolean {
   return ensureSidebarPanelsSnapshot().openProjectPaths.has(projectPath);
 }
 
+/**
+ * Persist only the target project path's expanded/collapsed bit.
+ */
 export function setProjectTreeOpen(projectPath: string, open: boolean): void {
   updateSidebarPanelsSnapshot((current) => {
     const nextOpenProjectPaths = new Set(current.openProjectPaths);
@@ -97,6 +124,7 @@ export function setProjectTreeOpen(projectPath: string, open: boolean): void {
         current.openProjectPaths.has(path),
       )
     ) {
+      // No-op guard: avoid redundant writes and rerenders when path state is unchanged.
       return current;
     }
 
@@ -107,6 +135,9 @@ export function setProjectTreeOpen(projectPath: string, open: boolean): void {
   });
 }
 
+/**
+ * Toggle whole projects section open/closed state.
+ */
 export function toggleProjectsPanelOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -114,6 +145,9 @@ export function toggleProjectsPanelOpen(): void {
   }));
 }
 
+/**
+ * Toggle whole workspace section open/closed state.
+ */
 export function toggleWorkspacePanelOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -121,6 +155,9 @@ export function toggleWorkspacePanelOpen(): void {
   }));
 }
 
+/**
+ * Toggle workspace active section open/closed state.
+ */
 export function toggleWorkspaceActiveSectionOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -128,6 +165,9 @@ export function toggleWorkspaceActiveSectionOpen(): void {
   }));
 }
 
+/**
+ * Toggle all threads section open/closed state.
+ */
 export function toggleThreadsPanelOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -135,6 +175,9 @@ export function toggleThreadsPanelOpen(): void {
   }));
 }
 
+/**
+ * Toggle git history section open/closed state.
+ */
 export function toggleGitHistoryPanelOpen(): void {
   updateSidebarPanelsSnapshot((current) => ({
     ...current,
@@ -142,6 +185,9 @@ export function toggleGitHistoryPanelOpen(): void {
   }));
 }
 
+/**
+ * Subscribe to the projects section open state from the shared snapshot.
+ */
 export function useProjectsPanelOpen(): boolean {
   return useSyncExternalStore(
     subscribeToSidebarPanels,
@@ -150,6 +196,9 @@ export function useProjectsPanelOpen(): boolean {
   );
 }
 
+/**
+ * Subscribe to the workspace panel open state from the shared snapshot.
+ */
 export function useWorkspacePanelOpen(): boolean {
   return useSyncExternalStore(
     subscribeToSidebarPanels,
@@ -158,6 +207,9 @@ export function useWorkspacePanelOpen(): boolean {
   );
 }
 
+/**
+ * Subscribe to workspace active section open state from the shared snapshot.
+ */
 export function useWorkspaceActiveSectionOpen(): boolean {
   return useSyncExternalStore(
     subscribeToSidebarPanels,
@@ -166,6 +218,9 @@ export function useWorkspaceActiveSectionOpen(): boolean {
   );
 }
 
+/**
+ * Subscribe to threads section open state from the shared snapshot.
+ */
 export function useThreadsPanelOpen(): boolean {
   return useSyncExternalStore(
     subscribeToSidebarPanels,
@@ -174,6 +229,9 @@ export function useThreadsPanelOpen(): boolean {
   );
 }
 
+/**
+ * Subscribe to git history section open state from the shared snapshot.
+ */
 export function useGitHistoryPanelOpen(): boolean {
   return useSyncExternalStore(
     subscribeToSidebarPanels,
@@ -182,6 +240,9 @@ export function useGitHistoryPanelOpen(): boolean {
   );
 }
 
+/**
+ * Subscribe to the current set of expanded project paths for tree rendering.
+ */
 export function useOpenProjectPaths(): Set<string> {
   return useSyncExternalStore(
     subscribeToSidebarPanels,

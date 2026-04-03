@@ -3,7 +3,7 @@
 ## Code file tasks
 
 - [x] Add comments to file `src/mainview/app/sidebar-content.tsx`.
-- [ ] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
+- [x] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
 - [ ] Add comments to file `src/mainview/app/state.ts`.
 - [ ] Add comments to file `src/mainview/app/tasks-workspace.tsx`.
 - [ ] Add comments to file `src/mainview/app/thread-list-row.tsx`.
