@@ -57,7 +57,8 @@
 │        └─ screen.png
 ├─ package.json
 ├─ src/
- │  ├─ bun/
+│  ├─ README.md
+│  ├─ bun/
 │  │  ├─ build-mainview.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
