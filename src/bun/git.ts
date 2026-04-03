@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "node:fs";
-import { delimiter, relative, resolve } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { delimiter, dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type {
   RpcGitCommitDiffResult,
@@ -543,8 +543,79 @@ export async function runGitCommand(
 
 /** Normalize an absolute worktree-relative git path to slash-delimited relative form. */
 export function normalizeGitPath(worktreePath: string, value: string): string {
-  const resolvedPath = resolve(worktreePath, value);
-  return relative(worktreePath, resolvedPath).replace(/\\/g, "/");
+  const resolvedWorktreePath = resolve(worktreePath);
+  const resolvedPath = resolve(resolvedWorktreePath, value);
+  assertPathInsideWorktree(resolvedWorktreePath, resolvedPath, value);
+  return relative(resolvedWorktreePath, resolvedPath).replace(/\\/g, "/");
+}
+
+/** Return true when a path falls outside a root after path normalization. */
+function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
+  const relativePath = relative(rootPath, candidatePath);
+  if (!relativePath) {
+    return false;
+  }
+  return (
+    relativePath === ".." ||
+    relativePath.split(/[\\/]/).includes("..") ||
+    isAbsolute(relativePath)
+  );
+}
+
+/**
+ * Resolve the nearest existing ancestor so symlink escapes are detected
+ * even when the final file path does not exist yet.
+ */
+function nearestExistingPath(path: string): string | null {
+  let current = path;
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+  return current;
+}
+
+/**
+ * Ensure a path stays within the worktree both lexically and after realpath resolution.
+ */
+function assertPathInsideWorktree(
+  worktreePath: string,
+  candidatePath: string,
+  originalValue: string,
+): void {
+  if (pathEscapesRoot(worktreePath, candidatePath)) {
+    throw new Error(
+      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
+    );
+  }
+
+  const existingPath = nearestExistingPath(candidatePath);
+  if (!existingPath) {
+    return;
+  }
+
+  let realWorktreePath = worktreePath;
+  try {
+    realWorktreePath = realpathSync(worktreePath);
+  } catch {
+    // Fall back to the normalized worktree path if the real path can't be resolved.
+  }
+
+  let realCandidatePath = existingPath;
+  try {
+    realCandidatePath = realpathSync(existingPath);
+  } catch {
+    return;
+  }
+
+  if (pathEscapesRoot(realWorktreePath, realCandidatePath)) {
+    throw new Error(
+      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
+    );
+  }
 }
 
 /** Split command output into logical lines while normalizing CRLF. */

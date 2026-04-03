@@ -66,6 +66,7 @@
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
 │  │  ├─ git.ts
+│  │  ├─ git.test.ts
 │  │  ├─ index.ts
 │  │  ├─ isolated-server.ts
 │  │  ├─ project-procedures/

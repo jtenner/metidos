@@ -1,8 +1,5 @@
 # Agent TODO
 
-- Phase 0: fix worktree path traversal and file containment.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Phase 0. Replace the current worktree path normalization/read logic with real containment checks in `src/bun/git.ts`, then add regression coverage for `..` traversal and symlink escape cases.
-
 - Phase 0: lock down unauthenticated transport and app surfaces.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Default-Deny Policy and Phase 0. Make the backend deny `/rpc`, project/worktree/thread procedures, filesystem data, and `/health` internals until authorization succeeds, and add websocket `Origin` validation in `src/bun/index.ts`.
 
