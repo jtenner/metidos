@@ -30,7 +30,6 @@ export type ResolvedTlsRuntimeConfig = ProtocolSet & {
   enabled: boolean;
   keyPath: string;
   passphrase: string | null;
-  required: boolean;
   tlsOptions: Bun.TLSOptions | null;
 };
 
@@ -125,16 +124,13 @@ function buildProtocolSet(tlsEnabled: boolean): ProtocolSet {
 function buildMissingTlsMessage(
   missingPaths: string[],
   paths: TlsFilePaths,
-  required: boolean,
 ): string {
   const missingSummary =
     missingPaths.length === 1
       ? `Missing TLS file: ${missingPaths[0]}.`
       : `Missing TLS files: ${missingPaths.join(", ")}.`;
   return [
-    required
-      ? "TLS is required outside dev mode."
-      : "TLS configuration is incomplete.",
+    "TLS configuration is incomplete.",
     missingSummary,
     `Run \`bun run tls:bootstrap\` to create loopback certificates at ${paths.certPath} and ${paths.keyPath}.`,
     `To use custom files instead, set ${TLS_CERT_PATH_ENV} and ${TLS_KEY_PATH_ENV}.`,
@@ -147,7 +143,6 @@ export function resolveTlsRuntimeConfig(
   const env = options.env ?? process.env;
   const defaults = getDefaultTlsPaths(options);
   const resolvedPaths = resolveTlsEnvironmentPaths(env, defaults);
-  const required = !options.isDevServer;
   const hasCert = existsSync(resolvedPaths.certPath);
   const hasKey = existsSync(resolvedPaths.keyPath);
   const hasCa = existsSync(resolvedPaths.caPath);
@@ -163,9 +158,9 @@ export function resolveTlsRuntimeConfig(
 
   if (
     missingPaths.length > 0 &&
-    (required || usingExplicitPair || usingExplicitCa || hasCert || hasKey)
+    (usingExplicitPair || usingExplicitCa || hasCert || hasKey)
   ) {
-    throw new Error(buildMissingTlsMessage(missingPaths, defaults, required));
+    throw new Error(buildMissingTlsMessage(missingPaths, defaults));
   }
 
   if (!hasCert || !hasKey) {
@@ -176,7 +171,6 @@ export function resolveTlsRuntimeConfig(
       enabled: false,
       keyPath: resolvedPaths.keyPath,
       passphrase: resolvedPaths.passphrase,
-      required,
       tlsOptions: null,
     };
   }
@@ -188,7 +182,6 @@ export function resolveTlsRuntimeConfig(
     enabled: true,
     keyPath: resolvedPaths.keyPath,
     passphrase: resolvedPaths.passphrase,
-    required,
     tlsOptions: {
       cert: Bun.file(resolvedPaths.certPath),
       key: Bun.file(resolvedPaths.keyPath),

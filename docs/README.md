@@ -12,7 +12,7 @@ The files are primarily for maintainers and contributors to understand tradeoffs
 - `2026-04-03-security-audit.md`
   - Security audit of the app's transport, RPC surface, filesystem access, Codex/MCP execution model, and local persistence.
 - `2026-04-03-security-remediation-plan.md`
-  - Implementation plan for locking down access, adding password plus TOTP authentication, step-up auth, TLS policy, and backend default-deny behavior.
+  - Implementation plan for locking down access, adding password plus TOTP authentication, step-up auth, optional loopback TLS support, and backend default-deny behavior.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.
   - Documents expected thread/session behavior and the integration surface the backend uses.

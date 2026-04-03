@@ -12,7 +12,7 @@ This plan turns the findings in `docs/2026-04-03-security-audit.md` into an impl
 The requested password/PIN and 2FA should be added, but not as a cosmetic login screen. It has to sit on top of a real backend trust model:
 
 - authenticated HTTP session
-- HTTPS/WSS transport
+- loopback-only transport with optional HTTPS/WSS
 - authenticated websocket upgrade
 - strict `Origin` checks
 - short-lived websocket tickets
@@ -34,7 +34,7 @@ Current product assumption:
 
 - the app is a single-user local app
 - one local installation maps to one logical account and one auth setup flow
-- this simplifies the initial design for sessions, recovery, and TLS bootstrap
+- this simplifies the initial design for sessions and recovery
 - the implementation should still avoid painting itself into a corner if multi-user support is added later
 
 TLS is also a good idea, with one important caveat:
@@ -45,9 +45,9 @@ TLS is also a good idea, with one important caveat:
 
 Recommended policy:
 
-- require TLS for any non-loopback bind
-- prefer TLS for loopback production mode too, if the app can provision or rely on a locally trusted certificate
-- keep an explicit dev exception only behind a development flag
+- bind to loopback only and do not depend on TLS for the local security boundary
+- keep HTTPS/WSS support optional for users who want it
+- if the app ever supports non-loopback access later, revisit and require TLS for that mode
 
 ## Recommended Authentication Model
 
@@ -98,7 +98,7 @@ Optional later addition:
 - websocket access requires both:
   - valid authenticated session
   - short-lived single-use websocket ticket
-- browser transport should use HTTPS and WSS in production
+- browser transport may use HTTPS/WSS when local certificate material is configured
 - all websocket upgrades validate `Origin`
 
 ### Step-up auth
@@ -173,9 +173,9 @@ Allowed only after authorization:
 
 Transport policy:
 
-- if running outside explicit development mode, the authenticated app should only be served over HTTPS/WSS
-- plaintext HTTP/WS should be rejected or redirected when TLS is configured
-- if loopback-only TLS cannot be made reliable immediately, keep plaintext loopback as a temporary development-only exception, not the long-term production model
+- authenticated transport stays loopback-only
+- plaintext HTTP/WS is acceptable for the current local-only app model
+- if TLS is configured, prefer HTTPS/WSS automatically without changing the auth model
 
 In other words: the unlocked app is a different trust state, not just a different screen.
 
@@ -192,10 +192,10 @@ These are chosen requirements for implementation:
 - regenerating recovery codes should require a fresh authenticated CLI flow using the configured primary factor plus TOTP
 - no app access is allowed before successful authorization
 - `unsafeMode` remains available after normal app authentication
-- TLS is required
-- the product should provide an easy TLS setup path on all supported platforms
+- TLS is optional
+- if TLS remains supported, the product may provide an easy local setup path on supported platforms
 - if the user has command-line access, the product should expose a reset path that uses CLI plus OTP verification
-- TLS setup may be Codex-assisted, but only through an explicit guided bootstrap flow with user approval for system-changing commands
+- TLS setup may be Codex-assisted, but only as an optional guided bootstrap flow with user approval for system-changing commands
 - a dev bypass is allowed only through an explicit development/reset flow
 - a dev reset flow may intentionally wipe local database contents
 
@@ -213,7 +213,7 @@ Work:
 - Minimize `/health` output
 - Temporarily gate or disable the most dangerous unauthenticated procedures until auth is in place
 - Move to explicit default-deny for all non-auth surfaces
-- design TLS mode and certificate strategy
+- keep TLS support optional and separate from the auth boundary
 
 Code areas:
 
@@ -227,7 +227,7 @@ Acceptance criteria:
 - websocket requests from unexpected origins fail
 - `/health` does not reveal internal queue state in normal mode
 - unauthenticated callers cannot reach any app RPC or app data surfaces
-- there is a clear production policy for HTTPS/WSS versus dev HTTP/WS
+- there is a clear loopback-only transport policy and TLS remains optional
 
 ## Phase 1: Authentication Foundation
 
@@ -252,8 +252,8 @@ Work:
 - Require auth for `/rpc`
 - Move websocket ticketing into the browser startup flow
 - Keep the unauthenticated route allowlist as small as possible
-- add TLS listener/configuration support and certificate loading
-- provide a cross-platform guided TLS setup path for users
+- keep optional TLS listener/configuration support and certificate loading
+- keep any certificate bootstrap flow explicitly optional
 - add first-run setup screens for:
   - primary-factor choice: PIN or password
   - TOTP enrollment with QR code
@@ -278,12 +278,12 @@ Acceptance criteria:
 - websocket connection cannot be established without valid session plus ticket
 - existing arbitrary websites cannot drive `/rpc`
 - no project or runtime data is returned before login
-- production mode uses HTTPS/WSS only
+- HTTP/WS works on loopback without weakening the auth/session boundary
 
 Implementation note:
 
-- The current implementation uses per-user default loopback certificate paths under the app-data directory plus `bun run tls:bootstrap` for guided certificate generation.
-- `mkcert` is the preferred bootstrap path because it can install a locally trusted root CA; OpenSSL remains a fallback generator for environments where `mkcert` is unavailable.
+- The current implementation may use per-user default loopback certificate paths under the app-data directory plus `bun run tls:bootstrap` for optional local certificate generation.
+- `mkcert` is the preferred optional bootstrap path because it can install a locally trusted root CA; OpenSSL remains a fallback generator for environments where `mkcert` is unavailable.
 
 ## Phase 2: Authorization And Privilege Separation
 
@@ -417,7 +417,7 @@ Implementation notes:
 Update `src/bun/index.ts` to:
 
 - set security headers on HTML and JSON responses
-- support TLS listener startup and certificate configuration
+- support optional TLS listener startup and certificate configuration
 - validate `Origin` on websocket upgrade
 - reject `/rpc` unless the request has:
   - authenticated session
@@ -432,11 +432,11 @@ Important design note:
 
 - do not inject the websocket auth secret directly into a static JS asset
 - fetch a short-lived ticket through an authenticated same-origin request and use that ticket for websocket connection
-- if the app supports non-loopback access, require HTTPS/WSS and reject plaintext transport entirely
+- if the app ever supports non-loopback access, add a stricter TLS policy at that point instead of treating loopback plaintext as a current bug
 
 ## TLS Strategy
 
-The right TLS approach depends on how this app will be shipped.
+TLS should be treated as optional local transport hardening, not as a required part of the single-user localhost security model.
 
 ### If this remains a browser app on localhost
 
@@ -464,12 +464,11 @@ Policy should be strict:
 
 ### Recommended product decision
 
-- loopback dev mode: HTTP/WS allowed only with explicit dev flag
-- loopback production mode: HTTPS/WSS required
-- non-loopback mode: HTTPS/WSS mandatory
-- provide an easy guided TLS setup path on all supported platforms
-- prefer a Codex-assisted guided bootstrap for TLS setup where feasible
-- the current implementation exposes that guided bootstrap as `bun run tls:bootstrap`, which is suitable for Codex-assisted local setup flows
+- loopback mode: HTTP/WS allowed by default
+- optional HTTPS/WSS may be enabled automatically when local certs are configured
+- keep loopback-only binding as the primary transport control
+- if non-loopback support is ever added, require HTTPS/WSS there
+- if TLS support remains in the product, `bun run tls:bootstrap` is an optional local helper rather than a startup prerequisite
 
 ## UI and UX plan
 
@@ -549,7 +548,7 @@ Unit and integration coverage should include:
 - websocket connection denied without session
 - websocket connection denied with bad `Origin`
 - websocket ticket expiry and one-time use
-- plaintext transport rejected in production TLS mode
+- plaintext loopback transport allowed when no TLS material is configured
 - `unsafeMode` access after normal login
 - step-up enforcement on task execution and recovery/reset flows
 - worktree traversal rejection
@@ -563,7 +562,7 @@ Current implementation coverage:
 - `src/bun/auth-service.test.ts` covers setup, TOTP login, recovery-code login, auth lifecycle audit events, invalid-credential lockout auditing, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
-- `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements, the guided bootstrap flow, and TLS bootstrap audit logging
+- `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover optional TLS runtime selection, the guided bootstrap flow, and TLS bootstrap audit logging
 - `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
 - `src/bun/project-security-audit.test.ts` covers audit-event persistence for cross-workspace thread creation, queued task execution, and project deletion
 - `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows, including audit-event persistence
@@ -593,7 +592,7 @@ If we want the fastest risk reduction with the least rework:
 
 1. Fix path traversal
 2. Add websocket `Origin` checks and loopback-only binding
-3. Add TLS policy and listener support
+3. Add optional TLS listener support
 4. Add session auth and websocket ticketing
 5. Add password plus TOTP setup/login UI
 6. Add step-up auth for selected high-risk actions
@@ -619,7 +618,8 @@ My recommendation is:
 - require TOTP in v1
 - provide an app-served TOTP enrollment page with QR code in v1
 - make sessions last one week by default
-- require TLS in production and provide guided setup across platforms
+- keep the local security boundary on auth, loopback binding, websocket ticketing, and strict `Origin` checks rather than requiring TLS
+- treat TLS as optional loopback hardening, with guided setup only for users who explicitly want it
 - expose a CLI reset path for command-line users that still requires OTP verification
 - treat recovery codes as view-once material and allow regeneration only through an authenticated CLI flow
 - keep `unsafeMode` available after login, but visibly dangerous and auditable

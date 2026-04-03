@@ -79,20 +79,23 @@ describe("tls runtime config", () => {
     ).toMatchObject({
       enabled: false,
       httpProtocol: "http",
-      required: false,
       websocketProtocol: "ws",
     });
   });
 
-  it("requires TLS outside dev mode and points users to the bootstrap helper", () => {
+  it("allows plaintext transport outside dev mode when no TLS material exists", () => {
     const appDataDir = createTempDirectory();
-    expect(() =>
+    expect(
       resolveTlsRuntimeConfig({
         appDataDir,
         env: {},
         isDevServer: false,
       }),
-    ).toThrow("bun run tls:bootstrap");
+    ).toMatchObject({
+      enabled: false,
+      httpProtocol: "http",
+      websocketProtocol: "ws",
+    });
   });
 
   it("enables HTTPS and WSS when default loopback certificates are present", () => {
@@ -109,7 +112,6 @@ describe("tls runtime config", () => {
       caPath: join(appDataDir, "tls", "loopback-ca.pem"),
       enabled: true,
       httpProtocol: "https",
-      required: true,
       websocketProtocol: "wss",
     });
   });

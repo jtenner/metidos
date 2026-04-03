@@ -21,7 +21,7 @@ Holds backend orchestration and server entry logic that powers local project/tas
 - `isolated-server.ts`
   - Isolated execution/server runner for sidecar workflows.
 - `tls-bootstrap.ts`
-  - Guided loopback certificate bootstrap script for production HTTPS/WSS setup.
+  - Guided loopback certificate bootstrap script for optional local HTTPS/WSS setup.
 - `tls-config.ts`
   - Shared TLS path/runtime policy helper used by the Bun entrypoints.
 - `project-procedures.ts`

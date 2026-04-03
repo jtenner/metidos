@@ -7,7 +7,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `index.ts`
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
-  - Exposes HTTP/HTTPS routes for mainview assets and websocket RPC at `/rpc`.
+  - Exposes loopback HTTP routes for mainview assets and websocket RPC at `/rpc`, with optional HTTPS/WSS when local certs are configured.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
 
@@ -25,11 +25,11 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `tls-config.ts`
   - Resolves the runtime TLS policy shared across monolith and isolated entrypoints.
-  - Picks the per-user default certificate/key/CA paths, enforces production TLS requirements, and normalizes the active HTTP/WSS protocol set.
+  - Picks the per-user default certificate/key/CA paths, keeps loopback TLS optional, and normalizes the active HTTP/WSS protocol set.
 
 - `tls-bootstrap.ts`
   - Implements the guided loopback TLS bootstrap flow exposed by `bun run tls:bootstrap`.
-  - Prefers `mkcert` for locally trusted certificates, falls back to OpenSSL generation, and stores certificate material in the per-user app-data directory.
+  - Prefers `mkcert` for locally trusted certificates, falls back to OpenSSL generation, and stores certificate material in the per-user app-data directory when users opt into TLS.
   - Records successful bootstrap runs in the local security audit log so trust-changing certificate setup remains reviewable.
 
 - `build-mainview.ts`
@@ -151,4 +151,4 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 ## Notes
 
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
-- Production startup now expects loopback TLS files to exist; use `bun run tls:bootstrap --trust` on new installs before `bun run start` or `bun run start:monolith`.
+- Loopback TLS is optional. If local certificate material exists, the entrypoints automatically switch to HTTPS/WSS; otherwise the app stays on loopback HTTP/WS.
