@@ -10,8 +10,11 @@ import type {
 
 const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
 
-// Sourced from OpenAI's official models docs on March 29, 2026. The SDK accepts
-// raw model IDs, but it does not expose a discovery API for enumerating them.
+/**
+ * Sourced from OpenAI's official models docs on March 29, 2026.
+ * The SDK accepts raw model IDs but does not expose a discovery API,
+ * so this list is treated as the source of truth for UI/model validation.
+ */
 const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
   {
     id: "gpt-5.4",
@@ -139,6 +142,9 @@ const codexModelOptionMap = new Map(
   CODEX_MODEL_OPTIONS.map((model) => [model.id, model]),
 );
 
+/**
+ * Available reasoning-effort values mirrored from supported model controls.
+ */
 const CODEX_REASONING_EFFORT_OPTIONS: RpcCodexReasoningEffortOption[] = [
   {
     id: "minimal",
@@ -166,6 +172,9 @@ const codexReasoningEffortOptionMap = new Map(
   CODEX_REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
 );
 
+/**
+ * Build the full model catalog payload consumed by front-end settings.
+ */
 export function buildCodexModelCatalog(): RpcCodexModelCatalog {
   return {
     defaultModel: DEFAULT_THREAD_MODEL,
@@ -175,6 +184,10 @@ export function buildCodexModelCatalog(): RpcCodexModelCatalog {
   };
 }
 
+/**
+ * Resolve a model to its declared context-window size.
+ * Unknown/null values fall back to a conservative default.
+ */
 export function contextWindowTokensForModel(
   model: string | null | undefined,
 ): number {
@@ -182,6 +195,10 @@ export function contextWindowTokensForModel(
   return codexModelOptionMap.get(normalized)?.contextWindowTokens ?? 400_000;
 }
 
+/**
+ * Estimate when to trigger context compaction for a given model.
+ * Uses a fixed ratio to avoid filling context windows to the edge.
+ */
 export function heuristicCompactionTriggerTokens(
   model: string | null | undefined,
 ): number {
@@ -190,6 +207,10 @@ export function heuristicCompactionTriggerTokens(
   );
 }
 
+/**
+ * Validate and return a configured model id.
+ * Throws if the model is not recognized.
+ */
 export function resolveCodexModel(model: string | null | undefined): string {
   const normalized = model?.trim();
   if (!normalized) {
@@ -201,6 +222,10 @@ export function resolveCodexModel(model: string | null | undefined): string {
   return normalized;
 }
 
+/**
+ * Normalize persisted model ids.
+ * Unknown values are silently reset to the default model.
+ */
 export function normalizeStoredCodexModel(
   model: string | null | undefined,
 ): string {
@@ -211,6 +236,10 @@ export function normalizeStoredCodexModel(
   return normalized;
 }
 
+/**
+ * Validate and return a reasoning-effort value.
+ * Throws if the value is not supported.
+ */
 export function resolveCodexReasoningEffort(
   reasoningEffort: string | null | undefined,
 ): RpcCodexReasoningEffort {
@@ -226,6 +255,10 @@ export function resolveCodexReasoningEffort(
   return normalized;
 }
 
+/**
+ * Normalize persisted reasoning-effort values.
+ * Unknown values are silently reset to the default effort.
+ */
 export function normalizeStoredCodexReasoningEffort(
   reasoningEffort: string | null | undefined,
 ): RpcCodexReasoningEffort {
