@@ -1,9 +1,12 @@
-import { isAbsolute, resolve } from "node:path";
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 
+import {
+  canonicalizeSidecarPath,
+  enforceBoundThreadScope,
+  enforceTargetScope,
+} from "./codex-sidecar-scope";
 import {
   getThreadById,
   initAppDatabase,
@@ -302,18 +305,9 @@ function normalizeRpcRequestPriority(
 }
 
 function canonicalPath(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error("Path is required.");
-  }
-
-  // Resolve relative inputs against the active worktree when available.
-  const baseDirectory = worktreePathContext ?? process.cwd();
-  const resolvedPath = isAbsolute(trimmed)
-    ? resolve(trimmed)
-    : resolve(baseDirectory, trimmed);
-  const normalized = resolvedPath.replace(/\\/g, "/").replace(/\/+$/, "");
-  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  return canonicalizeSidecarPath(value, {
+    baseDirectory: worktreePathContext ?? process.cwd(),
+  });
 }
 
 /** Compare two paths after canonical normalization for robust equality checks. */
@@ -429,6 +423,7 @@ async function resolveProjectIdForWorktreePath(
  * Resolve worktree target used by thread operations, using explicit args or context.
  */
 async function resolveWorktreeTarget(params?: {
+  allowCrossProject?: boolean;
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
   worktreePath?: string | null | undefined;
@@ -447,13 +442,25 @@ async function resolveWorktreeTarget(params?: {
       worktreePath,
       explicitProjectId,
     );
-    return {
+    const target = {
       projectId,
       projectPath:
         (await listKnownProjects()).find((project) => project.id === projectId)
           ?.path ?? null,
       worktreePath,
     };
+    enforceTargetScope({
+      projectIdContext,
+      targetProjectId: target.projectId,
+      targetWorktreePath: target.worktreePath,
+      worktreePathContext,
+      ...(params.allowCrossProject === true
+        ? {
+            allowCrossProject: true,
+          }
+        : {}),
+    });
+    return target;
   }
 
   if (typeof projectIdContext === "number" && worktreePathContext) {
@@ -473,6 +480,7 @@ async function resolveWorktreeTarget(params?: {
 
 function requireThreadId(threadId?: number | null): number {
   if (typeof threadId === "number") {
+    enforceBoundThreadScope(threadId, threadIdContext);
     return threadId;
   }
   throw new Error("threadId is required.");
@@ -793,6 +801,12 @@ server.registerTool(
         .describe(
           "When true, request permission in the UI before creating the thread. If unsafeMode is true, the thread starts immediately. Omit for null metadata.",
         ),
+      allowCrossProject: z
+        .boolean()
+        .optional()
+        .describe(
+          "Required when intentionally targeting a different bound project or worktree than the current sidecar context.",
+        ),
     },
     annotations: {
       idempotentHint: false,
@@ -801,6 +815,7 @@ server.registerTool(
     },
   },
   async ({
+    allowCrossProject,
     autoStart,
     input,
     model,
@@ -814,6 +829,11 @@ server.registerTool(
       projectId,
       projectPath,
       worktreePath,
+      ...(allowCrossProject === true
+        ? {
+            allowCrossProject: true,
+          }
+        : {}),
     });
     const metadata = {
       input,

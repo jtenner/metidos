@@ -83,6 +83,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
 
+- `codex-sidecar-scope.ts`
+  - Provides the scope-enforcement helpers used by the MCP sidecar.
+  - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes unless an explicit override is supplied.
+
 - `auth.ts`
   - Provides the first-pass auth primitives used by future setup/login flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
