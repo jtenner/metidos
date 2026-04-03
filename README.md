@@ -157,3 +157,94 @@ bun run harness:starvation    # run starvation harness utility
 - Prefer clear comments for edge-case behavior (cancellations, open/close sequencing, stale-response handling).
 - Run docs + format/style checks according to `bun run validate` before non-doc code changes.
 - Use `agent-todo.md` for new documentation or process work so the repo task list stays accurate.
+
+## End-to-end component diagram
+
+```mermaid
+flowchart LR
+  subgraph Client["Browser client (src/mainview)"]
+    A["index.ts (RPC transport + event bridge)"]
+    B["App.tsx (composition + state orchestration)"]
+    C["Derived hooks & panels (mainview/app/*)"]
+    D["Controls (mainview/controls/*)"]
+    A --> B --> C
+    C --> D
+  end
+
+  subgraph Transport["WebSocket transport boundary"]
+    W["WebSocket /rpc"]
+  end
+
+  subgraph Server["Bun backend (src/bun)"]
+    E["index.ts HTTP + WebSocket host"]
+    F["rpcHandlers + rpc schema registry"]
+    G["project-procedures.ts"]
+    H["shared services"]
+    I["project-procedures/codex-catalog.ts"]
+    J["project-procedures/git-history.ts"]
+    K["project-procedures/project-tasks.ts"]
+    L["project-procedures/directory-suggestions.ts"]
+    M["project-procedures/thread-detail.ts"]
+    N["db.ts (SQLite persistence)"]
+    O["git.ts (git command + priority queue)"]
+    P["codex-sidecar-mcp.ts (codex mcp process bridge)"]
+    Q["build-mainview.ts"]
+    R["static-server.ts / isolated-server.ts"]
+    E --> F --> G
+    G --> H
+    H --> I
+    H --> J
+    H --> K
+    H --> L
+    H --> M
+    G --> N
+    G --> O
+    G --> P
+    E --> Q
+    E --> R
+  end
+
+  subgraph External["External services"]
+    X["OpenAI Codex SDK"]
+    Y["Git CLI"]
+    Z["SQLite DB file"]
+    F1["File system / worktrees"]
+    F2["Node/Bun runtime"]
+  end
+
+  A <--> |typed request/response| W
+  W <--> E
+  G --> |persist/read| N
+  N --> |stores| Z
+  G --> |status/events| P
+  P --> |thread lifecycle/streams| X
+  O --> |commands| Y
+  O --> |read/write| F1
+  E --> |serves assets| R
+  F2 --> E
+```
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User action
+  participant MV as mainview index.ts
+  participant WS as ws://.../rpc
+  participant API as bun index.ts
+  participant PR as project-procedures
+  participant DB as db.ts
+  participant SIDE as codex-sidecar-mcp
+  participant CH as Codex SDK
+
+  U->>MV: click "start thread / run task / diff"
+  MV->>WS: RPC request {id, method, params, priority}
+  WS->>API: dispatch by method name
+  API->>PR: invoke procedure
+  PR->>DB: load/save projects/worktrees/threads/messages
+  PR->>SIDE: start/manage Codex thread or tool execution
+  SIDE->>CH: stream events / tool calls
+  PR-->>API: normalized result or streamed event envelope
+  API-->>WS: response or push notification (tasks/history/thread-start)
+  WS-->>MV: resolve pending promise or emit window event
+  MV-->>U: UI updates derived state + rendered diff/thread/message panels
+```
