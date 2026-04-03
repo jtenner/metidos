@@ -11,6 +11,10 @@ export type DiffFilePatchState = {
   path: string | null;
 };
 
+/**
+ * Tree node used by the diff file navigator.
+ * `path === null` indicates a directory entry.
+ */
 export type DiffFileTreeNode = {
   change: RpcWorktreeChange | null;
   children: DiffFileTreeNode[];
@@ -19,6 +23,9 @@ export type DiffFileTreeNode = {
   path: string | null;
 };
 
+/**
+ * Build an initial empty patch state for a specific file path.
+ */
 export function emptyDiffFilePatchState(
   path: string | null = null,
 ): DiffFilePatchState {
@@ -61,6 +68,7 @@ export function buildDiffFileTree(
       const existing = level.get(segment);
       if (existing) {
         if (isLeaf) {
+          // Reuse an existing node and convert it into a file node when we see its leaf later.
           existing.path = change.path;
           existing.change = change;
         }
@@ -80,6 +88,8 @@ export function buildDiffFileTree(
     }
   }
 
+  // Materialize map-backed tree into deterministic arrays:
+  // directories before files, both sorted lexicographically by label.
   const materialize = (nodes: Map<string, MutableNode>): DiffFileTreeNode[] =>
     [...nodes.values()]
       .sort((left, right) => {
@@ -101,6 +111,9 @@ export function buildDiffFileTree(
   return materialize(root);
 }
 
+/**
+ * Summarize unified diff body into hunk/addition/deletion totals for header stats.
+ */
 function summarizeDiffText(diffText: string): {
   additions: number;
   deletions: number;
@@ -143,6 +156,7 @@ function DiffFileTree({
   onSelectedDiffFilePathChange: (path: string) => void;
   selectedDiffFilePath: string | null;
 }): JSX.Element {
+  // Recursive renderer that increases left padding by depth for visual hierarchy.
   const renderNodes = (
     currentNodes: DiffFileTreeNode[],
     depth = 0,
@@ -151,6 +165,7 @@ function DiffFileTree({
       const path = node.path;
 
       if (path === null) {
+        // Directory nodes only render as labels and recurse into children.
         return (
           <div key={node.key}>
             <div
@@ -180,6 +195,7 @@ function DiffFileTree({
             paddingLeft: `${12 + depth * 14}px`,
           }}
           onClick={() => {
+            // Clicking a leaf file updates the selected diff path for focused viewer.
             onSelectedDiffFilePathChange(path);
           }}
         >
@@ -217,6 +233,10 @@ type DiffWorkspaceProps = {
   worktreeDiffError: string;
 };
 
+/**
+ * Worktree diff workspace with file navigation and focused diff viewer.
+ * Left column lists changed files, right column displays selected-file metadata and diff.
+ */
 export function DiffWorkspace({
   activeSelectedWorktreeFolder,
   activeSelectedWorktreeOpened,
@@ -238,8 +258,10 @@ export function DiffWorkspace({
   worktreeDiffError,
 }: DiffWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
+  // Recompute additions/deletions/hunk counts from current patch text only when needed.
   const diffStats = summarizeDiffText(diffFilePatchState.diffText);
 
+  // Left panel intentionally uses explicit fallthrough states for stable UX.
   const selectorContent =
     !selectedProject || !activeSelectedWorktreePath ? (
       <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
@@ -281,6 +303,7 @@ export function DiffWorkspace({
       </div>
     );
 
+  // Right panel intentionally guards against rendering stale data while file context changes.
   const contentBody = !selectedDiffFileChange ? (
     <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
       Select a changed file to inspect its focused diff.
@@ -314,6 +337,7 @@ export function DiffWorkspace({
       }
     >
       <div
+        {/* Desktop layout fixes the tree column width to keep diff text from reflowing. */}
         className={
           mobile
             ? "shrink-0"
@@ -339,6 +363,7 @@ export function DiffWorkspace({
                   : "No worktree selected"}
               </div>
             </div>
+            {/* Keep refresh disabled to avoid overlapping snapshot refresh requests. */}
             <button
               type="button"
               className="border border-[#31404a] bg-[#182025] px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#cfe0eb] transition-colors hover:bg-[#1e2a31] disabled:cursor-not-allowed disabled:opacity-60"
