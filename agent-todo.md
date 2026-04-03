@@ -1,8 +1,5 @@
 # Agent TODO
 
-- Phase 1: enforce login throttling and lockout rules.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Recommended Authentication Model and Phase 4. Apply the three-failed-attempt, 10-minute lockout behavior to PIN/password login attempts and cover it with tests for both primary-factor modes.
-
 - TLS: add HTTPS/WSS runtime support and guided TLS bootstrap.
   Reference: `docs/2026-04-03-security-remediation-plan.md` TLS Strategy. Add TLS listener/configuration support, require HTTPS/WSS outside explicit dev mode, and design the guided bootstrap flow so Codex can assist with certificate setup while still requiring explicit approval for trust-changing commands.
 

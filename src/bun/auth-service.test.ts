@@ -52,6 +52,21 @@ afterEach(() => {
   tempDirectories.clear();
 });
 
+const LOCKOUT_SCENARIOS = [
+  {
+    invalidPrimaryFactor: "000000",
+    name: "PIN logins",
+    primaryFactor: "123456",
+    primaryFactorType: "pin",
+  },
+  {
+    invalidPrimaryFactor: "incorrect horse battery staple",
+    name: "password logins",
+    primaryFactor: "correct horse battery staple",
+    primaryFactorType: "password",
+  },
+] as const;
+
 describe("auth service", () => {
   it("prepares TOTP enrollment material", () => {
     const enrollment = prepareTotpEnrollment({
@@ -98,83 +113,85 @@ describe("auth service", () => {
     });
   });
 
-  it("locks auth for ten minutes after three failed login attempts", async () => {
-    const database = createTestDatabase();
-    const appDataDir = createTempDirectory();
-    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
-    const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+  for (const scenario of LOCKOUT_SCENARIOS) {
+    it(`locks auth for ten minutes after three failed ${scenario.name}`, async () => {
+      const database = createTestDatabase();
+      const appDataDir = createTempDirectory();
+      const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+      const enrollment = prepareTotpEnrollment({
+        accountName: "local-user",
+      });
+      const setupCode = await generateTotpCode(
+        enrollment.totpSecret,
+        setupTimeMs,
+      );
+
+      await setupAuth(database, {
+        appDataDir,
+        nowMs: setupTimeMs,
+        primaryFactor: scenario.primaryFactor,
+        primaryFactorType: scenario.primaryFactorType,
+        totpCode: setupCode,
+        totpSecret: enrollment.totpSecret,
+      });
+
+      const firstAttemptCode = await generateTotpCode(
+        enrollment.totpSecret,
+        setupTimeMs + 1_000,
+      );
+      await expect(
+        login(database, {
+          appDataDir,
+          nowMs: setupTimeMs + 1_000,
+          primaryFactor: scenario.invalidPrimaryFactor,
+          totpCode: firstAttemptCode,
+        }),
+      ).rejects.toThrow("The provided credentials are invalid.");
+
+      await expect(
+        login(database, {
+          appDataDir,
+          nowMs: setupTimeMs + 2_000,
+          primaryFactor: scenario.invalidPrimaryFactor,
+          totpCode: firstAttemptCode,
+        }),
+      ).rejects.toThrow("The provided credentials are invalid.");
+
+      await expect(
+        login(database, {
+          appDataDir,
+          nowMs: setupTimeMs + 3_000,
+          primaryFactor: scenario.invalidPrimaryFactor,
+          totpCode: firstAttemptCode,
+        }),
+      ).rejects.toMatchObject({
+        code: "auth_locked",
+      } satisfies Partial<AuthServiceError>);
+
+      await expect(
+        login(database, {
+          appDataDir,
+          nowMs: setupTimeMs + 4_000,
+          primaryFactor: scenario.primaryFactor,
+          totpCode: firstAttemptCode,
+        }),
+      ).rejects.toMatchObject({
+        code: "auth_locked",
+      } satisfies Partial<AuthServiceError>);
+
+      const successCode = await generateTotpCode(
+        enrollment.totpSecret,
+        setupTimeMs + 10 * 60 * 1000 + 4_000,
+      );
+      const loginResult = await login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 10 * 60 * 1000 + 4_000,
+        primaryFactor: scenario.primaryFactor,
+        totpCode: successCode,
+      });
+      expect(loginResult.session.id.length).toBeGreaterThan(10);
     });
-    const setupCode = await generateTotpCode(
-      enrollment.totpSecret,
-      setupTimeMs,
-    );
-
-    await setupAuth(database, {
-      appDataDir,
-      nowMs: setupTimeMs,
-      primaryFactor: "123456",
-      primaryFactorType: "pin",
-      totpCode: setupCode,
-      totpSecret: enrollment.totpSecret,
-    });
-
-    const firstAttemptCode = await generateTotpCode(
-      enrollment.totpSecret,
-      setupTimeMs + 1_000,
-    );
-    await expect(
-      login(database, {
-        appDataDir,
-        nowMs: setupTimeMs + 1_000,
-        primaryFactor: "000000",
-        totpCode: firstAttemptCode,
-      }),
-    ).rejects.toThrow("The provided credentials are invalid.");
-
-    await expect(
-      login(database, {
-        appDataDir,
-        nowMs: setupTimeMs + 2_000,
-        primaryFactor: "000000",
-        totpCode: firstAttemptCode,
-      }),
-    ).rejects.toThrow("The provided credentials are invalid.");
-
-    await expect(
-      login(database, {
-        appDataDir,
-        nowMs: setupTimeMs + 3_000,
-        primaryFactor: "000000",
-        totpCode: firstAttemptCode,
-      }),
-    ).rejects.toMatchObject({
-      code: "auth_locked",
-    } satisfies Partial<AuthServiceError>);
-
-    await expect(
-      login(database, {
-        appDataDir,
-        nowMs: setupTimeMs + 4_000,
-        primaryFactor: "123456",
-        totpCode: firstAttemptCode,
-      }),
-    ).rejects.toMatchObject({
-      code: "auth_locked",
-    } satisfies Partial<AuthServiceError>);
-
-    const successCode = await generateTotpCode(
-      enrollment.totpSecret,
-      setupTimeMs + 10 * 60 * 1000 + 4_000,
-    );
-    const loginResult = await login(database, {
-      appDataDir,
-      nowMs: setupTimeMs + 10 * 60 * 1000 + 4_000,
-      primaryFactor: "123456",
-      totpCode: successCode,
-    });
-    expect(loginResult.session.id.length).toBeGreaterThan(10);
-  });
+  }
 
   it("issues and consumes websocket tickets for valid sessions", async () => {
     const database = createTestDatabase();
