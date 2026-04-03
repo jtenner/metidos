@@ -104,6 +104,7 @@ import {
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
+  isPublicTlsEnabled,
   resolveTlsRuntimeConfig,
 } from "./tls-config";
 
@@ -270,7 +271,9 @@ const BACKEND_ONLY =
   process.env.JOLT_BACKEND_ONLY === "1";
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  forceTls: PUBLIC_TLS_ENABLED,
   isDevServer: IS_DEV_SERVER,
 });
 const DEV_FLOW_MODE = resolveDevFlowMode({
@@ -466,6 +469,9 @@ function isSecureRequest(request: Request): boolean {
   }
   if (forwardedProto === "http") {
     return false;
+  }
+  if (TLS_RUNTIME.publicTls) {
+    return true;
   }
   return new URL(request.url).protocol === "https:";
 }
@@ -1008,6 +1014,11 @@ async function htmlResponse(): Promise<Response> {
   const runtimeConfig: InjectedRuntimeConfig = {
     devServer: IS_DEV_SERVER,
     healthUrl: "/health",
+    ...(TLS_RUNTIME.publicTls
+      ? {
+          preferTls: true,
+        }
+      : {}),
   };
   const runtimeConfigElement = buildRuntimeConfigElement(runtimeConfig);
   const template = await Bun.file(MAINVIEW_HTML_PATH).text();

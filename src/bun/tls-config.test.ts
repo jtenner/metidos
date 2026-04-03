@@ -7,10 +7,12 @@ import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
   getDefaultTlsPaths,
+  isPublicTlsEnabled,
   resolveTlsRuntimeConfig,
   TLS_CA_PATH_ENV,
   TLS_CERT_PATH_ENV,
   TLS_KEY_PATH_ENV,
+  TLS_PUBLIC_TRANSPORT_ENV,
 } from "./tls-config";
 
 const tempDirectories = new Set<string>();
@@ -79,6 +81,9 @@ describe("tls runtime config", () => {
     ).toMatchObject({
       enabled: false,
       httpProtocol: "http",
+      publicHttpProtocol: "http",
+      publicTls: false,
+      publicWebSocketProtocol: "ws",
       websocketProtocol: "ws",
     });
   });
@@ -94,6 +99,28 @@ describe("tls runtime config", () => {
     ).toMatchObject({
       enabled: false,
       httpProtocol: "http",
+      publicHttpProtocol: "http",
+      publicTls: false,
+      publicWebSocketProtocol: "ws",
+      websocketProtocol: "ws",
+    });
+  });
+
+  it("forces public https and wss when the public TLS flag is enabled", () => {
+    const appDataDir = createTempDirectory();
+    expect(
+      resolveTlsRuntimeConfig({
+        appDataDir,
+        env: {},
+        forceTls: true,
+        isDevServer: false,
+      }),
+    ).toMatchObject({
+      enabled: false,
+      httpProtocol: "http",
+      publicHttpProtocol: "https",
+      publicTls: true,
+      publicWebSocketProtocol: "wss",
       websocketProtocol: "ws",
     });
   });
@@ -112,8 +139,21 @@ describe("tls runtime config", () => {
       caPath: join(appDataDir, "tls", "loopback-ca.pem"),
       enabled: true,
       httpProtocol: "https",
+      publicHttpProtocol: "https",
+      publicTls: true,
+      publicWebSocketProtocol: "wss",
       websocketProtocol: "wss",
     });
+  });
+
+  it("detects the public TLS mode from CLI args or env", () => {
+    expect(isPublicTlsEnabled([])).toBe(false);
+    expect(isPublicTlsEnabled(["--tls"])).toBe(true);
+    expect(
+      isPublicTlsEnabled([], {
+        [TLS_PUBLIC_TRANSPORT_ENV]: "1",
+      }),
+    ).toBe(true);
   });
 
   it("requires explicit cert and key overrides to be set together", () => {

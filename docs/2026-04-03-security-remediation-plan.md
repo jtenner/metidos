@@ -47,6 +47,7 @@ Recommended policy:
 
 - bind to loopback only and do not depend on TLS for the local security boundary
 - keep HTTPS/WSS support optional for users who want it
+- support an explicit `--tls` / `JOLT_TLS=1` mode for reverse-proxy deployments that terminate TLS upstream
 - if the app ever supports non-loopback access later, revisit and require TLS for that mode
 
 ## Recommended Authentication Model

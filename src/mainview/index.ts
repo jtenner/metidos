@@ -139,6 +139,14 @@ function readInjectedRuntimeConfig(): RuntimeConfig | null {
           : {}),
         ...(typeof parsed === "object" &&
         parsed !== null &&
+        "preferTls" in parsed &&
+        typeof parsed.preferTls === "boolean"
+          ? {
+              preferTls: parsed.preferTls,
+            }
+          : {}),
+        ...(typeof parsed === "object" &&
+        parsed !== null &&
         "rpcWebSocketUrl" in parsed &&
         typeof parsed.rpcWebSocketUrl === "string"
           ? {
@@ -153,6 +161,11 @@ function readInjectedRuntimeConfig(): RuntimeConfig | null {
       ...(typeof parsed.healthUrl === "string"
         ? {
             healthUrl: parsed.healthUrl,
+          }
+        : {}),
+      ...(typeof parsed.preferTls === "boolean"
+        ? {
+            preferTls: parsed.preferTls,
           }
         : {}),
       ...(typeof parsed.rpcWebSocketUrl === "string"
@@ -172,7 +185,10 @@ const runtimeConfig: RuntimeConfig = readInjectedRuntimeConfig() ??
     devServer: false,
   };
 
-const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const socketProtocol =
+  runtimeConfig.preferTls || window.location.protocol === "https:"
+    ? "wss:"
+    : "ws:";
 const socketBaseUrl =
   runtimeConfig.rpcWebSocketUrl ??
   `${socketProtocol}//${window.location.host}/rpc`;

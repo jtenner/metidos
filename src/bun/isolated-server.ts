@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
+  isPublicTlsEnabled,
   resolveTlsRuntimeConfig,
+  TLS_PUBLIC_TRANSPORT_ENV,
 } from "./tls-config";
 
 /**
@@ -100,7 +102,9 @@ function spawnRole(
 const SERVER_ARGS = Bun.argv.slice(2);
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  forceTls: PUBLIC_TLS_ENABLED,
   isDevServer: IS_DEV_SERVER,
 });
 /**
@@ -158,6 +162,7 @@ const backend = spawnRole(
     JOLT_PORT: String(RPC_PORT),
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_URL: rpcWebSocketUrl,
+    [TLS_PUBLIC_TRANSPORT_ENV]: PUBLIC_TLS_ENABLED ? "1" : "",
   },
 );
 /**
@@ -173,7 +178,12 @@ const staticServer = spawnRole(
     JOLT_RPC_HEALTH_URL: `${rpcHttpOrigin}/health`,
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_PORT: String(RPC_PORT),
-    JOLT_RPC_URL: rpcWebSocketUrl,
+    ...(PUBLIC_TLS_ENABLED && !TLS_RUNTIME.enabled
+      ? {}
+      : {
+          JOLT_RPC_URL: rpcWebSocketUrl,
+        }),
+    [TLS_PUBLIC_TRANSPORT_ENV]: PUBLIC_TLS_ENABLED ? "1" : "",
   },
 );
 

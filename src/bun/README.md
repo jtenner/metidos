@@ -25,7 +25,8 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `tls-config.ts`
   - Resolves the runtime TLS policy shared across monolith and isolated entrypoints.
-  - Picks the per-user default certificate/key/CA paths, keeps loopback TLS optional, and normalizes the active HTTP/WSS protocol set.
+  - Picks the per-user default certificate/key/CA paths, keeps loopback TLS optional, and normalizes both the listener protocol and the browser-facing HTTP/WSS protocol set.
+  - Supports `--tls` / `JOLT_TLS=1` for reverse-proxy deployments where Bun stays on loopback HTTP but the public browser transport should still be treated as HTTPS/WSS.
 
 - `tls-bootstrap.ts`
   - Implements the guided loopback TLS bootstrap flow exposed by `bun run tls:bootstrap`.

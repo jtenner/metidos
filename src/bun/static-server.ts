@@ -11,6 +11,7 @@ import {
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
+  isPublicTlsEnabled,
   resolveTlsRuntimeConfig,
 } from "./tls-config";
 
@@ -39,7 +40,6 @@ const BACKEND_HEALTH_TIMEOUT_MS = 1_500;
  */
 type RuntimeConfig = InjectedRuntimeConfig & {
   healthUrl: string;
-  rpcWebSocketUrl: string;
 };
 
 type BackendFetchTlsOptions = NonNullable<BunFetchRequestInit["tls"]>;
@@ -203,7 +203,9 @@ async function readBackendHealthSnapshot(
 const SERVER_ARGS = Bun.argv.slice(2);
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  forceTls: PUBLIC_TLS_ENABLED,
   isDevServer: IS_DEV_SERVER,
 });
 const PUBLIC_PORT = resolvePort(
@@ -234,6 +236,24 @@ const BACKEND_FETCH_TLS: BackendFetchTlsOptions | undefined =
       }
     : undefined;
 
+function resolveForwardedProto(request: Request): "http" | "https" {
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    ?.toLowerCase();
+  if (forwardedProto === "https") {
+    return "https";
+  }
+  if (forwardedProto === "http") {
+    return "http";
+  }
+  if (TLS_RUNTIME.publicTls) {
+    return "https";
+  }
+  return new URL(request.url).protocol === "https:" ? "https" : "http";
+}
+
 async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   const requestUrl = new URL(request.url);
   const targetUrl = new URL(
@@ -242,7 +262,7 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   );
   const headers = new Headers(request.headers);
   headers.set("x-forwarded-host", requestUrl.host);
-  headers.set("x-forwarded-proto", requestUrl.protocol.replace(":", ""));
+  headers.set("x-forwarded-proto", resolveForwardedProto(request));
 
   const method = request.method.toUpperCase();
   const init: BunFetchRequestInit = {
@@ -270,10 +290,23 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
 }
 
 const mainviewBundlePath = await buildMainviewBundle();
+const shouldInjectDirectRpcWebSocketUrl =
+  Boolean(process.env.JOLT_RPC_URL?.trim()) ||
+  !TLS_RUNTIME.publicTls ||
+  TLS_RUNTIME.enabled;
 const runtimeConfig: RuntimeConfig = {
   devServer: IS_DEV_SERVER,
   healthUrl: "/health",
-  rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+  ...(TLS_RUNTIME.publicTls
+    ? {
+        preferTls: true,
+      }
+    : {}),
+  ...(shouldInjectDirectRpcWebSocketUrl
+    ? {
+        rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+      }
+    : {}),
 };
 
 let server: ReturnType<typeof Bun.serve>;

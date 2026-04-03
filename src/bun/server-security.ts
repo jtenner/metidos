@@ -11,6 +11,7 @@ export const RUNTIME_CONFIG_ELEMENT_ID = "jolt-runtime-config";
 export type InjectedRuntimeConfig = {
   devServer: boolean;
   healthUrl?: string;
+  preferTls?: boolean;
   rpcWebSocketUrl?: string;
 };
 

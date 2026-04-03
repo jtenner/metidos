@@ -12,6 +12,7 @@ export const TLS_CERT_PATH_ENV = "JOLT_TLS_CERT_PATH";
 export const TLS_KEY_PATH_ENV = "JOLT_TLS_KEY_PATH";
 export const TLS_CA_PATH_ENV = "JOLT_TLS_CA_PATH";
 export const TLS_PASSPHRASE_ENV = "JOLT_TLS_PASSPHRASE";
+export const TLS_PUBLIC_TRANSPORT_ENV = "JOLT_TLS";
 
 type ProtocolSet = {
   httpProtocol: "http" | "https";
@@ -30,11 +31,15 @@ export type ResolvedTlsRuntimeConfig = ProtocolSet & {
   enabled: boolean;
   keyPath: string;
   passphrase: string | null;
+  publicTls: boolean;
+  publicHttpProtocol: "http" | "https";
+  publicWebSocketProtocol: "ws" | "wss";
   tlsOptions: Bun.TLSOptions | null;
 };
 
 type ResolveTlsRuntimeConfigOptions = AppDataPathOptions & {
   env?: NodeJS.ProcessEnv;
+  forceTls?: boolean;
   isDevServer: boolean;
 };
 
@@ -121,6 +126,16 @@ function buildProtocolSet(tlsEnabled: boolean): ProtocolSet {
   };
 }
 
+export function isPublicTlsEnabled(
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (args.includes("--tls")) {
+    return true;
+  }
+  return env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1";
+}
+
 function buildMissingTlsMessage(
   missingPaths: string[],
   paths: TlsFilePaths,
@@ -143,6 +158,7 @@ export function resolveTlsRuntimeConfig(
   const env = options.env ?? process.env;
   const defaults = getDefaultTlsPaths(options);
   const resolvedPaths = resolveTlsEnvironmentPaths(env, defaults);
+  const forcedTls = options.forceTls === true;
   const hasCert = existsSync(resolvedPaths.certPath);
   const hasKey = existsSync(resolvedPaths.keyPath);
   const hasCa = existsSync(resolvedPaths.caPath);
@@ -164,6 +180,7 @@ export function resolveTlsRuntimeConfig(
   }
 
   if (!hasCert || !hasKey) {
+    const publicTls = forcedTls;
     return {
       ...buildProtocolSet(false),
       caPath: null,
@@ -171,10 +188,14 @@ export function resolveTlsRuntimeConfig(
       enabled: false,
       keyPath: resolvedPaths.keyPath,
       passphrase: resolvedPaths.passphrase,
+      publicHttpProtocol: publicTls ? "https" : "http",
+      publicTls,
+      publicWebSocketProtocol: publicTls ? "wss" : "ws",
       tlsOptions: null,
     };
   }
 
+  const publicTls = true;
   return {
     ...buildProtocolSet(true),
     caPath: hasCa ? resolvedPaths.caPath : null,
@@ -182,6 +203,9 @@ export function resolveTlsRuntimeConfig(
     enabled: true,
     keyPath: resolvedPaths.keyPath,
     passphrase: resolvedPaths.passphrase,
+    publicHttpProtocol: publicTls ? "https" : "http",
+    publicTls,
+    publicWebSocketProtocol: publicTls ? "wss" : "ws",
     tlsOptions: {
       cert: Bun.file(resolvedPaths.certPath),
       key: Bun.file(resolvedPaths.keyPath),
