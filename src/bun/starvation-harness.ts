@@ -8,8 +8,14 @@ import type {
   RpcWorktree,
 } from "./rpc-schema";
 
+/**
+ * Names of RPC methods available to the harness.
+ */
 type RpcMethodName = keyof AppRPCSchema["requests"];
 
+/**
+ * Parsed command-line options and effective configuration for a run.
+ */
 type HarnessOptions = {
   durationMs: number;
   help: boolean;
@@ -52,6 +58,9 @@ type PressureSummary = {
   failedCount: number;
 };
 
+/**
+ * Shape of RPC responses consumed by the harness socket client.
+ */
 type RpcResponseMessage =
   | {
       type: "response";
@@ -72,6 +81,9 @@ type PendingRpcCall = {
   timeout: ReturnType<typeof setTimeout> | null;
 };
 
+/**
+ * Working context tracked across startup, load generation, and cleanup.
+ */
 type HarnessContext = {
   project: RpcProject;
   projectWasCreated: boolean;
@@ -91,6 +103,9 @@ const DEFAULT_WORKER_COUNT = 3;
 const DEFAULT_TASK_RUNS = 1;
 const SAFE_TASK_SCRIPT_NAMES = ["validate", "typecheck", "build:dev", "format"];
 
+/**
+ * Lightweight websocket JSON-RPC request/response client used by the harness.
+ */
 class RpcHarnessClient {
   private readonly pending = new Map<number, PendingRpcCall>();
   private readonly readyPromise: Promise<void>;
@@ -135,6 +150,9 @@ class RpcHarnessClient {
     await this.readyPromise;
   }
 
+  /**
+   * Send one RPC request and await typed response or timeout.
+   */
   async call<K extends RpcMethodName>(
     method: K,
     params: AppRPCSchema["requests"][K]["params"],
@@ -315,6 +333,9 @@ function parseArgs(argv: string[]): HarnessOptions {
   return options;
 }
 
+/**
+ * Parse numeric flag values and enforce min/max bounds.
+ */
 function parseIntegerOption(
   flag: string,
   value: string,
@@ -353,12 +374,18 @@ Options:
 `);
 }
 
+/**
+ * Promise-based timer utility.
+ */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
+/**
+ * Check for AbortError/TimeoutError values.
+ */
 function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -366,6 +393,9 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Measure duration of an async callback.
+ */
 async function timed<T>(
   _label: string,
   callback: () => Promise<T>,
@@ -378,6 +408,9 @@ async function timed<T>(
   };
 }
 
+/**
+ * Time an HTTP endpoint request and classify latency/outcome.
+ */
 async function measureHttp(
   baseUrl: string,
   path: string,
@@ -421,6 +454,9 @@ async function measureHttp(
   }
 }
 
+/**
+ * Time an RPC request and return both parsed result and status payload.
+ */
 async function measureRpc<K extends RpcMethodName>(
   client: RpcHarnessClient,
   label: string,
@@ -482,6 +518,9 @@ function choosePreferredTask(
   return null;
 }
 
+/**
+ * Build/resolve project, worktree, and task context prior to running measurements.
+ */
 async function ensureHarnessContext(
   client: RpcHarnessClient,
   options: HarnessOptions,
@@ -555,6 +594,9 @@ async function ensureHarnessContext(
   };
 }
 
+/**
+ * Optionally create background tasks to produce active thread pressure.
+ */
 async function startProjectTaskPressure(
   client: RpcHarnessClient,
   context: HarnessContext,
@@ -599,6 +641,9 @@ async function startProjectTaskPressure(
   }
 }
 
+/**
+ * Continuous worker that repeatedly opens worktree and reads diff/history under load.
+ */
 async function runPressureWorker(
   client: RpcHarnessClient,
   context: HarnessContext,
@@ -674,6 +719,9 @@ async function runPressureWorker(
   return summary;
 }
 
+/**
+ * Measure startup path through HTTP and RPC endpoints and return timing summary.
+ */
 async function measureStartupSequence(
   client: RpcHarnessClient,
   baseUrl: string,
@@ -735,6 +783,9 @@ async function measureStartupSequence(
   };
 }
 
+/**
+ * Cleanup created threads/projects from test run as best effort.
+ */
 async function cleanupHarness(
   client: RpcHarnessClient,
   context: HarnessContext,
@@ -805,6 +856,9 @@ async function cleanupHarness(
   }
 }
 
+/**
+ * Poll thread state until not working or timeout elapses.
+ */
 async function waitForThreadIdle(
   client: RpcHarnessClient,
   threadId: number,
@@ -827,6 +881,9 @@ async function waitForThreadIdle(
   }
 }
 
+/**
+ * Normalize unknown error value into stable string label for output.
+ */
 function toErrorLabel(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message.trim();
@@ -834,10 +891,16 @@ function toErrorLabel(error: unknown): string {
   return String(error);
 }
 
+/**
+ * Compose default websocket URL from port.
+ */
 function websocketUrlFromPort(port: number): string {
   return `ws://127.0.0.1:${port}/rpc`;
 }
 
+/**
+ * Parse rpcWebSocketUrl from discovery payload when available.
+ */
 function readRpcWebSocketUrl(value: unknown): string | null {
   if (typeof value !== "object" || value === null) {
     return null;
@@ -850,6 +913,9 @@ function readRpcWebSocketUrl(value: unknown): string | null {
     : null;
 }
 
+/**
+ * Read /health endpoint and try to discover rpcWebSocketUrl.
+ */
 async function discoverRpcUrl(
   baseUrl: string,
   timeoutMs: number,
@@ -877,6 +943,9 @@ async function discoverRpcUrl(
   }
 }
 
+/**
+ * Resolve RPC websocket URL from explicit input, port, or /health discovery.
+ */
 async function resolveRpcUrl(
   baseUrl: string,
   options: HarnessOptions,
@@ -891,6 +960,9 @@ async function resolveRpcUrl(
   return discovered ?? websocketUrlFromPort(options.port);
 }
 
+/**
+ * Combine per-worker pressure counts.
+ */
 function summarizePressure(results: PressureSummary[]): PressureSummary {
   return results.reduce(
     (summary, current) => ({
@@ -906,6 +978,9 @@ function summarizePressure(results: PressureSummary[]): PressureSummary {
   );
 }
 
+/**
+ * Print structured startup and pressure summary lines to stdout.
+ */
 function printStartupSummary(
   startup: StartupSummary,
   pressure: PressureSummary,
@@ -946,6 +1021,9 @@ function printStartupSummary(
   );
 }
 
+/**
+ * Evaluate whether startup meets configured latency budgets.
+ */
 function didStartupPass(
   startup: StartupSummary,
   options: HarnessOptions,
@@ -959,6 +1037,9 @@ function didStartupPass(
   return httpOk && rpcOk && startup.totalDurationMs <= options.startupBudgetMs;
 }
 
+/**
+ * End-to-end harness flow: setup, warmup, pressure, startup probe, cleanup.
+ */
 async function main(): Promise<void> {
   const options = parseArgs(Bun.argv.slice(2));
   if (options.help) {
