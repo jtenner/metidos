@@ -1924,12 +1924,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectedThreadRunStateRef.current = detail.thread.runStatus.state;
       setThreadMessages(detail.messages);
       syncThreadContext(detail.thread);
-      void loadProjectWorktrees(detail.thread.projectId).catch(() => {
-        // Best effort; thread history should still open even if worktree metadata refresh fails.
-      });
+      if (sessionStateReady) {
+        void loadProjectWorktrees(detail.thread.projectId).catch(() => {
+          // Best effort; thread history should still open even if the worktree metadata refresh fails.
+        });
+      }
       setMobileProjectListOpen(false);
     },
-    [loadProjectWorktrees, syncThreadContext],
+    [loadProjectWorktrees, sessionStateReady, syncThreadContext],
   );
 
   const approveThreadStartRequest = useCallback(
