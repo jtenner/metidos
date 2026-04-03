@@ -110,6 +110,11 @@ import {
   toRpcThread,
   toRpcThreadMessages,
 } from "./project-procedures/thread-detail";
+import {
+  recordCrossWorkspaceThreadAuditEvent,
+  recordProjectDeletedAuditEvent,
+  recordProjectTaskQueuedAuditEvent,
+} from "./project-security-audit";
 import type {
   AppRPCSchema,
   RpcAppBootstrapResult,
@@ -2535,6 +2540,10 @@ export async function createThreadProcedure(
       forceRefresh: true,
     },
   );
+  recordCrossWorkspaceThreadAuditEvent(db, {
+    params,
+    thread,
+  });
   return readThreadDetailCached(thread.id);
 }
 
@@ -2928,6 +2937,7 @@ export async function runProjectTaskProcedure(
   });
 
   let thread = params.threadId ? threadById(params.threadId) : null;
+  const createdThread = thread === null;
   if (thread) {
     if (
       thread.projectId !== project.id ||
@@ -2949,11 +2959,18 @@ export async function runProjectTaskProcedure(
   }
 
   switch (params.task.kind) {
-    case "script":
-      return queuePackageScriptTask(
+    case "script": {
+      const detail = await queuePackageScriptTask(
         thread,
         resolvePackageJsonTask(worktreePath, params.task),
       );
+      recordProjectTaskQueuedAuditEvent(db, {
+        createdThread,
+        params,
+        thread,
+      });
+      return detail;
+    }
     case "file": {
       const taskFilePath = resolveProjectTaskFilePath(
         worktreePath,
@@ -2963,10 +2980,16 @@ export async function runProjectTaskProcedure(
       if (!taskContent.trim()) {
         throw new Error(`Task file is empty: ${params.task.path}`);
       }
-      return queueThreadMessage(
+      const detail = await queueThreadMessage(
         thread,
         formatTaskPrompt(taskTitleFromPath(params.task.path), taskContent),
       );
+      recordProjectTaskQueuedAuditEvent(db, {
+        createdThread,
+        params,
+        thread,
+      });
+      return detail;
     }
     default:
       throw new Error(`Unsupported project task kind: ${params.task.kind}`);
@@ -3568,6 +3591,10 @@ export async function deleteProjectProcedure(
   stopProjectPoller(project.id);
   clearProjectThreadRuntimeState(project.id);
   deleteProject(db, project.id);
+  recordProjectDeletedAuditEvent(db, {
+    project,
+    threadCount: projectThreads.length,
+  });
   return {
     success: true,
     projectId: project.id,

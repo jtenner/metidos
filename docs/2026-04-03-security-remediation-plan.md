@@ -565,6 +565,7 @@ Current implementation coverage:
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
 - `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow
 - `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
+- `src/bun/project-security-audit.test.ts` covers audit-event persistence for cross-workspace thread creation, queued task execution, and project deletion
 - `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows, including audit-event persistence
 
 Manual test matrix:

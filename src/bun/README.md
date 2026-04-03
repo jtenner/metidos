@@ -90,6 +90,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Centralizes the backend RPC authorization helpers for privileged browser actions.
   - Encapsulates cross-workspace thread step-up detection and auth-bypass-aware step-up enforcement so these rules stay unit-testable.
 
+- `project-security-audit.ts`
+  - Centralizes the persistent security audit helpers for privileged project/workspace actions.
+  - Records cross-workspace thread creation, queued task execution, and project deletion events with stable payloads that are easy to test.
+
 - `rpc-websocket-auth.ts`
   - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
   - Encapsulates the session-cookie and websocket-ticket requirements so those checks are regression-tested independently from the full server bootstrap.

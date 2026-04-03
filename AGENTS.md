@@ -91,6 +91,8 @@
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
+│  │  ├─ project-security-audit.test.ts
+│  │  ├─ project-security-audit.ts
 │  │  ├─ rpc-authz.test.ts
 │  │  ├─ rpc-authz.ts
 │  │  ├─ rpc-schema.ts
