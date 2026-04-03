@@ -11,6 +11,7 @@ import {
 } from "./state";
 
 function anchorStillActive(anchorId: string): boolean {
+  // Treat anchor as active when hovered or focus is on it/inside it; otherwise hide popovers.
   if (typeof document === "undefined") {
     return false;
   }
@@ -28,7 +29,16 @@ function anchorStillActive(anchorId: string): boolean {
   );
 }
 
-export function useThreadPreviews(options?: { disabled?: boolean }) {
+type UseThreadPreviewsOptions = {
+  /** Set true to disable all preview popover behavior. */
+  disabled?: boolean;
+};
+
+/**
+ * Provides thread popover handlers and computed visibility state for
+ * error and summary previews.
+ */
+export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
   const previewsDisabled = options?.disabled === true;
   const [errorPreviewPopover, setErrorPreviewPopover] =
     useState<ErrorPreviewPopoverState | null>(null);
@@ -50,6 +60,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       anchorId: string,
       text: string,
     ): void => {
+      // Early return when disabled or when no valid text is available.
       if (previewsDisabled) {
         setErrorPreviewPopover(null);
         return;
@@ -61,6 +72,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       }
       const viewportWidth =
         typeof window === "undefined" ? 1280 : window.innerWidth;
+      // Skip hover previews on compact layouts to avoid awkward positioning.
       if (viewportWidth < 768) {
         setErrorPreviewPopover(null);
         return;
@@ -94,6 +106,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       title: string,
       summary: string,
     ): void => {
+      // Early return when disabled or summary text is empty.
       if (previewsDisabled) {
         setThreadSummaryPopover(null);
         return;
@@ -105,6 +118,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       }
       const viewportWidth =
         typeof window === "undefined" ? 1280 : window.innerWidth;
+      // Skip summary preview on compact layouts to reduce modal churn.
       if (viewportWidth < 768) {
         setThreadSummaryPopover(null);
         return;
@@ -129,6 +143,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
 
   const deferHidePreview = useCallback(
     (anchorId: string, hidePreview: () => void): void => {
+      // Defer 1 frame so click/keyboard transitions can resolve before hiding.
       if (typeof window === "undefined") {
         hidePreview();
         return;
@@ -158,6 +173,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       }
       return {
         onMouseEnter: (event) => {
+          // Hover opens the error tooltip at the row anchor.
           showErrorPreview(
             event as ReactMouseEvent<HTMLElement>,
             anchorId,
@@ -165,6 +181,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
           );
         },
         onFocus: (event) => {
+          // Keyboard focus opens the same preview path for parity.
           showErrorPreview(
             event as ReactFocusEvent<HTMLElement>,
             anchorId,
@@ -172,9 +189,11 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
           );
         },
         onMouseLeave: () => {
+          // Hide after hover exits unless the anchor remains active.
           deferHidePreview(anchorId, hideErrorPreview);
         },
         onBlur: () => {
+          // Hide after focus exits unless moving to related UI.
           deferHidePreview(anchorId, hideErrorPreview);
         },
       };
@@ -199,6 +218,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
       }
       return {
         onMouseEnter: (event) => {
+          // Open on hover enter and keep live updates for mouse movement.
           showThreadSummaryPreview(
             event as ReactMouseEvent<HTMLElement>,
             anchorId,
@@ -207,6 +227,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
           );
         },
         onMouseMove: (event) => {
+          // Mouse move keeps the popover pinned when cursor drifts within the target.
           showThreadSummaryPreview(
             event as ReactMouseEvent<HTMLElement>,
             anchorId,
@@ -215,6 +236,7 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
           );
         },
         onFocus: (event) => {
+          // Keyboard focus opens summary preview too.
           showThreadSummaryPreview(
             event as ReactFocusEvent<HTMLElement>,
             anchorId,
@@ -223,9 +245,11 @@ export function useThreadPreviews(options?: { disabled?: boolean }) {
           );
         },
         onMouseLeave: () => {
+          // Defer hide so focus transitions don't close the popover instantly.
           deferHidePreview(anchorId, hideThreadSummaryPreview);
         },
         onBlur: () => {
+          // Defer hide so anchor/related focus transitions resolve.
           deferHidePreview(anchorId, hideThreadSummaryPreview);
         },
       };
