@@ -82,6 +82,7 @@
 │     ├─ README.md
 │     ├─ App.tsx
 │     ├─ app/
+│     │  ├─ README.md
 │     │  ├─ action-menus.tsx
 │     │  ├─ chat-workspace.tsx
 │     │  ├─ desktop-sidebar.tsx
