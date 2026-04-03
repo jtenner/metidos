@@ -17,6 +17,9 @@ type SidebarContentProps = {
   workspacePanelProps: ComponentProps<typeof WorkspacePanel>;
 };
 
+/**
+ * Renders the sidebar header plus sectioned content for workspace, projects, and git history.
+ */
 export function SidebarContent({
   activeSidebarBranchLabel,
   collapseControl,
@@ -49,9 +52,11 @@ export function SidebarContent({
           <SidebarSearchControl
             value={sidebarSearchQuery}
             onChange={(event) => {
+              // Keep search query state in parent to drive filtering across all sidebar sections.
               onSidebarSearchQueryChange(event.currentTarget.value);
             }}
             onClear={() => {
+              // Clearing search resets query for every filtered project/worktree/git list.
               onSidebarSearchQueryChange("");
             }}
           />
@@ -59,6 +64,7 @@ export function SidebarContent({
       </div>
 
       <div className="select-none space-y-5">
+        {/* Main panel stack: workspace context first, then worktrees/projects, then history. */}
         <WorkspacePanel {...workspacePanelProps} />
         <ProjectsPanel {...projectsPanelProps} />
         <GitHistoryPanel key={gitHistoryPanelKey} {...gitHistoryPanelProps} />
