@@ -15,6 +15,10 @@ const DIRECTORY_SUGGESTION_REFRESH_BATCH_SIZE = 6;
 const DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS = 5_000;
 const DIRECTORY_SUGGESTION_REFRESH_RECENT_WINDOW_MS = 90_000;
 
+/**
+ * In-memory LRU cache of directory listings by absolute path.
+ * Stores sorted child directory names plus freshness metadata.
+ */
 const directorySuggestionCache = new Map<
   string,
   {
@@ -24,9 +28,17 @@ const directorySuggestionCache = new Map<
   }
 >();
 
+/**
+ * Shared periodic timer handle for refreshing recently-used cache entries.
+ */
 let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
   null;
 
+/**
+ * Parse user input into:
+ * - a directory to inspect
+ * - optional name prefix to filter within that directory
+ */
 function parseDirectorySuggestionQuery(query: string): {
   searchDirectory: string;
   namePrefix: string;
@@ -60,6 +72,9 @@ function parseDirectorySuggestionQuery(query: string): {
   };
 }
 
+/**
+ * Sort names with locale-aware numeric semantics for user-friendly completion order.
+ */
 function sortDirectoryNames(values: string[]): string[] {
   return [...values].sort((left, right) =>
     left.localeCompare(right, undefined, {
@@ -69,6 +84,10 @@ function sortDirectoryNames(values: string[]): string[] {
   );
 }
 
+/**
+ * Read only immediate child directories from disk, including safe symlink directories.
+ * Hidden entries are excluded to keep suggestions signal-rich.
+ */
 function readDirectorySuggestionNamesFromDisk(
   searchDirectory: string,
 ): string[] {
@@ -90,6 +109,10 @@ function readDirectorySuggestionNamesFromDisk(
   );
 }
 
+/**
+ * Refresh a cache entry from disk and store it in LRU map.
+ * On read failure, invalidates the cache key to avoid serving stale data.
+ */
 function refreshDirectorySuggestionEntries(
   searchDirectory: string,
   lastAccessedAt = Date.now(),
@@ -114,6 +137,9 @@ function refreshDirectorySuggestionEntries(
   }
 }
 
+/**
+ * Return cached entries if still fresh; otherwise refresh from disk.
+ */
 function readDirectorySuggestionEntries(searchDirectory: string): string[] {
   const now = Date.now();
   const cached = readLruValue(directorySuggestionCache, searchDirectory);
@@ -125,6 +151,10 @@ function readDirectorySuggestionEntries(searchDirectory: string): string[] {
   return refreshDirectorySuggestionEntries(searchDirectory, now);
 }
 
+/**
+ * Periodically refresh only recently accessed cache entries, capped in batch.
+ * This keeps common paths warm without scanning every entry.
+ */
 function refreshRecentDirectorySuggestionEntries(): void {
   const now = Date.now();
   for (const [searchDirectory, cached] of lruEntriesNewestFirst(
@@ -147,6 +177,10 @@ function refreshRecentDirectorySuggestionEntries(): void {
   }
 }
 
+/**
+ * Start a single periodic directory-suggestion refresh timer.
+ * Repeated calls are idempotent.
+ */
 export function startDirectorySuggestionCacheMaintenance(): void {
   if (directorySuggestionRefreshTimer !== null) {
     return;
@@ -157,6 +191,9 @@ export function startDirectorySuggestionCacheMaintenance(): void {
   }, DIRECTORY_SUGGESTION_REFRESH_POLL_INTERVAL_MS);
 }
 
+/**
+ * Eagerly prime cache for home directory when available.
+ */
 export function warmDirectorySuggestionCache(): void {
   const homeDirectory = homedir();
   if (!safeIsDirectory(homeDirectory)) {
@@ -173,6 +210,10 @@ export function warmDirectorySuggestionCache(): void {
   }
 }
 
+/**
+ * Return absolute directory path suggestions for autocomplete:
+ * parse + validate query, refresh cache as needed, filter by prefix.
+ */
 export function listDirectorySuggestions(query: string): string[] {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
@@ -203,6 +244,9 @@ export function listDirectorySuggestions(query: string): string[] {
   }
 }
 
+/**
+ * Stop periodic maintenance timer and release resources.
+ */
 export function shutdownDirectorySuggestionCacheMaintenance(): void {
   if (directorySuggestionRefreshTimer === null) {
     return;
