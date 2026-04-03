@@ -28,17 +28,28 @@ type ChatComposerControlProps = {
   variant: "desktop" | "mobile";
 };
 
+/**
+ * Global draft listeners for cross-component updates to the composer value.
+ * A tiny external store is used here so the textarea can be kept in sync across
+ * lifecycle resets and submission flows without lifting state higher.
+ */
 const draftListeners = new Set<() => void>();
 
 let chatComposerDraft = "";
 let chatComposerDraftInitialized = false;
 
+/**
+ * Notify every subscriber that the shared chat draft changed.
+ */
 function emitDraftChange(): void {
   for (const listener of draftListeners) {
     listener();
   }
 }
 
+/**
+ * Subscribe to draft changes for `useSyncExternalStore` consumers.
+ */
 function subscribeToChatComposerDraft(listener: () => void): () => void {
   draftListeners.add(listener);
   return () => {
@@ -46,10 +57,16 @@ function subscribeToChatComposerDraft(listener: () => void): () => void {
   };
 }
 
+/**
+ * Snapshot accessor for the external draft store.
+ */
 function getChatComposerDraftSnapshot(): string {
   return chatComposerDraft;
 }
 
+/**
+ * Read the shared draft via `useSyncExternalStore`, initializing from `initialValue` on mount.
+ */
 function useChatComposerDraft(initialValue: string): string {
   const draft = useSyncExternalStore(
     subscribeToChatComposerDraft,
@@ -64,6 +81,10 @@ function useChatComposerDraft(initialValue: string): string {
   return chatComposerDraftInitialized ? draft : initialValue;
 }
 
+/**
+ * Initialize the draft value exactly once from bootstrap state.
+ * This avoids replacing existing user input with fallback values on remounts.
+ */
 export function initializeChatComposerDraft(initialValue: string): void {
   if (chatComposerDraftInitialized) {
     return;
@@ -73,10 +94,17 @@ export function initializeChatComposerDraft(initialValue: string): void {
   chatComposerDraftInitialized = true;
 }
 
+/**
+ * Read the draft, with a fallback for callers before initialization.
+ */
 export function readChatComposerDraft(fallback = ""): string {
   return chatComposerDraftInitialized ? chatComposerDraft : fallback;
 }
 
+/**
+ * Update the draft value and persist it to `mainview` state storage.
+ * Duplicate assignments are ignored to avoid needless rerenders and storage writes.
+ */
 export function setChatComposerDraft(nextValue: string): void {
   if (chatComposerDraftInitialized && chatComposerDraft === nextValue) {
     return;
@@ -90,6 +118,10 @@ export function setChatComposerDraft(nextValue: string): void {
   emitDraftChange();
 }
 
+/**
+ * Chat input control used in both desktop and mobile sidebars.
+ * Applies variant-specific layout and submit keyboard behavior.
+ */
 export function ChatComposerControl({
   actionDisabled,
   actionLabel,
@@ -100,6 +132,9 @@ export function ChatComposerControl({
   onSubmitMessage,
   variant,
 }: ChatComposerControlProps): JSX.Element {
+  /**
+   * Shared draft state for desktop and mobile variants.
+   */
   const draft = useChatComposerDraft(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const minHeightPx =
@@ -115,6 +150,8 @@ export function ChatComposerControl({
       : `Create a thread to chat with ${APP_TITLE}...`;
 
   useEffect(() => {
+    // Only resize when the DOM value is already aligned with controlled draft state.
+    // During transitional updates, skipping prevents cursor jumps and stale measurements.
     if (textareaRef.current && textareaRef.current.value !== draft) {
       return;
     }
@@ -131,11 +168,14 @@ export function ChatComposerControl({
 
   const onEnter = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Only treat Enter with modifier keys as explicit "send". Plain Enter preserves
+      // line breaks; IME composition completion is ignored here.
       if (event.key !== "Enter" || event.nativeEvent.isComposing) {
         return;
       }
       if (event.metaKey || event.ctrlKey) {
         event.preventDefault();
+        // Shift/Alt + Enter remains multiline; plain Cmd/Ctrl+Enter sends.
         if (!event.shiftKey && !event.altKey) {
           onSubmitMessage();
         }
@@ -144,6 +184,8 @@ export function ChatComposerControl({
     [onSubmitMessage],
   );
 
+  // Separate rendering branches keep spacing, sizing, and submit affordances tuned
+  // for mouse/keyboard desktop usage vs touch-optimized mobile UX.
   if (variant === "desktop") {
     return (
       <div className="relative flex items-end gap-4 rounded-sm border border-[#2b2b2b] bg-[#262626] p-4">
