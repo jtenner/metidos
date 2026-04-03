@@ -213,6 +213,39 @@ function shouldRecoverInterruptedThread(
   return lastInProgressMessageUpdatedAt >= lastSettledAt;
 }
 
+function pickBootstrapThreadRecord(
+  threads: ThreadRecord[],
+  params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
+): ThreadRecord | null {
+  const threadIdHint =
+    typeof params?.threadIdHint === "number" ? params.threadIdHint : null;
+  if (threadIdHint !== null) {
+    const hintedThread =
+      threads.find((thread) => thread.id === threadIdHint) ?? null;
+    if (hintedThread) {
+      return hintedThread;
+    }
+  }
+
+  if (
+    typeof params?.selectedProjectId === "number" &&
+    typeof params.selectedWorktreePath === "string" &&
+    params.selectedWorktreePath
+  ) {
+    const matchingThread =
+      threads.find(
+        (thread) =>
+          thread.projectId === params.selectedProjectId &&
+          thread.worktreePath === params.selectedWorktreePath,
+      ) ?? null;
+    if (matchingThread) {
+      return matchingThread;
+    }
+  }
+
+  return null;
+}
+
 export function recoverInterruptedThreadTurnsOnStartup(): void {
   const threads = listThreads(db);
   if (threads.length === 0) {
@@ -257,19 +290,19 @@ export async function getAppBootstrapProcedure(
     getHomeDirectoryProcedure(),
     getCodexModelCatalogProcedure(),
   ]);
-  const threadIdHint =
-    typeof params?.threadIdHint === "number" ? params.threadIdHint : null;
+  const threads = listThreads(db);
+  const hintedThread = pickBootstrapThreadRecord(threads, params);
   const threadDetail =
-    threadIdHint === null
+    hintedThread === null
       ? null
-      : await readThreadDetailCached(threadIdHint).catch(() => null);
+      : await readThreadDetailCached(hintedThread.id).catch(() => null);
 
   return {
     homeDirectory,
     modelCatalog,
     projects: listProjects(db),
     threadDetail,
-    threads: listThreads(db).map((thread) =>
+    threads: threads.map((thread) =>
       toRpcThread(thread, currentThreadRunStatus(thread)),
     ),
   };

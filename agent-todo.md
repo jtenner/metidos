@@ -33,3 +33,4 @@ Source: startup latency follow-up
 - [x] Startup task reuse: Reuse the tasks fetched by `openWorktree(...)` during startup and skip the redundant first `listProjectTasks(...)` refresh for freshly opened worktrees.
 - [x] Startup project restore batching: Batch restored `openProject(...)` work into one foreground RPC so startup does not send one project-open request per restored project.
 - [x] Startup selected-thread bootstrap: Let `getAppBootstrap(...)` return the hinted selected thread detail so startup can skip the extra `getThread(...)` request when the persisted selected thread still exists.
+- [x] Startup selected-worktree thread bootstrap: Let `getAppBootstrap(...)` reuse the latest thread for the persisted selected worktree so startup can also skip `getThread(...)` when thread selection falls back within that worktree.

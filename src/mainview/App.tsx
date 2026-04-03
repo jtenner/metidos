@@ -2086,6 +2086,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
         threads: loadedThreads,
       } = await procedures.getAppBootstrap(
         {
+          selectedProjectId: persistedState.selectedProjectId,
+          selectedWorktreePath: persistedState.selectedWorktreePath,
           threadIdHint: persistedState.selectedThreadId,
         },
         {

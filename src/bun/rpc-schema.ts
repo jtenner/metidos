@@ -90,6 +90,12 @@ export type RpcOpenWorktreesBatchResultItem =
         error: string;
       });
 
+export type RpcAppBootstrapHint = {
+  threadIdHint?: number | null;
+  selectedProjectId?: number | null;
+  selectedWorktreePath?: string | null;
+};
+
 export type RpcOpenWorktreeResult = {
   project: RpcProject;
   tasks: RpcProjectTask[];
@@ -414,11 +420,7 @@ export type AppRPCSchema = {
       response: RpcCodexModelCatalog;
     };
     getAppBootstrap: {
-      params:
-        | {
-            threadIdHint?: number | null;
-          }
-        | undefined;
+      params: RpcAppBootstrapHint | undefined;
       response: RpcAppBootstrapResult;
     };
     listProjects: {

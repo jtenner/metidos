@@ -695,6 +695,8 @@ async function measureStartupSequence(
     "getAppBootstrap",
     "getAppBootstrap",
     {
+      selectedProjectId: null,
+      selectedWorktreePath: null,
       threadIdHint: null,
     },
     {
