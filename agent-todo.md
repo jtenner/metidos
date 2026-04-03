@@ -3,9 +3,6 @@
 - Phase 0: lock down unauthenticated transport and app surfaces.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Default-Deny Policy and Phase 0. Make the backend deny `/rpc`, project/worktree/thread procedures, filesystem data, and `/health` internals until authorization succeeds, and add websocket `Origin` validation in `src/bun/index.ts`.
 
-- Phase 1: add auth schema, hashing, and session primitives.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Phase 1 and Concrete Backend Design. Add the auth tables and backend modules for primary-factor verification, TOTP handling, sessions, websocket tickets, and recovery-code storage in `src/bun/db.ts` and new auth runtime files.
-
 - Phase 1: implement setup flow for PIN/password choice plus mandatory TOTP enrollment.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Explicit Product Decisions and UI and UX plan. Build first-run setup for choosing PIN or password, enforcing the 6-digit minimum PIN policy, generating the TOTP secret, rendering the QR code plus manual secret fallback, and showing 10 view-once recovery codes.
 

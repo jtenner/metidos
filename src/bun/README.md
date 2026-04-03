@@ -86,6 +86,14 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Provides the first-pass auth primitives used by future setup/login flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
 
+- `auth-secrets.ts`
+  - Manages the local encryption key used to protect persisted TOTP secrets at rest.
+  - Encrypts and decrypts stored auth secrets with a locally generated AES-GCM key.
+
+- `auth-service.ts`
+  - Implements the backend auth flow used by upcoming HTTP routes and RPC gating.
+  - Coordinates setup, login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
+
 - `server-security.ts`
   - Centralizes local transport hardening helpers shared by the Bun entrypoints.
   - Defines loopback bind defaults, minimal liveness payloads, and browser `Origin` allowlist parsing/validation for websocket upgrades.
