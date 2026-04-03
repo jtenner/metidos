@@ -81,6 +81,7 @@ Use TOTP as the first real 2FA factor.
 - TOTP is mandatory
 - setup flow generates a TOTP secret and recovery codes
 - login requires PIN plus TOTP or password plus TOTP
+- recovery login requires the primary factor plus one unused recovery code
 - high-risk actions require recent step-up auth
 - 10 recovery codes are generated up front and shown to the user during setup
 
@@ -161,7 +162,7 @@ Allowed before authorization:
 - `GET /auth/status`
 - `POST /auth/setup` when auth has not been configured yet
 - `POST /auth/login`
-- `POST /auth/recovery-login` if recovery flow exists
+- `POST /auth/recovery-login`
 
 Allowed only after authorization:
 
@@ -559,7 +560,7 @@ Unit and integration coverage should include:
 
 Current implementation coverage:
 
-- `src/bun/auth-service.test.ts` covers setup, login, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
+- `src/bun/auth-service.test.ts` covers setup, TOTP login, recovery-code login, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
 - `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow

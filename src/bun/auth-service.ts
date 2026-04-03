@@ -11,6 +11,7 @@ import {
   hashPrimaryFactor,
   hashRecoveryCode,
   verifyPrimaryFactor,
+  verifyRecoveryCode,
   verifyTotpCode,
 } from "./auth";
 import { decryptAuthSecret, encryptAuthSecret } from "./auth-secrets";
@@ -21,12 +22,15 @@ import {
   consumeAuthWebSocketTicket,
   createAuthSession,
   createAuthWebSocketTicket,
+  createSecurityAuditEvent,
   deleteAuthSession,
   deleteExpiredAuthSessions,
   deleteExpiredAuthWebSocketTickets,
   getAuthSession,
   getAuthSettings,
   getAuthWebSocketTicket,
+  listAuthRecoveryCodes,
+  markAuthRecoveryCodeUsed,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
   setAuthFailureState,
@@ -67,6 +71,11 @@ type LoginInput = TimestampOptions &
     primaryFactor: string;
     totpCode: string;
   };
+
+type RecoveryLoginInput = TimestampOptions & {
+  primaryFactor: string;
+  recoveryCode: string;
+};
 
 type PrepareTotpEnrollmentInput = {
   accountName: string;
@@ -453,6 +462,75 @@ export async function verifyPrimaryFactorAndTotp(
 }
 
 /**
+ * Verify the configured primary factor and consume one recovery code in place of TOTP.
+ */
+export async function verifyPrimaryFactorAndRecoveryCode(
+  database: Database,
+  input: RecoveryLoginInput,
+): Promise<AuthSettingsRecord> {
+  const now = nowDate(input.nowMs);
+  const settings = enforceConfigured(database, now);
+  const primaryFactorValid = await verifyPrimaryFactor(
+    input.primaryFactor,
+    settings.primaryFactorHash,
+  );
+
+  let matchingCodeHash: string | null = null;
+  if (primaryFactorValid) {
+    for (const record of listAuthRecoveryCodes(database)) {
+      if (record.usedAt !== null) {
+        continue;
+      }
+      if (await verifyRecoveryCode(input.recoveryCode, record.codeHash)) {
+        matchingCodeHash = record.codeHash;
+        break;
+      }
+    }
+  }
+
+  if (!primaryFactorValid || !matchingCodeHash) {
+    const failure = incrementFailedAttempts(
+      database,
+      settings.failedPrimaryFactorAttempts,
+      now,
+    );
+
+    if (failure.lockedUntil) {
+      throw new AuthServiceError(
+        "auth_locked",
+        `Authentication is locked until ${failure.lockedUntil}.`,
+        423,
+        {
+          lockedUntil: failure.lockedUntil,
+        },
+      );
+    }
+
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  const markedUsed = markAuthRecoveryCodeUsed(
+    database,
+    matchingCodeHash,
+    now.toISOString(),
+  );
+  if (!markedUsed) {
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  resetAuthFailureState(database);
+  return settings;
+}
+
+/**
  * Complete first-run auth setup, persist settings, and create an authenticated session.
  */
 export async function setupAuth(
@@ -524,6 +602,29 @@ export async function login(
     settings.sessionLifetimeDays,
     now,
   );
+  return {
+    session,
+  };
+}
+
+/**
+ * Authenticate a user with their primary factor plus a single-use recovery code.
+ */
+export async function loginWithRecoveryCode(
+  database: Database,
+  input: RecoveryLoginInput,
+): Promise<LoginResult> {
+  const now = nowDate(input.nowMs);
+  const settings = await verifyPrimaryFactorAndRecoveryCode(database, input);
+  const session = await createSessionRecord(
+    database,
+    settings.sessionLifetimeDays,
+    now,
+  );
+  createSecurityAuditEvent(database, {
+    eventType: "recovery_code_login",
+    summaryText: "Authenticated with a recovery code.",
+  });
   return {
     session,
   };

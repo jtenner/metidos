@@ -189,6 +189,21 @@ export async function loginAuth(input: {
   });
 }
 
+export async function loginWithRecoveryCodeAuth(input: {
+  primaryFactor: string;
+  recoveryCode: string;
+}): Promise<{
+  status: AuthStatus;
+}> {
+  return requestAuthJson<{
+    ok: true;
+    status: AuthStatus;
+  }>("/auth/recovery-login", {
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
 export async function logoutAuth(): Promise<AuthStatus> {
   const payload = await requestAuthJson<{
     ok: true;

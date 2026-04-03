@@ -10,6 +10,7 @@ import {
   getAuthStatus,
   issueWebSocketTicket,
   login,
+  loginWithRecoveryCode,
   logout,
   prepareTotpEnrollment,
   readSessionCookie,
@@ -737,6 +738,35 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         nowMs,
         primaryFactor: readRequiredString(body, "primaryFactor"),
         totpCode: readRequiredString(body, "totpCode"),
+      });
+
+      return jsonResponse(
+        {
+          ok: true,
+          status: getAuthStatus(database, result.session.id, {
+            devBypass: DEV_FLOW_MODE.authBypass,
+            nowMs,
+          }),
+        },
+        200,
+        {
+          "set-cookie": buildSessionCookieHeader(result.session.id, {
+            maxAgeSeconds: sessionCookieMaxAgeSeconds(
+              result.session.expiresAt,
+              nowMs,
+            ),
+            secure: secureCookie,
+          }),
+        },
+      );
+    }
+
+    if (pathname === "/auth/recovery-login" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const result = await loginWithRecoveryCode(database, {
+        nowMs,
+        primaryFactor: readRequiredString(body, "primaryFactor"),
+        recoveryCode: readRequiredString(body, "recoveryCode"),
       });
 
       return jsonResponse(

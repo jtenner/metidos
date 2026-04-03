@@ -16,6 +16,7 @@ import {
   completeAuthSetup,
   getAuthStatus,
   loginAuth,
+  loginWithRecoveryCodeAuth,
   logoutAuth,
   prepareSetupEnrollment,
   type TotpEnrollment,
@@ -27,7 +28,13 @@ type AuthShellProps = {
   procedures: ProjectProcedures;
 };
 
-type AuthView = "app" | "loading" | "login" | "recovery" | "setup";
+type AuthView =
+  | "app"
+  | "loading"
+  | "login"
+  | "recovery"
+  | "recovery-login"
+  | "setup";
 
 const SESSION_LIFETIME_DAYS = 7;
 
@@ -208,6 +215,7 @@ export default function AuthShell({
   const [setupPrimaryFactor, setSetupPrimaryFactor] = useState("");
   const [setupTotpCode, setSetupTotpCode] = useState("");
   const [loginPrimaryFactor, setLoginPrimaryFactor] = useState("");
+  const [loginRecoveryCode, setLoginRecoveryCode] = useState("");
   const [loginTotpCode, setLoginTotpCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -260,6 +268,7 @@ export default function AuthShell({
         }
 
         setLoginPrimaryFactor("");
+        setLoginRecoveryCode("");
         setLoginTotpCode("");
         setView("login");
       } catch (nextError) {
@@ -397,6 +406,37 @@ export default function AuthShell({
       }
     },
     [connectRpcTransport, loginPrimaryFactor, loginTotpCode, status],
+  );
+
+  const handleRecoveryLoginSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setIsBusy(true);
+      setError("");
+      try {
+        const result = await loginWithRecoveryCodeAuth({
+          primaryFactor: loginPrimaryFactor,
+          recoveryCode: loginRecoveryCode,
+        });
+        setStatus(result.status);
+        await connectRpcTransport();
+        setView("app");
+      } catch (nextError) {
+        setError(errorMessage(nextError));
+        const lockedUntil = readLockedUntil(status, nextError);
+        setStatus((current) =>
+          current
+            ? {
+                ...current,
+                lockedUntil,
+              }
+            : current,
+        );
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [connectRpcTransport, loginPrimaryFactor, loginRecoveryCode, status],
   );
 
   const handleRecoveryContinue = useCallback(async () => {
@@ -752,6 +792,93 @@ export default function AuthShell({
     );
   }
 
+  if (view === "recovery-login") {
+    return authCardShell(
+      <>
+        <AuthHero
+          eyebrow="Recovery sign-in"
+          primary={`Use your configured ${loginFactorLabel.toLowerCase()} plus one unused recovery code.`}
+          secondary="This path replaces TOTP only when you no longer have access to the authenticator device."
+          tertiary="Each recovery code is single-use. Store any remaining codes outside the browser."
+        />
+        <AuthPanel
+          error={error}
+          footer={
+            <div className="space-y-3">
+              {lockedUntilLabel ? (
+                <div className="border border-[#4a3522] bg-[#2d1f14] px-4 py-3 text-sm text-[#efc092]">
+                  Too many failed attempts. Login is locked until{" "}
+                  {lockedUntilLabel}.
+                </div>
+              ) : null}
+              <button
+                className="w-full border border-[#2a3b47] bg-[#111920] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
+                disabled={isBusy}
+                onClick={() => {
+                  setError("");
+                  setLoginRecoveryCode("");
+                  setLoginTotpCode("");
+                  setView("login");
+                }}
+                type="button"
+              >
+                Back to TOTP login
+              </button>
+            </div>
+          }
+          title="Use a recovery code"
+        >
+          <form className="space-y-4" onSubmit={handleRecoveryLoginSubmit}>
+            <AuthInput
+              autoComplete="current-password"
+              inputMode={
+                status?.primaryFactorType === "pin" ? "numeric" : "text"
+              }
+              label={loginFactorLabel}
+              onChange={(value) => {
+                setLoginPrimaryFactor(
+                  status?.primaryFactorType === "pin"
+                    ? value.replace(/\D+/g, "")
+                    : value,
+                );
+              }}
+              placeholder={
+                status?.primaryFactorType === "pin"
+                  ? "Enter your PIN"
+                  : "Enter your password or passphrase"
+              }
+              type="password"
+              value={loginPrimaryFactor}
+            />
+            <AuthInput
+              autoComplete="off"
+              label="Recovery code"
+              onChange={(value) => {
+                setLoginRecoveryCode(value.toUpperCase().replace(/\s+/g, ""));
+              }}
+              placeholder="Enter one unused recovery code"
+              type="text"
+              value={loginRecoveryCode}
+            />
+
+            <div className="border border-[#1d2932] bg-[#0f171d] px-4 py-4 text-xs leading-5 text-[#879aa8]">
+              Recovery sign-in gets you back into the app when TOTP is
+              unavailable, but each code is consumed on success.
+            </div>
+
+            <button
+              className="w-full border border-[#6aa6cc] bg-[#173247] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#f4f7fa] uppercase transition hover:bg-[#20445d] disabled:border-[#2a3944] disabled:bg-[#11181d] disabled:text-[#697b89]"
+              disabled={isBusy}
+              type="submit"
+            >
+              {isBusy ? "Signing in…" : "Unlock with recovery code"}
+            </button>
+          </form>
+        </AuthPanel>
+      </>,
+    );
+  }
+
   return authCardShell(
     <>
       <AuthHero
@@ -815,6 +942,19 @@ export default function AuthShell({
             type="submit"
           >
             {isBusy ? "Signing in…" : "Unlock workspace"}
+          </button>
+          <button
+            className="w-full border border-[#2a3b47] bg-[#111920] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
+            disabled={isBusy}
+            onClick={() => {
+              setError("");
+              setLoginTotpCode("");
+              setLoginRecoveryCode("");
+              setView("recovery-login");
+            }}
+            type="button"
+          >
+            Use a recovery code instead
           </button>
         </form>
       </AuthPanel>

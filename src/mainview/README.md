@@ -8,9 +8,9 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries.
 
-`auth-shell.tsx` gates the workspace behind setup/login/recovery screens and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
+`auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
 
-`auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, login, logout, status polling, and websocket ticket acquisition.
+`auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and websocket ticket acquisition.
 
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 

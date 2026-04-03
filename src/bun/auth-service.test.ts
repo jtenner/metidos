@@ -14,6 +14,7 @@ import {
   getAuthStatus,
   issueWebSocketTicket,
   login,
+  loginWithRecoveryCode,
   logout,
   prepareTotpEnrollment,
   readSessionCookie,
@@ -23,7 +24,12 @@ import {
   stepUpSession,
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
-import { getAuthSettings, migrateDatabase } from "./db";
+import {
+  getAuthSettings,
+  listAuthRecoveryCodes,
+  listSecurityAuditEvents,
+  migrateDatabase,
+} from "./db";
 
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
@@ -251,6 +257,52 @@ describe("auth service", () => {
         ticketId: ticket.ticket,
       }),
     ).toThrow("The websocket ticket is invalid or expired.");
+  });
+
+  it("authenticates with a recovery code, consumes it, and records an audit event", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+    const recoveryCode = setupResult.recoveryCodes[0];
+    if (!recoveryCode) {
+      throw new Error("Expected an initial recovery code.");
+    }
+
+    const result = await loginWithRecoveryCode(database, {
+      nowMs: nowMs + 1_000,
+      primaryFactor: "123456",
+      recoveryCode,
+    });
+
+    expect(result.session.id.length).toBeGreaterThan(10);
+    expect(
+      listAuthRecoveryCodes(database).some((record) => record.usedAt !== null),
+    ).toBeTrue();
+    expect(
+      listSecurityAuditEvents(database).some(
+        (event) => event.eventType === "recovery_code_login",
+      ),
+    ).toBeTrue();
+
+    await expect(
+      loginWithRecoveryCode(database, {
+        nowMs: nowMs + 2_000,
+        primaryFactor: "123456",
+        recoveryCode,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
   });
 
   it("expires idle sessions after the configured inactivity window", async () => {
