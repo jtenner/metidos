@@ -1,11 +1,12 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   type CSSProperties,
   type FormEvent,
   type JSX,
-  type RefObject,
-  type UIEvent,
   memo,
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -69,10 +70,27 @@ type SharedChatControlsProps = {
 };
 
 type TranscriptProps = {
+  activeThreadId: number | null;
+  expandedItemIds: ReadonlySet<string>;
   localUserLabel: string;
   messages: VisibleMessage[];
+  onToggleItemExpanded: (messageKey: string) => void;
+  paddingEndPx: number;
+  paddingStartPx: number;
+  scrollContainerClassName: string;
+  scrollContainerStyle?: CSSProperties;
   selectedWorktreePath: string | null;
+  topContent?: JSX.Element | null;
   variant: "desktop" | "mobile";
+};
+
+type AssistantMessageRenderer = (message: VisibleMessage) => JSX.Element;
+
+type GroupRowProps = {
+  group: MessageGroup;
+  isLast: boolean;
+  localUserLabel: string;
+  renderAssistantMessageContent: AssistantMessageRenderer;
 };
 
 type UnsafeModeToggleProps = {
@@ -81,6 +99,42 @@ type UnsafeModeToggleProps = {
   onChange: (checked: boolean) => void;
   variant: "desktop" | "mobile";
 };
+
+const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 24;
+const DESKTOP_CHAT_PADDING_PX = 32;
+const DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX = 168;
+const DESKTOP_CHAT_TRANSCRIPT_GAP_PX = 40;
+const DESKTOP_CHAT_TRANSCRIPT_OVERSCAN = 6;
+const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
+const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
+
+function groupVisibleMessages(messages: VisibleMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+
+  for (const message of messages) {
+    if (isAssistantVisibleMessage(message)) {
+      const lastGroup = groups.at(-1);
+      if (lastGroup?.kind === "assistant") {
+        lastGroup.messages.push(message);
+        continue;
+      }
+      groups.push({
+        kind: "assistant",
+        key: message.key,
+        messages: [message],
+      });
+      continue;
+    }
+
+    groups.push({
+      kind: "user",
+      key: message.key,
+      text: message.kind === "chat" ? message.text : "",
+    });
+  }
+
+  return groups;
+}
 
 function UnsafeModeToggle({
   checked,
@@ -115,205 +169,111 @@ function UnsafeModeToggle({
   );
 }
 
-const ChatTranscript = memo(function ChatTranscript({
+function DesktopTranscriptGroupRow({
+  group,
+  isLast,
   localUserLabel,
-  messages,
-  selectedWorktreePath,
-  variant,
-}: TranscriptProps): JSX.Element {
-  const groupedMessages = useMemo<MessageGroup[]>(() => {
-    const groups: MessageGroup[] = [];
-
-    messages.forEach((message, index) => {
-      if (isAssistantVisibleMessage(message)) {
-        const lastGroup = groups.at(-1);
-        const nextMessage = { index, message };
-        if (lastGroup?.kind === "assistant") {
-          lastGroup.messages.push(nextMessage);
-          return;
-        }
-        groups.push({
-          kind: "assistant",
-          key: `assistant-${index}`,
-          messages: [nextMessage],
-        });
-        return;
-      }
-
-      groups.push({
-        kind: "user",
-        key: `user-${index}`,
-        text: message.kind === "chat" ? message.text : "",
-      });
-    });
-
-    return groups;
-  }, [messages]);
-
-  const renderAssistantMessageContent = (
-    message: VisibleMessage,
-  ): JSX.Element => {
-    if (message.kind === "chat") {
-      if (message.tone === "working") {
-        return <ProcessingMessage />;
-      }
-      if (message.tone === "error") {
-        return <ChatErrorMessage text={message.text} />;
-      }
-      if (message.tone === "notice") {
-        return <ChatNoticeMessage text={message.text} />;
-      }
-      return <MarkdownMessage text={message.text} />;
-    }
-    if (message.kind === "reasoning") {
-      return <ReasoningMessage state={message.state} text={message.text} />;
-    }
-    if (message.kind === "command") {
-      return (
-        <CommandExecutionMessage
-          command={message.command}
-          exitCode={message.exitCode}
-          output={message.output}
-          state={message.state}
-        />
-      );
-    }
-    if (message.kind === "tool_call") {
-      return (
-        <ToolCallMessage
-          argumentsText={message.argumentsText}
-          output={message.output}
-          server={message.server}
-          state={message.state}
-          tool={message.tool}
-        />
-      );
-    }
-    if (message.kind === "web_search") {
-      return <WebSearchMessage query={message.query} state={message.state} />;
-    }
-    if (message.kind === "error") {
-      return <ErrorItemMessage state={message.state} text={message.text} />;
-    }
-    return (
-      <FileChangeMessage
-        changeKind={message.changeKind}
-        diffText={message.diffText}
-        path={message.path}
-        state={message.state}
-        worktreePath={selectedWorktreePath ?? undefined}
-      />
-    );
-  };
-
-  if (variant === "desktop") {
-    return (
-      <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-10">
-        {groupedMessages.map((group) => {
-          if (group.kind === "assistant") {
-            return (
-              <div
-                className="group flex w-full min-w-0 items-start gap-6"
-                key={group.key}
-              >
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
-                  {brandBoltIcon("text-sm text-[#224259]")}
-                </div>
-                <div className="min-w-0 flex-1 space-y-4">
-                  <div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#bdd5e6]">
-                    {APP_TITLE}
-                  </div>
-                  <div className="space-y-3">
-                    {group.messages.map(({ message, index }) => (
-                      <div
-                        className={`min-w-0 ${
-                          isPlainAssistantTextMessage(message) ? "py-3" : ""
-                        }`}
-                        key={`${message.kind}-${index}`}
-                      >
-                        <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
-                          {renderAssistantMessageContent(message)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div
-              className="flex w-full min-w-0 justify-end gap-6"
-              key={group.key}
-            >
-              <div className="min-w-0 w-full max-w-2xl space-y-3 text-right">
-                <div className="font-body text-[13px] font-semibold tracking-[0.01em] text-[#b7b3b1]">
-                  {localUserLabel}
-                </div>
-                <div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
-                  <MarkdownMessage text={group.text} />
-                </div>
-              </div>
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#262626]">
-                {materialSymbol("person")}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
+  renderAssistantMessageContent,
+}: GroupRowProps): JSX.Element {
   return (
-    <>
-      {groupedMessages.map((group) => {
-        if (group.kind === "assistant") {
-          return (
-            <div
-              className="flex w-full max-w-full flex-col items-start gap-1.5"
-              key={group.key}
-            >
-              <div className="flex items-center gap-2 px-[2px] text-[#bdd5e6]">
-                {brandBoltIcon("text-sm")}
-                <span className="text-[10px] font-label font-bold uppercase tracking-wider">
-                  {APP_TITLE}
-                </span>
-              </div>
-              <div
-                className="flex w-full flex-col"
-                style={{ gap: `${MOBILE_CHAT_ITEM_GAP_PX}px` }}
-              >
-                {group.messages.map(({ message, index }) => {
-                  if (isPlainAssistantTextMessage(message)) {
-                    return (
-                      <div
-                        className="w-full bg-[#262a2d] px-[10px] py-[10px]"
-                        key={`${message.kind}-${index}`}
-                      >
-                        <div className="text-sm leading-relaxed text-[#ffffff]">
-                          {renderAssistantMessageContent(message)}
-                        </div>
-                      </div>
-                    );
-                  }
+    <div
+      className="mx-auto w-full max-w-4xl min-w-0"
+      style={{
+        paddingBottom: isLast ? 0 : `${DESKTOP_CHAT_TRANSCRIPT_GAP_PX}px`,
+      }}
+    >
+      {group.kind === "assistant" ? (
+        <div className="group flex w-full min-w-0 items-start gap-6">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
+            {brandBoltIcon("text-sm text-[#224259]")}
+          </div>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#bdd5e6]">
+              {APP_TITLE}
+            </div>
+            <div className="space-y-3">
+              {group.messages.map((message) => (
+                <div
+                  className={`min-w-0 ${
+                    isPlainAssistantTextMessage(message) ? "py-3" : ""
+                  }`}
+                  key={message.key}
+                >
+                  <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
+                    {renderAssistantMessageContent(message)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex w-full min-w-0 justify-end gap-6">
+          <div className="min-w-0 w-full max-w-2xl space-y-3 text-right">
+            <div className="font-body text-[13px] font-semibold tracking-[0.01em] text-[#b7b3b1]">
+              {localUserLabel}
+            </div>
+            <div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
+              <MarkdownMessage text={group.text} />
+            </div>
+          </div>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#262626]">
+            {materialSymbol("person")}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-                  return (
-                    <div className="w-full" key={`${message.kind}-${index}`}>
+function MobileTranscriptGroupRow({
+  group,
+  isLast,
+  localUserLabel,
+  renderAssistantMessageContent,
+}: GroupRowProps): JSX.Element {
+  return (
+    <div
+      className="w-full"
+      style={{ paddingBottom: isLast ? 0 : `${MOBILE_CHAT_ITEM_GAP_PX}px` }}
+    >
+      {group.kind === "assistant" ? (
+        <div className="flex w-full max-w-full flex-col items-start gap-1.5">
+          <div className="flex items-center gap-2 px-[2px] text-[#bdd5e6]">
+            {brandBoltIcon("text-sm")}
+            <span className="text-[10px] font-label font-bold uppercase tracking-wider">
+              {APP_TITLE}
+            </span>
+          </div>
+          <div
+            className="flex w-full flex-col"
+            style={{ gap: `${MOBILE_CHAT_ITEM_GAP_PX}px` }}
+          >
+            {group.messages.map((message) => {
+              if (isPlainAssistantTextMessage(message)) {
+                return (
+                  <div
+                    className="w-full bg-[#262a2d] px-[10px] py-[10px]"
+                    key={message.key}
+                  >
+                    <div className="text-sm leading-relaxed text-[#ffffff]">
                       {renderAssistantMessageContent(message)}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
+                  </div>
+                );
+              }
 
-        return (
-          <div
-            className="flex max-w-[92%] self-end flex-col items-end gap-1.5"
-            key={group.key}
-          >
+              return (
+                <div className="w-full" key={message.key}>
+                  {renderAssistantMessageContent(message)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="flex w-full justify-end">
+          <div className="flex max-w-[92%] flex-col items-end gap-1.5">
             <div className="flex items-center gap-2 px-[2px] text-[#b7b3b1]">
               <span className="font-body text-[13px] font-semibold tracking-[0.01em]">
                 {localUserLabel}
@@ -324,9 +284,229 @@ const ChatTranscript = memo(function ChatTranscript({
               <MarkdownMessage text={group.text} />
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ChatTranscript = memo(function ChatTranscript({
+  activeThreadId,
+  expandedItemIds,
+  localUserLabel,
+  messages,
+  onToggleItemExpanded,
+  paddingEndPx,
+  paddingStartPx,
+  scrollContainerClassName,
+  scrollContainerStyle,
+  selectedWorktreePath,
+  topContent = null,
+  variant,
+}: TranscriptProps): JSX.Element {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const pinnedToBottomRef = useRef(true);
+  const previousThreadIdRef = useRef<number | null>(activeThreadId);
+  const groupedMessages = useMemo<MessageGroup[]>(
+    () => groupVisibleMessages(messages),
+    [messages],
+  );
+  const hasTopContent = topContent !== null;
+  const rowCount = groupedMessages.length + (hasTopContent ? 1 : 0);
+
+  const renderAssistantMessageContent = useCallback(
+    (message: VisibleMessage): JSX.Element => {
+      if (message.kind === "chat") {
+        if (message.tone === "working") {
+          return <ProcessingMessage />;
+        }
+        if (message.tone === "error") {
+          return <ChatErrorMessage text={message.text} />;
+        }
+        if (message.tone === "notice") {
+          return <ChatNoticeMessage text={message.text} />;
+        }
+        return <MarkdownMessage text={message.text} />;
+      }
+      if (message.kind === "reasoning") {
+        return <ReasoningMessage state={message.state} text={message.text} />;
+      }
+      if (message.kind === "command") {
+        return (
+          <CommandExecutionMessage
+            command={message.command}
+            exitCode={message.exitCode}
+            expanded={expandedItemIds.has(message.key)}
+            onToggleExpanded={() => {
+              onToggleItemExpanded(message.key);
+            }}
+            output={message.output}
+            state={message.state}
+          />
         );
-      })}
-    </>
+      }
+      if (message.kind === "tool_call") {
+        return (
+          <ToolCallMessage
+            argumentsText={message.argumentsText}
+            output={message.output}
+            server={message.server}
+            state={message.state}
+            tool={message.tool}
+          />
+        );
+      }
+      if (message.kind === "web_search") {
+        return <WebSearchMessage query={message.query} state={message.state} />;
+      }
+      if (message.kind === "error") {
+        return <ErrorItemMessage state={message.state} text={message.text} />;
+      }
+      return (
+        <FileChangeMessage
+          changeKind={message.changeKind}
+          diffText={message.diffText}
+          expanded={expandedItemIds.has(message.key)}
+          onToggleExpanded={() => {
+            onToggleItemExpanded(message.key);
+          }}
+          path={message.path}
+          state={message.state}
+          worktreePath={selectedWorktreePath ?? undefined}
+        />
+      );
+    },
+    [expandedItemIds, onToggleItemExpanded, selectedWorktreePath],
+  );
+
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: rowCount,
+    estimateSize: (index) => {
+      if (hasTopContent && index === 0) {
+        return 140;
+      }
+      return variant === "desktop"
+        ? DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX
+        : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX;
+    },
+    getItemKey: (index) => {
+      if (hasTopContent && index === 0) {
+        return `chat-header:${activeThreadId ?? "none"}`;
+      }
+      return groupedMessages[index - (hasTopContent ? 1 : 0)]?.key ?? index;
+    },
+    getScrollElement: () => scrollRef.current,
+    overscan:
+      variant === "desktop"
+        ? DESKTOP_CHAT_TRANSCRIPT_OVERSCAN
+        : MOBILE_CHAT_TRANSCRIPT_OVERSCAN,
+    paddingEnd: paddingEndPx,
+    paddingStart: paddingStartPx,
+    scrollPaddingEnd: paddingEndPx,
+    scrollPaddingStart: paddingStartPx,
+    useAnimationFrameWithResizeObserver: true,
+    useFlushSync: false,
+  });
+
+  const virtualRows = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
+  const updatePinnedToBottom = useCallback(
+    (container: HTMLDivElement): void => {
+      pinnedToBottomRef.current =
+        container.scrollHeight - container.scrollTop - container.clientHeight <=
+        CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
+    },
+    [],
+  );
+
+  const scrollToBottom = useCallback((): void => {
+    if (rowCount <= 0) {
+      return;
+    }
+    virtualizer.scrollToIndex(rowCount - 1, {
+      align: "end",
+      behavior: "auto",
+    });
+  }, [rowCount, virtualizer]);
+
+  useLayoutEffect(() => {
+    void totalSize;
+    const threadChanged = previousThreadIdRef.current !== activeThreadId;
+    if (threadChanged) {
+      pinnedToBottomRef.current = true;
+      previousThreadIdRef.current = activeThreadId;
+    }
+    if (pinnedToBottomRef.current) {
+      scrollToBottom();
+    }
+  }, [activeThreadId, scrollToBottom, totalSize]);
+
+  return (
+    <div
+      className={scrollContainerClassName}
+      onScroll={(event) => {
+        updatePinnedToBottom(event.currentTarget);
+      }}
+      ref={scrollRef}
+      style={{
+        ...scrollContainerStyle,
+        overflowAnchor: "none",
+        scrollPaddingBottom: `${paddingEndPx}px`,
+        scrollPaddingTop: `${paddingStartPx}px`,
+      }}
+    >
+      <div
+        className="relative w-full"
+        style={{
+          height: `${totalSize}px`,
+        }}
+      >
+        {virtualRows.map((virtualRow) => {
+          const isHeaderRow = hasTopContent && virtualRow.index === 0;
+          const group = isHeaderRow
+            ? null
+            : groupedMessages[virtualRow.index - (hasTopContent ? 1 : 0)];
+          const isLastGroup = virtualRow.index === rowCount - 1;
+
+          return (
+            <div
+              className="absolute left-0 top-0 w-full"
+              data-index={virtualRow.index}
+              key={virtualRow.key}
+              ref={virtualizer.measureElement}
+              style={{
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {isHeaderRow ? (
+                topContent
+              ) : group ? (
+                variant === "desktop" ? (
+                  <DesktopTranscriptGroupRow
+                    group={group}
+                    isLast={isLastGroup}
+                    localUserLabel={localUserLabel}
+                    renderAssistantMessageContent={
+                      renderAssistantMessageContent
+                    }
+                  />
+                ) : (
+                  <MobileTranscriptGroupRow
+                    group={group}
+                    isLast={isLastGroup}
+                    localUserLabel={localUserLabel}
+                    renderAssistantMessageContent={
+                      renderAssistantMessageContent
+                    }
+                  />
+                )
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 });
 
@@ -336,9 +516,10 @@ type DesktopChatViewProps = SharedChatControlsProps & {
   activeScreenSubtitlePrimary: string;
   activeScreenSubtitleSecondary: string;
   activeScreenTitle: string;
-  chatScrollRef: RefObject<HTMLDivElement | null>;
+  activeThreadId: number | null;
+  expandedItemIds: ReadonlySet<string>;
   localUserLabel: string;
-  onChatScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onToggleItemExpanded: (messageKey: string) => void;
   selectedThreadIsWorking: boolean;
   selectedWorktreePath: string | null;
 };
@@ -348,29 +529,31 @@ export function DesktopChatView({
   activeContextInputTokens,
   activeContextWindowTokens,
   activeReasoningEffort,
-  activeUnsafeMode,
   activeScreenSubtitlePrimary,
   activeScreenSubtitleSecondary,
   activeScreenTitle,
-  chatScrollRef,
+  activeThreadId,
+  activeUnsafeMode,
   codexModels,
   composerActionDisabled,
   composerActionLabel,
   composerDisabled,
+  expandedItemIds,
   hasSelectedThread,
   initialChatInput,
   isLoadingProjectTasks,
   isWorking,
   localUserLabel,
+  messages,
   modelControlError,
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
   onChangeUnsafeMode,
-  onChatScroll,
   onSelectTask,
   onSubmit,
   onSubmitMessage,
+  onToggleItemExpanded,
   projectTasks,
   reasoningEffortControlError,
   reasoningEffortSelectorDisabled,
@@ -381,36 +564,37 @@ export function DesktopChatView({
   taskSelectorDisabled,
   unsafeModeControlError,
   unsafeModeToggleDisabled,
-  messages,
 }: DesktopChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
+  const headerContent = (
+    <div className="mx-auto w-full max-w-4xl pb-12">
+      <h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
+        {activeScreenTitle}
+      </h1>
+      <p className="max-w-2xl font-body text-sm text-[#b3afad]">
+        <span className="text-[#ddd8d5]">{activeScreenSubtitlePrimary}</span>
+        <span className="text-[#7f7c79]">
+          {" "}
+          | {activeScreenSubtitleSecondary}
+        </span>
+      </p>
+    </div>
+  );
+
   return (
     <>
-      <div
-        ref={chatScrollRef}
-        className="flex-1 space-y-8 overflow-y-auto px-6 py-8 hide-scrollbar"
-        onScroll={onChatScroll}
-      >
-        <div className="mx-auto mb-12 max-w-4xl">
-          <h1 className="mb-2 font-headline text-4xl font-extrabold tracking-tight text-[#ffffff]">
-            {activeScreenTitle}
-          </h1>
-          <p className="max-w-2xl font-body text-sm text-[#b3afad]">
-            <span className="text-[#ddd8d5]">
-              {activeScreenSubtitlePrimary}
-            </span>
-            <span className="text-[#7f7c79]">
-              {" "}
-              | {activeScreenSubtitleSecondary}
-            </span>
-          </p>
-        </div>
-        <ChatTranscript
-          localUserLabel={localUserLabel}
-          messages={messages}
-          selectedWorktreePath={selectedWorktreePath}
-          variant="desktop"
-        />
-      </div>
+      <ChatTranscript
+        activeThreadId={activeThreadId}
+        expandedItemIds={expandedItemIds}
+        localUserLabel={localUserLabel}
+        messages={messages}
+        onToggleItemExpanded={onToggleItemExpanded}
+        paddingEndPx={DESKTOP_CHAT_PADDING_PX}
+        paddingStartPx={DESKTOP_CHAT_PADDING_PX}
+        scrollContainerClassName="flex-1 overflow-y-auto px-6 hide-scrollbar"
+        selectedWorktreePath={selectedWorktreePath}
+        topContent={headerContent}
+        variant="desktop"
+      />
       <form
         className="border-t border-[#262626] bg-[#131313] p-6"
         onSubmit={onSubmit}
@@ -494,9 +678,10 @@ type MobileChatViewProps = SharedChatControlsProps & {
   activeScreenSubtitlePrimary: string;
   activeScreenSubtitleSecondary: string;
   activeScreenTitle: string;
-  chatScrollRef: RefObject<HTMLDivElement | null>;
+  activeThreadId: number | null;
+  expandedItemIds: ReadonlySet<string>;
   localUserLabel: string;
-  onChatScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onToggleItemExpanded: (messageKey: string) => void;
   selectedThreadIsWorking: boolean;
   selectedWorktreePath: string | null;
 };
@@ -512,29 +697,31 @@ const MOBILE_CHAT_SIDE_BLEED_PX =
 export function MobileChatView({
   activeCodexModel,
   activeReasoningEffort,
-  activeUnsafeMode,
   activeScreenSubtitlePrimary,
   activeScreenSubtitleSecondary,
   activeScreenTitle,
-  chatScrollRef,
+  activeThreadId,
+  activeUnsafeMode,
   codexModels,
   composerActionDisabled,
   composerActionLabel,
   composerDisabled,
+  expandedItemIds,
   hasSelectedThread,
   initialChatInput,
   isLoadingProjectTasks,
   isWorking,
   localUserLabel,
+  messages,
   modelControlError,
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
   onChangeUnsafeMode,
-  onChatScroll,
   onSelectTask,
   onSubmit,
   onSubmitMessage,
+  onToggleItemExpanded,
   projectTasks,
   reasoningEffortControlError,
   reasoningEffortSelectorDisabled,
@@ -545,7 +732,6 @@ export function MobileChatView({
   taskSelectorDisabled,
   unsafeModeControlError,
   unsafeModeToggleDisabled,
-  messages,
 }: MobileChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
   const footerRef = useRef<HTMLElement | null>(null);
   const [composerInsetPx, setComposerInsetPx] = useState(
@@ -587,9 +773,6 @@ export function MobileChatView({
     marginRight: `-${MOBILE_CHAT_SIDE_BLEED_PX}px`,
     paddingLeft: `${MOBILE_CHAT_SIDE_INSET_PX}px`,
     paddingRight: `${MOBILE_CHAT_SIDE_INSET_PX}px`,
-    paddingTop: `${MOBILE_CHAT_ITEM_GAP_PX}px`,
-    paddingBottom: `${composerInsetPx}px`,
-    scrollPaddingBottom: `${composerInsetPx}px`,
   };
 
   return (
@@ -606,19 +789,19 @@ export function MobileChatView({
           </span>
         </p>
       </div>
-      <div
-        ref={chatScrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto hide-scrollbar"
-        onScroll={onChatScroll}
-        style={chatScrollStyle}
-      >
-        <ChatTranscript
-          localUserLabel={localUserLabel}
-          messages={messages}
-          selectedWorktreePath={selectedWorktreePath}
-          variant="mobile"
-        />
-      </div>
+      <ChatTranscript
+        activeThreadId={activeThreadId}
+        expandedItemIds={expandedItemIds}
+        localUserLabel={localUserLabel}
+        messages={messages}
+        onToggleItemExpanded={onToggleItemExpanded}
+        paddingEndPx={composerInsetPx}
+        paddingStartPx={MOBILE_CHAT_ITEM_GAP_PX}
+        scrollContainerClassName="flex min-h-0 flex-1 overflow-y-auto hide-scrollbar"
+        scrollContainerStyle={chatScrollStyle}
+        selectedWorktreePath={selectedWorktreePath}
+        variant="mobile"
+      />
       <footer
         aria-label="Chat composer"
         className="fixed bottom-16 left-0 right-0 z-40 px-[10px] pb-[10px]"

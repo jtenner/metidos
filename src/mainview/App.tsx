@@ -1,7 +1,6 @@
 import {
   type FormEvent,
   type JSX,
-  type UIEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -107,10 +106,10 @@ type AppProps = {
   procedures: ProjectProcedures;
 };
 
-const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 12;
 const WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX = 360;
 const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
 const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
+const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
 type PrimaryView = "chat" | "diff" | "tasks";
 type WorktreeThreadPopoverState = {
   maxHeight: number;
@@ -126,51 +125,26 @@ function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
   );
 }
 
-function isScrolledToBottom(container: HTMLDivElement): boolean {
-  return (
-    container.scrollHeight - container.scrollTop - container.clientHeight <=
-    CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX
+function useDesktopViewport(): boolean {
+  const [matches, setMatches] = useState(
+    () => window.matchMedia(DESKTOP_MEDIA_QUERY).matches,
   );
-}
 
-function scrollContainerToBottom(container: HTMLDivElement | null): void {
-  if (!container) {
-    return;
-  }
-  container.scrollTop = container.scrollHeight;
-}
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    const handleChange = (event: MediaQueryListEvent): void => {
+      setMatches(event.matches);
+    };
 
-function observeChatScrollContent(
-  container: HTMLDivElement,
-  onContentResize: () => void,
-): () => void {
-  const resizeObserver = new ResizeObserver(() => {
-    onContentResize();
-  });
+    setMatches(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
 
-  const observeDirectChildren = (): void => {
-    resizeObserver.disconnect();
-    for (const child of Array.from(container.children)) {
-      if (child instanceof Element) {
-        resizeObserver.observe(child);
-      }
-    }
-  };
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
 
-  observeDirectChildren();
-
-  const mutationObserver = new MutationObserver(() => {
-    observeDirectChildren();
-    onContentResize();
-  });
-  mutationObserver.observe(container, {
-    childList: true,
-  });
-
-  return () => {
-    mutationObserver.disconnect();
-    resizeObserver.disconnect();
-  };
+  return matches;
 }
 
 function isThreadNotFoundError(error: unknown): boolean {
@@ -346,8 +320,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
     string | null
   >(null);
+  const [expandedTranscriptItemIds, setExpandedTranscriptItemIds] = useState(
+    () => new Set<string>(),
+  );
   const [worktreeThreadPopover, setWorktreeThreadPopover] =
     useState<WorktreeThreadPopoverState | null>(null);
+  const isDesktopViewport = useDesktopViewport();
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
@@ -363,15 +341,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
   const worktreeThreadPopoverRef = useRef<HTMLDivElement | null>(null);
   const desktopSidebarScrollRef = useRef<HTMLDivElement | null>(null);
-  const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileSidebarScrollRef = useRef<HTMLElement | null>(null);
-  const mobileChatScrollRef = useRef<HTMLDivElement | null>(null);
-  const desktopChatPinnedToBottomRef = useRef(true);
-  const mobileChatPinnedToBottomRef = useRef(true);
-  const chatScrollThreadIdRef = useRef<number | null>(
-    initialMainviewState.selectedThreadId,
-  );
-  const chatAutoScrollFrameRef = useRef<number | null>(null);
   const projectActionMenuRequestId = useRef(0);
   const projectTasksRequestIdRef = useRef(0);
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
@@ -593,6 +563,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
     },
     [completedThreadIndicatorIds, threads],
   );
+  const toggleTranscriptItemExpanded = useCallback((messageKey: string) => {
+    setExpandedTranscriptItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(messageKey)) {
+        next.delete(messageKey);
+      } else {
+        next.add(messageKey);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    void selectedThreadId;
+    setExpandedTranscriptItemIds(new Set());
+  }, [selectedThreadId]);
 
   useLayoutEffect(() => {
     void mobileProjectListOpen;
@@ -3705,6 +3691,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     if (isThreadLoading) {
       messages = [
         {
+          key: `thread-loading:${selectedThreadId ?? "none"}`,
           kind: "chat",
           speaker: "assistant",
           tone: "normal",
@@ -3714,6 +3701,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     } else if (!selectedThread) {
       messages = [
         {
+          key: `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
           kind: "chat",
           speaker: "assistant",
           tone: "normal",
@@ -3725,6 +3713,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     } else if (threadMessages.length === 0) {
       messages = [
         {
+          key: `thread-ready:${selectedThread.id}`,
           kind: "chat",
           speaker: "assistant",
           tone: "normal",
@@ -3735,6 +3724,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       messages = threadMessages.map((message) => {
         if (message.kind === "reasoning") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "reasoning",
             text: message.text,
             state: message.state,
@@ -3742,6 +3732,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
         if (message.kind === "command") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "command",
             command: message.command,
             output: message.output,
@@ -3751,6 +3742,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
         if (message.kind === "file_change") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "file_change",
             path: message.path,
             diffText: message.diffText,
@@ -3760,6 +3752,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
         if (message.kind === "tool_call") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "tool_call",
             server: message.server,
             tool: message.tool,
@@ -3770,6 +3763,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
         if (message.kind === "web_search") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "web_search",
             query: message.query,
             state: message.state,
@@ -3777,12 +3771,14 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
         if (message.kind === "error") {
           return {
+            key: `thread-message:${message.id}`,
             kind: "error",
             text: message.text,
             state: message.state,
           };
         }
         return {
+          key: `thread-message:${message.id}`,
           kind: "chat",
           speaker: message.role,
           tone: "normal",
@@ -3795,6 +3791,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       !hasInProgressAssistantChat
     ) {
       messages.push({
+        key: `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
         kind: "chat",
         speaker: "assistant",
         tone: "working",
@@ -3803,6 +3800,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     }
     if (activeChatError) {
       messages.push({
+        key: `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
         kind: "chat",
         speaker: "assistant",
         tone: "error",
@@ -3811,6 +3809,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     }
     if (activeChatNotice) {
       messages.push({
+        key: `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
         kind: "chat",
         speaker: "assistant",
         tone: "notice",
@@ -3822,90 +3821,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activeSelectedWorktreeFolder,
     activeChatError,
     activeChatNotice,
+    activeSelectedWorktreePath,
     isThreadLoading,
     selectedProject,
     selectedThread,
+    selectedThreadId,
     threadMessages,
   ]);
-
-  const handleDesktopChatScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      desktopChatPinnedToBottomRef.current = isScrolledToBottom(
-        event.currentTarget,
-      );
-    },
-    [],
-  );
-
-  const handleMobileChatScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      mobileChatPinnedToBottomRef.current = isScrolledToBottom(
-        event.currentTarget,
-      );
-    },
-    [],
-  );
-
-  const syncPinnedChatScroll = useCallback(() => {
-    if (desktopChatPinnedToBottomRef.current) {
-      scrollContainerToBottom(desktopChatScrollRef.current);
-    }
-    if (mobileChatPinnedToBottomRef.current) {
-      scrollContainerToBottom(mobileChatScrollRef.current);
-    }
-  }, []);
-
-  const schedulePinnedChatScroll = useCallback(() => {
-    if (chatAutoScrollFrameRef.current !== null) {
-      cancelAnimationFrame(chatAutoScrollFrameRef.current);
-    }
-
-    chatAutoScrollFrameRef.current = requestAnimationFrame(() => {
-      chatAutoScrollFrameRef.current = null;
-      syncPinnedChatScroll();
-    });
-  }, [syncPinnedChatScroll]);
-
-  useLayoutEffect(() => {
-    void visibleMessages;
-    const threadChanged = chatScrollThreadIdRef.current !== selectedThreadId;
-    if (threadChanged) {
-      desktopChatPinnedToBottomRef.current = true;
-      mobileChatPinnedToBottomRef.current = true;
-    }
-    syncPinnedChatScroll();
-    chatScrollThreadIdRef.current = selectedThreadId;
-  }, [selectedThreadId, syncPinnedChatScroll, visibleMessages]);
-
-  useEffect(() => {
-    const cleanups: Array<() => void> = [];
-    const desktopChatContainer = desktopChatScrollRef.current;
-    const mobileChatContainer = mobileChatScrollRef.current;
-
-    if (desktopChatContainer) {
-      cleanups.push(
-        observeChatScrollContent(
-          desktopChatContainer,
-          schedulePinnedChatScroll,
-        ),
-      );
-    }
-    if (mobileChatContainer) {
-      cleanups.push(
-        observeChatScrollContent(mobileChatContainer, schedulePinnedChatScroll),
-      );
-    }
-
-    return () => {
-      for (const cleanup of cleanups) {
-        cleanup();
-      }
-      if (chatAutoScrollFrameRef.current !== null) {
-        cancelAnimationFrame(chatAutoScrollFrameRef.current);
-        chatAutoScrollFrameRef.current = null;
-      }
-    };
-  }, [schedulePinnedChatScroll]);
 
   const sidebarActionButtonClass =
     "flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";
@@ -4132,56 +4054,59 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
           <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#0e0e0e]">
             {primaryView === "chat" ? (
-              <DesktopChatView
-                activeCodexModel={activeCodexModel}
-                activeContextInputTokens={activeContextInputTokens}
-                activeContextWindowTokens={activeContextWindowTokens}
-                activeReasoningEffort={activeReasoningEffort}
-                activeUnsafeMode={activeUnsafeMode}
-                activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
-                activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
-                activeScreenTitle={activeScreenTitle}
-                chatScrollRef={desktopChatScrollRef}
-                codexModels={codexModels}
-                composerActionDisabled={composerActionDisabled}
-                composerActionLabel={composerActionLabel}
-                composerDisabled={composerDisabled}
-                hasSelectedThread={Boolean(selectedThread)}
-                initialChatInput={initialMainviewState.chatInput}
-                isLoadingProjectTasks={isLoadingProjectTasks}
-                isWorking={selectedThreadIsWorking}
-                localUserLabel={localUserLabel}
-                messages={visibleMessages}
-                modelControlError={modelControlError}
-                modelSelectorDisabled={modelSelectorDisabled}
-                onChangeModel={(value) => {
-                  void updateActiveCodexModel(value);
-                }}
-                onChangeReasoningEffort={(value) => {
-                  void updateActiveReasoningEffort(value);
-                }}
-                onChangeUnsafeMode={(value) => {
-                  void updateActiveUnsafeMode(value);
-                }}
-                onChatScroll={handleDesktopChatScroll}
-                onSelectTask={(task) => {
-                  void runSelectedTask(task);
-                }}
-                onSubmit={onSubmit}
-                onSubmitMessage={postMessage}
-                projectTasks={projectTasks}
-                reasoningEffortControlError={reasoningEffortControlError}
-                reasoningEffortSelectorDisabled={
-                  reasoningEffortSelectorDisabled
-                }
-                reasoningEfforts={reasoningEfforts}
-                selectedThreadIsWorking={selectedThreadIsWorking}
-                selectedWorktreePath={activeSelectedWorktreePath}
-                taskControlError={taskControlError}
-                taskSelectorDisabled={taskSelectorDisabled}
-                unsafeModeControlError={unsafeModeControlError}
-                unsafeModeToggleDisabled={unsafeModeToggleDisabled}
-              />
+              isDesktopViewport ? (
+                <DesktopChatView
+                  activeCodexModel={activeCodexModel}
+                  activeContextInputTokens={activeContextInputTokens}
+                  activeContextWindowTokens={activeContextWindowTokens}
+                  activeReasoningEffort={activeReasoningEffort}
+                  activeUnsafeMode={activeUnsafeMode}
+                  activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
+                  activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
+                  activeScreenTitle={activeScreenTitle}
+                  activeThreadId={selectedThreadId}
+                  codexModels={codexModels}
+                  composerActionDisabled={composerActionDisabled}
+                  composerActionLabel={composerActionLabel}
+                  composerDisabled={composerDisabled}
+                  expandedItemIds={expandedTranscriptItemIds}
+                  hasSelectedThread={Boolean(selectedThread)}
+                  initialChatInput={initialMainviewState.chatInput}
+                  isLoadingProjectTasks={isLoadingProjectTasks}
+                  isWorking={selectedThreadIsWorking}
+                  localUserLabel={localUserLabel}
+                  messages={visibleMessages}
+                  modelControlError={modelControlError}
+                  modelSelectorDisabled={modelSelectorDisabled}
+                  onChangeModel={(value) => {
+                    void updateActiveCodexModel(value);
+                  }}
+                  onChangeReasoningEffort={(value) => {
+                    void updateActiveReasoningEffort(value);
+                  }}
+                  onChangeUnsafeMode={(value) => {
+                    void updateActiveUnsafeMode(value);
+                  }}
+                  onSelectTask={(task) => {
+                    void runSelectedTask(task);
+                  }}
+                  onSubmit={onSubmit}
+                  onSubmitMessage={postMessage}
+                  onToggleItemExpanded={toggleTranscriptItemExpanded}
+                  projectTasks={projectTasks}
+                  reasoningEffortControlError={reasoningEffortControlError}
+                  reasoningEffortSelectorDisabled={
+                    reasoningEffortSelectorDisabled
+                  }
+                  reasoningEfforts={reasoningEfforts}
+                  selectedThreadIsWorking={selectedThreadIsWorking}
+                  selectedWorktreePath={activeSelectedWorktreePath}
+                  taskControlError={taskControlError}
+                  taskSelectorDisabled={taskSelectorDisabled}
+                  unsafeModeControlError={unsafeModeControlError}
+                  unsafeModeToggleDisabled={unsafeModeToggleDisabled}
+                />
+              ) : null
             ) : primaryView === "diff" ? (
               <div className="flex min-h-0 flex-1 px-6 py-6">
                 <DiffWorkspace
@@ -4349,52 +4274,57 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
         <main className="mx-auto flex w-full max-w-2xl flex-1 min-h-0 flex-col gap-6 px-4 pt-14 pb-16">
           {primaryView === "chat" ? (
-            <MobileChatView
-              activeCodexModel={activeCodexModel}
-              activeReasoningEffort={activeReasoningEffort}
-              activeUnsafeMode={activeUnsafeMode}
-              activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
-              activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
-              activeScreenTitle={activeScreenTitle}
-              chatScrollRef={mobileChatScrollRef}
-              codexModels={codexModels}
-              composerActionDisabled={composerActionDisabled}
-              composerActionLabel={composerActionLabel}
-              composerDisabled={composerDisabled}
-              hasSelectedThread={Boolean(selectedThread)}
-              initialChatInput={initialMainviewState.chatInput}
-              isLoadingProjectTasks={isLoadingProjectTasks}
-              isWorking={selectedThreadIsWorking}
-              localUserLabel={localUserLabel}
-              messages={visibleMessages}
-              modelControlError={modelControlError}
-              modelSelectorDisabled={modelSelectorDisabled}
-              onChangeModel={(value) => {
-                void updateActiveCodexModel(value);
-              }}
-              onChangeReasoningEffort={(value) => {
-                void updateActiveReasoningEffort(value);
-              }}
-              onChangeUnsafeMode={(value) => {
-                void updateActiveUnsafeMode(value);
-              }}
-              onChatScroll={handleMobileChatScroll}
-              onSelectTask={(task) => {
-                void runSelectedTask(task);
-              }}
-              onSubmit={onSubmit}
-              onSubmitMessage={postMessage}
-              projectTasks={projectTasks}
-              reasoningEffortControlError={reasoningEffortControlError}
-              reasoningEffortSelectorDisabled={reasoningEffortSelectorDisabled}
-              reasoningEfforts={reasoningEfforts}
-              selectedThreadIsWorking={selectedThreadIsWorking}
-              selectedWorktreePath={activeSelectedWorktreePath}
-              taskControlError={taskControlError}
-              taskSelectorDisabled={taskSelectorDisabled}
-              unsafeModeControlError={unsafeModeControlError}
-              unsafeModeToggleDisabled={unsafeModeToggleDisabled}
-            />
+            !isDesktopViewport ? (
+              <MobileChatView
+                activeCodexModel={activeCodexModel}
+                activeReasoningEffort={activeReasoningEffort}
+                activeUnsafeMode={activeUnsafeMode}
+                activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
+                activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
+                activeScreenTitle={activeScreenTitle}
+                activeThreadId={selectedThreadId}
+                codexModels={codexModels}
+                composerActionDisabled={composerActionDisabled}
+                composerActionLabel={composerActionLabel}
+                composerDisabled={composerDisabled}
+                expandedItemIds={expandedTranscriptItemIds}
+                hasSelectedThread={Boolean(selectedThread)}
+                initialChatInput={initialMainviewState.chatInput}
+                isLoadingProjectTasks={isLoadingProjectTasks}
+                isWorking={selectedThreadIsWorking}
+                localUserLabel={localUserLabel}
+                messages={visibleMessages}
+                modelControlError={modelControlError}
+                modelSelectorDisabled={modelSelectorDisabled}
+                onChangeModel={(value) => {
+                  void updateActiveCodexModel(value);
+                }}
+                onChangeReasoningEffort={(value) => {
+                  void updateActiveReasoningEffort(value);
+                }}
+                onChangeUnsafeMode={(value) => {
+                  void updateActiveUnsafeMode(value);
+                }}
+                onSelectTask={(task) => {
+                  void runSelectedTask(task);
+                }}
+                onSubmit={onSubmit}
+                onSubmitMessage={postMessage}
+                onToggleItemExpanded={toggleTranscriptItemExpanded}
+                projectTasks={projectTasks}
+                reasoningEffortControlError={reasoningEffortControlError}
+                reasoningEffortSelectorDisabled={
+                  reasoningEffortSelectorDisabled
+                }
+                reasoningEfforts={reasoningEfforts}
+                selectedThreadIsWorking={selectedThreadIsWorking}
+                selectedWorktreePath={activeSelectedWorktreePath}
+                taskControlError={taskControlError}
+                taskSelectorDisabled={taskSelectorDisabled}
+                unsafeModeControlError={unsafeModeControlError}
+                unsafeModeToggleDisabled={unsafeModeToggleDisabled}
+              />
+            ) : null
           ) : primaryView === "diff" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 pt-6">
               <DiffWorkspace

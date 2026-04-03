@@ -24,6 +24,8 @@
 │  ├─ 2026-03-31-correctness-issues-2.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md
+│  ├─ react-virtuoso-chat-migration.md
+│  ├─ tanstack-virtual-chat-migration.md
 │  └─ references/
 │     ├─ ai_chat_mobile/
 │     │  ├─ code.html

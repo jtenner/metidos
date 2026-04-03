@@ -425,15 +425,27 @@ export function CommandExecutionMessage({
   output,
   state,
   exitCode,
+  expanded,
+  onToggleExpanded,
 }: {
   command: string;
   output: string;
   state: "in_progress" | "completed" | "failed" | "stopped";
   exitCode: number | null;
+  expanded?: boolean;
+  onToggleExpanded?: (() => void) | undefined;
 }): JSX.Element {
   const hasOutput = output.trim().length > 0;
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const isExpanded = expanded ?? localIsExpanded;
   const stateLabel = commandStateLabel(state, exitCode);
+  const toggleExpanded = (): void => {
+    if (expanded === undefined) {
+      setLocalIsExpanded((current) => !current);
+      return;
+    }
+    onToggleExpanded?.();
+  };
   const headerContent = (
     <>
       <div className="min-w-0 text-left">
@@ -466,9 +478,7 @@ export function CommandExecutionMessage({
         <button
           type="button"
           className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
-          onClick={() => {
-            setIsExpanded((current) => !current);
-          }}
+          onClick={toggleExpanded}
           aria-expanded={isExpanded}
           aria-label={`Toggle command output for ${command}`}
         >
@@ -548,12 +558,16 @@ export function FileChangeMessage({
   changeKind,
   state,
   worktreePath,
+  expanded,
+  onToggleExpanded,
 }: {
   path: string;
   diffText: string;
   changeKind: "add" | "delete" | "update";
   state: "in_progress" | "completed" | "failed" | "stopped";
   worktreePath?: string | undefined;
+  expanded?: boolean;
+  onToggleExpanded?: (() => void) | undefined;
 }): JSX.Element {
   const changeLabel =
     changeKind === "add"
@@ -570,7 +584,8 @@ export function FileChangeMessage({
           ? "Working"
           : changeLabel;
   const hasDiff = diffText.trim().length > 0;
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const isExpanded = expanded ?? localIsExpanded;
   const diffRegionId = `file-change-diff-${
     path.replaceAll(/[^a-zA-Z0-9_-]+/g, "-").replaceAll(/^-+|-+$/g, "") ||
     "content"
@@ -579,7 +594,11 @@ export function FileChangeMessage({
     if (!hasDiff) {
       return;
     }
-    setIsExpanded((current) => !current);
+    if (expanded === undefined) {
+      setLocalIsExpanded((current) => !current);
+      return;
+    }
+    onToggleExpanded?.();
   };
 
   const headerContent = (
@@ -741,12 +760,12 @@ export function DesktopMessageGroups({
                   {APP_TITLE}
                 </div>
                 <div className="space-y-3">
-                  {group.messages.map(({ message, index }) => (
+                  {group.messages.map((message) => (
                     <div
                       className={`min-w-0 ${
                         isPlainAssistantTextMessage(message) ? "py-3" : ""
                       }`}
-                      key={`${message.kind}-${index}`}
+                      key={message.key}
                     >
                       <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
                         {renderAssistantMessageContent(message)}
@@ -809,12 +828,12 @@ export function MobileMessageGroups({
                 </span>
               </div>
               <div className="flex w-full flex-col gap-3">
-                {group.messages.map(({ message, index }) => (
+                {group.messages.map((message) => (
                   <div
                     className={`w-full ${
                       isPlainAssistantTextMessage(message) ? "py-3" : ""
                     }`}
-                    key={`${message.kind}-${index}`}
+                    key={message.key}
                   >
                     <div className="glass-panel flex w-full flex-col gap-4 border border-[#bdd5e6]/10 p-5">
                       <div className="text-sm leading-relaxed text-[#ffffff]">

@@ -13,59 +13,60 @@ import type {
   RpcWorktreeSnapshot,
 } from "../../bun/rpc-schema";
 
+type VisibleMessageBase = {
+  key: string;
+};
+
 export type VisibleMessage =
-  | {
+  | (VisibleMessageBase & {
       kind: "chat";
       speaker: "assistant" | "user";
       text: string;
       tone?: "normal" | "working" | "error" | "notice";
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "reasoning";
       text: string;
       state: "in_progress" | "completed" | "stopped";
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "command";
       command: string;
       output: string;
       state: "in_progress" | "completed" | "failed" | "stopped";
       exitCode: number | null;
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "file_change";
       path: string;
       diffText: string;
       changeKind: "add" | "delete" | "update";
       state: "in_progress" | "completed" | "failed" | "stopped";
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "tool_call";
       server: string;
       tool: string;
       argumentsText: string;
       output: string;
       state: "in_progress" | "completed" | "failed" | "stopped";
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "web_search";
       query: string;
       state: "in_progress" | "completed" | "stopped";
-    }
-  | {
+    })
+  | (VisibleMessageBase & {
       kind: "error";
       text: string;
       state: "in_progress" | "completed" | "stopped";
-    };
+    });
 
 export type MessageGroup =
   | {
       kind: "assistant";
       key: string;
-      messages: Array<{
-        index: number;
-        message: VisibleMessage;
-      }>;
+      messages: VisibleMessage[];
     }
   | {
       kind: "user";
