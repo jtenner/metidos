@@ -7,13 +7,23 @@ type DesktopSidebarProps = {
   renderExpandedContent: (collapseSidebar: () => void) => JSX.Element;
 };
 
+/**
+ * Sidebar container with two rendering modes:
+ * - expanded content area (full width, interactive content)
+ * - collapsed rail (compact icon strip + expand control)
+ * `initialCollapsed` seeds local state and updates are echoed back via callback.
+ */
 export function DesktopSidebar({
   initialCollapsed,
   onCollapsedChange,
   renderExpandedContent,
 }: DesktopSidebarProps): JSX.Element {
+  // Local collapsed state allows animation before parent state catches up via callback.
   const [collapsed, setCollapsed] = useState(initialCollapsed);
 
+  /**
+   * Internal transition helper that keeps local UI state and parent handler in sync.
+   */
   const updateCollapsed = useCallback(
     (nextCollapsed: boolean): void => {
       setCollapsed(nextCollapsed);
@@ -26,6 +36,7 @@ export function DesktopSidebar({
     updateCollapsed(true);
   }, [updateCollapsed]);
 
+  // Shared handler passed to child content so it can request collapse directly.
   const expandSidebar = useCallback((): void => {
     updateCollapsed(false);
   }, [updateCollapsed]);
@@ -41,6 +52,7 @@ export function DesktopSidebar({
     >
       <div
         aria-hidden={collapsed}
+        // Expanded panel receives interactions and is invisible/click-through when collapsed.
         className={`absolute inset-y-0 left-0 flex w-[21rem] flex-col transition-opacity duration-150 ${
           collapsed ? "pointer-events-none invisible opacity-0" : "opacity-100"
         }`}
@@ -49,11 +61,13 @@ export function DesktopSidebar({
       </div>
       <div
         aria-hidden={!collapsed}
+        // Collapsed rail appears only in collapsed mode; expanded mode keeps it hidden.
         className={`absolute inset-y-0 left-0 flex w-14 flex-col transition-opacity duration-150 ${
           collapsed ? "opacity-100" : "pointer-events-none invisible opacity-0"
         }`}
       >
         <div className="flex flex-1 flex-col items-center gap-3 px-2 py-4">
+          {/* This button is always present in collapsed mode to allow one-click expansion. */}
           <button
             type="button"
             aria-label="Expand sidebar"
