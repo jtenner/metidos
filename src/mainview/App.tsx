@@ -2252,49 +2252,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
         }
       }
 
-      const restoredOpenWorktrees: Array<
-        | {
-            ok: true;
-            history: RpcWorktreeGitHistoryResult;
-            projectId: number;
-            tasks: RpcProjectTask[];
-            snapshot: RpcWorktreeSnapshot;
-            worktreePath: string;
-          }
-        | {
-            ok: false;
-            projectId: number;
-            error: string;
-            worktreePath: string;
-          }
-      > = [];
-      for (const { projectId, worktreePath } of persistedState.openWorktrees) {
-        if (!restoredOpenProjectIds.has(projectId)) {
-          continue;
-        }
-
-        try {
-          const result = await procedures.openWorktree({
-            projectId,
-            worktreePath,
-          });
-          restoredOpenWorktrees.push({
-            ok: true,
-            history: result.history,
-            projectId,
-            tasks: result.tasks,
-            snapshot: result.worktree,
-            worktreePath,
-          });
-        } catch (error) {
-          restoredOpenWorktrees.push({
-            ok: false,
-            projectId,
-            error: error instanceof Error ? error.message : String(error),
-            worktreePath,
-          });
-        }
-      }
+      const restoredOpenWorktrees = await procedures.openWorktreesBatch(
+        {
+          worktrees: persistedState.openWorktrees.filter(({ projectId }) =>
+            restoredOpenProjectIds.has(projectId),
+          ),
+        },
+        {
+          priority: "foreground",
+        },
+      );
 
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
@@ -2307,7 +2274,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           setWorktreeState(result.projectId, result.worktreePath, {
             loading: false,
             opened: true,
-            snapshot: result.snapshot,
+            snapshot: result.worktree,
             error: "",
           });
           continue;

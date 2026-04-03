@@ -30,6 +30,7 @@ import {
   openProjectProcedure,
   openProjectsBatchProcedure,
   openWorktreeProcedure,
+  openWorktreesBatchProcedure,
   readWorktreeFileContentPageProcedure,
   readWorktreeFileDiffProcedure,
   recoverInterruptedThreadTurnsOnStartup,
@@ -228,6 +229,8 @@ const rpcHandlers: RpcRequestHandlerMap = {
   openProject: (params, context) => openProjectProcedure(params, context),
   openProjectsBatch: (params, context) =>
     openProjectsBatchProcedure(params, context),
+  openWorktreesBatch: (params, context) =>
+    openWorktreesBatchProcedure(params, context),
   closeProject: (params) => closeProjectProcedure(params),
   deleteProject: (params) => deleteProjectProcedure(params),
   listProjectWorktrees: (params, context) =>

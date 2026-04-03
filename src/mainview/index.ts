@@ -563,6 +563,7 @@ const procedures: ProjectProcedures = {
   listProjectWorktrees: createProcedure("listProjectWorktrees"),
   listProjectTasks: createProcedure("listProjectTasks"),
   createWorktree: createProcedure("createWorktree"),
+  openWorktreesBatch: createProcedure("openWorktreesBatch"),
   createThread: createProcedure("createThread"),
   requestThreadStart: createProcedure("requestThreadStart"),
   getThread: createProcedure("getThread"),

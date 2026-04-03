@@ -120,6 +120,7 @@ import type {
   RpcHomeDirectoryResult,
   RpcOpenProjectsBatchResultItem,
   RpcOpenWorktreeResult,
+  RpcOpenWorktreesBatchResultItem,
   RpcProject,
   RpcProjectTask,
   RpcProjectWorktreesResult,
@@ -2988,66 +2989,106 @@ export async function openWorktreeProcedure(
 ): Promise<RpcOpenWorktreeResult> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
-    const state = ensureProjectPoller(project);
-    const worktreePath = normalizePath(params.worktreePath);
-    await ensureTrackedProjectWorktree(project, state, worktreePath, {
-      ...requestGitOptions,
-      forceRefresh: true,
-    });
-
-    const worktreeState = ensureWorktreePollState(state, worktreePath);
-    const tasksPromise = refreshWorktreeTaskCache(state, worktreePath, {
-      startWatching: true,
-    }).catch((error) => {
-      logBackgroundTaskFailure(
-        `Task cache warm failed for ${worktreePath}`,
-        error,
-      );
-      return worktreeState.tasks ?? [];
-    });
-    const [{ history, summary, signature }, snapshot, tasks] =
-      await runWorktreeOpenLimited(
-        () =>
-          Promise.all([
-            readGitHistoryFirstPage(
-              project.id,
-              worktreePath,
-              DEFAULT_GIT_HISTORY_PAGE_SIZE,
-              requestGitOptions,
-            ),
-            readAndStoreWorktreeSnapshot(
-              state,
-              worktreePath,
-              requestGitOptions,
-            ),
-            tasksPromise,
-          ]),
-        context?.signal,
-      );
-    worktreeState.history = summary;
-    worktreeState.historyEntries = history.entries;
-    worktreeState.historyNextOffset = history.nextOffset;
-    worktreeState.historySignature = signature;
-    startWorktreeTaskPolling(state, worktreePath);
-    syncProjectWorktreeBackgroundPolling(state);
-    queueBackgroundWorkWhenIdle(
-      `git-history-warm:${project.id}:${worktreePath}`,
-      () => {
-        warmGitHistoryCache(
-          worktreeState,
-          worktreePath,
-          logBackgroundGitFailure,
-        );
-      },
+    return openWorktreeWithGitOptions(
+      params,
+      requestGitOptions,
+      context?.signal,
     );
+  });
+}
 
-    return {
-      tasks,
-      project,
-      worktree: snapshot,
-      history,
-    };
+async function openWorktreeWithGitOptions(
+  params: AppRPCSchema["requests"]["openWorktree"]["params"],
+  requestGitOptions?: GitCommandOptions,
+  signal?: AbortSignal,
+): Promise<RpcOpenWorktreeResult> {
+  const project = projectByIdForPath(params.projectId);
+  const state = ensureProjectPoller(project);
+  const worktreePath = normalizePath(params.worktreePath);
+  await ensureTrackedProjectWorktree(project, state, worktreePath, {
+    ...requestGitOptions,
+    forceRefresh: true,
+  });
+
+  const worktreeState = ensureWorktreePollState(state, worktreePath);
+  const tasksPromise = refreshWorktreeTaskCache(state, worktreePath, {
+    startWatching: true,
+  }).catch((error) => {
+    logBackgroundTaskFailure(
+      `Task cache warm failed for ${worktreePath}`,
+      error,
+    );
+    return worktreeState.tasks ?? [];
+  });
+  const [{ history, summary, signature }, snapshot, tasks] =
+    await runWorktreeOpenLimited(
+      () =>
+        Promise.all([
+          readGitHistoryFirstPage(
+            project.id,
+            worktreePath,
+            DEFAULT_GIT_HISTORY_PAGE_SIZE,
+            requestGitOptions,
+          ),
+          readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions),
+          tasksPromise,
+        ]),
+      signal,
+    );
+  worktreeState.history = summary;
+  worktreeState.historyEntries = history.entries;
+  worktreeState.historyNextOffset = history.nextOffset;
+  worktreeState.historySignature = signature;
+  startWorktreeTaskPolling(state, worktreePath);
+  syncProjectWorktreeBackgroundPolling(state);
+  queueBackgroundWorkWhenIdle(
+    `git-history-warm:${project.id}:${worktreePath}`,
+    () => {
+      warmGitHistoryCache(worktreeState, worktreePath, logBackgroundGitFailure);
+    },
+  );
+
+  return {
+    tasks,
+    project,
+    worktree: snapshot,
+    history,
+  };
+}
+
+export async function openWorktreesBatchProcedure(
+  params: AppRPCSchema["requests"]["openWorktreesBatch"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcOpenWorktreesBatchResultItem[]> {
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const results: RpcOpenWorktreesBatchResultItem[] = [];
+
+    for (const worktree of params.worktrees) {
+      throwIfAborted(context?.signal, "Worktree restore was aborted.");
+      try {
+        const opened = await openWorktreeWithGitOptions(
+          worktree,
+          requestGitOptions,
+          context?.signal,
+        );
+        results.push({
+          ok: true,
+          projectId: worktree.projectId,
+          worktreePath: worktree.worktreePath,
+          ...opened,
+        });
+      } catch (error) {
+        results.push({
+          ok: false,
+          projectId: worktree.projectId,
+          worktreePath: worktree.worktreePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return results;
   });
 }
 

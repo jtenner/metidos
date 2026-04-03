@@ -74,6 +74,22 @@ export type RpcOpenProjectsBatchResultItem =
       error: string;
     };
 
+export type RpcOpenWorktreeRequest = {
+  projectId: number;
+  worktreePath: string;
+};
+
+export type RpcOpenWorktreesBatchResultItem =
+  | ({
+      ok: true;
+    } & RpcOpenWorktreeRequest &
+      RpcOpenWorktreeResult)
+  | ({
+      ok: false;
+    } & RpcOpenWorktreeRequest & {
+        error: string;
+      });
+
 export type RpcOpenWorktreeResult = {
   project: RpcProject;
   tasks: RpcProjectTask[];
@@ -439,8 +455,14 @@ export type AppRPCSchema = {
       response: RpcCreateWorktreeResult;
     };
     openWorktree: {
-      params: { projectId: number; worktreePath: string };
+      params: RpcOpenWorktreeRequest;
       response: RpcOpenWorktreeResult;
+    };
+    openWorktreesBatch: {
+      params: {
+        worktrees: RpcOpenWorktreeRequest[];
+      };
+      response: RpcOpenWorktreesBatchResultItem[];
     };
     getWorktreeSnapshot: {
       params: { projectId: number; worktreePath: string };
@@ -643,6 +665,10 @@ export interface ProjectProcedures {
   openWorktree: RpcProcedureCall<
     AppRPCSchema["requests"]["openWorktree"]["params"],
     RpcOpenWorktreeResult
+  >;
+  openWorktreesBatch: RpcProcedureCall<
+    AppRPCSchema["requests"]["openWorktreesBatch"]["params"],
+    AppRPCSchema["requests"]["openWorktreesBatch"]["response"]
   >;
   getWorktreeSnapshot: RpcProcedureCall<
     AppRPCSchema["requests"]["getWorktreeSnapshot"]["params"],
