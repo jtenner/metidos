@@ -11,6 +11,10 @@ type ProjectTaskSelectorProps = {
   variant: "desktop" | "mobile";
 };
 
+/**
+ * Dropdown used to select a project task from an available task list.
+ * Handles disabled/loading/no-task states and emits accessibility metadata for empty lists.
+ */
 export function ProjectTaskSelector({
   disabled,
   loading,
@@ -18,14 +22,22 @@ export function ProjectTaskSelector({
   tasks,
   variant,
 }: ProjectTaskSelectorProps): JSX.Element {
+  // Keep a precomputed empty-state check for both disabled logic and aria hints.
   const noTasksAvailable = !loading && tasks.length === 0;
   const unavailable = disabled || loading || noTasksAvailable;
   const noTasksHintId = useId();
+
+  // Desktop keeps a task count in the trigger when there is content; otherwise keep compact label.
   const buttonLabel =
     variant === "desktop" && tasks.length > 0
       ? `Tasks (${tasks.length})`
       : "Tasks";
 
+  /**
+   * Build optional secondary text for a task row:
+   * - script tasks include command inline when available
+   * - non-script tasks only show path if it differs from title.
+   */
   const taskMetaText = (task: RpcProjectTask): string | null => {
     if (task.kind === "script") {
       return task.command?.trim()
@@ -77,11 +89,13 @@ export function ProjectTaskSelector({
             </span>
           </button>
           {noTasksAvailable ? (
+            // Screen-reader-only hint avoids adding visible copy to the desktop button while still exposing the reason state.
             <span className="sr-only" id={noTasksHintId}>
               No project tasks found.
             </span>
           ) : null}
           {variant === "desktop" && noTasksAvailable ? (
+            // Desktop-only hover/focus tooltip replaces inline disabled copy and avoids layout shift in button row.
             <div className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
               <div className="whitespace-nowrap border border-[#3c4c58] bg-[#15191b] px-3 py-2 text-xs text-[#dfebf3] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
                 No tasks found.
@@ -117,6 +131,8 @@ export function ProjectTaskSelector({
                   type="button"
                   className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-[#1e2428]"
                   onClick={() => {
+                    // Close the dropdown before notifying selection to keep panel teardown
+                    // deterministic even if selection triggers expensive UI updates.
                     close();
                     onSelect(task);
                   }}
@@ -131,7 +147,8 @@ export function ProjectTaskSelector({
                     <span className="block truncate font-label text-[10px] font-bold uppercase tracking-wider text-[#f2f0ef]">
                       {task.title}
                     </span>
-                    {taskMetaText(task) ? (
+                      {taskMetaText(task) ? (
+                        // Additional metadata is shown only when distinct from the title.
                       <span className="mt-1 block truncate text-[11px] leading-4 text-[#a7b7c2]">
                         {taskMetaText(task)}
                       </span>
