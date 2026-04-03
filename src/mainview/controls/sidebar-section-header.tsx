@@ -1,13 +1,26 @@
 import type { JSX, ReactNode } from "react";
 import { materialSymbol } from "./icons";
 
+/**
+ * Common props for a sidebar section header with expand/collapse behavior.
+ */
 type SidebarSectionHeaderProps = {
+  /** Optional action button or node rendered at the far right of the header. */
   action?: JSX.Element | null;
+  /** Toggle callback fired when the header button is activated. */
   onToggle: () => void;
+  /** Whether the section body is currently expanded. */
   open: boolean;
+  /** Display label for the section; allows rich content from callers. */
   title: ReactNode;
 };
 
+/**
+ * Reusable sidebar section header row.
+ *
+ * The component is intentionally minimal: one clickable control toggles section
+ * visibility and an optional action slot can host contextual controls.
+ */
 export function SidebarSectionHeader({
   action,
   onToggle,
@@ -26,12 +39,14 @@ export function SidebarSectionHeader({
           {title}
         </span>
         <span className="ml-auto shrink-0 text-[#62737e] transition-colors group-hover:text-[#bdd5e6]">
+          {/* Flip icon to reflect current expand/collapse state. */}
           {materialSymbol(
             open ? "expand_more" : "chevron_right",
             "text-[16px]",
           )}
         </span>
       </button>
+      {/* Optional contextual action (e.g., add button) sits to the right of header. */}
       {action ?? null}
     </div>
   );
