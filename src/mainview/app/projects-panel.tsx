@@ -10,13 +10,13 @@ import {
   useProjectsPanelOpen,
 } from "./sidebar-panels-state";
 import {
-  type ProjectNodeState,
-  type ThreadErrorLevel,
-  type WorktreeNodeState,
   formatDirectoryPathForInput,
   formatPathForDisplay,
   orderProjectWorktrees,
+  type ProjectNodeState,
   shortName,
+  type ThreadErrorLevel,
+  type WorktreeNodeState,
   worktreeThreadPopoverAnchorId,
 } from "./state";
 
@@ -536,18 +536,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                         : "bg-[#5f5f5f]";
 
                 return (
-                  <div
-                    className="space-y-1"
-                    key={project.id}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      onOpenProjectActionMenu(
-                        project,
-                        event.clientX + 6,
-                        event.clientY + 6,
-                      );
-                    }}
-                  >
+                  <div className="space-y-1" key={project.id}>
                     <div className="group/project flex items-center gap-2">
                       <button
                         type="button"
@@ -560,6 +549,14 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                           const nextOpen = !projectTreeOpen;
                           setProjectTreeOpen(project.path, nextOpen);
                           onRefreshProject(project, nextOpen);
+                        }}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          onOpenProjectActionMenu(
+                            project,
+                            event.clientX + 6,
+                            event.clientY + 6,
+                          );
                         }}
                       >
                         <div className="flex items-center gap-2.5">

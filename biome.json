@@ -1,18 +1,24 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2
   },
   "files": {
-    "ignore": [
-      "coverage",
-      "dist",
-      "build",
-      "node_modules",
-      ".jolt-build",
-      "src/mainview/index.css"
+    "includes": [
+      "**",
+      "!**/coverage",
+      "!**/dist",
+      "!**/build",
+      "!**/node_modules",
+      "!**/.jolt-build",
+      "!**/src/mainview/index.css"
     ]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   }
 }

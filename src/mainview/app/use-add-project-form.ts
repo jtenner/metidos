@@ -7,16 +7,16 @@ import type {
 } from "../../bun/rpc-schema";
 import { setProjectTreeOpen } from "./sidebar-panels-state";
 import {
+  awaitAbortableResult,
+  createAbortError,
   DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS,
   DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
   DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS,
   type DirectorySuggestionResultCacheEntry,
-  type PendingSharedRequest,
-  type ProjectNodeState,
-  awaitAbortableResult,
-  createAbortError,
   formatDirectoryPathForInput,
   isAbortError,
+  type PendingSharedRequest,
+  type ProjectNodeState,
   readLruValue,
   upsertProjectList,
   writeLruValue,

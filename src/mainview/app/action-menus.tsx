@@ -2,9 +2,9 @@ import type { FormEvent, JSX, RefObject } from "react";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
+  formatPathForDisplay,
   type ProjectActionMenuState,
   type ThreadActionMenuState,
-  formatPathForDisplay,
 } from "./state";
 
 type ProjectActionMenuProps = {

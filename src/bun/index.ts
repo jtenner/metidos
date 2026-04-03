@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 
-import { MAINVIEW_BUILD_DIR, buildMainviewBundle } from "./build-mainview";
+import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
 import { initAppDatabase } from "./db";
 import {
   closeProjectProcedure,
@@ -18,9 +18,9 @@ import {
   getWorktreeGitCommitDiffProcedure,
   getWorktreeSnapshotProcedure,
   listDirectorySuggestionsProcedure,
+  listProjectsProcedure,
   listProjectTasksProcedure,
   listProjectWorktreesProcedure,
-  listProjectsProcedure,
   listThreadsProcedure,
   listWorktreeGitHistoryProcedure,
   markThreadErrorSeenProcedure,

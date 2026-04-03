@@ -4,9 +4,9 @@ import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
   type ErrorPreviewPopoverState,
+  formatPathForDisplay,
   type ProjectNodeState,
   type ThreadSummaryPopoverState,
-  formatPathForDisplay,
 } from "./state";
 import { useThreadPreviews } from "./use-thread-previews";
 

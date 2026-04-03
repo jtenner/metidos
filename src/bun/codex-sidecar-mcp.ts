@@ -1,15 +1,15 @@
-import { dirname, isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 
 import {
-  type ThreadRecord,
   getThreadById,
   initAppDatabase,
   renameThread as renameThreadRecord,
   setThreadPinned as setThreadPinnedRecord,
+  type ThreadRecord,
 } from "./db";
 import type {
   AppRPCSchema,

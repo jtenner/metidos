@@ -1,6 +1,6 @@
 import {
-  type UIEvent,
   memo,
+  type UIEvent,
   useCallback,
   useMemo,
   useRef,
@@ -14,12 +14,12 @@ import {
   useGitHistoryPanelOpen,
 } from "./sidebar-panels-state";
 import {
+  clampNumber,
+  formatGitHistoryTimestamp,
   GIT_HISTORY_DOM_WINDOW_SIZE,
   GIT_HISTORY_LOAD_MORE_THRESHOLD_PX,
   GIT_HISTORY_RENDER_OVERSCAN_ROWS,
   GIT_HISTORY_ROW_HEIGHT_PX,
-  clampNumber,
-  formatGitHistoryTimestamp,
 } from "./state";
 
 type GitHistoryPanelProps = {

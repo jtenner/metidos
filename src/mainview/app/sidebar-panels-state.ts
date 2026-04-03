@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import {
-  TREE_VIEW_STATE_STORAGE_VERSION,
   readPersistedTreeViewState,
+  TREE_VIEW_STATE_STORAGE_VERSION,
   writePersistedTreeViewState,
 } from "./state";
 

@@ -89,9 +89,7 @@ export function useWorktreeDiff({
   }, []);
 
   const loadSelectedDiffFilePatch = useCallback(
-    async (options?: {
-      background?: boolean;
-    }): Promise<void> => {
+    async (options?: { background?: boolean }): Promise<void> => {
       if (
         !selectedProject ||
         !activeSelectedWorktreePath ||

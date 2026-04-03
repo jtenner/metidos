@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, realpathSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { RpcProjectTask } from "../rpc-schema";

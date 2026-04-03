@@ -29,13 +29,13 @@ import {
   ContextUsageMeter,
   ErrorItemMessage,
   FileChangeMessage,
+  isAssistantVisibleMessage,
+  isPlainAssistantTextMessage,
   MarkdownMessage,
   ProcessingMessage,
   ReasoningMessage,
   ToolCallMessage,
   WebSearchMessage,
-  isAssistantVisibleMessage,
-  isPlainAssistantTextMessage,
 } from "./message-ui";
 import { APP_TITLE, type MessageGroup, type VisibleMessage } from "./state";
 
@@ -79,7 +79,6 @@ type TranscriptProps = {
   paddingStartPx: number;
   scrollContainerClassName: string;
   scrollContainerStyle?: CSSProperties;
-  selectedWorktreePath: string | null;
   topContent?: JSX.Element | null;
   variant: "desktop" | "mobile";
 };
@@ -300,7 +299,6 @@ const ChatTranscript = memo(function ChatTranscript({
   paddingStartPx,
   scrollContainerClassName,
   scrollContainerStyle,
-  selectedWorktreePath,
   topContent = null,
   variant,
 }: TranscriptProps): JSX.Element {
@@ -372,11 +370,10 @@ const ChatTranscript = memo(function ChatTranscript({
           }}
           path={message.path}
           state={message.state}
-          worktreePath={selectedWorktreePath ?? undefined}
         />
       );
     },
-    [expandedItemIds, onToggleItemExpanded, selectedWorktreePath],
+    [expandedItemIds, onToggleItemExpanded],
   );
 
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -521,7 +518,6 @@ type DesktopChatViewProps = SharedChatControlsProps & {
   localUserLabel: string;
   onToggleItemExpanded: (messageKey: string) => void;
   selectedThreadIsWorking: boolean;
-  selectedWorktreePath: string | null;
 };
 
 export function DesktopChatView({
@@ -559,7 +555,6 @@ export function DesktopChatView({
   reasoningEffortSelectorDisabled,
   reasoningEfforts,
   selectedThreadIsWorking,
-  selectedWorktreePath,
   taskControlError,
   taskSelectorDisabled,
   unsafeModeControlError,
@@ -591,7 +586,6 @@ export function DesktopChatView({
         paddingEndPx={DESKTOP_CHAT_PADDING_PX}
         paddingStartPx={DESKTOP_CHAT_PADDING_PX}
         scrollContainerClassName="flex-1 overflow-y-auto px-6 hide-scrollbar"
-        selectedWorktreePath={selectedWorktreePath}
         topContent={headerContent}
         variant="desktop"
       />
@@ -683,7 +677,6 @@ type MobileChatViewProps = SharedChatControlsProps & {
   localUserLabel: string;
   onToggleItemExpanded: (messageKey: string) => void;
   selectedThreadIsWorking: boolean;
-  selectedWorktreePath: string | null;
 };
 
 const MOBILE_CHAT_COMPOSER_GAP_PX = 34;
@@ -727,7 +720,6 @@ export function MobileChatView({
   reasoningEffortSelectorDisabled,
   reasoningEfforts,
   selectedThreadIsWorking,
-  selectedWorktreePath,
   taskControlError,
   taskSelectorDisabled,
   unsafeModeControlError,
@@ -799,11 +791,9 @@ export function MobileChatView({
         paddingStartPx={MOBILE_CHAT_ITEM_GAP_PX}
         scrollContainerClassName="flex min-h-0 flex-1 overflow-y-auto hide-scrollbar"
         scrollContainerStyle={chatScrollStyle}
-        selectedWorktreePath={selectedWorktreePath}
         variant="mobile"
       />
       <footer
-        aria-label="Chat composer"
         className="fixed bottom-16 left-0 right-0 z-40 px-[10px] pb-[10px]"
         ref={footerRef}
       >

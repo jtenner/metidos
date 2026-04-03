@@ -5,9 +5,9 @@ import type {
 } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
+  clampProjectMenuCoordinate,
   type ErrorPreviewPopoverState,
   type ThreadSummaryPopoverState,
-  clampProjectMenuCoordinate,
 } from "./state";
 
 function anchorStillActive(anchorId: string): boolean {
@@ -28,9 +28,7 @@ function anchorStillActive(anchorId: string): boolean {
   );
 }
 
-export function useThreadPreviews(options?: {
-  disabled?: boolean;
-}) {
+export function useThreadPreviews(options?: { disabled?: boolean }) {
   const previewsDisabled = options?.disabled === true;
   const [errorPreviewPopover, setErrorPreviewPopover] =
     useState<ErrorPreviewPopoverState | null>(null);

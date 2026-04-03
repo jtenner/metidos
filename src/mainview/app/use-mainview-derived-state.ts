@@ -15,22 +15,20 @@ import {
 } from "../controls/search-utils";
 import { buildDiffFileTree } from "./diff-workspace";
 import {
-  APP_TITLE,
-  type ProjectActionMenuState,
-  type ProjectNodeState,
-  type ThreadActionMenuState,
-  type ThreadErrorLevel,
-  type WorktreeNodeState,
   findPrimaryWorktree,
   formatPathForDisplay,
   mergeThreadErrorLevel,
   orderProjectWorktrees,
-  pinnedThreadForWorktree,
+  type ProjectActionMenuState,
+  type ProjectNodeState,
   primaryWorktreePath,
   shortName,
   sortThreads,
+  type ThreadActionMenuState,
+  type ThreadErrorLevel,
   threadErrorLevel,
   threadRunStatus,
+  type WorktreeNodeState,
   worktreeDisplayName,
   worktreeKey,
 } from "./state";

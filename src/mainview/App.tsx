@@ -41,26 +41,6 @@ import {
 } from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
-  GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
-  GIT_HISTORY_PAGE_SIZE,
-  GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
-  type GitHistoryDiffCacheEntry,
-  type GitHistoryModalState,
-  MAINVIEW_STATE_STORAGE_VERSION,
-  type OpenThreadOptions,
-  type PendingSharedRequest,
-  type PersistedMainviewState,
-  type ProjectActionMenuState,
-  type ProjectNodeState,
-  type ProjectStateMap,
-  THREAD_START_REQUEST_CREATED_EVENT_NAME,
-  THREAD_STATUS_POLL_INTERVAL_MS,
-  type ThreadActionMenuState,
-  type VisibleMessage,
-  WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-  WORKTREE_TASKS_CHANGED_EVENT_NAME,
-  type WorktreeNodeState,
-  type WorktreeStateMap,
   appendGitHistoryPage,
   awaitAbortableResult,
   clampProjectMenuCoordinate,
@@ -68,11 +48,23 @@ import {
   defaultProjectState,
   defaultWorktreeState,
   formatDirectoryPathForInput,
+  GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
+  GIT_HISTORY_PAGE_SIZE,
+  GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
+  type GitHistoryDiffCacheEntry,
+  type GitHistoryModalState,
   gitHistoryDiffCacheKey,
   isAbortError,
   isCodexReasoningEffort,
   latestThreadForWorktree,
+  MAINVIEW_STATE_STORAGE_VERSION,
   mergeResetGitHistory,
+  type OpenThreadOptions,
+  type PendingSharedRequest,
+  type PersistedMainviewState,
+  type ProjectActionMenuState,
+  type ProjectNodeState,
+  type ProjectStateMap,
   patchPersistedMainviewState,
   pickInitialThread,
   pinnedThreadForWorktree,
@@ -82,8 +74,16 @@ import {
   removeThreadFromList,
   serializeOpenWorktrees,
   sortThreads,
+  THREAD_START_REQUEST_CREATED_EVENT_NAME,
+  THREAD_STATUS_POLL_INTERVAL_MS,
+  type ThreadActionMenuState,
   upsertProjectList,
   upsertThreadList,
+  type VisibleMessage,
+  WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+  WORKTREE_TASKS_CHANGED_EVENT_NAME,
+  type WorktreeNodeState,
+  type WorktreeStateMap,
   withAcknowledgedUnreadThread,
   withAcknowledgedUnreadThreadDetail,
   worktreeKey,
@@ -441,7 +441,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     activeSelectedWorktreeName,
     activeSelectedWorktreeOpened,
     activeSelectedWorktreePath,
-    activeSelectedWorktreeState,
     activeWorktreeChanges,
     activeWorktreeSnapshot,
     composerActionDisabled,
@@ -463,10 +462,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     reasoningEffortSelectorDisabled,
     selectedDiffFileChange,
     selectedProject,
-    selectedProjectWorktrees,
     selectedThread,
     selectedThreadIsWorking,
-    selectedThreadRunStatus,
     taskSelectorDisabled,
     threadActionMenuThread,
     unsafeModeToggleDisabled,
@@ -4100,7 +4097,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                   }
                   reasoningEfforts={reasoningEfforts}
                   selectedThreadIsWorking={selectedThreadIsWorking}
-                  selectedWorktreePath={activeSelectedWorktreePath}
                   taskControlError={taskControlError}
                   taskSelectorDisabled={taskSelectorDisabled}
                   unsafeModeControlError={unsafeModeControlError}
@@ -4318,7 +4314,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 }
                 reasoningEfforts={reasoningEfforts}
                 selectedThreadIsWorking={selectedThreadIsWorking}
-                selectedWorktreePath={activeSelectedWorktreePath}
                 taskControlError={taskControlError}
                 taskSelectorDisabled={taskSelectorDisabled}
                 unsafeModeControlError={unsafeModeControlError}

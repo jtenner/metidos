@@ -6,7 +6,6 @@ import type {
   RpcProject,
   RpcThread,
   RpcThreadDetail,
-  RpcThreadMessage,
   RpcThreadRunStatus,
   RpcWorktree,
   RpcWorktreeGitHistoryResult,

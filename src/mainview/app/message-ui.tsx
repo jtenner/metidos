@@ -11,11 +11,7 @@ import type {
   MessageGroup,
   VisibleMessage,
 } from "./state";
-import {
-  APP_TITLE,
-  formatGitHistoryTimestamp,
-  formatPathForDisplay,
-} from "./state";
+import { APP_TITLE, formatGitHistoryTimestamp } from "./state";
 
 const CODE_FONT_STACK =
   '"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -123,24 +119,31 @@ export function ContextUsageMeter({
 
   return (
     <div className="shrink-0">
-      <div
-        role="meter"
-        aria-label="Context usage"
-        aria-valuemin={0}
-        aria-valuemax={safeContextWindowTokens}
-        aria-valuenow={clampedInputTokens}
-        aria-valuetext={`${inputTokens.toLocaleString()} of ${contextWindowTokens.toLocaleString()} context tokens used`}
-        className="relative h-6 w-6 rounded-full border border-[#31404a]"
-      >
+      <div className="relative h-6 w-6">
+        <meter
+          aria-label="Context usage"
+          className="sr-only"
+          max={safeContextWindowTokens}
+          min={0}
+          value={clampedInputTokens}
+        >
+          {inputTokens.toLocaleString()} of{" "}
+          {contextWindowTokens.toLocaleString()} context tokens used
+        </meter>
         <div
-          className="absolute inset-[1px] rounded-full"
-          style={{
-            background: `conic-gradient(from -90deg, #bdd5e6 0deg ${
-              progress * 360
-            }deg, #24313a ${progress * 360}deg 360deg)`,
-          }}
-        />
-        <div className="absolute inset-[4px] rounded-full bg-[#131313]" />
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full border border-[#31404a]"
+        >
+          <div
+            className="absolute inset-[1px] rounded-full"
+            style={{
+              background: `conic-gradient(from -90deg, #bdd5e6 0deg ${
+                progress * 360
+              }deg, #24313a ${progress * 360}deg 360deg)`,
+            }}
+          />
+          <div className="absolute inset-[4px] rounded-full bg-[#131313]" />
+        </div>
       </div>
     </div>
   );
@@ -526,38 +529,11 @@ export function ReasoningMessage({
   );
 }
 
-function isAbsoluteLocalPath(value: string): boolean {
-  return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
-}
-
-function joinLocalPath(basePath: string, nextPath: string): string {
-  if (!basePath) {
-    return nextPath;
-  }
-  return `${basePath.replace(/[\\/]+$/, "")}/${nextPath.replace(/^[\\/]+/, "")}`;
-}
-
-function toFileHref(path: string): string {
-  return path
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
-function buildLocalFileHref(path: string, worktreePath?: string): string {
-  const absolutePath =
-    isAbsoluteLocalPath(path) || !worktreePath
-      ? path
-      : joinLocalPath(worktreePath, path);
-  return `/${toFileHref(absolutePath)}`;
-}
-
 export function FileChangeMessage({
   path,
   diffText,
   changeKind,
   state,
-  worktreePath,
   expanded,
   onToggleExpanded,
 }: {
@@ -565,7 +541,6 @@ export function FileChangeMessage({
   diffText: string;
   changeKind: "add" | "delete" | "update";
   state: "in_progress" | "completed" | "failed" | "stopped";
-  worktreePath?: string | undefined;
   expanded?: boolean;
   onToggleExpanded?: (() => void) | undefined;
 }): JSX.Element {
@@ -669,19 +644,18 @@ export function GitHistoryDiffModal({
   const dialogBodyResetKey = `${state.projectId}:${state.worktreePath}:${state.entry.hash}:${state.loading ? "loading" : state.error ? "error" : "ready"}:${state.diffText.length}`;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <button
+        aria-label="Close commit diff"
+        className="absolute inset-0 bg-black/65"
+        onClick={onClose}
+        type="button"
+      />
       <dialog
         aria-describedby={dialogDescriptionId}
         aria-labelledby={dialogTitleId}
         aria-modal="true"
-        className="mx-auto my-auto flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden border border-[#35414a] bg-[#101518] p-0 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
+        className="relative mx-auto my-auto flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden border border-[#35414a] bg-[#101518] p-0 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
         open
       >
         <div className="flex items-start justify-between gap-4 border-b border-[#2b343b] bg-[#141b1f] px-4 py-4">

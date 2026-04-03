@@ -1,5 +1,5 @@
-import { type FSWatcher, existsSync, watch } from "node:fs";
-import { basename, dirname, relative, resolve } from "node:path";
+import { existsSync, type FSWatcher, watch } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import {
   Codex,
   type Thread as CodexThread,
@@ -16,8 +16,8 @@ import {
   getProjectById,
   getThreadById,
   initAppDatabase,
-  listProjectWorktreePins,
   listProjects,
+  listProjectWorktreePins,
   listThreadMessages,
   listThreads,
   listThreadsWithInProgressMessages,
@@ -70,40 +70,38 @@ import {
   warmDirectorySuggestionCache,
 } from "./project-procedures/directory-suggestions";
 import {
-  type PendingGitCommitDiffRequest,
-  type PendingGitHistoryPrefetch,
   abortGitHistoryPrefetch,
   buildGitHistoryResultFromCache,
   fillGitHistoryCache,
   getCachedGitCommitDiffResult,
+  type PendingGitCommitDiffRequest,
+  type PendingGitHistoryPrefetch,
   warmGitHistoryCache,
 } from "./project-procedures/git-history";
 import {
-  type TaskWatchTarget,
   formatTaskPrompt,
   readProjectTasksFromDisk,
   readTaskWatchTargets,
   resolvePackageJsonTask,
   resolveProjectTaskFilePath,
+  type TaskWatchTarget,
   taskTitleFromPath,
 } from "./project-procedures/project-tasks";
 import {
-  awaitAbortableResult,
   createAbortError,
   isAbortError,
   normalizePath,
   readLruValue,
   safeIsDirectory,
-  shortName,
   throwIfAborted,
   writeLruValue,
 } from "./project-procedures/shared";
 import {
-  THREAD_INTERRUPTED_MESSAGE,
-  THREAD_STOPPED_MESSAGE,
   buildNextCompactionTelemetry,
   buildThreadTitle,
   isStoppedThreadMessage,
+  THREAD_INTERRUPTED_MESSAGE,
+  THREAD_STOPPED_MESSAGE,
   threadRunStatusFromRecord,
   toRpcThread,
   toRpcThreadMessages,
