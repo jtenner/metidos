@@ -78,6 +78,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Provides compile-time guarantees between client and server message envelopes.
   - Describes thread/project/worktree/domain payload shapes consumed across the UI and sidecar.
 
+- `rpc-authz.ts`
+  - Centralizes the backend RPC authorization helpers for privileged browser actions.
+  - Encapsulates cross-workspace thread step-up detection and auth-bypass-aware step-up enforcement so these rules stay unit-testable.
+
 - `codex-sidecar-mcp.ts`
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.

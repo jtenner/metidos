@@ -75,6 +75,7 @@ import {
   updateThreadUnsafeModeProcedure,
   warmProcedureStartupCaches,
 } from "./project-procedures";
+import { createThreadRequiresStepUp, enforceRpcStepUp } from "./rpc-authz";
 import type {
   AppRPCSchema,
   RpcRequestContext,
@@ -270,40 +271,22 @@ const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
 );
 
-function normalizeScopePath(path: string): string {
-  return resolve(path);
-}
-
-function createThreadRequiresStepUp(
-  params: AppRPCSchema["requests"]["createThread"]["params"],
-): boolean {
-  if (
-    typeof params.currentProjectId !== "number" ||
-    typeof params.currentWorktreePath !== "string" ||
-    params.currentWorktreePath.trim().length === 0
-  ) {
-    return false;
-  }
-
-  return (
-    params.projectId !== params.currentProjectId ||
-    normalizeScopePath(params.worktreePath) !==
-      normalizeScopePath(params.currentWorktreePath)
-  );
-}
-
 function requireFreshStepUpForRpcAction(
   context: RpcRequestContext,
   actionDescription: string,
 ): void {
-  if (context.auth.authBypass) {
-    return;
-  }
-
-  requireFreshStepUp(initAppDatabase(), {
+  enforceRpcStepUp({
     actionDescription,
-    nowMs: currentNowMs(),
-    sessionId: context.auth.sessionId,
+    context,
+    onRequireStepUp: ({
+      actionDescription: nextActionDescription,
+      sessionId,
+    }) =>
+      requireFreshStepUp(initAppDatabase(), {
+        actionDescription: nextActionDescription,
+        nowMs: currentNowMs(),
+        sessionId,
+      }),
   });
 }
 

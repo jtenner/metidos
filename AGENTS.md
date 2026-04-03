@@ -91,6 +91,8 @@
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
+│  │  ├─ rpc-authz.test.ts
+│  │  ├─ rpc-authz.ts
 │  │  ├─ rpc-schema.ts
 │  │  ├─ server-security.test.ts
 │  │  ├─ server-security.ts
