@@ -5,7 +5,7 @@
 - [x] Add comments to file `src/mainview/app/sidebar-content.tsx`.
 - [x] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
 - [x] Add comments to file `src/mainview/app/state.ts`.
-- [ ] Add comments to file `src/mainview/app/use-mainview-derived-state.ts`.
+- [x] Add comments to file `src/mainview/app/use-mainview-derived-state.ts`.
 - [ ] Add comments to file `src/mainview/app/use-thread-previews.ts`.
 - [ ] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
 - [ ] Add comments to file `src/mainview/app/workspace-panel.tsx`.

@@ -33,6 +33,10 @@ import {
   worktreeKey,
 } from "./state";
 
+/**
+ * Creates a stable key for a dismissible thread status.
+ * Returns null for statuses that should not be tracked as dismissible.
+ */
 function dismissibleThreadStatusKey(
   runStatus: RpcThreadRunStatus,
 ): string | null {
@@ -48,6 +52,7 @@ function dismissibleThreadStatusKey(
   return `${runStatus.state}:${updatedAt}:${runStatus.error ?? ""}`;
 }
 
+/** Parameters required by {@link useMainviewDerivedState}. */
 type UseMainviewDerivedStateParams = {
   chatError: string;
   codexModels: RpcCodexModelOption[];
@@ -86,6 +91,9 @@ type UseMainviewDerivedStateParams = {
   threads: RpcThread[];
 };
 
+/**
+ * Computes derived mainview state and memoized selectors from raw state inputs.
+ */
 export function useMainviewDerivedState({
   chatError,
   codexModels,
@@ -125,6 +133,7 @@ export function useMainviewDerivedState({
   >({});
 
   const selectedProject = useMemo(() => {
+    // Resolve the selected project by ID from the full project list.
     if (!selectedProjectId) {
       return null;
     }
@@ -132,6 +141,7 @@ export function useMainviewDerivedState({
   }, [projects, selectedProjectId]);
 
   const selectedThread = useMemo(() => {
+    // Resolve the selected thread by ID from the full thread list.
     if (!selectedThreadId) {
       return null;
     }
@@ -144,6 +154,7 @@ export function useMainviewDerivedState({
   );
 
   const hasWorkingThreads = useMemo(
+    // Indicates whether any thread is currently running in the workspace.
     () => threads.some((thread) => thread.runStatus.state === "working"),
     [threads],
   );
@@ -161,6 +172,7 @@ export function useMainviewDerivedState({
   );
 
   const activeReasoningEffort = useMemo(() => {
+    // Keep active reasoning effort aligned with selected thread when available.
     if (selectedThread?.reasoningEffort) {
       return selectedThread.reasoningEffort;
     }
@@ -183,6 +195,7 @@ export function useMainviewDerivedState({
   const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
 
   const isThreadStatusDismissed = useCallback(
+    // A thread is considered dismissed if its current terminal key matches prior state.
     (thread: RpcThread | null): boolean => {
       if (!thread) {
         return false;
@@ -197,6 +210,7 @@ export function useMainviewDerivedState({
   );
 
   const projectThreadErrorLevels = useMemo(() => {
+    // Aggregate non-dismissed thread error levels per project, keeping max severity.
     const next = new Map<number, ThreadErrorLevel>();
     for (const thread of threads) {
       const level = isThreadStatusDismissed(thread)
@@ -214,6 +228,7 @@ export function useMainviewDerivedState({
   }, [isThreadStatusDismissed, threads]);
 
   const worktreeThreadErrorLevels = useMemo(() => {
+    // Aggregate non-dismissed thread error levels per worktree, keyed by project+path.
     const next = new Map<string, ThreadErrorLevel>();
     for (const thread of threads) {
       const level = isThreadStatusDismissed(thread)
@@ -229,6 +244,7 @@ export function useMainviewDerivedState({
   }, [isThreadStatusDismissed, threads]);
 
   useEffect(() => {
+    // Drop stale dismissals when threads are removed or their status key changes.
     setDismissedThreadStatusKeys((prev) => {
       const nextEntries = Object.entries(prev).filter(
         ([threadId, statusKey]) => {
@@ -248,6 +264,7 @@ export function useMainviewDerivedState({
   }, [threads]);
 
   const dismissThreadStatus = useCallback((thread: RpcThread): void => {
+    // Record dismissal only when thread has a terminal/dismissible status.
     const statusKey = dismissibleThreadStatusKey(thread.runStatus);
     if (!statusKey) {
       return;
@@ -264,6 +281,7 @@ export function useMainviewDerivedState({
   }, []);
 
   const selectedThreadIsWorking = selectedThreadRunStatus.state === "working";
+  // Disable inputs that mutate state while any thread action is in-flight.
   const modelSelectorDisabled =
     codexModels.length === 0 ||
     isCreatingThread ||
@@ -323,6 +341,7 @@ export function useMainviewDerivedState({
   }, [threadActionMenu, threads]);
 
   const selectedProjectWorktrees = useMemo(() => {
+    // Worktrees are sourced from project state cache, then ordered for UI display.
     if (!selectedProject) {
       return [];
     }
@@ -333,6 +352,7 @@ export function useMainviewDerivedState({
   }, [getProjectState, selectedProject]);
 
   const activeSelectedWorktreePath = useMemo(() => {
+    // Prefer the thread-specific worktree when valid; fall back to explicit selection.
     if (!selectedProject) {
       return null;
     }
@@ -361,6 +381,7 @@ export function useMainviewDerivedState({
   ]);
 
   const activeSelectedWorktree = useMemo(() => {
+    // Resolve requested worktree by path, otherwise fall back to primary.
     if (!selectedProject || !activeSelectedWorktreePath) {
       return null;
     }
@@ -386,6 +407,7 @@ export function useMainviewDerivedState({
     return getWorktreeState(selectedProject.id, activeSelectedWorktreePath);
   }, [activeSelectedWorktreePath, getWorktreeState, selectedProject]);
 
+  // Snapshot drives file tree + diff computations.
   const activeWorktreeSnapshot = activeSelectedWorktreeState?.snapshot ?? null;
   const activeWorktreeChanges = activeWorktreeSnapshot?.changes ?? [];
   const diffFileTree = useMemo(
@@ -402,6 +424,7 @@ export function useMainviewDerivedState({
     [activeWorktreeChanges, selectedDiffFilePath],
   );
 
+  // Poll only for open worktrees while the document is visible and selected.
   const activePollingProjectId =
     isDocumentVisible &&
     selectedProject &&
@@ -464,11 +487,13 @@ export function useMainviewDerivedState({
     isThreadLoading;
 
   const normalizedSidebarSearchQuery = useMemo(
+    // Normalize once so every query check uses a canonicalized token stream.
     () => normalizeSearchQuery(sidebarSearchQuery),
     [sidebarSearchQuery],
   );
 
   const filteredProjects = useMemo(() => {
+    // Match against project metadata and each worktree's display fields.
     if (!normalizedSidebarSearchQuery) {
       return projects;
     }
@@ -506,10 +531,12 @@ export function useMainviewDerivedState({
   ]);
 
   const filteredWorkspacePinnedThreads = useMemo(() => {
+    // Pinned threads are rendered as a separate, prioritized list.
     return sortThreads(threads.filter((thread) => thread.pinnedAt !== null));
   }, [threads]);
 
   const filteredWorkspaceActiveThreads = useMemo(() => {
+    // Active threads exclude pinned items to support split sidebar sections.
     return sortThreads(threads.filter((thread) => thread.pinnedAt === null));
   }, [threads]);
 
@@ -518,6 +545,7 @@ export function useMainviewDerivedState({
   }, [gitHistory]);
 
   const isActiveWorktree = useCallback(
+    // Re-used across lists/items to consistently highlight active worktree.
     (projectId: number, worktreePath: string): boolean =>
       selectedProjectId === projectId &&
       activeSelectedWorktreePath === worktreePath,
@@ -525,12 +553,14 @@ export function useMainviewDerivedState({
   );
 
   const projectThreadErrorLevel = useCallback(
+    // Exposed helper for UI badges at project level.
     (projectId: number): ThreadErrorLevel =>
       projectThreadErrorLevels.get(projectId) ?? "none",
     [projectThreadErrorLevels],
   );
 
   const worktreeThreadErrorLevel = useCallback(
+    // Exposed helper for UI badges at worktree level.
     (projectId: number, worktreePath: string): ThreadErrorLevel =>
       worktreeThreadErrorLevels.get(worktreeKey(projectId, worktreePath)) ??
       "none",
