@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -21,7 +22,7 @@ function authSecretDirectory(options?: AuthSecretOptions): string {
   return options?.appDataDir ?? dirname(getAppDatabasePath());
 }
 
-function authSecretKeyPath(options?: AuthSecretOptions): string {
+export function getAuthSecretKeyPath(options?: AuthSecretOptions): string {
   return resolve(authSecretDirectory(options), AUTH_SECRET_KEY_FILE_NAME);
 }
 
@@ -62,7 +63,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   const directory = authSecretDirectory(options);
   ensureDirectory(directory);
-  const path = authSecretKeyPath(options);
+  const path = getAuthSecretKeyPath(options);
 
   if (existsSync(path)) {
     const raw = readFileSync(path, "utf8").trim();
@@ -95,6 +96,18 @@ async function importSecretKey(
     false,
     usages,
   );
+}
+
+export function deleteAuthSecretKey(options?: AuthSecretOptions): boolean {
+  /** Remove the persisted auth-secret key so a full local reset can reseed TOTP encryption cleanly. */
+  const path = getAuthSecretKeyPath(options);
+  if (!existsSync(path)) {
+    return false;
+  }
+  rmSync(path, {
+    force: true,
+  });
+  return true;
 }
 
 /**

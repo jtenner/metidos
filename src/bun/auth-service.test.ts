@@ -107,9 +107,29 @@ describe("auth service", () => {
     ).toEqual({
       authenticated: true,
       configured: true,
+      devBypass: false,
       lockedUntil: null,
       primaryFactorType: "pin",
       sessionExpiresAt: result.session.expiresAt,
+    });
+  });
+
+  it("reports dev bypass while preserving the real auth configuration state", async () => {
+    const database = createTestDatabase();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+
+    expect(
+      getAuthStatus(database, null, {
+        devBypass: true,
+        nowMs,
+      }),
+    ).toEqual({
+      authenticated: true,
+      configured: false,
+      devBypass: true,
+      lockedUntil: null,
+      primaryFactorType: null,
+      sessionExpiresAt: null,
     });
   });
 

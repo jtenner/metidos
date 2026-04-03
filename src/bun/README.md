@@ -98,10 +98,15 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `auth-service.ts`
   - Implements the backend auth flow used by upcoming HTTP routes and RPC gating.
   - Coordinates setup, login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
+  - Also reports auth status to the UI, including the explicit dev-bypass state used by local development flows.
 
 - `auth-reset.ts`
   - Implements the command-line recovery and primary-factor reset flow for single-user local installs.
   - Verifies the configured primary factor plus TOTP before regenerating recovery codes or replacing the PIN/password.
+
+- `dev-flows.ts`
+  - Parses the explicit development-only security flags (`JOLT_DEV_BYPASS=1` and `JOLT_DEV_RESET=1`).
+  - Provides the local-state reset helper that wipes the SQLite/auth-secret files and the synthetic websocket-ticket path used when auth bypass is intentionally enabled in dev mode.
 
 - `server-security.ts`
   - Centralizes local transport hardening helpers shared by the Bun entrypoints.

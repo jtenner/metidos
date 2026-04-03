@@ -442,10 +442,19 @@ export default function AuthShell({
   }, [disconnectRpcTransport, loadGateState]);
 
   if (view === "app" && status?.authenticated) {
+    const devBypassMessage = status.configured
+      ? "Stored local auth remains configured, but this session is bypassing login checks."
+      : "No local auth is configured right now. Disable JOLT_DEV_BYPASS=1 before validating the real setup/login flow.";
+
     return (
       <div className="relative h-full">
         <div className="pointer-events-none absolute right-4 top-4 z-50 flex justify-end">
           <div className="pointer-events-auto flex items-center gap-3 border border-[#22303a] bg-[#0b1115]/92 px-3 py-2 text-xs text-[#ced6dc] shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+            {status.devBypass ? (
+              <span className="border border-[#6c5134] bg-[#332111] px-2 py-1 font-label text-[10px] font-semibold tracking-[0.16em] text-[#f4c996] uppercase">
+                Dev auth bypass
+              </span>
+            ) : null}
             {sessionExpiresLabel ? (
               <span className="hidden text-[#8da3b4] md:inline">
                 Session expires {sessionExpiresLabel}
@@ -453,16 +462,30 @@ export default function AuthShell({
             ) : null}
             <button
               className="border border-[#304350] bg-[#162029] px-3 py-1.5 font-label text-[10px] font-semibold tracking-[0.16em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#1a2933]"
-              disabled={isBusy}
+              disabled={isBusy || status.devBypass}
               onClick={() => {
                 void handleLogout();
               }}
               type="button"
             >
-              {isBusy ? "Locking…" : "Lock app"}
+              {status.devBypass
+                ? "Bypass active"
+                : isBusy
+                  ? "Locking…"
+                  : "Lock app"}
             </button>
           </div>
         </div>
+        {status.devBypass ? (
+          <div className="pointer-events-none absolute left-4 top-4 z-40 max-w-md">
+            <div className="pointer-events-auto border border-[#6c5134] bg-[#20150c]/95 px-4 py-3 text-xs leading-5 text-[#f4c996] shadow-[0_12px_32px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+              <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#f6d9ac] uppercase">
+                Dev-only access path
+              </div>
+              <div className="mt-1.5">{devBypassMessage}</div>
+            </div>
+          </div>
+        ) : null}
         <App procedures={procedures} />
       </div>
     );

@@ -17,6 +17,11 @@ import {
 } from "./auth-service";
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
 import { initAppDatabase } from "./db";
+import {
+  issueDevWebSocketTicket,
+  resetLocalAppState,
+  resolveDevFlowMode,
+} from "./dev-flows";
 import { getGitSchedulerStats } from "./git";
 import {
   closeProjectProcedure,
@@ -244,6 +249,10 @@ const BACKEND_ONLY =
   process.env.JOLT_BACKEND_ONLY === "1";
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const DEV_FLOW_MODE = resolveDevFlowMode({
+  env: process.env,
+  isDevServer: IS_DEV_SERVER,
+});
 
 process.env.JOLT_PORT = String(SERVER_PORT);
 process.env.JOLT_RPC_URL = `ws://${LOOPBACK_HOSTNAME}:${SERVER_PORT}/rpc`;
@@ -559,12 +568,15 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
   const secureCookie = isSecureRequest(request);
   const sessionId = readSessionCookie(request.headers.get("cookie"));
   const nowMs = currentNowMs();
+  const getCurrentAuthStatus = () =>
+    getAuthStatus(database, sessionId, {
+      devBypass: DEV_FLOW_MODE.authBypass,
+      nowMs,
+    });
 
   try {
     if (pathname === "/auth/status" && request.method === "GET") {
-      const status = getAuthStatus(database, sessionId, {
-        nowMs,
-      });
+      const status = getCurrentAuthStatus();
       return jsonResponse(
         {
           ok: true,
@@ -580,7 +592,12 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     }
 
     if (pathname === "/auth/setup/start" && request.method === "POST") {
-      if (getAuthStatus(database, null, { nowMs }).configured) {
+      if (
+        getAuthStatus(database, null, {
+          devBypass: DEV_FLOW_MODE.authBypass,
+          nowMs,
+        }).configured
+      ) {
         throw new AuthServiceError(
           "auth_already_configured",
           "Authentication has already been configured.",
@@ -628,6 +645,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
           ok: true,
           recoveryCodes: result.recoveryCodes,
           status: getAuthStatus(database, result.session.id, {
+            devBypass: DEV_FLOW_MODE.authBypass,
             nowMs,
           }),
         },
@@ -656,6 +674,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         {
           ok: true,
           status: getAuthStatus(database, result.session.id, {
+            devBypass: DEV_FLOW_MODE.authBypass,
             nowMs,
           }),
         },
@@ -677,9 +696,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
       return jsonResponse(
         {
           ok: true,
-          status: getAuthStatus(database, null, {
-            nowMs,
-          }),
+          status: getCurrentAuthStatus(),
         },
         200,
         {
@@ -689,6 +706,13 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     }
 
     if (pathname === "/auth/ws-ticket" && request.method === "POST") {
+      if (DEV_FLOW_MODE.authBypass) {
+        return jsonResponse({
+          ok: true,
+          ticket: issueDevWebSocketTicket(nowMs),
+        });
+      }
+
       if (!sessionId) {
         throw new AuthServiceError(
           "session_required",
@@ -1402,6 +1426,17 @@ function shutdownDevWatchers(): void {
  * Start DB recovery, background listeners, and HTTP/WebSocket server bootstrap.
  */
 async function bootstrap(): Promise<void> {
+  if (DEV_FLOW_MODE.resetOnStartup) {
+    resetLocalAppState({
+      logger: console,
+    });
+  }
+  if (DEV_FLOW_MODE.authBypass) {
+    console.warn(
+      "[jolt] JOLT_DEV_BYPASS=1 is active. Auth and RPC login checks are bypassed in dev mode.",
+    );
+  }
+
   initAppDatabase();
   recoverInterruptedThreadTurnsOnStartup();
   if (!BACKEND_ONLY) {
@@ -1445,26 +1480,28 @@ async function bootstrap(): Promise<void> {
             status: 403,
           });
         }
-        const sessionId = readSessionCookie(request.headers.get("cookie"));
-        const ticketId = new URL(request.url).searchParams.get("ticket");
-        if (!sessionId || !ticketId) {
-          return new Response("Authenticated websocket ticket required", {
-            status: 401,
-          });
-        }
+        if (!DEV_FLOW_MODE.authBypass) {
+          const sessionId = readSessionCookie(request.headers.get("cookie"));
+          const ticketId = new URL(request.url).searchParams.get("ticket");
+          if (!sessionId || !ticketId) {
+            return new Response("Authenticated websocket ticket required", {
+              status: 401,
+            });
+          }
 
-        try {
-          validateAndConsumeWebSocketTicket(initAppDatabase(), {
-            nowMs: currentNowMs(),
-            sessionId,
-            ticketId,
-          });
-        } catch (error) {
-          return authErrorResponse(request, error, {
-            clearSessionCookie:
-              error instanceof AuthServiceError &&
-              error.code === "session_required",
-          });
+          try {
+            validateAndConsumeWebSocketTicket(initAppDatabase(), {
+              nowMs: currentNowMs(),
+              sessionId,
+              ticketId,
+            });
+          } catch (error) {
+            return authErrorResponse(request, error, {
+              clearSessionCookie:
+                error instanceof AuthServiceError &&
+                error.code === "session_required",
+            });
+          }
         }
 
         if (serverInstance.upgrade(request)) {

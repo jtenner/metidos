@@ -12,9 +12,6 @@
 - Authorization: keep unsafe mode available after login, but make it explicit and auditable.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Explicit Product Decisions and Phase 2. Preserve `unsafeMode` as a normal post-login Codex configuration, but clearly label it in the UI and record its use in the audit trail.
 
-- Dev flows: add explicit dev bypass and dev reset behavior.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Dev Reset Policy. Implement `JOLT_DEV_BYPASS=1` and `JOLT_DEV_RESET=1`, keep both off by default, and make dev reset wipe the full local database rather than trying to do partial auth/session cleanup.
-
 - Persistence: reduce sensitive local storage and harden app data handling.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Phase 3. Remove risky browser persistence such as unsent chat text and `pendingThreadUnsafeMode`, tighten local DB location/permissions, and eliminate or heavily restrict the temp-directory fallback.
 

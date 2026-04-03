@@ -46,6 +46,7 @@ type AuthSecretOptions = {
 };
 
 type TimestampOptions = {
+  devBypass?: boolean;
   nowMs?: number;
 };
 
@@ -86,6 +87,7 @@ type ConsumeWebSocketTicketInput = TimestampOptions & {
 type AuthStatus = {
   authenticated: boolean;
   configured: boolean;
+  devBypass: boolean;
   lockedUntil: string | null;
   primaryFactorType: AuthPrimaryFactorType | null;
   sessionExpiresAt: string | null;
@@ -360,8 +362,9 @@ export function getAuthStatus(
     : null;
 
   return {
-    authenticated: session !== null,
+    authenticated: options.devBypass === true || session !== null,
     configured: settings !== null,
+    devBypass: options.devBypass === true,
     lockedUntil: settings?.lockedUntil ?? null,
     primaryFactorType: settings?.primaryFactorType ?? null,
     sessionExpiresAt: session?.expiresAt ?? null,

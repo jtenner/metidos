@@ -7,6 +7,7 @@ type AuthErrorDetails = Record<string, string | null>;
 export type AuthStatus = {
   authenticated: boolean;
   configured: boolean;
+  devBypass: boolean;
   lockedUntil: string | null;
   primaryFactorType: AuthPrimaryFactorType | null;
   sessionExpiresAt: string | null;

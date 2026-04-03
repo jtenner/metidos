@@ -217,6 +217,10 @@ const TEMP_APP_DATA_DIR = join(tmpdir(), APP_NAME);
 /** Cached app-data directory path resolved for this process. */
 let resolvedAppDataDir: string | null = null;
 
+export type AppDataPathOptions = {
+  appDataDir?: string;
+};
+
 /** Execute a SQL statement with optional positional bindings. */
 function runStatement(
   database: Database,
@@ -627,9 +631,26 @@ export function migrateDatabase(db: Database): void {
   );
 }
 
-export function getAppDatabasePath(): string {
+export function getAppDatabasePath(options?: AppDataPathOptions): string {
   /** Full path to the SQLite file in the resolved application data directory. */
-  return resolve(resolveAppDataDirectory(), DB_FILE_NAME);
+  return resolve(
+    options?.appDataDir ?? resolveAppDataDirectory(),
+    DB_FILE_NAME,
+  );
+}
+
+export function closeAppDatabase(): void {
+  /** Close the singleton database handle so maintenance/reset flows can remove the file safely. */
+  if (!appDatabase) {
+    return;
+  }
+  appDatabase.close(false);
+  appDatabase = null;
+}
+
+export function resetResolvedAppDataDirectory(): void {
+  /** Clear the cached app-data path so follow-up operations re-resolve it from env/defaults. */
+  resolvedAppDataDir = null;
 }
 
 /**
