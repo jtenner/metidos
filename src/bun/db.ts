@@ -361,6 +361,10 @@ function resolveAppDataDirectory(): string {
   return resolvedAppDataDir;
 }
 
+export function getAppDataDirectoryPath(options?: AppDataPathOptions): string {
+  return options?.appDataDir ?? resolveAppDataDirectory();
+}
+
 function applyAppDatabasePermissions(dbPath: string): void {
   if (existsSync(dbPath)) {
     applyOwnerOnlyFilePermissions(dbPath);
@@ -728,10 +732,7 @@ export function migrateDatabase(db: Database): void {
 
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
   /** Full path to the SQLite file in the resolved application data directory. */
-  return resolve(
-    options?.appDataDir ?? resolveAppDataDirectory(),
-    DB_FILE_NAME,
-  );
+  return resolve(getAppDataDirectoryPath(options), DB_FILE_NAME);
 }
 
 export function closeAppDatabase(): void {

@@ -2,6 +2,11 @@ import { resolve } from "node:path";
 
 import { buildMainviewBundle } from "./build-mainview";
 import { buildLivenessPayload, LOOPBACK_HOSTNAME } from "./server-security";
+import {
+  formatLoopbackHttpOrigin,
+  formatLoopbackWebSocketUrl,
+  resolveTlsRuntimeConfig,
+} from "./tls-config";
 
 // Runtime defaults and well-known paths used by the local static server.
 const DEFAULT_PUBLIC_PORT = "7599";
@@ -31,6 +36,8 @@ type RuntimeConfig = {
   healthUrl: string;
   rpcWebSocketUrl: string;
 };
+
+type BackendFetchTlsOptions = NonNullable<BunFetchRequestInit["tls"]>;
 
 /**
  * Returns true when a CLI string value is an unsigned decimal integer.
@@ -118,19 +125,6 @@ function fileResponse(path: string, contentType: string): Response {
 }
 
 /**
- * Converts an HTTP origin URL into a WebSocket URL targeting `/rpc`,
- * preserving host/port and selecting `ws` vs `wss` by request scheme.
- */
-function websocketUrlFromOrigin(origin: string): string {
-  const url = new URL(origin);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = "/rpc";
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
-/**
  * Builds the application HTML response by injecting runtime state and inline CSS if the
  * CSS asset exists on disk.
  */
@@ -159,6 +153,7 @@ async function buildHtmlResponse(
  */
 async function readBackendHealthSnapshot(
   backendHealthUrl: string,
+  tlsOptions?: BackendFetchTlsOptions,
 ): Promise<boolean> {
   const controller = new AbortController();
   // Use AbortController so a stalled backend does not block /health forever.
@@ -170,6 +165,11 @@ async function readBackendHealthSnapshot(
     const response = await fetch(backendHealthUrl, {
       cache: "no-store",
       signal: controller.signal,
+      ...(tlsOptions
+        ? {
+            tls: tlsOptions,
+          }
+        : {}),
     });
     const rawText = await response.text();
     let body: unknown = rawText;
@@ -196,6 +196,11 @@ async function readBackendHealthSnapshot(
 
 // Top-level CLI parsing and environment-derived defaults for all static-server ports/URLs.
 const SERVER_ARGS = Bun.argv.slice(2);
+const IS_DEV_SERVER =
+  SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  isDevServer: IS_DEV_SERVER,
+});
 const PUBLIC_PORT = resolvePort(
   SERVER_ARGS,
   "--port",
@@ -209,11 +214,20 @@ const RPC_PORT = resolvePort(
   String(PUBLIC_PORT + 1),
 );
 const RPC_HTTP_ORIGIN =
-  process.env.JOLT_RPC_HTTP_ORIGIN?.trim() || `http://127.0.0.1:${RPC_PORT}`;
+  process.env.JOLT_RPC_HTTP_ORIGIN?.trim() ||
+  formatLoopbackHttpOrigin(RPC_PORT, TLS_RUNTIME.enabled);
 const RPC_WEBSOCKET_URL =
-  process.env.JOLT_RPC_URL?.trim() || websocketUrlFromOrigin(RPC_HTTP_ORIGIN);
+  process.env.JOLT_RPC_URL?.trim() ||
+  formatLoopbackWebSocketUrl(RPC_PORT, TLS_RUNTIME.enabled);
 const BACKEND_HEALTH_URL =
   process.env.JOLT_RPC_HEALTH_URL?.trim() || `${RPC_HTTP_ORIGIN}/health`;
+const RPC_CA_PATH = process.env.JOLT_RPC_CA_PATH?.trim() || TLS_RUNTIME.caPath;
+const BACKEND_FETCH_TLS: BackendFetchTlsOptions | undefined =
+  new URL(RPC_HTTP_ORIGIN).protocol === "https:" && RPC_CA_PATH
+    ? {
+        ca: Bun.file(RPC_CA_PATH),
+      }
+    : undefined;
 
 async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   const requestUrl = new URL(request.url);
@@ -226,9 +240,14 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   headers.set("x-forwarded-proto", requestUrl.protocol.replace(":", ""));
 
   const method = request.method.toUpperCase();
-  const init: RequestInit = {
+  const init: BunFetchRequestInit = {
     headers,
     method,
+    ...(BACKEND_FETCH_TLS
+      ? {
+          tls: BACKEND_FETCH_TLS,
+        }
+      : {}),
   };
   if (method !== "GET" && method !== "HEAD") {
     init.body = await request.arrayBuffer();
@@ -243,7 +262,7 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
 
 const mainviewBundlePath = await buildMainviewBundle();
 const runtimeConfig: RuntimeConfig = {
-  devServer: false,
+  devServer: IS_DEV_SERVER,
   healthUrl: "/health",
   rpcWebSocketUrl: RPC_WEBSOCKET_URL,
 };
@@ -254,6 +273,11 @@ server = Bun.serve({
   hostname: LOOPBACK_HOSTNAME,
   idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   port: PUBLIC_PORT,
+  ...(TLS_RUNTIME.tlsOptions
+    ? {
+        tls: TLS_RUNTIME.tlsOptions,
+      }
+    : {}),
   async fetch(request): Promise<Response> {
     // Route only what the frontend requires and leave unknown paths as 404.
     const { pathname } = new URL(request.url);
@@ -302,7 +326,10 @@ server = Bun.serve({
     }
 
     if (pathname === "/health") {
-      const backendOk = await readBackendHealthSnapshot(BACKEND_HEALTH_URL);
+      const backendOk = await readBackendHealthSnapshot(
+        BACKEND_HEALTH_URL,
+        BACKEND_FETCH_TLS,
+      );
       return stringResponse(
         JSON.stringify(buildLivenessPayload(backendOk)),
         "application/json; charset=utf-8",
@@ -315,7 +342,7 @@ server = Bun.serve({
 });
 
 console.log(
-  `Jolt static server listening on http://localhost:${server.port} (RPC ${RPC_WEBSOCKET_URL})`,
+  `Jolt static server listening on ${TLS_RUNTIME.httpProtocol}://localhost:${server.port} (RPC ${RPC_WEBSOCKET_URL})`,
 );
 
 /**

@@ -277,6 +277,11 @@ Acceptance criteria:
 - no project or runtime data is returned before login
 - production mode uses HTTPS/WSS only
 
+Implementation note:
+
+- The current implementation uses per-user default loopback certificate paths under the app-data directory plus `bun run tls:bootstrap` for guided certificate generation.
+- `mkcert` is the preferred bootstrap path because it can install a locally trusted root CA; OpenSSL remains a fallback generator for environments where `mkcert` is unavailable.
+
 ## Phase 2: Authorization And Privilege Separation
 
 Goal: split ordinary usage from dangerous execution.
@@ -460,6 +465,7 @@ Policy should be strict:
 - non-loopback mode: HTTPS/WSS mandatory
 - provide an easy guided TLS setup path on all supported platforms
 - prefer a Codex-assisted guided bootstrap for TLS setup where feasible
+- the current implementation exposes that guided bootstrap as `bun run tls:bootstrap`, which is suitable for Codex-assisted local setup flows
 
 ## UI and UX plan
 

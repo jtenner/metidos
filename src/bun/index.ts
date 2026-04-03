@@ -91,6 +91,11 @@ import {
   LOOPBACK_HOSTNAME,
   parseAllowedBrowserOrigins,
 } from "./server-security";
+import {
+  formatLoopbackHttpOrigin,
+  formatLoopbackWebSocketUrl,
+  resolveTlsRuntimeConfig,
+} from "./tls-config";
 
 const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
@@ -259,13 +264,23 @@ const BACKEND_ONLY =
   process.env.JOLT_BACKEND_ONLY === "1";
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  isDevServer: IS_DEV_SERVER,
+});
 const DEV_FLOW_MODE = resolveDevFlowMode({
   env: process.env,
   isDevServer: IS_DEV_SERVER,
 });
 
 process.env.JOLT_PORT = String(SERVER_PORT);
-process.env.JOLT_RPC_URL = `ws://${LOOPBACK_HOSTNAME}:${SERVER_PORT}/rpc`;
+process.env.JOLT_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(
+  SERVER_PORT,
+  TLS_RUNTIME.enabled,
+);
+process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(
+  SERVER_PORT,
+  TLS_RUNTIME.enabled,
+);
 
 const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
@@ -1551,6 +1566,11 @@ async function bootstrap(): Promise<void> {
   const serverOptions = {
     hostname: LOOPBACK_HOSTNAME,
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
+    ...(TLS_RUNTIME.tlsOptions
+      ? {
+          tls: TLS_RUNTIME.tlsOptions,
+        }
+      : {}),
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 
@@ -1791,15 +1811,15 @@ async function bootstrap(): Promise<void> {
     });
     activeServerPort = server.port ?? activeServerPort;
     console.warn(
-      `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
+      `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to ${TLS_RUNTIME.httpProtocol}://localhost:${server.port ?? activeServerPort}.`,
     );
   }
   activeServerPort = server.port ?? activeServerPort;
 
   console.log(
     BACKEND_ONLY
-      ? `Jolt RPC backend listening on http://localhost:${server.port}`
-      : `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
+      ? `Jolt RPC backend listening on ${TLS_RUNTIME.httpProtocol}://localhost:${server.port}`
+      : `Jolt web app listening on ${TLS_RUNTIME.httpProtocol}://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
   );
 
   setTimeout(() => {

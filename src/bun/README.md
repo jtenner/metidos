@@ -7,7 +7,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `index.ts`
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
-  - Exposes HTTP routes for mainview assets and websocket RPC at `/rpc`.
+  - Exposes HTTP/HTTPS routes for mainview assets and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
 
@@ -16,12 +16,20 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Serves bundled frontend assets (`index.html`, `index.js`, `index.css`, fonts) and injects runtime config via `window.__joltRuntime`.
   - Proxies `/auth/*` requests to the backend so browser auth flows stay same-origin even when the UI and RPC server are split across ports.
   - Includes a minimal `/health` endpoint that reports only liveness and proxies backend readiness without exposing backend internals.
-  - Resolves and validates CLI args/env values for public and RPC ports.
+  - Resolves and validates CLI args/env values for public/RPC ports and internal TLS CA configuration.
 
 - `isolated-server.ts`
   - Launches two child processes (backend and static server) as separate roles with isolated env and ports.
   - Handles cross-process lifecycle and coordinated shutdown when either child exits unexpectedly.
   - Useful for local developer workflows where frontend and backend separation is desired.
+
+- `tls-config.ts`
+  - Resolves the runtime TLS policy shared across monolith and isolated entrypoints.
+  - Picks the per-user default certificate/key/CA paths, enforces production TLS requirements, and normalizes the active HTTP/WSS protocol set.
+
+- `tls-bootstrap.ts`
+  - Implements the guided loopback TLS bootstrap flow exposed by `bun run tls:bootstrap`.
+  - Prefers `mkcert` for locally trusted certificates, falls back to OpenSSL generation, and stores certificate material in the per-user app-data directory.
 
 - `build-mainview.ts`
   - Centralized Bun bundling entry for the React frontend.
@@ -125,3 +133,4 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `src/bun/project-procedures` still has a separate README task in `agent-todo.md` so nested procedures can be documented in more depth later.
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
+- Production startup now expects loopback TLS files to exist; use `bun run tls:bootstrap --trust` on new installs before `bun run start` or `bun run start:monolith`.

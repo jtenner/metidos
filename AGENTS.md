@@ -97,7 +97,11 @@
 │  │  ├─ server-security.test.ts
 │  │  ├─ server-security.ts
 │  │  ├─ static-server.ts
-│  │  └─ starvation-harness.ts
+│  │  ├─ starvation-harness.ts
+│  │  ├─ tls-bootstrap.test.ts
+│  │  ├─ tls-bootstrap.ts
+│  │  ├─ tls-config.test.ts
+│  │  └─ tls-config.ts
 │  └─ mainview/
 │     ├─ README.md
 │     ├─ App.tsx

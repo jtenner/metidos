@@ -1,5 +1,11 @@
 import { resolve } from "node:path";
 
+import {
+  formatLoopbackHttpOrigin,
+  formatLoopbackWebSocketUrl,
+  resolveTlsRuntimeConfig,
+} from "./tls-config";
+
 /**
  * Default port for the public static server when no CLI/env override is provided.
  */
@@ -92,6 +98,11 @@ function spawnRole(
  * Parse startup args once and calculate both ports before any subprocess starts.
  */
 const SERVER_ARGS = Bun.argv.slice(2);
+const IS_DEV_SERVER =
+  SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+const TLS_RUNTIME = resolveTlsRuntimeConfig({
+  isDevServer: IS_DEV_SERVER,
+});
 /**
  * Public port supports either --port/CLI, JOLT_PUBLIC_PORT/JOLT_PORT, then default.
  */
@@ -122,8 +133,11 @@ const staticEntry = resolve(process.cwd(), "src/bun/static-server.ts");
 /**
  * Origin/URL pair used by the static server for health checks and websocket client.
  */
-const rpcHttpOrigin = `http://127.0.0.1:${RPC_PORT}`;
-const rpcWebSocketUrl = `ws://127.0.0.1:${RPC_PORT}/rpc`;
+const rpcHttpOrigin = formatLoopbackHttpOrigin(RPC_PORT, TLS_RUNTIME.enabled);
+const rpcWebSocketUrl = formatLoopbackWebSocketUrl(
+  RPC_PORT,
+  TLS_RUNTIME.enabled,
+);
 
 /**
  * Launch the API/backend process first; it becomes the RPC service dependency
@@ -140,7 +154,9 @@ const backend = spawnRole(
       `https://localhost:${PUBLIC_PORT}`,
     ].join(","),
     JOLT_BACKEND_ONLY: "1",
+    JOLT_DEV: IS_DEV_SERVER ? "1" : process.env.JOLT_DEV || "",
     JOLT_PORT: String(RPC_PORT),
+    JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_URL: rpcWebSocketUrl,
   },
 );
@@ -151,7 +167,9 @@ const staticServer = spawnRole(
   "static",
   [staticEntry, "--port", String(PUBLIC_PORT), "--rpc-port", String(RPC_PORT)],
   {
+    JOLT_DEV: IS_DEV_SERVER ? "1" : process.env.JOLT_DEV || "",
     JOLT_PUBLIC_PORT: String(PUBLIC_PORT),
+    JOLT_RPC_CA_PATH: TLS_RUNTIME.caPath ?? "",
     JOLT_RPC_HEALTH_URL: `${rpcHttpOrigin}/health`,
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_PORT: String(RPC_PORT),
@@ -160,7 +178,7 @@ const staticServer = spawnRole(
 );
 
 console.log(
-  `Jolt isolated server listening on http://localhost:${PUBLIC_PORT} with RPC backend http://localhost:${RPC_PORT}`,
+  `Jolt isolated server listening on ${TLS_RUNTIME.httpProtocol}://localhost:${PUBLIC_PORT} with RPC backend ${rpcHttpOrigin}`,
 );
 
 let shuttingDown = false;

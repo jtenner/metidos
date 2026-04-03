@@ -32,7 +32,7 @@ flowchart TD
 
   %% transport boundary
   subgraph Transport["UI <-> backend transport"]
-    WS["ws://.../rpc\n- bidirectional request/response\n- timeout + cancellation + backoff"]
+    WS["ws(s)://.../rpc\n- bidirectional request/response\n- timeout + cancellation + backoff"]
   end
 
   %% Backend process host
@@ -97,9 +97,10 @@ flowchart TD
 
 1. **Startup**
    - `bun run src/bun/index.ts` (or `bun run start:monolith`) boots the server.
+   - Outside dev mode, startup now requires loopback TLS material; run `bun run tls:bootstrap --trust` first on a fresh machine.
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets (`index.html`, css, fonts)
-     - `ws://.../rpc` for bidirectional UI/backend calls
+     - `ws(s)://.../rpc` for bidirectional UI/backend calls
      - event-driven push updates for tasks/history changes
    - Runtime config is injected so the frontend connects back to the correct RPC endpoint.
 
@@ -164,6 +165,7 @@ bun run build:dev             # install + build mainview bundle
 bun run validate              # biome format check + typecheck
 bun run format                # auto-format with biome
 bun run typecheck             # TypeScript check
+bun run tls:bootstrap         # create default loopback TLS files under the per-user app-data dir
 bun run harness:starvation    # run starvation harness utility
 ```
 
@@ -172,6 +174,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--port` / `-p` or `JOLT_PORT` for custom server port selection.
 - `--backend-only` or `JOLT_BACKEND_ONLY=1` to restrict backend mode.
 - `--dev` or `JOLT_DEV=1` for development reconnect behavior and refresh hooks.
+- `JOLT_TLS_CERT_PATH`, `JOLT_TLS_KEY_PATH`, and optional `JOLT_TLS_CA_PATH` to override the default loopback TLS material.
 
 ## Data and performance characteristics
 
