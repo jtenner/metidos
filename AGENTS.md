@@ -79,6 +79,7 @@
 │  │  ├─ static-server.ts
 │  │  └─ starvation-harness.ts
 │  └─ mainview/
+│     ├─ README.md
 │     ├─ App.tsx
 │     ├─ app/
 │     │  ├─ action-menus.tsx
