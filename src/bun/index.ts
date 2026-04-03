@@ -151,6 +151,11 @@ type RpcRequestHandlerMap = {
   ) => Promise<RpcRequestMap[K]["response"]>;
 };
 
+/** Indicates whether a string can be safely parsed as a decimal port number. */
+function isStringInteger(value: string): boolean {
+  return /^\d+$/.test(value);
+}
+
 type PendingRpcRequest = {
   controller: AbortController;
   signal: AbortSignal;
@@ -158,10 +163,10 @@ type PendingRpcRequest = {
   canceledByClient: boolean;
 };
 
-function isStringInteger(value: string): boolean {
-  return /^\d+$/.test(value);
-}
-
+/**
+ * Resolve an explicit --port/-p override from process args.
+ * Supports --port 3000, -p 3000, --port=3000, and -p=3000.
+ */
 function readCliPort(args: string[]): string | null {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -186,6 +191,10 @@ function readCliPort(args: string[]): string | null {
   return null;
 }
 
+/**
+ * Resolve and validate server port from CLI arguments and optional env value.
+ * @throws if port is non-numeric or outside 1..65535.
+ */
 function resolveServerPort(args: string[], envPort?: string): number {
   const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
   if (!isStringInteger(configuredPort)) {
@@ -302,6 +311,9 @@ function stringResponse(body: string, contentType: string): Response {
   });
 }
 
+/**
+ * Build a file-backed HTTP response with explicit no-cache header.
+ */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
     headers: {
@@ -311,6 +323,9 @@ function fileResponse(path: string, contentType: string): Response {
   });
 }
 
+/**
+ * Track active RPC requests globally and capture peak concurrency.
+ */
 function incrementPendingRpcRequestCount(): void {
   pendingRpcRequestCount += 1;
   peakPendingRpcRequestCount = Math.max(
@@ -319,10 +334,16 @@ function incrementPendingRpcRequestCount(): void {
   );
 }
 
+/**
+ * Lower pending RPC request count safely without underflow.
+ */
 function decrementPendingRpcRequestCount(count = 1): void {
   pendingRpcRequestCount = Math.max(0, pendingRpcRequestCount - count);
 }
 
+/**
+ * Create a diagnostic snapshot used for `/health` and overload warning logs.
+ */
 function buildServerHealthSnapshot(activeServerPort: number): {
   backendOnly: boolean;
   devServer: boolean;
@@ -362,6 +383,9 @@ function buildServerHealthSnapshot(activeServerPort: number): {
   };
 }
 
+/**
+ * Periodically emit overload telemetry for backlog and event loop lag conditions.
+ */
 function startOverloadMonitoring(activeServerPort: () => number): void {
   if (overloadMonitorTimer) {
     return;
@@ -374,6 +398,7 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
     peakEventLoopLagMs = Math.max(peakEventLoopLagMs, lastEventLoopLagMs);
     expectedAt = now + SERVER_MONITOR_INTERVAL_MS;
 
+    // Sample health at each tick and compare against lag/pending thresholds.
     const health = buildServerHealthSnapshot(activeServerPort());
     const hasPressure =
       health.eventLoopLagMs.current >= EVENT_LOOP_LAG_WARN_MS ||
@@ -390,6 +415,7 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
     }
 
     const nowMs = Date.now();
+    // Throttle repeated overload logs so a spike doesn't drown the console.
     if (nowMs - lastOverloadLogAt < SERVER_OVERLOAD_LOG_INTERVAL_MS) {
       return;
     }
@@ -398,6 +424,9 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
   }, SERVER_MONITOR_INTERVAL_MS);
 }
 
+/**
+ * Detect port binding collisions without relying on a concrete error class.
+ */
 function isAddressInUseError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -407,6 +436,9 @@ function isAddressInUseError(error: unknown): boolean {
   );
 }
 
+/**
+ * Render the HTML entrypoint and inject runtime flags.
+ */
 async function htmlResponse(): Promise<Response> {
   const cssFile = Bun.file(MAINVIEW_CSS_PATH);
   const inlineCss = (await cssFile.exists())
@@ -426,7 +458,11 @@ async function htmlResponse(): Promise<Response> {
   return stringResponse(html, "text/html; charset=utf-8");
 }
 
+/**
+ * Parse and validate inbound websocket request messages.
+ */
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
+  // Parse first, then validate shape so runtime schema errors are surfaced consistently.
   const parsed = JSON.parse(raw) as Partial<RpcRequestMessage>;
   if (
     parsed.type !== "request" ||
@@ -449,6 +485,9 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
   };
 }
 
+/**
+ * Parse either a request or cancel message from a websocket payload.
+ */
 function parseRpcClientMessage(raw: string): RpcClientMessage {
   const parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
   if (parsed.type === "cancel" && typeof parsed.id === "number") {
@@ -460,6 +499,9 @@ function parseRpcClientMessage(raw: string): RpcClientMessage {
   return parseRpcRequestMessage(raw);
 }
 
+/**
+ * Convert exceptions into user-facing string payloads.
+ */
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -467,6 +509,9 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 
+/**
+ * Build cancellation `Error` with causal metadata while preserving names.
+ */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
     return reason;
@@ -486,6 +531,9 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
   return error;
 }
 
+/**
+ * Distinguish timeout/cancel style abort errors.
+ */
 function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -493,6 +541,9 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Coerce raw timeout values into normalized positive integers.
+ */
 function normalizeTimeoutMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return null;
@@ -500,6 +551,9 @@ function normalizeTimeoutMs(value: unknown): number | null {
   return Math.max(1, Math.floor(value));
 }
 
+/**
+ * Normalize unknown priorities to a valid RPC priority enum value.
+ */
 function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
   if (value === "background" || value === "default" || value === "foreground") {
     return value;
@@ -507,6 +561,9 @@ function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
   return "default";
 }
 
+/**
+ * Return (or create) a per-client map for pending RPC operations.
+ */
 function getPendingRpcRequests(
   client: ServerWebSocket<unknown>,
 ): Map<number, PendingRpcRequest> {
@@ -520,6 +577,9 @@ function getPendingRpcRequests(
   return created;
 }
 
+/**
+ * Cancel one request for a client when a matching cancel packet arrives.
+ */
 function abortPendingRpcRequest(
   client: ServerWebSocket<unknown>,
   requestId: number,
@@ -539,6 +599,9 @@ function abortPendingRpcRequest(
   );
 }
 
+/**
+ * Abort all outstanding requests for a socket (cleanup on disconnect/error paths).
+ */
 function abortAllPendingRpcRequests(
   client: ServerWebSocket<unknown>,
   reason: string,
@@ -557,6 +620,9 @@ function abortAllPendingRpcRequests(
   pendingRpcRequestsByClient.delete(client);
 }
 
+/**
+ * Await request completion while short-circuiting on abort/timeout signal events.
+ */
 async function awaitRequestResult<T>(
   promise: Promise<T>,
   signal: AbortSignal,
@@ -586,12 +652,18 @@ async function awaitRequestResult<T>(
   });
 }
 
+/**
+ * Normalize raw websocket data to a string payload.
+ */
 function parseRawSocketMessage(rawMessage: string | Buffer): string {
   return typeof rawMessage === "string"
     ? rawMessage
     : Buffer.from(rawMessage).toString("utf8");
 }
 
+/**
+ * Create an abort controller and optionally attach timeout behavior.
+ */
 function buildRequestSignal(timeoutMs: number | null): {
   controller: AbortController;
   signal: AbortSignal;
@@ -613,6 +685,9 @@ function buildRequestSignal(timeoutMs: number | null): {
   };
 }
 
+/**
+ * Check whether an abort signal came from timeout signal expiry.
+ */
 function isTimeoutAbort(signal: AbortSignal): boolean {
   return (
     signal.reason instanceof DOMException &&
@@ -620,6 +695,9 @@ function isTimeoutAbort(signal: AbortSignal): boolean {
   );
 }
 
+/**
+ * Convert aborted execution into a user-facing RPC timeout message when appropriate.
+ */
 function toRpcAbortMessage(
   request: RpcRequestMessage,
   pending: PendingRpcRequest,
@@ -631,6 +709,9 @@ function toRpcAbortMessage(
   return toErrorMessage(error);
 }
 
+/**
+ * Queue/reuse rebuilds for mainview bundle so rapid file edits only rebuild once.
+ */
 function queueMainviewBundleBuild(): Promise<string> {
   if (mainviewBuildPromise) {
     mainviewRebuildQueued = true;
@@ -653,6 +734,9 @@ function queueMainviewBundleBuild(): Promise<string> {
   return mainviewBuildPromise;
 }
 
+/**
+ * Broadcast a dev reload event to connected clients (frontend hot reload path).
+ */
 function broadcastReload(reason: string): void {
   if (!IS_DEV_SERVER || rpcClients.size === 0) {
     return;
@@ -672,6 +756,9 @@ function broadcastReload(reason: string): void {
   }
 }
 
+/**
+ * Broadcast that a worktree task list changed.
+ */
 function broadcastTasksChanged(projectId: number, worktreePath: string): void {
   if (rpcClients.size === 0) {
     return;
@@ -692,6 +779,9 @@ function broadcastTasksChanged(projectId: number, worktreePath: string): void {
   }
 }
 
+/**
+ * Broadcast that git history changed for a tracked worktree.
+ */
 function broadcastGitHistoryChanged(
   projectId: number,
   worktreePath: string,
@@ -715,6 +805,9 @@ function broadcastGitHistoryChanged(
   }
 }
 
+/**
+ * Broadcast that a background thread start request was created.
+ */
 function broadcastThreadStartRequestCreated(
   request: RpcThreadStartRequest,
 ): void {
@@ -746,6 +839,9 @@ function normalizeWatchFilename(filename?: string | Buffer | null): string {
   return "";
 }
 
+/**
+ * Flush pending file change events and decide whether to rebuild or just reload assets.
+ */
 function flushPendingMainviewReloads(): void {
   pendingMainviewReloadTimer = null;
   const changedFiles = [...pendingMainviewChanges].map((entry) =>
@@ -782,6 +878,9 @@ function flushPendingMainviewReloads(): void {
   })();
 }
 
+/**
+ * Debounce file change reload notifications to reduce event fan-out.
+ */
 function enqueueMainviewReload(filename?: string | Buffer | null): void {
   const normalizedFilename = normalizeWatchFilename(filename);
   pendingMainviewChanges.add(normalizedFilename);
@@ -795,6 +894,9 @@ function enqueueMainviewReload(filename?: string | Buffer | null): void {
   );
 }
 
+/**
+ * Read mainview directory mtimes and return a normalized path->mtime map.
+ */
 function readMainviewFileStamps(): Map<string, number> {
   const nextStamps = new Map<string, number>();
   const visitedRealPaths = new Set<string>();
@@ -847,6 +949,9 @@ function readMainviewFileStamps(): Map<string, number> {
   return nextStamps;
 }
 
+/**
+ * Start polling-based file watching in dev mode and enqueue debounced reloads on drift.
+ */
 function startDevMainviewWatcher(): void {
   if (!IS_DEV_SERVER || devMainviewPollTimer) {
     return;
@@ -870,6 +975,9 @@ function startDevMainviewWatcher(): void {
   }, MAINVIEW_WATCH_INTERVAL_MS);
 }
 
+/**
+ * Stop active polling/reload timers and clear pending file state.
+ */
 function shutdownDevWatchers(): void {
   if (devMainviewPollTimer) {
     clearInterval(devMainviewPollTimer);
@@ -884,6 +992,9 @@ function shutdownDevWatchers(): void {
   pendingMainviewChanges.clear();
 }
 
+/**
+ * Start DB recovery, background listeners, and HTTP/WebSocket server bootstrap.
+ */
 async function bootstrap(): Promise<void> {
   initAppDatabase();
   recoverInterruptedThreadTurnsOnStartup();
@@ -906,6 +1017,7 @@ async function bootstrap(): Promise<void> {
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 
+      // Upgrade websocket requests before falling through to HTTP routes.
       if (pathname === "/rpc") {
         if (serverInstance.upgrade(request)) {
           return;
@@ -972,6 +1084,7 @@ async function bootstrap(): Promise<void> {
           const payload = parseRawSocketMessage(rawMessage);
           let requestId = -1;
           try {
+            // Each websocket message is treated as either cancel or request and resolved independently.
             const message = parseRpcClientMessage(payload);
             if (message.type === "cancel") {
               abortPendingRpcRequest(ws, message.id);
@@ -1069,6 +1182,7 @@ async function bootstrap(): Promise<void> {
 
   let server: ReturnType<typeof Bun.serve>;
   try {
+    // Preferred port first; in dev, gracefully fallback when occupied.
     server = Bun.serve({
       ...serverOptions,
       port: SERVER_PORT,
@@ -1106,6 +1220,9 @@ async function bootstrap(): Promise<void> {
 
 let shutdownPromise: Promise<void> | null = null;
 
+/**
+ * Run coordinated shutdown steps once, then exit with the requested process code.
+ */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shutdownPromise) {
     process.exit(exitCode);
