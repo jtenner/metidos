@@ -12,6 +12,9 @@ import type {
   RpcWorktreeSnapshot,
 } from "../../bun/rpc-schema";
 
+/**
+ * Base chat-render payload shared by every visible row type.
+ */
 type VisibleMessageBase = {
   key: string;
 };
@@ -61,6 +64,9 @@ export type VisibleMessage =
       state: "in_progress" | "completed" | "stopped";
     });
 
+/**
+ * Grouped conversation rows used by the thread message list.
+ */
 export type MessageGroup =
   | {
       kind: "assistant";
@@ -73,6 +79,9 @@ export type MessageGroup =
       text: string;
     };
 
+/**
+ * Modal state for the git history diff viewer tied to one worktree entry.
+ */
 export type GitHistoryModalState = {
   projectId: number;
   worktreePath: string;
@@ -82,11 +91,17 @@ export type GitHistoryModalState = {
   error: string;
 };
 
+/**
+ * Cached git history diff payload keyed by commit for quick reopening.
+ */
 export type GitHistoryDiffCacheEntry = {
   commit: RpcGitHistoryEntry;
   diffText: string;
 };
 
+/**
+ * In-memory tree state for a single project and its worktrees.
+ */
 export type ProjectNodeState = {
   worktrees: RpcWorktree[];
   loadingWorktrees: boolean;
@@ -94,6 +109,9 @@ export type ProjectNodeState = {
   openWorktrees: Set<string>;
 };
 
+/**
+ * In-memory state for a single worktree row and snapshot loading.
+ */
 export type WorktreeNodeState = {
   loading: boolean;
   opened: boolean;
@@ -104,26 +122,41 @@ export type WorktreeNodeState = {
 export type ProjectStateMap = Record<number, ProjectNodeState>;
 export type WorktreeStateMap = Record<string, WorktreeNodeState>;
 
+/**
+ * UI anchor for project context menu rendering.
+ */
 export type ProjectActionMenuState = {
   projectId: number;
   x: number;
   y: number;
 };
 
+/**
+ * Context-menu coordinates for a single thread row action menu.
+ */
 export type ThreadActionMenuState = {
   threadId: number;
   x: number;
   y: number;
 };
 
+/**
+ * Coarser-grain thread health classification used for badges and ordering.
+ */
 export type ThreadErrorLevel = "none" | "stopped" | "failed" | "unread";
 
+/**
+ * Thread summary shown in warning/error popovers.
+ */
 export type ThreadErrorPreview = {
   level: ThreadErrorLevel;
   text: string;
   updatedAt: string;
 };
 
+/**
+ * Popover payload for inline thread warning/error text.
+ */
 export type ErrorPreviewPopoverState = {
   anchorId: string;
   text: string;
@@ -131,6 +164,9 @@ export type ErrorPreviewPopoverState = {
   y: number;
 };
 
+/**
+ * Popover payload for thread summary content display.
+ */
 export type ThreadSummaryPopoverState = {
   anchorId: string;
   title: string;
@@ -139,11 +175,17 @@ export type ThreadSummaryPopoverState = {
   y: number;
 };
 
+/**
+ * Persisted tuple describing an expanded/open worktree.
+ */
 export type PersistedOpenWorktree = {
   projectId: number;
   worktreePath: string;
 };
 
+/**
+ * Persisted global UI state for selected project/worktree/thread and composer inputs.
+ */
 export type PersistedMainviewState = {
   version: number;
   selectedProjectId: number | null;
@@ -158,6 +200,9 @@ export type PersistedMainviewState = {
   openWorktrees: PersistedOpenWorktree[];
 };
 
+/**
+ * Persisted sidebar expansion state for all left-tree sections.
+ */
 export type PersistedTreeViewState = {
   version: number;
   workspaceSectionOpen: boolean;
@@ -168,17 +213,26 @@ export type PersistedTreeViewState = {
   openProjectPaths: string[];
 };
 
+/**
+ * Cached directory suggestions for filesystem path autocomplete.
+ */
 export type DirectorySuggestionResultCacheEntry = {
   directories: string[];
   loadedAt: number;
 };
 
+/**
+ * Internal tracker for a deduplicated async request and its waiting consumers.
+ */
 export type PendingSharedRequest<T> = {
   controller: AbortController;
   promise: Promise<T>;
   waiterCount: number;
 };
 
+/**
+ * Optional details used when opening a thread and validating selection.
+ */
 export type OpenThreadOptions = {
   detailPromise?: Promise<RpcThreadDetail> | null;
   selectionGuard?: {
@@ -188,13 +242,22 @@ export type OpenThreadOptions = {
 };
 
 export const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
+/**
+ * Notifies subscribers when worktree task metadata changed.
+ */
 export const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
   "jolt:worktree-git-history-changed";
 export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "jolt:thread-start-request-created";
+/**
+ * Delay before firing directory suggestion network calls to avoid noisy typing.
+ */
 export const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;
+/**
+ * Git history pagination/window constants used by list rendering and requests.
+ */
 export const GIT_HISTORY_PAGE_SIZE = 20;
 export const GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES = 8;
 export const PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES = 8;
@@ -221,6 +284,9 @@ const CODEX_REASONING_EFFORT_VALUES: RpcCodexReasoningEffort[] = [
   "xhigh",
 ];
 
+/**
+ * Read-most-recently-used helper for cache access.
+ */
 export function readLruValue<Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
@@ -239,6 +305,9 @@ export function readLruValue<Key, Value>(
   return value;
 }
 
+/**
+ * Write to an LRU-style cache and evict oldest keys when capacity is exceeded.
+ */
 export function writeLruValue<Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
@@ -259,6 +328,9 @@ export function writeLruValue<Key, Value>(
   }
 }
 
+/**
+ * Normalize cancellation errors into typed `Error` values with stable `name`.
+ */
 export function createAbortError(
   reason: unknown,
   fallbackMessage: string,
@@ -281,6 +353,9 @@ export function createAbortError(
   return error;
 }
 
+/**
+ * Detect abort/timeout errors for expected cancellation paths.
+ */
 export function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -288,6 +363,9 @@ export function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Await a promise with optional abort support and a fallback reason message.
+ */
 export async function awaitAbortableResult<T>(
   promise: Promise<T>,
   signal: AbortSignal | null | undefined,
@@ -321,6 +399,9 @@ export async function awaitAbortableResult<T>(
   });
 }
 
+/**
+ * Return last path segment after normalizing trailing separators.
+ */
 export function shortName(value: string): string {
   const normalized = value.replace(/[\\/]$/, "");
   const parts = normalized.split(/[\\/]/).filter(Boolean);
@@ -331,6 +412,9 @@ export function worktreeKey(projectId: number, worktreePath: string): string {
   return `${projectId}::${worktreePath}`;
 }
 
+/**
+ * Clamp numeric value to inclusive min/max bounds.
+ */
 export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -343,6 +427,9 @@ export function gitHistoryDiffCacheKey(
   return `${projectId}::${worktreePath}::${commitHash}`;
 }
 
+/**
+ * Fresh project node state for newly loaded project entries.
+ */
 export function defaultProjectState(): ProjectNodeState {
   return {
     worktrees: [],
@@ -352,6 +439,9 @@ export function defaultProjectState(): ProjectNodeState {
   };
 }
 
+/**
+ * Fresh worktree node state for newly discovered worktree entries.
+ */
 export function defaultWorktreeState(): WorktreeNodeState {
   return {
     loading: false,
@@ -360,6 +450,9 @@ export function defaultWorktreeState(): WorktreeNodeState {
   };
 }
 
+/**
+ * Replace current page while preserving older entries that are not duplicated by server page.
+ */
 export function mergeResetGitHistory(
   current: RpcWorktreeGitHistoryResult | null,
   nextPage: RpcWorktreeGitHistoryResult,
@@ -415,6 +508,9 @@ export function findPrimaryWorktree(
   return worktrees.find((worktree) => worktree.path === project.path) ?? null;
 }
 
+/**
+ * Resolve the canonical primary worktree path, falling back to project path.
+ */
 export function primaryWorktreePath(
   project: RpcProject,
   worktrees: RpcWorktree[],
@@ -441,6 +537,7 @@ export function orderProjectWorktrees(
         return rightPinnedAt.localeCompare(leftPinnedAt);
       }
     }
+    // Ensure primary path is sorted ahead of secondary clones when pinned state is equal.
     if (left.path === primaryPath && right.path !== primaryPath) {
       return -1;
     }
@@ -455,6 +552,9 @@ export function worktreeDisplayName(worktree: RpcWorktree | null): string {
   return worktree?.branch ?? "Primary";
 }
 
+/**
+ * Stable anchor id to place error summary popovers per worktree row.
+ */
 export function worktreeThreadPopoverAnchorId(
   projectId: number,
   worktreePath: string,
@@ -478,6 +578,9 @@ export function defaultPersistedMainviewState(): PersistedMainviewState {
   };
 }
 
+/**
+ * Baseline tree view state used when storage is unavailable or out of date.
+ */
 export function defaultPersistedTreeViewState(): PersistedTreeViewState {
   return {
     version: TREE_VIEW_STATE_STORAGE_VERSION,
@@ -490,6 +593,9 @@ export function defaultPersistedTreeViewState(): PersistedTreeViewState {
   };
 }
 
+/**
+ * Parse and sanitize integers expected for ids.
+ */
 function parsePositiveInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value > 0
     ? value
@@ -505,6 +611,9 @@ export function isCodexReasoningEffort(
   );
 }
 
+/**
+ * Normalize persisted open-worktree entries and drop duplicates/invalid rows.
+ */
 function normalizePersistedOpenWorktrees(
   value: unknown,
 ): PersistedOpenWorktree[] {
@@ -566,6 +675,9 @@ function normalizePersistedOpenProjectPaths(value: unknown): string[] {
   return next;
 }
 
+/**
+ * Read mainview persisted state from storage with safe fallback for malformed/corrupt data.
+ */
 export function readPersistedMainviewState(): PersistedMainviewState {
   if (typeof window === "undefined") {
     return defaultPersistedMainviewState();
@@ -640,6 +752,9 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
   }
 }
 
+/**
+ * Persist mainview state blob unless executing outside browser context.
+ */
 export function writePersistedMainviewState(
   state: PersistedMainviewState,
 ): void {
@@ -678,6 +793,9 @@ export function writePersistedTreeViewState(
   );
 }
 
+/**
+ * Resize textarea to fit content while respecting a minimum height floor.
+ */
 export function resizeComposerTextarea(
   textarea: HTMLTextAreaElement | null,
   minHeight: number,
@@ -723,6 +841,9 @@ export function mergeThreadErrorLevel(
     : right;
 }
 
+/**
+ * Convert thread-level error level into sortable numeric precedence.
+ */
 export function threadErrorLevelWeight(level: ThreadErrorLevel): number {
   switch (level) {
     case "unread":
@@ -736,6 +857,9 @@ export function threadErrorLevelWeight(level: ThreadErrorLevel): number {
   }
 }
 
+/**
+ * Build an error preview payload when thread has a user-visible error string.
+ */
 export function threadErrorPreview(
   thread: RpcThread,
 ): ThreadErrorPreview | null {
@@ -768,10 +892,16 @@ export function pickPreferredThreadErrorPreview(
   return next.updatedAt.localeCompare(current.updatedAt) >= 0 ? next : current;
 }
 
+/**
+ * Detect file separator by inspecting path shape so formatting works cross-platform.
+ */
 export function pathSeparator(value: string): string {
   return value.includes("\\") ? "\\" : "/";
 }
 
+/**
+ * Return path with a trailing separator if absent for display/input composition.
+ */
 export function ensureTrailingSeparator(value: string): string {
   const separator = pathSeparator(value);
   return value.endsWith("/") || value.endsWith("\\")
@@ -807,6 +937,9 @@ export function formatDirectoryPathForInput(
   return ensureTrailingSeparator(normalized);
 }
 
+/**
+ * Render a path with a leading `~` when it shares the same home directory.
+ */
 export function formatPathForDisplay(
   path: string,
   homeDirectory: string,
@@ -843,6 +976,9 @@ export function sortThreads(items: RpcThread[]): RpcThread[] {
   return [...items].sort(compareThreadsByRecency);
 }
 
+/**
+ * Order threads by pinned timestamp first, then by last updated date.
+ */
 export function compareThreadsByRecency(
   left: RpcThread,
   right: RpcThread,
@@ -879,6 +1015,9 @@ export function latestThreadForWorktree(
   );
 }
 
+/**
+ * Return most recent pinned thread for a worktree, if any.
+ */
 export function pinnedThreadForWorktree(
   threads: RpcThread[],
   projectId: number,
@@ -915,6 +1054,9 @@ export function serializeOpenWorktrees(
   return next;
 }
 
+/**
+ * Rehydrate selected thread from persisted state, preferring explicit ID then worktree match.
+ */
 export function pickInitialThread(
   threads: RpcThread[],
   persistedState: PersistedMainviewState,
@@ -961,6 +1103,9 @@ function compareProjects(left: RpcProject, right: RpcProject): number {
   });
 }
 
+/**
+ * Insert/replace a project preserving sorted order by project name.
+ */
 export function upsertProjectList(
   items: RpcProject[],
   project: RpcProject,
@@ -997,6 +1142,9 @@ export function withAcknowledgedUnreadThreadDetail(
   };
 }
 
+/**
+ * Remove a thread by id and return the remaining list.
+ */
 export function removeThreadFromList(
   items: RpcThread[],
   threadId: number,
@@ -1004,6 +1152,9 @@ export function removeThreadFromList(
   return items.filter((thread) => thread.id !== threadId);
 }
 
+/**
+ * Keep context menu coordinate inside viewport bounds.
+ */
 export function clampProjectMenuCoordinate(
   value: number,
   viewportSize: number,
@@ -1012,6 +1163,9 @@ export function clampProjectMenuCoordinate(
   return clampNumber(value, 8, Math.max(8, viewportSize - panelSize - 8));
 }
 
+/**
+ * Store current scroll position and trigger lazy load when nearing the list end.
+ */
 export function handleGitHistoryScrollPosition(
   event: UIEvent<HTMLDivElement>,
   setScrollTop: (value: number) => void,
