@@ -93,6 +93,7 @@ Optional later addition:
 - password plus TOTP creates an authenticated session
 - session is stored in an `HttpOnly` cookie
 - normal session lifetime is one week
+- idle session timeout defaults to 24 hours without authenticated activity
 - websocket access requires both:
   - valid authenticated session
   - short-lived single-use websocket ticket
@@ -106,6 +107,7 @@ Require a fresh step-up for privileged actions. Do not treat "logged in" as enou
 Implementation default:
 
 - step-up freshness lasts 10 minutes after a successful primary-factor plus TOTP re-check
+- idle session timeout lasts 24 hours after the last authenticated HTTP or RPC activity
 
 Actions that should require step-up:
 
@@ -557,7 +559,7 @@ Unit and integration coverage should include:
 
 Current implementation coverage:
 
-- `src/bun/auth-service.test.ts` covers setup, login, session issuance, lockout, websocket ticket issuance/consumption, and step-up freshness
+- `src/bun/auth-service.test.ts` covers setup, login, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
 - `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow

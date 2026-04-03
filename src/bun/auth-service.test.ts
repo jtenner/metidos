@@ -9,6 +9,7 @@ import type { AuthServiceError } from "./auth-service";
 import {
   buildClearedSessionCookieHeader,
   buildSessionCookieHeader,
+  DEFAULT_SESSION_IDLE_TIMEOUT_MS,
   DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
   issueWebSocketTicket,
@@ -250,6 +251,71 @@ describe("auth service", () => {
         ticketId: ticket.ticket,
       }),
     ).toThrow("The websocket ticket is invalid or expired.");
+  });
+
+  it("expires idle sessions after the configured inactivity window", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+
+    expect(
+      resolveSession(database, {
+        nowMs: nowMs + DEFAULT_SESSION_IDLE_TIMEOUT_MS - 1,
+        sessionId: setupResult.session.id,
+        touch: true,
+      })?.id,
+    ).toBe(setupResult.session.id);
+
+    expect(
+      resolveSession(database, {
+        nowMs: nowMs + DEFAULT_SESSION_IDLE_TIMEOUT_MS + 1,
+        sessionId: setupResult.session.id,
+      })?.id,
+    ).toBe(setupResult.session.id);
+
+    expect(
+      resolveSession(database, {
+        nowMs: nowMs + DEFAULT_SESSION_IDLE_TIMEOUT_MS * 2 + 1,
+        sessionId: setupResult.session.id,
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects websocket tickets when the underlying session has gone idle", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+
+    expect(() =>
+      issueWebSocketTicket(database, {
+        nowMs: nowMs + DEFAULT_SESSION_IDLE_TIMEOUT_MS + 1,
+        sessionId: setupResult.session.id,
+      }),
+    ).toThrow("A valid authenticated session is required.");
   });
 
   it("requires a fresh step-up window for high-risk actions", async () => {

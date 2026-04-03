@@ -32,3 +32,11 @@ export function normalizeRpcErrorDetails(
 export function isStepUpRequiredError(error: unknown): boolean {
   return error instanceof RpcError && error.code === "step_up_required";
 }
+
+export function isAuthRequiredRpcError(error: unknown): boolean {
+  return (
+    error instanceof RpcError &&
+    (error.code === "session_required" ||
+      error.code === "invalid_websocket_ticket")
+  );
+}

@@ -22,7 +22,11 @@ import {
   issueWebSocketTicket,
 } from "./auth-client";
 import AuthShell from "./auth-shell";
-import { normalizeRpcErrorDetails, RpcError } from "./rpc-errors";
+import {
+  isAuthRequiredRpcError,
+  normalizeRpcErrorDetails,
+  RpcError,
+} from "./rpc-errors";
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -343,7 +347,7 @@ async function enableRpcTransport(): Promise<void> {
   await connectionReady;
 }
 
-function handleRpcAuthFailure(error: AuthApiError): void {
+function handleRpcAuthFailure(error: { message: string }): void {
   rejectConnection(error);
   disableRpcTransport();
   dispatchAuthRequired(error.message);
@@ -472,13 +476,17 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         pending.resolve(payload.result);
         return;
       }
-      pending.reject(
-        new RpcError(
-          payload.error || "RPC request failed",
-          payload.errorCode ?? "rpc_error",
-          normalizeRpcErrorDetails(payload.errorDetails),
-        ),
+      const error = new RpcError(
+        payload.error || "RPC request failed",
+        payload.errorCode ?? "rpc_error",
+        normalizeRpcErrorDetails(payload.errorDetails),
       );
+      if (isAuthRequiredRpcError(error)) {
+        pending.reject(error);
+        handleRpcAuthFailure(error);
+        return;
+      }
+      pending.reject(error);
     });
 
     nextSocket.addEventListener("close", () => {

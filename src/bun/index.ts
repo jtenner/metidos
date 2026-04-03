@@ -14,6 +14,7 @@ import {
   prepareTotpEnrollment,
   readSessionCookie,
   requireFreshStepUp,
+  resolveSession,
   setupAuth,
   stepUpSession,
   validateAndConsumeWebSocketTicket,
@@ -1721,6 +1722,21 @@ async function bootstrap(): Promise<void> {
             };
             pendingRequests.set(request.id, pending);
             incrementPendingRpcRequestCount();
+
+            if (!ws.data.authBypass) {
+              const session = resolveSession(initAppDatabase(), {
+                nowMs: currentNowMs(),
+                sessionId: ws.data.sessionId,
+                touch: true,
+              });
+              if (!session) {
+                throw new AuthServiceError(
+                  "session_required",
+                  "A valid authenticated session is required.",
+                  401,
+                );
+              }
+            }
 
             const handler = rpcHandlers[request.method] as (
               params: RpcRequestMap[RpcMethodName]["params"],

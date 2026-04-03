@@ -40,6 +40,7 @@ const SESSION_COOKIE_PATH = "/";
 const DEFAULT_TOTP_ISSUER = "Jolt";
 const LOGIN_LOCKOUT_AFTER_FAILURES = 3;
 const LOGIN_LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
+export const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_STEP_UP_LIFETIME_MS = 10 * 60 * 1000;
 const WEBSOCKET_TICKET_LIFETIME_MS = 60 * 1000;
 
@@ -156,6 +157,13 @@ function addDays(date: Date, days: number): Date {
 
 function addMilliseconds(date: Date, milliseconds: number): Date {
   return new Date(date.getTime() + milliseconds);
+}
+
+function isSessionIdleExpired(session: AuthSessionRecord, now: Date): boolean {
+  return (
+    Date.parse(session.lastUsedAt) + DEFAULT_SESSION_IDLE_TIMEOUT_MS <=
+    now.getTime()
+  );
 }
 
 function formatHttpDate(date: Date): string {
@@ -540,6 +548,11 @@ export function resolveSession(
   }
 
   if (Date.parse(session.expiresAt) <= now.getTime()) {
+    deleteAuthSession(database, session.id);
+    return null;
+  }
+
+  if (isSessionIdleExpired(session, now)) {
     deleteAuthSession(database, session.id);
     return null;
   }
