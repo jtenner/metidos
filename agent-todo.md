@@ -6,7 +6,7 @@
 - [x] Add comments to file `src/mainview/app/diff-workspace.tsx`.
 - [x] Add comments to file `src/mainview/app/git-history-panel.tsx`.
 - [x] Add comments to file `src/mainview/app/message-ui.tsx`.
-- [ ] Add comments to file `src/mainview/app/projects-panel.tsx`.
+- [x] Add comments to file `src/mainview/app/projects-panel.tsx`.
 - [ ] Add comments to file `src/mainview/app/sidebar-content.tsx`.
 - [ ] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
 - [ ] Add comments to file `src/mainview/app/state.ts`.

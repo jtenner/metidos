@@ -25,6 +25,9 @@ type PinnedWorktreeEntry = {
   worktree: RpcWorktree;
 };
 
+/**
+ * Row props for one worktree entry in either pinned or expanded project section.
+ */
 type ProjectWorktreeRowProps = {
   activeWorktree: boolean;
   homeDirectory: string;
@@ -43,6 +46,9 @@ type ProjectWorktreeRowProps = {
   worktreeState: WorktreeNodeState;
 };
 
+/**
+ * Match a project/worktree pair against sidebar search query.
+ */
 function worktreeMatchesProjectsSearch(
   normalizedSidebarSearchQuery: string,
   project: RpcProject,
@@ -60,6 +66,9 @@ function worktreeMatchesProjectsSearch(
   );
 }
 
+/**
+ * Sort pinned rows so newest pinned worktrees appear first, then project name, then path.
+ */
 function comparePinnedWorktreeEntries(
   left: PinnedWorktreeEntry,
   right: PinnedWorktreeEntry,
@@ -78,6 +87,9 @@ function comparePinnedWorktreeEntries(
   return left.worktree.path.localeCompare(right.worktree.path);
 }
 
+/**
+ * Render a selectable worktree row with pin/unpin affordance and status cue.
+ */
 function ProjectWorktreeRow({
   activeWorktree,
   homeDirectory,
@@ -99,6 +111,7 @@ function ProjectWorktreeRow({
     supportsTildePath,
   );
 
+  // Worktree row carries both row-level actions (open) and pin/unpin control.
   return (
     <div className="relative">
       <button
@@ -188,6 +201,9 @@ function ProjectWorktreeRow({
   );
 }
 
+/**
+ * Full prop contract for the sidebar ProjectsPanel.
+ */
 type ProjectsPanelProps = {
   addProjectError: string;
   addProjectInputIsPreviewing: boolean;
@@ -233,6 +249,12 @@ type ProjectsPanelProps = {
   ) => ThreadErrorLevel;
 };
 
+/**
+ * Sidebar section for project/worktree management:
+ * - add-project form + directory autocomplete
+ * - pinned worktree section
+ * - expandable project trees with worktree rows and thread-state error surfaces.
+ */
 export const ProjectsPanel = memo(function ProjectsPanel({
   addProjectError,
   addProjectInputIsPreviewing,
@@ -267,8 +289,10 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   worktreePinBusyPath,
   worktreeThreadErrorLevel,
 }: ProjectsPanelProps) {
+  // Panel visibility and expansion state are shared across components via hooks.
   const projectsOpen = useProjectsPanelOpen();
   const openProjectPaths = useOpenProjectPaths();
+  // Precompute pinned list once per render dependencies for deterministic render and sort.
   const pinnedWorktreeEntries = useMemo(() => {
     return filteredProjects
       .flatMap((project) =>
@@ -318,6 +342,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
       {projectsOpen ? (
         <div className="mt-3 space-y-3">
           {addProjectOpen ? (
+            // Suggestions only render while input is non-empty to avoid distracting UI noise.
             <form
               className="space-y-2 border border-[#23282c] bg-[#151515] px-3 py-2.5"
               onSubmit={onSubmitAddProject}
@@ -351,6 +376,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                       {isAddingProject ? "Adding" : "Add"}
                     </button>
                   </div>
+                  {/* Directory suggestions are driven by the current input to speed path entry. */}
                   {addProjectPath.trim() ? (
                     <div className="overflow-hidden border border-[#2f3f4b] bg-[#101315]/95 shadow-[0_14px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                       <div className="flex items-center justify-between border-b border-[#283036] px-3 py-2">
@@ -370,6 +396,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                         </div>
                       ) : null}
                       {directorySuggestions.length > 0 ? (
+                        // Suggestions capture mouse+keyboard focus states for accessible affordance.
                         <div className="app-scrollbar max-h-[30rem] overflow-y-auto overscroll-contain">
                           {directorySuggestions.map((directory) => {
                             const formattedDirectory =
@@ -389,6 +416,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                 }`}
                                 disabled={isAddingProject}
                                 onMouseDown={(event) => event.preventDefault()}
+                                // Keep focus on the suggestions list entry and avoid early blur.
                                 onMouseEnter={() => {
                                   onDirectorySuggestionEnter(directory);
                                 }}
@@ -402,6 +430,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                   onDirectorySuggestionLeave(directory);
                                 }}
                                 onClick={() => {
+                                  // Select a suggestion path and keep it in the add-project input.
                                   onSelectDirectorySuggestion(directory);
                                 }}
                               >
@@ -449,6 +478,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
             </form>
           ) : null}
           {pinnedWorktreeEntries.length > 0 ? (
+            // Pinned worktrees render at the top as a quick-access section.
             <div className="space-y-1">
               <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
                 Pinned
@@ -485,8 +515,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
             </div>
           ) : null}
           <div className="space-y-1">
-            {filteredProjects.length === 0 ? (
-              <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
+          {filteredProjects.length === 0 ? (
+            // Empty states vary between search miss and empty project list.
+            <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
                 {normalizedSidebarSearchQuery
                   ? "No matching projects."
                   : "No projects in database. Use + to add a project folder."}
@@ -536,6 +567,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                         : "bg-[#5f5f5f]";
 
                 return (
+                  // Keep project row and child worktrees grouped so collapse logic is local.
                   <div className="space-y-1" key={project.id}>
                     <div className="group/project flex items-center gap-2">
                       <button
@@ -546,11 +578,13 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                             : "text-[#d7d7d7] hover:bg-[#171a1b]"
                         }`}
                         onClick={() => {
+                          // Toggling the project header changes local UI state and refreshes project state.
                           const nextOpen = !projectTreeOpen;
                           setProjectTreeOpen(project.path, nextOpen);
                           onRefreshProject(project, nextOpen);
                         }}
                         onContextMenu={(event) => {
+                          // Right-click opens custom context menu anchored near the cursor.
                           event.preventDefault();
                           onOpenProjectActionMenu(
                             project,
@@ -598,6 +632,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                             : "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
                         }`}
                         onClick={(event) => {
+                          // Position popup menu using trigger button geometry for predictable placement.
                           event.stopPropagation();
                           const rect =
                             event.currentTarget.getBoundingClientRect();
