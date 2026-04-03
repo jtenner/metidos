@@ -30,6 +30,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `tls-bootstrap.ts`
   - Implements the guided loopback TLS bootstrap flow exposed by `bun run tls:bootstrap`.
   - Prefers `mkcert` for locally trusted certificates, falls back to OpenSSL generation, and stores certificate material in the per-user app-data directory.
+  - Records successful bootstrap runs in the local security audit log so trust-changing certificate setup remains reviewable.
 
 - `build-mainview.ts`
   - Centralized Bun bundling entry for the React frontend.

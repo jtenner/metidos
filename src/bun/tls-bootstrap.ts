@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import {
   chmodSync,
   cpSync,
@@ -8,6 +9,11 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 
+import {
+  closeAppDatabase,
+  createSecurityAuditEvent,
+  initAppDatabase,
+} from "./db";
 import { getDefaultTlsPaths } from "./tls-config";
 
 export type TlsBootstrapStrategy = "mkcert" | "openssl";
@@ -272,6 +278,26 @@ function printBootstrapSummary(
   );
 }
 
+export function recordTlsBootstrapAuditEvent(
+  database: Database,
+  input: {
+    forceOverwrite: boolean;
+    strategy: TlsBootstrapStrategy;
+    trustSystemCertificate: boolean;
+  },
+): void {
+  createSecurityAuditEvent(database, {
+    eventType: "tls_bootstrap_completed",
+    payloadJson: JSON.stringify({
+      forceOverwrite: input.forceOverwrite,
+      strategy: input.strategy,
+      trustSystemCertificate: input.trustSystemCertificate,
+    }),
+    summaryText:
+      "TLS bootstrap completed for the local loopback certificate flow.",
+  });
+}
+
 async function main(): Promise<void> {
   const options = parseTlsBootstrapArgs(Bun.argv.slice(2));
   const strategy = detectTlsBootstrapStrategy();
@@ -295,9 +321,18 @@ async function main(): Promise<void> {
     applyOwnerOnlyFilePermissions(path);
   }
 
+  recordTlsBootstrapAuditEvent(initAppDatabase(), {
+    forceOverwrite: options.forceOverwrite,
+    strategy,
+    trustSystemCertificate: options.trustSystemCertificate,
+  });
   printBootstrapSummary(strategy, options, paths);
 }
 
 if (import.meta.main) {
-  await main();
+  try {
+    await main();
+  } finally {
+    closeAppDatabase();
+  }
 }

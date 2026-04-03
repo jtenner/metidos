@@ -1,10 +1,29 @@
-import { describe, expect, it } from "bun:test";
+import { Database } from "bun:sqlite";
+import { afterEach, describe, expect, it } from "bun:test";
 
+import { listSecurityAuditEvents, migrateDatabase } from "./db";
 import {
   buildOpenSslConfig,
   detectTlsBootstrapStrategy,
   parseTlsBootstrapArgs,
+  recordTlsBootstrapAuditEvent,
 } from "./tls-bootstrap";
+
+const openDatabases = new Set<Database>();
+
+function createTestDatabase(): Database {
+  const database = new Database(":memory:");
+  migrateDatabase(database);
+  openDatabases.add(database);
+  return database;
+}
+
+afterEach(() => {
+  for (const database of openDatabases) {
+    database.close(false);
+  }
+  openDatabases.clear();
+});
 
 describe("tls bootstrap helpers", () => {
   it("parses supported flags", () => {
@@ -50,5 +69,27 @@ describe("tls bootstrap helpers", () => {
     expect(buildOpenSslConfig()).toContain("DNS.1 = localhost");
     expect(buildOpenSslConfig()).toContain("IP.1 = 127.0.0.1");
     expect(buildOpenSslConfig()).toContain("IP.2 = ::1");
+  });
+
+  it("records completed TLS bootstrap runs in the security audit log", () => {
+    const database = createTestDatabase();
+
+    recordTlsBootstrapAuditEvent(database, {
+      forceOverwrite: true,
+      strategy: "mkcert",
+      trustSystemCertificate: true,
+    });
+
+    expect(listSecurityAuditEvents(database)[0]).toMatchObject({
+      eventType: "tls_bootstrap_completed",
+      summaryText:
+        "TLS bootstrap completed for the local loopback certificate flow.",
+    });
+    expect(listSecurityAuditEvents(database)[0]?.payloadJson).toContain(
+      '"strategy":"mkcert"',
+    );
+    expect(listSecurityAuditEvents(database)[0]?.payloadJson).toContain(
+      '"trustSystemCertificate":true',
+    );
   });
 });
