@@ -19,6 +19,7 @@
 ├─ bun.lock
 ├─ bunfig.toml
 ├─ docs/
+│  ├─ README.md
 │  ├─ codex.md
 │  ├─ 2026-03-31-correctness-issues.md
 │  ├─ 2026-03-31-correctness-issues-2.md

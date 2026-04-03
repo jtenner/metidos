@@ -6,7 +6,6 @@
 
 - [ ] Add a README.md for folder `.` (repository root).
 - [ ] Add a README.md for folder `.tasks`.
-- [ ] Add a README.md for folder `docs`.
 - [ ] Add a README.md for folder `docs/references`.
 - [ ] Add a README.md for folder `src`.
 - [ ] Add a README.md for folder `src/bun`.
