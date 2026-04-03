@@ -3,6 +3,9 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
+/**
+ * Read and promote an LRU cache entry to most-recent.
+ */
 export function readLruValue<Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
@@ -21,6 +24,9 @@ export function readLruValue<Key, Value>(
   return value;
 }
 
+/**
+ * Write LRU value and evict oldest records when cache exceeds maxEntries.
+ */
 export function writeLruValue<Key, Value>(
   cache: Map<Key, Value>,
   key: Key,
@@ -41,12 +47,18 @@ export function writeLruValue<Key, Value>(
   }
 }
 
+/**
+ * Convert cache iteration into newest-first ordering.
+ */
 export function lruEntriesNewestFirst<Key, Value>(
   cache: Map<Key, Value>,
 ): Array<[Key, Value]> {
   return [...cache.entries()].reverse();
 }
 
+/**
+ * Convert arbitrary abort reasons into a consistent AbortError.
+ */
 export function createAbortError(
   reason: unknown,
   fallbackMessage: string,
@@ -69,6 +81,9 @@ export function createAbortError(
   return error;
 }
 
+/**
+ * Identify errors that represent cancellation/timeouts.
+ */
 export function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -76,6 +91,9 @@ export function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Throw when signal is already aborted.
+ */
 export function throwIfAborted(
   signal: AbortSignal | null | undefined,
   fallbackMessage: string,
@@ -85,6 +103,9 @@ export function throwIfAborted(
   }
 }
 
+/**
+ * Await a promise while listening for abort, preferring abort reasons when canceled.
+ */
 export async function awaitAbortableResult<T>(
   promise: Promise<T>,
   signal: AbortSignal | null | undefined,
@@ -118,6 +139,9 @@ export async function awaitAbortableResult<T>(
   });
 }
 
+/**
+ * Bounded concurrency queue with optional cancellation per task.
+ */
 export function createAsyncConcurrencyLimit(maxConcurrent: number): {
   run: <T>(
     callback: () => Promise<T> | T,
@@ -142,6 +166,9 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
     start: () => void;
   }> = [];
 
+  /**
+   * Remove a still-pending task from queue.
+   */
   const removePendingTask = (task: (typeof pendingTasks)[number]): void => {
     const index = pendingTasks.indexOf(task);
     if (index >= 0) {
@@ -149,6 +176,9 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
     }
   };
 
+  /**
+   * Start queued tasks up to configured parallelism.
+   */
   const schedule = (): void => {
     while (activeCount < concurrency) {
       const nextTask = pendingTasks.shift();
@@ -170,6 +200,9 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
   };
 
   return {
+    /**
+     * Enqueue callback and wait for execution result.
+     */
     run: <T>(
       callback: () => Promise<T> | T,
       options?: {
@@ -216,6 +249,9 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
         schedule();
       });
     },
+    /**
+     * Return current queue/worker utilization for debugging.
+     */
     stats: () => ({
       activeCount,
       maxConcurrent: concurrency,
@@ -224,6 +260,9 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
   };
 }
 
+/**
+ * Expand `~` to home directory for non-Windows inputs.
+ */
 export function expandHomeShorthandPath(value: string): string {
   if (process.platform === "win32") {
     return value;
@@ -237,10 +276,16 @@ export function expandHomeShorthandPath(value: string): string {
   return value;
 }
 
+/**
+ * Normalize path through home expansion and resolution.
+ */
 export function normalizePath(value: string): string {
   return resolve(expandHomeShorthandPath(value));
 }
 
+/**
+ * Safe sync directory check; false on missing/invalid paths.
+ */
 export function safeIsDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory();
@@ -249,6 +294,9 @@ export function safeIsDirectory(path: string): boolean {
   }
 }
 
+/**
+ * Safe sync file check; false on missing/invalid paths.
+ */
 export function safeIsFile(path: string): boolean {
   try {
     return statSync(path).isFile();
@@ -257,6 +305,9 @@ export function safeIsFile(path: string): boolean {
   }
 }
 
+/**
+ * Safe async directory check; false on missing/invalid paths.
+ */
 export async function safeIsDirectoryAsync(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
@@ -265,6 +316,9 @@ export async function safeIsDirectoryAsync(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Safe async file check; false on missing/invalid paths.
+ */
 export async function safeIsFileAsync(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isFile();
@@ -273,6 +327,9 @@ export async function safeIsFileAsync(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Return the last path segment, tolerant to trailing separators and both slashes.
+ */
 export function shortName(value: string): string {
   const normalized = value.replace(/[\\/]$/, "");
   const parts = normalized.split(/[\\/]/).filter(Boolean);
