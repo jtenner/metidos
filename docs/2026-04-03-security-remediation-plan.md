@@ -6,7 +6,7 @@ This plan turns the findings in `docs/2026-04-03-security-audit.md` into an impl
 
 1. lock down transport and filesystem exposure first
 2. add real authentication and session management to the app
-3. require step-up authentication for dangerous actions
+3. require step-up authentication for selected high-risk actions
 4. reduce stored plaintext and cross-project privilege bleed
 
 The requested password/PIN and 2FA should be added, but not as a cosmetic login screen. It has to sit on top of a real backend trust model:
@@ -30,6 +30,13 @@ The baseline policy should be:
 
 Only the minimum bootstrap surface for auth itself should remain reachable.
 
+Current product assumption:
+
+- the app is a single-user local app
+- one local installation maps to one logical account and one auth setup flow
+- this simplifies the initial design for sessions, recovery, and TLS bootstrap
+- the implementation should still avoid painting itself into a corner if multi-user support is added later
+
 TLS is also a good idea, with one important caveat:
 
 - TLS improves transport security
@@ -48,27 +55,34 @@ Recommended policy:
 
 Use a local master credential for unlock.
 
-- Recommended: master password or passphrase
-- Supported for convenience: optional quick-unlock PIN
-- Do not rely on a short 4-6 digit PIN as the only secret for the whole system
+- User chooses one primary factor during setup:
+  - PIN
+  - master password or passphrase
 
-Recommended product shape:
+Primary-factor policy:
 
-- v1 setup requires a master password/passphrase
-- v2 can add an optional quick-unlock PIN backed by OS keychain storage or a separate local verifier
+- the choice is made at setup time and stored in auth settings
+- changing between PIN and password later should require full re-auth plus TOTP
+- PIN mode needs stronger guardrails because it is easier to brute force than a password
+- minimum PIN length is 6
+- three failed primary-factor attempts trigger a 10-minute lockout
 
 Reasoning:
 
-- the master secret can protect sessions and data-at-rest keys
-- a short PIN is good UX, but weak as the only root secret
+- password/passphrase mode gives stronger entropy by default
+- PIN mode is acceptable only with strict rate limiting, backoff, and lockout behavior
+- both modes can still protect sessions and gate access when paired with mandatory TOTP
+- PIN mode should reject trivial values even though the minimum length is 6
 
 ### Second factor
 
 Use TOTP as the first real 2FA factor.
 
+- TOTP is mandatory
 - setup flow generates a TOTP secret and recovery codes
-- login requires password plus TOTP
+- login requires PIN plus TOTP or password plus TOTP
 - high-risk actions require recent step-up auth
+- 10 recovery codes are generated up front and shown to the user during setup
 
 Optional later addition:
 
@@ -78,6 +92,7 @@ Optional later addition:
 
 - password plus TOTP creates an authenticated session
 - session is stored in an `HttpOnly` cookie
+- normal session lifetime is one week
 - websocket access requires both:
   - valid authenticated session
   - short-lived single-use websocket ticket
@@ -90,12 +105,11 @@ Require a fresh step-up for privileged actions. Do not treat "logged in" as enou
 
 Actions that should require step-up:
 
-- enabling `unsafeMode`
-- starting a thread in `danger-full-access`
 - running package scripts from the UI
 - creating a thread outside the current project/worktree scope
 - deleting a project
 - revealing recovery codes or resetting auth settings
+- generating or regenerating recovery codes
 
 ## Target Security Architecture
 
@@ -158,6 +172,26 @@ Transport policy:
 
 In other words: the unlocked app is a different trust state, not just a different screen.
 
+## Explicit Product Decisions
+
+These are chosen requirements for implementation:
+
+- users may choose either PIN mode or password mode as the primary factor
+- TOTP is mandatory for every account
+- the app must provide a web-based TOTP setup flow with a QR code for authenticator apps
+- the setup flow must include a manual secret fallback in addition to the QR code
+- 10 recovery codes should be generated during TOTP setup and given to the user up front
+- recovery codes are view-once when first generated
+- regenerating recovery codes should require a fresh authenticated CLI flow using the configured primary factor plus TOTP
+- no app access is allowed before successful authorization
+- `unsafeMode` remains available after normal app authentication
+- TLS is required
+- the product should provide an easy TLS setup path on all supported platforms
+- if the user has command-line access, the product should expose a reset path that uses CLI plus OTP verification
+- TLS setup may be Codex-assisted, but only through an explicit guided bootstrap flow with user approval for system-changing commands
+- a dev bypass is allowed only through an explicit development/reset flow
+- a dev reset flow may intentionally wipe local database contents
+
 ## Phased Plan
 
 ## Phase 0: Immediate Containment
@@ -211,6 +245,11 @@ Work:
 - Move websocket ticketing into the browser startup flow
 - Keep the unauthenticated route allowlist as small as possible
 - add TLS listener/configuration support and certificate loading
+- provide a cross-platform guided TLS setup path for users
+- add first-run setup screens for:
+  - primary-factor choice: PIN or password
+  - TOTP enrollment with QR code
+  - recovery-code display and acknowledgement
 
 Code areas:
 
@@ -222,11 +261,16 @@ Code areas:
 Acceptance criteria:
 
 - the app shows setup flow on first run
+- setup lets the user choose PIN mode or password mode
+- setup requires TOTP enrollment before the account becomes usable
+- setup shows a QR code that can be scanned by an authenticator app
+- setup displays 10 pre-generated recovery codes
+- setup treats recovery codes as view-once material
 - the app shows login flow after setup
 - websocket connection cannot be established without valid session plus ticket
 - existing arbitrary websites cannot drive `/rpc`
 - no project or runtime data is returned before login
-- production mode uses HTTPS/WSS
+- production mode uses HTTPS/WSS only
 
 ## Phase 2: Authorization And Privilege Separation
 
@@ -236,8 +280,7 @@ Work:
 
 - Add authorization checks around sensitive procedures
 - Require recent step-up auth for dangerous actions
-- Stop treating `unsafeMode` as a persistent convenience flag without re-auth
-- Make dangerous-mode approval one-shot or short-lived
+- Keep `unsafeMode` available after normal app auth, but clearly label it and audit its use
 - Restrict MCP sidecar to the bound thread/project/worktree by default
 - Add explicit privileged override path for cross-project actions
 
@@ -251,9 +294,9 @@ Code areas:
 
 Acceptance criteria:
 
-- enabling `unsafeMode` always triggers step-up
 - `runProjectTask` requires step-up
 - `new_thread` in the sidecar cannot pivot to another project without explicit privileged approval
+- `unsafeMode` is available after login, clearly marked in the UI, and auditable
 
 ## Phase 3: Data Protection And Persistence Cleanup
 
@@ -295,13 +338,16 @@ Work:
   - frame restrictions
   - referrer policy
 - Add session expiry and idle timeout
-- Add dev-only auth bypass only behind explicit env flag, default off
+- Add CLI credential-reset flow that requires OTP verification for users with command-line access
+- Add dev-only auth bypass/reset flow behind explicit env flags, default off
 
 Acceptance criteria:
 
 - users can recover from lost 2FA device with recovery codes
-- repeated login failures slow down or lock out attempts
+- three failed login attempts trigger a 10-minute lockout
 - privileged actions are auditable
+- command-line reset requires OTP verification
+- dev bypass/reset is impossible unless explicitly enabled
 
 ## Concrete Backend Design
 
@@ -311,8 +357,10 @@ Add tables roughly like:
 
 - `auth_settings`
   - setup complete flag
-  - password hash params
+  - primary factor type: `pin` or `password`
+  - primary factor hash params
   - encrypted TOTP secret
+  - session lifetime config
   - created/updated timestamps
 - `auth_sessions`
   - session id
@@ -333,7 +381,12 @@ Add tables roughly like:
 Implementation notes:
 
 - use a memory-hard password hash such as Argon2id
+- use the same class of strong password hashing for PIN mode too
+- PIN mode must enforce minimum length 6 plus attempt throttling and a 10-minute lockout after three failures
 - hash recovery codes before storage
+- pre-generate 10 recovery codes during setup
+- recovery-code generation is view-once at setup
+- recovery-code regeneration must require a fresh authenticated CLI flow with the configured primary factor plus TOTP
 - keep websocket tickets short-lived and single-use
 
 ## HTTP and websocket changes
@@ -366,14 +419,16 @@ The right TLS approach depends on how this app will be shipped.
 
 Options:
 
-- ship with instructions or tooling to create a locally trusted certificate
+- ship with built-in tooling or a guided helper to create a locally trusted certificate
 - integrate with a local certificate helper such as a development CA flow
-- keep plain HTTP only for explicit development mode
+- avoid making users configure certificates manually if possible
+- support a Codex-assisted bootstrap flow that can perform TLS setup from an explicit user prompt
 
 Tradeoff:
 
 - localhost TLS improves transport guarantees and cookie security
 - certificate provisioning adds setup complexity
+- a Codex-assisted bootstrap is ergonomic, but it still needs explicit approval before certificate trust changes or privileged OS commands run
 
 ### If this may bind beyond loopback
 
@@ -387,8 +442,10 @@ Policy should be strict:
 ### Recommended product decision
 
 - loopback dev mode: HTTP/WS allowed only with explicit dev flag
-- loopback production mode: prefer HTTPS/WSS if certificate setup is feasible
+- loopback production mode: HTTPS/WSS required
 - non-loopback mode: HTTPS/WSS mandatory
+- provide an easy guided TLS setup path on all supported platforms
+- prefer a Codex-assisted guided bootstrap for TLS setup where feasible
 
 ## UI and UX plan
 
@@ -397,15 +454,20 @@ Policy should be strict:
 1. Open app
 2. `GET /auth/status`
 3. If not configured, show setup screen
-4. User sets master password
-5. App enrolls TOTP
-6. App shows recovery codes and requires acknowledgement
-7. App logs in and opens websocket
+4. User chooses primary factor mode: PIN or password
+5. User sets the chosen primary factor
+6. App renders a TOTP enrollment website/page with:
+   - QR code
+   - manual secret fallback
+   - issuer/account label for authenticator apps
+7. User confirms a valid TOTP code
+8. App shows 10 pre-generated recovery codes and requires acknowledgement
+9. App logs in and opens websocket
 
 ### Normal login flow
 
 1. Open app
-2. Password entry
+2. PIN or password entry, depending on configured mode
 3. TOTP entry
 4. Session cookie issued
 5. UI requests websocket ticket
@@ -428,6 +490,10 @@ Backend:
   - add auth routes, cookie parsing, origin checks, ticket checks, security headers
 - `src/bun/db.ts`
   - add auth/session/recovery/ticket schema
+- `src/bun/auth-reset.ts`
+  - implement CLI reset and recovery-code regeneration flow with configured primary factor plus OTP verification
+- `src/bun/dev-reset.ts`
+  - implement explicit dev bypass/reset flow with optional database wipe
 - `src/bun/project-procedures.ts`
   - add authz wrappers and step-up checks
 - `src/bun/git.ts`
@@ -446,6 +512,7 @@ Frontend:
 - new files under `src/mainview/app/`
   - `auth-setup.tsx`
   - `auth-login.tsx`
+  - `auth-totp-enrollment.tsx`
   - `auth-step-up-dialog.tsx`
   - `auth-recovery-codes.tsx`
 
@@ -459,17 +526,29 @@ Unit and integration coverage should include:
 - websocket connection denied with bad `Origin`
 - websocket ticket expiry and one-time use
 - plaintext transport rejected in production TLS mode
-- step-up enforcement on `unsafeMode` and task execution
+- `unsafeMode` access after normal login
+- step-up enforcement on task execution and recovery/reset flows
 - worktree traversal rejection
 - sidecar cross-project escape rejection
+- CLI reset flow requiring OTP verification
+- recovery-code regeneration via authenticated CLI flow
+- dev bypass/reset flow with optional DB wipe
 
 Manual test matrix:
 
 - first-time setup
+- first-time setup in PIN mode
+- first-time setup in password mode
+- three failed-attempt 10-minute lockout in PIN mode
+- three failed-attempt 10-minute lockout in password mode
 - restart and login
+- `unsafeMode` toggle/use after normal login
 - expired session during normal use
 - expired step-up during dangerous action
 - lost 2FA device recovery
+- CLI reset with OTP verification
+- recovery-code regeneration via CLI after fresh auth round
+- dev reset with database wipe
 - logout from one browser tab while another tab is open
 
 ## Proposed Delivery Order
@@ -481,28 +560,36 @@ If we want the fastest risk reduction with the least rework:
 3. Add TLS policy and listener support
 4. Add session auth and websocket ticketing
 5. Add password plus TOTP setup/login UI
-6. Add step-up auth for dangerous actions
+6. Add step-up auth for selected high-risk actions
 7. Restrict sidecar scope
 8. Clean up persistence and storage
 
-## Open Product Decisions
+## Dev Reset Policy
 
-These need decisions before implementation starts:
+The development/reset behavior should be explicit:
 
-- Should v1 require a master password, or allow PIN-only mode?
-- Should TOTP be mandatory or optional on first-run setup?
-- Do we want recovery codes printable/exportable only once?
-- Should `unsafeMode` be completely disabled until step-up auth exists?
-- Do we allow any dev bypass, and if so what exact env flag enables it?
+- `JOLT_DEV_BYPASS=1`
+  - enables development auth bypass behavior
+- `JOLT_DEV_RESET=1`
+  - enables development reset behavior
+- default dev reset wipes the whole local database
+- do not default to partial auth/session-only reset, because whole-DB reset is simpler and safer to reason about in the current single-user app model
 
 ## Recommendation
 
 My recommendation is:
 
-- require master password in v1
+- support both PIN mode and password mode in v1
 - require TOTP in v1
-- make quick-unlock PIN a follow-up feature
-- treat `unsafeMode` and task execution as step-up protected
+- provide an app-served TOTP enrollment page with QR code in v1
+- make sessions last one week by default
+- require TLS in production and provide guided setup across platforms
+- expose a CLI reset path for command-line users that still requires OTP verification
+- treat recovery codes as view-once material and allow regeneration only through an authenticated CLI flow
+- keep `unsafeMode` available after login, but visibly dangerous and auditable
+- keep task execution and recovery/reset flows step-up protected
+- use `JOLT_DEV_BYPASS=1` and `JOLT_DEV_RESET=1` for explicit development bypass/reset behavior
+- make dev reset wipe the full local database by default
 - do not ship auth without websocket/session enforcement
 
 That gets you the requested password/PIN and 2FA direction, but in a way that actually closes the security holes called out in the audit.

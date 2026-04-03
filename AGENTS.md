@@ -15,6 +15,7 @@
   ├─ .gitignore
   ├─ README.md
 ├─ AGENTS.md
+├─ agent-todo.md
 ├─ biome.json
 ├─ bun-plugin-react-compiler.ts
 ├─ bun.lock
