@@ -12,10 +12,10 @@
 │  ├─ commit.md
 │  └─ research.md
 ├─ .git
-├─ .gitignore
-├─ README.md
-├─ AGENTS.md
-├─ agent-todo.md
+  ├─ .gitignore
+  ├─ README.md
+  ├─ AGENTS.md
+  ├─ agent-todo.md
 ├─ biome.json
 ├─ bun-plugin-react-compiler.ts
 ├─ bun.lock
@@ -59,6 +59,7 @@
 ├─ src/
 │  ├─ README.md
 │  ├─ bun/
+│  │  ├─ README.md
 │  │  ├─ build-mainview.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
