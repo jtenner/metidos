@@ -1,12 +1,26 @@
 import type { ChangeEvent, JSX } from "react";
 import { materialSymbol } from "./icons";
 
+/**
+ * Props for the sidebar search input component.
+ */
 type SidebarSearchControlProps = {
+  /** Fired whenever the user types or edits the search query. */
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** Clears the current search text and hides the clear button. */
   onClear: () => void;
+  /** The current raw query string rendered in the input. */
   value: string;
 };
 
+/**
+ * Render the search field in the workspace/project sidebar.
+ *
+ * The control intentionally stays visually compact and keyboard-friendly while
+ * handling two states:
+ * - empty query: only search icon + input
+ * - non-empty query: search icon + input + clear button
+ */
 export function SidebarSearchControl({
   onChange,
   onClear,
@@ -26,6 +40,7 @@ export function SidebarSearchControl({
           autoCorrect="off"
           spellCheck={false}
         />
+        {/* Show clear action only for non-empty query to avoid accidental clears. */}
         {value ? (
           <button
             type="button"

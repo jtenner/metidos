@@ -47,7 +47,7 @@
 - [ ] Add comments to file `src/mainview/controls/project-task-selector.tsx`.
 - [ ] Add comments to file `src/mainview/controls/reasoning-effort-selector.tsx`.
 - [x] Add comments to file `src/mainview/controls/search-utils.ts`.
-- [ ] Add comments to file `src/mainview/controls/sidebar-search-control.tsx`.
+- [x] Add comments to file `src/mainview/controls/sidebar-search-control.tsx`.
 - [ ] Add comments to file `src/mainview/controls/sidebar-section-header.tsx`.
 - [ ] Add comments to file `src/mainview/index.ts`.
 
