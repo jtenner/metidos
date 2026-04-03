@@ -1,3 +1,6 @@
+/**
+ * Core project entity and project/worktree topology shapes.
+ */
 export type RpcProject = {
   id: number;
   path: string;
@@ -143,6 +146,9 @@ export type RpcWorktreeGitHistoryChanged = {
   worktreePath: string;
 };
 
+/**
+ * Thread start request is also used as queued payload and runtime response details.
+ */
 export type RpcThreadStartRequest = {
   requestId: string;
   projectId: number;
@@ -217,6 +223,9 @@ export type RpcRequestContext = {
   timeoutMs: number | null;
 };
 
+/**
+ * Model/ranking data used by thread creation and UI selectors.
+ */
 export type RpcCodexModelOption = {
   id: string;
   label: string;
@@ -253,6 +262,9 @@ export type RpcAppBootstrapResult = {
   threads: RpcThread[];
 };
 
+/**
+ * Runtime thread status and usage telemetry surfaced to clients.
+ */
 export type RpcThreadRunStatus = {
   state: "idle" | "working" | "failed" | "stopped";
   startedAt: string | null;
@@ -391,6 +403,9 @@ export type RpcErrorThreadMessage = {
   updatedAt: string;
 };
 
+/**
+ * Union of all RPC thread message kinds returned by backend thread reads.
+ */
 export type RpcThreadMessage =
   | RpcChatThreadMessage
   | RpcReasoningThreadMessage
@@ -405,6 +420,9 @@ export type RpcThreadDetail = {
   messages: RpcThreadMessage[];
 };
 
+/**
+ * Full schema of client-callable RPC request/response pairs.
+ */
 export type AppRPCSchema = {
   requests: {
     getHomeDirectory: {
@@ -616,10 +634,16 @@ export type AppRPCSchema = {
   };
 };
 
+/**
+ * Helper for RPC procedure signatures: params may be optional if explicitly undefined.
+ */
 type RpcProcedureCall<Params, Response> = undefined extends Params
   ? (params?: Params, options?: RpcProcedureCallOptions) => Promise<Response>
   : (params: Params, options?: RpcProcedureCallOptions) => Promise<Response>;
 
+/**
+ * Typed RPC surface used across Bun and UI bridge layers.
+ */
 export interface ProjectProcedures {
   getHomeDirectory: RpcProcedureCall<
     AppRPCSchema["requests"]["getHomeDirectory"]["params"],
