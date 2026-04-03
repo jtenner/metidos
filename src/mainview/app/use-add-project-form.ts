@@ -23,20 +23,33 @@ import {
 } from "./state";
 
 type UseAddProjectFormParams = {
+  /** Returns open/workspace state for a given project id. */
   getProjectState: (projectId: number) => ProjectNodeState;
+  /** Path that represents the user home directory. */
   homeDirectory: string;
+  /** Rehydrate project rows after opening a new project. */
   hydrateProjectRows: (items: RpcProject[]) => void;
+  /** RPC endpoint collection used for lookup and mutation operations. */
   procedures: ProjectProcedures;
+  /** Select active project/worktree after a successful open action. */
   selectProject: (project: RpcProject, worktreePath?: string | null) => void;
+  /** Controls whether the mobile project list panel is visible. */
   setMobileProjectListOpen: Dispatch<SetStateAction<boolean>>;
+  /** Updates the global project list state. */
   setProjects: Dispatch<SetStateAction<RpcProject[]>>;
+  /** Applies project detail updates after opening project worktrees. */
   setProjectState: (
     projectId: number,
     update: Partial<ProjectNodeState>,
   ) => void;
+  /** If enabled, input/output path formatting uses `~` shorthand. */
   supportsTildePath: boolean;
 };
 
+/**
+ * Manages add-project form state, including directory suggestion querying,
+ * abortable prefetch/cache behavior, and opening project side effects.
+ */
 export function useAddProjectForm({
   getProjectState,
   homeDirectory,
@@ -103,6 +116,7 @@ export function useAddProjectForm({
   );
 
   const clearDirectorySuggestionPrefetchTimer = useCallback(() => {
+    // Avoid stale debounced prefetch when query changes or UI is closed.
     if (directorySuggestionPrefetchTimerRef.current !== null) {
       window.clearTimeout(directorySuggestionPrefetchTimerRef.current);
       directorySuggestionPrefetchTimerRef.current = null;
@@ -137,6 +151,7 @@ export function useAddProjectForm({
         return;
       }
 
+      // Write normalized directory responses into bounded LRU cache and remember prefetches.
       writeLruValue(
         directorySuggestionResultCacheRef.current,
         normalizedQuery,
@@ -152,6 +167,7 @@ export function useAddProjectForm({
   );
 
   const abortDirectorySuggestionRequest = useCallback((reason: string) => {
+    // Cancel the active abort controller so downstream awaiters resolve with abort.
     const controller = directorySuggestionAbortControllerRef.current;
     if (!controller) {
       return;
@@ -170,6 +186,7 @@ export function useAddProjectForm({
         signal?: AbortSignal;
       },
     ): Promise<string[]> => {
+      // Return fresh cached results when available; otherwise fetch with dedupe/sharing.
       const normalizedQuery = query.trim();
       if (!normalizedQuery) {
         return [];
@@ -183,6 +200,7 @@ export function useAddProjectForm({
       const inFlight =
         directorySuggestionRequestCacheRef.current.get(normalizedQuery);
       if (inFlight) {
+        // Reuse shared in-flight request and keep waiter counts balanced.
         inFlight.waiterCount += 1;
         try {
           return await awaitAbortableResult(
@@ -261,6 +279,7 @@ export function useAddProjectForm({
 
   const prefetchDirectorySuggestions = useCallback(
     async (query: string) => {
+      // Background prefetches skip empty/duplicate queries and allow failures to be retried.
       const normalizedQuery = query.trim();
       if (!normalizedQuery) {
         return;
@@ -288,6 +307,7 @@ export function useAddProjectForm({
 
   const scheduleDirectorySuggestionPrefetch = useCallback(
     (directory: string) => {
+      // Normalize the directory and debounce prefetch to avoid aggressive querying.
       const prefetchQuery = formatDirectoryPathForInput(
         directory,
         homeDirectory,
@@ -319,6 +339,7 @@ export function useAddProjectForm({
   );
 
   const closeAddProjectForm = useCallback(() => {
+    // Close form and clear transient add-form state.
     setAddProjectOpen(false);
     setAddProjectError("");
     resetAddProjectPath();
@@ -343,6 +364,7 @@ export function useAddProjectForm({
 
   const openProjectFromInput = useCallback(
     async (projectPathInput: string) => {
+      // Ignore form submits while previous add request is in progress.
       if (isAddingProject) {
         return;
       }
@@ -357,6 +379,7 @@ export function useAddProjectForm({
       setAddProjectError("");
       try {
         const result = await procedures.openProject({ projectPath });
+        // Hydrate project rows and select the project immediately after open.
         const existingState = getProjectState(result.project.id);
         setProjects((prev) => upsertProjectList(prev, result.project));
         hydrateProjectRows([result.project]);
@@ -394,6 +417,7 @@ export function useAddProjectForm({
 
   const selectDirectorySuggestion = useCallback(
     (directory: string) => {
+      // Committing a hovered suggestion directly fills the input and clears preview.
       const formattedDirectory = formatDirectoryPathForInput(
         directory,
         homeDirectory,
@@ -407,6 +431,7 @@ export function useAddProjectForm({
   );
 
   const handleAddProjectPathChange = useCallback((value: string) => {
+    // Manual edits always cancel hover preview so input text is authoritative.
     setAddProjectError("");
     setHoveredDirectorySuggestion(null);
     setAddProjectPath(value);
@@ -414,6 +439,7 @@ export function useAddProjectForm({
 
   const handleDirectorySuggestionEnter = useCallback(
     (directory: string) => {
+      // Track hover for preview and start prefetch while the user dwells.
       setHoveredDirectorySuggestion(directory);
       scheduleDirectorySuggestionPrefetch(directory);
     },
@@ -422,6 +448,7 @@ export function useAddProjectForm({
 
   const handleDirectorySuggestionLeave = useCallback(
     (directory: string) => {
+      // Only clear hover when the same row loses hover; also cancel pending prefetch.
       setHoveredDirectorySuggestion((current) =>
         current === directory ? null : current,
       );
@@ -454,6 +481,7 @@ export function useAddProjectForm({
   const addProjectInputIsPreviewing = hoveredDirectorySuggestionPath.length > 0;
 
   useEffect(() => {
+    // Cleanup any pending network request on unmount.
     return () => {
       abortDirectorySuggestionRequest(
         "Directory suggestion request was canceled.",
@@ -462,6 +490,7 @@ export function useAddProjectForm({
   }, [abortDirectorySuggestionRequest]);
 
   useEffect(() => {
+    // Suggestion lifecycle: reset when form/query closes, otherwise fetch and track request IDs.
     if (!addProjectOpen) {
       directorySuggestionRequestIdRef.current += 1;
       abortDirectorySuggestionRequest(
