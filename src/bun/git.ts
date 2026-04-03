@@ -30,9 +30,15 @@ const GIT_EXECUTABLE_FALLBACK_DIRECTORIES =
           "C:\\Program Files (x86)\\Git\\bin",
         ]
       : ["/usr/local/bin", "/usr/bin", "/bin"];
+/** Delimiter used by low-level `git log` records before parsing.
+ * `\u001f` avoids collisions with ordinary subject/author text.
+ */
 const GIT_LOG_FIELD_SEPARATOR = "\u001f";
+/** Record separator used to split `git log` batches safely. */
 const GIT_LOG_RECORD_SEPARATOR = "\u001e";
+/** Default file content page size for `readWorktreeFileContentPage`. */
 const DEFAULT_WORKTREE_FILE_CONTENT_PAGE_BYTES = 64 * 1024;
+/** Hard page-size cap to prevent fetching unbounded file content in one query. */
 const MAX_WORKTREE_FILE_CONTENT_PAGE_BYTES = 256 * 1024;
 
 export const DEFAULT_GIT_HISTORY_PAGE_SIZE = 20;
@@ -69,10 +75,15 @@ const gitCommandQueueMap = new Map<
 >();
 let cachedGitExecutablePath: string | null = null;
 
+/** Return current UTC timestamp as an ISO string for snapshot metadata. */
 function getNow(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Build a stable `AbortError`-shaped object from either a DOM abort reason
+ * or a fallback string, preserving original cause when available.
+ */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
     return reason;
@@ -92,6 +103,9 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
   return error;
 }
 
+/**
+ * Throw an AbortError immediately when the provided signal is already aborted.
+ */
 function throwIfAborted(
   signal: AbortSignal | null | undefined,
   fallbackMessage: string,
@@ -101,6 +115,7 @@ function throwIfAborted(
   }
 }
 
+/** Guard against missing or non-executable paths when resolving git binary. */
 function safeIsExecutableFile(path: string): boolean {
   try {
     const stats = statSync(path);
@@ -113,16 +128,22 @@ function safeIsExecutableFile(path: string): boolean {
   }
 }
 
+/** Return the list of executable names to probe for git on each platform. */
 function gitExecutableCandidateNames(): string[] {
   return process.platform === "win32"
     ? ["git.exe", "git.cmd", "git.bat", "git"]
     : ["git"];
 }
 
+/** Read PATH with case-tolerant fallback for Windows shell environments. */
 function readProcessPathValue(): string {
   return process.env.PATH?.trim() || process.env.Path?.trim() || "";
 }
 
+/**
+ * Resolve git executable path, preferring previous cached successful location.
+ * Falls back across PATH and platform-specific default locations.
+ */
 function resolveGitExecutablePath(): string {
   if (
     cachedGitExecutablePath &&
@@ -167,6 +188,7 @@ function resolveGitExecutablePath(): string {
   );
 }
 
+/** Normalize git command options into canonical internal values. */
 export function normalizeGitCommandOptions(
   options?: GitCommandPriority | GitCommandOptions,
 ): { priority: GitCommandPriority; signal: AbortSignal | null } {
@@ -183,6 +205,10 @@ export function normalizeGitCommandOptions(
   };
 }
 
+/**
+ * Read-only snapshot for diagnostics and scheduling observability.
+ * Counts active and queued jobs across all cwd-scoped queues.
+ */
 export function getGitSchedulerStats(): {
   activeBackgroundCount: number;
   activeForegroundCount: number;
@@ -214,6 +240,7 @@ export function getGitSchedulerStats(): {
   };
 }
 
+/** Remove a queued task from whichever bucket (foreground/background) currently holds it. */
 function removeGitCommandTask(
   queue: {
     backgroundTasks: GitCommandQueueTask[];
@@ -233,10 +260,15 @@ function removeGitCommandTask(
   }
 }
 
+/** Reject a queued task with a normalized abort error. */
 function abortQueuedGitTask(task: GitCommandQueueTask, reason: string): void {
   task.reject(createAbortError(null, reason));
 }
 
+/**
+ * Cancel active background work for a repository and clear remaining queue entries.
+ * Called when a foreground request arrives and must preempt lower-priority tasks.
+ */
 function abortBackgroundGitCommands(reason: string): void {
   for (const [cwd, queue] of gitCommandQueueMap) {
     if (queue.activeTask?.priority === "background") {
@@ -259,6 +291,10 @@ function abortBackgroundGitCommands(reason: string): void {
   }
 }
 
+/**
+ * Start the next available task for this cwd, honoring foreground-first scheduling.
+ * Completed tasks re-trigger scheduling to continue draining queued work.
+ */
 function scheduleGitCommandQueue(cwd: string): void {
   const queue = gitCommandQueueMap.get(cwd);
   if (!queue || queue.active) {
@@ -285,6 +321,10 @@ function scheduleGitCommandQueue(cwd: string): void {
   nextTask.run();
 }
 
+/**
+ * Enqueue a git command with cancellation-aware execution.
+ * Foreground tasks preempt background, with deduplicated queue bookkeeping by cwd.
+ */
 function enqueueGitCommand<T>(
   cwd: string,
   priority: GitCommandPriority,
@@ -396,6 +436,10 @@ function enqueueGitCommand<T>(
   });
 }
 
+/**
+ * Spawn git with normalized options and return raw command output.
+ * Command execution is serialized via the scheduler and cancellation-aware.
+ */
 async function runGitCommandResult(
   cwd: string,
   args: string[],
@@ -430,6 +474,7 @@ async function runGitCommandResult(
   });
 }
 
+/** Build a user-facing message from git exit status and captured stderr. */
 function gitCommandFailureMessage(result: {
   exitCode: number;
   stderr: string;
@@ -439,6 +484,7 @@ function gitCommandFailureMessage(result: {
   );
 }
 
+/** Detect common "no HEAD yet / empty repository" failures from git history calls. */
 function isNoHeadGitHistoryFailure(result: {
   exitCode: number;
   stderr: string;
@@ -457,6 +503,10 @@ function isNoHeadGitHistoryFailure(result: {
   );
 }
 
+/**
+ * Run git commands used for history reads where an empty/no-HEAD repo
+ * should be treated as a valid "no data" state.
+ */
 async function runGitHistoryCommand(
   cwd: string,
   args: string[],
@@ -472,6 +522,9 @@ async function runGitHistoryCommand(
   throw new Error(gitCommandFailureMessage(result));
 }
 
+/**
+ * Execute git and throw on non-zero exit. Returns trimmed stdout on success.
+ */
 export async function runGitCommand(
   cwd: string,
   args: string[],
@@ -488,11 +541,13 @@ export async function runGitCommand(
   return stdout.trimEnd();
 }
 
+/** Normalize an absolute worktree-relative git path to slash-delimited relative form. */
 export function normalizeGitPath(worktreePath: string, value: string): string {
   const resolvedPath = resolve(worktreePath, value);
   return relative(worktreePath, resolvedPath).replace(/\\/g, "/");
 }
 
+/** Split command output into logical lines while normalizing CRLF. */
 function splitLines(value: string): string[] {
   if (!value) {
     return [];
@@ -500,6 +555,9 @@ function splitLines(value: string): string[] {
   return value.replace(/\r\n/g, "\n").split("\n");
 }
 
+/**
+ * Build a synthetic add diff for binary/add-only files where `git diff` may be empty.
+ */
 function buildSyntheticAddDiff(path: string, content: string): string {
   const lines = splitLines(content);
   const header = ["--- /dev/null", `+++ b/${path}`];
@@ -513,6 +571,9 @@ function buildSyntheticAddDiff(path: string, content: string): string {
   ].join("\n");
 }
 
+/**
+ * Build a synthetic delete diff for deleted files when HEAD content must be rendered.
+ */
 function buildSyntheticDeleteDiff(path: string, content: string): string {
   const lines = splitLines(content);
   const header = [`--- a/${path}`, "+++ /dev/null"];
@@ -526,10 +587,14 @@ function buildSyntheticDeleteDiff(path: string, content: string): string {
   ].join("\n");
 }
 
+/** Async helper for reading text content when synthesizing diffs. */
 async function readTextFile(path: string): Promise<string> {
   return Bun.file(path).text();
 }
 
+/**
+ * History/read methods may be called in empty repos; this handles both.
+ */
 async function runGitDiffCommandAllowNoHead(
   cwd: string,
   args: string[],
@@ -545,6 +610,7 @@ async function runGitDiffCommandAllowNoHead(
   throw new Error(gitCommandFailureMessage(result));
 }
 
+/** Join staged/unstaged diff payloads while dropping empty segments. */
 function joinDiffSections(sections: Array<string | null | undefined>): string {
   return sections
     .map((section) => section?.trim())
@@ -552,6 +618,9 @@ function joinDiffSections(sections: Array<string | null | undefined>): string {
     .join("\n\n");
 }
 
+/**
+ * Read diff for a single change request, preferring git diff output when possible.
+ */
 export async function readFileChangeDiff(
   worktreePath: string,
   changePath: string,
@@ -600,6 +669,10 @@ export async function readFileChangeDiff(
   return "";
 }
 
+/**
+ * Resolve and build a best-effort diff for one change event.
+ * Tries tracked diffs first and falls back to synthetic output when needed.
+ */
 export async function readWorktreeChangeDiff(
   worktreePath: string,
   change: RpcWorktreeChange,
@@ -684,6 +757,7 @@ export async function readWorktreeChangeDiff(
   return "";
 }
 
+/** Parse `git worktree list --porcelain` output into worktree records. */
 function parseWorktreeList(raw: string): RpcWorktree[] {
   if (!raw.trim()) {
     return [];
@@ -734,6 +808,9 @@ function parseWorktreeList(raw: string): RpcWorktree[] {
   return records;
 }
 
+/**
+ * List linked worktrees via porcelain format and normalize returned paths to abs.
+ */
 export async function listGitWorktreesForProjectPath(
   projectPath: string,
   options?: GitCommandPriority | GitCommandOptions,
@@ -749,6 +826,9 @@ export async function listGitWorktreesForProjectPath(
   }));
 }
 
+/**
+ * Read path status entries (`git diff --name-status`) for baseline snapshot deltas.
+ */
 async function readDiff(
   worktreePath: string,
   options?: GitCommandPriority | GitCommandOptions,
@@ -764,6 +844,7 @@ async function readDiff(
   return raw.split(/\r?\n/).filter(Boolean);
 }
 
+/** Read short file status output for quick file list snapshots. */
 async function readFiles(
   worktreePath: string,
   options?: GitCommandPriority | GitCommandOptions,
@@ -775,6 +856,7 @@ async function readFiles(
   return raw.split(/\r?\n/).filter(Boolean);
 }
 
+/** Map porcelain status char into typed change status expected by RPC types. */
 function normalizeWorktreeChangeStatus(
   code: string,
 ): RpcWorktreeChangeStatus | null {
@@ -798,6 +880,7 @@ function normalizeWorktreeChangeStatus(
   }
 }
 
+/** Parse NUL-delimited `git status --porcelain=v1 -z` records into structures. */
 function parseWorktreeChanges(raw: string): RpcWorktreeChange[] {
   if (!raw) {
     return [];
@@ -839,6 +922,7 @@ function parseWorktreeChanges(raw: string): RpcWorktreeChange[] {
   return changes.sort((left, right) => left.path.localeCompare(right.path));
 }
 
+/** Parse current worktree modifications using porcelain format with rename handling. */
 async function readWorktreeChanges(
   worktreePath: string,
   options?: GitCommandPriority | GitCommandOptions,
@@ -851,6 +935,9 @@ async function readWorktreeChanges(
   return parseWorktreeChanges(raw);
 }
 
+/**
+ * Read worktree snapshot pieces in parallel, aborting siblings if any query fails.
+ */
 export async function readWorktreeSnapshot(
   worktreePath: string,
   options?: GitCommandPriority | GitCommandOptions,
@@ -882,6 +969,7 @@ export async function readWorktreeSnapshot(
   };
 }
 
+/** Validate/normalize user-provided cursor for chunked file reads. */
 function normalizeWorktreeFileContentCursor(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return 0;
@@ -890,6 +978,7 @@ function normalizeWorktreeFileContentCursor(value: unknown): number {
   return Math.floor(value);
 }
 
+/** Normalize page size with clamp and positive-integer enforcement. */
 function normalizeWorktreeFileContentPageSize(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     return DEFAULT_WORKTREE_FILE_CONTENT_PAGE_BYTES;
@@ -901,6 +990,7 @@ function normalizeWorktreeFileContentPageSize(value: unknown): number {
   );
 }
 
+/** Heuristic binary detection via NUL byte in retrieved byte chunk. */
 function isLikelyBinaryContent(bytes: Uint8Array): boolean {
   for (const byte of bytes) {
     if (byte === 0) {
@@ -911,6 +1001,9 @@ function isLikelyBinaryContent(bytes: Uint8Array): boolean {
   return false;
 }
 
+/**
+ * Stream-read a fixed-size chunk of a file and return base64 payload metadata.
+ */
 export async function readWorktreeFileContentPage(
   worktreePath: string,
   filePath: string,
@@ -1007,6 +1100,9 @@ export async function readWorktreeFileContentPage(
   };
 }
 
+/**
+ * Construct a stable base summary object when git history is unavailable.
+ */
 function emptyGitHistorySummary(
   projectId: number,
   worktreePath: string,
@@ -1027,6 +1123,9 @@ function emptyGitHistorySummary(
   };
 }
 
+/**
+ * Parse a single non-decorated log record emitted with known field separators.
+ */
 function parseGitHistoryEntryRecord(record: string): RpcGitHistoryEntry | null {
   const [hash, shortHash, subject, authorName, committedAt] = record.split(
     GIT_LOG_FIELD_SEPARATOR,
@@ -1044,6 +1143,7 @@ function parseGitHistoryEntryRecord(record: string): RpcGitHistoryEntry | null {
   };
 }
 
+/** Parse every non-empty decorated-or-not entry in a git log payload. */
 function parseGitHistoryEntries(raw: string): RpcGitHistoryEntry[] {
   if (!raw) {
     return [];
@@ -1057,6 +1157,9 @@ function parseGitHistoryEntries(raw: string): RpcGitHistoryEntry[] {
     .filter((entry): entry is RpcGitHistoryEntry => entry !== null);
 }
 
+/**
+ * Parse one log record containing decoration metadata (`%D` for HEAD branch tags).
+ */
 function parseDecoratedGitHistoryEntryRecord(
   record: string,
 ): DecoratedGitHistoryEntry | null {
@@ -1076,6 +1179,9 @@ function parseDecoratedGitHistoryEntryRecord(
   };
 }
 
+/**
+ * Parse multiple decorated log records and drop malformed entries.
+ */
 function parseDecoratedGitHistoryEntries(
   raw: string,
 ): DecoratedGitHistoryEntry[] {
@@ -1091,6 +1197,7 @@ function parseDecoratedGitHistoryEntries(
     .filter((entry): entry is DecoratedGitHistoryEntry => entry !== null);
 }
 
+/** Extract checked-out branch name from `%D` decoration string. */
 function parseGitBranchFromDecoration(decoration: string): string | null {
   for (const token of decoration.split(",")) {
     const trimmedToken = token.trim();
@@ -1105,6 +1212,9 @@ function parseGitBranchFromDecoration(decoration: string): string | null {
   return null;
 }
 
+/**
+ * Compute a compact history signature for cache invalidation comparisons.
+ */
 function buildGitHistorySignature(
   branch: string | null,
   headHash: string | null,
@@ -1112,6 +1222,8 @@ function buildGitHistorySignature(
   return [branch ?? "", headHash ?? ""].join("\n");
 }
 
+/** Convert page-limit request to an integer in [1, DEFAULT_GIT_HISTORY_PAGE_SIZE]. */
+/** Convert page-limit request to a bounded positive integer. */
 export function normalizeGitHistoryPageLimit(limit?: number): number {
   if (typeof limit !== "number" || !Number.isInteger(limit)) {
     return DEFAULT_GIT_HISTORY_PAGE_SIZE;
@@ -1119,6 +1231,7 @@ export function normalizeGitHistoryPageLimit(limit?: number): number {
   return Math.min(Math.max(limit, 1), DEFAULT_GIT_HISTORY_PAGE_SIZE);
 }
 
+/** Read current HEAD/branch metadata and return history summary plus signature. */
 export async function readGitHistorySummary(
   projectId: number,
   worktreePath: string,
@@ -1183,6 +1296,9 @@ export async function readGitHistorySummary(
   };
 }
 
+/**
+ * Fetch a paged list of commit entries and indicate if another page exists.
+ */
 export async function readGitHistoryPageEntries(
   worktreePath: string,
   offset: number,
@@ -1219,6 +1335,9 @@ export async function readGitHistoryPageEntries(
   };
 }
 
+/**
+ * Read first page of commit history and derive a summary/signature from HEAD.
+ */
 export async function readGitHistoryFirstPage(
   projectId: number,
   worktreePath: string,
@@ -1295,6 +1414,9 @@ export async function readGitHistoryFirstPage(
   };
 }
 
+/**
+ * Read full commit metadata + diff with stable field separator framing.
+ */
 export async function readGitCommitDiffResult(
   projectId: number,
   worktreePath: string,
