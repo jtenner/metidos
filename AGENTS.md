@@ -67,7 +67,8 @@
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
-│  │  └─ rpc-schema.ts
+│  │  ├─ rpc-schema.ts
+│  │  └─ starvation-harness.ts
 │  └─ mainview/
 │     ├─ App.tsx
 │     ├─ app/

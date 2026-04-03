@@ -20,4 +20,4 @@ Source: server request starvation follow-up
 - [x] Expensive request concurrency caps: Add explicit concurrency limits for worktree restore, git history refresh, task cache rebuilds, and diff loading so one client cannot saturate the shared process.
 - Static server isolation: Split static asset and page serving from RPC/task execution so active tasks cannot starve `/`, `/index.js`, or other startup requests.
 - [x] Overload telemetry: Add event-loop lag, pending RPC count, queued git work, task rebuild duration, and persistence latency metrics to `/health` and server logs.
-- Starvation regression harness: Add a repeatable test or script that starts active tasks and verifies a second client can still load the app and complete core startup requests within a latency budget.
+- [x] Starvation regression harness: Add a repeatable test or script that starts active tasks and verifies a second client can still load the app and complete core startup requests within a latency budget.

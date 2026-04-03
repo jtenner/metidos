@@ -2111,7 +2111,11 @@ async function ensureTrackedProjectWorktree(
     return known;
   }
 
-  await refreshProjectPoll(project.id, options);
+  await awaitAbortableResult(
+    refreshProjectPoll(project.id, options),
+    options?.signal ?? null,
+    "Project worktree read was aborted.",
+  );
   const refreshed = trackedProjectWorktree(state, worktreePath);
   if (refreshed) {
     return refreshed;
@@ -2167,10 +2171,14 @@ export async function openProjectProcedure(
 
     let worktrees: RpcWorktree[];
     try {
-      worktrees = await readProjectWorktrees(
-        projectPath,
-        existingProject?.id,
-        requestGitOptions,
+      worktrees = await awaitAbortableResult(
+        readProjectWorktrees(
+          projectPath,
+          existingProject?.id,
+          requestGitOptions,
+        ),
+        context?.signal,
+        "Project open was aborted.",
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -2203,10 +2211,10 @@ export async function listProjectWorktreesProcedure(
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId);
     ensureProjectPoller(project);
-    const worktrees = await readProjectWorktrees(
-      project.path,
-      project.id,
-      requestGitOptions,
+    const worktrees = await awaitAbortableResult(
+      readProjectWorktrees(project.path, project.id, requestGitOptions),
+      context?.signal,
+      "Project worktree read was aborted.",
     );
 
     return {

@@ -385,10 +385,10 @@ function enqueueGitCommand<T>(
     }
 
     if (priority === "foreground") {
+      queue.foregroundTasks.push(task);
       abortBackgroundGitCommands(
         `Foreground git command preempted background work for ${cwd}.`,
       );
-      queue.foregroundTasks.push(task);
     } else {
       queue.backgroundTasks.push(task);
     }
