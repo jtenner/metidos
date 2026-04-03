@@ -217,7 +217,13 @@ export type RpcProcedureCallOptions = {
   priority?: RpcRequestPriority;
 };
 
+export type RpcAuthContext = {
+  authBypass: boolean;
+  sessionId: string | null;
+};
+
 export type RpcRequestContext = {
+  auth: RpcAuthContext;
   signal: AbortSignal;
   priority: RpcRequestPriority;
   timeoutMs: number | null;
@@ -551,6 +557,8 @@ export type AppRPCSchema = {
       params: {
         projectId: number;
         worktreePath: string;
+        currentProjectId?: number | null;
+        currentWorktreePath?: string | null;
         model?: string | null;
         reasoningEffort?: RpcCodexReasoningEffort | null;
         unsafeMode?: boolean | null;

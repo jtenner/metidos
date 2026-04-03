@@ -9,14 +9,17 @@ import type { AuthServiceError } from "./auth-service";
 import {
   buildClearedSessionCookieHeader,
   buildSessionCookieHeader,
+  DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
   issueWebSocketTicket,
   login,
   logout,
   prepareTotpEnrollment,
   readSessionCookie,
+  requireFreshStepUp,
   resolveSession,
   setupAuth,
+  stepUpSession,
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
 import { getAuthSettings, migrateDatabase } from "./db";
@@ -247,6 +250,63 @@ describe("auth service", () => {
         ticketId: ticket.ticket,
       }),
     ).toThrow("The websocket ticket is invalid or expired.");
+  });
+
+  it("requires a fresh step-up window for high-risk actions", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+
+    expect(() =>
+      requireFreshStepUp(database, {
+        actionDescription: "run project tasks",
+        nowMs: nowMs + 1_000,
+        sessionId: setupResult.session.id,
+      }),
+    ).toThrow(
+      "A fresh step-up authentication is required to run project tasks.",
+    );
+
+    const stepUpResult = await stepUpSession(database, {
+      appDataDir,
+      nowMs: nowMs + 2_000,
+      primaryFactor: "123456",
+      sessionId: setupResult.session.id,
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 2_000),
+    });
+    expect(stepUpResult.stepUpValidUntil).toBe(
+      new Date(nowMs + 2_000 + DEFAULT_STEP_UP_LIFETIME_MS).toISOString(),
+    );
+
+    expect(
+      requireFreshStepUp(database, {
+        actionDescription: "run project tasks",
+        nowMs: nowMs + 3_000,
+        sessionId: setupResult.session.id,
+      }).id,
+    ).toBe(setupResult.session.id);
+
+    expect(() =>
+      requireFreshStepUp(database, {
+        actionDescription: "run project tasks",
+        nowMs: nowMs + DEFAULT_STEP_UP_LIFETIME_MS + 3_000,
+        sessionId: setupResult.session.id,
+      }),
+    ).toThrow(
+      "A fresh step-up authentication is required to run project tasks.",
+    );
   });
 
   it("serializes and clears session cookies", () => {

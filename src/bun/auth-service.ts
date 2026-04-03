@@ -30,6 +30,7 @@ import {
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
   setAuthFailureState,
+  setAuthSessionStepUpValidUntil,
   touchAuthSession,
   upsertAuthSettings,
 } from "./db";
@@ -39,6 +40,7 @@ const SESSION_COOKIE_PATH = "/";
 const DEFAULT_TOTP_ISSUER = "Jolt";
 const LOGIN_LOCKOUT_AFTER_FAILURES = 3;
 const LOGIN_LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
+export const DEFAULT_STEP_UP_LIFETIME_MS = 10 * 60 * 1000;
 const WEBSOCKET_TICKET_LIFETIME_MS = 60 * 1000;
 
 type AuthSecretOptions = {
@@ -79,6 +81,15 @@ type IssueWebSocketTicketInput = TimestampOptions & {
   sessionId: string;
 };
 
+type RequireFreshStepUpInput = TimestampOptions & {
+  actionDescription: string;
+  sessionId: string | null;
+};
+
+type StepUpInput = LoginInput & {
+  sessionId: string;
+};
+
 type ConsumeWebSocketTicketInput = TimestampOptions & {
   sessionId: string;
   ticketId: string;
@@ -111,6 +122,10 @@ type IssueWebSocketTicketResult = {
   ticket: string;
 };
 
+type StepUpResult = {
+  stepUpValidUntil: string;
+};
+
 export class AuthServiceError extends Error {
   constructor(
     readonly code:
@@ -118,6 +133,7 @@ export class AuthServiceError extends Error {
       | "auth_not_configured"
       | "auth_locked"
       | "invalid_credentials"
+      | "step_up_required"
       | "session_required"
       | "session_expired"
       | "invalid_websocket_ticket",
@@ -544,6 +560,82 @@ export function logout(database: Database, sessionId: string | null): void {
     return;
   }
   deleteAuthSession(database, sessionId);
+}
+
+/**
+ * Re-verify the configured primary factor plus TOTP for a live session and open a short freshness window.
+ */
+export async function stepUpSession(
+  database: Database,
+  input: StepUpInput,
+): Promise<StepUpResult> {
+  const now = nowDate(input.nowMs);
+  const session = resolveSession(database, {
+    nowMs: now.getTime(),
+    sessionId: input.sessionId,
+    touch: true,
+  });
+  if (!session) {
+    throw new AuthServiceError(
+      "session_required",
+      "A valid authenticated session is required.",
+      401,
+    );
+  }
+
+  await verifyPrimaryFactorAndTotp(database, input);
+  const stepUpValidUntil = addMilliseconds(
+    now,
+    DEFAULT_STEP_UP_LIFETIME_MS,
+  ).toISOString();
+  setAuthSessionStepUpValidUntil(database, session.id, stepUpValidUntil);
+
+  return {
+    stepUpValidUntil,
+  };
+}
+
+/**
+ * Ensure the current session has a fresh step-up window for a high-risk action.
+ */
+export function requireFreshStepUp(
+  database: Database,
+  input: RequireFreshStepUpInput,
+): AuthSessionRecord {
+  const now = nowDate(input.nowMs);
+  const session = resolveSession(database, {
+    nowMs: now.getTime(),
+    sessionId: input.sessionId,
+    touch: true,
+  });
+  if (!session) {
+    throw new AuthServiceError(
+      "session_required",
+      "A valid authenticated session is required.",
+      401,
+    );
+  }
+
+  if (
+    session.stepUpValidUntil &&
+    Date.parse(session.stepUpValidUntil) <= now.getTime()
+  ) {
+    setAuthSessionStepUpValidUntil(database, session.id, null);
+    session.stepUpValidUntil = null;
+  }
+
+  if (!session.stepUpValidUntil) {
+    throw new AuthServiceError(
+      "step_up_required",
+      `A fresh step-up authentication is required to ${input.actionDescription}.`,
+      403,
+      {
+        action: input.actionDescription,
+      },
+    );
+  }
+
+  return session;
 }
 
 /**

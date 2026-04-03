@@ -486,7 +486,10 @@ export default function AuthShell({
             </div>
           </div>
         ) : null}
-        <App procedures={procedures} />
+        <App
+          primaryFactorType={status.primaryFactorType}
+          procedures={procedures}
+        />
       </div>
     );
   }

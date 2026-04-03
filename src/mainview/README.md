@@ -12,6 +12,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, login, logout, status polling, and websocket ticket acquisition.
 
+`rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
+
 `index.ts` is the JS entry point that wires runtime initialization and React mounting.
 
 `index.html` provides the host document, mount point, and static metadata required by the frontend bundle.

@@ -18,6 +18,7 @@ import {
   issueWebSocketTicket,
 } from "./auth-client";
 import AuthShell from "./auth-shell";
+import { normalizeRpcErrorDetails, RpcError } from "./rpc-errors";
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -49,6 +50,8 @@ type RpcResponseMessage = {
   ok: boolean;
   result?: unknown;
   error?: string;
+  errorCode?: string;
+  errorDetails?: Record<string, string | null> | null;
 };
 
 type RpcReloadMessage = {
@@ -414,7 +417,13 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         pending.resolve(payload.result);
         return;
       }
-      pending.reject(new Error(payload.error || "RPC request failed"));
+      pending.reject(
+        new RpcError(
+          payload.error || "RPC request failed",
+          payload.errorCode ?? "rpc_error",
+          normalizeRpcErrorDetails(payload.errorDetails),
+        ),
+      );
     });
 
     nextSocket.addEventListener("close", () => {

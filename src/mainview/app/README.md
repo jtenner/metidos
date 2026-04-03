@@ -9,6 +9,9 @@ The modules below are grouped into action panels, data derivation/state, workspa
 `action-menus.tsx`
 Provides contextual action menus (`ProjectActionMenu`, `ThreadActionMenu`) used throughout sidebar and thread rows to surface project/thread lifecycle operations.
 
+`auth-step-up-dialog.tsx`
+Renders the step-up confirmation dialog used when a privileged action requires a fresh primary-factor plus TOTP re-check.
+
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread/task workspaces.
 

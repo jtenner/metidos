@@ -101,9 +101,11 @@
 │     ├─ App.tsx
 │     ├─ auth-client.ts
 │     ├─ auth-shell.tsx
+│     ├─ rpc-errors.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx
+│     │  ├─ auth-step-up-dialog.tsx
 │     │  ├─ chat-workspace.tsx
 │     │  ├─ desktop-sidebar.tsx
 │     │  ├─ diff-workspace.tsx

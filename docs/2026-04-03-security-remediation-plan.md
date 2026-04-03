@@ -103,6 +103,10 @@ Optional later addition:
 
 Require a fresh step-up for privileged actions. Do not treat "logged in" as enough for everything.
 
+Implementation default:
+
+- step-up freshness lasts 10 minutes after a successful primary-factor plus TOTP re-check
+
 Actions that should require step-up:
 
 - running package scripts from the UI

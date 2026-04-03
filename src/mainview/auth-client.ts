@@ -200,6 +200,23 @@ export async function logoutAuth(): Promise<AuthStatus> {
   return payload.status;
 }
 
+export async function stepUpAuth(input: {
+  primaryFactor: string;
+  totpCode: string;
+}): Promise<{
+  status: AuthStatus;
+  stepUpValidUntil: string;
+}> {
+  return requestAuthJson<{
+    ok: true;
+    status: AuthStatus;
+    stepUpValidUntil: string;
+  }>("/auth/step-up", {
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
 export async function issueWebSocketTicket(): Promise<{
   expiresAt: string;
   ticket: string;

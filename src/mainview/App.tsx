@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { AuthPrimaryFactorType } from "../bun/db";
 import type {
   ProjectProcedures,
   RpcCodexModelOption,
@@ -30,6 +31,7 @@ import type {
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import { ProjectActionMenu, ThreadActionMenu } from "./app/action-menus";
+import { AuthStepUpDialog } from "./app/auth-step-up-dialog";
 import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
 import { DiffWorkspace } from "./app/diff-workspace";
@@ -96,13 +98,16 @@ import { ThreadList } from "./app/thread-list-row";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
+import { stepUpAuth } from "./auth-client";
 import {
   readChatComposerDraft,
   setChatComposerDraft,
 } from "./controls/chat-composer-control";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
+import { isStepUpRequiredError } from "./rpc-errors";
 
 type AppProps = {
+  primaryFactorType: AuthPrimaryFactorType | null;
   procedures: ProjectProcedures;
 };
 
@@ -238,7 +243,10 @@ declare global {
  * It composes sidebar/workspace panels, thread/project state derivation, and
  * RPC-driven update handlers into a single interface.
  */
-export default function App({ procedures }: AppProps): JSX.Element {
+export default function App({
+  primaryFactorType,
+  procedures,
+}: AppProps): JSX.Element {
   // Persisted UI state is loaded once and stored in a ref so initialization is
   // cached while state references remain stable across renders.
   const initialMainviewStateRef = useRef<PersistedMainviewState | null>(null);
@@ -350,6 +358,12 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
     string | null
   >(null);
+  const [stepUpActionLabel, setStepUpActionLabel] = useState("");
+  const [stepUpDialogOpen, setStepUpDialogOpen] = useState(false);
+  const [stepUpError, setStepUpError] = useState("");
+  const [stepUpPrimaryFactor, setStepUpPrimaryFactor] = useState("");
+  const [stepUpTotpCode, setStepUpTotpCode] = useState("");
+  const [isSubmittingStepUp, setIsSubmittingStepUp] = useState(false);
   const [expandedTranscriptItemIds, setExpandedTranscriptItemIds] = useState(
     () => new Set<string>(),
   );
@@ -373,11 +387,87 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const worktreeThreadPopoverRef = useRef<HTMLDivElement | null>(null);
   const desktopSidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileSidebarScrollRef = useRef<HTMLElement | null>(null);
+  const stepUpRequestResolveRef = useRef<
+    ((authorized: boolean) => void) | null
+  >(null);
   const projectActionMenuRequestId = useRef(0);
   const projectTasksRequestIdRef = useRef(0);
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryRequestIdRef = useRef(0);
   const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
+
+  const closeStepUpDialog = useCallback((authorized: boolean) => {
+    setStepUpDialogOpen(false);
+    setIsSubmittingStepUp(false);
+    setStepUpError("");
+    setStepUpPrimaryFactor("");
+    setStepUpTotpCode("");
+    const resolveStepUp = stepUpRequestResolveRef.current;
+    stepUpRequestResolveRef.current = null;
+    resolveStepUp?.(authorized);
+  }, []);
+
+  const requestStepUp = useCallback((actionLabel: string): Promise<boolean> => {
+    setStepUpActionLabel(actionLabel);
+    setStepUpDialogOpen(true);
+    setStepUpError("");
+    setStepUpPrimaryFactor("");
+    setStepUpTotpCode("");
+    setIsSubmittingStepUp(false);
+
+    return new Promise<boolean>((resolve) => {
+      stepUpRequestResolveRef.current = resolve;
+    });
+  }, []);
+
+  const executeWithStepUp = useCallback(
+    async <T,>(
+      actionLabel: string,
+      action: () => Promise<T>,
+    ): Promise<T | null> => {
+      try {
+        return await action();
+      } catch (error) {
+        if (!isStepUpRequiredError(error)) {
+          throw error;
+        }
+
+        const authorized = await requestStepUp(actionLabel);
+        if (!authorized) {
+          return null;
+        }
+        return action();
+      }
+    },
+    [requestStepUp],
+  );
+
+  const submitStepUp = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setIsSubmittingStepUp(true);
+      setStepUpError("");
+      try {
+        await stepUpAuth({
+          primaryFactor: stepUpPrimaryFactor,
+          totpCode: stepUpTotpCode,
+        });
+        closeStepUpDialog(true);
+      } catch (error) {
+        setStepUpError(error instanceof Error ? error.message : String(error));
+        setIsSubmittingStepUp(false);
+      }
+    },
+    [closeStepUpDialog, stepUpPrimaryFactor, stepUpTotpCode],
+  );
+
+  useEffect(() => {
+    return () => {
+      stepUpRequestResolveRef.current?.(false);
+      stepUpRequestResolveRef.current = null;
+    };
+  }, []);
+
   const gitHistoryDiffRequestIdRef = useRef(0);
   const gitHistoryDiffAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryDiffPreloadAbortControllerRef = useRef(
@@ -1333,14 +1423,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setUnsafeModeControlError("");
       setChatError("");
       try {
-        const detail = await procedures.createThread({
-          projectId,
-          worktreePath,
-          model: activeCodexModel || defaultCodexModel || null,
-          reasoningEffort:
-            activeReasoningEffort || defaultCodexReasoningEffort || null,
-          unsafeMode: activeUnsafeMode,
-        });
+        const detail = await executeWithStepUp(
+          "create a thread outside the current workspace",
+          () =>
+            procedures.createThread({
+              projectId,
+              worktreePath,
+              currentProjectId: selectedProjectIdRef.current,
+              currentWorktreePath: selectedWorktreePathRef.current,
+              model: activeCodexModel || defaultCodexModel || null,
+              reasoningEffort:
+                activeReasoningEffort || defaultCodexReasoningEffort || null,
+              unsafeMode: activeUnsafeMode,
+            }),
+        );
+        if (!detail) {
+          return null;
+        }
         const isActiveSelection =
           selectedProjectIdRef.current === projectId &&
           selectedWorktreePathRef.current === worktreePath;
@@ -1396,6 +1495,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       activeUnsafeMode,
       defaultCodexModel,
       defaultCodexReasoningEffort,
+      executeWithStepUp,
       loadProjectWorktrees,
       procedures,
       syncThreadContext,
@@ -1996,13 +2096,22 @@ export default function App({ procedures }: AppProps): JSX.Element {
 
       let createdDetail: RpcThreadDetail | null = null;
       try {
-        createdDetail = await procedures.createThread({
-          projectId: request.projectId,
-          worktreePath: request.worktreePath,
-          model: request.model,
-          reasoningEffort: request.reasoningEffort,
-          unsafeMode: request.unsafeMode,
-        });
+        createdDetail = await executeWithStepUp(
+          "create a thread outside the current workspace",
+          () =>
+            procedures.createThread({
+              projectId: request.projectId,
+              worktreePath: request.worktreePath,
+              currentProjectId: selectedProjectIdRef.current,
+              currentWorktreePath: selectedWorktreePathRef.current,
+              model: request.model,
+              reasoningEffort: request.reasoningEffort,
+              unsafeMode: request.unsafeMode,
+            }),
+        );
+        if (!createdDetail) {
+          return;
+        }
 
         const finalDetail =
           request.input.trim().length > 0
@@ -2033,6 +2142,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [
       applyOpenedThreadDetail,
       dismissThreadStartRequest,
+      executeWithStepUp,
       isApprovingThreadStartRequest,
       procedures,
     ],
@@ -2531,7 +2641,13 @@ export default function App({ procedures }: AppProps): JSX.Element {
       const removedProjectPath =
         projects.find((project) => project.id === projectId)?.path ?? null;
       try {
-        await procedures.deleteProject({ projectId });
+        const deletedProject = await executeWithStepUp(
+          "delete this project",
+          () => procedures.deleteProject({ projectId }),
+        );
+        if (!deletedProject) {
+          return;
+        }
         const [loaded, loadedThreads] = await Promise.all([
           procedures.listProjects({ includeClosed: true }),
           procedures.listThreads(),
@@ -2579,6 +2695,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [
       clearProjectState,
       clearThreadSelection,
+      executeWithStepUp,
       hydrateProjectRows,
       openThread,
       projects,
@@ -3535,19 +3652,24 @@ export default function App({ procedures }: AppProps): JSX.Element {
       setReasoningEffortControlError("");
       setUnsafeModeControlError("");
       try {
-        const detail = await procedures.runProjectTask({
-          projectId: requestedProjectId,
-          worktreePath: requestedWorktreePath,
-          task,
-          threadId: selectedThread?.id ?? null,
-          model: selectedThread
-            ? null
-            : activeCodexModel || defaultCodexModel || null,
-          reasoningEffort: selectedThread
-            ? null
-            : activeReasoningEffort || defaultCodexReasoningEffort || null,
-          unsafeMode: selectedThread ? null : activeUnsafeMode,
-        });
+        const detail = await executeWithStepUp("run this project task", () =>
+          procedures.runProjectTask({
+            projectId: requestedProjectId,
+            worktreePath: requestedWorktreePath,
+            task,
+            threadId: selectedThread?.id ?? null,
+            model: selectedThread
+              ? null
+              : activeCodexModel || defaultCodexModel || null,
+            reasoningEffort: selectedThread
+              ? null
+              : activeReasoningEffort || defaultCodexReasoningEffort || null,
+            unsafeMode: selectedThread ? null : activeUnsafeMode,
+          }),
+        );
+        if (!detail) {
+          return;
+        }
         setThreads((prev) => upsertThreadList(prev, detail.thread));
         if (
           selectedProjectIdRef.current !== requestedProjectId ||
@@ -3580,6 +3702,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       activeSelectedWorktreePath,
       defaultCodexModel,
       defaultCodexReasoningEffort,
+      executeWithStepUp,
       loadProjectWorktrees,
       procedures,
       selectedProject,
@@ -4754,6 +4877,27 @@ export default function App({ procedures }: AppProps): JSX.Element {
           ) : null}
         </div>
       ) : null}
+      <AuthStepUpDialog
+        actionLabel={stepUpActionLabel}
+        busy={isSubmittingStepUp}
+        error={stepUpError}
+        onCancel={() => {
+          closeStepUpDialog(false);
+        }}
+        onPrimaryFactorChange={(value) => {
+          setStepUpPrimaryFactor(
+            primaryFactorType === "pin" ? value.replace(/\D+/g, "") : value,
+          );
+        }}
+        onSubmit={submitStepUp}
+        onTotpCodeChange={(value) => {
+          setStepUpTotpCode(value.replace(/\D+/g, ""));
+        }}
+        open={stepUpDialogOpen}
+        primaryFactorType={primaryFactorType}
+        primaryFactorValue={stepUpPrimaryFactor}
+        totpCodeValue={stepUpTotpCode}
+      />
       {currentThreadStartRequest ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4 py-6">
           <div className="w-full max-w-xl rounded-2xl border border-[#3a4751] bg-[#151718] p-5 shadow-2xl shadow-black/50">

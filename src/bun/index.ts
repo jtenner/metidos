@@ -6,13 +6,16 @@ import {
   AuthServiceError,
   buildClearedSessionCookieHeader,
   buildSessionCookieHeader,
+  DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
   issueWebSocketTicket,
   login,
   logout,
   prepareTotpEnrollment,
   readSessionCookie,
+  requireFreshStepUp,
   setupAuth,
+  stepUpSession,
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
@@ -112,6 +115,10 @@ const SERVER_OVERLOAD_LOG_INTERVAL_MS = 10_000;
 const EVENT_LOOP_LAG_WARN_MS = 150;
 const PENDING_RPC_WARN_COUNT = 8;
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+type RpcSocketData = {
+  authBypass: boolean;
+  sessionId: string | null;
+};
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -142,6 +149,8 @@ type RpcResponseMessage =
       id: number;
       ok: false;
       error: string;
+      errorCode?: string;
+      errorDetails?: Record<string, string | null> | null;
     };
 
 type RpcReloadMessage = {
@@ -261,6 +270,43 @@ const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
 );
 
+function normalizeScopePath(path: string): string {
+  return resolve(path);
+}
+
+function createThreadRequiresStepUp(
+  params: AppRPCSchema["requests"]["createThread"]["params"],
+): boolean {
+  if (
+    typeof params.currentProjectId !== "number" ||
+    typeof params.currentWorktreePath !== "string" ||
+    params.currentWorktreePath.trim().length === 0
+  ) {
+    return false;
+  }
+
+  return (
+    params.projectId !== params.currentProjectId ||
+    normalizeScopePath(params.worktreePath) !==
+      normalizeScopePath(params.currentWorktreePath)
+  );
+}
+
+function requireFreshStepUpForRpcAction(
+  context: RpcRequestContext,
+  actionDescription: string,
+): void {
+  if (context.auth.authBypass) {
+    return;
+  }
+
+  requireFreshStepUp(initAppDatabase(), {
+    actionDescription,
+    nowMs: currentNowMs(),
+    sessionId: context.auth.sessionId,
+  });
+}
+
 const rpcHandlers: RpcRequestHandlerMap = {
   getHomeDirectory: () => getHomeDirectoryProcedure(),
   listDirectorySuggestions: (params) =>
@@ -275,13 +321,24 @@ const rpcHandlers: RpcRequestHandlerMap = {
   openWorktreesBatch: (params, context) =>
     openWorktreesBatchProcedure(params, context),
   closeProject: (params) => closeProjectProcedure(params),
-  deleteProject: (params) => deleteProjectProcedure(params),
+  deleteProject: (params, context) => {
+    requireFreshStepUpForRpcAction(context, "delete a project");
+    return deleteProjectProcedure(params);
+  },
   listProjectWorktrees: (params, context) =>
     listProjectWorktreesProcedure(params, context),
   listProjectTasks: (params, context) =>
     listProjectTasksProcedure(params, context),
   createWorktree: (params) => createWorktreeProcedure(params),
-  createThread: (params) => createThreadProcedure(params),
+  createThread: (params, context) => {
+    if (createThreadRequiresStepUp(params)) {
+      requireFreshStepUpForRpcAction(
+        context,
+        "create a thread outside the current workspace",
+      );
+    }
+    return createThreadProcedure(params);
+  },
   requestThreadStart: async (params) => {
     const request = await requestThreadStartProcedure(params);
     broadcastThreadStartRequestCreated(request);
@@ -291,7 +348,10 @@ const rpcHandlers: RpcRequestHandlerMap = {
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
   sendThreadMessage: (params) => sendThreadMessageProcedure(params),
   stopThreadTurn: (params) => stopThreadTurnProcedure(params),
-  runProjectTask: (params) => runProjectTaskProcedure(params),
+  runProjectTask: (params, context) => {
+    requireFreshStepUpForRpcAction(context, "run project tasks");
+    return runProjectTaskProcedure(params);
+  },
   renameThread: (params) => renameThreadProcedure(params),
   setThreadPinned: (params) => setThreadPinnedProcedure(params),
   updateThreadModel: (params) => updateThreadModelProcedure(params),
@@ -316,9 +376,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
   setWorktreePinned: (params) => setWorktreePinnedProcedure(params),
 };
 
-const rpcClients = new Set<ServerWebSocket<unknown>>();
+const rpcClients = new Set<ServerWebSocket<RpcSocketData>>();
 const pendingRpcRequestsByClient = new WeakMap<
-  ServerWebSocket<unknown>,
+  ServerWebSocket<RpcSocketData>,
   Map<number, PendingRpcRequest>
 >();
 const pendingMainviewChanges = new Set<string>();
@@ -691,6 +751,39 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
       );
     }
 
+    if (pathname === "/auth/step-up" && request.method === "POST") {
+      if (DEV_FLOW_MODE.authBypass) {
+        return jsonResponse({
+          ok: true,
+          status: getCurrentAuthStatus(),
+          stepUpValidUntil: new Date(
+            nowMs + DEFAULT_STEP_UP_LIFETIME_MS,
+          ).toISOString(),
+        });
+      }
+      if (!sessionId) {
+        throw new AuthServiceError(
+          "session_required",
+          "A valid authenticated session is required.",
+          401,
+        );
+      }
+
+      const body = await readJsonBody(request);
+      const result = await stepUpSession(database, {
+        nowMs,
+        primaryFactor: readRequiredString(body, "primaryFactor"),
+        sessionId,
+        totpCode: readRequiredString(body, "totpCode"),
+      });
+
+      return jsonResponse({
+        ok: true,
+        status: getCurrentAuthStatus(),
+        stepUpValidUntil: result.stepUpValidUntil,
+      });
+    }
+
     if (pathname === "/auth/logout" && request.method === "POST") {
       logout(database, sessionId);
       return jsonResponse(
@@ -939,6 +1032,25 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function buildRpcErrorPayload(
+  error: unknown,
+): Pick<
+  Extract<RpcResponseMessage, { ok: false }>,
+  "error" | "errorCode" | "errorDetails"
+> {
+  if (error instanceof AuthServiceError) {
+    return {
+      error: error.message,
+      errorCode: error.code,
+      errorDetails: error.details ?? null,
+    };
+  }
+
+  return {
+    error: toErrorMessage(error),
+  };
+}
+
 /**
  * Build cancellation `Error` with causal metadata while preserving names.
  */
@@ -995,7 +1107,7 @@ function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
  * Return (or create) a per-client map for pending RPC operations.
  */
 function getPendingRpcRequests(
-  client: ServerWebSocket<unknown>,
+  client: ServerWebSocket<RpcSocketData>,
 ): Map<number, PendingRpcRequest> {
   const existing = pendingRpcRequestsByClient.get(client);
   if (existing) {
@@ -1011,7 +1123,7 @@ function getPendingRpcRequests(
  * Cancel one request for a client when a matching cancel packet arrives.
  */
 function abortPendingRpcRequest(
-  client: ServerWebSocket<unknown>,
+  client: ServerWebSocket<RpcSocketData>,
   requestId: number,
 ): void {
   const pendingRequests = pendingRpcRequestsByClient.get(client);
@@ -1033,7 +1145,7 @@ function abortPendingRpcRequest(
  * Abort all outstanding requests for a socket (cleanup on disconnect/error paths).
  */
 function abortAllPendingRpcRequests(
-  client: ServerWebSocket<unknown>,
+  client: ServerWebSocket<RpcSocketData>,
   reason: string,
 ): void {
   const pendingRequests = pendingRpcRequestsByClient.get(client);
@@ -1480,8 +1592,8 @@ async function bootstrap(): Promise<void> {
             status: 403,
           });
         }
+        const sessionId = readSessionCookie(request.headers.get("cookie"));
         if (!DEV_FLOW_MODE.authBypass) {
-          const sessionId = readSessionCookie(request.headers.get("cookie"));
           const ticketId = new URL(request.url).searchParams.get("ticket");
           if (!sessionId || !ticketId) {
             return new Response("Authenticated websocket ticket required", {
@@ -1504,7 +1616,14 @@ async function bootstrap(): Promise<void> {
           }
         }
 
-        if (serverInstance.upgrade(request)) {
+        if (
+          serverInstance.upgrade(request, {
+            data: {
+              authBypass: DEV_FLOW_MODE.authBypass,
+              sessionId: DEV_FLOW_MODE.authBypass ? null : sessionId,
+            },
+          })
+        ) {
           return;
         }
         return new Response("WebSocket upgrade failed", { status: 400 });
@@ -1602,6 +1721,7 @@ async function bootstrap(): Promise<void> {
             try {
               const result = await awaitRequestResult(
                 handler(request.params, {
+                  auth: ws.data,
                   signal,
                   priority: request.priority,
                   timeoutMs: pending.timeoutMs,
@@ -1627,10 +1747,11 @@ async function bootstrap(): Promise<void> {
               const response: RpcResponseMessage = {
                 id: request.id,
                 ok: false,
-                error:
-                  isAbortError(error) && signal.aborted
-                    ? toRpcAbortMessage(request, pending, error)
-                    : toErrorMessage(error),
+                ...(isAbortError(error) && signal.aborted
+                  ? {
+                      error: toRpcAbortMessage(request, pending, error),
+                    }
+                  : buildRpcErrorPayload(error)),
                 type: "response",
               };
               ws.send(JSON.stringify(response satisfies RpcSocketMessage));
@@ -1655,7 +1776,7 @@ async function bootstrap(): Promise<void> {
             const response: RpcResponseMessage = {
               id: requestId,
               ok: false,
-              error: toErrorMessage(error),
+              ...buildRpcErrorPayload(error),
               type: "response",
             };
             ws.send(JSON.stringify(response satisfies RpcSocketMessage));
@@ -1663,7 +1784,7 @@ async function bootstrap(): Promise<void> {
         })();
       },
     },
-  } satisfies Bun.Serve.Options<undefined>;
+  } satisfies Bun.Serve.Options<RpcSocketData>;
 
   let server: ReturnType<typeof Bun.serve>;
   try {
