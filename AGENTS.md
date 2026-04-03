@@ -8,6 +8,7 @@
 ```text
 .
 ├─ .tasks/
+│  ├─ README.md
 │  ├─ commit.md
 │  └─ research.md
 ├─ .git
