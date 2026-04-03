@@ -6,8 +6,10 @@ import { join } from "node:path";
 import { encryptAuthSecret, getAuthSecretKeyPath } from "./auth-secrets";
 import {
   closeAppDatabase,
+  createSecurityAuditEvent,
   getAppDatabasePath,
   initAppDatabase,
+  listSecurityAuditEvents,
   resetResolvedAppDataDirectory,
   selectWritableAppDataDirectory,
 } from "./db";
@@ -88,5 +90,38 @@ describe("app database storage", () => {
     expect(statSync(appDataDir).mode & 0o777).toBe(0o700);
     expect(statSync(databasePath).mode & 0o777).toBe(0o600);
     expect(statSync(authSecretPath).mode & 0o777).toBe(0o600);
+  });
+
+  it("persists security audit events for dangerous local actions", () => {
+    const appDataDir = createTempDirectory();
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    const database = initAppDatabase();
+
+    createSecurityAuditEvent(database, {
+      eventType: "unsafe_mode_enabled",
+      summaryText:
+        "Unsafe mode enabled. This thread can use the danger-full-access sandbox.",
+      threadId: 12,
+      projectId: 5,
+      worktreePath: "/tmp/worktree",
+      payloadJson: JSON.stringify({
+        source: "toggle",
+        unsafeMode: true,
+      }),
+    });
+
+    expect(listSecurityAuditEvents(database)).toEqual([
+      expect.objectContaining({
+        eventType: "unsafe_mode_enabled",
+        projectId: 5,
+        threadId: 12,
+        worktreePath: "/tmp/worktree",
+      }),
+    ]);
+    expect(
+      listSecurityAuditEvents(database, {
+        threadId: 12,
+      }),
+    ).toHaveLength(1);
   });
 });

@@ -104,6 +104,15 @@ type AuthWebSocketTicketInput = {
   expiresAt: string;
 };
 
+type SecurityAuditEventInput = {
+  eventType: string;
+  summaryText: string;
+  threadId?: number | null;
+  projectId?: number | null;
+  worktreePath?: string | null;
+  payloadJson?: string | null;
+};
+
 /** Public DB shape for project rows returned from queries. */
 export type ProjectRecord = {
   id: number;
@@ -204,6 +213,17 @@ export type AuthWebSocketTicketRecord = {
   issuedAt: string;
   expiresAt: string;
   consumedAt: string | null;
+};
+
+export type SecurityAuditEventRecord = {
+  id: number;
+  eventType: string;
+  summaryText: string;
+  threadId: number | null;
+  projectId: number | null;
+  worktreePath: string | null;
+  payloadJson: string | null;
+  createdAt: string;
 };
 
 const DEFAULT_APP_DATA_DIR =
@@ -675,6 +695,35 @@ export function migrateDatabase(db: Database): void {
 			ON auth_websocket_tickets(expires_at);
 		`,
   );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS security_audit_events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				event_type TEXT NOT NULL,
+				summary_text TEXT NOT NULL,
+				thread_id INTEGER,
+				project_id INTEGER,
+				worktree_path TEXT,
+				payload_json TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_security_audit_events_created_at
+			ON security_audit_events(created_at DESC, id DESC);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_security_audit_events_thread_id
+			ON security_audit_events(thread_id, created_at DESC, id DESC);
+		`,
+  );
 }
 
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
@@ -1102,6 +1151,102 @@ export function deleteExpiredAuthWebSocketTickets(
     now,
   );
   return Number(result.changes);
+}
+
+export function createSecurityAuditEvent(
+  database: Database,
+  input: SecurityAuditEventInput,
+): SecurityAuditEventRecord {
+  /** Persist a security-relevant event so dangerous local actions can be reviewed later. */
+  const result = runStatement(
+    database,
+    `
+			INSERT INTO security_audit_events (
+				event_type,
+				summary_text,
+				thread_id,
+				project_id,
+				worktree_path,
+				payload_json
+			)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`,
+    input.eventType,
+    input.summaryText,
+    input.threadId ?? null,
+    input.projectId ?? null,
+    input.worktreePath ?? null,
+    input.payloadJson ?? null,
+  );
+  const eventId = Number(result.lastInsertRowid);
+  const event = database
+    .query<SecurityAuditEventRecord, [number]>(
+      `
+			SELECT
+				id,
+				event_type AS eventType,
+				summary_text AS summaryText,
+				thread_id AS threadId,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				payload_json AS payloadJson,
+				created_at AS createdAt
+			FROM security_audit_events
+			WHERE id = ?
+		`,
+    )
+    .get(eventId);
+  if (!event) {
+    throw new Error("Failed to create security audit event.");
+  }
+  return event;
+}
+
+export function listSecurityAuditEvents(
+  database: Database,
+  options?: {
+    threadId?: number;
+  },
+): SecurityAuditEventRecord[] {
+  /** Return persisted security audit events ordered newest-first, optionally scoped to one thread. */
+  if (typeof options?.threadId === "number") {
+    return database
+      .query<SecurityAuditEventRecord, [number]>(
+        `
+			SELECT
+				id,
+				event_type AS eventType,
+				summary_text AS summaryText,
+				thread_id AS threadId,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				payload_json AS payloadJson,
+				created_at AS createdAt
+			FROM security_audit_events
+			WHERE thread_id = ?
+			ORDER BY created_at DESC, id DESC
+		`,
+      )
+      .all(options.threadId);
+  }
+
+  return database
+    .query<SecurityAuditEventRecord, []>(
+      `
+			SELECT
+				id,
+				event_type AS eventType,
+				summary_text AS summaryText,
+				thread_id AS threadId,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				payload_json AS payloadJson,
+				created_at AS createdAt
+			FROM security_audit_events
+			ORDER BY created_at DESC, id DESC
+		`,
+    )
+    .all();
 }
 
 export function getProject(

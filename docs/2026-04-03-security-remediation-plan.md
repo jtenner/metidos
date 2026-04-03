@@ -303,6 +303,10 @@ Acceptance criteria:
 - `new_thread` in the sidecar cannot pivot to another project without explicit privileged approval
 - `unsafeMode` is available after login, clearly marked in the UI, and auditable
 
+Implementation note:
+
+- the current implementation can satisfy the unsafe-mode audit requirement with persistent local security audit events plus an in-product warning banner whenever unsafe mode is active
+
 ## Phase 3: Data Protection And Persistence Cleanup
 
 Goal: reduce the amount of sensitive state stored in plaintext and persistent browser storage.

@@ -9,6 +9,7 @@ import {
 
 import type { ProjectRecord, ThreadActivityInput, ThreadRecord } from "./db";
 import {
+  createSecurityAuditEvent,
   createThread,
   createThreadMessage,
   deleteProject,
@@ -2289,12 +2290,35 @@ async function createThreadRecord(
   try {
     const codexThread = createManagedCodexThread(thread);
     codexThreadMap.set(thread.id, codexThread);
+    if (unsafeMode) {
+      recordUnsafeModeAuditEvent(thread, true, "thread_create");
+    }
     return thread;
   } catch (error) {
     clearThreadRuntimeState(thread.id);
     deleteThread(db, thread.id);
     throw error;
   }
+}
+
+function recordUnsafeModeAuditEvent(
+  thread: ThreadRecord,
+  unsafeMode: boolean,
+  source: "thread_create" | "toggle",
+): void {
+  createSecurityAuditEvent(db, {
+    eventType: unsafeMode ? "unsafe_mode_enabled" : "unsafe_mode_disabled",
+    summaryText: unsafeMode
+      ? "Unsafe mode enabled. This thread can use the danger-full-access sandbox."
+      : "Unsafe mode disabled. This thread returned to the standard sandbox.",
+    threadId: thread.id,
+    projectId: thread.projectId,
+    worktreePath: thread.worktreePath,
+    payloadJson: JSON.stringify({
+      source,
+      unsafeMode,
+    }),
+  });
 }
 
 export async function openProjectProcedure(
@@ -3042,7 +3066,12 @@ export async function updateThreadUnsafeModeProcedure(
   }
 
   const unsafeMode = resolveUnsafeMode(params.unsafeMode);
+  if ((thread.unsafeMode === 1) === unsafeMode) {
+    return rpcThreadById(thread.id);
+  }
+
   setThreadUnsafeMode(db, thread.id, unsafeMode);
+  recordUnsafeModeAuditEvent(thread, unsafeMode, "toggle");
   codexThreadMap.delete(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);

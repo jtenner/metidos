@@ -36,7 +36,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
-  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, usage telemetry, and thread/task state.
+  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, usage telemetry, and thread/task state.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
 
 - `git.ts`

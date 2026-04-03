@@ -167,7 +167,7 @@ function UnsafeModeToggle({
           : "border-[#3d3d3d] bg-[#171717] text-[#b3afad]",
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
       ].join(" ")}
-      title="Uses the danger-full-access sandbox for this thread. This app applies it per thread, not per message."
+      title="Uses the danger-full-access sandbox for this thread. Unsafe-mode changes are also recorded in the local security audit log."
     >
       <input
         checked={checked}
@@ -180,6 +180,16 @@ function UnsafeModeToggle({
         Unsafe
       </span>
     </label>
+  );
+}
+
+function UnsafeModeWarningBanner(): JSX.Element {
+  return (
+    <div className="mt-2 border border-[#6d5930] bg-[#261f12] px-3 py-3 text-xs text-[#f2d79b]">
+      Unsafe mode is enabled for this thread. Codex can use the
+      danger-full-access sandbox, and unsafe-mode changes are recorded in the
+      local security audit log.
+    </div>
   );
 }
 
@@ -684,6 +694,7 @@ export function DesktopChatView({
               {unsafeModeControlError}
             </div>
           ) : null}
+          {activeUnsafeMode ? <UnsafeModeWarningBanner /> : null}
           <ChatComposerControl
             actionDisabled={composerActionDisabled}
             actionLabel={composerActionLabel}
@@ -909,6 +920,7 @@ export function MobileChatView({
               {unsafeModeControlError}
             </div>
           ) : null}
+          {activeUnsafeMode ? <UnsafeModeWarningBanner /> : null}
         </form>
       </footer>
     </>
