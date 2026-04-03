@@ -98,6 +98,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Provides the RPC-facing security audit log read path used by the browser UI.
   - Normalizes audit payload JSON into typed flat objects and enforces bounded list limits plus project/thread scoping for sidebar refreshes.
 
+- `security-audit-cli.ts`
+  - Implements the read-only CLI for inspecting recent security audit events outside the browser UI.
+  - Supports text or JSON output plus the same project/thread scoping and limit flags exposed by the shared audit query path.
+
 - `rpc-websocket-auth.ts`
   - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
   - Encapsulates the session-cookie and websocket-ticket requirements so those checks are regression-tested independently from the full server bootstrap.

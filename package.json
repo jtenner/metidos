@@ -11,6 +11,7 @@
     "dev": "bun run tailwind:build && (bun run tailwind:watch & bun src/bun/index.ts)",
     "dev:watch": "bun run dev",
     "auth:reset": "bun run src/bun/auth-reset.ts",
+    "audit:log": "bun run src/bun/security-audit-cli.ts",
     "tls:bootstrap": "bun run src/bun/tls-bootstrap.ts",
     "harness:starvation": "bun run src/bun/starvation-harness.ts",
     "typecheck": "bunx tsgo --noEmit",
