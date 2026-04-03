@@ -6,7 +6,7 @@ import {
   type ThreadItem,
 } from "@openai/codex-sdk";
 
-import type { ProjectRecord, ThreadRecord } from "./db";
+import type { ProjectRecord, ThreadActivityInput, ThreadRecord } from "./db";
 import {
   createThread,
   createThreadMessage,
@@ -37,7 +37,7 @@ import {
   stopInProgressThreadMessages,
   updateThreadCodexId,
   upsertProject,
-  upsertThreadActivity,
+  upsertThreadActivities,
 } from "./db";
 import {
   DEFAULT_GIT_HISTORY_PAGE_SIZE,
@@ -90,6 +90,7 @@ import {
 import {
   awaitAbortableResult,
   createAbortError,
+  createAsyncConcurrencyLimit,
   isAbortError,
   normalizePath,
   readLruValue,
@@ -242,6 +243,10 @@ const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
 const THREAD_DETAIL_CACHE_MAX_ENTRIES = 32;
 const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
 const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 500;
+const WORKTREE_OPEN_CONCURRENCY = 2;
+const GIT_HISTORY_READ_CONCURRENCY = 2;
+const TASK_CACHE_REFRESH_CONCURRENCY = 1;
+const DIFF_LOAD_CONCURRENCY = 2;
 
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
@@ -288,12 +293,179 @@ const gitCommitDiffRequestCache = new Map<
   string,
   PendingGitCommitDiffRequest
 >();
+const deferredBackgroundWork = new Map<string, () => void>();
+let foregroundReadCount = 0;
+const worktreeOpenLimit = createAsyncConcurrencyLimit(
+  WORKTREE_OPEN_CONCURRENCY,
+);
+const gitHistoryReadLimit = createAsyncConcurrencyLimit(
+  GIT_HISTORY_READ_CONCURRENCY,
+);
+const taskCacheRefreshLimit = createAsyncConcurrencyLimit(
+  TASK_CACHE_REFRESH_CONCURRENCY,
+);
+const diffLoadLimit = createAsyncConcurrencyLimit(DIFF_LOAD_CONCURRENCY);
+let lastTaskCacheRefreshDurationMs = 0;
+let peakTaskCacheRefreshDurationMs = 0;
+let lastThreadActivityPersistenceDurationMs = 0;
+let peakThreadActivityPersistenceDurationMs = 0;
 let worktreeTaskChangeListener:
   | ((projectId: number, worktreePath: string) => void)
   | null = null;
 let worktreeGitHistoryChangeListener:
   | ((projectId: number, worktreePath: string) => void)
   | null = null;
+
+function hasForegroundReadPressure(): boolean {
+  return foregroundReadCount > 0;
+}
+
+function flushDeferredBackgroundWork(): void {
+  if (hasForegroundReadPressure() || deferredBackgroundWork.size === 0) {
+    return;
+  }
+
+  const pendingWork = [...deferredBackgroundWork.values()];
+  deferredBackgroundWork.clear();
+  for (const callback of pendingWork) {
+    callback();
+  }
+}
+
+function queueBackgroundWorkWhenIdle(key: string, callback: () => void): void {
+  if (!hasForegroundReadPressure()) {
+    callback();
+    return;
+  }
+
+  deferredBackgroundWork.set(key, callback);
+}
+
+function syncAllProjectBackgroundPolling(): void {
+  for (const state of projectPollMap.values()) {
+    syncProjectWorktreeBackgroundPolling(state);
+    syncProjectRefreshPolling(state);
+  }
+}
+
+async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
+  foregroundReadCount += 1;
+  syncAllProjectBackgroundPolling();
+
+  try {
+    return await callback();
+  } finally {
+    foregroundReadCount = Math.max(0, foregroundReadCount - 1);
+    syncAllProjectBackgroundPolling();
+    flushDeferredBackgroundWork();
+  }
+}
+
+function runTaskCacheRefreshLimited<T>(callback: () => Promise<T>): Promise<T> {
+  return taskCacheRefreshLimit.run(callback, {
+    abortMessage: "Project task refresh was aborted.",
+  });
+}
+
+function runWorktreeOpenLimited<T>(
+  callback: () => Promise<T>,
+  signal: AbortSignal | null | undefined,
+): Promise<T> {
+  return worktreeOpenLimit.run(callback, {
+    abortMessage: "Worktree open was aborted.",
+    signal: signal ?? null,
+  });
+}
+
+function runGitHistoryReadLimited<T>(
+  callback: () => Promise<T>,
+  signal: AbortSignal | null | undefined,
+  abortMessage: string,
+): Promise<T> {
+  return gitHistoryReadLimit.run(callback, {
+    abortMessage,
+    signal: signal ?? null,
+  });
+}
+
+function runDiffLoadLimited<T>(
+  callback: () => Promise<T>,
+  signal: AbortSignal | null | undefined,
+  abortMessage: string,
+): Promise<T> {
+  return diffLoadLimit.run(callback, {
+    abortMessage,
+    signal: signal ?? null,
+  });
+}
+
+function recordTaskCacheRefreshDuration(durationMs: number): void {
+  lastTaskCacheRefreshDurationMs = durationMs;
+  peakTaskCacheRefreshDurationMs = Math.max(
+    peakTaskCacheRefreshDurationMs,
+    durationMs,
+  );
+}
+
+function recordThreadActivityPersistenceDuration(durationMs: number): void {
+  lastThreadActivityPersistenceDurationMs = durationMs;
+  peakThreadActivityPersistenceDurationMs = Math.max(
+    peakThreadActivityPersistenceDurationMs,
+    durationMs,
+  );
+}
+
+export function getProcedureRuntimeStats(): {
+  deferredBackgroundWorkCount: number;
+  diffLoadLimit: ReturnType<typeof diffLoadLimit.stats>;
+  foregroundReadCount: number;
+  gitHistoryReadLimit: ReturnType<typeof gitHistoryReadLimit.stats>;
+  openWorktreeCount: number;
+  projectPollerCount: number;
+  taskCacheRefreshInFlightCount: number;
+  taskCacheRefreshDurationMs: {
+    last: number;
+    peak: number;
+  };
+  taskCacheRefreshLimit: ReturnType<typeof taskCacheRefreshLimit.stats>;
+  threadActivityPersistenceDurationMs: {
+    last: number;
+    peak: number;
+  };
+  worktreeOpenLimit: ReturnType<typeof worktreeOpenLimit.stats>;
+} {
+  let openWorktreeCount = 0;
+  let taskCacheRefreshInFlightCount = 0;
+
+  for (const state of projectPollMap.values()) {
+    openWorktreeCount += state.openWorktrees.size;
+    for (const worktreeState of state.openWorktrees.values()) {
+      if (worktreeState.taskRefreshPromise !== null) {
+        taskCacheRefreshInFlightCount += 1;
+      }
+    }
+  }
+
+  return {
+    deferredBackgroundWorkCount: deferredBackgroundWork.size,
+    diffLoadLimit: diffLoadLimit.stats(),
+    foregroundReadCount,
+    gitHistoryReadLimit: gitHistoryReadLimit.stats(),
+    openWorktreeCount,
+    projectPollerCount: projectPollMap.size,
+    taskCacheRefreshInFlightCount,
+    taskCacheRefreshDurationMs: {
+      last: lastTaskCacheRefreshDurationMs,
+      peak: peakTaskCacheRefreshDurationMs,
+    },
+    taskCacheRefreshLimit: taskCacheRefreshLimit.stats(),
+    threadActivityPersistenceDurationMs: {
+      last: lastThreadActivityPersistenceDurationMs,
+      peak: peakThreadActivityPersistenceDurationMs,
+    },
+    worktreeOpenLimit: worktreeOpenLimit.stats(),
+  };
+}
 
 function joltRpcUrl(): string {
   const configured = process.env.JOLT_RPC_URL?.trim();
@@ -613,13 +785,14 @@ async function runThreadMessageInBackground(
           await bufferedActivityWriter.queue(
             activityItemId,
             `${state}\u0000${nextAssistantText}`,
-            () =>
-              upsertAssistantChatActivity(
+            async () => [
+              buildAssistantChatActivityInput(
                 threadId,
                 activityItemId,
                 nextAssistantText,
                 state,
               ),
+            ],
             {
               force: state !== "in_progress",
               terminal: state !== "in_progress",
@@ -637,7 +810,9 @@ async function runThreadMessageInBackground(
         await bufferedActivityWriter.queue(
           activityItemId,
           `${state}\u0000${text}`,
-          () => upsertReasoningActivity(threadId, activityItemId, item, state),
+          async () => [
+            buildReasoningActivityInput(threadId, activityItemId, item, state),
+          ],
           {
             force: state !== "in_progress",
             terminal: state !== "in_progress",
@@ -656,7 +831,9 @@ async function runThreadMessageInBackground(
             String(item.exit_code ?? ""),
             item.aggregated_output,
           ].join("\u0000"),
-          () => upsertCommandActivity(threadId, activityItemId, item),
+          async () => [
+            buildCommandActivityInput(threadId, activityItemId, item),
+          ],
           {
             force: item.status !== "in_progress",
             terminal: item.status !== "in_progress",
@@ -679,7 +856,9 @@ async function runThreadMessageInBackground(
             stringifyActivityValue(item.arguments),
             formatToolCallOutput(item),
           ].join("\u0000"),
-          () => upsertToolCallActivity(threadId, activityItemId, item),
+          async () => [
+            buildToolCallActivityInput(threadId, activityItemId, item),
+          ],
           {
             force: item.status !== "in_progress",
             terminal: item.status !== "in_progress",
@@ -696,7 +875,9 @@ async function runThreadMessageInBackground(
         await bufferedActivityWriter.queue(
           activityItemId,
           `${state}\u0000${query}`,
-          () => upsertWebSearchActivity(threadId, activityItemId, item, state),
+          async () => [
+            buildWebSearchActivityInput(threadId, activityItemId, item, state),
+          ],
           {
             force: state !== "in_progress",
             terminal: state !== "in_progress",
@@ -714,7 +895,9 @@ async function runThreadMessageInBackground(
         await bufferedActivityWriter.queue(
           activityItemId,
           `${state}\u0000${message}`,
-          () => upsertErrorActivity(threadId, activityItemId, item, state),
+          async () => [
+            buildErrorActivityInput(threadId, activityItemId, item, state),
+          ],
           {
             force: state !== "in_progress",
             terminal: state !== "in_progress",
@@ -732,7 +915,7 @@ async function runThreadMessageInBackground(
             ...item.changes.map((change) => `${change.kind}:${change.path}`),
           ].join("\u0000"),
           () =>
-            upsertFileChangeActivity(
+            buildFileChangeActivityInputs(
               threadId,
               activityItemId,
               thread.worktreePath,
@@ -946,9 +1129,10 @@ type ToolCallActivityPayload = {
 };
 
 type BufferedThreadActivityWrite = {
+  buildInputs: () => Promise<ThreadActivityInput[]>;
   lastPersistedAt: number;
   lastPersistedSignature: string | null;
-  persist: () => Promise<void>;
+  messageIds: Array<number | null>;
   persisted: boolean;
   signature: string;
   terminal: boolean;
@@ -1028,7 +1212,7 @@ function createBufferedThreadActivityWriter(): {
   queue: (
     activityId: string,
     signature: string,
-    persist: () => Promise<void>,
+    buildInputs: () => Promise<ThreadActivityInput[]>,
     options?: {
       force?: boolean;
       terminal?: boolean;
@@ -1061,6 +1245,11 @@ function createBufferedThreadActivityWriter(): {
   const flushEntries = async (force: boolean): Promise<void> => {
     const now = Date.now();
     let needsReschedule = false;
+    const dueEntries: Array<{
+      activityId: string;
+      entry: BufferedThreadActivityWrite;
+      signatureChanged: boolean;
+    }> = [];
 
     for (const [activityId, entry] of entries) {
       const dueToFlush =
@@ -1075,11 +1264,67 @@ function createBufferedThreadActivityWriter(): {
 
       const signatureChanged =
         !entry.persisted || entry.lastPersistedSignature !== entry.signature;
+      dueEntries.push({ activityId, entry, signatureChanged });
+    }
+
+    const entriesToPersist = dueEntries.filter(
+      ({ signatureChanged }) => signatureChanged,
+    );
+    if (entriesToPersist.length > 0) {
+      const resolvedEntries = await Promise.all(
+        entriesToPersist.map(async ({ entry }) => ({
+          entry,
+          inputs: await entry.buildInputs(),
+        })),
+      );
+
+      const flattenedInputs: ThreadActivityInput[] = [];
+      const flattenedMessageIds: Array<number | null> = [];
+      for (const { entry, inputs } of resolvedEntries) {
+        flattenedInputs.push(...inputs);
+        flattenedMessageIds.push(
+          ...inputs.map((_, index) => entry.messageIds[index] ?? null),
+        );
+      }
+
+      if (flattenedInputs.length > 0) {
+        const persistStartedAt = performance.now();
+        const persistedMessageIds = upsertThreadActivities(
+          db,
+          flattenedInputs.map((input, index) => ({
+            ...input,
+            messageId: flattenedMessageIds[index] ?? null,
+          })),
+        );
+        recordThreadActivityPersistenceDuration(
+          Math.max(0, performance.now() - persistStartedAt),
+        );
+        const affectedThreadIds = new Set<number>();
+        let nextMessageIdIndex = 0;
+
+        for (const { entry, inputs } of resolvedEntries) {
+          entry.messageIds = persistedMessageIds.slice(
+            nextMessageIdIndex,
+            nextMessageIdIndex + inputs.length,
+          );
+          nextMessageIdIndex += inputs.length;
+          for (const input of inputs) {
+            affectedThreadIds.add(input.threadId);
+          }
+        }
+
+        for (const threadId of affectedThreadIds) {
+          invalidateThreadDetailCache(threadId);
+        }
+      }
+    }
+
+    const persistedAt = Date.now();
+    for (const { activityId, entry, signatureChanged } of dueEntries) {
       if (signatureChanged) {
-        await entry.persist();
         entry.lastPersistedSignature = entry.signature;
       }
-      entry.lastPersistedAt = Date.now();
+      entry.lastPersistedAt = persistedAt;
       entry.persisted = true;
 
       if (entry.terminal) {
@@ -1109,21 +1354,22 @@ function createBufferedThreadActivityWriter(): {
     queue: async (
       activityId: string,
       signature: string,
-      persist: () => Promise<void>,
+      buildInputs: () => Promise<ThreadActivityInput[]>,
       options?: {
         force?: boolean;
         terminal?: boolean;
       },
     ): Promise<void> => {
       const entry = entries.get(activityId) ?? {
+        buildInputs,
         lastPersistedAt: 0,
         lastPersistedSignature: null,
-        persist,
+        messageIds: [],
         persisted: false,
         signature,
         terminal: false,
       };
-      entry.persist = persist;
+      entry.buildInputs = buildInputs;
       entry.signature = signature;
       entry.terminal = options?.terminal === true;
       entries.set(activityId, entry);
@@ -1141,20 +1387,59 @@ function createBufferedThreadActivityWriter(): {
   };
 }
 
-async function upsertReasoningActivity(
+function persistThreadActivityInputs(
+  inputs: readonly ThreadActivityInput[],
+): void {
+  const persistStartedAt = performance.now();
+  const persistedMessageIds = upsertThreadActivities(
+    db,
+    inputs.map((input) => ({
+      ...input,
+      messageId: null,
+    })),
+  );
+  recordThreadActivityPersistenceDuration(
+    Math.max(0, performance.now() - persistStartedAt),
+  );
+  if (persistedMessageIds.length === 0) {
+    return;
+  }
+
+  const affectedThreadIds = new Set(inputs.map((input) => input.threadId));
+  for (const threadId of affectedThreadIds) {
+    invalidateThreadDetailCache(threadId);
+  }
+}
+
+function buildReasoningActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "reasoning" }>,
   state: "in_progress" | "completed" | "stopped",
-): Promise<void> {
-  upsertThreadActivity(db, {
+): ThreadActivityInput {
+  return {
     threadId,
     itemId,
     kind: "reasoning",
     text: item.text.trim() || "Reasoning",
     state,
-  });
-  invalidateThreadDetailCache(threadId);
+  };
+}
+
+function buildAssistantChatActivityInput(
+  threadId: number,
+  itemId: string,
+  text: string,
+  state: "in_progress" | "completed" | "failed" | "stopped",
+): ThreadActivityInput {
+  return {
+    threadId,
+    itemId,
+    kind: "chat",
+    role: "assistant",
+    text,
+    state,
+  };
 }
 
 async function upsertAssistantChatActivity(
@@ -1163,38 +1448,19 @@ async function upsertAssistantChatActivity(
   text: string,
   state: "in_progress" | "completed" | "failed" | "stopped",
 ): Promise<void> {
-  upsertThreadActivity(db, {
-    threadId,
-    itemId,
-    kind: "chat",
-    role: "assistant",
-    text,
-    state,
-  });
-  invalidateThreadDetailCache(threadId);
+  persistThreadActivityInputs([
+    buildAssistantChatActivityInput(threadId, itemId, text, state),
+  ]);
 }
 
-async function upsertCommandActivity(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "command_execution" }>,
-): Promise<void> {
-  await upsertCommandActivityPayload(threadId, itemId, {
-    command: item.command,
-    exitCode: item.exit_code ?? null,
-    output: item.aggregated_output,
-    state: item.status,
-  });
-}
-
-async function upsertCommandActivityPayload(
+function buildCommandActivityInputPayload(
   threadId: number,
   itemId: string,
   payload: CommandActivityPayload & {
     state: "in_progress" | "completed" | "failed" | "stopped";
   },
-): Promise<void> {
-  upsertThreadActivity(db, {
+): ThreadActivityInput {
+  return {
     threadId,
     itemId,
     kind: "command",
@@ -1205,24 +1471,36 @@ async function upsertCommandActivityPayload(
       output: payload.output,
       exitCode: payload.exitCode,
     } satisfies CommandActivityPayload),
-  });
-  invalidateThreadDetailCache(threadId);
+  };
 }
 
-async function upsertFileChangeActivity(
+function buildCommandActivityInput(
+  threadId: number,
+  itemId: string,
+  item: Extract<ThreadItem, { type: "command_execution" }>,
+): ThreadActivityInput {
+  return buildCommandActivityInputPayload(threadId, itemId, {
+    command: item.command,
+    exitCode: item.exit_code ?? null,
+    output: item.aggregated_output,
+    state: item.status,
+  });
+}
+
+async function buildFileChangeActivityInputs(
   threadId: number,
   itemId: string,
   worktreePath: string,
   item: Extract<ThreadItem, { type: "file_change" }>,
-): Promise<void> {
-  await Promise.all(
+): Promise<ThreadActivityInput[]> {
+  return Promise.all(
     item.changes.map(async (change) => {
       const diffText =
         item.status === "completed"
           ? await readFileChangeDiff(worktreePath, change.path, change.kind)
           : "";
       const gitPath = normalizeGitPath(worktreePath, change.path);
-      upsertThreadActivity(db, {
+      return {
         threadId,
         itemId: `${itemId}:${gitPath}`,
         kind: "file_change",
@@ -1233,18 +1511,17 @@ async function upsertFileChangeActivity(
           changeKind: change.kind,
           diffText,
         } satisfies FileChangeActivityPayload),
-      });
+      } satisfies ThreadActivityInput;
     }),
   );
-  invalidateThreadDetailCache(threadId);
 }
 
-async function upsertToolCallActivity(
+function buildToolCallActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
-): Promise<void> {
-  upsertThreadActivity(db, {
+): ThreadActivityInput {
+  return {
     threadId,
     itemId,
     kind: "tool_call",
@@ -1256,40 +1533,37 @@ async function upsertToolCallActivity(
       argumentsText: stringifyActivityValue(item.arguments),
       output: formatToolCallOutput(item),
     } satisfies ToolCallActivityPayload),
-  });
-  invalidateThreadDetailCache(threadId);
+  };
 }
 
-async function upsertWebSearchActivity(
+function buildWebSearchActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "web_search" }>,
   state: "in_progress" | "completed" | "stopped",
-): Promise<void> {
-  upsertThreadActivity(db, {
+): ThreadActivityInput {
+  return {
     threadId,
     itemId,
     kind: "web_search",
     text: item.query.trim() || "Web search",
     state,
-  });
-  invalidateThreadDetailCache(threadId);
+  };
 }
 
-async function upsertErrorActivity(
+function buildErrorActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "error" }>,
   state: "in_progress" | "completed" | "stopped",
-): Promise<void> {
-  upsertThreadActivity(db, {
+): ThreadActivityInput {
+  return {
     threadId,
     itemId,
     kind: "error",
     text: item.message.trim() || "Codex reported a non-fatal error.",
     state,
-  });
-  invalidateThreadDetailCache(threadId);
+  };
 }
 
 function mergeProjectWorktreePins(
@@ -1393,6 +1667,11 @@ function stopProjectRefreshPolling(state: ProjectPollState): void {
 }
 
 function syncProjectRefreshPolling(state: ProjectPollState): void {
+  if (hasForegroundReadPressure()) {
+    stopProjectRefreshPolling(state);
+    return;
+  }
+
   if (state.activeWorktreePath !== null) {
     startProjectRefreshPolling(state);
     return;
@@ -1565,10 +1844,16 @@ async function refreshWorktreeTaskCache(
   const previousTasks = worktreeState.tasks ?? [];
   const previousTaskWatchTargets = worktreeState.taskWatchTargets;
   const refreshPromise = (async () => {
-    const [taskWatchTargets, tasks] = await Promise.all([
-      readTaskWatchTargets(worktreePath),
-      readProjectTasksFromDisk(worktreePath),
-    ]);
+    const refreshStartedAt = performance.now();
+    const [taskWatchTargets, tasks] = await runTaskCacheRefreshLimited(() =>
+      Promise.all([
+        readTaskWatchTargets(worktreePath),
+        readProjectTasksFromDisk(worktreePath),
+      ]),
+    );
+    recordTaskCacheRefreshDuration(
+      Math.max(0, performance.now() - refreshStartedAt),
+    );
     worktreeState.taskWatchTargets = taskWatchTargets;
     worktreeState.tasks = tasks;
     worktreeState.lastUpdatedAt = getNow();
@@ -1632,15 +1917,20 @@ function startWorktreeTaskPolling(
   }
 
   const invalidateTaskState = () => {
-    void refreshWorktreeTaskCache(state, worktreePath, {
-      notify: true,
-      startWatching: true,
-    }).catch((error) => {
-      logBackgroundTaskFailure(
-        `Task cache refresh failed for ${worktreePath}`,
-        error,
-      );
-    });
+    queueBackgroundWorkWhenIdle(
+      `task-cache-refresh:${state.id}:${worktreePath}`,
+      () => {
+        void refreshWorktreeTaskCache(state, worktreePath, {
+          notify: true,
+          startWatching: true,
+        }).catch((error) => {
+          logBackgroundTaskFailure(
+            `Task cache refresh failed for ${worktreePath}`,
+            error,
+          );
+        });
+      },
+    );
   };
 
   for (const target of worktreeState.taskWatchTargets) {
@@ -1733,6 +2023,16 @@ function startWorktreeGitHistoryPolling(
 }
 
 function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
+  if (hasForegroundReadPressure()) {
+    for (const [worktreePath, worktreeState] of state.openWorktrees) {
+      stopWorktreeBackgroundPolling(
+        worktreeState,
+        `Foreground read pressure paused worktree polling for ${worktreePath}.`,
+      );
+    }
+    return;
+  }
+
   for (const [worktreePath, worktreeState] of state.openWorktrees) {
     if (state.activeWorktreePath === worktreePath) {
       startWorktreeGitHistoryPolling(state, worktreePath);
@@ -1859,89 +2159,95 @@ export async function openProjectProcedure(
   params: AppRPCSchema["requests"]["openProject"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const projectPath = normalizePath(params.projectPath);
-  assertProjectDirectory(projectPath);
-  const existingProject = getProject(db, projectPath);
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const projectPath = normalizePath(params.projectPath);
+    assertProjectDirectory(projectPath);
+    const existingProject = getProject(db, projectPath);
 
-  let worktrees: RpcWorktree[];
-  try {
-    worktrees = await readProjectWorktrees(
+    let worktrees: RpcWorktree[];
+    try {
+      worktrees = await readProjectWorktrees(
+        projectPath,
+        existingProject?.id,
+        requestGitOptions,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
+      );
+    }
+    throwIfAborted(context?.signal, "Project open was aborted.");
+
+    const project = upsertProject(db, {
       projectPath,
-      existingProject?.id,
-      requestGitOptions,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
-    );
-  }
-  throwIfAborted(context?.signal, "Project open was aborted.");
+      name: params.name ?? basename(projectPath),
+    });
+    const state = ensureProjectPoller(project);
+    state.worktrees = worktrees;
+    state.worktreesLoadedAt = Date.now();
 
-  const project = upsertProject(db, {
-    projectPath,
-    name: params.name ?? basename(projectPath),
+    return {
+      project,
+      worktrees: state.worktrees,
+    };
   });
-  const state = ensureProjectPoller(project);
-  state.worktrees = worktrees;
-  state.worktreesLoadedAt = Date.now();
-
-  return {
-    project,
-    worktrees: state.worktrees,
-  };
 }
 
 export async function listProjectWorktreesProcedure(
   params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  ensureProjectPoller(project);
-  const worktrees = await readProjectWorktrees(
-    project.path,
-    project.id,
-    requestGitOptions,
-  );
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    ensureProjectPoller(project);
+    const worktrees = await readProjectWorktrees(
+      project.path,
+      project.id,
+      requestGitOptions,
+    );
 
-  return {
-    project,
-    worktrees,
-  };
+    return {
+      project,
+      worktrees,
+    };
+  });
 }
 
 export async function listProjectTasksProcedure(
   params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcProjectTask[]> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const worktreePath = normalizePath(params.worktreePath);
-  const projectState = ensureProjectPoller(project);
-  await ensureTrackedProjectWorktree(
-    project,
-    projectState,
-    worktreePath,
-    requestGitOptions,
-  );
-  const worktreeState = ensureWorktreePollState(projectState, worktreePath);
-  if (worktreeState.tasks !== null) {
-    startWorktreeTaskPolling(projectState, worktreePath);
-    return worktreeState.tasks;
-  }
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const worktreePath = normalizePath(params.worktreePath);
+    const projectState = ensureProjectPoller(project);
+    await ensureTrackedProjectWorktree(
+      project,
+      projectState,
+      worktreePath,
+      requestGitOptions,
+    );
+    const worktreeState = ensureWorktreePollState(projectState, worktreePath);
+    if (worktreeState.tasks !== null) {
+      startWorktreeTaskPolling(projectState, worktreePath);
+      return worktreeState.tasks;
+    }
 
-  throwIfAborted(context?.signal, "Project task read was aborted.");
-  const tasks = await awaitAbortableResult(
-    refreshWorktreeTaskCache(projectState, worktreePath, {
-      startWatching: true,
-    }),
-    context?.signal,
-    "Project task read was aborted.",
-  );
-  startWorktreeTaskPolling(projectState, worktreePath);
-  return tasks;
+    throwIfAborted(context?.signal, "Project task read was aborted.");
+    const tasks = await awaitAbortableResult(
+      refreshWorktreeTaskCache(projectState, worktreePath, {
+        startWatching: true,
+      }),
+      context?.signal,
+      "Project task read was aborted.",
+    );
+    startWorktreeTaskPolling(projectState, worktreePath);
+    return tasks;
+  });
 }
 
 export async function createWorktreeProcedure(
@@ -2248,13 +2554,14 @@ async function runPackageScriptTaskInBackground(
     await bufferedActivityWriter.queue(
       activityItemId,
       [state, command, String(exitCode ?? ""), output].join("\u0000"),
-      () =>
-        upsertCommandActivityPayload(threadId, activityItemId, {
+      async () => [
+        buildCommandActivityInputPayload(threadId, activityItemId, {
           command,
           exitCode,
           output,
           state,
         }),
+      ],
       {
         ...(typeof options?.force === "boolean"
           ? { force: options.force }
@@ -2600,236 +2907,306 @@ export async function openWorktreeProcedure(
   params: AppRPCSchema["requests"]["openWorktree"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcOpenWorktreeResult> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const state = ensureProjectPoller(project);
-  const worktreePath = normalizePath(params.worktreePath);
-  await ensureTrackedProjectWorktree(project, state, worktreePath, {
-    ...requestGitOptions,
-    forceRefresh: true,
-  });
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const state = ensureProjectPoller(project);
+    const worktreePath = normalizePath(params.worktreePath);
+    await ensureTrackedProjectWorktree(project, state, worktreePath, {
+      ...requestGitOptions,
+      forceRefresh: true,
+    });
 
-  const worktreeState = ensureWorktreePollState(state, worktreePath);
-  const historyPromise = readGitHistoryFirstPage(
-    project.id,
-    worktreePath,
-    DEFAULT_GIT_HISTORY_PAGE_SIZE,
-    requestGitOptions,
-  );
-  const snapshotPromise = readAndStoreWorktreeSnapshot(
-    state,
-    worktreePath,
-    requestGitOptions,
-  );
-  const [{ history, summary, signature }, snapshot] = await Promise.all([
-    historyPromise,
-    snapshotPromise,
-  ]);
-  worktreeState.history = summary;
-  worktreeState.historyEntries = history.entries;
-  worktreeState.historyNextOffset = history.nextOffset;
-  worktreeState.historySignature = signature;
-  syncProjectWorktreeBackgroundPolling(state);
-  warmGitHistoryCache(worktreeState, worktreePath, logBackgroundGitFailure);
-  void refreshWorktreeTaskCache(state, worktreePath).catch((error) => {
-    logBackgroundTaskFailure(
-      `Task cache warm failed for ${worktreePath}`,
-      error,
+    const worktreeState = ensureWorktreePollState(state, worktreePath);
+    const [{ history, summary, signature }, snapshot] =
+      await runWorktreeOpenLimited(
+        () =>
+          Promise.all([
+            readGitHistoryFirstPage(
+              project.id,
+              worktreePath,
+              DEFAULT_GIT_HISTORY_PAGE_SIZE,
+              requestGitOptions,
+            ),
+            readAndStoreWorktreeSnapshot(
+              state,
+              worktreePath,
+              requestGitOptions,
+            ),
+          ]),
+        context?.signal,
+      );
+    worktreeState.history = summary;
+    worktreeState.historyEntries = history.entries;
+    worktreeState.historyNextOffset = history.nextOffset;
+    worktreeState.historySignature = signature;
+    syncProjectWorktreeBackgroundPolling(state);
+    queueBackgroundWorkWhenIdle(
+      `git-history-warm:${project.id}:${worktreePath}`,
+      () => {
+        warmGitHistoryCache(
+          worktreeState,
+          worktreePath,
+          logBackgroundGitFailure,
+        );
+      },
     );
-  });
+    queueBackgroundWorkWhenIdle(
+      `task-cache-warm:${project.id}:${worktreePath}`,
+      () => {
+        void refreshWorktreeTaskCache(state, worktreePath).catch((error) => {
+          logBackgroundTaskFailure(
+            `Task cache warm failed for ${worktreePath}`,
+            error,
+          );
+        });
+      },
+    );
 
-  return {
-    project,
-    worktree: snapshot,
-    history,
-  };
+    return {
+      project,
+      worktree: snapshot,
+      history,
+    };
+  });
 }
 
 export async function getWorktreeSnapshotProcedure(
   params: AppRPCSchema["requests"]["getWorktreeSnapshot"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcWorktreeSnapshot> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const state = ensureProjectPoller(project);
-  const worktreePath = normalizePath(params.worktreePath);
-  await ensureTrackedProjectWorktree(project, state, worktreePath, {
-    ...requestGitOptions,
-    forceRefresh: true,
-  });
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const state = ensureProjectPoller(project);
+    const worktreePath = normalizePath(params.worktreePath);
+    await ensureTrackedProjectWorktree(project, state, worktreePath, {
+      ...requestGitOptions,
+      forceRefresh: true,
+    });
 
-  return readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions);
+    return runWorktreeOpenLimited(
+      () =>
+        readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions),
+      context?.signal,
+    );
+  });
 }
 
 export async function readWorktreeFileContentPageProcedure(
   params: AppRPCSchema["requests"]["readWorktreeFileContentPage"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcWorktreeFileContentPage> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const state = ensureProjectPoller(project);
-  const worktreePath = normalizePath(params.worktreePath);
-  await ensureTrackedProjectWorktree(project, state, worktreePath, {
-    ...requestGitOptions,
-    forceRefresh: true,
-  });
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const state = ensureProjectPoller(project);
+    const worktreePath = normalizePath(params.worktreePath);
+    await ensureTrackedProjectWorktree(project, state, worktreePath, {
+      ...requestGitOptions,
+      forceRefresh: true,
+    });
 
-  const page = await readWorktreeFileContentPage(worktreePath, params.path, {
-    ...(typeof params.cursor === "number" ? { cursor: params.cursor } : {}),
-    ...(typeof params.limitBytes === "number"
-      ? { limitBytes: params.limitBytes }
-      : {}),
-    signal: context?.signal ?? null,
-  });
+    const page = await readWorktreeFileContentPage(worktreePath, params.path, {
+      ...(typeof params.cursor === "number" ? { cursor: params.cursor } : {}),
+      ...(typeof params.limitBytes === "number"
+        ? { limitBytes: params.limitBytes }
+        : {}),
+      signal: context?.signal ?? null,
+    });
 
-  return {
-    projectId: project.id,
-    worktreePath,
-    ...page,
-  };
+    return {
+      projectId: project.id,
+      worktreePath,
+      ...page,
+    };
+  });
 }
 
 export async function readWorktreeFileDiffProcedure(
   params: AppRPCSchema["requests"]["readWorktreeFileDiff"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcWorktreeFileDiff> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const state = ensureProjectPoller(project);
-  const worktreePath = normalizePath(params.worktreePath);
-  await ensureTrackedProjectWorktree(project, state, worktreePath, {
-    ...requestGitOptions,
-    forceRefresh: true,
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const state = ensureProjectPoller(project);
+    const worktreePath = normalizePath(params.worktreePath);
+    await ensureTrackedProjectWorktree(project, state, worktreePath, {
+      ...requestGitOptions,
+      forceRefresh: true,
+    });
+
+    const diffText = await runDiffLoadLimited(
+      () =>
+        readWorktreeChangeDiff(worktreePath, params.change, requestGitOptions),
+      context?.signal,
+      "Worktree diff read was aborted.",
+    );
+
+    return {
+      projectId: project.id,
+      worktreePath,
+      path: normalizeGitPath(worktreePath, params.change.path),
+      diffText,
+    };
   });
-
-  const diffText = await readWorktreeChangeDiff(
-    worktreePath,
-    params.change,
-    requestGitOptions,
-  );
-
-  return {
-    projectId: project.id,
-    worktreePath,
-    path: normalizeGitPath(worktreePath, params.change.path),
-    diffText,
-  };
 }
 
 export async function listWorktreeGitHistoryProcedure(
   params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcWorktreeGitHistoryResult> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const worktreePath = normalizePath(params.worktreePath);
-  const offset =
-    Number.isInteger(params.offset) && typeof params.offset === "number"
-      ? Math.max(params.offset, 0)
-      : 0;
-  const limit = normalizeGitHistoryPageLimit(params.limit);
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const worktreePath = normalizePath(params.worktreePath);
+    const offset =
+      Number.isInteger(params.offset) && typeof params.offset === "number"
+        ? Math.max(params.offset, 0)
+        : 0;
+    const limit = normalizeGitHistoryPageLimit(params.limit);
 
-  const projectState = ensureProjectPoller(project);
-  await ensureTrackedProjectWorktree(
-    project,
-    projectState,
-    worktreePath,
-    requestGitOptions,
-  );
-  const state = ensureWorktreePollState(projectState, worktreePath);
-  if (offset === 0 && state.historySignature !== null) {
-    if (!state.history.headHash) {
+    const projectState = ensureProjectPoller(project);
+    await ensureTrackedProjectWorktree(
+      project,
+      projectState,
+      worktreePath,
+      requestGitOptions,
+    );
+    const state = ensureWorktreePollState(projectState, worktreePath);
+    if (offset === 0 && state.historySignature !== null) {
+      if (!state.history.headHash) {
+        syncProjectWorktreeBackgroundPolling(projectState);
+        return {
+          ...state.history,
+          entries: [],
+          limit,
+          nextOffset: null,
+        };
+      }
+
+      await runGitHistoryReadLimited(
+        () =>
+          fillGitHistoryCache(state, worktreePath, 0, limit, requestGitOptions),
+        context?.signal,
+        "Git history read was aborted.",
+      );
       syncProjectWorktreeBackgroundPolling(projectState);
+      queueBackgroundWorkWhenIdle(
+        `git-history-warm:${project.id}:${worktreePath}`,
+        () => {
+          warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
+        },
+      );
+      return buildGitHistoryResultFromCache(state, limit, 0);
+    }
+
+    if (offset === 0) {
+      const { history, summary, signature } = await runGitHistoryReadLimited(
+        () =>
+          readGitHistoryFirstPage(
+            project.id,
+            worktreePath,
+            limit,
+            requestGitOptions,
+          ),
+        context?.signal,
+        "Git history read was aborted.",
+      );
+      state.history = summary;
+      state.historyEntries = history.entries;
+      state.historyNextOffset = history.nextOffset;
+      state.historySignature = signature;
+      state.lastUpdatedAt = summary.lastUpdatedAt;
+      syncProjectWorktreeBackgroundPolling(projectState);
+      queueBackgroundWorkWhenIdle(
+        `git-history-warm:${project.id}:${worktreePath}`,
+        () => {
+          warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
+        },
+      );
+      return history;
+    }
+
+    let summary = state.history;
+    let signature = state.historySignature;
+    if (signature === null) {
+      const loadedSummary = await runGitHistoryReadLimited(
+        () =>
+          readGitHistorySummary(project.id, worktreePath, requestGitOptions),
+        context?.signal,
+        "Git history read was aborted.",
+      );
+      summary = loadedSummary.history;
+      signature = loadedSummary.signature;
+      state.history = summary;
+      state.historyNextOffset = summary.headHash ? 0 : null;
+      state.historySignature = signature;
+      state.lastUpdatedAt = summary.lastUpdatedAt;
+    }
+
+    if (!summary.headHash) {
       return {
-        ...state.history,
+        ...summary,
         entries: [],
         limit,
         nextOffset: null,
       };
     }
 
-    await fillGitHistoryCache(state, worktreePath, 0, limit, requestGitOptions);
-    syncProjectWorktreeBackgroundPolling(projectState);
-    warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
-    return buildGitHistoryResultFromCache(state, limit, 0);
-  }
-
-  if (offset === 0) {
-    const { history, summary, signature } = await readGitHistoryFirstPage(
-      project.id,
-      worktreePath,
-      limit,
-      requestGitOptions,
+    await runGitHistoryReadLimited(
+      () =>
+        fillGitHistoryCache(
+          state,
+          worktreePath,
+          offset,
+          limit,
+          requestGitOptions,
+        ),
+      context?.signal,
+      "Git history read was aborted.",
     );
-    state.history = summary;
-    state.historyEntries = history.entries;
-    state.historyNextOffset = history.nextOffset;
-    state.historySignature = signature;
-    state.lastUpdatedAt = summary.lastUpdatedAt;
     syncProjectWorktreeBackgroundPolling(projectState);
-    warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
-    return history;
-  }
-
-  let summary = state.history;
-  let signature = state.historySignature;
-  if (signature === null) {
-    const loadedSummary = await readGitHistorySummary(
-      project.id,
-      worktreePath,
-      requestGitOptions,
+    queueBackgroundWorkWhenIdle(
+      `git-history-warm:${project.id}:${worktreePath}`,
+      () => {
+        warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
+      },
     );
-    summary = loadedSummary.history;
-    signature = loadedSummary.signature;
-    state.history = summary;
-    state.historyNextOffset = summary.headHash ? 0 : null;
-    state.historySignature = signature;
-    state.lastUpdatedAt = summary.lastUpdatedAt;
-  }
-
-  if (!summary.headHash) {
-    return {
-      ...summary,
-      entries: [],
-      limit,
-      nextOffset: null,
-    };
-  }
-
-  await fillGitHistoryCache(
-    state,
-    worktreePath,
-    offset,
-    limit,
-    requestGitOptions,
-  );
-  syncProjectWorktreeBackgroundPolling(projectState);
-  warmGitHistoryCache(state, worktreePath, logBackgroundGitFailure);
-  return buildGitHistoryResultFromCache(state, limit, offset);
+    return buildGitHistoryResultFromCache(state, limit, offset);
+  });
 }
 
 export async function getWorktreeGitCommitDiffProcedure(
   params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcGitCommitDiffResult> {
-  const requestGitOptions = gitCommandOptionsFromRequest(context);
-  const project = projectByIdForPath(params.projectId);
-  const worktreePath = normalizePath(params.worktreePath);
-  if (!findKnownProjectWorktree(project.id, worktreePath)) {
-    await assertProjectWorktree(project, worktreePath, requestGitOptions);
-  }
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const worktreePath = normalizePath(params.worktreePath);
+    if (!findKnownProjectWorktree(project.id, worktreePath)) {
+      await assertProjectWorktree(project, worktreePath, requestGitOptions);
+    }
 
-  return getCachedGitCommitDiffResult(
-    project.id,
-    worktreePath,
-    params.commitHash,
-    {
-      gitCommitDiffCache,
-      gitCommitDiffRequestCache,
-      maxEntries: GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES,
-      requestOptions: requestGitOptions,
-    },
-  );
+    return runDiffLoadLimited(
+      () =>
+        getCachedGitCommitDiffResult(
+          project.id,
+          worktreePath,
+          params.commitHash,
+          {
+            gitCommitDiffCache,
+            gitCommitDiffRequestCache,
+            maxEntries: GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES,
+            requestOptions: requestGitOptions,
+          },
+        ),
+      context?.signal,
+      "Commit diff read was aborted.",
+    );
+  });
 }
 
 export async function setActiveWorktreeProcedure(

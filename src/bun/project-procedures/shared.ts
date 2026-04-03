@@ -118,6 +118,112 @@ export async function awaitAbortableResult<T>(
   });
 }
 
+export function createAsyncConcurrencyLimit(maxConcurrent: number): {
+  run: <T>(
+    callback: () => Promise<T> | T,
+    options?: {
+      abortMessage?: string;
+      signal?: AbortSignal | null;
+    },
+  ) => Promise<T>;
+  stats: () => {
+    activeCount: number;
+    maxConcurrent: number;
+    pendingCount: number;
+  };
+} {
+  const concurrency = Math.max(1, Math.trunc(maxConcurrent) || 1);
+  let activeCount = 0;
+  const pendingTasks: Array<{
+    abortMessage: string;
+    detachAbortListener: () => void;
+    reject: (reason?: unknown) => void;
+    signal: AbortSignal | null;
+    start: () => void;
+  }> = [];
+
+  const removePendingTask = (task: (typeof pendingTasks)[number]): void => {
+    const index = pendingTasks.indexOf(task);
+    if (index >= 0) {
+      pendingTasks.splice(index, 1);
+    }
+  };
+
+  const schedule = (): void => {
+    while (activeCount < concurrency) {
+      const nextTask = pendingTasks.shift();
+      if (!nextTask) {
+        return;
+      }
+      if (nextTask.signal?.aborted) {
+        nextTask.detachAbortListener();
+        nextTask.reject(
+          createAbortError(nextTask.signal.reason, nextTask.abortMessage),
+        );
+        continue;
+      }
+
+      nextTask.detachAbortListener();
+      activeCount += 1;
+      nextTask.start();
+    }
+  };
+
+  return {
+    run: <T>(
+      callback: () => Promise<T> | T,
+      options?: {
+        abortMessage?: string;
+        signal?: AbortSignal | null;
+      },
+    ): Promise<T> => {
+      const abortMessage =
+        options?.abortMessage ?? "Limited operation was aborted.";
+      const signal = options?.signal ?? null;
+
+      return new Promise<T>((resolve, reject) => {
+        const task = {
+          abortMessage,
+          detachAbortListener: () => {},
+          reject,
+          signal,
+          start: () => {
+            void Promise.resolve()
+              .then(callback)
+              .then(resolve, reject)
+              .finally(() => {
+                activeCount = Math.max(0, activeCount - 1);
+                schedule();
+              });
+          },
+        };
+
+        if (signal) {
+          const handleAbort = () => {
+            removePendingTask(task);
+            task.detachAbortListener();
+            reject(createAbortError(signal.reason, abortMessage));
+          };
+          signal.addEventListener("abort", handleAbort, {
+            once: true,
+          });
+          task.detachAbortListener = () => {
+            signal.removeEventListener("abort", handleAbort);
+          };
+        }
+
+        pendingTasks.push(task);
+        schedule();
+      });
+    },
+    stats: () => ({
+      activeCount,
+      maxConcurrent: concurrency,
+      pendingCount: pendingTasks.length,
+    }),
+  };
+}
+
 export function expandHomeShorthandPath(value: string): string {
   if (process.platform === "win32") {
     return value;

@@ -14,10 +14,10 @@ Source: `docs/2026-03-31-correctness-issues-2.md`
 Source: server request starvation follow-up
 
 - [x] Task discovery cache: Replace synchronous on-demand `.tasks` and `package.json` scans with a cached snapshot plus watcher-driven invalidation so startup and worktree selection do not block the Bun server.
-- Activity persistence batching: Move thread/task activity writes behind a batched persistence queue or transaction-based flusher so streaming output does not compete with HTTP responses.
-- Foreground read protection: Stop starting unrelated background polling or cache warming from foreground read paths, and suspend background work while startup or worktree-open reads are in flight.
-- Git work preemption: Tighten the git scheduler so foreground startup and worktree reads can cancel or overtake background git work instead of waiting behind it.
-- Expensive request concurrency caps: Add explicit concurrency limits for worktree restore, git history refresh, task cache rebuilds, and diff loading so one client cannot saturate the shared process.
+- [x] Activity persistence batching: Move thread/task activity writes behind a batched persistence queue or transaction-based flusher so streaming output does not compete with HTTP responses.
+- [x] Foreground read protection: Stop starting unrelated background polling or cache warming from foreground read paths, and suspend background work while startup or worktree-open reads are in flight.
+- [x] Git work preemption: Tighten the git scheduler so foreground startup and worktree reads can cancel or overtake background git work instead of waiting behind it.
+- [x] Expensive request concurrency caps: Add explicit concurrency limits for worktree restore, git history refresh, task cache rebuilds, and diff loading so one client cannot saturate the shared process.
 - Static server isolation: Split static asset and page serving from RPC/task execution so active tasks cannot starve `/`, `/index.js`, or other startup requests.
-- Overload telemetry: Add event-loop lag, pending RPC count, queued git work, task rebuild duration, and persistence latency metrics to `/health` and server logs.
+- [x] Overload telemetry: Add event-loop lag, pending RPC count, queued git work, task rebuild duration, and persistence latency metrics to `/health` and server logs.
 - Starvation regression harness: Add a repeatable test or script that starts active tasks and verifies a second client can still load the app and complete core startup requests within a latency budget.

@@ -5,6 +5,7 @@ import type { ServerWebSocket } from "bun";
 
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
 import { initAppDatabase } from "./db";
+import { getGitSchedulerStats } from "./git";
 import {
   closeProjectProcedure,
   closeWorktreeProcedure,
@@ -14,6 +15,7 @@ import {
   deleteThreadProcedure,
   discardEmptyThreadProcedure,
   getCodexModelCatalogProcedure,
+  getProcedureRuntimeStats,
   getThreadProcedure,
   getWorktreeGitCommitDiffProcedure,
   getWorktreeSnapshotProcedure,
@@ -77,6 +79,10 @@ const INTER_VARIABLE_FONT_LATIN_EXT_PATH = resolve(
 const MAINVIEW_RELOAD_DEBOUNCE_MS = 90;
 const MAINVIEW_WATCH_INTERVAL_MS = 250;
 const SERVER_IDLE_TIMEOUT_SECONDS = 30;
+const SERVER_MONITOR_INTERVAL_MS = 1_000;
+const SERVER_OVERLOAD_LOG_INTERVAL_MS = 10_000;
+const EVENT_LOOP_LAG_WARN_MS = 150;
+const PENDING_RPC_WARN_COUNT = 8;
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -273,6 +279,12 @@ let mainviewRebuildQueued = false;
 let devMainviewPollTimer: ReturnType<typeof setInterval> | null = null;
 let pendingMainviewReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let mainviewFileStamps = new Map<string, number>();
+let overloadMonitorTimer: ReturnType<typeof setInterval> | null = null;
+let pendingRpcRequestCount = 0;
+let peakPendingRpcRequestCount = 0;
+let lastEventLoopLagMs = 0;
+let peakEventLoopLagMs = 0;
+let lastOverloadLogAt = 0;
 
 function stringResponse(body: string, contentType: string): Response {
   return new Response(body, {
@@ -290,6 +302,88 @@ function fileResponse(path: string, contentType: string): Response {
       "cache-control": "no-store",
     },
   });
+}
+
+function incrementPendingRpcRequestCount(): void {
+  pendingRpcRequestCount += 1;
+  peakPendingRpcRequestCount = Math.max(
+    peakPendingRpcRequestCount,
+    pendingRpcRequestCount,
+  );
+}
+
+function decrementPendingRpcRequestCount(count = 1): void {
+  pendingRpcRequestCount = Math.max(0, pendingRpcRequestCount - count);
+}
+
+function buildServerHealthSnapshot(activeServerPort: number): {
+  devServer: boolean;
+  eventLoopLagMs: {
+    current: number;
+    peak: number;
+  };
+  git: ReturnType<typeof getGitSchedulerStats>;
+  ok: true;
+  pendingRpcRequests: {
+    current: number;
+    peak: number;
+  };
+  port: number;
+  procedures: ReturnType<typeof getProcedureRuntimeStats>;
+  rpcClientCount: number;
+} {
+  return {
+    devServer: IS_DEV_SERVER,
+    eventLoopLagMs: {
+      current: lastEventLoopLagMs,
+      peak: peakEventLoopLagMs,
+    },
+    git: getGitSchedulerStats(),
+    ok: true,
+    pendingRpcRequests: {
+      current: pendingRpcRequestCount,
+      peak: peakPendingRpcRequestCount,
+    },
+    port: activeServerPort,
+    procedures: getProcedureRuntimeStats(),
+    rpcClientCount: rpcClients.size,
+  };
+}
+
+function startOverloadMonitoring(activeServerPort: () => number): void {
+  if (overloadMonitorTimer) {
+    return;
+  }
+
+  let expectedAt = performance.now() + SERVER_MONITOR_INTERVAL_MS;
+  overloadMonitorTimer = setInterval(() => {
+    const now = performance.now();
+    lastEventLoopLagMs = Math.max(0, now - expectedAt);
+    peakEventLoopLagMs = Math.max(peakEventLoopLagMs, lastEventLoopLagMs);
+    expectedAt = now + SERVER_MONITOR_INTERVAL_MS;
+
+    const health = buildServerHealthSnapshot(activeServerPort());
+    const hasPressure =
+      health.eventLoopLagMs.current >= EVENT_LOOP_LAG_WARN_MS ||
+      health.pendingRpcRequests.current >= PENDING_RPC_WARN_COUNT ||
+      health.git.queuedBackgroundCount > 0 ||
+      health.git.queuedForegroundCount > 0 ||
+      health.procedures.foregroundReadCount > 0 ||
+      health.procedures.taskCacheRefreshLimit.pendingCount > 0 ||
+      health.procedures.gitHistoryReadLimit.pendingCount > 0 ||
+      health.procedures.diffLoadLimit.pendingCount > 0;
+
+    if (!hasPressure) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    if (nowMs - lastOverloadLogAt < SERVER_OVERLOAD_LOG_INTERVAL_MS) {
+      return;
+    }
+    lastOverloadLogAt = nowMs;
+    console.warn("Server overload pressure", JSON.stringify(health));
+  }, SERVER_MONITOR_INTERVAL_MS);
 }
 
 function isAddressInUseError(error: unknown): boolean {
@@ -446,6 +540,7 @@ function abortAllPendingRpcRequests(
     pending.canceledByClient = true;
     pending.controller.abort(createAbortError(null, reason));
   }
+  decrementPendingRpcRequestCount(pendingRequests.size);
   pendingRequests.clear();
   pendingRpcRequestsByClient.delete(client);
 }
@@ -791,6 +886,7 @@ async function bootstrap(): Promise<void> {
   });
 
   let activeServerPort = SERVER_PORT;
+  startOverloadMonitoring(() => activeServerPort);
   const serverOptions = {
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
     async fetch(request, serverInstance) {
@@ -832,11 +928,7 @@ async function bootstrap(): Promise<void> {
 
       if (pathname === "/health") {
         return stringResponse(
-          JSON.stringify({
-            devServer: IS_DEV_SERVER,
-            ok: true,
-            port: activeServerPort,
-          }),
+          JSON.stringify(buildServerHealthSnapshot(activeServerPort)),
           "application/json; charset=utf-8",
         );
       }
@@ -883,6 +975,7 @@ async function bootstrap(): Promise<void> {
               canceledByClient: false,
             };
             pendingRequests.set(request.id, pending);
+            incrementPendingRpcRequestCount();
 
             const handler = rpcHandlers[request.method] as (
               params: RpcRequestMap[RpcMethodName]["params"],
@@ -926,6 +1019,7 @@ async function bootstrap(): Promise<void> {
             } finally {
               if (pendingRequests.get(request.id) === pending) {
                 pendingRequests.delete(request.id);
+                decrementPendingRpcRequestCount();
               }
             }
           } catch (error) {

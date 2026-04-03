@@ -54,7 +54,7 @@ type ThreadActivityKind =
   | "web_search"
   | "error";
 
-type ThreadActivityInput = {
+export type ThreadActivityInput = {
   threadId: number;
   itemId: string;
   role?: "assistant" | "user";
@@ -62,6 +62,10 @@ type ThreadActivityInput = {
   text: string;
   state: string | null;
   payloadJson?: string | null;
+};
+
+type ThreadActivityPersistInput = ThreadActivityInput & {
+  messageId?: number | null;
 };
 
 export type ProjectRecord = {
@@ -151,6 +155,22 @@ function runStatement(
   return bindings.length === 0
     ? database.run(sql)
     : database.run(sql, bindings);
+}
+
+function runInTransaction<T>(database: Database, callback: () => T): T {
+  runStatement(database, "BEGIN IMMEDIATE");
+  try {
+    const result = callback();
+    runStatement(database, "COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      runStatement(database, "ROLLBACK");
+    } catch {
+      // Ignore rollback errors so the original failure surfaces.
+    }
+    throw error;
+  }
 }
 
 function ensureAppDirectory(appDataPath: string): void {
@@ -1134,6 +1154,14 @@ export function upsertThreadActivity(
   database: Database,
   input: ThreadActivityInput,
 ): void {
+  upsertThreadActivities(database, [input]);
+}
+
+function findThreadActivityMessageId(
+  database: Database,
+  threadId: number,
+  itemId: string,
+): number | null {
   const existing = database
     .query<{ id: number }, [number, string]>(
       `
@@ -1144,54 +1172,111 @@ export function upsertThreadActivity(
 				LIMIT 1
 			`,
     )
-    .get(input.threadId, input.itemId);
+    .get(threadId, itemId);
+  return existing ? existing.id : null;
+}
 
-  if (existing) {
-    runStatement(
-      database,
-      `
-				UPDATE thread_messages
-				SET
-					role = ?,
-					kind = ?,
-					text = ?,
-					state = ?,
-					payload_json = ?,
-					updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-				WHERE id = ?
-			`,
-      input.role ?? "assistant",
-      input.kind,
-      input.text,
-      input.state,
-      input.payloadJson ?? null,
-      existing.id,
-    );
-  } else {
-    runStatement(
-      database,
-      `
-				INSERT INTO thread_messages (
-					thread_id,
-					role,
-					kind,
-					item_id,
-					text,
-					state,
-					payload_json,
-					updated_at
-				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			`,
-      input.threadId,
-      input.role ?? "assistant",
-      input.kind,
-      input.itemId,
-      input.text,
-      input.state,
-      input.payloadJson ?? null,
-    );
+function updateThreadActivityById(
+  database: Database,
+  messageId: number,
+  input: ThreadActivityInput,
+): boolean {
+  const result = runStatement(
+    database,
+    `
+			UPDATE thread_messages
+			SET
+				role = ?,
+				kind = ?,
+				text = ?,
+				state = ?,
+				payload_json = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    input.role ?? "assistant",
+    input.kind,
+    input.text,
+    input.state,
+    input.payloadJson ?? null,
+    messageId,
+  );
+  return Number(result.changes) > 0;
+}
+
+function insertThreadActivity(
+  database: Database,
+  input: ThreadActivityInput,
+): number {
+  const result = runStatement(
+    database,
+    `
+			INSERT INTO thread_messages (
+				thread_id,
+				role,
+				kind,
+				item_id,
+				text,
+				state,
+				payload_json,
+				updated_at
+			)
+			VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		`,
+    input.threadId,
+    input.role ?? "assistant",
+    input.kind,
+    input.itemId,
+    input.text,
+    input.state,
+    input.payloadJson ?? null,
+  );
+  return Number(result.lastInsertRowid);
+}
+
+export function upsertThreadActivities(
+  database: Database,
+  inputs: readonly ThreadActivityPersistInput[],
+): number[] {
+  if (inputs.length === 0) {
+    return [];
   }
+
+  return runInTransaction(database, () => {
+    const resolvedMessageIds: number[] = [];
+    const messageIdByActivity = new Map<string, number>();
+
+    for (const input of inputs) {
+      const activityKey = `${input.threadId}\u0000${input.itemId}`;
+      let messageId =
+        typeof input.messageId === "number"
+          ? input.messageId
+          : (messageIdByActivity.get(activityKey) ?? null);
+
+      if (typeof messageId === "number") {
+        if (!updateThreadActivityById(database, messageId, input)) {
+          messageId = insertThreadActivity(database, input);
+        }
+      } else {
+        const existingMessageId = findThreadActivityMessageId(
+          database,
+          input.threadId,
+          input.itemId,
+        );
+        if (typeof existingMessageId === "number") {
+          updateThreadActivityById(database, existingMessageId, input);
+          messageId = existingMessageId;
+        } else {
+          messageId = insertThreadActivity(database, input);
+        }
+      }
+
+      messageIdByActivity.set(activityKey, messageId);
+      resolvedMessageIds.push(messageId);
+    }
+
+    return resolvedMessageIds;
+  });
 }
 
 export function stopInProgressThreadMessages(

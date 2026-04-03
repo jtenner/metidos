@@ -183,6 +183,37 @@ export function normalizeGitCommandOptions(
   };
 }
 
+export function getGitSchedulerStats(): {
+  activeBackgroundCount: number;
+  activeForegroundCount: number;
+  queueCount: number;
+  queuedBackgroundCount: number;
+  queuedForegroundCount: number;
+} {
+  let activeBackgroundCount = 0;
+  let activeForegroundCount = 0;
+  let queuedBackgroundCount = 0;
+  let queuedForegroundCount = 0;
+
+  for (const queue of gitCommandQueueMap.values()) {
+    if (queue.activeTask?.priority === "foreground") {
+      activeForegroundCount += 1;
+    } else if (queue.activeTask?.priority === "background") {
+      activeBackgroundCount += 1;
+    }
+    queuedForegroundCount += queue.foregroundTasks.length;
+    queuedBackgroundCount += queue.backgroundTasks.length;
+  }
+
+  return {
+    activeBackgroundCount,
+    activeForegroundCount,
+    queueCount: gitCommandQueueMap.size,
+    queuedBackgroundCount,
+    queuedForegroundCount,
+  };
+}
+
 function removeGitCommandTask(
   queue: {
     backgroundTasks: GitCommandQueueTask[];
@@ -199,6 +230,32 @@ function removeGitCommandTask(
   const backgroundIndex = queue.backgroundTasks.indexOf(task);
   if (backgroundIndex >= 0) {
     queue.backgroundTasks.splice(backgroundIndex, 1);
+  }
+}
+
+function abortQueuedGitTask(task: GitCommandQueueTask, reason: string): void {
+  task.reject(createAbortError(null, reason));
+}
+
+function abortBackgroundGitCommands(reason: string): void {
+  for (const [cwd, queue] of gitCommandQueueMap) {
+    if (queue.activeTask?.priority === "background") {
+      queue.activeTask.abort(reason);
+    }
+
+    for (const task of [...queue.backgroundTasks]) {
+      removeGitCommandTask(queue, task);
+      abortQueuedGitTask(task, reason);
+    }
+
+    if (
+      !queue.active &&
+      queue.activeTask === null &&
+      queue.foregroundTasks.length === 0 &&
+      queue.backgroundTasks.length === 0
+    ) {
+      gitCommandQueueMap.delete(cwd);
+    }
   }
 }
 
@@ -328,18 +385,12 @@ function enqueueGitCommand<T>(
     }
 
     if (priority === "foreground") {
+      abortBackgroundGitCommands(
+        `Foreground git command preempted background work for ${cwd}.`,
+      );
       queue.foregroundTasks.push(task);
     } else {
       queue.backgroundTasks.push(task);
-    }
-    if (
-      priority === "foreground" &&
-      queue.activeTask &&
-      queue.activeTask.priority === "background"
-    ) {
-      queue.activeTask.abort(
-        `Foreground git command preempted background work for ${cwd}.`,
-      );
     }
     scheduleGitCommandQueue(cwd);
   });
