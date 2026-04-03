@@ -16,6 +16,7 @@ import { APP_TITLE, formatGitHistoryTimestamp } from "./state";
 const CODE_FONT_STACK =
   '"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
+// Shared CSS objects for syntax highlighting used by markdown and diff rendering.
 const codeBlockStyle = {
   margin: 0,
   border: "1px solid rgba(153, 190, 217, 0.18)",
@@ -36,6 +37,12 @@ type DiffLine = {
   text: string;
 };
 
+/**
+ * Custom markdown renderers:
+ * - anchor tags open in new tab
+ * - fenced/inline code rendered with project visual style + syntax highlighting
+ * - block elements wrapped for horizontal scrolling and table styling.
+ */
 const markdownComponents: Components = {
   a({ href, children, ...props }) {
     return (
@@ -91,6 +98,7 @@ const markdownComponents: Components = {
 };
 
 export function MarkdownMessage({ text }: { text: string }): JSX.Element {
+  // React-markdown handles rich text rendering from assistant output with GFM support.
   return (
     <div className="message-markdown">
       <ReactMarkdown
@@ -117,6 +125,7 @@ export function ContextUsageMeter({
   );
   const progress = clampedInputTokens / safeContextWindowTokens;
 
+  // Use conic-gradient ring for compact token usage indicator with accessible <meter> semantics.
   return (
     <div className="shrink-0">
       <div className="relative h-6 w-6">
@@ -150,10 +159,12 @@ export function ContextUsageMeter({
 }
 
 export function isAssistantVisibleMessage(message: VisibleMessage): boolean {
+  // Non-chat entries (system/tool messages etc.) are always shown in conversation history.
   return message.kind !== "chat" || message.speaker === "assistant";
 }
 
 export function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
+  // Exclude status-like tones so plain text bubbles keep spacing consistent.
   return (
     message.kind === "chat" &&
     message.speaker === "assistant" &&
@@ -189,6 +200,7 @@ export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
 }
 
 function parseUnifiedDiff(diffText: string): DiffLine[] {
+  // Parse diff one line at a time into a minimal display model for lightweight rendering.
   if (!diffText.trim()) {
     return [];
   }
@@ -269,6 +281,10 @@ function errorItemStateLabel(
   return "Noted";
 }
 
+/**
+ * Render a unified diff block with simple line-kind based coloring.
+ * Keeps lines with empty bodies as non-empty whitespace so row heights stay stable.
+ */
 export function DiffViewer({
   className,
   diffText,
@@ -335,6 +351,7 @@ export function ToolCallMessage({
   output: string;
   state: "in_progress" | "completed" | "failed" | "stopped";
 }): JSX.Element {
+  // Tool messages show tool identity, arguments, and output/error with bounded scrolling.
   return (
     <div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
       <div className="flex items-center justify-between gap-4">
@@ -382,6 +399,7 @@ export function WebSearchMessage({
   query: string;
   state: "in_progress" | "completed" | "stopped";
 }): JSX.Element {
+  // Search result card is lightweight; only query and lifecycle state are surfaced.
   return (
     <div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
       <div className="flex items-center justify-between gap-4">
@@ -406,6 +424,7 @@ export function ErrorItemMessage({
   text: string;
   state: "in_progress" | "completed" | "stopped";
 }): JSX.Element {
+  // Generic inline error item used for non-blocking notices from backend execution.
   return (
     <div className="space-y-3 border border-[#6d5930] bg-[#261f12] p-4">
       <div className="flex items-center justify-between gap-4">
@@ -442,6 +461,7 @@ export function CommandExecutionMessage({
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
   const isExpanded = expanded ?? localIsExpanded;
   const stateLabel = commandStateLabel(state, exitCode);
+  // Supports controlled expansion from parent when needed; otherwise local toggle state.
   const toggleExpanded = (): void => {
     if (expanded === undefined) {
       setLocalIsExpanded((current) => !current);
@@ -510,6 +530,7 @@ export function ReasoningMessage({
   state: "in_progress" | "completed" | "stopped";
   text: string;
 }): JSX.Element {
+  // Assistant internal reasoning payloads are shown with a compact status pill.
   return (
     <div className="border border-[#2a3339] bg-[#11171a] px-4 py-3">
       <div className="flex items-center justify-between gap-4">
@@ -565,6 +586,7 @@ export function FileChangeMessage({
     path.replaceAll(/[^a-zA-Z0-9_-]+/g, "-").replaceAll(/^-+|-+$/g, "") ||
     "content"
   }`;
+  // Keep IDs stable/deterministic for aria-controls and screen-reader navigation.
   const toggleExpanded = (): void => {
     if (!hasDiff) {
       return;
@@ -641,6 +663,7 @@ export function GitHistoryDiffModal({
   const dialogTitleId = `git-history-modal-title-${state.entry.hash}`;
   const dialogDescriptionId = `git-history-modal-description-${state.entry.hash}`;
   const dialogBodyId = `git-history-modal-body-${state.entry.hash}`;
+  // Reset body key when async state transitions to force fresh dialog content lifecycle.
   const dialogBodyResetKey = `${state.projectId}:${state.worktreePath}:${state.entry.hash}:${state.loading ? "loading" : state.error ? "error" : "ready"}:${state.diffText.length}`;
 
   return (
@@ -717,6 +740,7 @@ export function DesktopMessageGroups({
   localUserLabel: string;
   renderAssistantMessageContent: (message: VisibleMessage) => JSX.Element;
 }): JSX.Element {
+  // Desktop layout arranges assistant and user bubbles in two fixed columns with avatars.
   return (
     <>
       {groups.map((group) => {
@@ -786,6 +810,7 @@ export function MobileMessageGroups({
   localUserLabel: string;
   renderAssistantMessageContent: (message: VisibleMessage) => JSX.Element;
 }): JSX.Element {
+  // Mobile layout uses stacked cards to maximize readibility on narrow widths.
   return (
     <>
       {groups.map((group) => {
@@ -853,6 +878,7 @@ export function ErrorPreviewPopover({
   x: number;
   y: number;
 }): JSX.Element {
+  // Lightweight tooltip-style preview; uses fixed positioning coordinates.
   return (
     <div
       className="pointer-events-none fixed z-[110] max-w-[22rem] rounded-md border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
@@ -880,6 +906,7 @@ export function ThreadSummaryPopover({
   x: number;
   y: number;
 }): JSX.Element {
+  // Position-aware summary tooltip with title + summary content.
   return (
     <div
       className="pointer-events-none fixed z-[108] hidden max-w-[22rem] rounded-md border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
