@@ -107,6 +107,9 @@ type AppProps = {
   procedures: ProjectProcedures;
 };
 
+/**
+ * App-level sizing and interaction constants for responsive layout decisions.
+ */
 const WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX = 360;
 const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
 const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
@@ -120,12 +123,18 @@ type WorktreeThreadPopoverState = {
 };
 type MobileNavigationIndicatorState = "none" | "working" | "completed";
 
+/**
+ * Stable sort for thread collections by updated timestamp, newest-first.
+ */
 function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
   return [...items].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt),
   );
 }
 
+/**
+ * Subscribes to a media query and keeps a boolean in sync with viewport width.
+ */
 function useDesktopViewport(): boolean {
   const [matches, setMatches] = useState(
     () => window.matchMedia(DESKTOP_MEDIA_QUERY).matches,
@@ -148,11 +157,17 @@ function useDesktopViewport(): boolean {
   return matches;
 }
 
+/**
+ * Normalizes backend thread errors to a quick classification predicate.
+ */
 function isThreadNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.startsWith("Thread not found:");
 }
 
+/**
+ * Compares worktree change arrays by field values and array order.
+ */
 function areWorktreeChangesEqual(
   left: RpcWorktreeChange[],
   right: RpcWorktreeChange[],
@@ -175,6 +190,9 @@ function areWorktreeChangesEqual(
   });
 }
 
+/**
+ * Compares simple string arrays in a deterministic, order-sensitive way.
+ */
 function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left === right) {
     return true;
@@ -186,6 +204,10 @@ function areStringArraysEqual(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
+/**
+ * Compares worktree snapshots by path and change/diff metadata before deciding to
+ * trigger refresh work.
+ */
 function areWorktreeSnapshotsEquivalent(
   left: RpcWorktreeSnapshot | undefined,
   right: RpcWorktreeSnapshot | undefined,
@@ -211,7 +233,15 @@ declare global {
   }
 }
 
+/**
+ * Root mainview component.
+ *
+ * It composes sidebar/workspace panels, thread/project state derivation, and
+ * RPC-driven update handlers into a single interface.
+ */
 export default function App({ procedures }: AppProps): JSX.Element {
+  // Persisted UI state is loaded once and stored in a ref so initialization is
+  // cached while state references remain stable across renders.
   const initialMainviewStateRef = useRef<PersistedMainviewState | null>(null);
   if (!initialMainviewStateRef.current) {
     initialMainviewStateRef.current = readPersistedMainviewState();
@@ -332,6 +362,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     (collapsed: boolean): void => {
       sidebarCollapsedRef.current = collapsed;
       setSidebarCollapsed(collapsed);
+      // Keep in sync with persisted layout state so reloads restore preference.
       patchPersistedMainviewState({
         sidebarCollapsed: collapsed,
       });
@@ -356,6 +387,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
     null,
   );
+  // Request/caching refs below track in-flight RPCs by key so refreshes can be
+  // shared, cancelled, or ignored without extra state transitions.
   const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
     null,
   );
@@ -419,6 +452,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       const nextWorktreePath =
         worktreePath ??
         primaryWorktreePath(project, getProjectState(project.id).worktrees);
+      // Keep both refs and state aligned so all async handlers observe new selection.
       selectedProjectIdRef.current = project.id;
       selectedWorktreePathRef.current = nextWorktreePath;
       setSelectedProjectId(project.id);
@@ -427,6 +461,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     [getProjectState],
   );
 
+  // Derive normalized UI state in one pass so child props stay internally
+  // consistent and side panels share the same source of truth.
   const {
     activeChatError,
     activeChatNotice,
@@ -507,6 +543,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     threads,
   });
 
+  // Request queue handling: show and resolve the oldest pending thread-start request
+  // first so users always act on the oldest queued action.
   const currentThreadStartRequest = pendingThreadStartRequests[0] ?? null;
   const currentThreadStartRequestProject =
     currentThreadStartRequest === null
@@ -537,6 +575,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
       ),
     );
   }, [activeSelectedWorktreePath, selectedProject, threads]);
+
+  // Maintain a compact set of acknowledged-completed thread IDs to avoid
+  // recomputing this visual state from full thread objects.
   const clearCompletedThreadIndicator = useCallback(
     (threadId: number): void => {
       setCompletedThreadIndicatorIds((current) => {
@@ -602,6 +643,8 @@ export default function App({ procedures }: AppProps): JSX.Element {
     );
     let frameId: number | null = null;
 
+    // Position recalculation is deferred to rAF and debounced across rapid
+    // animation frames to avoid jitter when the sidebar moves or resizes.
     const updatePopoverPosition = (): void => {
       if (frameId !== null) {
         cancelAnimationFrame(frameId);
