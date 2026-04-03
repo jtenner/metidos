@@ -209,6 +209,22 @@ export type RpcWorktreeFileContentPage = {
   isMissing: boolean;
 };
 
+export type RpcSecurityAuditPayload = Record<
+  string,
+  string | number | boolean | null
+>;
+
+export type RpcSecurityAuditEvent = {
+  id: number;
+  eventType: string;
+  summaryText: string;
+  threadId: number | null;
+  projectId: number | null;
+  worktreePath: string | null;
+  payload: RpcSecurityAuditPayload | null;
+  createdAt: string;
+};
+
 export type RpcRequestPriority = "background" | "default" | "foreground";
 
 export type RpcProcedureCallOptions = {
@@ -553,6 +569,13 @@ export type AppRPCSchema = {
       params: undefined;
       response: RpcThread[];
     };
+    listSecurityAuditEvents: {
+      params: {
+        limit?: number;
+        threadId?: number | null;
+      };
+      response: RpcSecurityAuditEvent[];
+    };
     createThread: {
       params: {
         projectId: number;
@@ -744,6 +767,10 @@ export interface ProjectProcedures {
   listThreads: RpcProcedureCall<
     AppRPCSchema["requests"]["listThreads"]["params"],
     AppRPCSchema["requests"]["listThreads"]["response"]
+  >;
+  listSecurityAuditEvents: RpcProcedureCall<
+    AppRPCSchema["requests"]["listSecurityAuditEvents"]["params"],
+    AppRPCSchema["requests"]["listSecurityAuditEvents"]["response"]
   >;
   createThread: RpcProcedureCall<
     AppRPCSchema["requests"]["createThread"]["params"],

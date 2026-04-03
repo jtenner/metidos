@@ -3,6 +3,7 @@ import { materialSymbol } from "../controls/icons";
 import { SidebarSearchControl } from "../controls/sidebar-search-control";
 import { GitHistoryPanel } from "./git-history-panel";
 import { ProjectsPanel } from "./projects-panel";
+import { SecurityAuditPanel } from "./security-audit-panel";
 import { WorkspacePanel } from "./workspace-panel";
 
 type SidebarContentProps = {
@@ -12,6 +13,7 @@ type SidebarContentProps = {
   gitHistoryPanelProps: ComponentProps<typeof GitHistoryPanel>;
   onSidebarSearchQueryChange: (value: string) => void;
   projectsPanelProps: ComponentProps<typeof ProjectsPanel>;
+  securityAuditPanelProps: ComponentProps<typeof SecurityAuditPanel>;
   selectedProjectName: string | null;
   sidebarSearchQuery: string;
   workspacePanelProps: ComponentProps<typeof WorkspacePanel>;
@@ -27,6 +29,7 @@ export function SidebarContent({
   gitHistoryPanelProps,
   onSidebarSearchQueryChange,
   projectsPanelProps,
+  securityAuditPanelProps,
   selectedProjectName,
   sidebarSearchQuery,
   workspacePanelProps,
@@ -68,6 +71,7 @@ export function SidebarContent({
         <WorkspacePanel {...workspacePanelProps} />
         <ProjectsPanel {...projectsPanelProps} />
         <GitHistoryPanel key={gitHistoryPanelKey} {...gitHistoryPanelProps} />
+        <SecurityAuditPanel {...securityAuditPanelProps} />
       </div>
     </div>
   );

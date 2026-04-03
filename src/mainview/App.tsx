@@ -18,6 +18,7 @@ import type {
   RpcProject,
   RpcProjectTask,
   RpcRequestPriority,
+  RpcSecurityAuditEvent,
   RpcThread,
   RpcThreadDetail,
   RpcThreadMessage,
@@ -275,6 +276,12 @@ export default function App({
   );
   const [threads, setThreads] = useState<RpcThread[]>([]);
   const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
+  const [securityAuditEvents, setSecurityAuditEvents] = useState<
+    RpcSecurityAuditEvent[]
+  >([]);
+  const [securityAuditError, setSecurityAuditError] = useState("");
+  const [securityAuditLoading, setSecurityAuditLoading] = useState(false);
+  const [securityAuditLoaded, setSecurityAuditLoaded] = useState(false);
   const [gitHistory, setGitHistory] =
     useState<RpcWorktreeGitHistoryResult | null>(null);
   const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
@@ -395,6 +402,8 @@ export default function App({
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryRequestIdRef = useRef(0);
   const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
+  const securityAuditRequestIdRef = useRef(0);
+  const securityAuditLoadingRef = useRef(false);
 
   const closeStepUpDialog = useCallback((authorized: boolean) => {
     setStepUpDialogOpen(false);
@@ -551,6 +560,41 @@ export default function App({
     },
     [getProjectState],
   );
+
+  const refreshSecurityAuditEvents = useCallback(async (): Promise<void> => {
+    if (securityAuditLoadingRef.current) {
+      return;
+    }
+
+    const requestId = securityAuditRequestIdRef.current + 1;
+    securityAuditRequestIdRef.current = requestId;
+    securityAuditLoadingRef.current = true;
+    setSecurityAuditLoading(true);
+    setSecurityAuditError("");
+
+    try {
+      const nextEvents = await procedures.listSecurityAuditEvents({
+        limit: 100,
+      });
+      if (securityAuditRequestIdRef.current !== requestId) {
+        return;
+      }
+      setSecurityAuditEvents(nextEvents);
+    } catch (error) {
+      if (securityAuditRequestIdRef.current !== requestId) {
+        return;
+      }
+      setSecurityAuditError(
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      if (securityAuditRequestIdRef.current === requestId) {
+        setSecurityAuditLoaded(true);
+        setSecurityAuditLoading(false);
+      }
+      securityAuditLoadingRef.current = false;
+    }
+  }, [procedures]);
 
   // Derive normalized UI state in one pass so child props stay internally
   // consistent and side panels share the same source of truth.
@@ -4397,6 +4441,15 @@ export default function App({
                     worktreePinBusyPath,
                     worktreeThreadErrorLevel,
                   }}
+                  securityAuditPanelProps={{
+                    error: securityAuditError,
+                    events: securityAuditEvents,
+                    hasLoaded: securityAuditLoaded,
+                    loading: securityAuditLoading,
+                    onRefresh: refreshSecurityAuditEvents,
+                    projects,
+                    selectedThreadId,
+                  }}
                   selectedProjectName={selectedProject?.name ?? null}
                   sidebarSearchQuery={sidebarSearchQuery}
                   workspacePanelProps={{
@@ -4616,6 +4669,15 @@ export default function App({
                 supportsTildePath,
                 worktreePinBusyPath,
                 worktreeThreadErrorLevel,
+              }}
+              securityAuditPanelProps={{
+                error: securityAuditError,
+                events: securityAuditEvents,
+                hasLoaded: securityAuditLoaded,
+                loading: securityAuditLoading,
+                onRefresh: refreshSecurityAuditEvents,
+                projects,
+                selectedThreadId,
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}

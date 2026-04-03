@@ -94,6 +94,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Centralizes the persistent security audit helpers for privileged project/workspace actions.
   - Records cross-workspace thread creation, queued task execution, and project deletion events with stable payloads that are easy to test.
 
+- `security-audit.ts`
+  - Provides the RPC-facing security audit log read path used by the browser UI.
+  - Normalizes audit payload JSON into typed flat objects and enforces bounded list limits for sidebar refreshes.
+
 - `rpc-websocket-auth.ts`
   - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
   - Encapsulates the session-cookie and websocket-ticket requirements so those checks are regression-tested independently from the full server bootstrap.

@@ -567,6 +567,7 @@ Current implementation coverage:
 - `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
 - `src/bun/project-security-audit.test.ts` covers audit-event persistence for cross-workspace thread creation, queued task execution, and project deletion
 - `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows, including audit-event persistence
+- `src/bun/security-audit.test.ts` covers bounded audit-log reads, thread scoping, and payload normalization for the UI-facing audit procedure
 
 Manual test matrix:
 

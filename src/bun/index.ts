@@ -90,6 +90,7 @@ import {
   authorizeRpcWebSocketUpgrade,
   type RpcWebSocketSocketData,
 } from "./rpc-websocket-auth";
+import { listSecurityAuditEventsProcedure } from "./security-audit";
 import {
   applySecurityHeaders,
   buildLivenessPayload,
@@ -318,6 +319,8 @@ const rpcHandlers: RpcRequestHandlerMap = {
   getAppBootstrap: (params) => getAppBootstrapProcedure(params),
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),
+  listSecurityAuditEvents: async (params) =>
+    listSecurityAuditEventsProcedure(params),
   openProject: (params, context) => openProjectProcedure(params, context),
   openProjectsBatch: (params, context) =>
     openProjectsBatchProcedure(params, context),

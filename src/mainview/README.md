@@ -40,6 +40,8 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
 
+`app/security-audit-panel.tsx` displays the local security audit log in a dedicated sidebar panel and supports refresh-on-open behavior.
+
 `app/sidebar-content.tsx` composes shared sidebar sections and controls how project, thread, and task data are organized.
 
 `app/sidebar-panels-state.ts` owns persisted sidebar panel open/closed state and cross-panel toggle synchronization.

@@ -741,6 +741,7 @@ const procedures: ProjectProcedures = {
   getAppBootstrap: createProcedure("getAppBootstrap"),
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),
+  listSecurityAuditEvents: createProcedure("listSecurityAuditEvents"),
   openProject: createProcedure("openProject"),
   openProjectsBatch: createProcedure("openProjectsBatch"),
   closeProject: createProcedure("closeProject"),

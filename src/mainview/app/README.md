@@ -21,6 +21,9 @@ Composes reusable sidebar sections (projects, threads, tasks) and controls their
 `projects-panel.tsx`
 Renders project listings and project-focused interactions, including selection and project status actions.
 
+`security-audit-panel.tsx`
+Displays the local security audit log in a dedicated sidebar section with refresh controls and event metadata.
+
 `threads-panel.tsx`
 Renders thread lists and thread row interactions as the canonical thread-navigation surface.
 

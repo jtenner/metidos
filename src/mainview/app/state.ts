@@ -215,6 +215,7 @@ export type PersistedTreeViewState = {
   projectsSectionOpen: boolean;
   threadsSectionOpen: boolean;
   gitSectionOpen: boolean;
+  securityAuditSectionOpen: boolean;
   openProjectPaths: string[];
 };
 
@@ -594,6 +595,7 @@ export function defaultPersistedTreeViewState(): PersistedTreeViewState {
     projectsSectionOpen: true,
     threadsSectionOpen: true,
     gitSectionOpen: true,
+    securityAuditSectionOpen: false,
     openProjectPaths: [],
   };
 }
@@ -749,6 +751,7 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
       projectsSectionOpen: parsed.projectsSectionOpen !== false,
       threadsSectionOpen: parsed.threadsSectionOpen !== false,
       gitSectionOpen: parsed.gitSectionOpen !== false,
+      securityAuditSectionOpen: parsed.securityAuditSectionOpen === true,
       openProjectPaths: normalizePersistedOpenProjectPaths(
         parsed.openProjectPaths,
       ),
