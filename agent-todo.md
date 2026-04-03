@@ -20,7 +20,7 @@
 - [ ] Add comments to file `src/mainview/app/workspace-panel.tsx`.
 - [ ] Add comments to file `src/mainview/controls/chat-composer-control.tsx`.
 - [ ] Add comments to file `src/mainview/controls/codex-model-selector.tsx`.
-- [ ] Add comments to file `src/mainview/controls/codex-utils.ts`.
+- [x] Add comments to file `src/mainview/controls/codex-utils.ts`.
 - [x] Add comments to file `src/mainview/controls/icons.tsx`.
 - [ ] Add comments to file `src/mainview/controls/project-task-selector.tsx`.
 - [x] Add comments to file `src/mainview/controls/reasoning-effort-selector.tsx`.
