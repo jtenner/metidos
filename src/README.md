@@ -26,6 +26,8 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Shared TLS path/runtime policy helper used by the Bun entrypoints.
 - `project-procedures.ts`
   - High-level project orchestration: open/close workflows, background tasks, and thread command lifecycle.
+- `rpc-websocket-auth.ts`
+  - Shared websocket-upgrade auth gate used to verify session/ticket requirements before `/rpc` upgrades.
 - `rpc-schema.ts`
   - Shared RPC typings/contracts used across Bun/browser boundaries.
 - `static-server.ts`

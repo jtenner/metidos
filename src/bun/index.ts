@@ -85,6 +85,10 @@ import type {
   RpcWorktreeTasksChanged,
 } from "./rpc-schema";
 import {
+  authorizeRpcWebSocketUpgrade,
+  type RpcWebSocketSocketData,
+} from "./rpc-websocket-auth";
+import {
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
   isWebSocketOriginAllowed,
@@ -121,10 +125,6 @@ const SERVER_OVERLOAD_LOG_INTERVAL_MS = 10_000;
 const EVENT_LOOP_LAG_WARN_MS = 150;
 const PENDING_RPC_WARN_COUNT = 8;
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
-type RpcSocketData = {
-  authBypass: boolean;
-  sessionId: string | null;
-};
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -374,9 +374,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
   setWorktreePinned: (params) => setWorktreePinnedProcedure(params),
 };
 
-const rpcClients = new Set<ServerWebSocket<RpcSocketData>>();
+const rpcClients = new Set<ServerWebSocket<RpcWebSocketSocketData>>();
 const pendingRpcRequestsByClient = new WeakMap<
-  ServerWebSocket<RpcSocketData>,
+  ServerWebSocket<RpcWebSocketSocketData>,
   Map<number, PendingRpcRequest>
 >();
 const pendingMainviewChanges = new Set<string>();
@@ -1105,7 +1105,7 @@ function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
  * Return (or create) a per-client map for pending RPC operations.
  */
 function getPendingRpcRequests(
-  client: ServerWebSocket<RpcSocketData>,
+  client: ServerWebSocket<RpcWebSocketSocketData>,
 ): Map<number, PendingRpcRequest> {
   const existing = pendingRpcRequestsByClient.get(client);
   if (existing) {
@@ -1121,7 +1121,7 @@ function getPendingRpcRequests(
  * Cancel one request for a client when a matching cancel packet arrives.
  */
 function abortPendingRpcRequest(
-  client: ServerWebSocket<RpcSocketData>,
+  client: ServerWebSocket<RpcWebSocketSocketData>,
   requestId: number,
 ): void {
   const pendingRequests = pendingRpcRequestsByClient.get(client);
@@ -1143,7 +1143,7 @@ function abortPendingRpcRequest(
  * Abort all outstanding requests for a socket (cleanup on disconnect/error paths).
  */
 function abortAllPendingRpcRequests(
-  client: ServerWebSocket<RpcSocketData>,
+  client: ServerWebSocket<RpcWebSocketSocketData>,
   reason: string,
 ): void {
   const pendingRequests = pendingRpcRequestsByClient.get(client);
@@ -1595,36 +1595,29 @@ async function bootstrap(): Promise<void> {
             status: 403,
           });
         }
-        const sessionId = readSessionCookie(request.headers.get("cookie"));
-        if (!DEV_FLOW_MODE.authBypass) {
-          const ticketId = new URL(request.url).searchParams.get("ticket");
-          if (!sessionId || !ticketId) {
-            return new Response("Authenticated websocket ticket required", {
-              status: 401,
+        const websocketAuth = authorizeRpcWebSocketUpgrade({
+          authBypass: DEV_FLOW_MODE.authBypass,
+          cookieHeader: request.headers.get("cookie"),
+          nowMs: currentNowMs(),
+          requestUrl: request.url,
+          validateTicket: (input) => {
+            validateAndConsumeWebSocketTicket(initAppDatabase(), input);
+          },
+        });
+        if (!websocketAuth.ok) {
+          if (websocketAuth.failure.kind === "auth_error") {
+            return authErrorResponse(request, websocketAuth.failure.error, {
+              clearSessionCookie: websocketAuth.failure.clearSessionCookie,
             });
           }
-
-          try {
-            validateAndConsumeWebSocketTicket(initAppDatabase(), {
-              nowMs: currentNowMs(),
-              sessionId,
-              ticketId,
-            });
-          } catch (error) {
-            return authErrorResponse(request, error, {
-              clearSessionCookie:
-                error instanceof AuthServiceError &&
-                error.code === "session_required",
-            });
-          }
+          return new Response(websocketAuth.failure.body, {
+            status: websocketAuth.failure.status,
+          });
         }
 
         if (
           serverInstance.upgrade(request, {
-            data: {
-              authBypass: DEV_FLOW_MODE.authBypass,
-              sessionId: DEV_FLOW_MODE.authBypass ? null : sessionId,
-            },
+            data: websocketAuth.socketData,
           })
         ) {
           return;
@@ -1787,7 +1780,7 @@ async function bootstrap(): Promise<void> {
         })();
       },
     },
-  } satisfies Bun.Serve.Options<RpcSocketData>;
+  } satisfies Bun.Serve.Options<RpcWebSocketSocketData>;
 
   let server: ReturnType<typeof Bun.serve>;
   try {

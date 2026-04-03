@@ -554,6 +554,15 @@ Unit and integration coverage should include:
 - recovery-code regeneration via authenticated CLI flow
 - dev bypass/reset flow with optional DB wipe
 
+Current implementation coverage:
+
+- `src/bun/auth-service.test.ts` covers setup, login, session issuance, lockout, websocket ticket issuance/consumption, and step-up freshness
+- `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
+- `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting
+- `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover production TLS requirements and the guided bootstrap flow
+- `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
+- `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows
+
 Manual test matrix:
 
 - first-time setup

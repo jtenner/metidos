@@ -90,6 +90,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Centralizes the backend RPC authorization helpers for privileged browser actions.
   - Encapsulates cross-workspace thread step-up detection and auth-bypass-aware step-up enforcement so these rules stay unit-testable.
 
+- `rpc-websocket-auth.ts`
+  - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
+  - Encapsulates the session-cookie and websocket-ticket requirements so those checks are regression-tested independently from the full server bootstrap.
+
 - `codex-sidecar-mcp.ts`
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
@@ -131,6 +135,5 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 ## Notes
 
-- `src/bun/project-procedures` still has a separate README task in `agent-todo.md` so nested procedures can be documented in more depth later.
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
 - Production startup now expects loopback TLS files to exist; use `bun run tls:bootstrap --trust` on new installs before `bun run start` or `bun run start:monolith`.
