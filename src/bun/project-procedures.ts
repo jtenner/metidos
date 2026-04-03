@@ -88,6 +88,7 @@ import {
   taskTitleFromPath,
 } from "./project-procedures/project-tasks";
 import {
+  awaitAbortableResult,
   createAbortError,
   isAbortError,
   normalizePath,
@@ -260,6 +261,8 @@ type WorktreePollState = {
   tasks: RpcProjectTask[] | null;
   taskWatchTargets: TaskWatchTarget[];
   taskWatchers: FSWatcher[];
+  taskRefreshPromise: Promise<RpcProjectTask[]> | null;
+  taskRefreshQueued: boolean;
   lastUpdatedAt: string;
 };
 
@@ -1462,6 +1465,8 @@ function createWorktreePollState(
     tasks: null,
     taskWatchTargets: [],
     taskWatchers: [],
+    taskRefreshPromise: null,
+    taskRefreshQueued: false,
     lastUpdatedAt,
   };
 }
@@ -1491,6 +1496,121 @@ function closeTaskWatchers(worktreeState: WorktreePollState): void {
   worktreeState.taskWatchers = [];
 }
 
+function areTaskWatchTargetsEqual(
+  left: TaskWatchTarget[],
+  right: TaskWatchTarget[],
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every(
+    (target, index) =>
+      target.kind === right[index]?.kind && target.path === right[index]?.path,
+  );
+}
+
+function areProjectTasksEqual(
+  left: RpcProjectTask[],
+  right: RpcProjectTask[],
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((task, index) => {
+    const other = right[index];
+    return (
+      task.id === other?.id &&
+      task.kind === other.kind &&
+      task.path === other.path &&
+      task.title === other.title &&
+      task.scriptName === other.scriptName &&
+      task.command === other.command
+    );
+  });
+}
+
+function logBackgroundTaskFailure(message: string, error: unknown): void {
+  if (isAbortError(error)) {
+    return;
+  }
+
+  console.error(message, error);
+}
+
+async function refreshWorktreeTaskCache(
+  state: ProjectPollState,
+  worktreePath: string,
+  options?: {
+    notify?: boolean;
+    startWatching?: boolean;
+  },
+): Promise<RpcProjectTask[]> {
+  const worktreeState = ensureWorktreePollState(state, worktreePath);
+  if (worktreeState.taskRefreshPromise) {
+    if (options?.notify === true) {
+      worktreeState.taskRefreshQueued = true;
+    }
+    return worktreeState.taskRefreshPromise;
+  }
+
+  const hadTaskWatchers = worktreeState.taskWatchers.length > 0;
+  const previousTasks = worktreeState.tasks ?? [];
+  const previousTaskWatchTargets = worktreeState.taskWatchTargets;
+  const refreshPromise = (async () => {
+    const [taskWatchTargets, tasks] = await Promise.all([
+      readTaskWatchTargets(worktreePath),
+      readProjectTasksFromDisk(worktreePath),
+    ]);
+    worktreeState.taskWatchTargets = taskWatchTargets;
+    worktreeState.tasks = tasks;
+    worktreeState.lastUpdatedAt = getNow();
+
+    if (hadTaskWatchers || options?.startWatching === true) {
+      closeTaskWatchers(worktreeState);
+      startWorktreeTaskPolling(state, worktreePath);
+    }
+
+    if (
+      options?.notify === true &&
+      (!areTaskWatchTargetsEqual(previousTaskWatchTargets, taskWatchTargets) ||
+        !areProjectTasksEqual(previousTasks, tasks))
+    ) {
+      worktreeTaskChangeListener?.(state.id, worktreePath);
+    }
+
+    return tasks;
+  })();
+  worktreeState.taskRefreshPromise = refreshPromise;
+
+  try {
+    return await refreshPromise;
+  } finally {
+    if (worktreeState.taskRefreshPromise === refreshPromise) {
+      worktreeState.taskRefreshPromise = null;
+    }
+    if (worktreeState.taskRefreshQueued) {
+      worktreeState.taskRefreshQueued = false;
+      void refreshWorktreeTaskCache(state, worktreePath, {
+        notify: true,
+        startWatching: hadTaskWatchers || options?.startWatching === true,
+      }).catch((error) => {
+        logBackgroundTaskFailure(
+          `Task cache refresh failed for ${worktreePath}`,
+          error,
+        );
+      });
+    }
+  }
+}
+
 function stopWorktreeBackgroundPolling(
   worktreeState: WorktreePollState,
   reason: string,
@@ -1512,25 +1632,18 @@ function startWorktreeTaskPolling(
   }
 
   const invalidateTaskState = () => {
-    if (
-      worktreeState.tasks === null &&
-      worktreeState.taskWatchTargets.length === 0
-    ) {
-      return;
-    }
-
-    closeTaskWatchers(worktreeState);
-    worktreeState.taskWatchTargets = [];
-    worktreeState.tasks = null;
-    worktreeState.lastUpdatedAt = getNow();
-    worktreeTaskChangeListener?.(state.id, worktreePath);
+    void refreshWorktreeTaskCache(state, worktreePath, {
+      notify: true,
+      startWatching: true,
+    }).catch((error) => {
+      logBackgroundTaskFailure(
+        `Task cache refresh failed for ${worktreePath}`,
+        error,
+      );
+    });
   };
 
   for (const target of worktreeState.taskWatchTargets) {
-    if (!safeIsDirectory(target.path)) {
-      continue;
-    }
-
     try {
       const watcher = watch(target.path, (eventType, filename) => {
         const watchedName = filename ? String(filename) : "";
@@ -1820,12 +1933,13 @@ export async function listProjectTasksProcedure(
   }
 
   throwIfAborted(context?.signal, "Project task read was aborted.");
-  const taskWatchTargets = readTaskWatchTargets(worktreePath);
-  throwIfAborted(context?.signal, "Project task read was aborted.");
-  const tasks = readProjectTasksFromDisk(worktreePath);
-  worktreeState.taskWatchTargets = taskWatchTargets;
-  worktreeState.tasks = tasks;
-  worktreeState.lastUpdatedAt = getNow();
+  const tasks = await awaitAbortableResult(
+    refreshWorktreeTaskCache(projectState, worktreePath, {
+      startWatching: true,
+    }),
+    context?.signal,
+    "Project task read was aborted.",
+  );
   startWorktreeTaskPolling(projectState, worktreePath);
   return tasks;
 }
@@ -2517,6 +2631,12 @@ export async function openWorktreeProcedure(
   worktreeState.historySignature = signature;
   syncProjectWorktreeBackgroundPolling(state);
   warmGitHistoryCache(worktreeState, worktreePath, logBackgroundGitFailure);
+  void refreshWorktreeTaskCache(state, worktreePath).catch((error) => {
+    logBackgroundTaskFailure(
+      `Task cache warm failed for ${worktreePath}`,
+      error,
+    );
+  });
 
   return {
     project,

@@ -1,8 +1,14 @@
-import { readdirSync, readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { readdir, readFile, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { RpcProjectTask } from "../rpc-schema";
-import { safeIsDirectory, safeIsFile } from "./shared";
+import {
+  safeIsDirectory,
+  safeIsDirectoryAsync,
+  safeIsFile,
+  safeIsFileAsync,
+} from "./shared";
 
 export type TaskWatchTarget = {
   kind: "directory" | "tasks";
@@ -70,24 +76,26 @@ function sortDirectoryEntries<
   );
 }
 
-function safeDirectoryRealPath(path: string): string | null {
-  if (!safeIsDirectory(path)) {
+async function safeDirectoryRealPathAsync(
+  path: string,
+): Promise<string | null> {
+  if (!(await safeIsDirectoryAsync(path))) {
     return null;
   }
 
   try {
-    return realpathSync(path);
+    return await realpath(path);
   } catch {
     return null;
   }
 }
 
-function visitDirectoryOnce(
+async function visitDirectoryOnceAsync(
   path: string,
   visitedRealPaths: Set<string>,
   rootRealPath: string,
-): boolean {
-  const realPath = safeDirectoryRealPath(path);
+): Promise<boolean> {
+  const realPath = await safeDirectoryRealPathAsync(path);
   if (!realPath) {
     return false;
   }
@@ -108,40 +116,76 @@ function visitDirectoryOnce(
   return true;
 }
 
-function listProjectTaskFiles(
+async function isDirectoryCandidate(
+  entry: {
+    isDirectory: () => boolean;
+  },
+  fullPath: string,
+): Promise<boolean> {
+  if (entry.isDirectory()) {
+    return true;
+  }
+
+  return safeIsDirectoryAsync(fullPath);
+}
+
+async function isFileCandidate(
+  entry: {
+    isFile: () => boolean;
+  },
+  fullPath: string,
+): Promise<boolean> {
+  if (entry.isFile()) {
+    return true;
+  }
+
+  return safeIsFileAsync(fullPath);
+}
+
+async function listProjectTaskFilesAsync(
   tasksDirectory: string,
   prefix = "",
-  rootRealPath = safeDirectoryRealPath(tasksDirectory),
+  rootRealPath?: string | null,
   visitedRealPaths = new Set<string>(),
-): RpcProjectTask[] {
-  if (!rootRealPath) {
+): Promise<RpcProjectTask[]> {
+  const resolvedRootRealPath =
+    rootRealPath ?? (await safeDirectoryRealPathAsync(tasksDirectory));
+  if (!resolvedRootRealPath) {
     return [];
   }
 
-  if (!visitDirectoryOnce(tasksDirectory, visitedRealPaths, rootRealPath)) {
+  if (
+    !(await visitDirectoryOnceAsync(
+      tasksDirectory,
+      visitedRealPaths,
+      resolvedRootRealPath,
+    ))
+  ) {
     return [];
   }
 
   const tasks: RpcProjectTask[] = [];
   for (const entry of sortDirectoryEntries(
-    readdirSync(tasksDirectory, {
-      withFileTypes: true,
-    }).filter((value) => !value.name.startsWith(".")),
+    (
+      await readdir(tasksDirectory, {
+        withFileTypes: true,
+      })
+    ).filter((value) => !value.name.startsWith(".")),
   )) {
     const fullPath = resolve(tasksDirectory, entry.name);
     const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory() || safeIsDirectory(fullPath)) {
+    if (await isDirectoryCandidate(entry, fullPath)) {
       tasks.push(
-        ...listProjectTaskFiles(
+        ...(await listProjectTaskFilesAsync(
           fullPath,
           relativePath,
-          rootRealPath,
+          resolvedRootRealPath,
           visitedRealPaths,
-        ),
+        )),
       );
       continue;
     }
-    if (!(entry.isFile() || safeIsFile(fullPath))) {
+    if (!(await isFileCandidate(entry, fullPath))) {
       continue;
     }
     tasks.push({
@@ -157,34 +201,42 @@ function listProjectTaskFiles(
   return tasks;
 }
 
-function listPackageJsonTasks(
+async function listPackageJsonTasksAsync(
   rootDirectory: string,
   currentDirectory = rootDirectory,
-  rootRealPath = safeDirectoryRealPath(rootDirectory),
+  rootRealPath?: string | null,
   visitedRealPaths = new Set<string>(),
-): RpcProjectTask[] {
-  if (!rootRealPath) {
+): Promise<RpcProjectTask[]> {
+  const resolvedRootRealPath =
+    rootRealPath ?? (await safeDirectoryRealPathAsync(rootDirectory));
+  if (!resolvedRootRealPath) {
     return [];
   }
 
-  if (!visitDirectoryOnce(currentDirectory, visitedRealPaths, rootRealPath)) {
+  if (
+    !(await visitDirectoryOnceAsync(
+      currentDirectory,
+      visitedRealPaths,
+      resolvedRootRealPath,
+    ))
+  ) {
     return [];
   }
 
   const tasks: RpcProjectTask[] = [];
   const entries = sortDirectoryEntries(
-    readdirSync(currentDirectory, {
+    await readdir(currentDirectory, {
       withFileTypes: true,
     }),
   );
   const packageJsonPath = resolve(currentDirectory, "package.json");
   if (
     entries.some((entry) => entry.name === "package.json") &&
-    safeIsFile(packageJsonPath)
+    (await safeIsFileAsync(packageJsonPath))
   ) {
     try {
       const parsed = JSON.parse(
-        readFileSync(packageJsonPath, "utf8"),
+        await readFile(packageJsonPath, "utf8"),
       ) as Partial<{
         scripts: Record<string, unknown>;
       }>;
@@ -224,18 +276,18 @@ function listPackageJsonTasks(
     }
     const fullPath = resolve(currentDirectory, entry.name);
     if (
-      !(entry.isDirectory() || safeIsDirectory(fullPath)) ||
+      !(await isDirectoryCandidate(entry, fullPath)) ||
       isIgnoredPackageDirectory(entry.name)
     ) {
       continue;
     }
     tasks.push(
-      ...listPackageJsonTasks(
+      ...(await listPackageJsonTasksAsync(
         rootDirectory,
         fullPath,
-        rootRealPath,
+        resolvedRootRealPath,
         visitedRealPaths,
-      ),
+      )),
     );
   }
 
@@ -254,19 +306,25 @@ function addTaskWatchTarget(
   watchTargetKinds.set(path, kind);
 }
 
-function collectTaskWatchTargets(
+async function collectTaskWatchTargetsAsync(
   worktreePath: string,
   currentDirectory: string,
   watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
   rootRealPath: string,
   visitedRealPaths: Set<string>,
-): void {
-  if (!visitDirectoryOnce(currentDirectory, visitedRealPaths, rootRealPath)) {
+): Promise<void> {
+  if (
+    !(await visitDirectoryOnceAsync(
+      currentDirectory,
+      visitedRealPaths,
+      rootRealPath,
+    ))
+  ) {
     return;
   }
 
   const entries = sortDirectoryEntries(
-    readdirSync(currentDirectory, {
+    await readdir(currentDirectory, {
       withFileTypes: true,
     }),
   );
@@ -286,8 +344,8 @@ function collectTaskWatchTargets(
         continue;
       }
       const fullPath = resolve(currentDirectory, entry.name);
-      if (entry.isDirectory() || safeIsDirectory(fullPath)) {
-        collectTaskWatchTargets(
+      if (await isDirectoryCandidate(entry, fullPath)) {
+        await collectTaskWatchTargetsAsync(
           worktreePath,
           fullPath,
           watchTargetKinds,
@@ -301,7 +359,7 @@ function collectTaskWatchTargets(
 
   for (const entry of entries) {
     if (entry.name === ".tasks") {
-      collectTaskWatchTargets(
+      await collectTaskWatchTargetsAsync(
         worktreePath,
         resolve(currentDirectory, entry.name),
         watchTargetKinds,
@@ -313,12 +371,12 @@ function collectTaskWatchTargets(
 
     const fullPath = resolve(currentDirectory, entry.name);
     if (
-      !(entry.isDirectory() || safeIsDirectory(fullPath)) ||
+      !(await isDirectoryCandidate(entry, fullPath)) ||
       isIgnoredPackageDirectory(entry.name)
     ) {
       continue;
     }
-    collectTaskWatchTargets(
+    await collectTaskWatchTargetsAsync(
       worktreePath,
       fullPath,
       watchTargetKinds,
@@ -328,24 +386,32 @@ function collectTaskWatchTargets(
   }
 }
 
-export function readTaskWatchTargets(worktreePath: string): TaskWatchTarget[] {
-  const rootRealPath = safeDirectoryRealPath(worktreePath);
+export async function readTaskWatchTargets(
+  worktreePath: string,
+): Promise<TaskWatchTarget[]> {
+  const rootRealPath = await safeDirectoryRealPathAsync(worktreePath);
   if (!rootRealPath) {
     return [];
   }
 
   const watchTargetKinds = new Map<string, TaskWatchTarget["kind"]>();
-  collectTaskWatchTargets(
+  await collectTaskWatchTargetsAsync(
     worktreePath,
     worktreePath,
     watchTargetKinds,
     rootRealPath,
     new Set<string>(),
   );
-  return [...watchTargetKinds.entries()].map(([path, kind]) => ({
-    path,
-    kind,
-  }));
+  return [...watchTargetKinds.entries()]
+    .map(([path, kind]) => ({
+      path,
+      kind,
+    }))
+    .sort((left, right) =>
+      left.path === right.path
+        ? left.kind.localeCompare(right.kind)
+        : left.path.localeCompare(right.path),
+    );
 }
 
 function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
@@ -361,12 +427,12 @@ function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
   });
 }
 
-export function readProjectTasksFromDisk(
+export async function readProjectTasksFromDisk(
   worktreePath: string,
-): RpcProjectTask[] {
+): Promise<RpcProjectTask[]> {
   return sortProjectTasks([
-    ...listProjectTaskFiles(tasksDirectoryPath(worktreePath)),
-    ...listPackageJsonTasks(worktreePath),
+    ...(await listProjectTaskFilesAsync(tasksDirectoryPath(worktreePath))),
+    ...(await listPackageJsonTasksAsync(worktreePath)),
   ]);
 }
 
