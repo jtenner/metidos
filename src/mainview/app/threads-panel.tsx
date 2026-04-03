@@ -22,6 +22,7 @@ type ThreadsPanelProps = SharedThreadListProps & {
 export const ThreadsPanel = memo(function ThreadsPanel({
   acknowledgeThreadErrorSeenInBackground,
   activeSelectedWorktreePath,
+  clearCompletedThreadIndicator,
   dismissThreadStatus,
   errorPreviewHandlers,
   errorPreviewPopover,
@@ -41,6 +42,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   selectedThreadId,
   sidebarActionButtonClass,
   supportsTildePath,
+  threadActivityIndicator,
   threadSummaryPopover,
   threadSummaryPreviewHandlers,
   threadsError,
@@ -95,6 +97,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
                     acknowledgeThreadErrorSeenInBackground
                   }
                   anchorIdPrefix="threads-thread"
+                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                   dismissThreadStatus={dismissThreadStatus}
                   errorPreviewHandlers={errorPreviewHandlers}
                   errorPreviewPopover={errorPreviewPopover}
@@ -109,6 +112,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
                   selectedThreadId={selectedThreadId}
                   supportsTildePath={supportsTildePath}
                   thread={thread}
+                  threadActivityIndicator={threadActivityIndicator}
                   threadSummaryPopover={threadSummaryPopover}
                   threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
                 />

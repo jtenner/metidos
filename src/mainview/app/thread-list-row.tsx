@@ -1,5 +1,4 @@
 import type { HTMLAttributes, JSX } from "react";
-import { BeatLoader } from "react-spinners";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
@@ -11,6 +10,7 @@ import {
 
 export type SharedThreadListProps = {
   acknowledgeThreadErrorSeenInBackground: (threadId: number) => void;
+  clearCompletedThreadIndicator: (threadId: number) => void;
   dismissThreadStatus: (thread: RpcThread) => void;
   errorPreviewHandlers: (
     anchorId: string,
@@ -30,6 +30,9 @@ export type SharedThreadListProps = {
   projects: RpcProject[];
   selectedThreadId: number | null;
   supportsTildePath: boolean;
+  threadActivityIndicator: (
+    threadId: number,
+  ) => "none" | "working" | "completed";
   threadSummaryPopover: ThreadSummaryPopoverState | null;
   threadSummaryPreviewHandlers: (
     anchorId: string,
@@ -50,6 +53,7 @@ type ThreadListRowProps = SharedThreadListProps & {
 export function ThreadListRow({
   acknowledgeThreadErrorSeenInBackground,
   anchorIdPrefix = "thread",
+  clearCompletedThreadIndicator,
   dismissThreadStatus,
   errorPreviewHandlers,
   errorPreviewPopover,
@@ -65,6 +69,7 @@ export function ThreadListRow({
   showLocation = false,
   supportsTildePath,
   thread,
+  threadActivityIndicator,
   threadSummaryPopover,
   threadSummaryPreviewHandlers,
 }: ThreadListRowProps): JSX.Element {
@@ -88,7 +93,9 @@ export function ThreadListRow({
   const threadPopoverAnchorId = `${anchorIdPrefix}-sidebar-row-${thread.id}`;
   const threadPinned = Boolean(thread.pinnedAt);
   const isActive = selectedThreadId === thread.id;
-  const isWorking = thread.runStatus.state === "working";
+  const activityIndicator = threadActivityIndicator(thread.id);
+  const isWorking = activityIndicator === "working";
+  const hasCompletedActivity = activityIndicator === "completed";
   const threadStatusDismissed = isThreadStatusDismissed(thread);
   const hasRunError =
     !threadStatusDismissed && thread.runStatus.state === "failed";
@@ -111,7 +118,9 @@ export function ThreadListRow({
           ? "Stopped."
           : isWorking
             ? "Working."
-            : null,
+            : hasCompletedActivity
+              ? "Completed."
+              : null,
     `Branch ${threadBranchName}.`,
     `Worktree ${threadWorktreeDisplayPath}.`,
   ]
@@ -136,11 +145,13 @@ export function ThreadListRow({
       ? "Run failed"
       : hasRunStopped
         ? "Stopped"
-        : isWorking
-          ? "Working"
-          : threadPinned
-            ? "Pinned"
-            : null;
+        : hasCompletedActivity
+          ? "Completed"
+          : isWorking
+            ? "Working"
+            : threadPinned
+              ? "Pinned"
+              : null;
   const secondaryLabel = [
     threadStatusLabel,
     showLocation
@@ -173,6 +184,7 @@ export function ThreadListRow({
         hideErrorPreview();
         hideThreadSummaryPreview();
         dismissThreadStatus(thread);
+        clearCompletedThreadIndicator(thread.id);
         if (thread.runStatus.hasUnreadError) {
           acknowledgeThreadErrorSeenInBackground(thread.id);
         }
@@ -181,13 +193,25 @@ export function ThreadListRow({
     >
       <div className="flex items-center gap-2.5">
         <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center ${
+          className={`relative flex h-7 w-7 shrink-0 items-center justify-center ${
             isActive
               ? "bg-[#1f313c] text-[#bdd5e6]"
               : "bg-[#151a1c] text-[#8ca6b9]"
           }`}
         >
           {materialSymbol("chat_bubble", "text-[14px]")}
+          {activityIndicator !== "none" ? (
+            <span
+              aria-hidden="true"
+              className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border ${
+                isActive ? "border-[#1f313c]" : "border-[#151a1c]"
+              } ${
+                activityIndicator === "completed"
+                  ? "bg-[#5df28b]"
+                  : "bg-[#4aa8ff]"
+              }`}
+            />
+          ) : null}
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] font-medium leading-4">
@@ -211,14 +235,6 @@ export function ThreadListRow({
             <span className="border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
               Unread
             </span>
-          ) : null}
-          {isWorking ? (
-            <BeatLoader
-              color="#bdd5e6"
-              margin={1}
-              size={5}
-              speedMultiplier={0.85}
-            />
           ) : null}
         </div>
       </div>

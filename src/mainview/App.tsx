@@ -119,6 +119,7 @@ type WorktreeThreadPopoverState = {
   x: number;
   y: number;
 };
+type MobileNavigationIndicatorState = "none" | "working" | "completed";
 
 function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
   return [...items].sort((left, right) =>
@@ -323,6 +324,10 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
   const sidebarCollapsedRef = useRef(initialMainviewState.sidebarCollapsed);
   const [mobileProjectListOpen, setMobileProjectListOpen] = useState(false);
+  const [mobileNavigationIndicator, setMobileNavigationIndicator] =
+    useState<MobileNavigationIndicatorState>("none");
+  const [completedThreadIndicatorIds, setCompletedThreadIndicatorIds] =
+    useState(() => new Set<number>());
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
     initialMainviewState.selectedProjectId,
   );
@@ -419,6 +424,9 @@ export default function App({ procedures }: AppProps): JSX.Element {
   const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
   const threadStatusPollInFlightRef = useRef(false);
   const initializedRef = useRef(false);
+  const previousThreadRunStatesRef = useRef(
+    new Map<number, RpcThreadRunStatus["state"]>(),
+  );
   const getProjectState = useCallback(
     (projectId: number): ProjectNodeState =>
       projectStates[projectId] ?? defaultProjectState(),
@@ -569,6 +577,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
       ),
     );
   }, [activeSelectedWorktreePath, selectedProject, threads]);
+  const clearCompletedThreadIndicator = useCallback(
+    (threadId: number): void => {
+      setCompletedThreadIndicatorIds((current) => {
+        if (!current.has(threadId)) {
+          return current;
+        }
+
+        const next = new Set(current);
+        next.delete(threadId);
+        return next;
+      });
+    },
+    [],
+  );
+  const threadActivityIndicator = useCallback(
+    (threadId: number): "none" | "working" | "completed" => {
+      if (completedThreadIndicatorIds.has(threadId)) {
+        return "completed";
+      }
+
+      return threads.find((thread) => thread.id === threadId)?.runStatus
+        .state === "working"
+        ? "working"
+        : "none";
+    },
+    [completedThreadIndicatorIds, threads],
+  );
 
   useLayoutEffect(() => {
     void mobileProjectListOpen;
@@ -3046,6 +3081,71 @@ export default function App({ procedures }: AppProps): JSX.Element {
   ]);
 
   useEffect(() => {
+    const previousThreadRunStates = previousThreadRunStatesRef.current;
+    let completedThreadDetected = false;
+    const nextCompletedThreadIds = new Set<number>();
+
+    for (const thread of threads) {
+      if (thread.runStatus.state === "working") {
+        continue;
+      }
+
+      if (completedThreadIndicatorIds.has(thread.id)) {
+        nextCompletedThreadIds.add(thread.id);
+      }
+
+      if (
+        previousThreadRunStates.get(thread.id) === "working" &&
+        thread.runStatus.state === "idle"
+      ) {
+        completedThreadDetected = true;
+        nextCompletedThreadIds.add(thread.id);
+      }
+    }
+
+    previousThreadRunStatesRef.current = new Map(
+      threads.map((thread) => [thread.id, thread.runStatus.state]),
+    );
+    setCompletedThreadIndicatorIds((current) => {
+      const currentIds = [...current].sort((left, right) => left - right);
+      const nextIds = [...nextCompletedThreadIds].sort(
+        (left, right) => left - right,
+      );
+      if (
+        currentIds.length === nextIds.length &&
+        currentIds.every((value, index) => value === nextIds[index])
+      ) {
+        return current;
+      }
+      return nextCompletedThreadIds;
+    });
+
+    if (completedThreadDetected) {
+      setMobileNavigationIndicator("completed");
+      return;
+    }
+
+    if (hasWorkingThreads) {
+      setMobileNavigationIndicator((current) =>
+        current === "completed" ? current : "working",
+      );
+      return;
+    }
+
+    setMobileNavigationIndicator((current) =>
+      current === "completed" ? current : "none",
+    );
+  }, [completedThreadIndicatorIds, hasWorkingThreads, threads]);
+
+  useEffect(() => {
+    if (!mobileProjectListOpen) {
+      return;
+    }
+
+    setMobileNavigationIndicator("none");
+  }, [mobileProjectListOpen]);
+
+  useEffect(() => {
     if (!hasWorkingThreads) {
       if (threads.length === 0) {
         selectedThreadRunStateRef.current = "idle";
@@ -4051,6 +4151,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                   sidebarSearchQuery={sidebarSearchQuery}
                   workspacePanelProps={{
                     acknowledgeThreadErrorSeenInBackground,
+                    clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     errorPreviewHandlers,
                     errorPreviewPopover,
@@ -4064,6 +4165,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     projects,
                     selectedThreadId,
                     supportsTildePath,
+                    threadActivityIndicator,
                     threadSummaryPopover,
                     threadSummaryPreviewHandlers,
                     threadsError,
@@ -4181,7 +4283,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="text-[#bdd5e6]"
+              className="relative text-[#bdd5e6]"
               aria-controls="mobile-navigation-drawer"
               aria-expanded={mobileProjectListOpen}
               aria-label={
@@ -4190,6 +4292,16 @@ export default function App({ procedures }: AppProps): JSX.Element {
               onClick={() => setMobileProjectListOpen((value) => !value)}
             >
               {materialSymbol("menu")}
+              {mobileNavigationIndicator !== "none" ? (
+                <span
+                  aria-hidden="true"
+                  className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border border-[#0e0e0e] ${
+                    mobileNavigationIndicator === "completed"
+                      ? "bg-[#5df28b]"
+                      : "bg-[#4aa8ff]"
+                  }`}
+                />
+              ) : null}
             </button>
             <h1 className="font-headline tracking-wider uppercase text-sm font-bold text-[#bdd5e6]">
               {APP_TITLE}
@@ -4262,6 +4374,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
               sidebarSearchQuery={sidebarSearchQuery}
               workspacePanelProps={{
                 acknowledgeThreadErrorSeenInBackground,
+                clearCompletedThreadIndicator,
                 dismissThreadStatus,
                 errorPreviewHandlers,
                 errorPreviewPopover,
@@ -4275,6 +4388,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                 projects,
                 selectedThreadId,
                 supportsTildePath,
+                threadActivityIndicator,
                 threadSummaryPopover,
                 threadSummaryPreviewHandlers,
                 threadsError,
@@ -4490,6 +4604,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                     acknowledgeThreadErrorSeenInBackground
                   }
                   anchorIdPrefix="worktree-thread"
+                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                   dismissThreadStatus={dismissThreadStatus}
                   errorPreviewHandlers={errorPreviewHandlers}
                   errorPreviewPopover={errorPreviewPopover}
@@ -4504,6 +4619,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
                   selectedThreadId={selectedThreadId}
                   supportsTildePath={supportsTildePath}
                   thread={thread}
+                  threadActivityIndicator={threadActivityIndicator}
                   threadSummaryPopover={threadSummaryPopover}
                   threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
                 />

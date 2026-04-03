@@ -18,6 +18,7 @@ type WorkspacePanelProps = SharedThreadListProps & {
 
 export const WorkspacePanel = memo(function WorkspacePanel({
   acknowledgeThreadErrorSeenInBackground,
+  clearCompletedThreadIndicator,
   dismissThreadStatus,
   errorPreviewHandlers,
   errorPreviewPopover,
@@ -31,6 +32,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   projects,
   selectedThreadId,
   supportsTildePath,
+  threadActivityIndicator,
   threadSummaryPopover,
   threadSummaryPreviewHandlers,
   threadsError,
@@ -68,6 +70,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                     acknowledgeThreadErrorSeenInBackground
                   }
                   anchorIdPrefix="workspace-thread"
+                  clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                   dismissThreadStatus={dismissThreadStatus}
                   errorPreviewHandlers={errorPreviewHandlers}
                   errorPreviewPopover={errorPreviewPopover}
@@ -83,6 +86,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   showLocation
                   supportsTildePath={supportsTildePath}
                   thread={thread}
+                  threadActivityIndicator={threadActivityIndicator}
                   threadSummaryPopover={threadSummaryPopover}
                   threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
                 />
@@ -115,6 +119,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                         acknowledgeThreadErrorSeenInBackground
                       }
                       anchorIdPrefix="workspace-thread"
+                      clearCompletedThreadIndicator={
+                        clearCompletedThreadIndicator
+                      }
                       dismissThreadStatus={dismissThreadStatus}
                       errorPreviewHandlers={errorPreviewHandlers}
                       errorPreviewPopover={errorPreviewPopover}
@@ -130,6 +137,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                       showLocation
                       supportsTildePath={supportsTildePath}
                       thread={thread}
+                      threadActivityIndicator={threadActivityIndicator}
                       threadSummaryPopover={threadSummaryPopover}
                       threadSummaryPreviewHandlers={
                         threadSummaryPreviewHandlers
