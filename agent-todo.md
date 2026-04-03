@@ -1,3 +1,65 @@
 # Agent Todo
 
-- No open tasks.
+## Code file tasks
+
+- [ ] Add comments to file `bun-plugin-react-compiler.ts`.
+- [ ] Add comments to file `package.json`.
+- [ ] Add comments to file `src/bun/build-mainview.ts`.
+- [ ] Add comments to file `src/bun/codex-sidecar-mcp.ts`.
+- [ ] Add comments to file `src/bun/db.ts`.
+- [ ] Add comments to file `src/bun/git.ts`.
+- [ ] Add comments to file `src/bun/index.ts`.
+- [ ] Add comments to file `src/bun/isolated-server.ts`.
+- [ ] Add comments to file `src/bun/project-procedures.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/codex-catalog.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/directory-suggestions.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/git-history.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/project-tasks.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/shared.ts`.
+- [ ] Add comments to file `src/bun/project-procedures/thread-detail.ts`.
+- [ ] Add comments to file `src/bun/rpc-schema.ts`.
+- [ ] Add comments to file `src/bun/starvation-harness.ts`.
+- [ ] Add comments to file `src/bun/static-server.ts`.
+- [ ] Add comments to file `src/mainview/App.tsx`.
+- [ ] Add comments to file `src/mainview/app/action-menus.tsx`.
+- [ ] Add comments to file `src/mainview/app/chat-workspace.tsx`.
+- [ ] Add comments to file `src/mainview/app/desktop-sidebar.tsx`.
+- [ ] Add comments to file `src/mainview/app/diff-workspace.tsx`.
+- [ ] Add comments to file `src/mainview/app/git-history-panel.tsx`.
+- [ ] Add comments to file `src/mainview/app/message-ui.tsx`.
+- [ ] Add comments to file `src/mainview/app/projects-panel.tsx`.
+- [ ] Add comments to file `src/mainview/app/sidebar-content.tsx`.
+- [ ] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
+- [ ] Add comments to file `src/mainview/app/state.ts`.
+- [ ] Add comments to file `src/mainview/app/tasks-workspace.tsx`.
+- [ ] Add comments to file `src/mainview/app/thread-list-row.tsx`.
+- [ ] Add comments to file `src/mainview/app/threads-panel.tsx`.
+- [ ] Add comments to file `src/mainview/app/use-add-project-form.ts`.
+- [ ] Add comments to file `src/mainview/app/use-mainview-derived-state.ts`.
+- [ ] Add comments to file `src/mainview/app/use-thread-previews.ts`.
+- [ ] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
+- [ ] Add comments to file `src/mainview/app/workspace-panel.tsx`.
+- [ ] Add comments to file `src/mainview/controls/chat-composer-control.tsx`.
+- [ ] Add comments to file `src/mainview/controls/codex-model-selector.tsx`.
+- [ ] Add comments to file `src/mainview/controls/codex-utils.ts`.
+- [ ] Add comments to file `src/mainview/controls/dropdown.tsx`.
+- [ ] Add comments to file `src/mainview/controls/icons.tsx`.
+- [ ] Add comments to file `src/mainview/controls/project-task-selector.tsx`.
+- [ ] Add comments to file `src/mainview/controls/reasoning-effort-selector.tsx`.
+- [ ] Add comments to file `src/mainview/controls/search-utils.ts`.
+- [ ] Add comments to file `src/mainview/controls/sidebar-search-control.tsx`.
+- [ ] Add comments to file `src/mainview/controls/sidebar-section-header.tsx`.
+- [ ] Add comments to file `src/mainview/index.ts`.
+
+## Folder tasks
+
+- [ ] Add a README.md for folder `.` (repository root).
+- [ ] Add a README.md for folder `.tasks`.
+- [ ] Add a README.md for folder `docs`.
+- [ ] Add a README.md for folder `docs/references`.
+- [ ] Add a README.md for folder `src`.
+- [ ] Add a README.md for folder `src/bun`.
+- [ ] Add a README.md for folder `src/bun/project-procedures`.
+- [ ] Add a README.md for folder `src/mainview`.
+- [ ] Add a README.md for folder `src/mainview/app`.
+- [ ] Add a README.md for folder `src/mainview/controls`.
