@@ -4,19 +4,36 @@ import { materialSymbol } from "../controls/icons";
 import { formatPathForDisplay } from "./state";
 
 type TasksWorkspaceProps = {
+  /** True when the currently selected worktree was already opened. */
   activeSelectedWorktreeOpened: boolean;
+  /** Absolute path of the currently selected worktree in the projects panel. */
   activeSelectedWorktreePath: string | null;
+  /** User's home directory path used for path abbreviation. */
   homeDirectory: string;
+  /** Loading flag while project tasks are being fetched from the server. */
   isLoadingProjectTasks: boolean;
+  /** Callback to start a selected task command. */
   onRunTask: (task: RpcProjectTask) => void;
+  /** Disables task-run buttons when task control is not available. */
   runDisabled: boolean;
+  /** Current project selected in the workspace, or `null` if none is selected. */
   selectedProject: RpcProject | null;
+  /** Whether the app can abbreviate home-directory paths with `~`. */
   supportsTildePath: boolean;
+  /** Optional control-plane error message shown above task list. */
   taskControlError: string;
+  /** Tasks discovered for the currently selected worktree. */
   tasks: RpcProjectTask[];
+  /** Layout variant used by parent container. */
   variant: "desktop" | "mobile";
 };
 
+/**
+ * Returns optional secondary task text for list rows.
+ *
+ * Scripts include their command when available; other kinds show a path only when
+ * it differs from the task title so rows don't show duplicate text.
+ */
 function taskMetaText(task: RpcProjectTask): string | null {
   if (task.kind === "script") {
     return task.command?.trim() ? `${task.path} · ${task.command}` : task.path;
@@ -24,6 +41,10 @@ function taskMetaText(task: RpcProjectTask): string | null {
   return task.path !== task.title ? task.path : null;
 }
 
+/**
+ * Renders the tasks workspace panel, including header, loading/error/empty states,
+ * and the actionable task list for the selected project worktree.
+ */
 export function TasksWorkspace({
   activeSelectedWorktreeOpened,
   activeSelectedWorktreePath,
@@ -38,6 +59,8 @@ export function TasksWorkspace({
   variant,
 }: TasksWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
+
+  // Title/subtitle are based on whether a worktree can currently be operated on.
   const title = selectedProject ? "Project Tasks" : "No project selected";
   const subtitle = selectedProject
     ? formatPathForDisplay(
@@ -47,6 +70,7 @@ export function TasksWorkspace({
       )
     : "Select a project worktree to view tasks.";
 
+  // Task area has progressively higher-priority states before rendering list content.
   const content =
     !selectedProject || !activeSelectedWorktreePath ? (
       <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
@@ -74,6 +98,7 @@ export function TasksWorkspace({
               className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[#151d22] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={runDisabled}
               onClick={() => {
+                // Triggering a task runs it through parent handlers for workspace state.
                 onRunTask(task);
               }}
             >
