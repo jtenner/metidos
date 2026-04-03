@@ -62,6 +62,13 @@ import type {
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeTasksChanged,
 } from "./rpc-schema";
+import {
+  buildLivenessPayload,
+  buildLoopbackBrowserOrigins,
+  isWebSocketOriginAllowed,
+  LOOPBACK_HOSTNAME,
+  parseAllowedBrowserOrigins,
+} from "./server-security";
 
 const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
@@ -225,7 +232,11 @@ const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
 
 process.env.JOLT_PORT = String(SERVER_PORT);
-process.env.JOLT_RPC_URL = `ws://127.0.0.1:${SERVER_PORT}/rpc`;
+process.env.JOLT_RPC_URL = `ws://${LOOPBACK_HOSTNAME}:${SERVER_PORT}/rpc`;
+
+const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
+  process.env.JOLT_ALLOWED_WS_ORIGINS,
+);
 
 const rpcHandlers: RpcRequestHandlerMap = {
   getHomeDirectory: () => getHomeDirectoryProcedure(),
@@ -342,7 +353,7 @@ function decrementPendingRpcRequestCount(count = 1): void {
 }
 
 /**
- * Create a diagnostic snapshot used for `/health` and overload warning logs.
+ * Create a diagnostic snapshot used for overload warning logs.
  */
 function buildServerHealthSnapshot(activeServerPort: number): {
   backendOnly: boolean;
@@ -1013,12 +1024,27 @@ async function bootstrap(): Promise<void> {
   let activeServerPort = SERVER_PORT;
   startOverloadMonitoring(() => activeServerPort);
   const serverOptions = {
+    hostname: LOOPBACK_HOSTNAME,
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 
       // Upgrade websocket requests before falling through to HTTP routes.
       if (pathname === "/rpc") {
+        const allowedOrigins = new Set([
+          ...buildLoopbackBrowserOrigins(activeServerPort),
+          ...CONFIGURED_ALLOWED_WS_ORIGINS,
+        ]);
+        if (
+          !isWebSocketOriginAllowed(
+            request.headers.get("origin"),
+            allowedOrigins,
+          )
+        ) {
+          return new Response("WebSocket origin not allowed", {
+            status: 403,
+          });
+        }
         if (serverInstance.upgrade(request)) {
           return;
         }
@@ -1060,7 +1086,7 @@ async function bootstrap(): Promise<void> {
 
       if (pathname === "/health") {
         return stringResponse(
-          JSON.stringify(buildServerHealthSnapshot(activeServerPort)),
+          JSON.stringify(buildLivenessPayload(true)),
           "application/json; charset=utf-8",
         );
       }

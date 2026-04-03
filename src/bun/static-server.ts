@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { buildMainviewBundle } from "./build-mainview";
+import { buildLivenessPayload, LOOPBACK_HOSTNAME } from "./server-security";
 
 // Runtime defaults and well-known paths used by the local static server.
 const DEFAULT_PUBLIC_PORT = "7599";
@@ -89,8 +90,13 @@ function resolvePort(
 /**
  * Creates an HTTP response with a plain text body and explicit content type.
  */
-function stringResponse(body: string, contentType: string): Response {
+function stringResponse(
+  body: string,
+  contentType: string,
+  status = 200,
+): Response {
   return new Response(body, {
+    status,
     headers: {
       "cache-control": "no-store",
       "content-type": contentType,
@@ -149,11 +155,11 @@ async function buildHtmlResponse(
 
 /**
  * Probes the backend health endpoint with a short timeout.
- * Returns a normalized shape for health aggregation in the static server `/health` endpoint.
+ * Returns true only when the backend emits an explicit liveness success.
  */
 async function readBackendHealthSnapshot(
   backendHealthUrl: string,
-): Promise<unknown> {
+): Promise<boolean> {
   const controller = new AbortController();
   // Use AbortController so a stalled backend does not block /health forever.
   const timeout = setTimeout(() => {
@@ -173,23 +179,16 @@ async function readBackendHealthSnapshot(
       // Fall back to the raw text body if the backend health response changes.
     }
 
-    return {
-      ok:
-        response.ok &&
-        typeof body === "object" &&
-        body !== null &&
-        "ok" in body &&
-        body.ok === true,
-      response,
-      status: response.status,
-      value: body,
-    };
+    return (
+      response.ok &&
+      typeof body === "object" &&
+      body !== null &&
+      "ok" in body &&
+      body.ok === true
+    );
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : String(error),
-      ok: false,
-      status: 0,
-    };
+    void error;
+    return false;
   } finally {
     clearTimeout(timeout);
   }
@@ -226,6 +225,7 @@ const runtimeConfig: RuntimeConfig = {
 let server: ReturnType<typeof Bun.serve>;
 
 server = Bun.serve({
+  hostname: LOOPBACK_HOSTNAME,
   idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   port: PUBLIC_PORT,
   async fetch(request): Promise<Response> {
@@ -260,23 +260,11 @@ server = Bun.serve({
     }
 
     if (pathname === "/health") {
-      const backend = await readBackendHealthSnapshot(BACKEND_HEALTH_URL);
+      const backendOk = await readBackendHealthSnapshot(BACKEND_HEALTH_URL);
       return stringResponse(
-        JSON.stringify({
-          backend,
-          ok:
-            typeof backend === "object" &&
-            backend !== null &&
-            "ok" in backend &&
-            backend.ok === true,
-          port: server.port,
-          rpcWebSocketUrl: RPC_WEBSOCKET_URL,
-          static: {
-            ok: true,
-            port: server.port,
-          },
-        }),
+        JSON.stringify(buildLivenessPayload(backendOk)),
         "application/json; charset=utf-8",
+        backendOk ? 200 : 503,
       );
     }
 

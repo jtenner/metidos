@@ -14,7 +14,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `static-server.ts`
   - Runs the static/public HTTP server for the frontend app when not using the unified mode.
   - Serves bundled frontend assets (`index.html`, `index.js`, `index.css`, fonts) and injects runtime config via `window.__joltRuntime`.
-  - Includes a `/health` endpoint that includes backend health probe results.
+  - Includes a minimal `/health` endpoint that reports only liveness and proxies backend readiness without exposing backend internals.
   - Resolves and validates CLI args/env values for public and RPC ports.
 
 - `isolated-server.ts`
@@ -31,7 +31,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Exposes all RPC procedure implementations consumed by the frontend.
   - Coordinates projects, worktrees, threads, tasks, file content reads/diffs, git history, and thread lifecycle operations.
   - Maintains in-memory caches/polling state, manages worktree/task background refresh loops, and publishes change events to connected clients.
-  - Also owns runtime recovery (interrupted turns), startup cache warmup, and stats exposed to `/health`.
+  - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
@@ -81,6 +81,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
+
+- `server-security.ts`
+  - Centralizes local transport hardening helpers shared by the Bun entrypoints.
+  - Defines loopback bind defaults, minimal liveness payloads, and browser `Origin` allowlist parsing/validation for websocket upgrades.
 
 - `starvation-harness.ts`
   - Optional benchmarking harness to exercise startup, HTTP, and RPC behavior under worker concurrency.

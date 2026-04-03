@@ -133,6 +133,12 @@ const backend = spawnRole(
   "backend",
   [backendEntry, "--backend-only", "--port", String(RPC_PORT)],
   {
+    JOLT_ALLOWED_WS_ORIGINS: [
+      `http://127.0.0.1:${PUBLIC_PORT}`,
+      `https://127.0.0.1:${PUBLIC_PORT}`,
+      `http://localhost:${PUBLIC_PORT}`,
+      `https://localhost:${PUBLIC_PORT}`,
+    ].join(","),
     JOLT_BACKEND_ONLY: "1",
     JOLT_PORT: String(RPC_PORT),
     JOLT_RPC_URL: rpcWebSocketUrl,

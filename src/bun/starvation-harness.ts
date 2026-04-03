@@ -899,7 +899,7 @@ function websocketUrlFromPort(port: number): string {
 }
 
 /**
- * Parse rpcWebSocketUrl from discovery payload when available.
+ * Parse rpcWebSocketUrl from runtime config when available.
  */
 function readRpcWebSocketUrl(value: unknown): string | null {
   if (typeof value !== "object" || value === null) {
@@ -914,7 +914,23 @@ function readRpcWebSocketUrl(value: unknown): string | null {
 }
 
 /**
- * Read /health endpoint and try to discover rpcWebSocketUrl.
+ * Extract the injected runtime config from the main HTML page.
+ */
+function readRuntimeConfigFromHtml(html: string): unknown {
+  const match = html.match(/window\.__joltRuntime=(\{.+?\});<\/script>/s);
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the public app HTML and try to discover rpcWebSocketUrl.
  */
 async function discoverRpcUrl(
   baseUrl: string,
@@ -926,7 +942,7 @@ async function discoverRpcUrl(
   }, timeoutMs);
 
   try {
-    const response = await fetch(`${baseUrl}/health`, {
+    const response = await fetch(baseUrl, {
       cache: "no-store",
       signal: controller.signal,
     });
@@ -934,8 +950,9 @@ async function discoverRpcUrl(
       return null;
     }
 
-    const parsed = (await response.json()) as unknown;
-    return readRpcWebSocketUrl(parsed);
+    return readRpcWebSocketUrl(
+      readRuntimeConfigFromHtml(await response.text()),
+    );
   } catch {
     return null;
   } finally {
@@ -944,7 +961,7 @@ async function discoverRpcUrl(
 }
 
 /**
- * Resolve RPC websocket URL from explicit input, port, or /health discovery.
+ * Resolve RPC websocket URL from explicit input, port, or injected runtime discovery.
  */
 async function resolveRpcUrl(
   baseUrl: string,

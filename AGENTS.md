@@ -79,6 +79,8 @@
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
 │  │  ├─ rpc-schema.ts
+│  │  ├─ server-security.test.ts
+│  │  ├─ server-security.ts
 │  │  ├─ static-server.ts
 │  │  └─ starvation-harness.ts
 │  └─ mainview/
