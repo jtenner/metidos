@@ -29,7 +29,8 @@
 │  ├─ react-virtuoso-chat-migration.md
 │  ├─ tanstack-virtual-chat-migration.md
 │  └─ references/
-│     ├─ ai_chat_mobile/
+    │     ├─ README.md
+    │     ├─ ai_chat_mobile/
 │     │  ├─ code.html
 │     │  └─ screen.png
 │     ├─ codex_view/
