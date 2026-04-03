@@ -357,6 +357,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
+  const worktreeThreadPopoverRef = useRef<HTMLDivElement | null>(null);
   const desktopSidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const desktopChatScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileSidebarScrollRef = useRef<HTMLElement | null>(null);
@@ -698,6 +699,45 @@ export default function App({ procedures }: AppProps): JSX.Element {
       }
     };
   }, [dismissWorktreeThreadPopover, worktreeThreadPopover]);
+
+  useEffect(() => {
+    if (
+      !worktreeThreadPopover ||
+      !selectedProject ||
+      !activeSelectedWorktreePath
+    ) {
+      return;
+    }
+
+    const anchorId = worktreeThreadPopoverAnchorId(
+      selectedProject.id,
+      activeSelectedWorktreePath,
+    );
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (worktreeThreadPopoverRef.current?.contains(target)) {
+        return;
+      }
+
+      const anchor = document.getElementById(anchorId);
+      if (anchor?.contains(target)) {
+        return;
+      }
+
+      dismissWorktreeThreadPopover();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [
+    activeSelectedWorktreePath,
+    dismissWorktreeThreadPopover,
+    selectedProject,
+    worktreeThreadPopover,
+  ]);
 
   useEffect(() => {
     if (worktreeThreadPopover) {
@@ -4402,6 +4442,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
       selectedProject &&
       activeSelectedWorktreePath ? (
         <div
+          ref={worktreeThreadPopoverRef}
           className="fixed z-[85] flex select-none flex-col overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
           style={{
             left: worktreeThreadPopover.x,

@@ -1,5 +1,5 @@
-import { type FormEvent, memo } from "react";
-import type { RpcProject } from "../../bun/rpc-schema";
+import { type FormEvent, memo, useMemo } from "react";
+import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import { matchesSearchQuery } from "../controls/search-utils";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";
@@ -19,6 +19,174 @@ import {
   shortName,
   worktreeThreadPopoverAnchorId,
 } from "./state";
+
+type PinnedWorktreeEntry = {
+  project: RpcProject;
+  worktree: RpcWorktree;
+};
+
+type ProjectWorktreeRowProps = {
+  activeWorktree: boolean;
+  homeDirectory: string;
+  onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
+  onToggleWorktreePinned: (
+    projectId: number,
+    worktreePath: string,
+    pinned: boolean,
+  ) => void;
+  project: RpcProject;
+  showProjectName?: boolean;
+  supportsTildePath: boolean;
+  worktree: RpcWorktree;
+  worktreeErrorLevel: ThreadErrorLevel;
+  worktreePinBusyPath: string | null;
+  worktreeState: WorktreeNodeState;
+};
+
+function worktreeMatchesProjectsSearch(
+  normalizedSidebarSearchQuery: string,
+  project: RpcProject,
+  worktree: RpcWorktree,
+  homeDirectory: string,
+  supportsTildePath: boolean,
+): boolean {
+  return matchesSearchQuery(
+    normalizedSidebarSearchQuery,
+    project.name,
+    worktree.branch,
+    worktree.path,
+    shortName(worktree.path),
+    formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
+  );
+}
+
+function comparePinnedWorktreeEntries(
+  left: PinnedWorktreeEntry,
+  right: PinnedWorktreeEntry,
+): number {
+  const leftPinnedAt = left.worktree.pinnedAt ?? "";
+  const rightPinnedAt = right.worktree.pinnedAt ?? "";
+  if (leftPinnedAt !== rightPinnedAt) {
+    return rightPinnedAt.localeCompare(leftPinnedAt);
+  }
+
+  const projectNameOrder = left.project.name.localeCompare(right.project.name);
+  if (projectNameOrder !== 0) {
+    return projectNameOrder;
+  }
+
+  return left.worktree.path.localeCompare(right.worktree.path);
+}
+
+function ProjectWorktreeRow({
+  activeWorktree,
+  homeDirectory,
+  onProjectWorktreeClick,
+  onToggleWorktreePinned,
+  project,
+  showProjectName = false,
+  supportsTildePath,
+  worktree,
+  worktreeErrorLevel,
+  worktreePinBusyPath,
+  worktreeState,
+}: ProjectWorktreeRowProps) {
+  const worktreePinned = Boolean(worktree.pinnedAt);
+  const togglingPin = worktreePinBusyPath === worktree.path;
+  const displayPath = formatPathForDisplay(
+    worktree.path,
+    homeDirectory,
+    supportsTildePath,
+  );
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        id={worktreeThreadPopoverAnchorId(project.id, worktree.path)}
+        className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
+          activeWorktree
+            ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
+            : "text-[#cfd1d4] hover:bg-[#14181a]"
+        }`}
+        onClick={() => {
+          onProjectWorktreeClick(project, worktree.path);
+        }}
+      >
+        <span
+          className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+            activeWorktree
+              ? "bg-[#24333b] text-[#bdd5e6]"
+              : "bg-[#14181a] text-[#8ca6b9]"
+          }`}
+        >
+          {materialSymbol(
+            activeWorktree ? "folder_open" : "folder",
+            "text-[14px]",
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          {showProjectName ? (
+            <div className="truncate font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
+              {project.name}
+            </div>
+          ) : null}
+          <div
+            className={`truncate text-[13px] font-medium leading-4 ${
+              showProjectName ? "mt-0.5" : ""
+            }`}
+            title={shortName(worktree.path)}
+          >
+            {shortName(worktree.path)}
+          </div>
+          <div className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]">
+            {showProjectName ? (
+              `${worktree.branch ?? "Primary"} · ${displayPath}`
+            ) : (
+              <>
+                {worktree.branch ?? "Primary"} · {displayPath}
+              </>
+            )}
+          </div>
+        </div>
+        <span
+          className={`absolute right-10 top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
+            worktreeErrorLevel === "unread"
+              ? "bg-[#ff304f]"
+              : worktreeErrorLevel === "failed"
+                ? "bg-[#8f4956]"
+                : worktreeErrorLevel === "stopped"
+                  ? "bg-[#b98a3a]"
+                  : "bg-transparent"
+          }`}
+        />
+      </button>
+      <button
+        type="button"
+        className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+          activeWorktree
+            ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
+            : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
+        }`}
+        onClick={() => {
+          onToggleWorktreePinned(project.id, worktree.path, worktreePinned);
+        }}
+        disabled={togglingPin || worktreePinBusyPath !== null}
+        aria-label={worktreePinned ? "Unpin worktree" : "Pin worktree"}
+        title={worktreePinned ? "Unpin worktree" : "Pin worktree"}
+      >
+        {materialSymbol("push_pin", "text-[13px]", {
+          filled: worktreePinned,
+        })}
+      </button>
+      {worktreeState.error ? (
+        <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
+          {worktreeState.error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type ProjectsPanelProps = {
   addProjectError: string;
@@ -101,6 +269,34 @@ export const ProjectsPanel = memo(function ProjectsPanel({
 }: ProjectsPanelProps) {
   const projectsOpen = useProjectsPanelOpen();
   const openProjectPaths = useOpenProjectPaths();
+  const pinnedWorktreeEntries = useMemo(() => {
+    return filteredProjects
+      .flatMap((project) =>
+        orderProjectWorktrees(project, getProjectState(project.id).worktrees)
+          .filter(
+            (worktree) =>
+              worktree.pinnedAt !== null &&
+              worktreeMatchesProjectsSearch(
+                normalizedSidebarSearchQuery,
+                project,
+                worktree,
+                homeDirectory,
+                supportsTildePath,
+              ),
+          )
+          .map((worktree) => ({
+            project,
+            worktree,
+          })),
+      )
+      .sort(comparePinnedWorktreeEntries);
+  }, [
+    filteredProjects,
+    getProjectState,
+    homeDirectory,
+    normalizedSidebarSearchQuery,
+    supportsTildePath,
+  ]);
 
   return (
     <section className="select-none">
@@ -252,6 +448,42 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               ) : null}
             </form>
           ) : null}
+          {pinnedWorktreeEntries.length > 0 ? (
+            <div className="space-y-1">
+              <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
+                Pinned
+              </div>
+              <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
+                <div className="space-y-1">
+                  {pinnedWorktreeEntries.map(({ project, worktree }) => (
+                    <ProjectWorktreeRow
+                      key={`${project.id}:${worktree.path}`}
+                      activeWorktree={isActiveWorktree(
+                        project.id,
+                        worktree.path,
+                      )}
+                      homeDirectory={homeDirectory}
+                      onProjectWorktreeClick={onProjectWorktreeClick}
+                      onToggleWorktreePinned={onToggleWorktreePinned}
+                      project={project}
+                      showProjectName
+                      supportsTildePath={supportsTildePath}
+                      worktree={worktree}
+                      worktreeErrorLevel={worktreeThreadErrorLevel(
+                        project.id,
+                        worktree.path,
+                      )}
+                      worktreePinBusyPath={worktreePinBusyPath}
+                      worktreeState={getWorktreeState(
+                        project.id,
+                        worktree.path,
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-1">
             {filteredProjects.length === 0 ? (
               <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
@@ -265,22 +497,31 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                 const projectTreeOpen = openProjectPaths.has(project.path);
                 const isActive = selectedProjectId === project.id;
                 const projectErrorLevel = projectThreadErrorLevel(project.id);
-                const visibleWorktrees = orderProjectWorktrees(
+                const orderedWorktrees = orderProjectWorktrees(
                   project,
                   state.worktrees,
-                ).filter((worktree) =>
-                  matchesSearchQuery(
-                    normalizedSidebarSearchQuery,
-                    project.name,
-                    worktree.branch,
-                    worktree.path,
-                    shortName(worktree.path),
-                    formatPathForDisplay(
-                      worktree.path,
+                );
+                const visiblePinnedWorktrees = orderedWorktrees.filter(
+                  (worktree) =>
+                    worktree.pinnedAt !== null &&
+                    worktreeMatchesProjectsSearch(
+                      normalizedSidebarSearchQuery,
+                      project,
+                      worktree,
                       homeDirectory,
                       supportsTildePath,
                     ),
-                  ),
+                );
+                const visibleWorktrees = orderedWorktrees.filter(
+                  (worktree) =>
+                    worktree.pinnedAt === null &&
+                    worktreeMatchesProjectsSearch(
+                      normalizedSidebarSearchQuery,
+                      project,
+                      worktree,
+                      homeDirectory,
+                      supportsTildePath,
+                    ),
                 );
                 const showWorktrees =
                   projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
@@ -391,149 +632,47 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                           {visibleWorktrees.length === 0 ? (
                             <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
                               {normalizedSidebarSearchQuery
-                                ? "No matching worktrees."
-                                : "No worktrees found."}
+                                ? visiblePinnedWorktrees.length > 0
+                                  ? "Matching pinned worktrees are listed above."
+                                  : "No matching worktrees."
+                                : orderedWorktrees.some(
+                                      (worktree) => worktree.pinnedAt !== null,
+                                    )
+                                  ? "Pinned worktrees are listed above."
+                                  : "No worktrees found."}
                             </div>
                           ) : null}
                           {visibleWorktrees.length > 0 ? (
                             <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
                               <div className="space-y-1">
                                 {visibleWorktrees.map((worktree) => {
-                                  const worktreeState = getWorktreeState(
-                                    project.id,
-                                    worktree.path,
-                                  );
-                                  const worktreePinned = Boolean(
-                                    worktree.pinnedAt,
-                                  );
-                                  const togglingPin =
-                                    worktreePinBusyPath === worktree.path;
-                                  const activeWorktree = isActiveWorktree(
-                                    project.id,
-                                    worktree.path,
-                                  );
-                                  const worktreeErrorLevel =
-                                    worktreeThreadErrorLevel(
-                                      project.id,
-                                      worktree.path,
-                                    );
-
                                   return (
-                                    <div
-                                      className="relative"
+                                    <ProjectWorktreeRow
                                       key={worktree.path}
-                                    >
-                                      <button
-                                        type="button"
-                                        id={worktreeThreadPopoverAnchorId(
-                                          project.id,
-                                          worktree.path,
-                                        )}
-                                        className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 pr-10 text-left transition-colors ${
-                                          activeWorktree
-                                            ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
-                                            : "text-[#cfd1d4] hover:bg-[#14181a]"
-                                        }`}
-                                        onClick={() => {
-                                          onProjectWorktreeClick(
-                                            project,
-                                            worktree.path,
-                                          );
-                                        }}
-                                      >
-                                        <span
-                                          className={`flex h-6 w-6 shrink-0 items-center justify-center ${
-                                            activeWorktree
-                                              ? "bg-[#24333b] text-[#bdd5e6]"
-                                              : "bg-[#14181a] text-[#8ca6b9]"
-                                          }`}
-                                        >
-                                          {materialSymbol(
-                                            activeWorktree
-                                              ? "folder_open"
-                                              : "folder",
-                                            "text-[14px]",
-                                          )}
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                          <div
-                                            className="truncate text-[13px] font-medium leading-4"
-                                            title={shortName(worktree.path)}
-                                          >
-                                            {shortName(worktree.path)}
-                                          </div>
-                                          <div
-                                            className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]"
-                                            title={formatPathForDisplay(
-                                              worktree.path,
-                                              homeDirectory,
-                                              supportsTildePath,
-                                            )}
-                                          >
-                                            {worktree.branch ?? "Primary"} ·{" "}
-                                            {formatPathForDisplay(
-                                              worktree.path,
-                                              homeDirectory,
-                                              supportsTildePath,
-                                            )}
-                                          </div>
-                                        </div>
-                                        <span
-                                          className={`absolute right-10 top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
-                                            worktreeErrorLevel === "unread"
-                                              ? "bg-[#ff304f]"
-                                              : worktreeErrorLevel === "failed"
-                                                ? "bg-[#8f4956]"
-                                                : worktreeErrorLevel ===
-                                                    "stopped"
-                                                  ? "bg-[#b98a3a]"
-                                                  : "bg-transparent"
-                                          }`}
-                                        />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                                          activeWorktree
-                                            ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
-                                            : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
-                                        }`}
-                                        onClick={() => {
-                                          onToggleWorktreePinned(
-                                            project.id,
-                                            worktree.path,
-                                            worktreePinned,
-                                          );
-                                        }}
-                                        disabled={
-                                          togglingPin ||
-                                          worktreePinBusyPath !== null
-                                        }
-                                        aria-label={
-                                          worktreePinned
-                                            ? "Unpin worktree"
-                                            : "Pin worktree"
-                                        }
-                                        title={
-                                          worktreePinned
-                                            ? "Unpin worktree"
-                                            : "Pin worktree"
-                                        }
-                                      >
-                                        {materialSymbol(
-                                          "push_pin",
-                                          "text-[13px]",
-                                          {
-                                            filled: worktreePinned,
-                                          },
-                                        )}
-                                      </button>
-                                      {worktreeState.error ? (
-                                        <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
-                                          {worktreeState.error}
-                                        </div>
-                                      ) : null}
-                                    </div>
+                                      activeWorktree={isActiveWorktree(
+                                        project.id,
+                                        worktree.path,
+                                      )}
+                                      homeDirectory={homeDirectory}
+                                      onProjectWorktreeClick={
+                                        onProjectWorktreeClick
+                                      }
+                                      onToggleWorktreePinned={
+                                        onToggleWorktreePinned
+                                      }
+                                      project={project}
+                                      supportsTildePath={supportsTildePath}
+                                      worktree={worktree}
+                                      worktreeErrorLevel={worktreeThreadErrorLevel(
+                                        project.id,
+                                        worktree.path,
+                                      )}
+                                      worktreePinBusyPath={worktreePinBusyPath}
+                                      worktreeState={getWorktreeState(
+                                        project.id,
+                                        worktree.path,
+                                      )}
+                                    />
                                   );
                                 })}
                               </div>

@@ -650,7 +650,14 @@ export function GitHistoryDiffModal({
   const dialogBodyResetKey = `${state.projectId}:${state.worktreePath}:${state.entry.hash}:${state.loading ? "loading" : state.error ? "error" : "ready"}:${state.diffText.length}`;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <dialog
         aria-describedby={dialogDescriptionId}
         aria-labelledby={dialogTitleId}
