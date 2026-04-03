@@ -2,11 +2,6 @@
 
 ## Code file tasks
 
-- [ ] Add comments to file `src/bun/project-procedures.ts`.
-- [ ] Add comments to file `src/bun/project-procedures/codex-catalog.ts`.
-- [ ] Add comments to file `src/bun/project-procedures/directory-suggestions.ts`.
-- [ ] Add comments to file `src/bun/project-procedures/git-history.ts`.
-- [ ] Add comments to file `src/bun/project-procedures/project-tasks.ts`.
 - [ ] Add comments to file `src/bun/project-procedures/shared.ts`.
 - [ ] Add comments to file `src/bun/project-procedures/thread-detail.ts`.
 - [ ] Add comments to file `src/bun/rpc-schema.ts`.
