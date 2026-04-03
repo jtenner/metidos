@@ -4,9 +4,13 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = ".jolt";
+/** Database filename under the app data directory. */
 const DB_FILE_NAME = "app.db";
+/** Default thread model used when no explicit model is provided. */
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
+/** Default reasoning effort used for thread creation and migration repair. */
 export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
+/** Lazily-initialized singleton db handle for the process lifetime. */
 let appDatabase: Database | null = null;
 
 type ProjectInput = {
@@ -14,6 +18,7 @@ type ProjectInput = {
   name?: string | null;
 };
 
+/** Input used when inserting a thread row. */
 type ThreadInput = {
   projectId: number;
   worktreePath: string;
@@ -30,6 +35,7 @@ type ThreadUsageInput = {
   outputTokens: number;
 };
 
+/** Input for compaction metric updates persisted with token usage. */
 type ThreadCompactionStatsInput = {
   maxInputTokens: number;
   estimatedCompactionTriggerTokens: number | null;
@@ -68,6 +74,7 @@ type ThreadActivityPersistInput = ThreadActivityInput & {
   messageId?: number | null;
 };
 
+/** Public DB shape for project rows returned from queries. */
 export type ProjectRecord = {
   id: number;
   path: string;
@@ -79,6 +86,7 @@ export type ProjectRecord = {
   lastOpenedAt: string;
 };
 
+/** Public DB shape for thread rows returned from queries. */
 export type ThreadRecord = {
   id: number;
   projectId: number;
@@ -108,6 +116,7 @@ export type ThreadRecord = {
   lastErrorMessage: string | null;
 };
 
+/** Public DB shape for thread_messages rows returned from queries. */
 export type ThreadMessageRecord = {
   id: number;
   threadId: number;
@@ -144,9 +153,12 @@ const DEFAULT_APP_DATA_DIR =
           process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
           APP_NAME,
         );
+/** Temporary fallback directory when configured/default directories are not writable. */
 const TEMP_APP_DATA_DIR = join(tmpdir(), APP_NAME);
+/** Cached app-data directory path resolved for this process. */
 let resolvedAppDataDir: string | null = null;
 
+/** Execute a SQL statement with optional positional bindings. */
 function runStatement(
   database: Database,
   sql: string,
@@ -157,6 +169,9 @@ function runStatement(
     : database.run(sql, bindings);
 }
 
+/**
+ * Run operations inside a transaction and rollback on exceptions.
+ */
 function runInTransaction<T>(database: Database, callback: () => T): T {
   runStatement(database, "BEGIN IMMEDIATE");
   try {
@@ -165,6 +180,7 @@ function runInTransaction<T>(database: Database, callback: () => T): T {
     return result;
   } catch (error) {
     try {
+      // Keep caller's original error as primary even if rollback fails.
       runStatement(database, "ROLLBACK");
     } catch {
       // Ignore rollback errors so the original failure surfaces.
@@ -173,12 +189,14 @@ function runInTransaction<T>(database: Database, callback: () => T): T {
   }
 }
 
+/** Create folder if it doesn't exist before opening DB files. */
 function ensureAppDirectory(appDataPath: string): void {
   if (!existsSync(appDataPath)) {
     mkdirSync(appDataPath, { recursive: true });
   }
 }
 
+/** Probe directory by writing and deleting a temp file. */
 function isWritableDirectory(path: string): boolean {
   try {
     ensureAppDirectory(path);
@@ -194,6 +212,9 @@ function isWritableDirectory(path: string): boolean {
   }
 }
 
+/**
+ * Resolve an existing writable app-data directory using env and platform defaults.
+ */
 function resolveAppDataDirectory(): string {
   if (resolvedAppDataDir) {
     return resolvedAppDataDir;
@@ -229,27 +250,38 @@ function tableHasColumn(
   tableName: string,
   columnName: string,
 ): boolean {
+  /** True when `columnName` is already present in the table schema. */
   return db
     .query<{ name: string }, []>(`PRAGMA table_info(${tableName})`)
     .all()
     .some((column) => column.name === columnName);
 }
 
+/**
+ * Ensure `threads` has a column for evolving schema versions.
+ * This lets older databases safely add newer nullable/default fields.
+ */
 function ensureThreadColumn(
   db: Database,
   columnName: string,
   columnDefinition: string,
 ): void {
+  // Column addition is additive and preserves existing row data.
   if (!tableHasColumn(db, "threads", columnName)) {
     runStatement(db, `ALTER TABLE threads ADD COLUMN ${columnDefinition}`);
   }
 }
 
+/**
+ * Ensure `thread_messages` has a column for evolving schema versions.
+ * This is used for backfills and zero-downtime schema updates.
+ */
 function ensureThreadMessageColumn(
   db: Database,
   columnName: string,
   columnDefinition: string,
 ): void {
+  // Column addition is additive and preserves existing row data.
   if (!tableHasColumn(db, "thread_messages", columnName)) {
     runStatement(
       db,
@@ -258,6 +290,10 @@ function ensureThreadMessageColumn(
   }
 }
 
+/**
+ * Migrate/create schema and apply incremental column backfills on startup.
+ * Keeps the on-disk DB in sync with expected runtime shape.
+ */
 function migrate(db: Database): void {
   runStatement(
     db,
@@ -454,9 +490,14 @@ function migrate(db: Database): void {
 }
 
 export function getAppDatabasePath(): string {
+  /** Full path to the SQLite file in the resolved application data directory. */
   return resolve(resolveAppDataDirectory(), DB_FILE_NAME);
 }
 
+/**
+ * Initialize and cache the singleton app database handle.
+ * Applies migrations to repair/upgrade user data stores in place.
+ */
 export function initAppDatabase(): Database {
   if (appDatabase) {
     return appDatabase;
@@ -477,6 +518,7 @@ export function getProject(
   database: Database,
   projectPath: string,
 ): ProjectRecord | null {
+  /** Load a single project row by canonical path. */
   return database
     .query<ProjectRecord, [string]>(
       `
@@ -500,6 +542,7 @@ export function getProjectById(
   database: Database,
   projectId: number,
 ): ProjectRecord | null {
+  /** Load a single project row by primary key id. */
   return database
     .query<ProjectRecord, [number]>(
       `
@@ -520,6 +563,7 @@ export function getProjectById(
 }
 
 export function listProjects(database: Database): ProjectRecord[] {
+  /** Read all projects ordered by recent activity and then name. */
   return database
     .query<ProjectRecord, []>(
       `
@@ -543,6 +587,10 @@ export function upsertProject(
   database: Database,
   input: ProjectInput,
 ): ProjectRecord {
+  /**
+   * Create-or-update a project row and refresh its open/timestamp state.
+   * Returns the canonical row after write to avoid stale callers.
+   */
   runStatement(
     database,
     `
@@ -565,6 +613,7 @@ export function upsertProject(
 }
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
+  /** Return only open projects for current workspaces. */
   return database
     .query<ProjectRecord, []>(
       `
@@ -586,6 +635,7 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 }
 
 export function setProjectClosed(database: Database, projectId: number): void {
+  /** Soft-close a project by unsetting its open flag. */
   runStatement(
     database,
     `UPDATE projects SET is_open = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
@@ -594,6 +644,7 @@ export function setProjectClosed(database: Database, projectId: number): void {
 }
 
 export function deleteProject(database: Database, projectId: number): void {
+  /** Delete a project and cascade dependent rows via FK constraints. */
   runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
 }
 
@@ -601,6 +652,7 @@ export function listProjectWorktreePins(
   database: Database,
   projectId: number,
 ): ProjectWorktreePinRecord[] {
+  /** Fetch pinned worktree entries for project workspace recall. */
   return database
     .query<ProjectWorktreePinRecord, [number]>(
       `
@@ -621,6 +673,10 @@ export function setProjectWorktreePinned(
   worktreePath: string,
   pinned: boolean,
 ): void {
+  /**
+   * Add or remove a pinned worktree marker.
+   * Insert updates pin timestamps; delete unpins and removes history.
+   */
   if (pinned) {
     runStatement(
       database,
@@ -656,6 +712,7 @@ export function setProjectWorktreePinned(
 }
 
 export function listThreads(database: Database): ThreadRecord[] {
+  /** Fetch all threads, prioritized by pin state and recency. */
   return database
     .query<ThreadRecord, []>(
       `
@@ -702,6 +759,7 @@ export function getThreadById(
   database: Database,
   threadId: number,
 ): ThreadRecord | null {
+  /** Fetch one thread record with token/compaction/error metadata mapped to camelCase. */
   return database
     .query<ThreadRecord, [number]>(
       `
@@ -743,6 +801,10 @@ export function createThread(
   database: Database,
   input: ThreadInput,
 ): ThreadRecord {
+  /**
+   * Insert a thread row and return the inserted record.
+   * Throws if readback fails, which indicates write/read consistency issues.
+   */
   const result = runStatement(
     database,
     `
@@ -788,6 +850,7 @@ export function updateThreadCodexId(
   threadId: number,
   codexThreadId: string,
 ): void {
+  /** Persist the provider thread identifier from external API backfill. */
   runStatement(
     database,
     `
@@ -808,6 +871,7 @@ export function renameThread(
   title: string,
   summary?: string | null,
 ): void {
+  /** Rename a thread; includes optional summary persistence. */
   if (typeof summary !== "undefined") {
     runStatement(
       database,
@@ -842,6 +906,7 @@ export function setThreadModel(
   threadId: number,
   model: string,
 ): void {
+  /** Persist selected model and update audit timestamp. */
   runStatement(
     database,
     `
@@ -861,6 +926,7 @@ export function setThreadReasoningEffort(
   threadId: number,
   reasoningEffort: string,
 ): void {
+  /** Persist selected reasoning effort and refresh update time. */
   runStatement(
     database,
     `
@@ -880,6 +946,7 @@ export function setThreadUnsafeMode(
   threadId: number,
   unsafeMode: boolean,
 ): void {
+  /** Set unsafe mode flag and update thread's modified timestamp. */
   runStatement(
     database,
     `
@@ -899,6 +966,10 @@ export function setThreadPinned(
   threadId: number,
   pinned: boolean,
 ): void {
+  /**
+   * Toggle pinned state by setting or clearing `pinned_at`.
+   * Pinned threads sort above unpinned in listQueries.
+   */
   runStatement(
     database,
     `
@@ -915,10 +986,12 @@ export function setThreadPinned(
 }
 
 export function deleteThread(database: Database, threadId: number): void {
+  /** Remove a thread and all its messages via foreign key cascade. */
   runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
 }
 
 export function markThreadRan(database: Database, threadId: number): void {
+  /** Mark a thread successfully executed and clear transient error state. */
   runStatement(
     database,
     `
@@ -941,6 +1014,10 @@ export function markThreadRunStarted(
   threadId: number,
   startedAt: string,
 ): void {
+  /**
+   * Mark a thread turn as in-progress with a caller-provided start timestamp.
+   * Mirrors start times across restart/resume scenarios.
+   */
   runStatement(
     database,
     `
@@ -961,6 +1038,7 @@ export function markThreadStopped(
   threadId: number,
   message: string,
 ): void {
+  /** Mark thread as stopped with human-readable failure text and timestamps. */
   runStatement(
     database,
     `
@@ -985,6 +1063,7 @@ export function setThreadUsage(
   usage: ThreadUsageInput,
   compactionStats: ThreadCompactionStatsInput,
 ): void {
+  /** Store latest token usage and compaction telemetry for thread analytics. */
   runStatement(
     database,
     `
@@ -1020,6 +1099,7 @@ export function markThreadFailed(
   threadId: number,
   errorMessage: string,
 ): void {
+  /** Capture a hard failure and make it visible as last error for UI surfacing. */
   runStatement(
     database,
     `
@@ -1041,6 +1121,10 @@ export function markThreadErrorSeen(
   database: Database,
   threadId: number,
 ): void {
+  /**
+   * Mark last error as acknowledged by user.
+   * If no prior error exists, leave `last_error_seen_at` null.
+   */
   runStatement(
     database,
     `
@@ -1059,6 +1143,7 @@ export function markThreadErrorSeen(
 export function listThreadsWithInProgressMessages(
   database: Database,
 ): InProgressThreadMessageRecord[] {
+  /** Summarize latest activity update per thread for in-flight UI restoration. */
   return database
     .query<InProgressThreadMessageRecord, []>(
       `
@@ -1077,6 +1162,7 @@ export function listThreadMessages(
   database: Database,
   threadId: number,
 ): ThreadMessageRecord[] {
+  /** Return all messages in canonical order for a thread. */
   return database
     .query<ThreadMessageRecord, [number]>(
       `
@@ -1103,6 +1189,7 @@ export function createThreadMessage(
   database: Database,
   input: ThreadMessageInput,
 ): ThreadMessageRecord {
+  /** Insert a message row using default chat activity values and return inserted row. */
   const result = runStatement(
     database,
     `
@@ -1154,6 +1241,10 @@ export function upsertThreadActivity(
   database: Database,
   input: ThreadActivityInput,
 ): void {
+  /**
+   * Convenience one-item wrapper around multi-activity upsert.
+   * Keeps caller code simple when only a single activity update is needed.
+   */
   upsertThreadActivities(database, [input]);
 }
 
@@ -1162,6 +1253,7 @@ function findThreadActivityMessageId(
   threadId: number,
   itemId: string,
 ): number | null {
+  /** Find most recent message row for given thread+item to coalesce activity updates. */
   const existing = database
     .query<{ id: number }, [number, string]>(
       `
@@ -1181,6 +1273,10 @@ function updateThreadActivityById(
   messageId: number,
   input: ThreadActivityInput,
 ): boolean {
+  /**
+   * Apply a full activity upsert payload into an existing row.
+   * Returns true when at least one database row changed.
+   */
   const result = runStatement(
     database,
     `
@@ -1208,6 +1304,7 @@ function insertThreadActivity(
   database: Database,
   input: ThreadActivityInput,
 ): number {
+  /** Insert a new activity message row and return the row id for downstream correlation. */
   const result = runStatement(
     database,
     `
@@ -1238,6 +1335,10 @@ export function upsertThreadActivities(
   database: Database,
   inputs: readonly ThreadActivityPersistInput[],
 ): number[] {
+  /**
+   * Upsert many activity events in one atomic transaction.
+   * Reuses known message ids within the batch to avoid duplicate rows for same item.
+   */
   if (inputs.length === 0) {
     return [];
   }
@@ -1254,6 +1355,7 @@ export function upsertThreadActivities(
           : (messageIdByActivity.get(activityKey) ?? null);
 
       if (typeof messageId === "number") {
+        // Prefer in-batch update first so duplicate event chunks stay idempotent.
         if (!updateThreadActivityById(database, messageId, input)) {
           messageId = insertThreadActivity(database, input);
         }
@@ -1263,6 +1365,7 @@ export function upsertThreadActivities(
           input.threadId,
           input.itemId,
         );
+        // Fall back to DB search for pre-existing activity rows from prior sessions.
         if (typeof existingMessageId === "number") {
           updateThreadActivityById(database, existingMessageId, input);
           messageId = existingMessageId;
@@ -1283,6 +1386,7 @@ export function stopInProgressThreadMessages(
   database: Database,
   threadId: number,
 ): void {
+  /** Mark orphaned in-progress messages as stopped (used on restart/cleanup). */
   runStatement(
     database,
     `
