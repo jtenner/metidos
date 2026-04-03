@@ -67,6 +67,7 @@
 │  │  ├─ index.ts
 │  │  ├─ isolated-server.ts
 │  │  ├─ project-procedures/
+│  │  │  ├─ README.md
 │  │  │  ├─ codex-catalog.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
