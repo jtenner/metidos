@@ -5,6 +5,14 @@ The files are primarily for maintainers and contributors to understand tradeoffs
 
 ## Files
 
+- `2026-03-31-correctness-issues.md`
+  - Initial correctness/performance audit with findings tied to async orchestration, polling, and UI state races.
+- `2026-03-31-correctness-issues-2.md`
+  - Follow-up/round 2 correctness audit with additional findings and refined severity list.
+- `2026-04-03-security-audit.md`
+  - Security audit of the app's transport, RPC surface, filesystem access, Codex/MCP execution model, and local persistence.
+- `2026-04-03-security-remediation-plan.md`
+  - Implementation plan for locking down access, adding password plus TOTP authentication, step-up auth, TLS policy, and backend default-deny behavior.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.
   - Documents expected thread/session behavior and the integration surface the backend uses.
@@ -20,10 +28,6 @@ The files are primarily for maintainers and contributors to understand tradeoffs
 - `tanstack-virtual-chat-migration.md`
   - Alternative migration plan using `@tanstack/react-virtual`.
   - Documents compatibility tradeoffs, implementation shape, and list rendering strategy.
-- `2026-03-31-correctness-issues.md`
-  - Initial correctness/performance audit with findings tied to async orchestration, polling, and UI state races.
-- `2026-03-31-correctness-issues-2.md`
-  - Follow-up/round 2 correctness audit with additional findings and refined severity list.
 
 ## Subfolder: `docs/references/`
 

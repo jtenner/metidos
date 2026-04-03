@@ -21,9 +21,11 @@
 ├─ bunfig.toml
 ├─ docs/
 │  ├─ README.md
-│  ├─ codex.md
 │  ├─ 2026-03-31-correctness-issues.md
 │  ├─ 2026-03-31-correctness-issues-2.md
+│  ├─ 2026-04-03-security-audit.md
+│  ├─ 2026-04-03-security-remediation-plan.md
+│  ├─ codex.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md
 │  ├─ react-virtuoso-chat-migration.md
