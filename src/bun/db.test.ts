@@ -1,0 +1,92 @@
+import { afterEach, describe, expect, it } from "bun:test";
+import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { encryptAuthSecret, getAuthSecretKeyPath } from "./auth-secrets";
+import {
+  closeAppDatabase,
+  getAppDatabasePath,
+  initAppDatabase,
+  resetResolvedAppDataDirectory,
+  selectWritableAppDataDirectory,
+} from "./db";
+
+const tempDirectories = new Set<string>();
+const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+
+function createTempDirectory(): string {
+  const path = mkdtempSync(join(tmpdir(), "jolt-db-"));
+  tempDirectories.add(path);
+  return path;
+}
+
+afterEach(() => {
+  closeAppDatabase();
+  resetResolvedAppDataDirectory();
+
+  if (typeof originalAppDataDir === "string") {
+    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+  } else {
+    delete process.env.JOLT_APP_DATA_DIR;
+  }
+
+  for (const path of tempDirectories) {
+    rmSync(path, {
+      force: true,
+      recursive: true,
+    });
+  }
+  tempDirectories.clear();
+});
+
+describe("app database storage", () => {
+  it("falls back only to the default app-data directory when the configured path is unusable", () => {
+    const defaultAppDataDir = "/safe/default";
+    const result = selectWritableAppDataDirectory({
+      configuredAppDataDir: "/broken/configured",
+      defaultAppDataDir,
+      isWritableDirectory: (path) => path === defaultAppDataDir,
+    });
+
+    expect(result).toBe(defaultAppDataDir);
+  });
+
+  it("throws without mentioning a temp-directory fallback when no writable app-data directory exists", () => {
+    expect(() =>
+      selectWritableAppDataDirectory({
+        configuredAppDataDir: "/broken/configured",
+        defaultAppDataDir: "/broken/default",
+        isWritableDirectory: () => false,
+      }),
+    ).toThrow(
+      "Set JOLT_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
+    );
+  });
+
+  it("applies owner-only permissions to the app-data directory, database, and auth key when supported", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const appDataDir = createTempDirectory();
+    chmodSync(appDataDir, 0o755);
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+
+    initAppDatabase();
+    await encryptAuthSecret("totp-secret", {
+      appDataDir,
+    });
+
+    const databasePath = getAppDatabasePath();
+    const authSecretPath = getAuthSecretKeyPath({
+      appDataDir,
+    });
+
+    expect(existsSync(databasePath)).toBeTrue();
+    expect(existsSync(authSecretPath)).toBeTrue();
+    expect(statSync(appDataDir).mode & 0o777).toBe(0o700);
+    expect(statSync(databasePath).mode & 0o777).toBe(0o600);
+    expect(statSync(authSecretPath).mode & 0o777).toBe(0o600);
+  });
+});

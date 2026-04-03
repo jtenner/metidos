@@ -26,15 +26,25 @@ export function getAuthSecretKeyPath(options?: AuthSecretOptions): string {
   return resolve(authSecretDirectory(options), AUTH_SECRET_KEY_FILE_NAME);
 }
 
+function applyOwnerOnlyDirectoryPermissions(path: string): void {
+  try {
+    chmodSync(path, 0o700);
+  } catch {
+    // Windows does not reliably support POSIX chmod semantics; ignore there.
+  }
+}
+
 function ensureDirectory(path: string): void {
   if (!existsSync(path)) {
     mkdirSync(path, {
       recursive: true,
+      mode: 0o700,
     });
   }
+  applyOwnerOnlyDirectoryPermissions(path);
 }
 
-function applyOwnerOnlyPermissions(path: string): void {
+function applyOwnerOnlyFilePermissions(path: string): void {
   try {
     chmodSync(path, 0o600);
   } catch {
@@ -66,6 +76,7 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   const path = getAuthSecretKeyPath(options);
 
   if (existsSync(path)) {
+    applyOwnerOnlyFilePermissions(path);
     const raw = readFileSync(path, "utf8").trim();
     if (!raw) {
       throw new Error(`Auth secret key file at ${path} is empty.`);
@@ -78,7 +89,7 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
     encoding: "utf8",
     mode: 0o600,
   });
-  applyOwnerOnlyPermissions(path);
+  applyOwnerOnlyFilePermissions(path);
   return created;
 }
 

@@ -319,6 +319,11 @@ Code areas:
 - `src/mainview/app/state.ts`
 - possibly a new `src/bun/crypto.ts`
 
+Implementation note:
+
+- Do not silently fall back to the OS temp directory for the SQLite DB.
+- If the default per-user app data directory is unavailable, require an explicit `JOLT_APP_DATA_DIR` override instead.
+
 Acceptance criteria:
 
 - browser persistence no longer stores unsent chat text

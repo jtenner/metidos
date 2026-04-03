@@ -12,8 +12,5 @@
 - Authorization: keep unsafe mode available after login, but make it explicit and auditable.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Explicit Product Decisions and Phase 2. Preserve `unsafeMode` as a normal post-login Codex configuration, but clearly label it in the UI and record its use in the audit trail.
 
-- Persistence: reduce sensitive local storage and harden app data handling.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Phase 3. Remove risky browser persistence such as unsent chat text and `pendingThreadUnsafeMode`, tighten local DB location/permissions, and eliminate or heavily restrict the temp-directory fallback.
-
 - Verification: add end-to-end security regression coverage and keep the docs in sync.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Testing Plan. Add tests for setup, login, lockout, websocket auth, TLS-mode behavior, step-up-protected actions, CLI reset/regeneration flows, and update the security docs as implementation details settle.

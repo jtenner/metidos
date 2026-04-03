@@ -75,6 +75,7 @@
 │  │  ├─ codex-sidecar-scope.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
+│  │  ├─ db.test.ts
 │  │  ├─ dev-flows.test.ts
 │  │  ├─ dev-flows.ts
 │  │  ├─ git.ts

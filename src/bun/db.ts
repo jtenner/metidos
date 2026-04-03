@@ -1,6 +1,12 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = ".jolt";
@@ -212,8 +218,6 @@ const DEFAULT_APP_DATA_DIR =
           process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
           APP_NAME,
         );
-/** Temporary fallback directory when configured/default directories are not writable. */
-const TEMP_APP_DATA_DIR = join(tmpdir(), APP_NAME);
 /** Cached app-data directory path resolved for this process. */
 let resolvedAppDataDir: string | null = null;
 
@@ -255,7 +259,15 @@ function runInTransaction<T>(database: Database, callback: () => T): T {
 /** Create folder if it doesn't exist before opening DB files. */
 function ensureAppDirectory(appDataPath: string): void {
   if (!existsSync(appDataPath)) {
-    mkdirSync(appDataPath, { recursive: true });
+    mkdirSync(appDataPath, {
+      recursive: true,
+      mode: 0o700,
+    });
+  }
+  try {
+    chmodSync(appDataPath, 0o700);
+  } catch {
+    // Windows does not reliably support POSIX chmod semantics; ignore there.
   }
 }
 
@@ -275,6 +287,44 @@ function isWritableDirectory(path: string): boolean {
   }
 }
 
+function applyOwnerOnlyFilePermissions(path: string): void {
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Windows does not reliably support POSIX chmod semantics; ignore there.
+  }
+}
+
+export function selectWritableAppDataDirectory(options: {
+  configuredAppDataDir?: string | null | undefined;
+  defaultAppDataDir: string;
+  isWritableDirectory?: (path: string) => boolean;
+}): string {
+  const isWritable = options.isWritableDirectory ?? isWritableDirectory;
+  const candidates = [
+    options.configuredAppDataDir || null,
+    options.defaultAppDataDir,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    if (!isWritable(candidate)) {
+      continue;
+    }
+    return candidate;
+  }
+
+  const checkedPaths = options.configuredAppDataDir
+    ? `Checked JOLT_APP_DATA_DIR=${options.configuredAppDataDir} and ${options.defaultAppDataDir}.`
+    : `Checked ${options.defaultAppDataDir}.`;
+  throw new Error(
+    [
+      "Unable to find a writable application data directory.",
+      checkedPaths,
+      "Set JOLT_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
+    ].join(" "),
+  );
+}
+
 /**
  * Resolve an existing writable app-data directory using env and platform defaults.
  */
@@ -284,28 +334,24 @@ function resolveAppDataDirectory(): string {
   }
 
   const configuredAppDataDir = process.env.JOLT_APP_DATA_DIR?.trim();
-  const candidates = [
-    configuredAppDataDir || null,
-    DEFAULT_APP_DATA_DIR,
-    TEMP_APP_DATA_DIR,
-  ].filter((value): value is string => Boolean(value));
+  resolvedAppDataDir = selectWritableAppDataDirectory({
+    configuredAppDataDir,
+    defaultAppDataDir: DEFAULT_APP_DATA_DIR,
+  });
+  return resolvedAppDataDir;
+}
 
-  for (const candidate of candidates) {
-    if (!isWritableDirectory(candidate)) {
+function applyAppDatabasePermissions(dbPath: string): void {
+  if (existsSync(dbPath)) {
+    applyOwnerOnlyFilePermissions(dbPath);
+  }
+  const journalingSidecars = [`${dbPath}-shm`, `${dbPath}-wal`];
+  for (const sidecarPath of journalingSidecars) {
+    if (!existsSync(sidecarPath)) {
       continue;
     }
-    resolvedAppDataDir = candidate;
-    return candidate;
+    applyOwnerOnlyFilePermissions(sidecarPath);
   }
-
-  throw new Error(
-    [
-      "Unable to find a writable application data directory.",
-      configuredAppDataDir
-        ? `Checked JOLT_APP_DATA_DIR=${configuredAppDataDir}, ${DEFAULT_APP_DATA_DIR}, and ${TEMP_APP_DATA_DIR}.`
-        : `Checked ${DEFAULT_APP_DATA_DIR} and ${TEMP_APP_DATA_DIR}.`,
-    ].join(" "),
-  );
 }
 
 function tableHasColumn(
@@ -669,6 +715,7 @@ export function initAppDatabase(): Database {
   const db = new Database(dbPath);
   runStatement(db, "PRAGMA foreign_keys = ON");
   migrateDatabase(db);
+  applyAppDatabasePermissions(dbPath);
   appDatabase = db;
   return db;
 }
