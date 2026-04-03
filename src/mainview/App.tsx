@@ -428,6 +428,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
   );
   const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
   const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
+  const gitHistoryRefreshedThreadIdRef = useRef<number | null>(null);
   const threadStatusPollInFlightRef = useRef(false);
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
@@ -3029,6 +3030,38 @@ export default function App({ procedures }: AppProps): JSX.Element {
     loadGitHistory,
     sessionStateReady,
     selectedProject,
+  ]);
+
+  useEffect(() => {
+    if (!sessionStateReady) {
+      return;
+    }
+    if (!selectedThread) {
+      gitHistoryRefreshedThreadIdRef.current = null;
+      return;
+    }
+    if (
+      !selectedProject ||
+      !activeSelectedWorktreePath ||
+      selectedThread.projectId !== selectedProject.id ||
+      selectedThread.worktreePath !== activeSelectedWorktreePath
+    ) {
+      return;
+    }
+    if (gitHistoryRefreshedThreadIdRef.current === selectedThread.id) {
+      return;
+    }
+
+    gitHistoryRefreshedThreadIdRef.current = selectedThread.id;
+    void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
+      preferCached: true,
+    });
+  }, [
+    activeSelectedWorktreePath,
+    loadGitHistory,
+    selectedProject,
+    selectedThread,
+    sessionStateReady,
   ]);
 
   useEffect(() => {
