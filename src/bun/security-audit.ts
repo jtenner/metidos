@@ -43,6 +43,14 @@ function normalizeThreadId(threadId?: number | null): number | undefined {
     : undefined;
 }
 
+function normalizeProjectId(projectId?: number | null): number | undefined {
+  return typeof projectId === "number" &&
+    Number.isInteger(projectId) &&
+    projectId > 0
+    ? projectId
+    : undefined;
+}
+
 function parseSecurityAuditPayload(
   payloadJson: string | null,
 ): RpcSecurityAuditEvent["payload"] {
@@ -73,10 +81,16 @@ export function listSecurityAuditEventsFromDatabase(
   database: Database,
   params: ListSecurityAuditEventsParams = {},
 ): RpcSecurityAuditEvent[] {
+  const projectId = normalizeProjectId(params.projectId);
   const threadId = normalizeThreadId(params.threadId);
 
   return listSecurityAuditEvents(database, {
     limit: normalizeSecurityAuditLimit(params.limit),
+    ...(typeof projectId === "number"
+      ? {
+          projectId,
+        }
+      : {}),
     ...(typeof threadId === "number"
       ? {
           threadId,

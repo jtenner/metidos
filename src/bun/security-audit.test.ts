@@ -82,4 +82,34 @@ describe("security audit procedures", () => {
     expect(result[0]?.threadId).toBe(11);
     expect(result[0]?.payload).toBeNull();
   });
+
+  it("supports project-scoped queries when no thread filter is supplied", () => {
+    const database = createTestDatabase();
+
+    createSecurityAuditEvent(database, {
+      eventType: "project_task_queued",
+      payloadJson: JSON.stringify({
+        taskKind: "script",
+      }),
+      projectId: 5,
+      summaryText: "Queued a project task for Codex execution.",
+      threadId: 51,
+    });
+    createSecurityAuditEvent(database, {
+      eventType: "project_deleted",
+      payloadJson: JSON.stringify({
+        projectName: "Other",
+      }),
+      projectId: 6,
+      summaryText: "Deleted project Other.",
+    });
+
+    const result = listSecurityAuditEventsFromDatabase(database, {
+      projectId: 5,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.projectId).toBe(5);
+    expect(result[0]?.eventType).toBe("project_task_queued");
+  });
 });

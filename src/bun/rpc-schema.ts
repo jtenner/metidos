@@ -572,6 +572,7 @@ export type AppRPCSchema = {
     listSecurityAuditEvents: {
       params: {
         limit?: number;
+        projectId?: number | null;
         threadId?: number | null;
       };
       response: RpcSecurityAuditEvent[];

@@ -561,40 +561,56 @@ export default function App({
     [getProjectState],
   );
 
-  const refreshSecurityAuditEvents = useCallback(async (): Promise<void> => {
-    if (securityAuditLoadingRef.current) {
-      return;
-    }
-
-    const requestId = securityAuditRequestIdRef.current + 1;
-    securityAuditRequestIdRef.current = requestId;
-    securityAuditLoadingRef.current = true;
-    setSecurityAuditLoading(true);
-    setSecurityAuditError("");
-
-    try {
-      const nextEvents = await procedures.listSecurityAuditEvents({
-        limit: 100,
-      });
-      if (securityAuditRequestIdRef.current !== requestId) {
+  const refreshSecurityAuditEvents = useCallback(
+    async (options?: {
+      projectId?: number | null;
+      threadId?: number | null;
+    }): Promise<void> => {
+      if (securityAuditLoadingRef.current) {
         return;
       }
-      setSecurityAuditEvents(nextEvents);
-    } catch (error) {
-      if (securityAuditRequestIdRef.current !== requestId) {
-        return;
+
+      const requestId = securityAuditRequestIdRef.current + 1;
+      securityAuditRequestIdRef.current = requestId;
+      securityAuditLoadingRef.current = true;
+      setSecurityAuditLoading(true);
+      setSecurityAuditError("");
+
+      try {
+        const nextEvents = await procedures.listSecurityAuditEvents({
+          limit: 100,
+          ...(typeof options?.projectId === "number"
+            ? {
+                projectId: options.projectId,
+              }
+            : {}),
+          ...(typeof options?.threadId === "number"
+            ? {
+                threadId: options.threadId,
+              }
+            : {}),
+        });
+        if (securityAuditRequestIdRef.current !== requestId) {
+          return;
+        }
+        setSecurityAuditEvents(nextEvents);
+      } catch (error) {
+        if (securityAuditRequestIdRef.current !== requestId) {
+          return;
+        }
+        setSecurityAuditError(
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        if (securityAuditRequestIdRef.current === requestId) {
+          setSecurityAuditLoaded(true);
+          setSecurityAuditLoading(false);
+        }
+        securityAuditLoadingRef.current = false;
       }
-      setSecurityAuditError(
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      if (securityAuditRequestIdRef.current === requestId) {
-        setSecurityAuditLoaded(true);
-        setSecurityAuditLoading(false);
-      }
-      securityAuditLoadingRef.current = false;
-    }
-  }, [procedures]);
+    },
+    [procedures],
+  );
 
   // Derive normalized UI state in one pass so child props stay internally
   // consistent and side panels share the same source of truth.
@@ -4448,6 +4464,7 @@ export default function App({
                     loading: securityAuditLoading,
                     onRefresh: refreshSecurityAuditEvents,
                     projects,
+                    selectedProjectId,
                     selectedThreadId,
                   }}
                   selectedProjectName={selectedProject?.name ?? null}
@@ -4677,6 +4694,7 @@ export default function App({
                 loading: securityAuditLoading,
                 onRefresh: refreshSecurityAuditEvents,
                 projects,
+                selectedProjectId,
                 selectedThreadId,
               }}
               selectedProjectName={selectedProject?.name ?? null}

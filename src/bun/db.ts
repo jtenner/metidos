@@ -1207,10 +1207,11 @@ export function listSecurityAuditEvents(
   database: Database,
   options?: {
     limit?: number;
+    projectId?: number;
     threadId?: number;
   },
 ): SecurityAuditEventRecord[] {
-  /** Return persisted security audit events ordered newest-first, optionally scoped to one thread. */
+  /** Return persisted security audit events ordered newest-first, optionally scoped to one thread or project. */
   const limit =
     typeof options?.limit === "number" &&
     Number.isInteger(options.limit) &&
@@ -1258,6 +1259,49 @@ export function listSecurityAuditEvents(
 		`,
       )
       .all(options.threadId);
+  }
+
+  if (typeof options?.projectId === "number") {
+    if (limit !== null) {
+      return database
+        .query<SecurityAuditEventRecord, [number, number]>(
+          `
+			SELECT
+				id,
+				event_type AS eventType,
+				summary_text AS summaryText,
+				thread_id AS threadId,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				payload_json AS payloadJson,
+				created_at AS createdAt
+			FROM security_audit_events
+			WHERE project_id = ?
+			ORDER BY created_at DESC, id DESC
+			LIMIT ?
+		`,
+        )
+        .all(options.projectId, limit);
+    }
+
+    return database
+      .query<SecurityAuditEventRecord, [number]>(
+        `
+			SELECT
+				id,
+				event_type AS eventType,
+				summary_text AS summaryText,
+				thread_id AS threadId,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				payload_json AS payloadJson,
+				created_at AS createdAt
+			FROM security_audit_events
+			WHERE project_id = ?
+			ORDER BY created_at DESC, id DESC
+		`,
+      )
+      .all(options.projectId);
   }
 
   if (limit !== null) {

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import type { RpcProject, RpcSecurityAuditEvent } from "../../bun/rpc-schema";
 import { type AppIconName, materialSymbol } from "../controls/icons";
@@ -9,16 +9,21 @@ import {
 } from "./sidebar-panels-state";
 
 type SecurityAuditPanelProps = {
+  selectedProjectId: number | null;
   events: RpcSecurityAuditEvent[];
   error: string;
   hasLoaded: boolean;
   loading: boolean;
-  onRefresh: () => void | Promise<void>;
+  onRefresh: (options?: {
+    projectId?: number | null;
+    threadId?: number | null;
+  }) => void | Promise<void>;
   projects: RpcProject[];
   selectedThreadId: number | null;
 };
 
 const SECURITY_AUDIT_REFRESH_INTERVAL_MS = 15_000;
+type AuditFilterScope = "all" | "project" | "thread";
 
 function eventIconName(eventType: string): AppIconName {
   if (
@@ -56,6 +61,7 @@ function readPayloadProjectName(event: RpcSecurityAuditEvent): string | null {
 }
 
 export const SecurityAuditPanel = memo(function SecurityAuditPanel({
+  selectedProjectId,
   events,
   error,
   hasLoaded,
@@ -65,6 +71,8 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
   selectedThreadId,
 }: SecurityAuditPanelProps) {
   const securityAuditOpen = useSecurityAuditPanelOpen();
+  const [scope, setScope] = useState<AuditFilterScope>("all");
+  const lastRefreshKeyRef = useRef<string | null>(null);
   const projectNames = useMemo(
     () =>
       new Map(
@@ -75,13 +83,70 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
       ),
     [projects],
   );
+  const projectFilterAvailable = selectedProjectId !== null;
+  const threadFilterAvailable = selectedThreadId !== null;
+
+  const refreshOptions = useMemo(() => {
+    switch (scope) {
+      case "project":
+        return projectFilterAvailable
+          ? {
+              projectId: selectedProjectId,
+            }
+          : {};
+      case "thread":
+        return threadFilterAvailable
+          ? {
+              threadId: selectedThreadId,
+            }
+          : {};
+      default:
+        return {};
+    }
+  }, [
+    projectFilterAvailable,
+    scope,
+    selectedProjectId,
+    selectedThreadId,
+    threadFilterAvailable,
+  ]);
+  const refreshKey = `${scope}:${selectedProjectId ?? "none"}:${selectedThreadId ?? "none"}`;
+
+  useEffect(() => {
+    if (scope === "thread" && !threadFilterAvailable) {
+      setScope(projectFilterAvailable ? "project" : "all");
+      return;
+    }
+    if (scope === "project" && !projectFilterAvailable) {
+      setScope("all");
+    }
+  }, [projectFilterAvailable, scope, threadFilterAvailable]);
 
   useEffect(() => {
     if (!securityAuditOpen || hasLoaded || loading) {
       return;
     }
-    void onRefresh();
-  }, [hasLoaded, loading, onRefresh, securityAuditOpen]);
+    lastRefreshKeyRef.current = refreshKey;
+    void onRefresh(refreshOptions);
+  }, [
+    hasLoaded,
+    loading,
+    onRefresh,
+    refreshKey,
+    refreshOptions,
+    securityAuditOpen,
+  ]);
+
+  useEffect(() => {
+    if (!securityAuditOpen || !hasLoaded) {
+      return;
+    }
+    if (lastRefreshKeyRef.current === refreshKey) {
+      return;
+    }
+    lastRefreshKeyRef.current = refreshKey;
+    void onRefresh(refreshOptions);
+  }, [hasLoaded, onRefresh, refreshKey, refreshOptions, securityAuditOpen]);
 
   useEffect(() => {
     if (!securityAuditOpen) {
@@ -89,13 +154,13 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
     }
 
     const intervalId = window.setInterval(() => {
-      void onRefresh();
+      void onRefresh(refreshOptions);
     }, SECURITY_AUDIT_REFRESH_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [onRefresh, securityAuditOpen]);
+  }, [onRefresh, refreshOptions, securityAuditOpen]);
 
   return (
     <section className="select-none">
@@ -122,6 +187,38 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
       />
       {securityAuditOpen ? (
         <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ["all", "All"],
+                ["project", "Project"],
+                ["thread", "Thread"],
+              ] as const
+            ).map(([nextScope, label]) => {
+              const disabled =
+                (nextScope === "project" && !projectFilterAvailable) ||
+                (nextScope === "thread" && !threadFilterAvailable);
+              const active = scope === nextScope;
+
+              return (
+                <button
+                  type="button"
+                  key={nextScope}
+                  className={`px-2 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors ${
+                    active
+                      ? "bg-[#24455e] text-[#d8ecf9]"
+                      : "bg-[#14181a] text-[#8ca6b9]"
+                  } ${disabled ? "opacity-40" : "hover:bg-[#1a2328] hover:text-[#d6e5f0]"}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    setScope(nextScope);
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           {!hasLoaded && loading ? (
             <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
               Loading security audit log...
