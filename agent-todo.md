@@ -9,7 +9,7 @@
 - [x] Add comments to file `src/mainview/app/use-thread-previews.ts`.
 - [x] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
 - [x] Add comments to file `src/mainview/app/workspace-panel.tsx`.
-- [ ] Add comments to file `src/mainview/index.ts`.
+- [x] Add comments to file `src/mainview/index.ts`.
 
 ## Folder tasks
 

@@ -16,6 +16,7 @@ import App from "./App";
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
 
+/** Tracked pending call awaiting a response on the shared websocket channel. */
 type PendingRequest = {
   method: RpcMethodName;
   reject: (reason?: unknown) => void;
@@ -76,6 +77,7 @@ type RuntimeConfig = {
   rpcWebSocketUrl?: string;
 };
 
+/** Mainview event names that bridge websocket worktree/thread updates into DOM events. */
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
 const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
   "jolt:worktree-git-history-changed";
@@ -121,6 +123,7 @@ let rpcReconnectAttempt = 0;
 let connectionReady!: Promise<void>;
 
 function resetConnectionReady(): void {
+  // Recreate this promise whenever the socket closes so new requests await reconnection.
   connectionReadyResolved = false;
   connectionReady = new Promise<void>((resolve, reject) => {
     resolveConnection = () => {
@@ -150,6 +153,7 @@ function clearRpcReconnectTimer(): void {
 }
 
 function reloadWindow(reason: string): void {
+  // In dev mode only, reload after backend reports readiness.
   if (!runtimeConfig.devServer || isPageUnloading) {
     return;
   }
@@ -161,6 +165,7 @@ function reloadWindow(reason: string): void {
 }
 
 async function waitForDevServer(): Promise<void> {
+  // Poll the health endpoint until the dev server accepts traffic again.
   if (!runtimeConfig.devServer || isPageUnloading) {
     return;
   }
@@ -185,6 +190,7 @@ async function waitForDevServer(): Promise<void> {
 }
 
 function scheduleDevRecovery(reason: string): void {
+  // Avoid launching parallel recovery checks when one is already scheduled.
   if (!runtimeConfig.devServer || isPageUnloading || devRecoveryScheduled) {
     return;
   }
@@ -198,12 +204,14 @@ function scheduleDevRecovery(reason: string): void {
 }
 
 window.addEventListener("beforeunload", () => {
+  // Stop background reconnect/recovery timers on page unload.
   isPageUnloading = true;
   clearDevRecoveryTimer();
   clearRpcReconnectTimer();
 });
 
 function rejectPendingRequests(reason: unknown): void {
+  // Fail and clear every in-flight request when transport is dropped.
   for (const pending of pendingRequests.values()) {
     pending.reject(reason);
   }
@@ -211,6 +219,7 @@ function rejectPendingRequests(reason: unknown): void {
 }
 
 function scheduleRpcReconnect(reason: string): void {
+  // Exponential backoff reconnect for non-dev environments.
   if (
     runtimeConfig.devServer ||
     isPageUnloading ||
@@ -260,6 +269,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
   });
 
   nextSocket.addEventListener("message", (event) => {
+    // Messages are either control notifications or RPC request responses.
     if (socket !== nextSocket) {
       return;
     }
@@ -322,6 +332,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
   });
 
   nextSocket.addEventListener("close", () => {
+    // On close, clear active socket state and recover per environment policy.
     if (socket !== nextSocket) {
       return;
     }
@@ -353,6 +364,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
 connectRpcSocket("initial");
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
+  // Normalize arbitrary abort signals into a reusable Error with cause metadata.
   if (reason instanceof Error) {
     return reason;
   }
@@ -369,6 +381,7 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
 }
 
 function normalizeTimeoutMs(timeoutMs?: number): number | null {
+  // Guard against invalid timeouts before forwarding as transport-level constraints.
   if (
     typeof timeoutMs !== "number" ||
     !Number.isFinite(timeoutMs) ||
@@ -402,6 +415,7 @@ function buildRequestSignal(
 }
 
 async function waitForConnection(signal: AbortSignal | null): Promise<void> {
+  // Block until the websocket handshake is ready unless caller aborts first.
   if (!signal) {
     await connectionReady;
     return;
@@ -427,6 +441,7 @@ async function waitForConnection(signal: AbortSignal | null): Promise<void> {
 async function waitForOpenSocket(
   signal: AbortSignal | null,
 ): Promise<WebSocket> {
+  // Keep retrying until an OPEN socket is available after connection readiness.
   while (true) {
     await waitForConnection(signal);
     const activeSocket = socket;
@@ -440,6 +455,7 @@ function sendSocketMessage(
   targetSocket: WebSocket,
   message: RpcClientMessage,
 ): void {
+  // Send typed payload to the active websocket.
   targetSocket.send(JSON.stringify(message));
 }
 
@@ -448,6 +464,7 @@ async function sendRequest<K extends RpcMethodName>(
   params: RpcRequestMap[K]["params"],
   options?: RpcProcedureCallOptions,
 ): Promise<RpcRequestMap[K]["response"]> {
+  // Compose abortable request signaling and wait for an open socket before dispatch.
   const signal = buildRequestSignal(options);
   const requestSocket = await waitForOpenSocket(signal);
   if (signal?.aborted) {
@@ -476,6 +493,7 @@ async function sendRequest<K extends RpcMethodName>(
       };
 
       if (signal) {
+        // On caller abort, cancel server side request and reject the local promise.
         const handleAbort = () => {
           finalize(() => {
             if (requestSocket.readyState === WebSocket.OPEN) {
@@ -549,6 +567,7 @@ function createProcedure<K extends RpcMethodName>(
     )) as ProjectProcedures[K];
 }
 
+/** RPC procedure map bound to each generated schema method and used by the React app. */
 const procedures: ProjectProcedures = {
   getHomeDirectory: createProcedure("getHomeDirectory"),
   listDirectorySuggestions: createProcedure("listDirectorySuggestions"),
@@ -593,10 +612,12 @@ window.joltProcedures = procedures;
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
+  // Safety fallback if HTML entrypoint wiring is missing.
   console.error("Mainview root not found");
   document.body.innerHTML =
     '<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Mainview root missing (id="app").</main>';
 } else {
+  // Mount app with injected RPC procedures.
   console.log("React version:", React.version);
   console.log("Mounting React app (App.tsx)");
   const root = createRoot(appRoot);
