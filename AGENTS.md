@@ -93,6 +93,7 @@
 │     │  ├─ use-worktree-diff.ts
 │     │  └─ workspace-panel.tsx
 │     ├─ controls/
+│     │  ├─ README.md
 │     │  ├─ chat-composer-control.tsx
 │     │  ├─ codex-model-selector.tsx
 │     │  ├─ codex-utils.ts
