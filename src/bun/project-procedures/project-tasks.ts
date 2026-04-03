@@ -19,14 +19,23 @@ function tasksDirectoryPath(worktreePath: string): string {
   return resolve(worktreePath, ".tasks");
 }
 
+/**
+ * Normalize task paths so callers can pass loose input safely.
+ */
 function normalizeRelativeTaskPath(taskPath: string): string {
   return taskPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
+/**
+ * Convert `.tasks` file path to a user-facing title.
+ */
 export function taskTitleFromPath(taskPath: string): string {
   return taskPath.replace(/\.[^./\\]+$/, "").replace(/\\/g, "/");
 }
 
+/**
+ * Build the user prompt for file-backed tasks.
+ */
 export function formatTaskPrompt(
   taskTitle: string,
   taskContent: string,
@@ -34,6 +43,9 @@ export function formatTaskPrompt(
   return `Your job is to perform the task: ${taskTitle}\n${taskContent.trim()}\n\nDo this now.`;
 }
 
+/**
+ * Build the user prompt for package.json script tasks.
+ */
 export function formatPackageScriptTaskPrompt(task: {
   packageJsonPath: string;
   packageDirectory: string;
@@ -51,6 +63,9 @@ export function formatPackageScriptTaskPrompt(task: {
   ].join("\n");
 }
 
+/**
+ * Skip directories that should not be traversed for task discovery.
+ */
 function isIgnoredPackageDirectory(name: string): boolean {
   return (
     name === ".git" ||
@@ -68,6 +83,9 @@ function sortDirectoryEntries<
     name: string;
   },
 >(values: Entry[]): Entry[] {
+  /**
+   * Locale-aware numeric sort keeps human-friendly ordering (e.g. task-2 before task-10).
+   */
   return [...values].sort((left, right) =>
     left.name.localeCompare(right.name, undefined, {
       numeric: true,
@@ -90,6 +108,9 @@ async function safeDirectoryRealPathAsync(
   }
 }
 
+/**
+ * Visit a directory exactly once using real path tracking; reject paths outside the root subtree.
+ */
 async function visitDirectoryOnceAsync(
   path: string,
   visitedRealPaths: Set<string>,
@@ -129,6 +150,9 @@ async function isDirectoryCandidate(
   return safeIsDirectoryAsync(fullPath);
 }
 
+/**
+ * Candidate helper supports both Dirent-backed and symlink-resolved directories.
+ */
 async function isFileCandidate(
   entry: {
     isFile: () => boolean;
@@ -294,6 +318,9 @@ async function listPackageJsonTasksAsync(
   return tasks;
 }
 
+/**
+ * Promote watch target kind to "tasks" when needed while preserving "tasks" over "directory".
+ */
 function addTaskWatchTarget(
   watchTargetKinds: Map<string, TaskWatchTarget["kind"]>,
   path: string,
@@ -306,6 +333,11 @@ function addTaskWatchTarget(
   watchTargetKinds.set(path, kind);
 }
 
+/**
+ * Recursively discover directories to watch:
+ *  - all directories under .tasks
+ *  - package directories that may contain script changes.
+ */
 async function collectTaskWatchTargetsAsync(
   worktreePath: string,
   currentDirectory: string,
@@ -386,6 +418,9 @@ async function collectTaskWatchTargetsAsync(
   }
 }
 
+/**
+ * Read all task watch targets for a worktree and return deterministic ordering.
+ */
 export async function readTaskWatchTargets(
   worktreePath: string,
 ): Promise<TaskWatchTarget[]> {
@@ -414,6 +449,9 @@ export async function readTaskWatchTargets(
     );
 }
 
+/**
+ * Sort first by task kind (file before script), then by title and path.
+ */
 function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
   return [...tasks].sort((left, right) => {
     if (left.kind !== right.kind) {
@@ -427,6 +465,9 @@ function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
   });
 }
 
+/**
+ * Aggregate `.tasks` files and package scripts, then sort results.
+ */
 export async function readProjectTasksFromDisk(
   worktreePath: string,
 ): Promise<RpcProjectTask[]> {
@@ -436,6 +477,9 @@ export async function readProjectTasksFromDisk(
   ]);
 }
 
+/**
+ * Resolve and validate task file path to prevent escaping from the `.tasks` root.
+ */
 export function resolveProjectTaskFilePath(
   worktreePath: string,
   taskPath: string,
@@ -467,6 +511,9 @@ export function resolveProjectTaskFilePath(
   return fullPath;
 }
 
+/**
+ * Resolve, validate, and parse a package.json script target from an RpcProjectTask.
+ */
 export function resolvePackageJsonTask(
   worktreePath: string,
   task: RpcProjectTask,
