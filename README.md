@@ -19,26 +19,78 @@ The goal is to keep coding sessions, project state, and tool outputs tightly cou
 
 ## Big-picture architecture
 
-```text
-┌────────────────────┐
-│  Browser (mainview)│
-│  React + TS + CSS  │
-│  WebSocket client   │
-└──────────┬─────────┘
-           │
-           │  RPC over WebSocket
-           │
-┌──────────▼──────────┐
-│     Bun backend      │
-│  src/bun/index.ts    │
-│  HTTP + WS + static  │
-└──────────┬───────────┘
-           │
-           ├── Project procedures (`src/bun/project-procedures/*`)
-           ├── Database/state persistence (`src/bun/db.ts`)
-           ├── Git helpers (`src/bun/git.ts`)
-           ├── Codex sidecar (`src/bun/codex-sidecar-mcp.ts`, `@openai/codex-sdk`)
-           └── Build artifacts (`src/bun/build-mainview.ts`)
+```mermaid
+flowchart TD
+  %% Frontend layer
+  subgraph Client["Browser client (mainview)"]
+    UI["mainview index.ts\n- boots WS transport\n- pending request map + reconnect + type map"]
+    APP["App.tsx\n- shell + route-like workspace composition\n- orchestrates selected project/worktree/thread state"]
+    DER["app/* hooks + derived state\n- maps RPC data into panels\n- memoized selectors + thread/workspace views"]
+    CTRL["controls/* UI controls\n- composer, menus, selectors, search\n- model/effort toggles and actions"]
+    ROUT["window event bridge\n- custom events for async server pushes"]
+  end
+
+  %% transport boundary
+  subgraph Transport["UI <-> backend transport"]
+    WS["ws://.../rpc\n- bidirectional request/response\n- timeout + cancellation + backoff"]
+  end
+
+  %% Backend process host
+  subgraph Server["Bun backend process (src/bun)"]
+    HOST["index.ts\n- HTTP routes for assets and fonts\n- WS upgrade + heartbeat + request envelope handling"]
+    DISPATCH["RPC dispatch in index.ts\n- validates request name\n- executes procedure\n- serializes ok/error replies"]
+    SCHEMA["rpc-schema.ts\n- shared TypeScript contract for UI/backend"]
+    ORCH["project-procedures.ts\n- orchestrates project/worktree/thread/task ops\n- cache warmup + background maintenance"]
+    DB["db.ts\n- sqlite persistence\n- projects/worktrees/threads/messages/usage"]
+    GIT["git.ts\n- git command execution\n- diffs, snapshots, history pages"]
+    SIDE["codex-sidecar-mcp.ts\n- MCP stdio process endpoint\n- tools for thread metadata + create/start flow"]
+    TASKS["project-procedures/project-tasks.ts\n- discover .tasks files & package scripts\n- build execution prompts"]
+    DIR["project-procedures/directory-suggestions.ts\n- directory autocomplete cache (LRU + TTL)\n- home/tilded path parsing"]
+    HISTRY["project-procedures/git-history.ts\n- paged history cache + prefetch + diff request dedupe"]
+    SHARED["project-procedures/shared.ts\n- LRU, abort-aware promises, concurrency limiter\n- safe path and fs helpers"]
+    DETAIL["project-procedures/thread-detail.ts\n- maps DB rows to RpcThread/RpcThreadMessage\n- run state + compaction signals"]
+    CATALOG["project-procedures/codex-catalog.ts\n- model + reasoning catalog\n- validation and normalization"]
+    BUILD["build-mainview.ts\n- bundles mainview entry to .jolt-build/index.js\n- production/dev artifact prep"]
+    WATCH["isolated-server.ts / static-server.ts\n- dev helper mode and static-only mode variants"]
+  end
+
+  %% external services
+  subgraph External["External/operating layers"]
+    OPENAI["OpenAI Codex SDK"]
+    SQLITE["SQLite file store"]
+    FS["Filesystem + git repo worktrees"]
+    PROC["Bun process spawns (package scripts / child tasks)"]
+  end
+
+  UI --> APP
+  APP --> DER
+  APP --> CTRL
+  APP --> ROUT
+  ROUT --> UI
+  APP -->|RPC requests| WS
+  WS <--> DISPATCH
+  DISPATCH --> SCHEMA
+  DISPATCH --> ORCH
+  ORCH --> DB
+  ORCH --> GIT
+  ORCH --> SIDE
+  ORCH --> TASKS
+  ORCH --> DIR
+  ORCH --> HISTRY
+  ORCH --> SHARED
+  ORCH --> DETAIL
+  ORCH --> CATALOG
+  HOST --> BUILD
+  HOST --> WATCH
+  ORCH -->|streams/updates| ROUT
+  ORCH -->|thread lifecycle events| ROUT
+  DB --> SQLITE
+  GIT --> FS
+  GIT --> PROC
+  SIDE -->|MCP IPC over stdio| OPENAI
+  CATALOG --> OPENAI
+  TASKS --> FS
+  DIR --> FS
 ```
 
 ## Runtime flow (how it works day-to-day)
@@ -157,94 +209,3 @@ bun run harness:starvation    # run starvation harness utility
 - Prefer clear comments for edge-case behavior (cancellations, open/close sequencing, stale-response handling).
 - Run docs + format/style checks according to `bun run validate` before non-doc code changes.
 - Use `agent-todo.md` for new documentation or process work so the repo task list stays accurate.
-
-## End-to-end component diagram
-
-```mermaid
-flowchart LR
-  subgraph Client["Browser client (src/mainview)"]
-    A["index.ts (RPC transport + event bridge)"]
-    B["App.tsx (composition + state orchestration)"]
-    C["Derived hooks & panels (mainview/app/*)"]
-    D["Controls (mainview/controls/*)"]
-    A --> B --> C
-    C --> D
-  end
-
-  subgraph Transport["WebSocket transport boundary"]
-    W["WebSocket /rpc"]
-  end
-
-  subgraph Server["Bun backend (src/bun)"]
-    E["index.ts HTTP + WebSocket host"]
-    F["rpcHandlers + rpc schema registry"]
-    G["project-procedures.ts"]
-    H["shared services"]
-    I["project-procedures/codex-catalog.ts"]
-    J["project-procedures/git-history.ts"]
-    K["project-procedures/project-tasks.ts"]
-    L["project-procedures/directory-suggestions.ts"]
-    M["project-procedures/thread-detail.ts"]
-    N["db.ts (SQLite persistence)"]
-    O["git.ts (git command + priority queue)"]
-    P["codex-sidecar-mcp.ts (codex mcp process bridge)"]
-    Q["build-mainview.ts"]
-    R["static-server.ts / isolated-server.ts"]
-    E --> F --> G
-    G --> H
-    H --> I
-    H --> J
-    H --> K
-    H --> L
-    H --> M
-    G --> N
-    G --> O
-    G --> P
-    E --> Q
-    E --> R
-  end
-
-  subgraph External["External services"]
-    X["OpenAI Codex SDK"]
-    Y["Git CLI"]
-    Z["SQLite DB file"]
-    F1["File system / worktrees"]
-    F2["Node/Bun runtime"]
-  end
-
-  A <--> |typed request/response| W
-  W <--> E
-  G --> |persist/read| N
-  N --> |stores| Z
-  G --> |status/events| P
-  P --> |thread lifecycle/streams| X
-  O --> |commands| Y
-  O --> |read/write| F1
-  E --> |serves assets| R
-  F2 --> E
-```
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant U as User action
-  participant MV as mainview index.ts
-  participant WS as ws://.../rpc
-  participant API as bun index.ts
-  participant PR as project-procedures
-  participant DB as db.ts
-  participant SIDE as codex-sidecar-mcp
-  participant CH as Codex SDK
-
-  U->>MV: click "start thread / run task / diff"
-  MV->>WS: RPC request {id, method, params, priority}
-  WS->>API: dispatch by method name
-  API->>PR: invoke procedure
-  PR->>DB: load/save projects/worktrees/threads/messages
-  PR->>SIDE: start/manage Codex thread or tool execution
-  SIDE->>CH: stream events / tool calls
-  PR-->>API: normalized result or streamed event envelope
-  API-->>WS: response or push notification (tasks/history/thread-start)
-  WS-->>MV: resolve pending promise or emit window event
-  MV-->>U: UI updates derived state + rendered diff/thread/message panels
-```
