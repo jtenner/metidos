@@ -2,11 +2,6 @@
 
 ## Code file tasks
 
-- [x] Add comments to file `src/mainview/app/desktop-sidebar.tsx`.
-- [x] Add comments to file `src/mainview/app/diff-workspace.tsx`.
-- [x] Add comments to file `src/mainview/app/git-history-panel.tsx`.
-- [x] Add comments to file `src/mainview/app/message-ui.tsx`.
-- [x] Add comments to file `src/mainview/app/projects-panel.tsx`.
 - [ ] Add comments to file `src/mainview/app/sidebar-content.tsx`.
 - [ ] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
 - [ ] Add comments to file `src/mainview/app/state.ts`.
@@ -18,12 +13,6 @@
 - [ ] Add comments to file `src/mainview/app/use-thread-previews.ts`.
 - [ ] Add comments to file `src/mainview/app/use-worktree-diff.ts`.
 - [ ] Add comments to file `src/mainview/app/workspace-panel.tsx`.
-- [x] Add comments to file `src/mainview/controls/chat-composer-control.tsx`.
-- [x] Add comments to file `src/mainview/controls/codex-model-selector.tsx`.
-- [x] Add comments to file `src/mainview/controls/codex-utils.ts`.
-- [x] Add comments to file `src/mainview/controls/icons.tsx`.
-- [x] Add comments to file `src/mainview/controls/project-task-selector.tsx`.
-- [x] Add comments to file `src/mainview/controls/reasoning-effort-selector.tsx`.
 - [ ] Add comments to file `src/mainview/index.ts`.
 
 ## Folder tasks
