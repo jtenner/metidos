@@ -999,6 +999,30 @@ export function compareThreadsByRecency(
   return right.updatedAt.localeCompare(left.updatedAt);
 }
 
+export function preferredThreadForWorktree(
+  threads: RpcThread[],
+  projectId: number,
+  worktreePath: string,
+): RpcThread | null {
+  let preferredThread: RpcThread | null = null;
+  for (const thread of threads) {
+    if (
+      thread.projectId !== projectId ||
+      thread.worktreePath !== worktreePath
+    ) {
+      continue;
+    }
+    if (
+      preferredThread === null ||
+      compareThreadsByRecency(thread, preferredThread) < 0
+    ) {
+      preferredThread = thread;
+    }
+  }
+
+  return preferredThread;
+}
+
 export function latestThreadForWorktree(
   threads: RpcThread[],
   projectId: number,

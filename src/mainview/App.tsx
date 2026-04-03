@@ -56,7 +56,6 @@ import {
   gitHistoryDiffCacheKey,
   isAbortError,
   isCodexReasoningEffort,
-  latestThreadForWorktree,
   MAINVIEW_STATE_STORAGE_VERSION,
   mergeResetGitHistory,
   type OpenThreadOptions,
@@ -68,7 +67,7 @@ import {
   type ProjectStateMap,
   patchPersistedMainviewState,
   pickInitialThread,
-  pinnedThreadForWorktree,
+  preferredThreadForWorktree,
   primaryWorktreePath,
   readLruValue,
   readPersistedMainviewState,
@@ -428,6 +427,7 @@ export default function App({ procedures }: AppProps): JSX.Element {
     new Map<number, Promise<RpcThreadDetail>>(),
   );
   const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
+  const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
   const threadStatusPollInFlightRef = useRef(false);
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
@@ -2117,6 +2117,53 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ],
   );
 
+  const syncSelectedWorktreeThread = useCallback(
+    (projectId: number, worktreePath: string): void => {
+      const preferredThread = preferredThreadForWorktree(
+        threads,
+        projectId,
+        worktreePath,
+      );
+      if (preferredThread) {
+        if (selectedThreadIdRef.current === preferredThread.id) {
+          return;
+        }
+        if (threadOpenAbortControllerRef.current !== null) {
+          return;
+        }
+        void openThread(preferredThread.id, {
+          selectionGuard: {
+            projectId,
+            worktreePath,
+          },
+        });
+        return;
+      }
+
+      if (
+        selectedProjectIdRef.current !== projectId ||
+        selectedWorktreePathRef.current !== worktreePath ||
+        selectedThreadIdRef.current !== null ||
+        threadOpenAbortControllerRef.current !== null
+      ) {
+        return;
+      }
+
+      const key = worktreeKey(projectId, worktreePath);
+      if (autoThreadCreationWorktreeKeysRef.current.has(key)) {
+        return;
+      }
+
+      autoThreadCreationWorktreeKeysRef.current.add(key);
+      void createThreadForWorktree(projectId, worktreePath, {
+        requireNoSelectedThread: true,
+      }).finally(() => {
+        autoThreadCreationWorktreeKeysRef.current.delete(key);
+      });
+    },
+    [createThreadForWorktree, openThread, threads],
+  );
+
   const initialize = useCallback(async () => {
     const persistedState = initialMainviewState;
     const initiallyOpenProjectTreePaths =
@@ -3160,40 +3207,30 @@ export default function App({ procedures }: AppProps): JSX.Element {
     ) {
       return;
     }
-    const preferredThread =
-      pinnedThreadForWorktree(
-        threads,
-        selectedProjectId,
-        activeSelectedWorktreePath,
-      ) ??
-      latestThreadForWorktree(
-        threads,
-        selectedProjectId,
-        activeSelectedWorktreePath,
-      );
+    const preferredThread = preferredThreadForWorktree(
+      threads,
+      selectedProjectId,
+      activeSelectedWorktreePath,
+    );
     if (!preferredThread) {
       if (selectedThreadId !== null) {
         clearThreadSelection();
       }
+      syncSelectedWorktreeThread(selectedProjectId, activeSelectedWorktreePath);
       return;
     }
     if (selectedThreadId === preferredThread.id) {
       return;
     }
-    void openThread(preferredThread.id, {
-      selectionGuard: {
-        projectId: selectedProjectId,
-        worktreePath: activeSelectedWorktreePath,
-      },
-    });
+    syncSelectedWorktreeThread(selectedProjectId, activeSelectedWorktreePath);
   }, [
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
     clearThreadSelection,
-    openThread,
     selectedProjectId,
     selectedThread,
     selectedThreadId,
+    syncSelectedWorktreeThread,
     threads,
   ]);
 
@@ -3695,19 +3732,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
           loadingWorktrees: false,
           openWorktrees: new Set([...current.openWorktrees, worktreePath]),
         }));
-        const existingThread =
-          pinnedThreadForWorktree(threads, projectId, worktreePath) ??
-          latestThreadForWorktree(threads, projectId, worktreePath);
-        if (
-          existingThread ||
-          selectedProjectIdRef.current !== projectId ||
-          selectedWorktreePathRef.current !== worktreePath
-        ) {
-          return;
-        }
-        await createThreadForWorktree(projectId, worktreePath, {
-          requireNoSelectedThread: true,
-        });
       } catch (error) {
         if (!isCurrentWorktreeToggleRequest(key, requestId)) {
           return;
@@ -3722,7 +3746,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
     },
     [
       beginWorktreeToggleRequest,
-      createThreadForWorktree,
       getWorktreeState,
       finishWorktreeToggleRequest,
       isCurrentWorktreeToggleRequest,
@@ -3730,7 +3753,6 @@ export default function App({ procedures }: AppProps): JSX.Element {
       primeGitHistoryResult,
       procedures,
       setWorktreeState,
-      threads,
       updateProjectState,
     ],
   );
@@ -3742,18 +3764,23 @@ export default function App({ procedures }: AppProps): JSX.Element {
       const alreadySelected =
         selectedProjectIdRef.current === project.id &&
         selectedWorktreePathRef.current === worktreePath;
-      if (alreadySelected) {
-        if (!target.opened && !target.loading) {
-          clearThreadSelection();
-          void ensureWorktreeOpen(project.id, worktreePath);
-        }
+      if (!alreadySelected) {
+        clearThreadSelection();
+        selectProject(project, worktreePath);
+      }
+      syncSelectedWorktreeThread(project.id, worktreePath);
+      if (target.opened || target.loading) {
         return;
       }
-      clearThreadSelection();
-      selectProject(project, worktreePath);
       void ensureWorktreeOpen(project.id, worktreePath);
     },
-    [clearThreadSelection, ensureWorktreeOpen, getWorktreeState, selectProject],
+    [
+      clearThreadSelection,
+      ensureWorktreeOpen,
+      getWorktreeState,
+      selectProject,
+      syncSelectedWorktreeThread,
+    ],
   );
 
   useEffect(() => {
