@@ -11,23 +11,36 @@ import {
 import { useThreadPreviews } from "./use-thread-previews";
 
 export type SharedThreadListProps = {
+  /** Ack callback for clearing "unread error" thread state when opened in background. */
   acknowledgeThreadErrorSeenInBackground: (threadId: number) => void;
+  /** Clears completion indicator after the user returns to that thread row. */
   clearCompletedThreadIndicator: (threadId: number) => void;
+  /** Dismisses the inline run-status badge for a thread from persistent state. */
   dismissThreadStatus: (thread: RpcThread) => void;
+  /** Resolves project state buckets (including worktree/branch info) by project id. */
   getProjectState: (projectId: number) => ProjectNodeState;
+  /** User home directory for display-friendly worktree path formatting. */
   homeDirectory: string;
+  /** Returns whether status chips and errors are already dismissed for a thread. */
   isThreadStatusDismissed: (thread: RpcThread | null) => boolean;
+  /** Opens the main thread view for a specific thread id. */
   onOpenThread: (threadId: number) => void;
+  /** Opens context menu for a thread row at pixel coordinates. */
   onOpenThreadActionMenu: (thread: RpcThread, x: number, y: number) => void;
+  /** Known projects list used to attach project and worktree metadata to thread rows. */
   projects: RpcProject[];
+  /** Currently selected thread id to apply active state styling to matching row. */
   selectedThreadId: number | null;
+  /** Feature flag controlling whether `~` is used for home-directory path display. */
   supportsTildePath: boolean;
+  /** Returns activity state for a thread to drive status badge and visual marker. */
   threadActivityIndicator: (
     threadId: number,
   ) => "none" | "working" | "completed";
 };
 
 type ThreadListPreviewProps = {
+  /** Event handlers for error preview anchoring and visibility transitions. */
   errorPreviewHandlers: (
     anchorId: string,
     text: string | null | undefined,
@@ -35,10 +48,15 @@ type ThreadListPreviewProps = {
     HTMLAttributes<HTMLElement>,
     "onBlur" | "onFocus" | "onMouseEnter" | "onMouseLeave"
   >;
+  /** Currently open error popover state for this list's render scope. */
   errorPreviewPopover: ErrorPreviewPopoverState | null;
+  /** Hides active error preview to prevent stale overlays. */
   hideErrorPreview: () => void;
+  /** Hides thread summary overlay when pointer focus leaves or opens another view. */
   hideThreadSummaryPreview: () => void;
+  /** Currently open thread-summary popover state for this list's render scope. */
   threadSummaryPopover: ThreadSummaryPopoverState | null;
+  /** Event handlers for summary popover anchored to a row when no error is available. */
   threadSummaryPreviewHandlers: (
     anchorId: string,
     title: string,
@@ -54,23 +72,36 @@ type ThreadListRowProps = Omit<
   "isThreadStatusDismissed" | "selectedThreadId" | "threadActivityIndicator"
 > &
   ThreadListPreviewProps & {
+    /** Thread row activity value (`working` adds a dot and status text). */
     activityIndicator: "none" | "working" | "completed";
+    /** Prefix that uniquely scopes tooltip/popover IDs for this list instance. */
     anchorIdPrefix?: string;
+    /** ID used by react-portal for the error popover element. */
     errorPreviewPopoverId: string;
+    /** True when this row is the active selection in the thread list. */
     isActive: boolean;
+    /** Whether to append location info to the row's secondary label. */
     showLocation?: boolean;
+    /** Thread entity rendered by this row. */
     thread: RpcThread;
+    /** Whether thread status indicators are hidden by user dismissal. */
     threadStatusDismissed: boolean;
+    /** ID used by react-portal for the summary popover element. */
     threadSummaryPopoverId: string;
   };
 
 type ThreadListProps = SharedThreadListProps & {
+  /** Optional anchor id prefix for multiple thread lists on one page. */
   anchorIdPrefix?: string;
+  /** Disable preview popover state/handlers when heavy re-renders are undesirable. */
   previewDisabled?: boolean;
+  /** Add project/worktree context to each row label when enabled. */
   showLocation?: boolean;
+  /** Threads rendered in this list, usually in recency order. */
   threads: RpcThread[];
 };
 
+/** Renders thread rows and shared portal containers for previews. */
 export const ThreadList = memo(function ThreadList({
   acknowledgeThreadErrorSeenInBackground,
   anchorIdPrefix = "thread",
@@ -182,6 +213,7 @@ function ThreadListPreviewPortal({
 }: {
   children: JSX.Element | null | false | Array<JSX.Element | null | false>;
 }): JSX.Element | null {
+  // Guard for SSR: `document` is only available in browser environments.
   if (typeof document === "undefined") {
     return null;
   }
@@ -214,6 +246,7 @@ const ThreadListRow = memo(function ThreadListRow({
   threadSummaryPopoverId,
   threadSummaryPreviewHandlers,
 }: ThreadListRowProps): JSX.Element {
+  // Resolve thread project/worktree context to compute branch and display path.
   const threadProject =
     projects.find((project) => project.id === thread.projectId) ?? null;
   const threadWorktree = threadProject
@@ -233,6 +266,7 @@ const ThreadListRow = memo(function ThreadListRow({
   );
   const threadPopoverAnchorId = `${anchorIdPrefix}-sidebar-row-${thread.id}`;
   const threadPinned = Boolean(thread.pinnedAt);
+  // Precompute row activity and status bits to keep icon, label, and aria state aligned.
   const isWorking = activityIndicator === "working";
   const hasCompletedActivity = activityIndicator === "completed";
   const hasRunError =
@@ -241,6 +275,7 @@ const ThreadListRow = memo(function ThreadListRow({
     !threadStatusDismissed && thread.runStatus.state === "stopped";
   const hasUnreadError =
     !threadStatusDismissed && thread.runStatus.hasUnreadError;
+  // Use error text whenever an unread, failed, or stopped state is active.
   const threadErrorPreviewText =
     hasUnreadError || hasRunError || hasRunStopped
       ? (thread.runStatus.error ?? "")
@@ -264,6 +299,7 @@ const ThreadListRow = memo(function ThreadListRow({
   ]
     .filter(Boolean)
     .join(" ");
+  // Prefer error handlers to make error details interactive without switching popover type.
   const threadPreviewHandlers = threadErrorPreviewText
     ? errorPreviewHandlers(threadPopoverAnchorId, threadErrorPreviewText)
     : threadSummaryPreviewHandlers(
@@ -299,6 +335,7 @@ const ThreadListRow = memo(function ThreadListRow({
     .filter(Boolean)
     .join(" · ");
 
+  // Compose ARIA label and preview handlers to keep keyboard/screen-reader context consistent.
   return (
     <button
       type="button"
@@ -318,6 +355,7 @@ const ThreadListRow = memo(function ThreadListRow({
         hideThreadSummaryPreview();
         onOpenThreadActionMenu(thread, event.clientX + 6, event.clientY + 6);
       }}
+      // Left click opens thread details and acknowledges/clears transient indicators first.
       onClick={() => {
         hideErrorPreview();
         hideThreadSummaryPreview();
@@ -384,9 +422,13 @@ function isPreviewAnchorActive(
   anchorId: string,
   popover: ErrorPreviewPopoverState | ThreadSummaryPopoverState | null,
 ): boolean {
+  // Small helper used to determine whether a given anchor currently owns a popover.
   return popover?.anchorId === anchorId;
 }
 
+/**
+ * Memo comparator for a thread row: checks only row-relevant prop changes.
+ */
 function areThreadListRowPropsEqual(
   previous: ThreadListRowProps,
   next: ThreadListRowProps,

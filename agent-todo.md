@@ -5,7 +5,6 @@
 - [x] Add comments to file `src/mainview/app/sidebar-content.tsx`.
 - [x] Add comments to file `src/mainview/app/sidebar-panels-state.ts`.
 - [x] Add comments to file `src/mainview/app/state.ts`.
-- [ ] Add comments to file `src/mainview/app/thread-list-row.tsx`.
 - [ ] Add comments to file `src/mainview/app/threads-panel.tsx`.
 - [ ] Add comments to file `src/mainview/app/use-add-project-form.ts`.
 - [ ] Add comments to file `src/mainview/app/use-mainview-derived-state.ts`.
