@@ -62,6 +62,8 @@
 │  ├─ README.md
 │  ├─ bun/
 │  │  ├─ README.md
+│  │  ├─ auth.test.ts
+│  │  ├─ auth.ts
 │  │  ├─ build-mainview.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts

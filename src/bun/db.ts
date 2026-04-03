@@ -74,6 +74,30 @@ type ThreadActivityPersistInput = ThreadActivityInput & {
   messageId?: number | null;
 };
 
+export type AuthPrimaryFactorType = "pin" | "password";
+
+type AuthSettingsInput = {
+  primaryFactorType: AuthPrimaryFactorType;
+  primaryFactorHash: string;
+  totpSecretCiphertext: string;
+  sessionLifetimeDays: number;
+};
+
+type AuthSessionInput = {
+  id: string;
+  issuedAt: string;
+  expiresAt: string;
+  lastUsedAt: string;
+  stepUpValidUntil?: string | null;
+};
+
+type AuthWebSocketTicketInput = {
+  id: string;
+  sessionId: string;
+  issuedAt: string;
+  expiresAt: string;
+};
+
 /** Public DB shape for project rows returned from queries. */
 export type ProjectRecord = {
   id: number;
@@ -139,6 +163,41 @@ export type ProjectWorktreePinRecord = {
 export type InProgressThreadMessageRecord = {
   threadId: number;
   lastUpdatedAt: string;
+};
+
+export type AuthSettingsRecord = {
+  id: number;
+  primaryFactorType: AuthPrimaryFactorType;
+  primaryFactorHash: string;
+  totpSecretCiphertext: string;
+  sessionLifetimeDays: number;
+  failedPrimaryFactorAttempts: number;
+  lockedUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AuthSessionRecord = {
+  id: string;
+  issuedAt: string;
+  expiresAt: string;
+  lastUsedAt: string;
+  stepUpValidUntil: string | null;
+};
+
+export type AuthRecoveryCodeRecord = {
+  id: number;
+  codeHash: string;
+  usedAt: string | null;
+  createdAt: string;
+};
+
+export type AuthWebSocketTicketRecord = {
+  id: string;
+  sessionId: string;
+  issuedAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
 };
 
 const DEFAULT_APP_DATA_DIR =
@@ -294,7 +353,7 @@ function ensureThreadMessageColumn(
  * Migrate/create schema and apply incremental column backfills on startup.
  * Keeps the on-disk DB in sync with expected runtime shape.
  */
-function migrate(db: Database): void {
+export function migrateDatabase(db: Database): void {
   runStatement(
     db,
     `
@@ -487,6 +546,85 @@ function migrate(db: Database): void {
 			ON thread_messages(thread_id, item_id);
 		`,
   );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS auth_settings (
+				id INTEGER PRIMARY KEY CHECK(id = 1),
+				primary_factor_type TEXT NOT NULL CHECK(primary_factor_type IN ('pin', 'password')),
+				primary_factor_hash TEXT NOT NULL,
+				totp_secret_ciphertext TEXT NOT NULL,
+				session_lifetime_days INTEGER NOT NULL DEFAULT 7,
+				failed_primary_factor_attempts INTEGER NOT NULL DEFAULT 0,
+				locked_until TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS auth_sessions (
+				id TEXT PRIMARY KEY,
+				issued_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL,
+				last_used_at TEXT NOT NULL,
+				step_up_valid_until TEXT
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS auth_recovery_codes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				code_hash TEXT NOT NULL UNIQUE,
+				used_at TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS auth_websocket_tickets (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL REFERENCES auth_sessions(id) ON DELETE CASCADE,
+				issued_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL,
+				consumed_at TEXT
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at
+			ON auth_sessions(expires_at);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_auth_recovery_codes_used_at
+			ON auth_recovery_codes(used_at);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_auth_websocket_tickets_session_id
+			ON auth_websocket_tickets(session_id);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_auth_websocket_tickets_expires_at
+			ON auth_websocket_tickets(expires_at);
+		`,
+  );
 }
 
 export function getAppDatabasePath(): string {
@@ -509,9 +647,387 @@ export function initAppDatabase(): Database {
 
   const db = new Database(dbPath);
   runStatement(db, "PRAGMA foreign_keys = ON");
-  migrate(db);
+  migrateDatabase(db);
   appDatabase = db;
   return db;
+}
+
+export function getAuthSettings(database: Database): AuthSettingsRecord | null {
+  /** Read the singleton auth-settings row if setup has been completed. */
+  return database
+    .query<AuthSettingsRecord, []>(
+      `
+			SELECT
+				id,
+				primary_factor_type AS primaryFactorType,
+				primary_factor_hash AS primaryFactorHash,
+				totp_secret_ciphertext AS totpSecretCiphertext,
+				session_lifetime_days AS sessionLifetimeDays,
+				failed_primary_factor_attempts AS failedPrimaryFactorAttempts,
+				locked_until AS lockedUntil,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM auth_settings
+			WHERE id = 1
+		`,
+    )
+    .get();
+}
+
+export function upsertAuthSettings(
+  database: Database,
+  input: AuthSettingsInput,
+): AuthSettingsRecord {
+  /** Create or replace the singleton auth configuration row. */
+  runStatement(
+    database,
+    `
+			INSERT INTO auth_settings (
+				id,
+				primary_factor_type,
+				primary_factor_hash,
+				totp_secret_ciphertext,
+				session_lifetime_days,
+				failed_primary_factor_attempts,
+				locked_until,
+				updated_at
+			)
+			VALUES (
+				1,
+				?,
+				?,
+				?,
+				?,
+				0,
+				NULL,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			)
+			ON CONFLICT(id) DO UPDATE SET
+				primary_factor_type = excluded.primary_factor_type,
+				primary_factor_hash = excluded.primary_factor_hash,
+				totp_secret_ciphertext = excluded.totp_secret_ciphertext,
+				session_lifetime_days = excluded.session_lifetime_days,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		`,
+    input.primaryFactorType,
+    input.primaryFactorHash,
+    input.totpSecretCiphertext,
+    input.sessionLifetimeDays,
+  );
+
+  const settings = getAuthSettings(database);
+  if (!settings) {
+    throw new Error("Failed to upsert auth settings.");
+  }
+  return settings;
+}
+
+export function setAuthFailureState(
+  database: Database,
+  failedPrimaryFactorAttempts: number,
+  lockedUntil: string | null,
+): void {
+  /** Persist login failure counters and optional lockout expiry on the singleton row. */
+  runStatement(
+    database,
+    `
+			UPDATE auth_settings
+			SET
+				failed_primary_factor_attempts = ?,
+				locked_until = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = 1
+		`,
+    failedPrimaryFactorAttempts,
+    lockedUntil,
+  );
+}
+
+export function resetAuthFailureState(database: Database): void {
+  /** Clear any stored failed-attempt counters and lockout state. */
+  setAuthFailureState(database, 0, null);
+}
+
+export function listAuthRecoveryCodes(
+  database: Database,
+): AuthRecoveryCodeRecord[] {
+  /** List all stored recovery-code hashes and whether they have been consumed. */
+  return database
+    .query<AuthRecoveryCodeRecord, []>(
+      `
+			SELECT
+				id,
+				code_hash AS codeHash,
+				used_at AS usedAt,
+				created_at AS createdAt
+			FROM auth_recovery_codes
+			ORDER BY id ASC
+		`,
+    )
+    .all();
+}
+
+export function replaceAuthRecoveryCodeHashes(
+  database: Database,
+  codeHashes: readonly string[],
+): AuthRecoveryCodeRecord[] {
+  /**
+   * Replace the full recovery-code set atomically so setup/regeneration never leaves
+   * a partial code list behind.
+   */
+  return runInTransaction(database, () => {
+    runStatement(database, "DELETE FROM auth_recovery_codes");
+    for (const codeHash of codeHashes) {
+      runStatement(
+        database,
+        `
+				INSERT INTO auth_recovery_codes (code_hash)
+				VALUES (?)
+			`,
+        codeHash,
+      );
+    }
+
+    return listAuthRecoveryCodes(database);
+  });
+}
+
+export function markAuthRecoveryCodeUsed(
+  database: Database,
+  codeHash: string,
+  usedAt: string,
+): boolean {
+  /** Consume one recovery code exactly once. */
+  const result = runStatement(
+    database,
+    `
+			UPDATE auth_recovery_codes
+			SET used_at = ?
+			WHERE code_hash = ?
+				AND used_at IS NULL
+		`,
+    usedAt,
+    codeHash,
+  );
+  return Number(result.changes) > 0;
+}
+
+export function createAuthSession(
+  database: Database,
+  input: AuthSessionInput,
+): AuthSessionRecord {
+  /** Insert one authenticated session row and return the stored record. */
+  runStatement(
+    database,
+    `
+			INSERT INTO auth_sessions (
+				id,
+				issued_at,
+				expires_at,
+				last_used_at,
+				step_up_valid_until
+			)
+			VALUES (?, ?, ?, ?, ?)
+		`,
+    input.id,
+    input.issuedAt,
+    input.expiresAt,
+    input.lastUsedAt,
+    input.stepUpValidUntil ?? null,
+  );
+
+  const session = getAuthSession(database, input.id);
+  if (!session) {
+    throw new Error(`Failed to create auth session ${input.id}.`);
+  }
+  return session;
+}
+
+export function getAuthSession(
+  database: Database,
+  sessionId: string,
+): AuthSessionRecord | null {
+  /** Fetch one session row by opaque session token. */
+  return database
+    .query<AuthSessionRecord, [string]>(
+      `
+			SELECT
+				id,
+				issued_at AS issuedAt,
+				expires_at AS expiresAt,
+				last_used_at AS lastUsedAt,
+				step_up_valid_until AS stepUpValidUntil
+			FROM auth_sessions
+			WHERE id = ?
+		`,
+    )
+    .get(sessionId);
+}
+
+export function touchAuthSession(
+  database: Database,
+  sessionId: string,
+  lastUsedAt: string,
+  expiresAt?: string,
+): void {
+  /** Refresh session activity and optionally extend its expiry. */
+  if (typeof expiresAt === "string") {
+    runStatement(
+      database,
+      `
+				UPDATE auth_sessions
+				SET
+					last_used_at = ?,
+					expires_at = ?
+				WHERE id = ?
+			`,
+      lastUsedAt,
+      expiresAt,
+      sessionId,
+    );
+    return;
+  }
+
+  runStatement(
+    database,
+    `
+			UPDATE auth_sessions
+			SET last_used_at = ?
+			WHERE id = ?
+		`,
+    lastUsedAt,
+    sessionId,
+  );
+}
+
+export function setAuthSessionStepUpValidUntil(
+  database: Database,
+  sessionId: string,
+  stepUpValidUntil: string | null,
+): void {
+  /** Store the current step-up freshness window for a session. */
+  runStatement(
+    database,
+    `
+			UPDATE auth_sessions
+			SET step_up_valid_until = ?
+			WHERE id = ?
+		`,
+    stepUpValidUntil,
+    sessionId,
+  );
+}
+
+export function deleteAuthSession(database: Database, sessionId: string): void {
+  /** Remove one session and cascade any dependent websocket tickets. */
+  runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
+}
+
+export function deleteExpiredAuthSessions(
+  database: Database,
+  now: string,
+): number {
+  /** Remove sessions that are already past their expiry. */
+  const result = runStatement(
+    database,
+    `
+			DELETE FROM auth_sessions
+			WHERE expires_at <= ?
+		`,
+    now,
+  );
+  return Number(result.changes);
+}
+
+export function createAuthWebSocketTicket(
+  database: Database,
+  input: AuthWebSocketTicketInput,
+): AuthWebSocketTicketRecord {
+  /** Insert one short-lived websocket ticket bound to an authenticated session. */
+  runStatement(
+    database,
+    `
+			INSERT INTO auth_websocket_tickets (
+				id,
+				session_id,
+				issued_at,
+				expires_at,
+				consumed_at
+			)
+			VALUES (?, ?, ?, ?, NULL)
+		`,
+    input.id,
+    input.sessionId,
+    input.issuedAt,
+    input.expiresAt,
+  );
+
+  const ticket = getAuthWebSocketTicket(database, input.id);
+  if (!ticket) {
+    throw new Error(`Failed to create websocket ticket ${input.id}.`);
+  }
+  return ticket;
+}
+
+export function getAuthWebSocketTicket(
+  database: Database,
+  ticketId: string,
+): AuthWebSocketTicketRecord | null {
+  /** Fetch one websocket ticket row by opaque ticket id. */
+  return database
+    .query<AuthWebSocketTicketRecord, [string]>(
+      `
+			SELECT
+				id,
+				session_id AS sessionId,
+				issued_at AS issuedAt,
+				expires_at AS expiresAt,
+				consumed_at AS consumedAt
+			FROM auth_websocket_tickets
+			WHERE id = ?
+		`,
+    )
+    .get(ticketId);
+}
+
+export function consumeAuthWebSocketTicket(
+  database: Database,
+  ticketId: string,
+  consumedAt: string,
+): AuthWebSocketTicketRecord | null {
+  /** Consume a websocket ticket only if it has not been consumed before. */
+  const result = runStatement(
+    database,
+    `
+			UPDATE auth_websocket_tickets
+			SET consumed_at = ?
+			WHERE id = ?
+				AND consumed_at IS NULL
+		`,
+    consumedAt,
+    ticketId,
+  );
+  if (Number(result.changes) === 0) {
+    return null;
+  }
+  return getAuthWebSocketTicket(database, ticketId);
+}
+
+export function deleteExpiredAuthWebSocketTickets(
+  database: Database,
+  now: string,
+): number {
+  /** Remove websocket tickets that are expired or already consumed. */
+  const result = runStatement(
+    database,
+    `
+			DELETE FROM auth_websocket_tickets
+			WHERE expires_at <= ?
+				OR consumed_at IS NOT NULL
+		`,
+    now,
+  );
+  return Number(result.changes);
 }
 
 export function getProject(

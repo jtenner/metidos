@@ -35,7 +35,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
-  - Stores projects, worktrees, threads, messages, usage telemetry, and thread/task state.
+  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, usage telemetry, and thread/task state.
   - Handles migrations/defaults, typed record types, and path selection for app data location.
 
 - `git.ts`
@@ -81,6 +81,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
+
+- `auth.ts`
+  - Provides the first-pass auth primitives used by future setup/login flows.
+  - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
 
 - `server-security.ts`
   - Centralizes local transport hardening helpers shared by the Bun entrypoints.
