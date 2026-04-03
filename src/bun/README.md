@@ -95,6 +95,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements the backend auth flow used by upcoming HTTP routes and RPC gating.
   - Coordinates setup, login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
 
+- `auth-reset.ts`
+  - Implements the command-line recovery and primary-factor reset flow for single-user local installs.
+  - Verifies the configured primary factor plus TOTP before regenerating recovery codes or replacing the PIN/password.
+
 - `server-security.ts`
   - Centralizes local transport hardening helpers shared by the Bun entrypoints.
   - Defines loopback bind defaults, minimal liveness payloads, and browser `Origin` allowlist parsing/validation for websocket upgrades.

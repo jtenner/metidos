@@ -923,6 +923,12 @@ export function deleteAuthSession(database: Database, sessionId: string): void {
   runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
 }
 
+export function deleteAllAuthSessions(database: Database): number {
+  /** Revoke every authenticated session and cascade dependent websocket tickets. */
+  const result = runStatement(database, "DELETE FROM auth_sessions");
+  return Number(result.changes);
+}
+
 export function deleteExpiredAuthSessions(
   database: Database,
   now: string,

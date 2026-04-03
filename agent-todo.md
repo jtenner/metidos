@@ -15,9 +15,6 @@
 - Sidecar: enforce project/worktree scoping in the MCP layer.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Phase 2. Restrict `src/bun/codex-sidecar-mcp.ts` so the sidecar stays within the bound thread/project/worktree by default and only uses explicit privileged override paths for cross-project work.
 
-- CLI recovery: add authenticated CLI reset and recovery-code regeneration.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Explicit Product Decisions and File-Level Implementation Plan. Implement `src/bun/auth-reset.ts` so command-line users can do password/PIN reset and recovery-code regeneration only after a fresh auth round with the configured primary factor plus TOTP.
-
 - Dev flows: add explicit dev bypass and dev reset behavior.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Dev Reset Policy. Implement `JOLT_DEV_BYPASS=1` and `JOLT_DEV_RESET=1`, keep both off by default, and make dev reset wipe the full local database rather than trying to do partial auth/session cleanup.
 

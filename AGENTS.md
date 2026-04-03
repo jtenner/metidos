@@ -62,6 +62,8 @@
 │  ├─ README.md
 │  ├─ bun/
 │  │  ├─ README.md
+│  │  ├─ auth-reset.test.ts
+│  │  ├─ auth-reset.ts
 │  │  ├─ auth-secrets.test.ts
 │  │  ├─ auth-secrets.ts
 │  │  ├─ auth-service.test.ts

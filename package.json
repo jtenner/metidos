@@ -10,6 +10,7 @@
     "start:monolith": "bun run tailwind:build && bun run src/bun/index.ts",
     "dev": "bun run tailwind:build && (bun run tailwind:watch & bun src/bun/index.ts)",
     "dev:watch": "bun run dev",
+    "auth:reset": "bun run src/bun/auth-reset.ts",
     "harness:starvation": "bun run src/bun/starvation-harness.ts",
     "typecheck": "bunx tsgo --noEmit",
     "validate": "bunx biome check biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json && bun run typecheck",

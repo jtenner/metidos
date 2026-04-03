@@ -17,6 +17,7 @@ import { decryptAuthSecret, encryptAuthSecret } from "./auth-secrets";
 import {
   type AuthPrimaryFactorType,
   type AuthSessionRecord,
+  type AuthSettingsRecord,
   consumeAuthWebSocketTicket,
   createAuthSession,
   createAuthWebSocketTicket,
@@ -368,6 +369,63 @@ export function getAuthStatus(
 }
 
 /**
+ * Verify the configured primary factor and TOTP code without creating a session.
+ * Shared by login, CLI recovery flows, and future step-up paths.
+ */
+export async function verifyPrimaryFactorAndTotp(
+  database: Database,
+  input: LoginInput,
+): Promise<AuthSettingsRecord> {
+  const now = nowDate(input.nowMs);
+  const settings = enforceConfigured(database, now);
+
+  const primaryFactorValid = await verifyPrimaryFactor(
+    input.primaryFactor,
+    settings.primaryFactorHash,
+  );
+  const totpSecret = primaryFactorValid
+    ? await decryptAuthSecret(
+        settings.totpSecretCiphertext,
+        buildAuthSecretOptions(input.appDataDir),
+      )
+    : null;
+  const totpValid =
+    totpSecret === null
+      ? false
+      : await verifyTotpCode(totpSecret, input.totpCode, {
+          atMs: now.getTime(),
+        });
+
+  if (!primaryFactorValid || !totpValid) {
+    const failure = incrementFailedAttempts(
+      database,
+      settings.failedPrimaryFactorAttempts,
+      now,
+    );
+
+    if (failure.lockedUntil) {
+      throw new AuthServiceError(
+        "auth_locked",
+        `Authentication is locked until ${failure.lockedUntil}.`,
+        423,
+        {
+          lockedUntil: failure.lockedUntil,
+        },
+      );
+    }
+
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  resetAuthFailureState(database);
+  return settings;
+}
+
+/**
  * Complete first-run auth setup, persist settings, and create an authenticated session.
  */
 export async function setupAuth(
@@ -433,51 +491,7 @@ export async function login(
   input: LoginInput,
 ): Promise<LoginResult> {
   const now = nowDate(input.nowMs);
-  const settings = enforceConfigured(database, now);
-
-  const primaryFactorValid = await verifyPrimaryFactor(
-    input.primaryFactor,
-    settings.primaryFactorHash,
-  );
-  const totpSecret = primaryFactorValid
-    ? await decryptAuthSecret(
-        settings.totpSecretCiphertext,
-        buildAuthSecretOptions(input.appDataDir),
-      )
-    : null;
-  const totpValid =
-    totpSecret === null
-      ? false
-      : await verifyTotpCode(totpSecret, input.totpCode, {
-          atMs: now.getTime(),
-        });
-
-  if (!primaryFactorValid || !totpValid) {
-    const failure = incrementFailedAttempts(
-      database,
-      settings.failedPrimaryFactorAttempts,
-      now,
-    );
-
-    if (failure.lockedUntil) {
-      throw new AuthServiceError(
-        "auth_locked",
-        `Authentication is locked until ${failure.lockedUntil}.`,
-        423,
-        {
-          lockedUntil: failure.lockedUntil,
-        },
-      );
-    }
-
-    throw new AuthServiceError(
-      "invalid_credentials",
-      "The provided credentials are invalid.",
-      401,
-    );
-  }
-
-  resetAuthFailureState(database);
+  const settings = await verifyPrimaryFactorAndTotp(database, input);
   const session = await createSessionRecord(
     database,
     settings.sessionLifetimeDays,
