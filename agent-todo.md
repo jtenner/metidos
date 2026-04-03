@@ -2,7 +2,6 @@
 
 ## Code file tasks
 
-- [ ] Add comments to file `src/bun/project-procedures/thread-detail.ts`.
 - [ ] Add comments to file `src/bun/rpc-schema.ts`.
 - [ ] Add comments to file `src/bun/starvation-harness.ts`.
 - [ ] Add comments to file `src/bun/static-server.ts`.

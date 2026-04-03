@@ -26,18 +26,27 @@ const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
 const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
 const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
 
+/**
+ * Activity payload stored for command/file/tool messages.
+ */
 type CommandActivityPayload = {
   command: string;
   output: string;
   exitCode: number | null;
 };
 
+/**
+ * Activity payload stored for filesystem-change messages.
+ */
 type FileChangeActivityPayload = {
   path: string;
   changeKind: "add" | "delete" | "update";
   diffText: string;
 };
 
+/**
+ * Activity payload stored for tool-call messages.
+ */
 type ToolCallActivityPayload = {
   server: string;
   tool: string;
@@ -45,6 +54,9 @@ type ToolCallActivityPayload = {
   output: string;
 };
 
+/**
+ * Unread error exists when lastErrorAt exists and wasn't seen later.
+ */
 function hasUnreadThreadError(thread: ThreadRecord): boolean {
   return Boolean(
     thread.lastErrorAt &&
@@ -61,6 +73,9 @@ export function isStoppedThreadMessage(message: string | null): boolean {
   );
 }
 
+/**
+ * Compute derived run state for a thread, preferring active status from runtime when present.
+ */
 export function threadRunStatusFromRecord(
   thread: ThreadRecord,
   activeStatus?: RpcThreadRunStatus,
@@ -104,6 +119,9 @@ export function threadRunStatusFromRecord(
   };
 }
 
+/**
+ * Convert token counters from DB record into optional RPC usage shape.
+ */
 function threadUsageFromRecord(thread: ThreadRecord): RpcThreadUsage | null {
   if (
     thread.lastInputTokens === null &&
@@ -119,6 +137,9 @@ function threadUsageFromRecord(thread: ThreadRecord): RpcThreadUsage | null {
   };
 }
 
+/**
+ * Derive compaction telemetry with fallback heuristic and observed inference history.
+ */
 function threadCompactionFromRecord(thread: ThreadRecord): RpcThreadCompaction {
   return {
     estimatedTriggerTokens:
@@ -135,6 +156,9 @@ function threadCompactionFromRecord(thread: ThreadRecord): RpcThreadCompaction {
   };
 }
 
+/**
+ * Convert DB thread record to RPC thread object with normalized model/effort and runtime status.
+ */
 export function toRpcThread(
   thread: ThreadRecord,
   activeStatus?: RpcThreadRunStatus,
@@ -152,6 +176,9 @@ export function toRpcThread(
   };
 }
 
+/**
+ * Build updated compaction telemetry from latest usage sample.
+ */
 export function buildNextCompactionTelemetry(
   thread: ThreadRecord,
   usage: RpcThreadUsage,
@@ -230,6 +257,9 @@ export function buildNextCompactionTelemetry(
   };
 }
 
+/**
+ * Parse optional JSON payload on command/file/tool messages; fallback to null on invalid JSON.
+ */
 function parseActivityPayload<T>(value: string | null): T | null {
   if (!value) {
     return null;
@@ -241,6 +271,9 @@ function parseActivityPayload<T>(value: string | null): T | null {
   }
 }
 
+/**
+ * Convert a single persisted message into strongly-typed RPC message form.
+ */
 function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
   if (message.kind === "command" && message.itemId) {
     const payload = parseActivityPayload<CommandActivityPayload>(
@@ -389,12 +422,18 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
   };
 }
 
+/**
+ * Map stored thread messages to RPC wire shape.
+ */
 export function toRpcThreadMessages(
   messages: ThreadMessageRecord[],
 ): RpcThreadMessage[] {
   return messages.map(toRpcThreadMessage);
 }
 
+/**
+ * Build display title from branch name or fallback directory short name.
+ */
 export function buildThreadTitle(
   worktree: RpcWorktree | null,
   worktreePath: string,
