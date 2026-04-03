@@ -1,5 +1,9 @@
 import type { JSX, SVGProps } from "react";
 
+/**
+ * Canonical icon names supported by UI controls.
+ * Each name maps to a Material Symbols style glyph in `renderIconGlyph`.
+ */
 export type AppIconName =
   | "account_circle"
   | "arrow_forward"
@@ -27,6 +31,11 @@ export type AppIconName =
   | "task_alt"
   | "terminal";
 
+/**
+ * Return one or more SVG path/circle elements for a given icon name.
+ * Supports both "outline" and "filled" variants where relevant.
+ * Throws in the default branch if an unsupported name is introduced.
+ */
 function renderIconGlyph(
   name: AppIconName,
   filled: boolean,
@@ -212,6 +221,14 @@ function renderIconGlyph(
   throw new Error(`Unsupported icon: ${exhaustiveCheck}`);
 }
 
+/**
+ * Build a Material-symbol-style icon wrapped as an inline SVG.
+ *
+ * - `filled` changes selected variants where the icon has both outline and filled forms.
+ * - `className` is merged with baseline icon sizing/alignment classes.
+ * - `aria-hidden` is set so decorative icons are not announced; a title remains
+ *   for developer/tooling readability and easy inspection.
+ */
 export function materialSymbol(
   name: AppIconName,
   className = "",
@@ -219,6 +236,7 @@ export function materialSymbol(
     filled?: boolean;
   } = {},
 ): JSX.Element {
+  // Default props intentionally pin all icon strokes/fills to predictable rendering.
   const { filled = false } = options;
   const svgProps: SVGProps<SVGSVGElement> = {
     "aria-hidden": "true",
@@ -242,6 +260,9 @@ export function materialSymbol(
   );
 }
 
+/**
+ * App-branded rotated bolt icon used in top-level shell affordances.
+ */
 export function brandBoltIcon(className = ""): JSX.Element {
   return materialSymbol("bolt", `rotate-45 ${className}`.trim(), {
     filled: true,
