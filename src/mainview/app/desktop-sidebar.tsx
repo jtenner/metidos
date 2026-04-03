@@ -33,7 +33,7 @@ export function DesktopSidebar({
   return (
     <aside
       className={`relative min-h-0 shrink-0 overflow-hidden border-r border-[#262626] bg-[#131313] transition-[width] duration-300 ${
-        collapsed ? "w-14" : "w-[18.5rem]"
+        collapsed ? "w-14" : "w-[21rem]"
       }`}
       style={{
         willChange: "width",
@@ -41,7 +41,7 @@ export function DesktopSidebar({
     >
       <div
         aria-hidden={collapsed}
-        className={`absolute inset-y-0 left-0 flex w-[18.5rem] flex-col transition-opacity duration-150 ${
+        className={`absolute inset-y-0 left-0 flex w-[21rem] flex-col transition-opacity duration-150 ${
           collapsed ? "pointer-events-none invisible opacity-0" : "opacity-100"
         }`}
       >

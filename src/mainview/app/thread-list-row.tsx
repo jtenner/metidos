@@ -1,4 +1,5 @@
 import { type HTMLAttributes, type JSX, memo } from "react";
+import { createPortal } from "react-dom";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
@@ -133,46 +134,60 @@ export const ThreadList = memo(function ThreadList({
           threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
         />
       ))}
-      {errorPreviewPopover ? (
-        <div
-          id={errorPreviewPopoverId}
-          role="note"
-          className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
-          style={{
-            left: errorPreviewPopover.x,
-            top: errorPreviewPopover.y,
-            transform: "translateY(-50%)",
-          }}
-        >
-          <div className="whitespace-pre-wrap break-words">
-            {errorPreviewPopover.text}
+      <ThreadListPreviewPortal>
+        {errorPreviewPopover ? (
+          <div
+            id={errorPreviewPopoverId}
+            role="note"
+            className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+            style={{
+              left: errorPreviewPopover.x,
+              top: errorPreviewPopover.y,
+              transform: "translateY(-50%)",
+            }}
+          >
+            <div className="whitespace-pre-wrap break-words">
+              {errorPreviewPopover.text}
+            </div>
           </div>
-        </div>
-      ) : null}
-      {threadSummaryPopover ? (
-        <div
-          id={threadSummaryPopoverId}
-          role="note"
-          className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
-          style={{
-            left: threadSummaryPopover.x,
-            top: threadSummaryPopover.y,
-          }}
-        >
-          <div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
-            Thread Summary
+        ) : null}
+        {threadSummaryPopover ? (
+          <div
+            id={threadSummaryPopoverId}
+            role="note"
+            className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
+            style={{
+              left: threadSummaryPopover.x,
+              top: threadSummaryPopover.y,
+            }}
+          >
+            <div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
+              Thread Summary
+            </div>
+            <div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
+              {threadSummaryPopover.title}
+            </div>
+            <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
+              {threadSummaryPopover.summary}
+            </div>
           </div>
-          <div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
-            {threadSummaryPopover.title}
-          </div>
-          <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
-            {threadSummaryPopover.summary}
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </ThreadListPreviewPortal>
     </>
   );
 });
+
+function ThreadListPreviewPortal({
+  children,
+}: {
+  children: JSX.Element | null | false | Array<JSX.Element | null | false>;
+}): JSX.Element | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(children, document.body);
+}
 
 const ThreadListRow = memo(function ThreadListRow({
   acknowledgeThreadErrorSeenInBackground,
