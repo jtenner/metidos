@@ -243,6 +243,7 @@ export type RpcAppBootstrapResult = {
   homeDirectory: RpcHomeDirectoryResult;
   modelCatalog: RpcCodexModelCatalog;
   projects: RpcProject[];
+  threadDetail: RpcThreadDetail | null;
   threads: RpcThread[];
 };
 
@@ -413,7 +414,11 @@ export type AppRPCSchema = {
       response: RpcCodexModelCatalog;
     };
     getAppBootstrap: {
-      params: undefined;
+      params:
+        | {
+            threadIdHint?: number | null;
+          }
+        | undefined;
       response: RpcAppBootstrapResult;
     };
     listProjects: {

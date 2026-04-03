@@ -223,7 +223,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
   listDirectorySuggestions: (params) =>
     listDirectorySuggestionsProcedure(params),
   getCodexModelCatalog: (params) => getCodexModelCatalogProcedure(params),
-  getAppBootstrap: () => getAppBootstrapProcedure(),
+  getAppBootstrap: (params) => getAppBootstrapProcedure(params),
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),
   openProject: (params, context) => openProjectProcedure(params, context),

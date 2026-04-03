@@ -694,7 +694,9 @@ async function measureStartupSequence(
     client,
     "getAppBootstrap",
     "getAppBootstrap",
-    undefined,
+    {
+      threadIdHint: null,
+    },
     {
       priority: "foreground",
       timeoutMs: options.rpcBudgetMs,

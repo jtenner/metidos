@@ -250,16 +250,25 @@ export async function getCodexModelCatalogProcedure(
   return buildCodexModelCatalog();
 }
 
-export async function getAppBootstrapProcedure(): Promise<RpcAppBootstrapResult> {
+export async function getAppBootstrapProcedure(
+  params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
+): Promise<RpcAppBootstrapResult> {
   const [homeDirectory, modelCatalog] = await Promise.all([
     getHomeDirectoryProcedure(),
     getCodexModelCatalogProcedure(),
   ]);
+  const threadIdHint =
+    typeof params?.threadIdHint === "number" ? params.threadIdHint : null;
+  const threadDetail =
+    threadIdHint === null
+      ? null
+      : await readThreadDetailCached(threadIdHint).catch(() => null);
 
   return {
     homeDirectory,
     modelCatalog,
     projects: listProjects(db),
+    threadDetail,
     threads: listThreads(db).map((thread) =>
       toRpcThread(thread, currentThreadRunStatus(thread)),
     ),

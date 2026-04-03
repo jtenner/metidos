@@ -32,3 +32,4 @@ Source: startup latency follow-up
 - [x] Startup history reuse: Reuse the history already fetched by `openWorktree(...)` during startup and skip the redundant first `listWorktreeGitHistory(...)` refresh after session restore.
 - [x] Startup task reuse: Reuse the tasks fetched by `openWorktree(...)` during startup and skip the redundant first `listProjectTasks(...)` refresh for freshly opened worktrees.
 - [x] Startup project restore batching: Batch restored `openProject(...)` work into one foreground RPC so startup does not send one project-open request per restored project.
+- [x] Startup selected-thread bootstrap: Let `getAppBootstrap(...)` return the hinted selected thread detail so startup can skip the extra `getThread(...)` request when the persisted selected thread still exists.

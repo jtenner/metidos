@@ -2082,23 +2082,32 @@ export default function App({ procedures }: AppProps): JSX.Element {
         homeDirectory: homeDirectoryResult,
         modelCatalog,
         projects: loadedProjects,
+        threadDetail: bootstrapThreadDetail,
         threads: loadedThreads,
-      } = await procedures.getAppBootstrap(undefined, {
-        priority: "foreground",
-      });
+      } = await procedures.getAppBootstrap(
+        {
+          threadIdHint: persistedState.selectedThreadId,
+        },
+        {
+          priority: "foreground",
+        },
+      );
       let startupThreads = sortThreads(loadedThreads);
       let initialThread = pickInitialThread(startupThreads, persistedState);
       let initialThreadDetailPromise: Promise<RpcThreadDetail> | null = null;
       if (initialThread) {
         try {
-          const initialThreadDetail = await procedures.getThread(
-            {
-              threadId: initialThread.id,
-            },
-            {
-              priority: "foreground",
-            },
-          );
+          const initialThreadDetail =
+            bootstrapThreadDetail?.thread.id === initialThread.id
+              ? bootstrapThreadDetail
+              : await procedures.getThread(
+                  {
+                    threadId: initialThread.id,
+                  },
+                  {
+                    priority: "foreground",
+                  },
+                );
           initialThreadDetailPromise = Promise.resolve(initialThreadDetail);
         } catch (error) {
           if (!isThreadNotFoundError(error)) {
