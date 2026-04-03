@@ -295,6 +295,11 @@ describe("auth service", () => {
         (event) => event.eventType === "recovery_code_login",
       ),
     ).toBeTrue();
+    expect(
+      listSecurityAuditEvents(database).find(
+        (event) => event.eventType === "recovery_code_login",
+      )?.payloadJson,
+    ).toContain('"method":"recovery_code"');
 
     await expect(
       loginWithRecoveryCode(database, {
@@ -303,6 +308,62 @@ describe("auth service", () => {
         recoveryCode,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
+  });
+
+  it("records setup, TOTP login, step-up, and logout audit events", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+    logout(database, setupResult.session.id);
+
+    const loginResult = await login(database, {
+      appDataDir,
+      nowMs: nowMs + 1_000,
+      primaryFactor: "123456",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 1_000),
+    });
+    await stepUpSession(database, {
+      appDataDir,
+      nowMs: nowMs + 2_000,
+      primaryFactor: "123456",
+      sessionId: loginResult.session.id,
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 2_000),
+    });
+    logout(database, loginResult.session.id);
+
+    const auditEvents = listSecurityAuditEvents(database);
+    expect(
+      auditEvents.some((event) => event.eventType === "auth_configured"),
+    ).toBeTrue();
+    expect(
+      auditEvents.some((event) => event.eventType === "auth_login"),
+    ).toBeTrue();
+    expect(
+      auditEvents.some((event) => event.eventType === "auth_step_up"),
+    ).toBeTrue();
+    expect(
+      auditEvents.filter((event) => event.eventType === "auth_logout"),
+    ).toHaveLength(2);
+    expect(
+      auditEvents.find((event) => event.eventType === "auth_login")
+        ?.payloadJson,
+    ).toContain('"method":"totp"');
+    expect(
+      auditEvents.find((event) => event.eventType === "auth_step_up")
+        ?.summaryText,
+    ).toBe("Completed step-up authentication for privileged local actions.");
   });
 
   it("expires idle sessions after the configured inactivity window", async () => {
@@ -468,5 +529,10 @@ describe("auth service", () => {
         sessionId: setupResult.session.id,
       }),
     ).toBeNull();
+    expect(
+      listSecurityAuditEvents(database).some(
+        (event) => event.eventType === "auth_logout",
+      ),
+    ).toBeTrue();
   });
 });

@@ -15,7 +15,12 @@ import {
   resolveSession,
   setupAuth,
 } from "./auth-service";
-import { getAuthSettings, listAuthRecoveryCodes, migrateDatabase } from "./db";
+import {
+  getAuthSettings,
+  listAuthRecoveryCodes,
+  listSecurityAuditEvents,
+  migrateDatabase,
+} from "./db";
 
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
@@ -81,6 +86,11 @@ describe("auth reset CLI helpers", () => {
     expect(resetResult.primaryFactorType).toBe("password");
     expect(resetResult.revokedSessionCount).toBe(1);
     expect(getAuthSettings(database)?.primaryFactorType).toBe("password");
+    expect(
+      listSecurityAuditEvents(database).find(
+        (event) => event.eventType === "primary_factor_reset",
+      )?.payloadJson,
+    ).toContain('"primaryFactorType":"password"');
     expect(
       resolveSession(database, {
         nowMs: setupTimeMs + 1_000,
@@ -151,6 +161,11 @@ describe("auth reset CLI helpers", () => {
 
     const storedRecords = listAuthRecoveryCodes(database);
     expect(storedRecords).toHaveLength(10);
+    expect(
+      listSecurityAuditEvents(database).find(
+        (event) => event.eventType === "recovery_codes_regenerated",
+      )?.payloadJson,
+    ).toContain('"recoveryCodeCount":10');
 
     const originalMatches = await Promise.all(
       storedRecords.map((record) =>

@@ -299,6 +299,21 @@ async function createSessionRecord(
   });
 }
 
+function recordAuthAuditEvent(
+  database: Database,
+  input: {
+    eventType: string;
+    payload?: Record<string, string | number | boolean | null>;
+    summaryText: string;
+  },
+): void {
+  createSecurityAuditEvent(database, {
+    eventType: input.eventType,
+    payloadJson: input.payload ? JSON.stringify(input.payload) : null,
+    summaryText: input.summaryText,
+  });
+}
+
 function parseCookieHeaderValue(
   cookieHeader: string,
   name: string,
@@ -581,6 +596,15 @@ export async function setupAuth(
   });
   replaceAuthRecoveryCodeHashes(database, recoveryCodeHashes);
   const session = await createSessionRecord(database, sessionLifetimeDays, now);
+  recordAuthAuditEvent(database, {
+    eventType: "auth_configured",
+    payload: {
+      primaryFactorType: input.primaryFactorType,
+      sessionLifetimeDays,
+    },
+    summaryText:
+      "Authentication was configured and the first session was created.",
+  });
 
   return {
     recoveryCodes,
@@ -602,6 +626,14 @@ export async function login(
     settings.sessionLifetimeDays,
     now,
   );
+  recordAuthAuditEvent(database, {
+    eventType: "auth_login",
+    payload: {
+      method: "totp",
+      primaryFactorType: settings.primaryFactorType,
+    },
+    summaryText: "Authenticated with the configured primary factor and TOTP.",
+  });
   return {
     session,
   };
@@ -621,9 +653,14 @@ export async function loginWithRecoveryCode(
     settings.sessionLifetimeDays,
     now,
   );
-  createSecurityAuditEvent(database, {
+  recordAuthAuditEvent(database, {
     eventType: "recovery_code_login",
-    summaryText: "Authenticated with a recovery code.",
+    payload: {
+      method: "recovery_code",
+      primaryFactorType: settings.primaryFactorType,
+    },
+    summaryText:
+      "Authenticated with the configured primary factor and a recovery code.",
   });
   return {
     session,
@@ -673,7 +710,15 @@ export function logout(database: Database, sessionId: string | null): void {
   if (!sessionId) {
     return;
   }
+  const session = getAuthSession(database, sessionId);
   deleteAuthSession(database, sessionId);
+  if (!session) {
+    return;
+  }
+  recordAuthAuditEvent(database, {
+    eventType: "auth_logout",
+    summaryText: "Logged out of the current authenticated session.",
+  });
 }
 
 /**
@@ -697,12 +742,21 @@ export async function stepUpSession(
     );
   }
 
-  await verifyPrimaryFactorAndTotp(database, input);
+  const settings = await verifyPrimaryFactorAndTotp(database, input);
   const stepUpValidUntil = addMilliseconds(
     now,
     DEFAULT_STEP_UP_LIFETIME_MS,
   ).toISOString();
   setAuthSessionStepUpValidUntil(database, session.id, stepUpValidUntil);
+  recordAuthAuditEvent(database, {
+    eventType: "auth_step_up",
+    payload: {
+      primaryFactorType: settings.primaryFactorType,
+      stepUpValidUntil,
+    },
+    summaryText:
+      "Completed step-up authentication for privileged local actions.",
+  });
 
   return {
     stepUpValidUntil,

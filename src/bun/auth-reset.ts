@@ -10,6 +10,7 @@ import {
 import { AuthServiceError, verifyPrimaryFactorAndTotp } from "./auth-service";
 import {
   type AuthPrimaryFactorType,
+  createSecurityAuditEvent,
   deleteAllAuthSessions,
   getAuthSettings,
   initAppDatabase,
@@ -189,6 +190,14 @@ export async function resetPrimaryFactorFromCli(
   });
   resetAuthFailureState(database);
   const revokedSessionCount = deleteAllAuthSessions(database);
+  createSecurityAuditEvent(database, {
+    eventType: "primary_factor_reset",
+    payloadJson: JSON.stringify({
+      primaryFactorType: input.newPrimaryFactorType,
+      revokedSessionCount,
+    }),
+    summaryText: "Primary factor was reset via the authenticated CLI flow.",
+  });
   return {
     primaryFactorType: input.newPrimaryFactorType,
     revokedSessionCount,
@@ -205,6 +214,14 @@ export async function regenerateRecoveryCodesFromCli(
     recoveryCodes.map((code) => hashRecoveryCode(code)),
   );
   replaceAuthRecoveryCodeHashes(database, codeHashes);
+  createSecurityAuditEvent(database, {
+    eventType: "recovery_codes_regenerated",
+    payloadJson: JSON.stringify({
+      recoveryCodeCount: recoveryCodes.length,
+    }),
+    summaryText:
+      "Recovery codes were regenerated via the authenticated CLI flow.",
+  });
   return recoveryCodes;
 }
 
