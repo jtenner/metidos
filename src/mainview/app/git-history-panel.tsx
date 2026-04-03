@@ -35,6 +35,10 @@ type GitHistoryPanelProps = {
   selectedProject: RpcProject | null;
 };
 
+/**
+ * Sidebar panel that renders project worktree git history in a virtualized list.
+ * Includes progressive loading and lightweight diff preloading on interaction.
+ */
 export const GitHistoryPanel = memo(function GitHistoryPanel({
   activeSelectedWorktreePath,
   filteredGitHistoryEntries,
@@ -51,6 +55,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
   const [scrollTop, setScrollTop] = useState(0);
   const gitHistoryListRef = useRef<HTMLDivElement | null>(null);
 
+  // Build a visible window over the full dataset to keep DOM size bounded.
   const visibleGitHistoryEntries = useMemo(() => {
     const totalEntries = filteredGitHistoryEntries.length;
     if (totalEntries === 0) {
@@ -83,6 +88,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
       const container = event.currentTarget;
       setScrollTop(container.scrollTop);
 
+      // Trigger lazy load when near viewport end to prefetch next page.
       if (
         container.scrollHeight - container.scrollTop - container.clientHeight <=
         GIT_HISTORY_LOAD_MORE_THRESHOLD_PX
@@ -121,6 +127,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                 className="max-h-64 overflow-y-auto pr-1 hide-scrollbar"
                 onScroll={handleGitHistoryScroll}
               >
+                {/* Top spacer pushes visible window down to match absolute index in full list. */}
                 {visibleGitHistoryEntries.topSpacerHeight > 0 ? (
                   <div
                     aria-hidden="true"
@@ -129,7 +136,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                     }}
                   />
                 ) : null}
-                <div>
+                  <div>
                   {visibleGitHistoryEntries.entries.map((entry) => (
                     <button
                       type="button"
@@ -137,6 +144,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                       className="w-full px-3 py-2 text-left transition-colors hover:bg-[#171a1b]"
                       style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
                       onMouseEnter={() => {
+                        // Prefetch diff while hovering/focusing to make open feel instant.
                         onPreloadGitHistoryDiff(entry);
                       }}
                       onFocus={() => {
@@ -152,6 +160,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                         onCancelPreloadGitHistoryDiff(entry);
                       }}
                       onClick={() => {
+                        // Open selected commit diff and keep it in view via persisted preload state.
                         onOpenGitHistoryDiff(entry);
                       }}
                     >
@@ -175,6 +184,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                     </button>
                   ))}
                 </div>
+                {/* Bottom spacer preserves total scroll height for non-rendered trailing items. */}
                 {visibleGitHistoryEntries.bottomSpacerHeight > 0 ? (
                   <div
                     aria-hidden="true"
