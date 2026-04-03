@@ -7,6 +7,9 @@ import {
   type ThreadActionMenuState,
 } from "./state";
 
+/**
+ * Props for the project action popover anchored to a project row.
+ */
 type ProjectActionMenuProps = {
   error: string;
   homeDirectory: string;
@@ -23,6 +26,9 @@ type ProjectActionMenuProps = {
   worktreePinBusyPath: string | null;
 };
 
+/**
+ * Floating project action menu with project deletion and worktree creation.
+ */
 export function ProjectActionMenu({
   error,
   homeDirectory,
@@ -38,6 +44,7 @@ export function ProjectActionMenu({
   supportsTildePath,
   worktreePinBusyPath,
 }: ProjectActionMenuProps): JSX.Element | null {
+  // Hide when menu anchor/state is unavailable or target project no longer exists.
   if (!menu || !project) {
     return null;
   }
@@ -90,6 +97,7 @@ export function ProjectActionMenu({
         </div>
       </div>
       {error ? (
+        {/* Render a compact error strip so failed worktree actions stay visible without replacing controls. */}
         <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
           {error}
         </div>
@@ -117,6 +125,7 @@ export function ProjectActionMenu({
             autoCorrect="off"
             spellCheck={false}
           />
+          {/* Disable while submission is in progress to prevent duplicate create-worktree requests. */}
           <button
             className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isCreatingWorktree || worktreePinBusyPath !== null}
@@ -133,6 +142,9 @@ export function ProjectActionMenu({
   );
 }
 
+/**
+ * Props for the thread action popover anchored to a thread row.
+ */
 type ThreadActionMenuProps = {
   error: string;
   homeDirectory: string;
@@ -151,6 +163,9 @@ type ThreadActionMenuProps = {
   threadRenameTitle: string;
 };
 
+/**
+ * Renders thread-specific controls for rename, pin/unpin, and delete actions.
+ */
 export function ThreadActionMenu({
   error,
   homeDirectory,
@@ -168,6 +183,7 @@ export function ThreadActionMenu({
   threadRenameSummary,
   threadRenameTitle,
 }: ThreadActionMenuProps): JSX.Element | null {
+  // Guard against stale menu references when the selected thread is removed.
   if (!menu || !thread) {
     return null;
   }
@@ -209,6 +225,7 @@ export function ThreadActionMenu({
         </div>
       </div>
       {error ? (
+        {/* Thread-level errors are shown inline so retry actions stay available. */}
         <div className="border-b border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff7e93]">
           {error}
         </div>
@@ -258,6 +275,7 @@ export function ThreadActionMenu({
           <div className="text-[11px] text-[#828d94]">
             Shown as a desktop hover popover. Leave blank to clear it.
           </div>
+          {/* Disable submit while any thread action is in progress. */}
           <button
             type="submit"
             className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
