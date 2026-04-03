@@ -14,17 +14,29 @@ import { createAbortError, isAbortError } from "./state";
 
 const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
 
+/** Parameters controlling worktree snapshot and diff polling behavior. */
 type UseWorktreeDiffParams = {
+  /** Whether the active worktree is currently opened in the UI state. */
   activeSelectedWorktreeOpened: boolean;
+  /** Active worktree path selected by the UI. */
   activeSelectedWorktreePath: string | null;
+  /** Current changes for the active worktree used to compute default selected file. */
   activeWorktreeChanges: RpcWorktreeChange[];
+  /** Whether app is visible; hidden documents pause background polling. */
   isDocumentVisible: boolean;
+  /** Active panel mode; diff effects only run in `diff` mode. */
   primaryView: "chat" | "diff" | "tasks";
+  /** RPC procedures for fetching snapshot and file diffs. */
   procedures: ProjectProcedures;
+  /** Currently selected threaded change for patch rendering. */
   selectedDiffFileChange: RpcWorktreeChange | null;
+  /** Currently selected file path in diff view. */
   selectedDiffFilePath: string | null;
+  /** Selected project for loading worktree data. */
   selectedProject: RpcProject | null;
+  /** Setter for selected diff file path state. */
   setSelectedDiffFilePath: Dispatch<SetStateAction<string | null>>;
+  /** Merge function for updating per-worktree state in global store. */
   setWorktreeState: (
     projectId: number,
     worktreePath: string,
@@ -32,6 +44,9 @@ type UseWorktreeDiffParams = {
   ) => void;
 };
 
+/**
+ * Manages worktree snapshot polling and selected-file patch fetching for diff view.
+ */
 export function useWorktreeDiff({
   activeSelectedWorktreeOpened,
   activeSelectedWorktreePath,
@@ -65,10 +80,12 @@ export function useWorktreeDiff({
     selectedDiffFileChange?.unstagedStatus ?? null;
 
   useEffect(() => {
+    // Keep latest patch state in a ref so async callbacks can compare against current state.
     diffFilePatchStateRef.current = diffFilePatchState;
   }, [diffFilePatchState]);
 
   const abortDiffSnapshotRequest = useCallback((reason: string) => {
+    // Cancel any in-flight snapshot request and tag it with a concrete abort reason.
     const controller = diffSnapshotAbortControllerRef.current;
     if (!controller) {
       return;
@@ -79,6 +96,7 @@ export function useWorktreeDiff({
   }, []);
 
   const abortDiffFilePatchRequest = useCallback((reason: string) => {
+    // Cancel any in-flight file patch request and tag it with a concrete abort reason.
     const controller = diffFilePatchAbortControllerRef.current;
     if (!controller) {
       return;
@@ -90,6 +108,7 @@ export function useWorktreeDiff({
 
   const loadSelectedDiffFilePatch = useCallback(
     async (options?: { background?: boolean }): Promise<void> => {
+      // If there is no valid selection, reset patch state deterministically and skip fetch.
       if (
         !selectedProject ||
         !activeSelectedWorktreePath ||
@@ -108,6 +127,7 @@ export function useWorktreeDiff({
       }
 
       const requestId = ++diffFilePatchRequestIdRef.current;
+      // Supersede previous patch loads before starting a new request.
       abortDiffFilePatchRequest("Worktree file diff request was superseded.");
       const controller = new AbortController();
       diffFilePatchAbortControllerRef.current = controller;
@@ -124,6 +144,7 @@ export function useWorktreeDiff({
         currentState.diffText.trim().length > 0 &&
         !currentState.error;
       if (!preserveVisiblePatch) {
+        // Replace displayed patch with loading state unless background reuse is safe.
         setDiffFilePatchState((current) => {
           const next = {
             ...emptyDiffFilePatchState(selectedDiffFileChangePath),
@@ -155,6 +176,7 @@ export function useWorktreeDiff({
         }
 
         setDiffFilePatchState((current) => {
+          // Success path: stash loaded patch and clear any stale error.
           const next = {
             diffText: result.diffText,
             error: "",
@@ -169,6 +191,7 @@ export function useWorktreeDiff({
             : next;
         });
       } catch (error) {
+        // Ignore expected cancellation races; surface other errors for the selected file row.
         if (isAbortError(error)) {
           return;
         }
@@ -204,6 +227,7 @@ export function useWorktreeDiff({
 
   const refreshActiveWorktreeSnapshot = useCallback(
     async (options?: { background?: boolean }) => {
+      // Snapshot refresh requires an active/open worktree selection.
       if (
         !selectedProject ||
         !activeSelectedWorktreePath ||
@@ -213,6 +237,7 @@ export function useWorktreeDiff({
       }
 
       const requestId = ++diffSnapshotRequestIdRef.current;
+      // Start from a clean in-flight state and clear stale worktree snapshots.
       abortDiffSnapshotRequest(
         "Worktree diff snapshot request was superseded.",
       );
@@ -249,11 +274,13 @@ export function useWorktreeDiff({
         setWorktreeDiffError("");
 
         if (options?.background && selectedDiffFileChangePath) {
+          // Refresh patch in the background to keep diff pane responsive.
           void loadSelectedDiffFilePatch({
             background: true,
           });
         }
       } catch (error) {
+        // Ignore abort races; otherwise record and show the latest error.
         if (isAbortError(error)) {
           return;
         }
@@ -288,6 +315,7 @@ export function useWorktreeDiff({
   );
 
   useEffect(() => {
+    // Unmount cleanup: invalidate both request channels and abort any active calls.
     return () => {
       diffSnapshotRequestIdRef.current += 1;
       diffFilePatchRequestIdRef.current += 1;
@@ -297,6 +325,7 @@ export function useWorktreeDiff({
   }, [abortDiffFilePatchRequest, abortDiffSnapshotRequest]);
 
   useEffect(() => {
+    // Close worktree/selection means patch state is stale; clear local view state.
     if (
       selectedProject &&
       activeSelectedWorktreePath &&
@@ -323,6 +352,7 @@ export function useWorktreeDiff({
   ]);
 
   useEffect(() => {
+    // Poll snapshot every 2.5s only when in diff view and document is visible.
     if (
       primaryView !== "diff" ||
       !selectedProject ||
@@ -357,6 +387,7 @@ export function useWorktreeDiff({
   ]);
 
   useEffect(() => {
+    // Ensure selected file stays valid; default to first change when current selection drops out.
     if (activeWorktreeChanges.length === 0) {
       setSelectedDiffFilePath(null);
       return;
@@ -374,6 +405,7 @@ export function useWorktreeDiff({
   }, [activeWorktreeChanges, setSelectedDiffFilePath]);
 
   useEffect(() => {
+    // Gate patch fetch by active view + selection; cancel when conditions no longer hold.
     if (
       primaryView !== "diff" ||
       !selectedProject ||
