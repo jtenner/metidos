@@ -1,0 +1,268 @@
+import { resolve } from "node:path";
+
+import { buildMainviewBundle } from "./build-mainview";
+
+const DEFAULT_PUBLIC_PORT = "7599";
+const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
+const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
+const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
+  process.cwd(),
+  "node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
+);
+const INTER_VARIABLE_FONT_LATIN_PATH = resolve(
+  process.cwd(),
+  "node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+);
+const INTER_VARIABLE_FONT_LATIN_EXT_PATH = resolve(
+  process.cwd(),
+  "node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2",
+);
+const SERVER_IDLE_TIMEOUT_SECONDS = 30;
+const BACKEND_HEALTH_TIMEOUT_MS = 1_500;
+
+type RuntimeConfig = {
+  devServer: boolean;
+  healthUrl: string;
+  rpcWebSocketUrl: string;
+};
+
+function isStringInteger(value: string): boolean {
+  return /^\d+$/.test(value);
+}
+
+function readCliValue(args: string[], flag: string): string | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (typeof arg !== "string") {
+      continue;
+    }
+    if (arg === flag) {
+      const nextArg = args[index + 1];
+      if (!nextArg) {
+        throw new Error(`Missing value for ${flag}`);
+      }
+      return nextArg;
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      return arg.slice(flag.length + 1);
+    }
+  }
+
+  return null;
+}
+
+function resolvePort(
+  args: string[],
+  flag: string,
+  envValue: string | undefined,
+  fallback: string,
+): number {
+  const configuredPort = readCliValue(args, flag) ?? envValue ?? fallback;
+  if (!isStringInteger(configuredPort)) {
+    throw new Error(`Invalid port "${configuredPort}" for ${flag}.`);
+  }
+
+  const parsedPort = Number.parseInt(configuredPort, 10);
+  if (parsedPort < 1 || parsedPort > 65_535) {
+    throw new Error(`Port for ${flag} must be between 1 and 65535.`);
+  }
+
+  return parsedPort;
+}
+
+function stringResponse(body: string, contentType: string): Response {
+  return new Response(body, {
+    headers: {
+      "cache-control": "no-store",
+      "content-type": contentType,
+    },
+  });
+}
+
+function fileResponse(path: string, contentType: string): Response {
+  return new Response(Bun.file(path), {
+    headers: {
+      "cache-control": "no-store",
+      "content-type": contentType,
+    },
+  });
+}
+
+function websocketUrlFromOrigin(origin: string): string {
+  const url = new URL(origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/rpc";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+async function buildHtmlResponse(
+  runtimeConfig: RuntimeConfig,
+): Promise<Response> {
+  const cssFile = Bun.file(MAINVIEW_CSS_PATH);
+  const inlineCss = (await cssFile.exists())
+    ? `<style>${(await cssFile.text()).replaceAll("</style", "<\\/style")}</style>`
+    : "";
+  const runtimeScript = `<script>window.__joltRuntime=${JSON.stringify(runtimeConfig)};</script>`;
+  const template = await Bun.file(MAINVIEW_HTML_PATH).text();
+  const html = template.includes("</head>")
+    ? template.replace(
+        "</head>",
+        `${inlineCss ? `${inlineCss}\n\t\t` : ""}${runtimeScript}\n\t</head>`,
+      )
+    : `${inlineCss}${runtimeScript}\n${template}`;
+
+  return stringResponse(html, "text/html; charset=utf-8");
+}
+
+async function readBackendHealthSnapshot(
+  backendHealthUrl: string,
+): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new Error("Backend health probe timed out."));
+  }, BACKEND_HEALTH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(backendHealthUrl, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const rawText = await response.text();
+    let body: unknown = rawText;
+    try {
+      body = JSON.parse(rawText);
+    } catch {
+      // Fall back to the raw text body if the backend health response changes.
+    }
+
+    return {
+      ok:
+        response.ok &&
+        typeof body === "object" &&
+        body !== null &&
+        "ok" in body &&
+        body.ok === true,
+      response,
+      status: response.status,
+      value: body,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      ok: false,
+      status: 0,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const SERVER_ARGS = Bun.argv.slice(2);
+const PUBLIC_PORT = resolvePort(
+  SERVER_ARGS,
+  "--port",
+  process.env.JOLT_PUBLIC_PORT,
+  DEFAULT_PUBLIC_PORT,
+);
+const RPC_PORT = resolvePort(
+  SERVER_ARGS,
+  "--rpc-port",
+  process.env.JOLT_RPC_PORT,
+  String(PUBLIC_PORT + 1),
+);
+const RPC_HTTP_ORIGIN =
+  process.env.JOLT_RPC_HTTP_ORIGIN?.trim() || `http://127.0.0.1:${RPC_PORT}`;
+const RPC_WEBSOCKET_URL =
+  process.env.JOLT_RPC_URL?.trim() || websocketUrlFromOrigin(RPC_HTTP_ORIGIN);
+const BACKEND_HEALTH_URL =
+  process.env.JOLT_RPC_HEALTH_URL?.trim() || `${RPC_HTTP_ORIGIN}/health`;
+
+const mainviewBundlePath = await buildMainviewBundle();
+const runtimeConfig: RuntimeConfig = {
+  devServer: false,
+  healthUrl: "/health",
+  rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+};
+
+let server: ReturnType<typeof Bun.serve>;
+
+server = Bun.serve({
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
+  port: PUBLIC_PORT,
+  async fetch(request): Promise<Response> {
+    const { pathname } = new URL(request.url);
+
+    if (pathname === "/" || pathname === "/index.html") {
+      return buildHtmlResponse(runtimeConfig);
+    }
+
+    if (pathname === "/index.css") {
+      return fileResponse(MAINVIEW_CSS_PATH, "text/css; charset=utf-8");
+    }
+
+    if (pathname === "/index.js") {
+      return fileResponse(
+        mainviewBundlePath,
+        "application/javascript; charset=utf-8",
+      );
+    }
+
+    if (pathname === "/fonts/fira-code-vf.woff2") {
+      return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
+    }
+
+    if (pathname === "/fonts/inter-latin-wght-normal.woff2") {
+      return fileResponse(INTER_VARIABLE_FONT_LATIN_PATH, "font/woff2");
+    }
+
+    if (pathname === "/fonts/inter-latin-ext-wght-normal.woff2") {
+      return fileResponse(INTER_VARIABLE_FONT_LATIN_EXT_PATH, "font/woff2");
+    }
+
+    if (pathname === "/health") {
+      const backend = await readBackendHealthSnapshot(BACKEND_HEALTH_URL);
+      return stringResponse(
+        JSON.stringify({
+          backend,
+          ok:
+            typeof backend === "object" &&
+            backend !== null &&
+            "ok" in backend &&
+            backend.ok === true,
+          port: server.port,
+          rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+          static: {
+            ok: true,
+            port: server.port,
+          },
+        }),
+        "application/json; charset=utf-8",
+      );
+    }
+
+    return new Response("Not found", { status: 404 });
+  },
+});
+
+console.log(
+  `Jolt static server listening on http://localhost:${server.port} (RPC ${RPC_WEBSOCKET_URL})`,
+);
+
+function shutdownAndExit(exitCode: number): void {
+  try {
+    server.stop(true);
+  } catch {
+    // Ignore stop failures during shutdown.
+  }
+  process.exit(exitCode);
+}
+
+process.on("SIGINT", () => {
+  shutdownAndExit(0);
+});
+
+process.on("SIGTERM", () => {
+  shutdownAndExit(0);
+});

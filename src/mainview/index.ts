@@ -72,6 +72,8 @@ type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
 type RuntimeConfig = {
   devServer: boolean;
+  healthUrl?: string;
+  rpcWebSocketUrl?: string;
 };
 
 const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
@@ -101,7 +103,10 @@ const runtimeConfig: RuntimeConfig = window.__joltRuntime ?? {
 };
 
 const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const socketUrl = `${socketProtocol}//${window.location.host}/rpc`;
+const socketUrl =
+  runtimeConfig.rpcWebSocketUrl ??
+  `${socketProtocol}//${window.location.host}/rpc`;
+const healthUrl = runtimeConfig.healthUrl ?? "/health";
 const pendingRequests = new Map<number, PendingRequest>();
 let socket: WebSocket | null = null;
 let nextRequestId = 1;
@@ -161,7 +166,9 @@ async function waitForDevServer(): Promise<void> {
   }
 
   try {
-    const response = await fetch("/health", {
+    const response = await fetch(healthUrl, {
+      // Use the configured health endpoint so split static/RPC deployments
+      // can still reuse the existing dev recovery flow.
       cache: "no-store",
     });
     if (response.ok) {

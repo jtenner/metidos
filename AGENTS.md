@@ -59,6 +59,7 @@
 │  │  ├─ db.ts
 │  │  ├─ git.ts
 │  │  ├─ index.ts
+│  │  ├─ isolated-server.ts
 │  │  ├─ project-procedures/
 │  │  │  ├─ codex-catalog.ts
 │  │  │  ├─ directory-suggestions.ts
@@ -68,6 +69,7 @@
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
 │  │  ├─ rpc-schema.ts
+│  │  ├─ static-server.ts
 │  │  └─ starvation-harness.ts
 │  └─ mainview/
 │     ├─ App.tsx

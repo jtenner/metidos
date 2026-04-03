@@ -206,6 +206,9 @@ const CONFIGURED_SERVER_PORT =
   readCliPort(SERVER_ARGS) ?? process.env.JOLT_PORT;
 const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JOLT_PORT);
 const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
+const BACKEND_ONLY =
+  SERVER_ARGS.includes("--backend-only") ||
+  process.env.JOLT_BACKEND_ONLY === "1";
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
 
@@ -317,6 +320,7 @@ function decrementPendingRpcRequestCount(count = 1): void {
 }
 
 function buildServerHealthSnapshot(activeServerPort: number): {
+  backendOnly: boolean;
   devServer: boolean;
   eventLoopLagMs: {
     current: number;
@@ -333,6 +337,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
   rpcClientCount: number;
 } {
   return {
+    backendOnly: BACKEND_ONLY,
     devServer: IS_DEV_SERVER,
     eventLoopLagMs: {
       current: lastEventLoopLagMs,
@@ -875,8 +880,10 @@ function shutdownDevWatchers(): void {
 async function bootstrap(): Promise<void> {
   initAppDatabase();
   recoverInterruptedThreadTurnsOnStartup();
-  await queueMainviewBundleBuild();
-  startDevMainviewWatcher();
+  if (!BACKEND_ONLY) {
+    await queueMainviewBundleBuild();
+    startDevMainviewWatcher();
+  }
   startProcedureCacheMaintenance();
   setWorktreeTaskChangeListener((projectId, worktreePath) => {
     broadcastTasksChanged(projectId, worktreePath);
@@ -899,30 +906,36 @@ async function bootstrap(): Promise<void> {
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
 
-      if (pathname === "/" || pathname === "/index.html") {
+      if (!BACKEND_ONLY && (pathname === "/" || pathname === "/index.html")) {
         return htmlResponse();
       }
 
-      if (pathname === "/index.css") {
+      if (!BACKEND_ONLY && pathname === "/index.css") {
         return fileResponse(MAINVIEW_CSS_PATH, "text/css; charset=utf-8");
       }
 
-      if (pathname === "/index.js") {
+      if (!BACKEND_ONLY && pathname === "/index.js") {
         return fileResponse(
           mainviewBundlePath,
           "application/javascript; charset=utf-8",
         );
       }
 
-      if (pathname === "/fonts/fira-code-vf.woff2") {
+      if (!BACKEND_ONLY && pathname === "/fonts/fira-code-vf.woff2") {
         return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
       }
 
-      if (pathname === "/fonts/inter-latin-wght-normal.woff2") {
+      if (
+        !BACKEND_ONLY &&
+        pathname === "/fonts/inter-latin-wght-normal.woff2"
+      ) {
         return fileResponse(INTER_VARIABLE_FONT_LATIN_PATH, "font/woff2");
       }
 
-      if (pathname === "/fonts/inter-latin-ext-wght-normal.woff2") {
+      if (
+        !BACKEND_ONLY &&
+        pathname === "/fonts/inter-latin-ext-wght-normal.woff2"
+      ) {
         return fileResponse(INTER_VARIABLE_FONT_LATIN_EXT_PATH, "font/woff2");
       }
 
@@ -1074,7 +1087,9 @@ async function bootstrap(): Promise<void> {
   activeServerPort = server.port ?? activeServerPort;
 
   console.log(
-    `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
+    BACKEND_ONLY
+      ? `Jolt RPC backend listening on http://localhost:${server.port}`
+      : `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
   );
 
   setTimeout(() => {
@@ -1091,6 +1106,10 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
 
   shutdownPromise = (async () => {
     shutdownDevWatchers();
+    if (overloadMonitorTimer) {
+      clearInterval(overloadMonitorTimer);
+      overloadMonitorTimer = null;
+    }
     setWorktreeGitHistoryChangeListener(null);
     setWorktreeTaskChangeListener(null);
     shutdownProcedureCacheMaintenance();
