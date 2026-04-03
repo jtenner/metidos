@@ -200,6 +200,11 @@ export type PersistedMainviewState = {
   openWorktrees: PersistedOpenWorktree[];
 };
 
+type PersistedMainviewStorageRecord = Omit<
+  PersistedMainviewState,
+  "chatInput" | "pendingThreadUnsafeMode"
+>;
+
 /**
  * Persisted sidebar expansion state for all left-tree sections.
  */
@@ -708,8 +713,9 @@ export function readPersistedMainviewState(): PersistedMainviewState {
         typeof parsed.pendingThreadReasoningEffort === "string"
           ? parsed.pendingThreadReasoningEffort
           : "",
-      pendingThreadUnsafeMode: parsed.pendingThreadUnsafeMode === true,
-      chatInput: typeof parsed.chatInput === "string" ? parsed.chatInput : "",
+      // Sensitive local inputs stay memory-only and are intentionally never restored.
+      pendingThreadUnsafeMode: false,
+      chatInput: "",
       sidebarCollapsed: parsed.sidebarCollapsed === true,
       sidebarSearchQuery:
         typeof parsed.sidebarSearchQuery === "string"
@@ -752,6 +758,17 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
   }
 }
 
+function serializePersistedMainviewState(
+  state: PersistedMainviewState,
+): PersistedMainviewStorageRecord {
+  const {
+    chatInput: _chatInput,
+    pendingThreadUnsafeMode: _pendingThreadUnsafeMode,
+    ...persistedState
+  } = state;
+  return persistedState;
+}
+
 /**
  * Persist mainview state blob unless executing outside browser context.
  */
@@ -763,7 +780,7 @@ export function writePersistedMainviewState(
   }
   window.localStorage.setItem(
     MAINVIEW_STATE_STORAGE_KEY,
-    JSON.stringify(state),
+    JSON.stringify(serializePersistedMainviewState(state)),
   );
 }
 

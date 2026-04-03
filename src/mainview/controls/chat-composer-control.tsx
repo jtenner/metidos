@@ -12,7 +12,6 @@ import {
   COMPOSER_MAX_HEIGHT_PX,
   DESKTOP_COMPOSER_MIN_HEIGHT_PX,
   MOBILE_COMPOSER_MIN_HEIGHT_PX,
-  patchPersistedMainviewState,
   resizeComposerTextarea,
 } from "../app/state";
 import { materialSymbol } from "./icons";
@@ -102,8 +101,8 @@ export function readChatComposerDraft(fallback = ""): string {
 }
 
 /**
- * Update the draft value and persist it to `mainview` state storage.
- * Duplicate assignments are ignored to avoid needless rerenders and storage writes.
+ * Update the draft value in the shared in-memory store only.
+ * Duplicate assignments are ignored to avoid needless rerenders.
  */
 export function setChatComposerDraft(nextValue: string): void {
   if (chatComposerDraftInitialized && chatComposerDraft === nextValue) {
@@ -112,9 +111,6 @@ export function setChatComposerDraft(nextValue: string): void {
 
   chatComposerDraft = nextValue;
   chatComposerDraftInitialized = true;
-  patchPersistedMainviewState({
-    chatInput: nextValue,
-  });
   emitDraftChange();
 }
 
