@@ -2221,22 +2221,33 @@ export default function App({ procedures }: AppProps): JSX.Element {
         });
       }
 
-      for (const project of restoredProjects) {
-        try {
-          const result = await procedures.openProject({
-            projectPath: project.path,
-            name: project.name,
-          });
-          setProjects((prev) => upsertProjectList(prev, result.project));
-          setProjectState(result.project.id, {
-            worktrees: result.worktrees,
+      if (restoredProjects.length > 0) {
+        const restoredProjectResults = await procedures.openProjectsBatch(
+          {
+            projects: restoredProjects.map((project) => ({
+              projectId: project.id,
+              projectPath: project.path,
+              name: project.name,
+            })),
+          },
+          {
+            priority: "foreground",
+          },
+        );
+        for (const result of restoredProjectResults) {
+          if (result.ok) {
+            setProjects((prev) => upsertProjectList(prev, result.project));
+            setProjectState(result.project.id, {
+              worktrees: result.worktrees,
+              loadingWorktrees: false,
+              error: "",
+            });
+            continue;
+          }
+
+          setProjectState(result.projectId, {
             loadingWorktrees: false,
-            error: "",
-          });
-        } catch (error) {
-          setProjectState(project.id, {
-            loadingWorktrees: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: result.error,
           });
         }
       }

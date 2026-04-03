@@ -118,6 +118,7 @@ import type {
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
+  RpcOpenProjectsBatchResultItem,
   RpcOpenWorktreeResult,
   RpcProject,
   RpcProjectTask,
@@ -2192,41 +2193,84 @@ export async function openProjectProcedure(
 ): Promise<RpcProjectWorktreesResult> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const projectPath = normalizePath(params.projectPath);
-    assertProjectDirectory(projectPath);
-    const existingProject = getProject(db, projectPath);
-
-    let worktrees: RpcWorktree[];
-    try {
-      worktrees = await awaitAbortableResult(
-        readProjectWorktrees(
-          projectPath,
-          existingProject?.id,
-          requestGitOptions,
-        ),
-        context?.signal,
-        "Project open was aborted.",
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
-      );
-    }
+    const opened = await awaitAbortableResult(
+      openProjectWithGitOptions(params, requestGitOptions),
+      context?.signal,
+      "Project open was aborted.",
+    );
     throwIfAborted(context?.signal, "Project open was aborted.");
+    return opened;
+  });
+}
 
-    const project = upsertProject(db, {
+async function openProjectWithGitOptions(
+  params: AppRPCSchema["requests"]["openProject"]["params"],
+  requestGitOptions?: GitCommandOptions,
+): Promise<RpcProjectWorktreesResult> {
+  const projectPath = normalizePath(params.projectPath);
+  assertProjectDirectory(projectPath);
+  const existingProject = getProject(db, projectPath);
+
+  let worktrees: RpcWorktree[];
+  try {
+    worktrees = await readProjectWorktrees(
       projectPath,
-      name: params.name ?? basename(projectPath),
-    });
-    const state = ensureProjectPoller(project);
-    state.worktrees = worktrees;
-    state.worktreesLoadedAt = Date.now();
+      existingProject?.id,
+      requestGitOptions,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
+    );
+  }
 
-    return {
-      project,
-      worktrees: state.worktrees,
-    };
+  const project = upsertProject(db, {
+    projectPath,
+    name: params.name ?? basename(projectPath),
+  });
+  const state = ensureProjectPoller(project);
+  state.worktrees = worktrees;
+  state.worktreesLoadedAt = Date.now();
+
+  return {
+    project,
+    worktrees: state.worktrees,
+  };
+}
+
+export async function openProjectsBatchProcedure(
+  params: AppRPCSchema["requests"]["openProjectsBatch"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcOpenProjectsBatchResultItem[]> {
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const results: RpcOpenProjectsBatchResultItem[] = [];
+
+    for (const project of params.projects) {
+      throwIfAborted(context?.signal, "Project restore was aborted.");
+      try {
+        const opened = await awaitAbortableResult(
+          openProjectWithGitOptions(project, requestGitOptions),
+          context?.signal,
+          "Project restore was aborted.",
+        );
+        results.push({
+          ok: true,
+          projectId: project.projectId,
+          project: opened.project,
+          worktrees: opened.worktrees,
+        });
+      } catch (error) {
+        results.push({
+          ok: false,
+          projectId: project.projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return results;
   });
 }
 

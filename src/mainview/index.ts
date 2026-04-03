@@ -557,6 +557,7 @@ const procedures: ProjectProcedures = {
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),
   openProject: createProcedure("openProject"),
+  openProjectsBatch: createProcedure("openProjectsBatch"),
   closeProject: createProcedure("closeProject"),
   deleteProject: createProcedure("deleteProject"),
   listProjectWorktrees: createProcedure("listProjectWorktrees"),

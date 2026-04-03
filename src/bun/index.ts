@@ -28,6 +28,7 @@ import {
   listWorktreeGitHistoryProcedure,
   markThreadErrorSeenProcedure,
   openProjectProcedure,
+  openProjectsBatchProcedure,
   openWorktreeProcedure,
   readWorktreeFileContentPageProcedure,
   readWorktreeFileDiffProcedure,
@@ -225,6 +226,8 @@ const rpcHandlers: RpcRequestHandlerMap = {
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),
   openProject: (params, context) => openProjectProcedure(params, context),
+  openProjectsBatch: (params, context) =>
+    openProjectsBatchProcedure(params, context),
   closeProject: (params) => closeProjectProcedure(params),
   deleteProject: (params) => deleteProjectProcedure(params),
   listProjectWorktrees: (params, context) =>

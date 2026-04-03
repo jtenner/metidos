@@ -52,6 +52,28 @@ export type RpcProjectWorktreesResult = {
   worktrees: RpcWorktree[];
 };
 
+export type RpcOpenProjectRequest = {
+  projectPath: string;
+  name?: string | null;
+};
+
+export type RpcOpenProjectsBatchRequestItem = RpcOpenProjectRequest & {
+  projectId: number;
+};
+
+export type RpcOpenProjectsBatchResultItem =
+  | {
+      ok: true;
+      projectId: number;
+      project: RpcProject;
+      worktrees: RpcWorktree[];
+    }
+  | {
+      ok: false;
+      projectId: number;
+      error: string;
+    };
+
 export type RpcOpenWorktreeResult = {
   project: RpcProject;
   tasks: RpcProjectTask[];
@@ -387,8 +409,14 @@ export type AppRPCSchema = {
       response: RpcProject[];
     };
     openProject: {
-      params: { projectPath: string; name?: string | null };
+      params: RpcOpenProjectRequest;
       response: RpcProjectWorktreesResult;
+    };
+    openProjectsBatch: {
+      params: {
+        projects: RpcOpenProjectsBatchRequestItem[];
+      };
+      response: RpcOpenProjectsBatchResultItem[];
     };
     closeProject: {
       params: { projectId: number };
@@ -587,6 +615,10 @@ export interface ProjectProcedures {
   openProject: RpcProcedureCall<
     AppRPCSchema["requests"]["openProject"]["params"],
     RpcProjectWorktreesResult
+  >;
+  openProjectsBatch: RpcProcedureCall<
+    AppRPCSchema["requests"]["openProjectsBatch"]["params"],
+    AppRPCSchema["requests"]["openProjectsBatch"]["response"]
   >;
   closeProject: RpcProcedureCall<
     AppRPCSchema["requests"]["closeProject"]["params"],
