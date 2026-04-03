@@ -21,3 +21,7 @@ Source: server request starvation follow-up
 - [x] Static server isolation: Split static asset and page serving from RPC/task execution so active tasks cannot starve `/`, `/index.js`, or other startup requests.
 - [x] Overload telemetry: Add event-loop lag, pending RPC count, queued git work, task rebuild duration, and persistence latency metrics to `/health` and server logs.
 - [x] Starvation regression harness: Add a repeatable test or script that starts active tasks and verifies a second client can still load the app and complete core startup requests within a latency budget.
+
+Source: isolated topology follow-up
+
+- [x] Split-topology starvation harness: Teach the starvation harness to discover or override the RPC endpoint separately from the public HTTP port so it validates the default isolated `start` path.

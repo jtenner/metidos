@@ -335,6 +335,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
   port: number;
   procedures: ReturnType<typeof getProcedureRuntimeStats>;
   rpcClientCount: number;
+  rpcWebSocketUrl: string;
 } {
   return {
     backendOnly: BACKEND_ONLY,
@@ -352,6 +353,8 @@ function buildServerHealthSnapshot(activeServerPort: number): {
     port: activeServerPort,
     procedures: getProcedureRuntimeStats(),
     rpcClientCount: rpcClients.size,
+    rpcWebSocketUrl:
+      process.env.JOLT_RPC_URL ?? `ws://127.0.0.1:${activeServerPort}/rpc`,
   };
 }
 

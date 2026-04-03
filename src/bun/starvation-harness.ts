@@ -18,6 +18,8 @@ type HarnessOptions = {
   projectId: number | null;
   projectPath: string;
   rpcBudgetMs: number;
+  rpcPort: number | null;
+  rpcUrl: string | null;
   startupBudgetMs: number;
   taskId: string | null;
   taskRuns: number;
@@ -227,6 +229,8 @@ function parseArgs(argv: string[]): HarnessOptions {
     projectId: null,
     projectPath: process.cwd(),
     rpcBudgetMs: DEFAULT_RPC_BUDGET_MS,
+    rpcPort: null,
+    rpcUrl: null,
     startupBudgetMs: DEFAULT_STARTUP_BUDGET_MS,
     taskId: null,
     taskRuns: DEFAULT_TASK_RUNS,
@@ -269,6 +273,12 @@ function parseArgs(argv: string[]): HarnessOptions {
         break;
       case "--project-path":
         options.projectPath = resolve(readValue());
+        break;
+      case "--rpc-port":
+        options.rpcPort = parseIntegerOption(flag, readValue(), 1, 65_535);
+        break;
+      case "--rpc-url":
+        options.rpcUrl = readValue();
         break;
       case "--worktree-path":
         options.worktreePath = resolve(readValue());
@@ -325,7 +335,9 @@ function printHelp(): void {
   console.log(`Usage: bun run src/bun/starvation-harness.ts [options]
 
 Options:
-  --port <port>                 Server port. Default: ${DEFAULT_PORT}
+  --port <port>                 Public HTTP server port. Default: ${DEFAULT_PORT}
+  --rpc-port <port>             RPC WebSocket port override. Default: autodetect or reuse --port.
+  --rpc-url <url>               RPC WebSocket URL override. Example: ws://127.0.0.1:7600/rpc
   --project-id <id>             Existing tracked project id to target.
   --project-path <path>         Project path to target. Default: current working directory.
   --worktree-path <path>        Worktree path to target. Default: inferred from project/worktrees.
@@ -863,6 +875,63 @@ function toErrorLabel(error: unknown): string {
   return String(error);
 }
 
+function websocketUrlFromPort(port: number): string {
+  return `ws://127.0.0.1:${port}/rpc`;
+}
+
+function readRpcWebSocketUrl(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  if (!("rpcWebSocketUrl" in value)) {
+    return null;
+  }
+  return typeof value.rpcWebSocketUrl === "string"
+    ? value.rpcWebSocketUrl
+    : null;
+}
+
+async function discoverRpcUrl(
+  baseUrl: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new Error("RPC discovery timed out."));
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const parsed = (await response.json()) as unknown;
+    return readRpcWebSocketUrl(parsed);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function resolveRpcUrl(
+  baseUrl: string,
+  options: HarnessOptions,
+): Promise<string> {
+  if (options.rpcUrl) {
+    return options.rpcUrl;
+  }
+  if (typeof options.rpcPort === "number") {
+    return websocketUrlFromPort(options.rpcPort);
+  }
+  const discovered = await discoverRpcUrl(baseUrl, options.httpBudgetMs);
+  return discovered ?? websocketUrlFromPort(options.port);
+}
+
 function summarizePressure(results: PressureSummary[]): PressureSummary {
   return results.reduce(
     (summary, current) => ({
@@ -883,8 +952,12 @@ function printStartupSummary(
   pressure: PressureSummary,
   context: HarnessContext,
   options: HarnessOptions,
+  baseUrl: string,
+  rpcUrl: string,
 ): void {
   console.log("Target");
+  console.log(`  public: ${baseUrl}`);
+  console.log(`  rpc: ${rpcUrl}`);
   console.log(`  project: ${context.project.name} (#${context.project.id})`);
   console.log(`  worktree: ${context.worktree.path}`);
   console.log(`  task: ${context.task?.id ?? "none"}`);
@@ -935,7 +1008,7 @@ async function main(): Promise<void> {
   }
 
   const baseUrl = `http://127.0.0.1:${options.port}`;
-  const rpcUrl = `ws://127.0.0.1:${options.port}/rpc`;
+  const rpcUrl = await resolveRpcUrl(baseUrl, options);
   const controlClient = new RpcHarnessClient(rpcUrl);
   const pressureClient = new RpcHarnessClient(rpcUrl);
   const startupClient = new RpcHarnessClient(rpcUrl);
@@ -965,7 +1038,7 @@ async function main(): Promise<void> {
     );
     stopPressureController.abort();
     const pressure = summarizePressure(await Promise.all(pressureWorkers));
-    printStartupSummary(startup, pressure, context, options);
+    printStartupSummary(startup, pressure, context, options, baseUrl, rpcUrl);
 
     await cleanupHarness(controlClient, context);
 
