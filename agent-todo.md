@@ -1,14 +1,5 @@
 # Agent TODO
 
-- Phase 0: lock down unauthenticated transport and app surfaces.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Default-Deny Policy and Phase 0. Make the backend deny `/rpc`, project/worktree/thread procedures, filesystem data, and `/health` internals until authorization succeeds, and add websocket `Origin` validation in `src/bun/index.ts`.
-
-- Phase 1: implement setup flow for PIN/password choice plus mandatory TOTP enrollment.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Explicit Product Decisions and UI and UX plan. Build first-run setup for choosing PIN or password, enforcing the 6-digit minimum PIN policy, generating the TOTP secret, rendering the QR code plus manual secret fallback, and showing 10 view-once recovery codes.
-
-- Phase 1: implement login flow and authenticated websocket ticketing.
-  Reference: `docs/2026-04-03-security-remediation-plan.md` Session model and HTTP and websocket changes. Add login/logout/status/step-up/ws-ticket routes, enforce `HttpOnly` authenticated sessions, and change `src/mainview/index.ts` so websocket startup requires a valid session and a short-lived ticket.
-
 - Phase 1: enforce login throttling and lockout rules.
   Reference: `docs/2026-04-03-security-remediation-plan.md` Recommended Authentication Model and Phase 4. Apply the three-failed-attempt, 10-minute lockout behavior to PIN/password login attempts and cover it with tests for both primary-factor modes.
 

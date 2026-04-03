@@ -11,7 +11,13 @@ import type {
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
-import App from "./App";
+import {
+  AuthApiError,
+  dispatchAuthRequired,
+  isAuthRequiredError,
+  issueWebSocketTicket,
+} from "./auth-client";
+import AuthShell from "./auth-shell";
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -105,7 +111,7 @@ const runtimeConfig: RuntimeConfig = window.__joltRuntime ?? {
 };
 
 const socketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const socketUrl =
+const socketBaseUrl =
   runtimeConfig.rpcWebSocketUrl ??
   `${socketProtocol}//${window.location.host}/rpc`;
 const healthUrl = runtimeConfig.healthUrl ?? "/health";
@@ -120,6 +126,8 @@ let devRecoveryScheduled = false;
 let devRecoveryTimer: number | null = null;
 let rpcReconnectTimer: number | null = null;
 let rpcReconnectAttempt = 0;
+let rpcTransportEnabled = false;
+let rpcSocketConnectPromise: Promise<void> | null = null;
 let connectionReady!: Promise<void>;
 
 function resetConnectionReady(): void {
@@ -150,6 +158,12 @@ function clearRpcReconnectTimer(): void {
     window.clearTimeout(rpcReconnectTimer);
     rpcReconnectTimer = null;
   }
+}
+
+function buildSocketUrlWithTicket(ticket: string): string {
+  const url = new URL(socketBaseUrl, window.location.href);
+  url.searchParams.set("ticket", ticket);
+  return url.toString();
 }
 
 function reloadWindow(reason: string): void {
@@ -222,6 +236,7 @@ function scheduleRpcReconnect(reason: string): void {
   // Exponential backoff reconnect for non-dev environments.
   if (
     runtimeConfig.devServer ||
+    !rpcTransportEnabled ||
     isPageUnloading ||
     rpcReconnectTimer !== null
   ) {
@@ -240,8 +255,44 @@ function scheduleRpcReconnect(reason: string): void {
   }, delay);
 }
 
+function disableRpcTransport(): void {
+  rpcTransportEnabled = false;
+  rpcReconnectAttempt = 0;
+  clearRpcReconnectTimer();
+  rejectPendingRequests(new Error("RPC transport is unavailable."));
+  if (socket) {
+    const activeSocket = socket;
+    socket = null;
+    activeSocket.close();
+  }
+  rpcSocketConnectPromise = null;
+  resetConnectionReady();
+}
+
+async function enableRpcTransport(): Promise<void> {
+  rpcTransportEnabled = true;
+  if (
+    socket?.readyState === WebSocket.OPEN ||
+    socket?.readyState === WebSocket.CONNECTING
+  ) {
+    await connectionReady;
+    return;
+  }
+  if (!rpcSocketConnectPromise) {
+    resetConnectionReady();
+  }
+  connectRpcSocket("initial");
+  await connectionReady;
+}
+
+function handleRpcAuthFailure(error: AuthApiError): void {
+  rejectConnection(error);
+  disableRpcTransport();
+  dispatchAuthRequired(error.message);
+}
+
 function connectRpcSocket(reason: "initial" | "reconnect"): void {
-  if (isPageUnloading) {
+  if (isPageUnloading || !rpcTransportEnabled || rpcSocketConnectPromise) {
     return;
   }
   if (
@@ -253,115 +304,155 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
   }
 
   clearRpcReconnectTimer();
-  const nextSocket = new WebSocket(socketUrl);
-  socket = nextSocket;
-  if (reason === "reconnect") {
-    console.info("[jolt] opening replacement RPC socket");
-  }
+  rpcSocketConnectPromise = (async () => {
+    let nextSocketUrl: string;
+    try {
+      const ticket = await issueWebSocketTicket();
+      nextSocketUrl = buildSocketUrlWithTicket(ticket.ticket);
+    } catch (error) {
+      if (error instanceof AuthApiError && isAuthRequiredError(error)) {
+        handleRpcAuthFailure(error);
+        return;
+      }
 
-  nextSocket.addEventListener("open", () => {
-    if (socket !== nextSocket) {
+      if (reason === "initial") {
+        rejectConnection(error);
+      } else {
+        console.error("Failed to acquire websocket auth ticket", error);
+        scheduleRpcReconnect("ws-ticket");
+      }
+      return;
+    }
+    if (isPageUnloading || !rpcTransportEnabled) {
       return;
     }
 
-    rpcReconnectAttempt = 0;
-    resolveConnection();
-  });
-
-  nextSocket.addEventListener("message", (event) => {
-    // Messages are either control notifications or RPC request responses.
-    if (socket !== nextSocket) {
+    let nextSocket: WebSocket;
+    try {
+      nextSocket = new WebSocket(nextSocketUrl);
+    } catch (error) {
+      if (reason === "initial") {
+        rejectConnection(error);
+      } else {
+        console.error("Failed to open replacement RPC socket", error);
+        scheduleRpcReconnect("socket-open");
+      }
       return;
     }
 
-    const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
-    if (payload.type === "reload") {
-      reloadWindow(payload.reason);
-      return;
+    socket = nextSocket;
+    if (reason === "reconnect") {
+      console.info("[jolt] opening replacement RPC socket");
     }
-    if (payload.type === "tasks-changed") {
-      window.dispatchEvent(
-        new CustomEvent<RpcWorktreeTasksChanged>(
-          WORKTREE_TASKS_CHANGED_EVENT_NAME,
-          {
-            detail: {
-              projectId: payload.projectId,
-              worktreePath: payload.worktreePath,
+
+    nextSocket.addEventListener("open", () => {
+      if (socket !== nextSocket || !rpcTransportEnabled) {
+        return;
+      }
+
+      rpcReconnectAttempt = 0;
+      resolveConnection();
+    });
+
+    nextSocket.addEventListener("message", (event) => {
+      // Messages are either control notifications or RPC request responses.
+      if (socket !== nextSocket) {
+        return;
+      }
+
+      const payload = JSON.parse(String(event.data)) as RpcSocketMessage;
+      if (payload.type === "reload") {
+        reloadWindow(payload.reason);
+        return;
+      }
+      if (payload.type === "tasks-changed") {
+        window.dispatchEvent(
+          new CustomEvent<RpcWorktreeTasksChanged>(
+            WORKTREE_TASKS_CHANGED_EVENT_NAME,
+            {
+              detail: {
+                projectId: payload.projectId,
+                worktreePath: payload.worktreePath,
+              },
             },
-          },
-        ),
-      );
-      return;
-    }
-    if (payload.type === "git-history-changed") {
-      window.dispatchEvent(
-        new CustomEvent<RpcWorktreeGitHistoryChanged>(
-          WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-          {
-            detail: {
-              projectId: payload.projectId,
-              worktreePath: payload.worktreePath,
+          ),
+        );
+        return;
+      }
+      if (payload.type === "git-history-changed") {
+        window.dispatchEvent(
+          new CustomEvent<RpcWorktreeGitHistoryChanged>(
+            WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
+            {
+              detail: {
+                projectId: payload.projectId,
+                worktreePath: payload.worktreePath,
+              },
             },
-          },
-        ),
-      );
-      return;
-    }
-    if (payload.type === "thread-start-request-created") {
-      window.dispatchEvent(
-        new CustomEvent<RpcThreadStartRequest>(
-          THREAD_START_REQUEST_CREATED_EVENT_NAME,
-          {
-            detail: payload,
-          },
-        ),
-      );
-      return;
-    }
+          ),
+        );
+        return;
+      }
+      if (payload.type === "thread-start-request-created") {
+        window.dispatchEvent(
+          new CustomEvent<RpcThreadStartRequest>(
+            THREAD_START_REQUEST_CREATED_EVENT_NAME,
+            {
+              detail: payload,
+            },
+          ),
+        );
+        return;
+      }
 
-    const pending = pendingRequests.get(payload.id);
-    if (!pending) {
-      return;
-    }
-    pendingRequests.delete(payload.id);
-    if (payload.ok) {
-      pending.resolve(payload.result);
-      return;
-    }
-    pending.reject(new Error(payload.error || "RPC request failed"));
-  });
+      const pending = pendingRequests.get(payload.id);
+      if (!pending) {
+        return;
+      }
+      pendingRequests.delete(payload.id);
+      if (payload.ok) {
+        pending.resolve(payload.result);
+        return;
+      }
+      pending.reject(new Error(payload.error || "RPC request failed"));
+    });
 
-  nextSocket.addEventListener("close", () => {
-    // On close, clear active socket state and recover per environment policy.
-    if (socket !== nextSocket) {
-      return;
-    }
+    nextSocket.addEventListener("close", () => {
+      // On close, clear active socket state and recover per environment policy.
+      if (socket !== nextSocket) {
+        return;
+      }
 
-    socket = null;
-    const error = new Error("RPC connection closed");
-    rejectPendingRequests(error);
+      socket = null;
+      const error = new Error("RPC connection closed");
+      rejectPendingRequests(error);
 
-    if (runtimeConfig.devServer) {
-      rejectConnection(error);
-      scheduleDevRecovery("rpc-close");
-      return;
-    }
+      if (!rpcTransportEnabled) {
+        return;
+      }
 
-    if (connectionReadyResolved) {
-      resetConnectionReady();
-    }
-    scheduleRpcReconnect("rpc-close");
-  });
+      if (runtimeConfig.devServer) {
+        rejectConnection(error);
+        scheduleDevRecovery("rpc-close");
+        return;
+      }
 
-  nextSocket.addEventListener("error", () => {
-    if (socket !== nextSocket) {
-      return;
-    }
-    console.error("Jolt RPC socket encountered an error");
+      if (connectionReadyResolved) {
+        resetConnectionReady();
+      }
+      scheduleRpcReconnect("rpc-close");
+    });
+
+    nextSocket.addEventListener("error", () => {
+      if (socket !== nextSocket) {
+        return;
+      }
+      console.error("Jolt RPC socket encountered an error");
+    });
+  })().finally(() => {
+    rpcSocketConnectPromise = null;
   });
 }
-
-connectRpcSocket("initial");
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   // Normalize arbitrary abort signals into a reusable Error with cause metadata.
@@ -416,6 +507,9 @@ function buildRequestSignal(
 
 async function waitForConnection(signal: AbortSignal | null): Promise<void> {
   // Block until the websocket handshake is ready unless caller aborts first.
+  if (!rpcTransportEnabled) {
+    throw new Error("RPC transport is not enabled.");
+  }
   if (!signal) {
     await connectionReady;
     return;
@@ -619,13 +713,19 @@ if (!appRoot) {
 } else {
   // Mount app with injected RPC procedures.
   console.log("React version:", React.version);
-  console.log("Mounting React app (App.tsx)");
+  console.log("Mounting React app (AuthShell)");
   const root = createRoot(appRoot);
   try {
-    root.render(createElement(App, { procedures }));
+    root.render(
+      createElement(AuthShell, {
+        connectRpcTransport: enableRpcTransport,
+        disconnectRpcTransport: disableRpcTransport,
+        procedures,
+      }),
+    );
     window.__joltAppMountedAt = Date.now();
   } catch (error) {
-    console.error("Failed to mount App.tsx", error);
+    console.error("Failed to mount auth shell", error);
     window.__joltAppMountedAt = Number.NaN;
     appRoot.innerHTML =
       '<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Failed to initialize App UI. Check console for details.</main>';

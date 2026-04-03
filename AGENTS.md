@@ -92,6 +92,8 @@
 │  └─ mainview/
 │     ├─ README.md
 │     ├─ App.tsx
+│     ├─ auth-client.ts
+│     ├─ auth-shell.tsx
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx

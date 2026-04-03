@@ -13,6 +13,7 @@ import {
   prepareTotpEnrollment,
   readSessionCookie,
   setupAuth,
+  validateAndConsumeWebSocketTicket,
 } from "./auth-service";
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
 import { initAppDatabase } from "./db";
@@ -1444,6 +1445,28 @@ async function bootstrap(): Promise<void> {
             status: 403,
           });
         }
+        const sessionId = readSessionCookie(request.headers.get("cookie"));
+        const ticketId = new URL(request.url).searchParams.get("ticket");
+        if (!sessionId || !ticketId) {
+          return new Response("Authenticated websocket ticket required", {
+            status: 401,
+          });
+        }
+
+        try {
+          validateAndConsumeWebSocketTicket(initAppDatabase(), {
+            nowMs: currentNowMs(),
+            sessionId,
+            ticketId,
+          });
+        } catch (error) {
+          return authErrorResponse(request, error, {
+            clearSessionCookie:
+              error instanceof AuthServiceError &&
+              error.code === "session_required",
+          });
+        }
+
         if (serverInstance.upgrade(request)) {
           return;
         }
