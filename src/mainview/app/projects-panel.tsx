@@ -25,6 +25,14 @@ type PinnedWorktreeEntry = {
   worktree: RpcWorktree;
 };
 
+type ProjectWorktreeRenderData = {
+  hasPinnedWorktrees: boolean;
+  project: RpcProject;
+  state: ProjectNodeState;
+  visiblePinnedWorktrees: RpcWorktree[];
+  visibleWorktrees: RpcWorktree[];
+};
+
 /**
  * Row props for one worktree entry in either pinned or expanded project section.
  */
@@ -294,36 +302,63 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   // Panel visibility and expansion state are shared across components via hooks.
   const projectsOpen = useProjectsPanelOpen();
   const openProjectPaths = useOpenProjectPaths();
-  // Precompute pinned list once per render dependencies for deterministic render and sort.
-  const pinnedWorktreeEntries = useMemo(() => {
-    return filteredProjects
-      .flatMap((project) =>
-        orderProjectWorktrees(project, getProjectState(project.id).worktrees)
-          .filter(
-            (worktree) =>
-              worktree.pinnedAt !== null &&
-              worktreeMatchesProjectsSearch(
-                normalizedSidebarSearchQuery,
-                worktreeSearchTextByKey,
-                project.id,
-                worktree,
-              ),
-          )
-          .map((worktree) => ({
-            projectId: project.id,
+  const projectWorktreeRenderData = useMemo(() => {
+    const renderData: ProjectWorktreeRenderData[] = [];
+    for (const project of filteredProjects) {
+      const state = getProjectState(project.id);
+      const orderedWorktrees = orderProjectWorktrees(project, state.worktrees);
+      const visiblePinnedWorktrees: RpcWorktree[] = [];
+      const visibleWorktrees: RpcWorktree[] = [];
+
+      for (const worktree of orderedWorktrees) {
+        if (
+          !worktreeMatchesProjectsSearch(
+            normalizedSidebarSearchQuery,
+            worktreeSearchTextByKey,
+            project.id,
             worktree,
-          })),
-      )
-      .sort((left, right) =>
-        comparePinnedWorktreeEntries(left, right, projectById),
-      );
+          )
+        ) {
+          continue;
+        }
+
+        if (worktree.pinnedAt !== null) {
+          visiblePinnedWorktrees.push(worktree);
+          continue;
+        }
+
+        visibleWorktrees.push(worktree);
+      }
+
+      renderData.push({
+        hasPinnedWorktrees: visiblePinnedWorktrees.length > 0,
+        project,
+        state,
+        visiblePinnedWorktrees,
+        visibleWorktrees,
+      });
+    }
+
+    return renderData;
   }, [
     filteredProjects,
     getProjectState,
     normalizedSidebarSearchQuery,
-    projectById,
     worktreeSearchTextByKey,
   ]);
+  // Precompute pinned list once per render dependencies for deterministic render and sort.
+  const pinnedWorktreeEntries = useMemo(() => {
+    return projectWorktreeRenderData
+      .flatMap(({ project, visiblePinnedWorktrees }) =>
+        visiblePinnedWorktrees.map((worktree) => ({
+          projectId: project.id,
+          worktree,
+        })),
+      )
+      .sort((left, right) =>
+        comparePinnedWorktreeEntries(left, right, projectById),
+      );
+  }, [projectById, projectWorktreeRenderData]);
 
   return (
     <section className="select-none">
@@ -533,196 +568,179 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                   : "No projects in database. Use + to add a project folder."}
               </div>
             ) : (
-              filteredProjects.map((project) => {
-                const state = getProjectState(project.id);
-                const projectTreeOpen = openProjectPaths.has(project.path);
-                const isActive = selectedProjectId === project.id;
-                const projectErrorLevel = projectThreadErrorLevel(project.id);
-                const orderedWorktrees = orderProjectWorktrees(
+              projectWorktreeRenderData.map(
+                ({
+                  hasPinnedWorktrees,
                   project,
-                  state.worktrees,
-                );
-                const visiblePinnedWorktrees = orderedWorktrees.filter(
-                  (worktree) =>
-                    worktree.pinnedAt !== null &&
-                    worktreeMatchesProjectsSearch(
-                      normalizedSidebarSearchQuery,
-                      worktreeSearchTextByKey,
-                      project.id,
-                      worktree,
-                    ),
-                );
-                const visibleWorktrees = orderedWorktrees.filter(
-                  (worktree) =>
-                    worktree.pinnedAt === null &&
-                    worktreeMatchesProjectsSearch(
-                      normalizedSidebarSearchQuery,
-                      worktreeSearchTextByKey,
-                      project.id,
-                      worktree,
-                    ),
-                );
-                const showWorktrees =
-                  projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
-                const projectIndicatorClass = isActive
-                  ? "bg-[#7aa5c4]"
-                  : projectErrorLevel === "unread"
-                    ? "bg-[#ff304f]"
-                    : projectErrorLevel === "failed"
-                      ? "bg-[#8f4956]"
-                      : projectErrorLevel === "stopped"
-                        ? "bg-[#b98a3a]"
-                        : "bg-[#5f5f5f]";
+                  state,
+                  visiblePinnedWorktrees,
+                  visibleWorktrees,
+                }) => {
+                  const projectTreeOpen = openProjectPaths.has(project.path);
+                  const isActive = selectedProjectId === project.id;
+                  const projectErrorLevel = projectThreadErrorLevel(project.id);
+                  const showWorktrees =
+                    projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
+                  const projectIndicatorClass = isActive
+                    ? "bg-[#7aa5c4]"
+                    : projectErrorLevel === "unread"
+                      ? "bg-[#ff304f]"
+                      : projectErrorLevel === "failed"
+                        ? "bg-[#8f4956]"
+                        : projectErrorLevel === "stopped"
+                          ? "bg-[#b98a3a]"
+                          : "bg-[#5f5f5f]";
 
-                return (
-                  // Keep project row and child worktrees grouped so collapse logic is local.
-                  <div className="space-y-1" key={project.id}>
-                    <div className="group/project flex items-center gap-2">
-                      <button
-                        type="button"
-                        className={`min-w-0 flex-1 px-3 py-2 text-left transition-colors ${
-                          isActive
-                            ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
-                            : "text-[#d7d7d7] hover:bg-[#171a1b]"
-                        }`}
-                        onClick={() => {
-                          // App-level refresh logic owns project open/close persistence so failed closes can roll back cleanly.
-                          const nextOpen = !projectTreeOpen;
-                          void onRefreshProject(project, nextOpen);
-                        }}
-                        onContextMenu={(event) => {
-                          // Right-click opens custom context menu anchored near the cursor.
-                          event.preventDefault();
-                          onOpenProjectActionMenu(
-                            project,
-                            event.clientX + 6,
-                            event.clientY + 6,
-                          );
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center ${
-                              isActive
-                                ? "bg-[#1f313c] text-[#bdd5e6]"
-                                : "bg-[#151a1c] text-[#8ca6b9]"
-                            }`}
-                          >
-                            {materialSymbol(
-                              showWorktrees ? "folder_open" : "folder",
-                              "text-[16px]",
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
-                            {project.name}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
+                  return (
+                    // Keep project row and child worktrees grouped so collapse logic is local.
+                    <div className="space-y-1" key={project.id}>
+                      <div className="group/project flex items-center gap-2">
+                        <button
+                          type="button"
+                          className={`min-w-0 flex-1 px-3 py-2 text-left transition-colors ${
+                            isActive
+                              ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
+                              : "text-[#d7d7d7] hover:bg-[#171a1b]"
+                          }`}
+                          onClick={() => {
+                            // App-level refresh logic owns project open/close persistence so failed closes can roll back cleanly.
+                            const nextOpen = !projectTreeOpen;
+                            void onRefreshProject(project, nextOpen);
+                          }}
+                          onContextMenu={(event) => {
+                            // Right-click opens custom context menu anchored near the cursor.
+                            event.preventDefault();
+                            onOpenProjectActionMenu(
+                              project,
+                              event.clientX + 6,
+                              event.clientY + 6,
+                            );
+                          }}
+                        >
+                          <div className="flex items-center gap-2.5">
                             <span
-                              className={`h-1.5 w-1.5 ${projectIndicatorClass}`}
-                            />
-                            <span className="text-[#62737e]">
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center ${
+                                isActive
+                                  ? "bg-[#1f313c] text-[#bdd5e6]"
+                                  : "bg-[#151a1c] text-[#8ca6b9]"
+                              }`}
+                            >
                               {materialSymbol(
-                                projectTreeOpen
-                                  ? "expand_more"
-                                  : "chevron_right",
-                                "text-[17px]",
+                                showWorktrees ? "folder_open" : "folder",
+                                "text-[16px]",
                               )}
                             </span>
+                            <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                              {project.name}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span
+                                className={`h-1.5 w-1.5 ${projectIndicatorClass}`}
+                              />
+                              <span className="text-[#62737e]">
+                                {materialSymbol(
+                                  projectTreeOpen
+                                    ? "expand_more"
+                                    : "chevron_right",
+                                  "text-[17px]",
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${sidebarActionButtonClass} ${
+                            isActive
+                              ? "opacity-100"
+                              : "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
+                          }`}
+                          onClick={(event) => {
+                            // Position popup menu using trigger button geometry for predictable placement.
+                            event.stopPropagation();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            onOpenProjectActionMenu(
+                              project,
+                              rect.right + 8,
+                              rect.bottom + 6,
+                            );
+                          }}
+                          aria-label={`Project actions for ${project.name}`}
+                        >
+                          {materialSymbol("menu", "text-[14px]")}
+                        </button>
+                      </div>
+
+                      {showWorktrees ? (
+                        <div className="ml-4 border-l border-[#1f262a] pl-3">
+                          <div className="space-y-1">
+                            {state.loadingWorktrees ? (
+                              <div className="px-3 py-1 text-xs text-[#8f9aa2]">
+                                Loading worktrees...
+                              </div>
+                            ) : null}
+                            {state.error ? (
+                              <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+                                {state.error}
+                              </div>
+                            ) : null}
+                            {visibleWorktrees.length === 0 ? (
+                              <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
+                                {normalizedSidebarSearchQuery
+                                  ? visiblePinnedWorktrees.length > 0
+                                    ? "Matching pinned worktrees are listed above."
+                                    : "No matching worktrees."
+                                  : hasPinnedWorktrees
+                                    ? "Pinned worktrees are listed above."
+                                    : "No worktrees found."}
+                              </div>
+                            ) : null}
+                            {visibleWorktrees.length > 0 ? (
+                              <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
+                                <div className="space-y-1">
+                                  {visibleWorktrees.map((worktree) => {
+                                    return (
+                                      <ProjectWorktreeRow
+                                        key={worktree.path}
+                                        activeWorktree={isActiveWorktree(
+                                          project.id,
+                                          worktree.path,
+                                        )}
+                                        homeDirectory={homeDirectory}
+                                        onProjectWorktreeClick={
+                                          onProjectWorktreeClick
+                                        }
+                                        onToggleWorktreePinned={
+                                          onToggleWorktreePinned
+                                        }
+                                        project={project}
+                                        supportsTildePath={supportsTildePath}
+                                        worktree={worktree}
+                                        worktreeErrorLevel={worktreeThreadErrorLevel(
+                                          project.id,
+                                          worktree.path,
+                                        )}
+                                        worktreePinBusyPath={
+                                          worktreePinBusyPath
+                                        }
+                                        worktreeState={getWorktreeState(
+                                          project.id,
+                                          worktree.path,
+                                        )}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${sidebarActionButtonClass} ${
-                          isActive
-                            ? "opacity-100"
-                            : "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
-                        }`}
-                        onClick={(event) => {
-                          // Position popup menu using trigger button geometry for predictable placement.
-                          event.stopPropagation();
-                          const rect =
-                            event.currentTarget.getBoundingClientRect();
-                          onOpenProjectActionMenu(
-                            project,
-                            rect.right + 8,
-                            rect.bottom + 6,
-                          );
-                        }}
-                        aria-label={`Project actions for ${project.name}`}
-                      >
-                        {materialSymbol("menu", "text-[14px]")}
-                      </button>
+                      ) : null}
                     </div>
-
-                    {showWorktrees ? (
-                      <div className="ml-4 border-l border-[#1f262a] pl-3">
-                        <div className="space-y-1">
-                          {state.loadingWorktrees ? (
-                            <div className="px-3 py-1 text-xs text-[#8f9aa2]">
-                              Loading worktrees...
-                            </div>
-                          ) : null}
-                          {state.error ? (
-                            <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
-                              {state.error}
-                            </div>
-                          ) : null}
-                          {visibleWorktrees.length === 0 ? (
-                            <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
-                              {normalizedSidebarSearchQuery
-                                ? visiblePinnedWorktrees.length > 0
-                                  ? "Matching pinned worktrees are listed above."
-                                  : "No matching worktrees."
-                                : orderedWorktrees.some(
-                                      (worktree) => worktree.pinnedAt !== null,
-                                    )
-                                  ? "Pinned worktrees are listed above."
-                                  : "No worktrees found."}
-                            </div>
-                          ) : null}
-                          {visibleWorktrees.length > 0 ? (
-                            <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
-                              <div className="space-y-1">
-                                {visibleWorktrees.map((worktree) => {
-                                  return (
-                                    <ProjectWorktreeRow
-                                      key={worktree.path}
-                                      activeWorktree={isActiveWorktree(
-                                        project.id,
-                                        worktree.path,
-                                      )}
-                                      homeDirectory={homeDirectory}
-                                      onProjectWorktreeClick={
-                                        onProjectWorktreeClick
-                                      }
-                                      onToggleWorktreePinned={
-                                        onToggleWorktreePinned
-                                      }
-                                      project={project}
-                                      supportsTildePath={supportsTildePath}
-                                      worktree={worktree}
-                                      worktreeErrorLevel={worktreeThreadErrorLevel(
-                                        project.id,
-                                        worktree.path,
-                                      )}
-                                      worktreePinBusyPath={worktreePinBusyPath}
-                                      worktreeState={getWorktreeState(
-                                        project.id,
-                                        worktree.path,
-                                      )}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })
+                  );
+                },
+              )
             )}
           </div>
         </div>

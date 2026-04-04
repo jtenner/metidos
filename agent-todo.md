@@ -179,7 +179,7 @@ Done when:
 
 ### Slice P1.3: Reduce repeated project-worktree ordering/filtering in projects panel
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Project rows and pinned sections repeatedly sort and refilter the same worktree data.
