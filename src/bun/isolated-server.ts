@@ -105,7 +105,6 @@ const IS_DEV_SERVER =
 const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
   forceTls: PUBLIC_TLS_ENABLED,
-  isDevServer: IS_DEV_SERVER,
 });
 /**
  * Public port supports either --port/CLI, JOLT_PUBLIC_PORT/JOLT_PORT, then default.
@@ -137,11 +136,8 @@ const staticEntry = resolve(process.cwd(), "src/bun/static-server.ts");
 /**
  * Origin/URL pair used by the static server for health checks and websocket client.
  */
-const rpcHttpOrigin = formatLoopbackHttpOrigin(RPC_PORT, TLS_RUNTIME.enabled);
-const rpcWebSocketUrl = formatLoopbackWebSocketUrl(
-  RPC_PORT,
-  TLS_RUNTIME.enabled,
-);
+const rpcWebSocketUrl = formatLoopbackWebSocketUrl(RPC_PORT, false);
+const rpcHttpOrigin = formatLoopbackHttpOrigin(RPC_PORT, false);
 
 /**
  * Launch the API/backend process first; it becomes the RPC service dependency
@@ -174,11 +170,10 @@ const staticServer = spawnRole(
   {
     JOLT_DEV: IS_DEV_SERVER ? "1" : process.env.JOLT_DEV || "",
     JOLT_PUBLIC_PORT: String(PUBLIC_PORT),
-    JOLT_RPC_CA_PATH: TLS_RUNTIME.caPath ?? "",
     JOLT_RPC_HEALTH_URL: `${rpcHttpOrigin}/health`,
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_PORT: String(RPC_PORT),
-    ...(PUBLIC_TLS_ENABLED && !TLS_RUNTIME.enabled
+    ...(PUBLIC_TLS_ENABLED
       ? {}
       : {
           JOLT_RPC_URL: rpcWebSocketUrl,
@@ -188,7 +183,7 @@ const staticServer = spawnRole(
 );
 
 console.log(
-  `Jolt isolated server listening on ${TLS_RUNTIME.httpProtocol}://localhost:${PUBLIC_PORT} with RPC backend ${rpcHttpOrigin}`,
+  `Jolt isolated server listening on http://localhost:${PUBLIC_PORT} with RPC backend ${rpcHttpOrigin}${TLS_RUNTIME.publicTls ? " and public HTTPS/WSS expected via reverse proxy" : ""}`,
 );
 
 let shuttingDown = false;

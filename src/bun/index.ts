@@ -274,7 +274,6 @@ const IS_DEV_SERVER =
 const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
   forceTls: PUBLIC_TLS_ENABLED,
-  isDevServer: IS_DEV_SERVER,
 });
 const DEV_FLOW_MODE = resolveDevFlowMode({
   env: process.env,
@@ -282,14 +281,8 @@ const DEV_FLOW_MODE = resolveDevFlowMode({
 });
 
 process.env.JOLT_PORT = String(SERVER_PORT);
-process.env.JOLT_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(
-  SERVER_PORT,
-  TLS_RUNTIME.enabled,
-);
-process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(
-  SERVER_PORT,
-  TLS_RUNTIME.enabled,
-);
+process.env.JOLT_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(SERVER_PORT, false);
+process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
 
 const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
@@ -1616,11 +1609,6 @@ async function bootstrap(): Promise<void> {
   const serverOptions = {
     hostname: LOOPBACK_HOSTNAME,
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-    ...(TLS_RUNTIME.tlsOptions
-      ? {
-          tls: TLS_RUNTIME.tlsOptions,
-        }
-      : {}),
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 
@@ -1876,15 +1864,15 @@ async function bootstrap(): Promise<void> {
     });
     activeServerPort = server.port ?? activeServerPort;
     console.warn(
-      `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to ${TLS_RUNTIME.httpProtocol}://localhost:${server.port ?? activeServerPort}.`,
+      `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
     );
   }
   activeServerPort = server.port ?? activeServerPort;
 
   console.log(
     BACKEND_ONLY
-      ? `Jolt RPC backend listening on ${TLS_RUNTIME.httpProtocol}://localhost:${server.port}`
-      : `Jolt web app listening on ${TLS_RUNTIME.httpProtocol}://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}`,
+      ? `Jolt RPC backend listening on http://localhost:${server.port}`
+      : `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}${TLS_RUNTIME.publicTls ? " with public HTTPS/WSS expected via reverse proxy" : ""}`,
   );
 
   setTimeout(() => {

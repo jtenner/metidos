@@ -12,7 +12,7 @@ This plan turns the findings in `docs/2026-04-03-security-audit.md` into an impl
 The requested password/PIN and 2FA should be added, but not as a cosmetic login screen. It has to sit on top of a real backend trust model:
 
 - authenticated HTTP session
-- loopback-only transport with optional HTTPS/WSS
+- loopback-only transport with optional reverse-proxy HTTPS/WSS
 - authenticated websocket upgrade
 - strict `Origin` checks
 - short-lived websocket tickets
@@ -41,12 +41,12 @@ TLS is also a good idea, with one important caveat:
 
 - TLS improves transport security
 - TLS does not solve localhost trust or authorization by itself
-- if the app stays browser-first on `localhost`, certificate management has to be handled intentionally
+- if the app stays browser-first on `localhost`, the TLS story should live at the reverse proxy rather than in the Bun process
 
 Recommended policy:
 
 - bind to loopback only and do not depend on TLS for the local security boundary
-- keep HTTPS/WSS support optional for users who want it
+- keep HTTPS/WSS support available only through a reverse proxy
 - support an explicit `--tls` / `JOLT_TLS=1` mode for reverse-proxy deployments that terminate TLS upstream
 - if the app ever supports non-loopback access later, revisit and require TLS for that mode
 
@@ -99,7 +99,7 @@ Optional later addition:
 - websocket access requires both:
   - valid authenticated session
   - short-lived single-use websocket ticket
-- browser transport may use HTTPS/WSS when local certificate material is configured
+- browser transport may use HTTPS/WSS when a reverse proxy terminates TLS upstream
 - all websocket upgrades validate `Origin`
 
 ### Step-up auth
@@ -194,9 +194,9 @@ These are chosen requirements for implementation:
 - no app access is allowed before successful authorization
 - `unsafeMode` remains available after normal app authentication
 - TLS is optional
-- if TLS remains supported, the product may provide an easy local setup path on supported platforms
+- if TLS is enabled, it should be enabled through an upstream reverse proxy
 - if the user has command-line access, the product should expose a reset path that uses CLI plus OTP verification
-- TLS setup may be Codex-assisted, but only as an optional guided bootstrap flow with user approval for system-changing commands
+- TLS setup may be Codex-assisted only insofar as Codex can help configure the reverse proxy
 - a dev bypass is allowed only through an explicit development/reset flow
 - a dev reset flow may intentionally wipe local database contents
 
@@ -253,8 +253,7 @@ Work:
 - Require auth for `/rpc`
 - Move websocket ticketing into the browser startup flow
 - Keep the unauthenticated route allowlist as small as possible
-- keep optional TLS listener/configuration support and certificate loading
-- keep any certificate bootstrap flow explicitly optional
+- keep reverse-proxy TLS mode separate from local loopback listeners
 - add first-run setup screens for:
   - primary-factor choice: PIN or password
   - TOTP enrollment with QR code
@@ -283,8 +282,7 @@ Acceptance criteria:
 
 Implementation note:
 
-- The current implementation may use per-user default loopback certificate paths under the app-data directory plus `bun run tls:bootstrap` for optional local certificate generation.
-- `mkcert` is the preferred optional bootstrap path because it can install a locally trusted root CA; OpenSSL remains a fallback generator for environments where `mkcert` is unavailable.
+- The current implementation keeps Bun listeners on loopback HTTP/WS and uses `--tls` / `JOLT_TLS=1` only to mark browser-facing transport as HTTPS/WSS when a reverse proxy terminates TLS upstream.
 
 ## Phase 2: Authorization And Privilege Separation
 
@@ -418,7 +416,7 @@ Implementation notes:
 Update `src/bun/index.ts` to:
 
 - set security headers on HTML and JSON responses
-- support optional TLS listener startup and certificate configuration
+- support reverse-proxy TLS mode for browser-facing protocol selection and secure cookies
 - validate `Origin` on websocket upgrade
 - reject `/rpc` unless the request has:
   - authenticated session
@@ -441,18 +439,11 @@ TLS should be treated as optional local transport hardening, not as a required p
 
 ### If this remains a browser app on localhost
 
-Options:
+Recommended policy:
 
-- ship with built-in tooling or a guided helper to create a locally trusted certificate
-- integrate with a local certificate helper such as a development CA flow
-- avoid making users configure certificates manually if possible
-- support a Codex-assisted bootstrap flow that can perform TLS setup from an explicit user prompt
-
-Tradeoff:
-
-- localhost TLS improves transport guarantees and cookie security
-- certificate provisioning adds setup complexity
-- a Codex-assisted bootstrap is ergonomic, but it still needs explicit approval before certificate trust changes or privileged OS commands run
+- keep the Bun processes on loopback HTTP/WS
+- let nginx or another reverse proxy terminate TLS when HTTPS/WSS is needed
+- use `--tls` / `JOLT_TLS=1` so the app treats the browser-facing transport as secure in that deployment shape
 
 ### If this may bind beyond loopback
 
@@ -461,15 +452,14 @@ Policy should be strict:
 - require TLS
 - require secure cookies
 - require WSS for websocket transport
-- reject startup if TLS cert/key are missing
+- reject startup unless the deployment is behind a trusted TLS-terminating proxy or equivalent secure edge
 
 ### Recommended product decision
 
 - loopback mode: HTTP/WS allowed by default
-- optional HTTPS/WSS may be enabled automatically when local certs are configured
 - keep loopback-only binding as the primary transport control
+- support `--tls` / `JOLT_TLS=1` only for reverse-proxy deployments that terminate TLS upstream
 - if non-loopback support is ever added, require HTTPS/WSS there
-- if TLS support remains in the product, `bun run tls:bootstrap` is an optional local helper rather than a startup prerequisite
 
 ## UI and UX plan
 
@@ -549,7 +539,7 @@ Unit and integration coverage should include:
 - websocket connection denied without session
 - websocket connection denied with bad `Origin`
 - websocket ticket expiry and one-time use
-- plaintext loopback transport allowed when no TLS material is configured
+- plaintext loopback transport with reverse-proxy `--tls` mode forcing browser-facing `https/wss`
 - `unsafeMode` access after normal login
 - step-up enforcement on task execution and recovery/reset flows
 - worktree traversal rejection
@@ -563,7 +553,7 @@ Current implementation coverage:
 - `src/bun/auth-service.test.ts` covers setup, TOTP login, recovery-code login, auth lifecycle audit events, invalid-credential lockout auditing, session issuance, idle expiry, lockout, websocket ticket issuance/consumption, and step-up freshness
 - `src/bun/rpc-websocket-auth.test.ts` covers websocket upgrade denial without session/ticket plus cookie-clearing behavior for expired sessions
 - `src/bun/server-security.test.ts` covers websocket `Origin` allowlisting, CSP generation, and shared browser security headers
-- `src/bun/tls-config.test.ts` and `src/bun/tls-bootstrap.test.ts` cover optional TLS runtime selection, the guided bootstrap flow, and TLS bootstrap audit logging
+- `src/bun/tls-config.test.ts` covers reverse-proxy TLS runtime selection and `--tls`/`JOLT_TLS=1` public transport behavior
 - `src/bun/rpc-authz.test.ts` covers step-up gating for privileged RPC actions
 - `src/bun/project-security-audit.test.ts` covers audit-event persistence for cross-workspace thread creation, queued task execution, and project deletion
 - `src/bun/auth-reset.test.ts` covers authenticated CLI reset and recovery-code regeneration flows, including audit-event persistence

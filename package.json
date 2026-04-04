@@ -12,7 +12,6 @@
     "dev:watch": "bun run dev",
     "auth:reset": "bun run src/bun/auth-reset.ts",
     "audit:log": "bun run src/bun/security-audit-cli.ts",
-    "tls:bootstrap": "bun run src/bun/tls-bootstrap.ts",
     "harness:starvation": "bun run src/bun/starvation-harness.ts",
     "typecheck": "bunx tsgo --noEmit",
     "validate": "bunx biome check biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json && bun run typecheck",

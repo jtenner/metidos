@@ -20,10 +20,8 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Bun-side entrypoint that wires RPC and process-level handlers.
 - `isolated-server.ts`
   - Isolated execution/server runner for sidecar workflows.
-- `tls-bootstrap.ts`
-  - Guided loopback certificate bootstrap script for optional local HTTPS/WSS setup.
 - `tls-config.ts`
-  - Shared TLS path/runtime policy helper used by the Bun entrypoints.
+  - Shared reverse-proxy TLS policy helper used by the Bun entrypoints.
 - `project-procedures.ts`
   - High-level project orchestration: open/close workflows, background tasks, and thread command lifecycle.
 - `rpc-websocket-auth.ts`
