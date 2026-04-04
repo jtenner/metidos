@@ -24,6 +24,10 @@ type SecurityAuditPanelProps = {
 
 const SECURITY_AUDIT_REFRESH_INTERVAL_MS = 15_000;
 type AuditFilterScope = "all" | "project" | "thread";
+const AUDIT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "short",
+  timeStyle: "medium",
+});
 
 function eventIconName(eventType: string): AppIconName {
   if (
@@ -50,7 +54,11 @@ function eventIconName(eventType: string): AppIconName {
 }
 
 function formatAuditTimestamp(value: string): string {
-  return new Date(value).toLocaleString();
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+  return AUDIT_TIMESTAMP_FORMATTER.format(timestamp);
 }
 
 function readPayloadProjectName(event: RpcSecurityAuditEvent): string | null {

@@ -39,6 +39,10 @@ type AuthView =
   | "setup";
 
 const SESSION_LIFETIME_DAYS = 7;
+const AUTH_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 function formatDateTime(value: string | null): string | null {
   if (!value) {
@@ -50,10 +54,7 @@ function formatDateTime(value: string | null): string | null {
     return null;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(timestamp));
+  return AUTH_DATE_TIME_FORMATTER.format(timestamp);
 }
 
 function errorMessage(error: unknown): string {

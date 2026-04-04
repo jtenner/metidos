@@ -281,6 +281,12 @@ export const MAINVIEW_STATE_STORAGE_VERSION = 1;
 export const TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
 export const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 export const APP_TITLE = "Jolt";
+const GIT_HISTORY_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 const CODEX_REASONING_EFFORT_VALUES: RpcCodexReasoningEffort[] = [
   "minimal",
@@ -980,16 +986,11 @@ export function formatPathForDisplay(
 }
 
 export function formatGitHistoryTimestamp(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
     return value;
   }
-  return parsed.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return GIT_HISTORY_TIMESTAMP_FORMATTER.format(timestamp);
 }
 
 export function sortThreads(items: RpcThread[]): RpcThread[] {

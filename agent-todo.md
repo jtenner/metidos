@@ -97,7 +97,7 @@ Done when:
 
 ### Slice P0.5: Reuse shared `Intl.DateTimeFormat` instances
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Date formatting happens in hot render paths and currently constructs formatting logic repeatedly through `toLocaleString()` or `Intl.DateTimeFormat` in multiple places.
