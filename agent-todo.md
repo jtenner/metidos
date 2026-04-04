@@ -4,14 +4,6 @@
 
 ## Active Correctness Slices
 
-### Slice 2
-
-- Title: Validate task targets before creating new task threads
-- Description: Reorder `runProjectTask(...)` so script/file task validation happens before `createThreadRecord(...)`, or roll back the created thread on every pre-run failure path.
-- Source: [Finding 2](docs/2026-04-04-correctness-audit-2.md#2-high-runprojecttask-leaks-empty-threads-on-stale-task-definitions)
-- Scope: `src/bun/project-procedures.ts`, `src/bun/project-procedures/project-tasks.ts`, targeted UI coverage in `src/mainview/App.tsx` if needed
-- Verify: Add coverage for stale `.tasks` files and stale `package.json` scripts after the task list was already loaded.
-
 ### Slice 5
 
 - Title: Make sidecar thread metadata updates authoritative
@@ -21,6 +13,13 @@
 - Verify: Add coverage for metadata updates while the RPC transport is temporarily unavailable or timing out.
 
 ## Recently Completed
+
+### Slice 2
+
+- Title: Validate task targets before creating new task threads
+- Completed: 2026-04-04
+- Outcome: `runProjectTaskProcedure(...)` now resolves and validates the selected task payload before creating a thread, so stale `.tasks` files and removed `package.json` scripts fail without leaving behind orphan empty threads. `project-tasks.ts` now exposes a validated runnable-task resolver for both file and script tasks, and `runProjectTaskProcedure(...)` also performs a best-effort empty-thread rollback if any later queueing step fails after creating a new thread. Procedure-level regression tests now cover stale package-script and stale task-file selections loaded from the real task list before the repo changes underneath them.
+- Source: [Finding 2](docs/2026-04-04-correctness-audit-2.md#2-high-runprojecttask-leaks-empty-threads-on-stale-task-definitions)
 
 ### Slice 1
 

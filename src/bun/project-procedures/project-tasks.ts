@@ -15,6 +15,21 @@ export type TaskWatchTarget = {
   path: string;
 };
 
+export type ResolvedProjectTaskExecution =
+  | {
+      kind: "file";
+      prompt: string;
+    }
+  | {
+      kind: "script";
+      task: {
+        packageJsonPath: string;
+        packageDirectory: string;
+        scriptName: string;
+        command: string;
+      };
+    };
+
 function tasksDirectoryPath(worktreePath: string): string {
   return resolve(worktreePath, ".tasks");
 }
@@ -635,4 +650,34 @@ export function resolvePackageJsonTask(
     scriptName: task.scriptName,
     command,
   };
+}
+
+/**
+ * Resolve a task into the validated payload needed to queue it. This allows
+ * stale task selections to fail before a new thread is created.
+ */
+export async function resolveProjectTaskExecution(
+  worktreePath: string,
+  task: RpcProjectTask,
+): Promise<ResolvedProjectTaskExecution> {
+  switch (task.kind) {
+    case "script":
+      return {
+        kind: "script",
+        task: resolvePackageJsonTask(worktreePath, task),
+      };
+    case "file": {
+      const taskFilePath = resolveProjectTaskFilePath(worktreePath, task.path);
+      const taskContent = await Bun.file(taskFilePath).text();
+      if (!taskContent.trim()) {
+        throw new Error(`Task file is empty: ${task.path}`);
+      }
+      return {
+        kind: "file",
+        prompt: formatTaskPrompt(taskTitleFromPath(task.path), taskContent),
+      };
+    }
+    default:
+      throw new Error(`Unsupported project task kind: ${task.kind}`);
+  }
 }

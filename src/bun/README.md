@@ -65,7 +65,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `project-procedures/project-tasks.ts`
   - Discovers available `.tasks` and `package.json` script tasks within a project/worktree.
-  - Normalizes task identity/pathing and builds task prompts for worker execution.
+  - Normalizes task identity/pathing, validates stale task selections, and builds task prompts for worker execution.
   - Includes filesystem traversal guards, symlink/loop prevention, and safe filtering.
 
 - `project-procedures/thread-detail.ts`

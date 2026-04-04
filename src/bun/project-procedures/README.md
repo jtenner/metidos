@@ -25,6 +25,7 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Discovers runnable project work tasks from `.tasks` directories and `package.json` scripts.
   - Traverses candidate directories safely (symlink/real-path and ignore-list aware) to avoid loops and huge scans.
   - Normalizes task IDs, task titles, and prompt payloads (`formatTaskPrompt`, `formatPackageScriptTaskPrompt`) so worker execution is deterministic.
+  - Also resolves stale task selections into validated runnable payloads before a new thread is created, so missing `.tasks` files or removed package scripts fail cleanly without leaking empty threads.
 
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.

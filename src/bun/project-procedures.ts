@@ -81,13 +81,10 @@ import {
   warmGitHistoryCache,
 } from "./project-procedures/git-history";
 import {
-  formatTaskPrompt,
   readProjectTasksFromDisk,
   readTaskWatchTargets,
-  resolvePackageJsonTask,
-  resolveProjectTaskFilePath,
+  resolveProjectTaskExecution,
   type TaskWatchTarget,
-  taskTitleFromPath,
 } from "./project-procedures/project-tasks";
 import {
   awaitAbortableResult,
@@ -3029,6 +3026,10 @@ export async function runProjectTaskProcedure(
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
   });
+  const resolvedTask = await resolveProjectTaskExecution(
+    worktreePath,
+    params.task,
+  );
 
   let thread = params.threadId ? threadById(params.threadId) : null;
   const createdThread = thread === null;
@@ -3052,41 +3053,34 @@ export async function runProjectTaskProcedure(
     );
   }
 
-  switch (params.task.kind) {
-    case "script": {
-      const detail = await queuePackageScriptTask(
-        thread,
-        resolvePackageJsonTask(worktreePath, params.task),
-      );
-      recordProjectTaskQueuedAuditEvent(db, {
-        createdThread,
-        params,
-        thread,
-      });
-      return detail;
-    }
-    case "file": {
-      const taskFilePath = resolveProjectTaskFilePath(
-        worktreePath,
-        params.task.path,
-      );
-      const taskContent = await Bun.file(taskFilePath).text();
-      if (!taskContent.trim()) {
-        throw new Error(`Task file is empty: ${params.task.path}`);
+  try {
+    switch (resolvedTask.kind) {
+      case "script": {
+        const detail = await queuePackageScriptTask(thread, resolvedTask.task);
+        recordProjectTaskQueuedAuditEvent(db, {
+          createdThread,
+          params,
+          thread,
+        });
+        return detail;
       }
-      const detail = await queueThreadMessage(
-        thread,
-        formatTaskPrompt(taskTitleFromPath(params.task.path), taskContent),
-      );
-      recordProjectTaskQueuedAuditEvent(db, {
-        createdThread,
-        params,
-        thread,
-      });
-      return detail;
+      case "file": {
+        const detail = await queueThreadMessage(thread, resolvedTask.prompt);
+        recordProjectTaskQueuedAuditEvent(db, {
+          createdThread,
+          params,
+          thread,
+        });
+        return detail;
+      }
     }
-    default:
-      throw new Error(`Unsupported project task kind: ${params.task.kind}`);
+  } catch (error) {
+    if (createdThread) {
+      await discardEmptyThreadProcedure({
+        threadId: thread.id,
+      });
+    }
+    throw error;
   }
 }
 

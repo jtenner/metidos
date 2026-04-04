@@ -94,6 +94,7 @@
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
 │  │  ├─ project-security-audit.test.ts
+│  │  ├─ project-task-run.test.ts
 │  │  ├─ project-security-audit.ts
 │  │  ├─ rpc-authz.test.ts
 │  │  ├─ rpc-authz.ts
