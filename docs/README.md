@@ -20,7 +20,7 @@ The files are primarily for maintainers and contributors to understand tradeoffs
   - Historical April 4 correctness snapshot from the first recheck/remediation pass.
   - Focuses on startup restore drift, active-worktree validation, project close rollback, sidecar scope contract drift, and initial RPC boot resilience.
 - `2026-04-04-correctness-audit-2.md`
-  - Current follow-up correctness audit snapshot from a fresh full-codebase pass later the same day.
+  - April 4 follow-up correctness audit snapshot from a fresh full-codebase pass later the same day.
   - Focuses on project lifecycle request races, task-run orphan threads, security-audit scope drift, post-login RPC bootstrap fragility, and sidecar/live-app metadata divergence.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.

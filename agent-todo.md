@@ -20,14 +20,6 @@
 - Scope: `src/bun/project-procedures.ts`, `src/bun/project-procedures/project-tasks.ts`, targeted UI coverage in `src/mainview/App.tsx` if needed
 - Verify: Add coverage for stale `.tasks` files and stale `package.json` scripts after the task list was already loaded.
 
-### Slice 4
-
-- Title: Reuse RPC bootstrap retry logic after successful auth
-- Description: Route login, recovery-code login, and post-setup recovery continue through the same retrying connect bootstrap used by authenticated startup so a transient websocket/ticket failure does not strand an already-authenticated user on the login shell.
-- Source: [Finding 4](docs/2026-04-04-correctness-audit-2.md#4-medium-fresh-login-and-recovery-flows-still-fail-on-the-first-transient-rpc-connect-error)
-- Scope: `src/mainview/auth-shell.tsx`, `src/mainview/auth-shell-connect.ts`, related tests in `src/mainview/auth-shell-connect.test.ts`
-- Verify: Add coverage for transient connect failures after successful login and recovery-code login.
-
 ### Slice 5
 
 - Title: Make sidecar thread metadata updates authoritative
@@ -37,6 +29,13 @@
 - Verify: Add coverage for metadata updates while the RPC transport is temporarily unavailable or timing out.
 
 ## Recently Completed
+
+### Slice 4
+
+- Title: Reuse RPC bootstrap retry logic after successful auth
+- Completed: 2026-04-04
+- Outcome: Successful login, recovery-code login, and post-setup recovery continuation now all re-enter the shared auth gate loader instead of calling `connectRpcTransport()` directly. The shared bootstrap resolves auth status, reuses the bounded retrying RPC connect path for any authenticated session, and leaves failures on the loading shell instead of bouncing an already-authenticated user back to login. Regression coverage now exercises authenticated gate resolution for fresh-login and recovery-login retry paths plus the setup/login branch behavior.
+- Source: [Finding 4](docs/2026-04-04-correctness-audit-2.md#4-medium-fresh-login-and-recovery-flows-still-fail-on-the-first-transient-rpc-connect-error)
 
 ### Slice 3
 

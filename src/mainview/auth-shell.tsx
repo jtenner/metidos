@@ -21,7 +21,7 @@ import {
   prepareSetupEnrollment,
   type TotpEnrollment,
 } from "./auth-client";
-import { connectRpcTransportWithRetry } from "./auth-shell-connect";
+import { resolveAuthShellGate } from "./auth-shell-connect";
 
 type AuthShellProps = {
   connectRpcTransport: () => Promise<void>;
@@ -266,27 +266,30 @@ export default function AuthShell({
       }
 
       try {
-        const nextStatus = await getAuthStatus();
-        setStatus(nextStatus);
+        const gate = await resolveAuthShellGate({
+          connectRpcTransport,
+          getAuthStatus,
+          onAuthenticatedConnectRetry: ({ nextAttemptNumber, maxAttempts }) => {
+            setLoadingMessage(
+              `Opening authenticated workspace… retrying connection (${nextAttemptNumber}/${maxAttempts})…`,
+            );
+          },
+          onAuthenticatedConnectStart: () => {
+            setLoadingMessage("Opening authenticated workspace…");
+          },
+          prepareSetupEnrollment,
+        });
+        setStatus(gate.status);
 
-        if (nextStatus.authenticated) {
-          setLoadingMessage("Opening authenticated workspace…");
-          await connectRpcTransportWithRetry({
-            connect: connectRpcTransport,
-            onRetry: ({ nextAttemptNumber, maxAttempts }) => {
-              setLoadingMessage(
-                `Opening authenticated workspace… retrying connection (${nextAttemptNumber}/${maxAttempts})…`,
-              );
-            },
-          });
+        if (gate.kind === "authenticated") {
           setView("app");
           return;
         }
 
         disconnectRpcTransport();
-        if (!nextStatus.configured) {
+        if (gate.kind === "setup") {
           setLoadingMessage("Preparing first-run setup…");
-          setEnrollment(await prepareSetupEnrollment());
+          setEnrollment(gate.enrollment);
           setSetupPrimaryFactor("");
           setSetupTotpCode("");
           setRecoveryCodes([]);
@@ -411,13 +414,11 @@ export default function AuthShell({
       setIsBusy(true);
       setError("");
       try {
-        const result = await loginAuth({
+        await loginAuth({
           primaryFactor: loginPrimaryFactor,
           totpCode: loginTotpCode,
         });
-        setStatus(result.status);
-        await connectRpcTransport();
-        setView("app");
+        await loadGateState();
       } catch (nextError) {
         setError(errorMessage(nextError));
         const lockedUntil = readLockedUntil(status, nextError);
@@ -433,7 +434,7 @@ export default function AuthShell({
         setIsBusy(false);
       }
     },
-    [connectRpcTransport, loginPrimaryFactor, loginTotpCode, status],
+    [loadGateState, loginPrimaryFactor, loginTotpCode, status],
   );
 
   const handleRecoveryLoginSubmit = useCallback(
@@ -442,13 +443,11 @@ export default function AuthShell({
       setIsBusy(true);
       setError("");
       try {
-        const result = await loginWithRecoveryCodeAuth({
+        await loginWithRecoveryCodeAuth({
           primaryFactor: loginPrimaryFactor,
           recoveryCode: loginRecoveryCode,
         });
-        setStatus(result.status);
-        await connectRpcTransport();
-        setView("app");
+        await loadGateState();
       } catch (nextError) {
         setError(errorMessage(nextError));
         const lockedUntil = readLockedUntil(status, nextError);
@@ -464,24 +463,18 @@ export default function AuthShell({
         setIsBusy(false);
       }
     },
-    [connectRpcTransport, loginPrimaryFactor, loginRecoveryCode, status],
+    [loadGateState, loginPrimaryFactor, loginRecoveryCode, status],
   );
 
   const handleRecoveryContinue = useCallback(async () => {
     setIsBusy(true);
     setError("");
     try {
-      await connectRpcTransport();
-      setView("app");
-    } catch (nextError) {
-      setError(errorMessage(nextError));
-      await loadGateState({
-        preserveError: true,
-      });
+      await loadGateState();
     } finally {
       setIsBusy(false);
     }
-  }, [connectRpcTransport, loadGateState]);
+  }, [loadGateState]);
 
   const handleCopyRecoveryCodes = useCallback(async () => {
     try {

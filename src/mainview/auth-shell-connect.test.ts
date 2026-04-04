@@ -1,11 +1,25 @@
 import { describe, expect, it } from "bun:test";
 
+import type { AuthStatus } from "./auth-client";
 import { AuthApiError } from "./auth-client";
 import {
   connectRpcTransportWithRetry,
   INITIAL_RPC_CONNECT_BASE_DELAY_MS,
+  resolveAuthShellGate,
   shouldRetryInitialRpcConnect,
 } from "./auth-shell-connect";
+
+function buildAuthStatus(overrides: Partial<AuthStatus> = {}): AuthStatus {
+  return {
+    authenticated: false,
+    configured: true,
+    devBypass: false,
+    lockedUntil: null,
+    primaryFactorType: "pin",
+    sessionExpiresAt: null,
+    ...overrides,
+  };
+}
 
 describe("auth shell connect retry helpers", () => {
   it("retries transient initial RPC connect failures until a later attempt succeeds", async () => {
@@ -105,5 +119,148 @@ describe("auth shell connect retry helpers", () => {
     expect(attempts).toBe(1);
     expect(waits).toEqual([]);
     expect(shouldRetryInitialRpcConnect(failure)).toBeFalse();
+  });
+
+  it("reuses the authenticated gate retry path when a fresh login reaches RPC bootstrap", async () => {
+    const retries: number[] = [];
+    let connectAttempts = 0;
+    let connectStarted = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+        if (connectAttempts < 3) {
+          throw new Error(`transient connect failure ${connectAttempts}`);
+        }
+      },
+      getAuthStatus: async () =>
+        buildAuthStatus({
+          authenticated: true,
+        }),
+      onAuthenticatedConnectRetry: ({ nextAttemptNumber }) => {
+        retries.push(nextAttemptNumber);
+      },
+      onAuthenticatedConnectStart: () => {
+        connectStarted += 1;
+      },
+      prepareSetupEnrollment: async () => {
+        throw new Error(
+          "setup enrollment should not load for authenticated sessions",
+        );
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "authenticated",
+      status: buildAuthStatus({
+        authenticated: true,
+      }),
+    });
+    expect(connectAttempts).toBe(3);
+    expect(connectStarted).toBe(1);
+    expect(retries).toEqual([2, 3]);
+  });
+
+  it("reuses the authenticated gate retry path when a recovery-code login reaches RPC bootstrap", async () => {
+    const retries: number[] = [];
+    let connectAttempts = 0;
+    let connectStarted = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+        if (connectAttempts < 2) {
+          throw new Error(`transient connect failure ${connectAttempts}`);
+        }
+      },
+      getAuthStatus: async () =>
+        buildAuthStatus({
+          authenticated: true,
+        }),
+      onAuthenticatedConnectRetry: ({ nextAttemptNumber }) => {
+        retries.push(nextAttemptNumber);
+      },
+      onAuthenticatedConnectStart: () => {
+        connectStarted += 1;
+      },
+      prepareSetupEnrollment: async () => {
+        throw new Error(
+          "setup enrollment should not load for authenticated sessions",
+        );
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "authenticated",
+      status: buildAuthStatus({
+        authenticated: true,
+      }),
+    });
+    expect(connectAttempts).toBe(2);
+    expect(connectStarted).toBe(1);
+    expect(retries).toEqual([2]);
+  });
+
+  it("returns setup enrollment when auth is not configured", async () => {
+    let connectAttempts = 0;
+    let setupLoads = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+      },
+      getAuthStatus: async () =>
+        buildAuthStatus({
+          configured: false,
+          primaryFactorType: null,
+        }),
+      prepareSetupEnrollment: async () => {
+        setupLoads += 1;
+        return {
+          totpSecret: "secret",
+          totpUri: "otpauth://example",
+        };
+      },
+    });
+
+    expect(result).toEqual({
+      enrollment: {
+        totpSecret: "secret",
+        totpUri: "otpauth://example",
+      },
+      kind: "setup",
+      status: buildAuthStatus({
+        configured: false,
+        primaryFactorType: null,
+      }),
+    });
+    expect(connectAttempts).toBe(0);
+    expect(setupLoads).toBe(1);
+  });
+
+  it("returns the login gate when auth is configured but no session is active", async () => {
+    let connectAttempts = 0;
+    let setupLoads = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+      },
+      getAuthStatus: async () => buildAuthStatus(),
+      prepareSetupEnrollment: async () => {
+        setupLoads += 1;
+        return {
+          totpSecret: "secret",
+          totpUri: "otpauth://example",
+        };
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "login",
+      status: buildAuthStatus(),
+    });
+    expect(connectAttempts).toBe(0);
+    expect(setupLoads).toBe(0);
   });
 });

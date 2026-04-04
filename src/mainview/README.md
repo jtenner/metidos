@@ -12,7 +12,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and websocket ticket acquisition.
 
-`auth-shell-connect.ts` isolates the bounded retry logic used when the UI boots into an already-authenticated session and the first RPC transport connect needs transient recovery.
+`auth-shell-connect.ts` isolates the shared authenticated-bootstrap logic used when the UI opens an existing session or transitions into a newly authenticated session and the first RPC transport connect needs transient recovery.
 
 `project-close.ts` isolates the rollback-safe project-collapse sequencing so the UI only commits local close state after the backend confirms the project has closed.
 

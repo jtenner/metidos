@@ -1,8 +1,24 @@
+import type { AuthStatus, TotpEnrollment } from "./auth-client";
 import { AuthApiError, isAuthRequiredError } from "./auth-client";
 
 export const INITIAL_RPC_CONNECT_MAX_ATTEMPTS = 4;
 export const INITIAL_RPC_CONNECT_BASE_DELAY_MS = 250;
 export const INITIAL_RPC_CONNECT_MAX_DELAY_MS = 1_000;
+
+export type AuthShellGateResolution =
+  | {
+      kind: "authenticated";
+      status: AuthStatus;
+    }
+  | {
+      enrollment: TotpEnrollment;
+      kind: "setup";
+      status: AuthStatus;
+    }
+  | {
+      kind: "login";
+      status: AuthStatus;
+    };
 
 export type InitialRpcConnectRetryInfo = {
   delayMs: number;
@@ -10,6 +26,14 @@ export type InitialRpcConnectRetryInfo = {
   maxAttempts: number;
   nextAttemptNumber: number;
   previousAttemptNumber: number;
+};
+
+type ResolveAuthShellGateOptions = {
+  connectRpcTransport: () => Promise<void>;
+  getAuthStatus: () => Promise<AuthStatus>;
+  onAuthenticatedConnectRetry?: (info: InitialRpcConnectRetryInfo) => void;
+  onAuthenticatedConnectStart?: () => void;
+  prepareSetupEnrollment: () => Promise<TotpEnrollment>;
 };
 
 function defaultRetryWait(delayMs: number): Promise<void> {
@@ -84,4 +108,44 @@ export async function connectRpcTransportWithRetry(options: {
       );
     }
   }
+}
+
+/**
+ * Resolve the auth gate into either setup, login, or the authenticated app,
+ * while reusing the same bounded transport-retry path for every authenticated
+ * bootstrap.
+ */
+export async function resolveAuthShellGate(
+  options: ResolveAuthShellGateOptions,
+): Promise<AuthShellGateResolution> {
+  const status = await options.getAuthStatus();
+
+  if (status.authenticated) {
+    options.onAuthenticatedConnectStart?.();
+    await connectRpcTransportWithRetry({
+      connect: options.connectRpcTransport,
+      ...(options.onAuthenticatedConnectRetry
+        ? {
+            onRetry: options.onAuthenticatedConnectRetry,
+          }
+        : {}),
+    });
+    return {
+      kind: "authenticated",
+      status,
+    };
+  }
+
+  if (!status.configured) {
+    return {
+      enrollment: await options.prepareSetupEnrollment(),
+      kind: "setup",
+      status,
+    };
+  }
+
+  return {
+    kind: "login",
+    status,
+  };
 }
