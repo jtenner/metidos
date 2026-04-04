@@ -380,6 +380,7 @@ const GIT_HISTORY_READ_CONCURRENCY = 2;
 const TASK_CACHE_REFRESH_CONCURRENCY = 1;
 const DIFF_LOAD_CONCURRENCY = 2;
 const WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS = 30_000;
+const TASK_WATCH_RETRY_DELAY_MS = 60_000;
 
 /**
  * Per-worktree command options, including an explicit refresh override.
@@ -404,6 +405,7 @@ type WorktreePollState = {
   historyTimer: ReturnType<typeof setInterval> | null;
   tasks: RpcProjectTask[] | null;
   taskWatchTargets: TaskWatchTarget[];
+  taskWatchTargetRetryAt: Map<string, number>;
   taskWatchers: FSWatcher[];
   taskRefreshPromise: Promise<RpcProjectTask[]> | null;
   taskRefreshQueued: boolean;
@@ -1897,6 +1899,7 @@ function createWorktreePollState(
     historyTimer: null,
     tasks: null,
     taskWatchTargets: [],
+    taskWatchTargetRetryAt: new Map(),
     taskWatchers: [],
     taskRefreshPromise: null,
     taskRefreshQueued: false,
@@ -2090,8 +2093,60 @@ function startWorktreeTaskPolling(
   };
 
   for (const target of worktreeState.taskWatchTargets) {
+    const nextRetryAt =
+      worktreeState.taskWatchTargetRetryAt.get(target.path) ?? 0;
+    if (Date.now() < nextRetryAt) {
+      continue;
+    }
+    if (!safeIsDirectory(target.path)) {
+      worktreeState.taskWatchTargetRetryAt.set(
+        target.path,
+        Date.now() + TASK_WATCH_RETRY_DELAY_MS,
+      );
+      continue;
+    }
+
+    const unregisterWatcher = (watcherToRemove: FSWatcher | null) => {
+      if (!watcherToRemove) {
+        return;
+      }
+
+      const index = worktreeState.taskWatchers.indexOf(watcherToRemove);
+      if (index >= 0) {
+        worktreeState.taskWatchers.splice(index, 1);
+      }
+    };
+
+    let watcher: FSWatcher | null = null;
+    const onWatchError = (error: unknown) => {
+      const watchErrorCode =
+        error instanceof Error ? (error as NodeJS.ErrnoException).code : null;
+      const shouldBackoffWatchTarget =
+        watchErrorCode === "EINVAL" ||
+        watchErrorCode === "ENOENT" ||
+        watchErrorCode === "ENOTDIR";
+      if (shouldBackoffWatchTarget) {
+        worktreeState.taskWatchTargetRetryAt.set(
+          target.path,
+          Date.now() + TASK_WATCH_RETRY_DELAY_MS,
+        );
+        unregisterWatcher(watcher);
+        if (watcher) {
+          try {
+            watcher.close();
+          } catch {
+            // Ignore watcher close failures during task watch error recovery.
+          }
+        }
+        return;
+      }
+
+      console.error(`Task watcher failed for ${target.path}`, error);
+      invalidateTaskState();
+    };
+
     try {
-      const watcher = watch(target.path, (eventType, filename) => {
+      watcher = watch(target.path, (eventType, filename) => {
         const watchedName = filename ? String(filename) : "";
         if (target.kind === "tasks") {
           if (watchedName.startsWith(".")) {
@@ -2110,12 +2165,24 @@ function startWorktreeTaskPolling(
           invalidateTaskState();
         }
       });
-      watcher.on("error", (error) => {
-        console.error(`Task watcher failed for ${target.path}`, error);
-        invalidateTaskState();
-      });
+      watcher.on("error", onWatchError);
+      worktreeState.taskWatchTargetRetryAt.delete(target.path);
       worktreeState.taskWatchers.push(watcher);
     } catch (error) {
+      const watchErrorCode =
+        error instanceof Error ? (error as NodeJS.ErrnoException).code : null;
+      if (
+        watchErrorCode === "EINVAL" ||
+        watchErrorCode === "ENOENT" ||
+        watchErrorCode === "ENOTDIR"
+      ) {
+        worktreeState.taskWatchTargetRetryAt.set(
+          target.path,
+          Date.now() + TASK_WATCH_RETRY_DELAY_MS,
+        );
+        continue;
+      }
+
       console.error(`Failed to watch task inputs in ${target.path}`, error);
     }
   }
