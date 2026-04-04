@@ -119,6 +119,8 @@
 │     ├─ project-close.test.ts
 │     ├─ project-close.ts
 │     ├─ rpc-errors.ts
+│     ├─ startup-project-restore.test.ts
+│     ├─ startup-project-restore.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx

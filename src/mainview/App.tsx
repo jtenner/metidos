@@ -107,6 +107,10 @@ import {
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { runRollbackSafeProjectClose } from "./project-close";
 import { isStepUpRequiredError } from "./rpc-errors";
+import {
+  closeProjectsForStartupRestore,
+  reconcileStartupProjectRestore,
+} from "./startup-project-restore";
 
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
@@ -2426,24 +2430,19 @@ export default function App({
       } else if (loadedProjects[0]) {
         restoredOpenProjectIds.add(loadedProjects[0].id);
       }
-      const optimisticProjects = loadedProjects.map((project) => ({
-        ...project,
-        isOpen: restoredOpenProjectIds.has(project.id)
-          ? (1 as const)
-          : (0 as const),
-      }));
+      const startupProjects = closeProjectsForStartupRestore(loadedProjects);
       const initialThreadProject =
         initialThread === null
           ? undefined
-          : optimisticProjects.find(
+          : startupProjects.find(
               (project) => project.id === initialThread.projectId,
             );
       const initialProject =
         initialThreadProject ??
-        optimisticProjects.find(
+        startupProjects.find(
           (project) => project.id === persistedState.selectedProjectId,
         ) ??
-        optimisticProjects[0] ??
+        startupProjects[0] ??
         null;
       const initialWorktreePath =
         initialThread?.worktreePath ??
@@ -2454,7 +2453,7 @@ export default function App({
             ? persistedState.selectedWorktreePath
             : initialProject.path);
 
-      setProjects(optimisticProjects);
+      setProjects(startupProjects);
       setThreads(startupThreads);
       setCodexModels(modelCatalog.models);
       setDefaultCodexModel(modelCatalog.defaultModel);
@@ -2521,7 +2520,7 @@ export default function App({
           })
         : null;
 
-      const restoredProjects = optimisticProjects.filter((project) =>
+      const restoredProjects = startupProjects.filter((project) =>
         restoredOpenProjectIds.has(project.id),
       );
 
@@ -2547,9 +2546,31 @@ export default function App({
             priority: "foreground",
           },
         );
+        const reconciledRestore = reconcileStartupProjectRestore({
+          allowSelectedProjectFallback: initialThread === null,
+          projects: startupProjects,
+          results: restoredProjectResults,
+          selectedProjectId: selectedProjectIdRef.current,
+          selectedWorktreePath: selectedWorktreePathRef.current,
+        });
+        setProjects(reconciledRestore.projects);
+        for (const path of reconciledRestore.failedProjectPaths) {
+          setProjectTreeOpen(path, false);
+        }
+        if (
+          reconciledRestore.selectedProjectId !==
+            selectedProjectIdRef.current ||
+          reconciledRestore.selectedWorktreePath !==
+            selectedWorktreePathRef.current
+        ) {
+          selectedProjectIdRef.current = reconciledRestore.selectedProjectId;
+          selectedWorktreePathRef.current =
+            reconciledRestore.selectedWorktreePath;
+          setSelectedProjectId(reconciledRestore.selectedProjectId);
+          setSelectedWorktreePath(reconciledRestore.selectedWorktreePath);
+        }
         for (const result of restoredProjectResults) {
           if (result.ok) {
-            setProjects((prev) => upsertProjectList(prev, result.project));
             setProjectState(result.project.id, {
               worktrees: result.worktrees,
               loadingWorktrees: false,

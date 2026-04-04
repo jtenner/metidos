@@ -16,6 +16,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `project-close.ts` isolates the rollback-safe project-collapse sequencing so the UI only commits local close state after the backend confirms the project has closed.
 
+`startup-project-restore.ts` isolates startup restore reconciliation for project reopen state so the UI keeps projects closed until batch restore confirms them and can roll back failed restore targets cleanly.
+
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 
 `index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.

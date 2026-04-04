@@ -4,12 +4,6 @@
 
 ## Active Correctness Slices
 
-### Slice 1
-
-- Title: Revalidate restored project openness during startup
-- Description: Change startup restore so projects are not treated as open until `openProjectsBatch(...)` confirms them. Clear optimistic open state when a restored project no longer exists or fails to reopen cleanly.
-- Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
-
 ### Slice 2
 
 - Title: Roll back stale restored worktree selections
@@ -17,6 +11,13 @@
 - Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
 
 ## Recently Completed
+
+### Slice 1
+
+- Title: Revalidate restored project openness during startup
+- Completed: 2026-04-04
+- Outcome: Startup now initializes every project as closed, then reconciles `openProjectsBatch(...)` results back into the project list so only confirmed restores become open in the UI. Failed restore targets are collapsed out of persisted sidebar-open state, and project-only startup selection can fall back to a successfully reopened project instead of staying pinned to an unconfirmed restore target.
+- Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
 
 ### Slice 4
 
