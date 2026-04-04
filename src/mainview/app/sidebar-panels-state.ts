@@ -103,7 +103,7 @@ export function readSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
 }
 
 /**
- * Check whether a project row is currently expanded in sidebar state.
+ * Check whether a project row path is currently marked expanded in sidebar state.
  */
 export function isProjectTreeOpen(projectPath: string): boolean {
   return ensureSidebarPanelsSnapshot().openProjectPaths.has(projectPath);

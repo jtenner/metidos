@@ -154,7 +154,7 @@ export function useMainviewDerivedState({
   );
 
   const hasWorkingThreads = useMemo(
-    // Indicates whether any thread is currently running in the workspace.
+    // Tracks whether any thread in the workspace list is in the working state.
     () => threads.some((thread) => thread.runStatus.state === "working"),
     [threads],
   );

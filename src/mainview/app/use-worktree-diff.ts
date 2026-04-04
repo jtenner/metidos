@@ -16,7 +16,7 @@ const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
 
 /** Parameters controlling worktree snapshot and diff polling behavior. */
 type UseWorktreeDiffParams = {
-  /** Whether the active worktree is currently opened in the UI state. */
+  /** Whether the active worktree is currently opened in the workspace panel. */
   activeSelectedWorktreeOpened: boolean;
   /** Active worktree path selected by the UI. */
   activeSelectedWorktreePath: string | null;
@@ -28,9 +28,9 @@ type UseWorktreeDiffParams = {
   primaryView: "chat" | "diff" | "tasks";
   /** RPC procedures for fetching snapshot and file diffs. */
   procedures: ProjectProcedures;
-  /** Currently selected threaded change for patch rendering. */
+  /** Selected worktree change that should render as the focused patch row. */
   selectedDiffFileChange: RpcWorktreeChange | null;
-  /** Currently selected file path in diff view. */
+  /** Selected file path currently displayed in the diff viewer. */
   selectedDiffFilePath: string | null;
   /** Selected project for loading worktree data. */
   selectedProject: RpcProject | null;

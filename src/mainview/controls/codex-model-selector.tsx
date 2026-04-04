@@ -137,7 +137,7 @@ export function CodexModelSelector({
   }, [dropdownOpen, expandedModelId, filteredModelIds]);
 
   useEffect(() => {
-    // Position the mobile submenu next to the currently hovered/focused model.
+    // Position the mobile submenu next to the currently expanded model button.
     // We clamp to panel bounds so the flyout never overflows vertically.
     if (!dropdownOpen || expandedModelId == null) {
       return;

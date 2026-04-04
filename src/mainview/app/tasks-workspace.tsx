@@ -4,7 +4,7 @@ import { materialSymbol } from "../controls/icons";
 import { formatPathForDisplay } from "./state";
 
 type TasksWorkspaceProps = {
-  /** True when the currently selected worktree was already opened. */
+  /** True when the currently selected worktree is already opened in sidebar state. */
   activeSelectedWorktreeOpened: boolean;
   /** Absolute path of the currently selected worktree in the projects panel. */
   activeSelectedWorktreePath: string | null;
@@ -60,7 +60,7 @@ export function TasksWorkspace({
 }: TasksWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
 
-  // Title/subtitle are based on whether a worktree can currently be operated on.
+  // Title/subtitle reflect whether a selected worktree is available to open tasks.
   const title = selectedProject ? "Project Tasks" : "No project selected";
   const subtitle = selectedProject
     ? formatPathForDisplay(

@@ -422,7 +422,7 @@ function isPreviewAnchorActive(
   anchorId: string,
   popover: ErrorPreviewPopoverState | ThreadSummaryPopoverState | null,
 ): boolean {
-  // Small helper used to determine whether a given anchor currently owns a popover.
+  // Compare an anchor id against the active popover's anchor ownership.
   return popover?.anchorId === anchorId;
 }
 
