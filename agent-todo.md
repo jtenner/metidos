@@ -324,7 +324,7 @@ Done when:
 
 ### Slice P2.6: Virtualize large diff content
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `DiffViewer` still renders all parsed diff lines once the diff is opened.

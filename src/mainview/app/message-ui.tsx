@@ -1,4 +1,12 @@
-import { type CSSProperties, type JSX, memo, useMemo, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  type CSSProperties,
+  type JSX,
+  memo,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { BeatLoader } from "react-spinners";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -32,6 +40,9 @@ const codeTagStyle = {
 } satisfies CSSProperties;
 const MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS = 12_000;
 const MAX_HIGHLIGHTED_CODE_BLOCK_LINES = 240;
+const DIFF_LINE_ESTIMATE_PX = 24;
+const DIFF_VIRTUALIZATION_OVERSCAN = 20;
+const MIN_VIRTUALIZED_DIFF_LINES = 400;
 
 type DiffLine = {
   kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
@@ -308,6 +319,25 @@ function errorItemStateLabel(
   return "Noted";
 }
 
+function diffLineClassName(kind: DiffLine["kind"]): string {
+  if (kind === "meta") {
+    return "bg-[#0f1418] text-[#8aa6ba]";
+  }
+  if (kind === "file") {
+    return "bg-[#12191e] text-[#b7d0e1]";
+  }
+  if (kind === "hunk") {
+    return "bg-[#182229] text-[#f0d79a]";
+  }
+  if (kind === "add") {
+    return "bg-[#112118] text-[#9fe2b1]";
+  }
+  if (kind === "remove") {
+    return "bg-[#27141a] text-[#ffb1bf]";
+  }
+  return "text-[#c9d2d8]";
+}
+
 /**
  * Render a unified diff block with simple line-kind based coloring.
  * Keeps lines with empty bodies as non-empty whitespace so row heights stay stable.
@@ -322,6 +352,18 @@ export function DiffViewer({
   viewportClassName?: string;
 }): JSX.Element {
   const lines = useMemo(() => parseUnifiedDiff(diffText), [diffText]);
+  const scrollRef = useRef<HTMLElement | null>(null);
+  const useVirtualizedDiff = lines.length >= MIN_VIRTUALIZED_DIFF_LINES;
+  const virtualizer = useVirtualizer({
+    count: lines.length,
+    estimateSize: () => DIFF_LINE_ESTIMATE_PX,
+    getScrollElement: () => scrollRef.current,
+    overscan: DIFF_VIRTUALIZATION_OVERSCAN,
+    useAnimationFrameWithResizeObserver: true,
+  });
+  const virtualRows = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
   if (lines.length === 0) {
     return (
       <div className="border border-[#252f36] bg-[#111518] px-3 py-3 text-xs text-[#7f8c95]">
@@ -339,27 +381,46 @@ export function DiffViewer({
         className={`app-scrollbar overflow-auto text-[11px] leading-5 ${
           viewportClassName ?? "max-h-[28rem]"
         }`.trim()}
+        ref={scrollRef}
       >
-        {lines.map((line) => (
+        {useVirtualizedDiff ? (
           <div
-            key={line.key}
-            className={`font-mono px-3 py-0.5 whitespace-pre-wrap ${
-              line.kind === "meta"
-                ? "bg-[#0f1418] text-[#8aa6ba]"
-                : line.kind === "file"
-                  ? "bg-[#12191e] text-[#b7d0e1]"
-                  : line.kind === "hunk"
-                    ? "bg-[#182229] text-[#f0d79a]"
-                    : line.kind === "add"
-                      ? "bg-[#112118] text-[#9fe2b1]"
-                      : line.kind === "remove"
-                        ? "bg-[#27141a] text-[#ffb1bf]"
-                        : "text-[#c9d2d8]"
-            }`}
+            className="relative w-full"
+            style={{
+              height: `${totalSize}px`,
+            }}
           >
-            {line.text || " "}
+            {virtualRows.map((virtualRow) => {
+              const line = lines[virtualRow.index];
+              if (!line) {
+                return null;
+              }
+
+              return (
+                <div
+                  data-index={virtualRow.index}
+                  key={line.key}
+                  ref={virtualizer.measureElement}
+                  className={`absolute left-0 top-0 w-full font-mono px-3 py-0.5 whitespace-pre-wrap ${diffLineClassName(line.kind)}`}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {line.text || " "}
+                </div>
+              );
+            })}
           </div>
-        ))}
+        ) : (
+          lines.map((line) => (
+            <div
+              key={line.key}
+              className={`font-mono px-3 py-0.5 whitespace-pre-wrap ${diffLineClassName(line.kind)}`}
+            >
+              {line.text || " "}
+            </div>
+          ))
+        )}
       </section>
     </div>
   );
