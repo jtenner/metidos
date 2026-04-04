@@ -270,7 +270,7 @@ Done when:
 
 ### Slice P2.3: Make transcript grouping incremental
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Grouping visible messages into assistant/user blocks still walks the whole message list before virtualization.

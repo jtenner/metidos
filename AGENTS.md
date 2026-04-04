@@ -145,6 +145,7 @@
 │     │  ├─ action-menus.tsx
 │     │  ├─ auth-step-up-dialog.tsx
 │     │  ├─ chat-workspace.tsx
+│     │  ├─ chat-workspace.test.ts
 │     │  ├─ desktop-sidebar.tsx
 │     │  ├─ diff-workspace.tsx
 │     │  ├─ git-history-panel.tsx

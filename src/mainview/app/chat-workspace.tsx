@@ -8,7 +8,6 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -38,7 +37,7 @@ import {
   ToolCallMessage,
   WebSearchMessage,
 } from "./message-ui";
-import { APP_TITLE, type MessageGroup, type VisibleMessage } from "./state";
+import { APP_TITLE, type VisibleMessage } from "./state";
 
 type SharedChatControlsProps = {
   activeCodexModel: string;
@@ -70,6 +69,27 @@ type SharedChatControlsProps = {
   codexModels: RpcCodexModelOption[];
 };
 
+type TranscriptMessageGroup =
+  | {
+      kind: "assistant";
+      endIndex: number;
+      key: string;
+      startIndex: number;
+    }
+  | {
+      kind: "user";
+      key: string;
+      messageIndex: number;
+    };
+
+type GroupedVisibleMessagesCache = {
+  activeThreadId: number | null;
+  firstMessageKey: string | null;
+  groups: TranscriptMessageGroup[];
+  lastMessageKey: string | null;
+  messages: VisibleMessage[];
+};
+
 /**
  * Shared props for both desktop and mobile chat views.
  */
@@ -94,9 +114,10 @@ type AssistantMessageRenderer = (message: VisibleMessage) => JSX.Element;
  * Properties needed to render one grouped row in the transcript.
  */
 type GroupRowProps = {
-  group: MessageGroup;
+  group: TranscriptMessageGroup;
   isLast: boolean;
   localUserLabel: string;
+  messages: VisibleMessage[];
   renderAssistantMessageContent: AssistantMessageRenderer;
 };
 
@@ -121,35 +142,125 @@ const UNSAFE_MODE_DESCRIPTION =
   "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
 
 /**
- * Group assistant-visible messages into adjacent assistant-only rows to render as
- * conversational turns; user messages stay as one-row entries.
+ * Append assistant/user transcript group structure for one contiguous message range.
  */
-function groupVisibleMessages(messages: VisibleMessage[]): MessageGroup[] {
-  const groups: MessageGroup[] = [];
+function appendGroupedVisibleMessages(
+  groups: TranscriptMessageGroup[],
+  messages: VisibleMessage[],
+  startIndex: number,
+): TranscriptMessageGroup[] {
+  const nextGroups = groups.slice();
 
-  for (const message of messages) {
+  for (let index = startIndex; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (!message) {
+      continue;
+    }
     if (isAssistantVisibleMessage(message)) {
-      const lastGroup = groups.at(-1);
-      if (lastGroup?.kind === "assistant") {
-        lastGroup.messages.push(message);
+      const lastGroup = nextGroups.at(-1);
+      if (lastGroup?.kind === "assistant" && lastGroup.endIndex === index) {
+        nextGroups[nextGroups.length - 1] = {
+          ...lastGroup,
+          endIndex: index + 1,
+        };
         continue;
       }
-      groups.push({
+      nextGroups.push({
         kind: "assistant",
+        endIndex: index + 1,
         key: message.key,
-        messages: [message],
+        startIndex: index,
       });
       continue;
     }
 
-    groups.push({
+    nextGroups.push({
       kind: "user",
       key: message.key,
-      text: message.kind === "chat" ? message.text : "",
+      messageIndex: index,
     });
   }
 
-  return groups;
+  return nextGroups;
+}
+
+/**
+ * Group assistant-visible messages into adjacent assistant-only rows to render as
+ * conversational turns; user messages stay as one-row entries.
+ */
+function groupVisibleMessages(
+  messages: VisibleMessage[],
+): TranscriptMessageGroup[] {
+  return appendGroupedVisibleMessages([], messages, 0);
+}
+
+export function deriveGroupedVisibleMessages(
+  activeThreadId: number | null,
+  messages: VisibleMessage[],
+  previousCache: GroupedVisibleMessagesCache | null,
+): GroupedVisibleMessagesCache {
+  const firstMessageKey = messages[0]?.key ?? null;
+  const lastMessageKey = messages.at(-1)?.key ?? null;
+
+  if (
+    previousCache &&
+    previousCache.activeThreadId === activeThreadId &&
+    previousCache.messages === messages
+  ) {
+    return previousCache;
+  }
+
+  if (
+    previousCache &&
+    previousCache.activeThreadId === activeThreadId &&
+    previousCache.messages.length === messages.length &&
+    previousCache.firstMessageKey === firstMessageKey &&
+    previousCache.lastMessageKey === lastMessageKey
+  ) {
+    // Group boundaries only depend on message ordering and assistant/user classification.
+    return {
+      ...previousCache,
+      messages,
+    };
+  }
+
+  if (
+    previousCache &&
+    previousCache.activeThreadId === activeThreadId &&
+    previousCache.messages.length > 0 &&
+    previousCache.messages.length < messages.length &&
+    previousCache.firstMessageKey === firstMessageKey &&
+    messages[previousCache.messages.length - 1]?.key ===
+      previousCache.lastMessageKey
+  ) {
+    return {
+      activeThreadId,
+      firstMessageKey,
+      groups: appendGroupedVisibleMessages(
+        previousCache.groups,
+        messages,
+        previousCache.messages.length,
+      ),
+      lastMessageKey,
+      messages,
+    };
+  }
+
+  return {
+    activeThreadId,
+    firstMessageKey,
+    groups: groupVisibleMessages(messages),
+    lastMessageKey,
+    messages,
+  };
+}
+
+function readUserGroupText(
+  group: Extract<TranscriptMessageGroup, { kind: "user" }>,
+  messages: VisibleMessage[],
+): string {
+  const message = messages[group.messageIndex];
+  return message?.kind === "chat" ? message.text : "";
 }
 
 function UnsafeModeToggle({
@@ -211,6 +322,7 @@ function DesktopTranscriptGroupRow({
   group,
   isLast,
   localUserLabel,
+  messages,
   renderAssistantMessageContent,
 }: GroupRowProps): JSX.Element {
   // Desktop rows separate assistant and user turns into distinct alignment/typography paths.
@@ -231,18 +343,23 @@ function DesktopTranscriptGroupRow({
               {APP_TITLE}
             </div>
             <div className="space-y-3">
-              {group.messages.map((message) => (
-                <div
-                  className={`min-w-0 ${
-                    isPlainAssistantTextMessage(message) ? "py-3" : ""
-                  }`}
-                  key={message.key}
-                >
-                  <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
-                    {renderAssistantMessageContent(message)}
+              {Array.from(
+                { length: group.endIndex - group.startIndex },
+                (_, offset) => messages[group.startIndex + offset],
+              ).map((message) =>
+                message ? (
+                  <div
+                    className={`min-w-0 ${
+                      isPlainAssistantTextMessage(message) ? "py-3" : ""
+                    }`}
+                    key={message.key}
+                  >
+                    <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
+                      {renderAssistantMessageContent(message)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ) : null,
+              )}
             </div>
           </div>
         </div>
@@ -253,7 +370,7 @@ function DesktopTranscriptGroupRow({
               {localUserLabel}
             </div>
             <div className="ml-auto max-w-full overflow-hidden rounded-sm bg-[#262626] p-4 text-left text-sm text-[#ffffff]">
-              <MarkdownMessage text={group.text} />
+              <MarkdownMessage text={readUserGroupText(group, messages)} />
             </div>
           </div>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-[#262626]">
@@ -269,6 +386,7 @@ function MobileTranscriptGroupRow({
   group,
   isLast,
   localUserLabel,
+  messages,
   renderAssistantMessageContent,
 }: GroupRowProps): JSX.Element {
   // Mobile keeps cards narrower with larger spacing tuned for touch and small screens.
@@ -289,7 +407,14 @@ function MobileTranscriptGroupRow({
             className="flex w-full flex-col"
             style={{ gap: `${MOBILE_CHAT_ITEM_GAP_PX}px` }}
           >
-            {group.messages.map((message) => {
+            {Array.from(
+              { length: group.endIndex - group.startIndex },
+              (_, offset) => messages[group.startIndex + offset],
+            ).map((message) => {
+              if (!message) {
+                return null;
+              }
+
               if (isPlainAssistantTextMessage(message)) {
                 return (
                   <div
@@ -321,7 +446,7 @@ function MobileTranscriptGroupRow({
               {materialSymbol("account_circle", "text-sm text-[#9f9b99]")}
             </div>
             <div className="w-fit max-w-full bg-[#30353a] px-[10px] py-[10px] text-sm leading-relaxed text-[#ffffff] shadow-sm">
-              <MarkdownMessage text={group.text} />
+              <MarkdownMessage text={readUserGroupText(group, messages)} />
             </div>
           </div>
         </div>
@@ -351,10 +476,16 @@ const ChatTranscript = memo(function ChatTranscript({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
   const previousThreadIdRef = useRef<number | null>(activeThreadId);
-  const groupedMessages = useMemo<MessageGroup[]>(
-    () => groupVisibleMessages(messages),
-    [messages],
+  const groupedMessagesCacheRef = useRef<GroupedVisibleMessagesCache | null>(
+    null,
   );
+  const groupedMessagesCache = deriveGroupedVisibleMessages(
+    activeThreadId,
+    messages,
+    groupedMessagesCacheRef.current,
+  );
+  groupedMessagesCacheRef.current = groupedMessagesCache;
+  const groupedMessages = groupedMessagesCache.groups;
   const hasTopContent = topContent !== null;
   const rowCount = groupedMessages.length + (hasTopContent ? 1 : 0);
 
@@ -536,6 +667,7 @@ const ChatTranscript = memo(function ChatTranscript({
                     group={group}
                     isLast={isLastGroup}
                     localUserLabel={localUserLabel}
+                    messages={messages}
                     renderAssistantMessageContent={
                       renderAssistantMessageContent
                     }
@@ -545,6 +677,7 @@ const ChatTranscript = memo(function ChatTranscript({
                     group={group}
                     isLast={isLastGroup}
                     localUserLabel={localUserLabel}
+                    messages={messages}
                     renderAssistantMessageContent={
                       renderAssistantMessageContent
                     }
