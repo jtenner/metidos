@@ -49,5 +49,6 @@ playwright/.cache/
 
 # OS and editor artifacts
 automation/
+.codex
 .DS_Store
 Thumbs.db
