@@ -80,7 +80,7 @@ Done when:
 
 ### Slice P0.4: Make security-audit payload formatting lazy
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - The security panel stringifies payload JSON during row render even when details remain collapsed.

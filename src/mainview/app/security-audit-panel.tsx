@@ -60,6 +60,92 @@ function readPayloadProjectName(event: RpcSecurityAuditEvent): string | null {
     : null;
 }
 
+const SecurityAuditEventRow = memo(function SecurityAuditEventRow({
+  event,
+  projectLabel,
+  selectedThreadId,
+}: {
+  event: RpcSecurityAuditEvent;
+  projectLabel: string | null;
+  selectedThreadId: number | null;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const payloadText = useMemo(() => {
+    if (!detailsOpen || event.payload === null) {
+      return null;
+    }
+    return JSON.stringify(event.payload, null, 2);
+  }, [detailsOpen, event.payload]);
+
+  return (
+    <article
+      className={`border px-3 py-2.5 ${
+        event.threadId !== null && event.threadId === selectedThreadId
+          ? "border-[#4a6678] bg-[#14202a]"
+          : "border-[#232b30] bg-[#15191b]"
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[#111619] text-[#8ca6b9]">
+          {materialSymbol(eventIconName(event.eventType), "text-[14px]")}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[13px] font-medium leading-4 text-[#f2f0ef]">
+              {event.summaryText}
+            </div>
+            {event.threadId !== null && event.threadId === selectedThreadId ? (
+              <span className="bg-[#24455e] px-1.5 py-0.5 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-[#d8ecf9]">
+                Current Thread
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 text-[10px] text-[#8f9aa2]">
+            {formatAuditTimestamp(event.createdAt)}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="bg-[#101416] px-1.5 py-0.5 font-mono text-[10px] text-[#8ca6b9]">
+              {event.eventType}
+            </span>
+            {projectLabel ? (
+              <span className="bg-[#101416] px-1.5 py-0.5 text-[10px] text-[#d0d7dc]">
+                {projectLabel}
+              </span>
+            ) : null}
+            {event.threadId !== null ? (
+              <span className="bg-[#101416] px-1.5 py-0.5 text-[10px] text-[#d0d7dc]">
+                Thread #{event.threadId}
+              </span>
+            ) : null}
+            {event.worktreePath ? (
+              <span className="max-w-full truncate bg-[#101416] px-1.5 py-0.5 font-mono text-[10px] text-[#d0d7dc]">
+                {event.worktreePath}
+              </span>
+            ) : null}
+          </div>
+          {event.payload !== null ? (
+            <details
+              className="mt-2"
+              onToggle={(event) => {
+                setDetailsOpen(event.currentTarget.open);
+              }}
+            >
+              <summary className="cursor-pointer text-[10px] uppercase tracking-[0.16em] text-[#8ca6b9]">
+                Event details
+              </summary>
+              {payloadText ? (
+                <pre className="mt-2 overflow-x-auto bg-[#0f1315] px-2 py-2 text-[10px] leading-4 text-[#cdd8df]">
+                  {payloadText}
+                </pre>
+              ) : null}
+            </details>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+});
+
 export const SecurityAuditPanel = memo(function SecurityAuditPanel({
   selectedProjectId,
   events,
@@ -232,76 +318,14 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
                     ? (projectNames.get(event.projectId) ??
                       `Project #${event.projectId}`)
                     : null);
-                const payloadText =
-                  event.payload === null
-                    ? null
-                    : JSON.stringify(event.payload, null, 2);
 
                 return (
-                  <article
+                  <SecurityAuditEventRow
                     key={event.id}
-                    className={`border px-3 py-2.5 ${
-                      event.threadId !== null &&
-                      event.threadId === selectedThreadId
-                        ? "border-[#4a6678] bg-[#14202a]"
-                        : "border-[#232b30] bg-[#15191b]"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[#111619] text-[#8ca6b9]">
-                        {materialSymbol(
-                          eventIconName(event.eventType),
-                          "text-[14px]",
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-[13px] font-medium leading-4 text-[#f2f0ef]">
-                            {event.summaryText}
-                          </div>
-                          {event.threadId !== null &&
-                          event.threadId === selectedThreadId ? (
-                            <span className="bg-[#24455e] px-1.5 py-0.5 font-label text-[9px] font-semibold uppercase tracking-[0.18em] text-[#d8ecf9]">
-                              Current Thread
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 text-[10px] text-[#8f9aa2]">
-                          {formatAuditTimestamp(event.createdAt)}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className="bg-[#101416] px-1.5 py-0.5 font-mono text-[10px] text-[#8ca6b9]">
-                            {event.eventType}
-                          </span>
-                          {projectLabel ? (
-                            <span className="bg-[#101416] px-1.5 py-0.5 text-[10px] text-[#d0d7dc]">
-                              {projectLabel}
-                            </span>
-                          ) : null}
-                          {event.threadId !== null ? (
-                            <span className="bg-[#101416] px-1.5 py-0.5 text-[10px] text-[#d0d7dc]">
-                              Thread #{event.threadId}
-                            </span>
-                          ) : null}
-                          {event.worktreePath ? (
-                            <span className="max-w-full truncate bg-[#101416] px-1.5 py-0.5 font-mono text-[10px] text-[#d0d7dc]">
-                              {event.worktreePath}
-                            </span>
-                          ) : null}
-                        </div>
-                        {payloadText ? (
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-[10px] uppercase tracking-[0.16em] text-[#8ca6b9]">
-                              Event details
-                            </summary>
-                            <pre className="mt-2 overflow-x-auto bg-[#0f1315] px-2 py-2 text-[10px] leading-4 text-[#cdd8df]">
-                              {payloadText}
-                            </pre>
-                          </details>
-                        ) : null}
-                      </div>
-                    </div>
-                  </article>
+                    event={event}
+                    projectLabel={projectLabel}
+                    selectedThreadId={selectedThreadId}
+                  />
                 );
               })}
             </div>
