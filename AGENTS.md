@@ -133,6 +133,8 @@
 │     ├─ startup-project-restore.ts
 │     ├─ startup-worktree-restore.test.ts
 │     ├─ startup-worktree-restore.ts
+│     ├─ thread-send.test.ts
+│     ├─ thread-send.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx

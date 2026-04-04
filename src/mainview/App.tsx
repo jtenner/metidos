@@ -117,6 +117,10 @@ import {
   filterStartupWorktreeRestoreRequests,
   reconcileStartupSelectedWorktreePath,
 } from "./startup-worktree-restore";
+import {
+  shouldApplySentThreadDetailToSelection,
+  shouldApplyThreadSendFailureToSelection,
+} from "./thread-send";
 
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
@@ -4199,6 +4203,7 @@ export default function App({
       return;
     }
 
+    const sendingThreadId = selectedThreadId;
     const pendingInput = text;
     setIsSending(true);
     setChatError("");
@@ -4206,16 +4211,36 @@ export default function App({
     void (async () => {
       try {
         const detail = await procedures.sendThreadMessage({
-          threadId: selectedThreadId,
+          threadId: sendingThreadId,
           input: pendingInput,
         });
         setThreads((prev) => upsertThreadList(prev, detail.thread));
-        selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-        setThreadMessages(detail.messages);
+        if (
+          shouldApplySentThreadDetailToSelection({
+            detail,
+            requestedThreadId: sendingThreadId,
+            selectedThreadId: selectedThreadIdRef.current,
+          })
+        ) {
+          selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+          setThreadMessages(detail.messages);
+        }
       } catch (error) {
-        setChatError(error instanceof Error ? error.message : String(error));
-        if (!readChatComposerDraft()) {
-          setChatComposerDraft(pendingInput);
+        if (
+          shouldApplyThreadSendFailureToSelection({
+            requestedThreadId: sendingThreadId,
+            selectedThreadId: selectedThreadIdRef.current,
+          })
+        ) {
+          setChatError(error instanceof Error ? error.message : String(error));
+          if (!readChatComposerDraft()) {
+            setChatComposerDraft(pendingInput);
+          }
+        } else {
+          console.error(
+            `Failed to send message for stale thread selection ${sendingThreadId}`,
+            error,
+          );
         }
       } finally {
         setIsSending(false);

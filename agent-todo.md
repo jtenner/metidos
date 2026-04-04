@@ -52,6 +52,8 @@ Done when:
 
 ## Slice 3: Guard message-send completions against thread switches
 
+Status: completed on 2026-04-04
+
 Audit reference: [Correctness audit - 2026-04-04](docs/2026-04-04-correctness-audit-current-tree.md)
 Finding: `3. High: sending a message can overwrite the currently visible thread after the user switches threads`
 
