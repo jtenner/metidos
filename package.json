@@ -7,7 +7,7 @@
     "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
     "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
     "start": "bun run tailwind:build && bun run src/bun/isolated-server.ts",
-    "start:tls": "bun run tailwind:build && bun run src/bun/isolated-server.ts --tls",
+    "start:tls": "bun run tailwind:build && JOLT_ALLOWED_WS_ORIGINS=\"${JOLT_ALLOWED_WS_ORIGINS:-}${JOLT_PUBLIC_ORIGIN:+ ${JOLT_PUBLIC_ORIGIN}}\" bun run src/bun/isolated-server.ts --tls",
     "start:monolith": "bun run tailwind:build && bun run src/bun/index.ts",
     "dev": "bun run tailwind:build && (bun run tailwind:watch & bun src/bun/index.ts)",
     "dev:watch": "bun run dev",

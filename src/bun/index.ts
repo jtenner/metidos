@@ -523,15 +523,11 @@ function resolveRpcClientOriginFromRequest(request: Request): string | null {
     return normalizeBrowserOrigin(`${protocol}://${forwardedHost}`);
   }
 
-  if (TLS_RUNTIME.publicTls) {
-    const host = request.headers.get("host")?.trim();
-    if (!host) {
-      return null;
-    }
-    return normalizeBrowserOrigin(`${protocol}://${host}`);
+  const host = request.headers.get("host")?.trim();
+  if (!host) {
+    return null;
   }
-
-  return null;
+  return normalizeBrowserOrigin(`${protocol}://${host}`);
 }
 
 function normalizeAuthRouteOrigin(origin: string): string | null {

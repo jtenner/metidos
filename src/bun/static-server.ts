@@ -104,13 +104,14 @@ function stringResponse(
   body: string,
   contentType: string,
   status = 200,
+  connectUrls: string[] = [],
 ): Response {
   const headers = new Headers({
     "cache-control": "no-store",
     "content-type": contentType,
   });
   applySecurityHeaders(headers, {
-    connectUrls: CSP_CONNECT_URLS,
+    connectUrls,
   });
   return new Response(body, {
     status,
@@ -122,13 +123,17 @@ function stringResponse(
  * Creates an HTTP response by streaming the file at `path` and forcing no-cache
  * behavior to ensure UI updates are immediately visible during development.
  */
-function fileResponse(path: string, contentType: string): Response {
+function fileResponse(
+  path: string,
+  contentType: string,
+  connectUrls: string[] = [],
+): Response {
   const headers = new Headers({
     "cache-control": "no-store",
     "content-type": contentType,
   });
   applySecurityHeaders(headers, {
-    connectUrls: CSP_CONNECT_URLS,
+    connectUrls,
   });
   return new Response(Bun.file(path), {
     headers,
@@ -140,6 +145,7 @@ function fileResponse(path: string, contentType: string): Response {
  */
 async function buildHtmlResponse(
   runtimeConfig: RuntimeConfig,
+  connectUrls: string[],
 ): Promise<Response> {
   const runtimeConfigElement = buildRuntimeConfigElement(runtimeConfig);
   const template = await Bun.file(MAINVIEW_HTML_PATH).text();
@@ -147,7 +153,7 @@ async function buildHtmlResponse(
     ? template.replace("</head>", `${runtimeConfigElement}\n\t</head>`)
     : `${runtimeConfigElement}\n${template}`;
 
-  return stringResponse(html, "text/html; charset=utf-8");
+  return stringResponse(html, "text/html; charset=utf-8", 200, connectUrls);
 }
 
 /**
@@ -238,7 +244,102 @@ function resolveForwardedProto(request: Request): "http" | "https" {
   return new URL(request.url).protocol === "https:" ? "https" : "http";
 }
 
-async function proxyBackendAuthRequest(request: Request): Promise<Response> {
+function readBrowserFacingHost(request: Request): string | null {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  if (forwardedHost) {
+    return forwardedHost;
+  }
+
+  const hostHeader = request.headers.get("host")?.trim();
+  if (hostHeader) {
+    return hostHeader;
+  }
+
+  try {
+    return new URL(request.url).host;
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackBrowserHost(host: string | null): boolean {
+  if (!host) {
+    return false;
+  }
+
+  try {
+    const url = new URL(`http://${host}`);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+function shouldInjectDirectRpcWebSocketUrlForRequest(
+  request: Request,
+): boolean {
+  if (process.env.JOLT_RPC_URL?.trim()) {
+    return true;
+  }
+
+  if (resolveForwardedProto(request) === "https") {
+    return false;
+  }
+
+  return isLoopbackBrowserHost(readBrowserFacingHost(request));
+}
+
+function buildBrowserFacingWebSocketUrl(request: Request): string | null {
+  const browserFacingHost = readBrowserFacingHost(request);
+  if (!browserFacingHost) {
+    return null;
+  }
+
+  return `${resolveForwardedProto(request) === "https" ? "wss" : "ws"}://${browserFacingHost}/rpc`;
+}
+
+function buildConnectUrlsForRequest(request: Request): string[] {
+  const connectUrls = new Set<string>();
+  if (shouldInjectDirectRpcWebSocketUrlForRequest(request)) {
+    connectUrls.add(RPC_WEBSOCKET_URL);
+  }
+
+  const browserFacingWebSocketUrl = buildBrowserFacingWebSocketUrl(request);
+  if (browserFacingWebSocketUrl) {
+    connectUrls.add(browserFacingWebSocketUrl);
+  }
+
+  return [...connectUrls];
+}
+
+function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
+  const forwardedProto = resolveForwardedProto(request);
+  const shouldInjectDirectRpcWebSocketUrl =
+    shouldInjectDirectRpcWebSocketUrlForRequest(request);
+
+  return {
+    devServer: IS_DEV_SERVER,
+    healthUrl: "/health",
+    ...(forwardedProto === "https" || TLS_RUNTIME.publicTls
+      ? {
+          preferTls: true,
+        }
+      : {}),
+    ...(shouldInjectDirectRpcWebSocketUrl
+      ? {
+          rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+        }
+      : {}),
+  };
+}
+
+async function proxyBackendAuthRequest(
+  request: Request,
+  connectUrls: string[],
+): Promise<Response> {
   const requestUrl = new URL(request.url);
   const targetUrl = new URL(
     `${requestUrl.pathname}${requestUrl.search}`,
@@ -259,7 +360,7 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
   const response = await fetch(targetUrl, init);
   const responseHeaders = new Headers(response.headers);
   applySecurityHeaders(responseHeaders, {
-    connectUrls: CSP_CONNECT_URLS,
+    connectUrls,
   });
 
   return new Response(response.body, {
@@ -269,25 +370,6 @@ async function proxyBackendAuthRequest(request: Request): Promise<Response> {
 }
 
 const mainviewBundlePath = await buildMainviewBundle();
-const shouldInjectDirectRpcWebSocketUrl =
-  Boolean(process.env.JOLT_RPC_URL?.trim()) || !TLS_RUNTIME.publicTls;
-const CSP_CONNECT_URLS = shouldInjectDirectRpcWebSocketUrl
-  ? [RPC_WEBSOCKET_URL]
-  : [];
-const runtimeConfig: RuntimeConfig = {
-  devServer: IS_DEV_SERVER,
-  healthUrl: "/health",
-  ...(TLS_RUNTIME.publicTls
-    ? {
-        preferTls: true,
-      }
-    : {}),
-  ...(shouldInjectDirectRpcWebSocketUrl
-    ? {
-        rpcWebSocketUrl: RPC_WEBSOCKET_URL,
-      }
-    : {}),
-};
 
 let server: ReturnType<typeof Bun.serve>;
 
@@ -298,10 +380,11 @@ server = Bun.serve({
   async fetch(request): Promise<Response> {
     // Route only what the frontend requires and leave unknown paths as 404.
     const { pathname } = new URL(request.url);
+    const connectUrls = buildConnectUrlsForRequest(request);
 
     if (pathname.startsWith("/auth/")) {
       try {
-        return await proxyBackendAuthRequest(request);
+        return await proxyBackendAuthRequest(request, connectUrls);
       } catch (error) {
         console.error("Failed to proxy auth request to backend", error);
         return stringResponse(
@@ -311,35 +394,56 @@ server = Bun.serve({
           }),
           "application/json; charset=utf-8",
           502,
+          connectUrls,
         );
       }
     }
 
     if (pathname === "/" || pathname === "/index.html") {
-      return buildHtmlResponse(runtimeConfig);
+      return buildHtmlResponse(
+        buildRuntimeConfigForRequest(request),
+        connectUrls,
+      );
     }
 
     if (pathname === "/index.css") {
-      return fileResponse(MAINVIEW_CSS_PATH, "text/css; charset=utf-8");
+      return fileResponse(
+        MAINVIEW_CSS_PATH,
+        "text/css; charset=utf-8",
+        connectUrls,
+      );
     }
 
     if (pathname === "/index.js") {
       return fileResponse(
         mainviewBundlePath,
         "application/javascript; charset=utf-8",
+        connectUrls,
       );
     }
 
     if (pathname === "/fonts/fira-code-vf.woff2") {
-      return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
+      return fileResponse(
+        FIRA_CODE_VARIABLE_FONT_PATH,
+        "font/woff2",
+        connectUrls,
+      );
     }
 
     if (pathname === "/fonts/inter-latin-wght-normal.woff2") {
-      return fileResponse(INTER_VARIABLE_FONT_LATIN_PATH, "font/woff2");
+      return fileResponse(
+        INTER_VARIABLE_FONT_LATIN_PATH,
+        "font/woff2",
+        connectUrls,
+      );
     }
 
     if (pathname === "/fonts/inter-latin-ext-wght-normal.woff2") {
-      return fileResponse(INTER_VARIABLE_FONT_LATIN_EXT_PATH, "font/woff2");
+      return fileResponse(
+        INTER_VARIABLE_FONT_LATIN_EXT_PATH,
+        "font/woff2",
+        connectUrls,
+      );
     }
 
     if (pathname === "/health") {
@@ -348,10 +452,16 @@ server = Bun.serve({
         JSON.stringify(buildLivenessPayload(backendOk)),
         "application/json; charset=utf-8",
         backendOk ? 200 : 503,
+        connectUrls,
       );
     }
 
-    return stringResponse("Not found", "text/plain; charset=utf-8", 404);
+    return stringResponse(
+      "Not found",
+      "text/plain; charset=utf-8",
+      404,
+      connectUrls,
+    );
   },
 });
 
