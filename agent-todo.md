@@ -63,7 +63,7 @@ Done when:
 
 ### Slice P0.3: Remove or throttle thread preview `onMouseMove` churn
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Thread summary previews do layout reads and state updates on every mouse move.

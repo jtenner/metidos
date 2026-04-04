@@ -208,7 +208,7 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
       summary: string | null | undefined,
     ): Pick<
       HTMLAttributes<HTMLElement>,
-      "onMouseEnter" | "onMouseMove" | "onMouseLeave" | "onFocus" | "onBlur"
+      "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
     > => {
       const previewSummary = summary?.trim();
       const viewportWidth =
@@ -218,16 +218,7 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
       }
       return {
         onMouseEnter: (event) => {
-          // Open on hover enter and keep live updates for mouse movement.
-          showThreadSummaryPreview(
-            event as ReactMouseEvent<HTMLElement>,
-            anchorId,
-            title,
-            previewSummary,
-          );
-        },
-        onMouseMove: (event) => {
-          // Mouse move keeps the popover pinned when cursor drifts within the target.
+          // Open once on hover enter; the popover is row-anchored, not cursor-anchored.
           showThreadSummaryPreview(
             event as ReactMouseEvent<HTMLElement>,
             anchorId,
