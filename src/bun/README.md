@@ -112,7 +112,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes unless an explicit override is supplied.
 
 - `auth.ts`
-  - Provides the first-pass auth primitives used by future setup/login flows.
+  - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
 
 - `auth-secrets.ts`
@@ -120,7 +120,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Encrypts and decrypts stored auth secrets with a locally generated AES-GCM key.
 
 - `auth-service.ts`
-  - Implements the backend auth flow used by upcoming HTTP routes and RPC gating.
+  - Implements the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
   - Coordinates setup, TOTP login, recovery-code login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
   - Persists security audit events for successful auth setup, login, step-up, recovery-code usage, logout transitions, and invalid-credential lockout events.
   - Also manages the 24-hour idle session timeout plus the short-lived step-up freshness window used to protect high-risk RPC actions such as task execution and project deletion.
