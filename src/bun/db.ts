@@ -2015,6 +2015,74 @@ export function listThreadMessages(
     .all(threadId);
 }
 
+export function listThreadMessagesPage(
+  database: Database,
+  threadId: number,
+  options?: {
+    cursor?: number | null;
+    limit?: number;
+  },
+): {
+  messages: ThreadMessageRecord[];
+  nextCursor: number | null;
+} {
+  const limit = Math.max(1, options?.limit ?? 100);
+  const pageSize = limit + 1;
+  const cursor = typeof options?.cursor === "number" ? options.cursor : null;
+  const rows =
+    cursor === null
+      ? database
+          .query<ThreadMessageRecord, [number, number]>(
+            `
+				SELECT
+					id,
+					thread_id AS threadId,
+					role,
+					kind,
+					item_id AS itemId,
+					text,
+					state,
+					payload_json AS payloadJson,
+					created_at AS createdAt,
+					COALESCE(updated_at, created_at) AS updatedAt
+				FROM thread_messages
+				WHERE thread_id = ?
+				ORDER BY id DESC
+				LIMIT ?
+			`,
+          )
+          .all(threadId, pageSize)
+      : database
+          .query<ThreadMessageRecord, [number, number, number]>(
+            `
+				SELECT
+					id,
+					thread_id AS threadId,
+					role,
+					kind,
+					item_id AS itemId,
+					text,
+					state,
+					payload_json AS payloadJson,
+					created_at AS createdAt,
+					COALESCE(updated_at, created_at) AS updatedAt
+				FROM thread_messages
+				WHERE thread_id = ?
+					AND id < ?
+				ORDER BY id DESC
+				LIMIT ?
+			`,
+          )
+          .all(threadId, cursor, pageSize);
+  const hasMore = rows.length > limit;
+  const pageRows = (hasMore ? rows.slice(0, limit) : rows).reverse();
+  return {
+    messages: pageRows,
+    nextCursor:
+      hasMore && pageRows.length > 0 ? (pageRows[0]?.id ?? null) : null,
+  };
+}
+
 export function createThreadMessage(
   database: Database,
   input: ThreadMessageInput,

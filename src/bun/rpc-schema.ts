@@ -440,6 +440,7 @@ export type RpcThreadMessage =
 export type RpcThreadDetail = {
   thread: RpcThread;
   messages: RpcThreadMessage[];
+  nextCursor: number | null;
 };
 
 /**
@@ -602,7 +603,7 @@ export type AppRPCSchema = {
       response: RpcThreadStartRequest;
     };
     getThread: {
-      params: { threadId: number };
+      params: { threadId: number; cursor?: number | null };
       response: RpcThreadDetail;
     };
     markThreadErrorSeen: {

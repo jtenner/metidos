@@ -21,6 +21,7 @@ import {
   listProjects,
   listProjectWorktreePins,
   listThreadMessages,
+  listThreadMessagesPage,
   listThreads,
   listThreadsWithInProgressMessages,
   markThreadErrorSeen,
@@ -433,6 +434,7 @@ const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 const threadTurnAbortControllerMap = new Map<number, AbortController>();
 const threadTurnCompletionMap = new Map<number, Promise<void>>();
 const threadDetailCache = new Map<number, RpcThreadDetail>();
+const THREAD_DETAIL_PAGE_MESSAGE_LIMIT = 100;
 const gitCommitDiffCache = new Map<string, RpcGitCommitDiffResult>();
 const gitCommitDiffRequestCache = new Map<
   string,
@@ -786,11 +788,21 @@ function rpcThreadById(threadId: number): RpcThread {
   return toRpcThread(thread, currentThreadRunStatus(thread));
 }
 
-async function buildThreadDetail(threadId: number): Promise<RpcThreadDetail> {
+async function buildThreadDetail(
+  threadId: number,
+  options?: {
+    cursor?: number | null;
+  },
+): Promise<RpcThreadDetail> {
   const thread = threadById(threadId);
+  const page = listThreadMessagesPage(db, thread.id, {
+    cursor: options?.cursor ?? null,
+    limit: THREAD_DETAIL_PAGE_MESSAGE_LIMIT,
+  });
   return {
     thread: toRpcThread(thread, currentThreadRunStatus(thread)),
-    messages: toRpcThreadMessages(listThreadMessages(db, thread.id)),
+    messages: toRpcThreadMessages(page.messages),
+    nextCursor: page.nextCursor,
   };
 }
 
@@ -2676,6 +2688,12 @@ export async function requestThreadStartProcedure(
 export async function getThreadProcedure(
   params: AppRPCSchema["requests"]["getThread"]["params"],
 ): Promise<RpcThreadDetail> {
+  if (typeof params.cursor === "number") {
+    return buildThreadDetail(params.threadId, {
+      cursor: params.cursor,
+    });
+  }
+
   return readThreadDetailCached(params.threadId);
 }
 

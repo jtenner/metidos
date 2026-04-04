@@ -123,6 +123,30 @@ import {
 } from "./thread-send";
 import { resolveThreadStatusRefreshOutcome } from "./thread-status-refresh";
 
+function mergeThreadMessageHistory(
+  current: RpcThreadMessage[],
+  incoming: RpcThreadMessage[],
+): RpcThreadMessage[] {
+  if (incoming.length === 0) {
+    return current;
+  }
+  if (current.length === 0) {
+    return incoming;
+  }
+
+  const messagesById = new Map<number, RpcThreadMessage>();
+  for (const message of current) {
+    messagesById.set(message.id, message);
+  }
+  for (const message of incoming) {
+    messagesById.set(message.id, message);
+  }
+
+  return Array.from(messagesById.values()).sort(
+    (left, right) => left.id - right.id,
+  );
+}
+
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
   procedures: ProjectProcedures;
@@ -529,6 +553,7 @@ export default function App({
   const skipFreshProjectTaskRefreshRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
+  const selectedThreadHistoryCursorRef = useRef<number | null>(null);
   const previousSelectedThreadIdRef = useRef<number | null>(
     initialMainviewState.selectedThreadId,
   );
@@ -548,10 +573,13 @@ export default function App({
   const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
   const gitHistoryRefreshedThreadIdRef = useRef<number | null>(null);
   const threadStatusPollInFlightRef = useRef(false);
+  const threadHistoryBackfillAbortControllerRef =
+    useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
     new Map<number, RpcThreadRunStatus["state"]>(),
   );
+  const previousDocumentVisibilityRef = useRef(isDocumentVisible);
   const projectLifecycleRequestTracker = useMemo(
     () => createProjectLifecycleRequestTracker(),
     [],
@@ -1696,9 +1724,91 @@ export default function App({
     controller.abort(createAbortError(null, reason));
   }, []);
 
+  const abortThreadHistoryBackfill = useCallback((reason: string) => {
+    selectedThreadHistoryCursorRef.current = null;
+    const controller = threadHistoryBackfillAbortControllerRef.current;
+    if (!controller) {
+      return;
+    }
+
+    threadHistoryBackfillAbortControllerRef.current = null;
+    controller.abort(createAbortError(null, reason));
+  }, []);
+
+  const startThreadHistoryBackfill = useCallback(
+    (threadId: number, initialCursor: number | null) => {
+      abortThreadHistoryBackfill("Thread history backfill was superseded.");
+      selectedThreadHistoryCursorRef.current = initialCursor;
+      if (initialCursor === null) {
+        return;
+      }
+
+      const controller = new AbortController();
+      threadHistoryBackfillAbortControllerRef.current = controller;
+      void (async () => {
+        let nextCursor: number | null = initialCursor;
+        while (nextCursor !== null) {
+          const detail = await procedures.getThread(
+            {
+              threadId,
+              cursor: nextCursor,
+            },
+            {
+              priority: "default",
+              signal: controller.signal,
+            },
+          );
+          if (selectedThreadIdRef.current !== threadId) {
+            return;
+          }
+
+          setThreadMessages((current) =>
+            mergeThreadMessageHistory(current, detail.messages),
+          );
+          nextCursor =
+            detail.nextCursor === nextCursor ? null : detail.nextCursor;
+          selectedThreadHistoryCursorRef.current = nextCursor;
+        }
+      })()
+        .catch((error) => {
+          if (isAbortError(error)) {
+            return;
+          }
+          console.error(
+            `Failed to backfill thread history for thread ${threadId}`,
+            error,
+          );
+        })
+        .finally(() => {
+          if (threadHistoryBackfillAbortControllerRef.current === controller) {
+            threadHistoryBackfillAbortControllerRef.current = null;
+          }
+        });
+    },
+    [abortThreadHistoryBackfill, procedures],
+  );
+
+  const replaceSelectedThreadMessageHistory = useCallback(
+    (detail: RpcThreadDetail) => {
+      setThreadMessages(detail.messages);
+      startThreadHistoryBackfill(detail.thread.id, detail.nextCursor);
+    },
+    [startThreadHistoryBackfill],
+  );
+
+  const mergeSelectedThreadMessageHistory = useCallback(
+    (detail: RpcThreadDetail) => {
+      setThreadMessages((current) =>
+        mergeThreadMessageHistory(current, detail.messages),
+      );
+    },
+    [],
+  );
+
   const clearThreadSelection = useCallback(() => {
     threadOpenRequestIdRef.current += 1;
     abortThreadOpenRequest("Thread selection was cleared.");
+    abortThreadHistoryBackfill("Thread selection was cleared.");
     setSelectedThreadId(null);
     setThreadMessages([]);
     setChatError("");
@@ -1706,7 +1816,7 @@ export default function App({
     setIsThreadLoading(false);
     selectedThreadIdRef.current = null;
     selectedThreadRunStateRef.current = "idle";
-  }, [abortThreadOpenRequest]);
+  }, [abortThreadHistoryBackfill, abortThreadOpenRequest]);
 
   const discardThreadIfEmpty = useCallback(
     async (threadId: number): Promise<void> => {
@@ -2110,7 +2220,7 @@ export default function App({
           if (selectedThreadIdRef.current === threadId) {
             selectedThreadRunStateRef.current =
               settledDetail.thread.runStatus.state;
-            setThreadMessages(settledDetail.messages);
+            mergeSelectedThreadMessageHistory(settledDetail);
           }
         })
         .catch((error) => {
@@ -2124,6 +2234,7 @@ export default function App({
     [
       applyOptimisticThreadErrorSeenToDetail,
       applyOptimisticThreadErrorSeenToList,
+      mergeSelectedThreadMessageHistory,
       requestThreadErrorSeen,
     ],
   );
@@ -2193,7 +2304,7 @@ export default function App({
         return;
       }
       selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-      setThreadMessages(detail.messages);
+      mergeSelectedThreadMessageHistory(detail);
     } catch (error) {
       const resolution = resolveThreadStatusRefreshOutcome({
         detail: null,
@@ -2210,6 +2321,7 @@ export default function App({
     }
   }, [
     applyOptimisticThreadErrorSeenToList,
+    mergeSelectedThreadMessageHistory,
     prepareOpenedThreadDetail,
     procedures,
   ]);
@@ -2220,7 +2332,7 @@ export default function App({
       setSelectedThreadId(detail.thread.id);
       selectedThreadIdRef.current = detail.thread.id;
       selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-      setThreadMessages(detail.messages);
+      replaceSelectedThreadMessageHistory(detail);
       syncThreadContext(detail.thread);
       if (sessionStateReady) {
         void loadProjectWorktrees(detail.thread.projectId).catch(() => {
@@ -2229,7 +2341,12 @@ export default function App({
       }
       setMobileProjectListOpen(false);
     },
-    [loadProjectWorktrees, sessionStateReady, syncThreadContext],
+    [
+      loadProjectWorktrees,
+      replaceSelectedThreadMessageHistory,
+      sessionStateReady,
+      syncThreadContext,
+    ],
   );
 
   const approveThreadStartRequest = useCallback(
@@ -2333,9 +2450,21 @@ export default function App({
   const openThread = useCallback(
     async (threadId: number, options?: OpenThreadOptions) => {
       const requestId = ++threadOpenRequestIdRef.current;
+      const optimisticThread =
+        threads.find((thread) => thread.id === threadId) ?? null;
       abortThreadOpenRequest("Thread open request was superseded.");
+      abortThreadHistoryBackfill("Thread open request was superseded.");
       const controller = new AbortController();
       threadOpenAbortControllerRef.current = controller;
+      setSelectedThreadId(threadId);
+      selectedThreadIdRef.current = threadId;
+      selectedThreadRunStateRef.current =
+        optimisticThread?.runStatus.state ?? "idle";
+      setThreadMessages([]);
+      if (optimisticThread) {
+        syncThreadContext(optimisticThread);
+      }
+      setMobileProjectListOpen(false);
       setIsThreadLoading(true);
       setThreadsError("");
       setChatError("");
@@ -2375,10 +2504,13 @@ export default function App({
       }
     },
     [
+      abortThreadHistoryBackfill,
       abortThreadOpenRequest,
       applyOpenedThreadDetail,
       loadThreadDetailForOpen,
       prepareOpenedThreadDetail,
+      syncThreadContext,
+      threads,
     ],
   );
 
@@ -3196,6 +3328,29 @@ export default function App({
   }, []);
 
   useEffect(() => {
+    const wasVisible = previousDocumentVisibilityRef.current;
+    previousDocumentVisibilityRef.current = isDocumentVisible;
+    if (!isDocumentVisible || wasVisible || threads.length === 0) {
+      return;
+    }
+    if (threadStatusPollInFlightRef.current) {
+      return;
+    }
+
+    threadStatusPollInFlightRef.current = true;
+    void refreshThreadStatuses()
+      .catch((error) => {
+        console.error(
+          "Failed to refresh thread statuses after document became visible",
+          error,
+        );
+      })
+      .finally(() => {
+        threadStatusPollInFlightRef.current = false;
+      });
+  }, [isDocumentVisible, refreshThreadStatuses, threads.length]);
+
+  useEffect(() => {
     activeWorktreeSyncAbortControllerRef.current?.abort(
       createAbortError(
         null,
@@ -3892,8 +4047,13 @@ export default function App({
           return;
         }
         setSelectedThreadId(detail.thread.id);
+        selectedThreadIdRef.current = detail.thread.id;
         selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-        setThreadMessages(detail.messages);
+        if (selectedThreadIdRef.current === detail.thread.id) {
+          mergeSelectedThreadMessageHistory(detail);
+        } else {
+          replaceSelectedThreadMessageHistory(detail);
+        }
         syncThreadContext(detail.thread);
         setMobileProjectListOpen(false);
         try {
@@ -3918,7 +4078,9 @@ export default function App({
       defaultCodexReasoningEffort,
       executeWithStepUp,
       loadProjectWorktrees,
+      mergeSelectedThreadMessageHistory,
       procedures,
+      replaceSelectedThreadMessageHistory,
       selectedProject,
       selectedThread,
       syncThreadContext,
@@ -4244,7 +4406,7 @@ export default function App({
           })
         ) {
           selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-          setThreadMessages(detail.messages);
+          mergeSelectedThreadMessageHistory(detail);
         }
       } catch (error) {
         if (
@@ -4270,6 +4432,7 @@ export default function App({
   }, [
     initialMainviewState.chatInput,
     isSending,
+    mergeSelectedThreadMessageHistory,
     procedures,
     selectedThreadId,
     selectedThreadIsWorking,
@@ -4290,7 +4453,7 @@ export default function App({
         setThreads((prev) => upsertThreadList(prev, detail.thread));
         if (selectedThreadIdRef.current === detail.thread.id) {
           selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-          setThreadMessages(detail.messages);
+          mergeSelectedThreadMessageHistory(detail);
         }
       } catch (error) {
         setChatError(error instanceof Error ? error.message : String(error));
@@ -4298,7 +4461,13 @@ export default function App({
         setIsStoppingThread(false);
       }
     })();
-  }, [isStoppingThread, procedures, selectedThreadId, selectedThreadIsWorking]);
+  }, [
+    isStoppingThread,
+    mergeSelectedThreadMessageHistory,
+    procedures,
+    selectedThreadId,
+    selectedThreadIsWorking,
+  ]);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
