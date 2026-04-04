@@ -236,7 +236,7 @@ export function materialSymbol(
     filled?: boolean;
   } = {},
 ): JSX.Element {
-  // Default props intentionally pin all icon strokes/fills to predictable rendering.
+  // Default icon props keep stroke/fill behavior stable and predictable across renders.
   const { filled = false } = options;
   const svgProps: SVGProps<SVGSVGElement> = {
     "aria-hidden": "true",

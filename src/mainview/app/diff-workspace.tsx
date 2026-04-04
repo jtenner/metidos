@@ -261,7 +261,7 @@ export function DiffWorkspace({
   // Recompute additions/deletions/hunk counts from current patch text only when needed.
   const diffStats = summarizeDiffText(diffFilePatchState.diffText);
 
-  // Left panel intentionally uses explicit fallthrough states for stable UX.
+  // Left panel renders a single fallback/content state using ordered branches.
   const selectorContent =
     !selectedProject || !activeSelectedWorktreePath ? (
       <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
@@ -303,7 +303,7 @@ export function DiffWorkspace({
       </div>
     );
 
-  // Right panel intentionally guards against rendering stale data while file context changes.
+  // Right panel only renders diff content when the focused file selection is valid.
   const contentBody = !selectedDiffFileChange ? (
     <div className="border border-[#252f36] bg-[#12181c] px-4 py-4 text-sm text-[#8f9aa2]">
       Select a changed file to inspect its focused diff.

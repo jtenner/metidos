@@ -3821,7 +3821,7 @@ export default function App({
               worktreePath: path,
             });
           } catch {
-            // best effort
+            // Ignore close-worktree failures; collapse stays responsive with local state.
           }
         }
         setWorktreeStates((prev) => {
@@ -3844,7 +3844,7 @@ export default function App({
             }),
           );
         } catch {
-          // best effort
+          // Ignore project-close errors; local UI state is already updated.
         }
         if (selectedProjectId === project.id) {
           selectedWorktreePathRef.current = project.path;

@@ -25,7 +25,7 @@ type ChildRole = "backend" | "static";
 
 /**
  * Validate a value looks like a non-negative whole-number string for port parsing.
- * We intentionally do not accept whitespace or signs.
+ * Parsing accepts only a non-empty decimal integer without whitespace/sign characters.
  */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
