@@ -77,95 +77,59 @@ function readLockedUntil(
   return status?.lockedUntil ?? null;
 }
 
-function authCardShell(children: JSX.Element): JSX.Element {
-  return (
-    <main className="relative flex min-h-full bg-[#050709] text-[#f3f4f6]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(78,143,193,0.2),_transparent_45%),radial-gradient(circle_at_bottom_right,_rgba(191,111,89,0.16),_transparent_40%),linear-gradient(180deg,_rgba(11,16,21,0.96),_rgba(5,7,9,1))]" />
-      <div className="relative flex min-h-full w-full items-center justify-center px-5 py-10">
-        <div className="w-full max-w-5xl overflow-hidden border border-[#23303a] bg-[#0d1216]/95 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-          <div className="grid min-h-[720px] md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            {children}
-          </div>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function AuthHero(props: {
-  eyebrow: string;
-  primary: string;
-  secondary: string;
-  tertiary: string;
+function AuthActionButton(props: {
+  children: JSX.Element | string;
+  disabled?: boolean;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  variant: "primary" | "secondary";
+  wide?: boolean;
 }): JSX.Element {
   return (
-    <section className="relative overflow-hidden border-b border-[#1d2932] bg-[#0f171d] px-6 py-7 md:border-b-0 md:border-r md:px-10 md:py-10">
-      <div className="absolute inset-0 bg-[linear-gradient(160deg,_rgba(85,150,204,0.16),_transparent_32%),linear-gradient(18deg,_rgba(220,119,79,0.12),_transparent_38%)]" />
-      <div className="relative space-y-8">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 border border-[#2d4252] bg-[#13222c] px-3 py-1 font-mono text-[11px] tracking-[0.22em] text-[#8eb7d2] uppercase">
-            <span className="h-2 w-2 rounded-full bg-[#79c3ff]" />
-            {props.eyebrow}
-          </div>
-          <div className="space-y-3">
-            <h1 className="max-w-md text-3xl font-semibold tracking-tight text-[#f6f5f4] md:text-4xl">
-              Local access is locked behind a real sign-in flow.
-            </h1>
-            <p className="max-w-lg text-sm leading-6 text-[#a2b5c3] md:text-base">
-              Jolt now requires a primary factor plus TOTP before any workspace
-              data or RPC actions are available.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 text-sm md:max-w-xl">
-          <div className="border border-[#21313c] bg-[#101a21] px-4 py-3">
-            <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#85a9c2] uppercase">
-              Primary factor
-            </div>
-            <div className="mt-1.5 text-[#ebf0f3]">{props.primary}</div>
-          </div>
-          <div className="border border-[#21313c] bg-[#101a21] px-4 py-3">
-            <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#85a9c2] uppercase">
-              Mandatory TOTP
-            </div>
-            <div className="mt-1.5 text-[#ebf0f3]">{props.secondary}</div>
-          </div>
-          <div className="border border-[#21313c] bg-[#101a21] px-4 py-3">
-            <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#85a9c2] uppercase">
-              Recovery handling
-            </div>
-            <div className="mt-1.5 text-[#ebf0f3]">{props.tertiary}</div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <button
+      className={`${
+        props.wide ? "w-full" : ""
+      } border px-5 py-4 font-label text-[11px] font-semibold tracking-[0.2em] uppercase transition disabled:cursor-not-allowed disabled:border-[#21313d] disabled:bg-[#0a131b] disabled:text-[#50616f] ${
+        props.variant === "primary"
+          ? "border-[#d1deea] bg-[#c4d0dd] text-[#08111a] hover:bg-[#d7e1ea]"
+          : "border-[#20323f] bg-[#08131c] text-[#9fb2c2] hover:border-[#3a5567] hover:text-[#e8f1f9]"
+      }`}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      type={props.type ?? "button"}
+    >
+      {props.children}
+    </button>
   );
 }
 
-function AuthPanel(props: {
-  children: JSX.Element;
-  error: string;
-  footer?: JSX.Element | null;
+function AuthChoiceButton(props: {
+  active: boolean;
+  body: string;
+  onClick: () => void;
   title: string;
 }): JSX.Element {
   return (
-    <section className="flex min-h-full flex-col bg-[#0b1014]">
-      <div className="border-b border-[#182028] px-6 py-5 md:px-8">
-        <div className="font-label text-[10px] font-semibold tracking-[0.2em] text-[#7f9ab0] uppercase">
-          {props.title}
-        </div>
+    <button
+      className={
+        props.active
+          ? "border border-[#b7c6d5] bg-[#445668] px-5 py-5 text-left transition hover:bg-[#4b6072]"
+          : "border border-[#20323f] bg-[#07131c] px-5 py-5 text-left text-[#8ca0b0] transition hover:border-[#3a5567] hover:text-[#e8f1f9]"
+      }
+      onClick={props.onClick}
+      type="button"
+    >
+      <div className="font-label text-[11px] font-semibold tracking-[0.2em] text-inherit uppercase">
+        {props.title}
       </div>
-      <div className="flex flex-1 flex-col px-6 py-6 md:px-8 md:py-8">
-        {props.error ? (
-          <div className="mb-5 border border-[#4a2520] bg-[#2a1714] px-4 py-3 text-sm text-[#f4b2a7]">
-            {props.error}
-          </div>
-        ) : null}
-        <div className="flex-1">{props.children}</div>
-        {props.footer ? <div className="mt-6">{props.footer}</div> : null}
+      <div
+        className={`mt-2 text-sm leading-6 ${
+          props.active ? "text-[#edf4fa]" : "text-[#7890a2]"
+        }`}
+      >
+        {props.body}
       </div>
-    </section>
+    </button>
   );
 }
 
@@ -174,29 +138,85 @@ function AuthInput(props: {
   inputMode?: "numeric" | "text";
   label: string;
   maxLength?: number;
+  monospace?: boolean;
   onChange: (value: string) => void;
   placeholder: string;
   type?: "password" | "text";
   value: string;
 }): JSX.Element {
   return (
-    <label className="block space-y-2">
-      <span className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#7d97ab] uppercase">
+    <label className="block">
+      <span className="font-mono text-[11px] tracking-[0.22em] text-[#668093] uppercase">
         {props.label}
       </span>
-      <input
-        autoComplete={props.autoComplete}
-        className="w-full border border-[#23303a] bg-[#11181d] px-3 py-3 text-sm text-[#f4f6f8] outline-none transition focus:border-[#6aa6cc] focus:bg-[#121c22]"
-        inputMode={props.inputMode}
-        maxLength={props.maxLength}
-        onChange={(event) => {
-          props.onChange(event.currentTarget.value);
-        }}
-        placeholder={props.placeholder}
-        type={props.type ?? "text"}
-        value={props.value}
-      />
+      <div className="mt-4 border border-[#20323f] bg-[#08131c] px-4 py-3 transition focus-within:border-[#88a3b7] focus-within:bg-[#0d1821]">
+        <input
+          autoComplete={props.autoComplete}
+          className={`w-full bg-transparent text-base text-[#edf4fa] outline-none placeholder:text-[#4c6474] ${
+            props.monospace ? "font-mono tracking-[0.16em]" : ""
+          }`}
+          inputMode={props.inputMode}
+          maxLength={props.maxLength}
+          onChange={(event) => {
+            props.onChange(event.currentTarget.value);
+          }}
+          placeholder={props.placeholder}
+          spellCheck={false}
+          type={props.type ?? "text"}
+          value={props.value}
+        />
+      </div>
     </label>
+  );
+}
+
+function authConsoleShell(props: {
+  children: JSX.Element;
+  error: string;
+  footer?: JSX.Element | null;
+  size?: "sm" | "md" | "lg";
+  subtitle?: string;
+  title: string;
+}): JSX.Element {
+  const maxWidth =
+    props.size === "lg"
+      ? "max-w-lg"
+      : props.size === "sm"
+        ? "max-w-sm"
+        : "max-w-md";
+
+  return (
+    <main className="relative flex min-h-full flex-col items-center justify-center overflow-auto bg-[#040b11] px-4 py-12 text-[#e8eef5]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(62,105,142,0.16),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(88,126,158,0.12),_transparent_32%),linear-gradient(180deg,_#06111a_0%,_#04090f_58%,_#03070b_100%)]" />
+      <div className={`relative w-full ${maxWidth}`}>
+        <div className="border border-[#162733] bg-[#060f17]">
+          <div className="border-b border-[#162733] px-7 py-5">
+            <h1 className="text-[1.05rem] font-semibold tracking-[-0.02em] text-[#edf4fa]">
+              {props.title}
+            </h1>
+            {props.subtitle ? (
+              <p className="mt-1.5 text-sm leading-6 text-[#6a8799]">
+                {props.subtitle}
+              </p>
+            ) : null}
+          </div>
+
+          {props.error ? (
+            <div className="border-b border-[#4c2820] bg-[#1a0a08] px-7 py-3.5 text-sm leading-6 text-[#efb6a9]">
+              {props.error}
+            </div>
+          ) : null}
+
+          <div className="px-7 py-7">{props.children}</div>
+
+          {props.footer ? (
+            <div className="border-t border-[#162733] px-7 py-5">
+              {props.footer}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -535,379 +555,280 @@ export default function AuthShell({
   }
 
   if (view === "loading") {
-    return authCardShell(
-      <>
-        <AuthHero
-          eyebrow="Authorization required"
-          primary="Choose a local PIN or a master password at setup, then use that factor for every login."
-          secondary="Every login also requires a fresh TOTP code from your authenticator app."
-          tertiary="Recovery codes are generated once and shown once during enrollment."
-        />
-        <AuthPanel
-          error={error}
-          footer={
-            <button
-              className="border border-[#2a3b47] bg-[#12202a] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
-              onClick={() => {
-                void loadGateState();
-              }}
-              type="button"
-            >
-              Retry
-            </button>
-          }
-          title="Access check"
-        >
-          <div className="flex h-full flex-col justify-center space-y-5">
-            <div className="h-1.5 w-full overflow-hidden bg-[#111920]">
-              <div className="h-full w-1/3 animate-pulse bg-[#6aa6cc]" />
-            </div>
-            <div className="space-y-2">
-              <div className="text-lg font-semibold text-[#eef2f5]">
-                {loadingMessage}
-              </div>
-              <div className="max-w-md text-sm leading-6 text-[#93a5b2]">
-                Jolt is checking whether this local install needs first-run
-                setup, a login prompt, or an authenticated session restore.
-              </div>
-            </div>
+    return authConsoleShell({
+      children: (
+        <div className="space-y-4">
+          <div className="h-0.5 w-full overflow-hidden bg-[#0d1e2b]">
+            <div className="h-full w-1/3 animate-pulse bg-[#4a7fa0]" />
           </div>
-        </AuthPanel>
-      </>,
-    );
+          <p className="text-sm leading-6 text-[#6a8799]">{loadingMessage}</p>
+        </div>
+      ),
+      error,
+      footer: error ? (
+        <AuthActionButton
+          onClick={() => {
+            void loadGateState();
+          }}
+          variant="secondary"
+        >
+          Retry
+        </AuthActionButton>
+      ) : null,
+      title: "Checking authorization…",
+    });
   }
 
   if (view === "setup") {
-    return authCardShell(
-      <>
-        <AuthHero
-          eyebrow="First-run setup"
-          primary="Pick a 6-digit-or-longer PIN, or use a password or passphrase instead."
-          secondary="Scan the QR code into your authenticator app, then confirm with a live 6-digit code."
-          tertiary="Ten recovery codes are generated after setup and shown one time before workspace access unlocks."
-        />
-        <AuthPanel
-          error={error}
-          footer={
-            <div className="text-xs leading-5 text-[#8397a6]">
-              Session lifetime is fixed to 7 days. The app remains locked until
-              setup succeeds.
+    return authConsoleShell({
+      children: (
+        <form className="space-y-6" onSubmit={handleSetupSubmit}>
+          <div className="flex gap-5">
+            <div className="flex-shrink-0">
+              {qrCodeDataUrl ? (
+                <img
+                  alt="TOTP enrollment QR code"
+                  className="w-[140px] border border-[#1d3347]"
+                  src={qrCodeDataUrl}
+                />
+              ) : (
+                <div className="flex h-[140px] w-[140px] items-center justify-center border border-dashed border-[#29404e] bg-[#09121a] text-center text-xs leading-5 text-[#546e80]">
+                  Generating…
+                </div>
+              )}
             </div>
-          }
-          title="Create local access"
-        >
-          <div className="space-y-6">
-            <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-              <div className="border border-[#22303a] bg-[#0f171d] p-4">
-                <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#7fa1b9] uppercase">
-                  Authenticator QR
-                </div>
-                <div className="mt-4 flex justify-center">
-                  {qrCodeDataUrl ? (
-                    <img
-                      alt="TOTP enrollment QR code"
-                      className="w-full max-w-[180px] border border-[#243641] bg-[#0b1014] p-3"
-                      src={qrCodeDataUrl}
-                    />
-                  ) : (
-                    <div className="flex h-[204px] w-[204px] items-center justify-center border border-dashed border-[#29404e] bg-[#0b1014] px-4 text-center text-xs leading-5 text-[#7990a2]">
-                      Generating QR code…
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="space-y-3">
-                  <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#7d97ab] uppercase">
-                    Choose primary factor
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      className={
-                        setupPrimaryFactorType === "pin"
-                          ? "border border-[#6aa6cc] bg-[#13222c] px-4 py-4 text-left text-sm text-[#eef3f6]"
-                          : "border border-[#23303a] bg-[#11181d] px-4 py-4 text-left text-sm text-[#aab9c4]"
-                      }
-                      onClick={() => {
-                        setSetupPrimaryFactorType("pin");
-                        setSetupPrimaryFactor("");
-                      }}
-                      type="button"
-                    >
-                      <div className="font-semibold text-[#eef3f6]">PIN</div>
-                      <div className="mt-1 text-xs leading-5 text-[#8ea3b3]">
-                        Digits only, minimum length 6.
-                      </div>
-                    </button>
-                    <button
-                      className={
-                        setupPrimaryFactorType === "password"
-                          ? "border border-[#6aa6cc] bg-[#13222c] px-4 py-4 text-left text-sm text-[#eef3f6]"
-                          : "border border-[#23303a] bg-[#11181d] px-4 py-4 text-left text-sm text-[#aab9c4]"
-                      }
-                      onClick={() => {
-                        setSetupPrimaryFactorType("password");
-                        setSetupPrimaryFactor("");
-                      }}
-                      type="button"
-                    >
-                      <div className="font-semibold text-[#eef3f6]">
-                        Password / passphrase
-                      </div>
-                      <div className="mt-1 text-xs leading-5 text-[#8ea3b3]">
-                        Any non-empty secret, paired with TOTP.
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <form className="space-y-4" onSubmit={handleSetupSubmit}>
-                  <AuthInput
-                    autoComplete="new-password"
-                    inputMode={
-                      setupPrimaryFactorType === "pin" ? "numeric" : "text"
-                    }
-                    label={
-                      setupPrimaryFactorType === "pin"
-                        ? "PIN"
-                        : "Password / passphrase"
-                    }
-                    onChange={(value) => {
-                      setSetupPrimaryFactor(
-                        setupPrimaryFactorType === "pin"
-                          ? value.replace(/\D+/g, "")
-                          : value,
-                      );
-                    }}
-                    placeholder={
-                      setupPrimaryFactorType === "pin"
-                        ? "Enter a 6-digit or longer PIN"
-                        : "Enter a password or passphrase"
-                    }
-                    type="password"
-                    value={setupPrimaryFactor}
-                  />
-                  <AuthInput
-                    autoComplete="one-time-code"
-                    inputMode="numeric"
-                    label="TOTP code"
-                    maxLength={6}
-                    onChange={(value) => {
-                      setSetupTotpCode(value.replace(/\D+/g, ""));
-                    }}
-                    placeholder="Enter the current 6-digit code"
-                    type="text"
-                    value={setupTotpCode}
-                  />
-
-                  <div className="space-y-2 border border-[#1d2932] bg-[#0f171d] px-4 py-4">
-                    <div className="font-label text-[10px] font-semibold tracking-[0.18em] text-[#7d97ab] uppercase">
-                      Manual secret fallback
-                    </div>
-                    <div className="break-all font-mono text-sm text-[#edf3f7]">
-                      {enrollment?.totpSecret ?? "Preparing secret…"}
-                    </div>
-                    <div className="text-xs leading-5 text-[#879aa8]">
-                      If QR scanning is unavailable, add a TOTP account manually
-                      with this secret and a 30-second 6-digit SHA-1 profile.
-                    </div>
-                  </div>
-
-                  <button
-                    className="w-full border border-[#6aa6cc] bg-[#173247] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#f4f7fa] uppercase transition hover:bg-[#20445d] disabled:border-[#2a3944] disabled:bg-[#11181d] disabled:text-[#697b89]"
-                    disabled={isBusy || !enrollment}
-                    type="submit"
-                  >
-                    {isBusy ? "Finishing setup…" : "Complete setup"}
-                  </button>
-                </form>
-              </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[10px] tracking-[0.22em] text-[#4d7a95] uppercase">
+                Manual entry
+              </p>
+              <p className="mt-2 break-all font-mono text-xs leading-6 text-[#aec8d8]">
+                {enrollment?.totpSecret ?? "Preparing…"}
+              </p>
+              <p className="mt-2 text-xs text-[#4d7a95]">
+                Use only if QR scan fails.
+              </p>
             </div>
           </div>
-        </AuthPanel>
-      </>,
-    );
+
+          <div>
+            <p className="mb-3 font-mono text-[10px] tracking-[0.22em] text-[#4d7a95] uppercase">
+              Primary factor
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <AuthChoiceButton
+                active={setupPrimaryFactorType === "pin"}
+                body="6+ digits"
+                onClick={() => {
+                  setSetupPrimaryFactorType("pin");
+                  setSetupPrimaryFactor("");
+                }}
+                title="PIN"
+              />
+              <AuthChoiceButton
+                active={setupPrimaryFactorType === "password"}
+                body="Any passphrase"
+                onClick={() => {
+                  setSetupPrimaryFactorType("password");
+                  setSetupPrimaryFactor("");
+                }}
+                title="Passphrase"
+              />
+            </div>
+          </div>
+
+          <AuthInput
+            autoComplete="new-password"
+            inputMode={setupPrimaryFactorType === "pin" ? "numeric" : "text"}
+            label={
+              setupPrimaryFactorType === "pin" ? "Set PIN" : "Set passphrase"
+            }
+            monospace={setupPrimaryFactorType === "pin"}
+            onChange={(value) => {
+              setSetupPrimaryFactor(
+                setupPrimaryFactorType === "pin"
+                  ? value.replace(/\D+/g, "")
+                  : value,
+              );
+            }}
+            placeholder={
+              setupPrimaryFactorType === "pin"
+                ? "Enter 6+ digits"
+                : "Enter passphrase"
+            }
+            type="password"
+            value={setupPrimaryFactor}
+          />
+          <AuthInput
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            label="TOTP code"
+            maxLength={6}
+            monospace
+            onChange={(value) => {
+              setSetupTotpCode(value.replace(/\D+/g, ""));
+            }}
+            placeholder="Enter current 6-digit code"
+            type="text"
+            value={setupTotpCode}
+          />
+
+          <AuthActionButton
+            disabled={isBusy || !enrollment}
+            type="submit"
+            variant="primary"
+            wide
+          >
+            {isBusy ? "Finishing setup…" : "Complete setup"}
+          </AuthActionButton>
+        </form>
+      ),
+      error,
+      size: "md",
+      subtitle:
+        "Scan the QR code with your authenticator app, then complete the form below.",
+      title: "First-run setup",
+    });
   }
 
   if (view === "recovery") {
-    return authCardShell(
-      <>
-        <AuthHero
-          eyebrow="Recovery codes"
-          primary="These codes replace TOTP only when normal authenticator access is unavailable."
-          secondary="They are shown once. Regeneration is a separate authenticated CLI flow."
-          tertiary="Store them outside the browser before unlocking the workspace."
-        />
-        <AuthPanel
-          error={error}
-          footer={
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                className="border border-[#2a3b47] bg-[#111920] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
-                onClick={() => {
-                  void handleCopyRecoveryCodes();
-                }}
-                type="button"
+    return authConsoleShell({
+      children: (
+        <div className="space-y-5">
+          <p className="text-sm leading-6 text-[#6a8799]">
+            Store these codes somewhere safe outside the browser. This is the
+            only time they will be shown.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {recoveryCodes.map((code) => (
+              <div
+                className="border border-[#1d3347] bg-[#08131c] px-3 py-2.5 font-mono text-sm tracking-[0.12em] text-[#cde0ed]"
+                key={code}
               >
-                Copy codes
-              </button>
-              <button
-                className="border border-[#6aa6cc] bg-[#173247] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#f4f7fa] uppercase transition hover:bg-[#20445d] disabled:border-[#2a3944] disabled:bg-[#11181d] disabled:text-[#697b89]"
-                disabled={isBusy}
-                onClick={() => {
-                  void handleRecoveryContinue();
-                }}
-                type="button"
-              >
-                {isBusy ? "Opening workspace…" : "I stored them, continue"}
-              </button>
-            </div>
-          }
-          title="View once"
-        >
-          <div className="space-y-4">
-            <div className="text-sm leading-6 text-[#9aabb8]">
-              Keep these ten codes somewhere outside the browser. This screen
-              will not show them again after you continue.
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {recoveryCodes.map((code) => (
-                <div
-                  className="border border-[#22303a] bg-[#10171d] px-4 py-3 font-mono text-sm tracking-[0.14em] text-[#f0f4f7]"
-                  key={code}
-                >
-                  {code}
-                </div>
-              ))}
-            </div>
-            {copyFeedback ? (
-              <div className="text-xs leading-5 text-[#87b4cf]">
-                {copyFeedback}
+                {code}
               </div>
-            ) : null}
+            ))}
           </div>
-        </AuthPanel>
-      </>,
-    );
+          {copyFeedback ? (
+            <div className="border border-[#284155] bg-[#0b1822] px-4 py-3 text-sm text-[#b6d0e2]">
+              {copyFeedback}
+            </div>
+          ) : null}
+        </div>
+      ),
+      error,
+      footer: (
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <AuthActionButton
+            onClick={() => {
+              void handleCopyRecoveryCodes();
+            }}
+            variant="secondary"
+          >
+            Copy codes
+          </AuthActionButton>
+          <AuthActionButton
+            disabled={isBusy}
+            onClick={() => {
+              void handleRecoveryContinue();
+            }}
+            variant="primary"
+          >
+            {isBusy ? "Opening workspace…" : "I stored them, continue"}
+          </AuthActionButton>
+        </div>
+      ),
+      size: "md",
+      subtitle:
+        "Each code is single-use. They cannot be recovered after this screen.",
+      title: "Save your recovery codes",
+    });
   }
 
   if (view === "recovery-login") {
-    return authCardShell(
-      <>
-        <AuthHero
-          eyebrow="Recovery sign-in"
-          primary={`Use your configured ${loginFactorLabel.toLowerCase()} plus one unused recovery code.`}
-          secondary="This path replaces TOTP only when you no longer have access to the authenticator device."
-          tertiary="Each recovery code is single-use. Store any remaining codes outside the browser."
-        />
-        <AuthPanel
-          error={error}
-          footer={
-            <div className="space-y-3">
-              {lockedUntilLabel ? (
-                <div className="border border-[#4a3522] bg-[#2d1f14] px-4 py-3 text-sm text-[#efc092]">
-                  Too many failed attempts. Login is locked until{" "}
-                  {lockedUntilLabel}.
-                </div>
-              ) : null}
-              <button
-                className="w-full border border-[#2a3b47] bg-[#111920] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
-                disabled={isBusy}
-                onClick={() => {
-                  setError("");
-                  setLoginRecoveryCode("");
-                  setLoginTotpCode("");
-                  setView("login");
-                }}
-                type="button"
-              >
-                Back to TOTP login
-              </button>
-            </div>
-          }
-          title="Use a recovery code"
-        >
-          <form className="space-y-4" onSubmit={handleRecoveryLoginSubmit}>
-            <AuthInput
-              autoComplete="current-password"
-              inputMode={
-                status?.primaryFactorType === "pin" ? "numeric" : "text"
-              }
-              label={loginFactorLabel}
-              onChange={(value) => {
-                setLoginPrimaryFactor(
-                  status?.primaryFactorType === "pin"
-                    ? value.replace(/\D+/g, "")
-                    : value,
-                );
-              }}
-              placeholder={
-                status?.primaryFactorType === "pin"
-                  ? "Enter your PIN"
-                  : "Enter your password or passphrase"
-              }
-              type="password"
-              value={loginPrimaryFactor}
-            />
-            <AuthInput
-              autoComplete="off"
-              label="Recovery code"
-              onChange={(value) => {
-                setLoginRecoveryCode(value.toUpperCase().replace(/\s+/g, ""));
-              }}
-              placeholder="Enter one unused recovery code"
-              type="text"
-              value={loginRecoveryCode}
-            />
-
-            <div className="border border-[#1d2932] bg-[#0f171d] px-4 py-4 text-xs leading-5 text-[#879aa8]">
-              Recovery sign-in gets you back into the app when TOTP is
-              unavailable, but each code is consumed on success.
-            </div>
-
-            <button
-              className="w-full border border-[#6aa6cc] bg-[#173247] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#f4f7fa] uppercase transition hover:bg-[#20445d] disabled:border-[#2a3944] disabled:bg-[#11181d] disabled:text-[#697b89]"
-              disabled={isBusy}
-              type="submit"
-            >
-              {isBusy ? "Signing in…" : "Unlock with recovery code"}
-            </button>
-          </form>
-        </AuthPanel>
-      </>,
-    );
-  }
-
-  return authCardShell(
-    <>
-      <AuthHero
-        eyebrow="Sign in"
-        primary={`Use your configured ${loginFactorLabel.toLowerCase()} as the first factor.`}
-        secondary="Every login also requires the current TOTP code from your authenticator app."
-        tertiary="Three failed attempts trigger a ten-minute lockout."
-      />
-      <AuthPanel
-        error={error}
-        footer={
-          lockedUntilLabel ? (
-            <div className="border border-[#4a3522] bg-[#2d1f14] px-4 py-3 text-sm text-[#efc092]">
-              Too many failed attempts. Login is locked until {lockedUntilLabel}
-              .
-            </div>
-          ) : null
-        }
-        title="Unlock workspace"
-      >
-        <form className="space-y-4" onSubmit={handleLoginSubmit}>
+    return authConsoleShell({
+      children: (
+        <form className="space-y-5" onSubmit={handleRecoveryLoginSubmit}>
           <AuthInput
-            autoComplete={
-              status?.primaryFactorType === "pin"
-                ? "current-password"
-                : "current-password"
-            }
+            autoComplete="current-password"
             inputMode={status?.primaryFactorType === "pin" ? "numeric" : "text"}
             label={loginFactorLabel}
+            monospace={status?.primaryFactorType === "pin"}
+            onChange={(value) => {
+              setLoginPrimaryFactor(
+                status?.primaryFactorType === "pin"
+                  ? value.replace(/\D+/g, "")
+                  : value,
+              );
+            }}
+            placeholder={
+              status?.primaryFactorType === "pin"
+                ? "Enter your PIN"
+                : "Enter your passphrase"
+            }
+            type="password"
+            value={loginPrimaryFactor}
+          />
+          <AuthInput
+            autoComplete="off"
+            label="Recovery code"
+            monospace
+            onChange={(value) => {
+              setLoginRecoveryCode(value.toUpperCase().replace(/\s+/g, ""));
+            }}
+            placeholder="Enter one unused recovery code"
+            type="text"
+            value={loginRecoveryCode}
+          />
+          <AuthActionButton
+            disabled={isBusy}
+            type="submit"
+            variant="primary"
+            wide
+          >
+            {isBusy ? "Signing in…" : "Unlock with recovery code"}
+          </AuthActionButton>
+        </form>
+      ),
+      error,
+      footer: (
+        <div className="space-y-3">
+          {lockedUntilLabel ? (
+            <div className="border border-[#503526] bg-[#1a0e09] px-4 py-3 text-sm text-[#efc092]">
+              Locked until {lockedUntilLabel}.
+            </div>
+          ) : null}
+          <AuthActionButton
+            disabled={isBusy}
+            onClick={() => {
+              setError("");
+              setLoginRecoveryCode("");
+              setLoginTotpCode("");
+              setView("login");
+            }}
+            variant="secondary"
+          >
+            Back to TOTP login
+          </AuthActionButton>
+        </div>
+      ),
+      subtitle: "Use your primary factor and one unused recovery code.",
+      title: "Recovery sign-in",
+    });
+  }
+
+  return authConsoleShell({
+    title: "Set Password or Pin",
+    children: (
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <form
+          className="space-y-5 border border-[#162733] bg-[#06111a] px-6 py-6"
+          onSubmit={handleLoginSubmit}
+        >
+          <AuthInput
+            autoComplete="current-password"
+            inputMode={status?.primaryFactorType === "pin" ? "numeric" : "text"}
+            label={loginFactorLabel}
+            monospace={status?.primaryFactorType === "pin"}
             onChange={(value) => {
               setLoginPrimaryFactor(
                 status?.primaryFactorType === "pin"
@@ -928,6 +849,7 @@ export default function AuthShell({
             inputMode="numeric"
             label="TOTP code"
             maxLength={6}
+            monospace
             onChange={(value) => {
               setLoginTotpCode(value.replace(/\D+/g, ""));
             }}
@@ -936,15 +858,16 @@ export default function AuthShell({
             value={loginTotpCode}
           />
 
-          <button
-            className="w-full border border-[#6aa6cc] bg-[#173247] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#f4f7fa] uppercase transition hover:bg-[#20445d] disabled:border-[#2a3944] disabled:bg-[#11181d] disabled:text-[#697b89]"
+          <AuthActionButton
             disabled={isBusy}
             type="submit"
+            variant="primary"
+            wide
           >
-            {isBusy ? "Signing in…" : "Unlock workspace"}
-          </button>
-          <button
-            className="w-full border border-[#2a3b47] bg-[#111920] px-4 py-3 font-label text-[11px] font-semibold tracking-[0.18em] text-[#dbe9f2] uppercase transition hover:border-[#6aa6cc] hover:bg-[#173140]"
+            {isBusy ? "Signing in..." : "Unlock workspace"}
+          </AuthActionButton>
+
+          <AuthActionButton
             disabled={isBusy}
             onClick={() => {
               setError("");
@@ -952,12 +875,42 @@ export default function AuthShell({
               setLoginRecoveryCode("");
               setView("recovery-login");
             }}
-            type="button"
+            variant="secondary"
+            wide
           >
             Use a recovery code instead
-          </button>
+          </AuthActionButton>
         </form>
-      </AuthPanel>
-    </>,
-  );
+
+        <div className="space-y-5">
+          <div className="border border-[#162733] bg-[#0a1620] px-5 py-5">
+            <div className="font-mono text-[11px] tracking-[0.22em] text-[#688093] uppercase">
+              Active policy
+            </div>
+            <div className="mt-4 text-sm leading-7 text-[#8ea5b6]">
+              Every login requires the configured{" "}
+              {loginFactorLabel.toLowerCase()} plus the current TOTP code from
+              your authenticator app.
+            </div>
+          </div>
+
+          <div className="border border-[#162733] bg-[#06111a] px-5 py-5">
+            <div className="font-mono text-[11px] tracking-[0.22em] text-[#688093] uppercase">
+              Session scope
+            </div>
+            <div className="mt-4 text-sm leading-7 text-[#8ea5b6]">
+              Workspace data and RPC transport remain unavailable until the
+              sign-in succeeds.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    error,
+    footer: lockedUntilLabel ? (
+      <div className="border border-[#503526] bg-[#281a13] px-4 py-3 text-sm leading-7 text-[#efc092]">
+        Too many failed attempts. Login is locked until {lockedUntilLabel}.
+      </div>
+    ) : null,
+  });
 }
