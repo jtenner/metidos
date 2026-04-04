@@ -3,9 +3,11 @@ import { describe, expect, it } from "bun:test";
 import type { AuthStatus } from "./auth-client";
 import { AuthApiError } from "./auth-client";
 import {
+  AuthShellTimeoutError,
   connectRpcTransportWithRetry,
   DISCARDED_SESSION_NOTICE,
   INITIAL_RPC_CONNECT_BASE_DELAY_MS,
+  INITIAL_RPC_CONNECT_TIMEOUT_MS,
   resolveAuthShellGate,
   shouldRetryInitialRpcConnect,
 } from "./auth-shell-connect";
@@ -147,6 +149,73 @@ describe("auth shell connect retry helpers", () => {
     expect(attempts).toBe(1);
     expect(waits).toEqual([]);
     expect(shouldRetryInitialRpcConnect(failure)).toBeFalse();
+  });
+
+  it("times out a stalled initial RPC bootstrap, resets the transport, and retries fresh", async () => {
+    const retries: number[] = [];
+    let connectAttempts = 0;
+    let disconnects = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRetryBaseDelayMs: 1,
+      connectRetryMaxAttempts: 2,
+      connectRetryMaxDelayMs: 1,
+      connectRetryWait: async () => {},
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+        if (connectAttempts === 1) {
+          return new Promise<void>(() => {});
+        }
+      },
+      connectTimeoutMs: 5,
+      disconnectRpcTransport: () => {
+        disconnects += 1;
+      },
+      getAuthStatus: async () =>
+        buildAuthStatus({
+          authenticated: true,
+        }),
+      onAuthenticatedConnectRetry: ({ nextAttemptNumber }) => {
+        retries.push(nextAttemptNumber);
+      },
+      prepareSetupEnrollment: async () => {
+        throw new Error(
+          "setup enrollment should not load for authenticated sessions",
+        );
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "authenticated",
+      status: buildAuthStatus({
+        authenticated: true,
+      }),
+    });
+    expect(connectAttempts).toBe(2);
+    expect(disconnects).toBe(1);
+    expect(retries).toEqual([2]);
+  });
+
+  it("times out stalled auth-status loads instead of waiting forever", async () => {
+    try {
+      await resolveAuthShellGate({
+        connectRpcTransport: async () => {},
+        connectTimeoutMs: INITIAL_RPC_CONNECT_TIMEOUT_MS,
+        getAuthStatus: async () => new Promise<AuthStatus>(() => {}),
+        prepareSetupEnrollment: async () => {
+          throw new Error(
+            "setup enrollment should not load when auth status stalls",
+          );
+        },
+        statusTimeoutMs: 5,
+      });
+      throw new Error("expected stalled auth status to time out");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthShellTimeoutError);
+      expect((error as Error).message).toBe(
+        "Checking authorization timed out. Retry and confirm the local server is responding.",
+      );
+    }
   });
 
   it("reuses the authenticated gate retry path when a fresh login reaches RPC bootstrap", async () => {

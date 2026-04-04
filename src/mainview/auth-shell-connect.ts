@@ -5,6 +5,16 @@ import { isAuthRequiredRpcError } from "./rpc-errors";
 export const INITIAL_RPC_CONNECT_MAX_ATTEMPTS = 4;
 export const INITIAL_RPC_CONNECT_BASE_DELAY_MS = 250;
 export const INITIAL_RPC_CONNECT_MAX_DELAY_MS = 1_000;
+export const AUTH_SHELL_STATUS_TIMEOUT_MS = 5_000;
+export const AUTH_SHELL_SETUP_TIMEOUT_MS = 5_000;
+export const INITIAL_RPC_CONNECT_TIMEOUT_MS = 5_000;
+
+const AUTH_STATUS_TIMEOUT_MESSAGE =
+  "Checking authorization timed out. Retry and confirm the local server is responding.";
+const AUTH_SETUP_TIMEOUT_MESSAGE =
+  "Preparing authorization setup timed out. Retry and confirm the local server is responding.";
+const INITIAL_RPC_CONNECT_TIMEOUT_MESSAGE =
+  "Opening the authenticated workspace timed out. Retry and confirm the local RPC transport is responding.";
 
 export type AuthShellGateResolution =
   | {
@@ -34,12 +44,27 @@ export type InitialRpcConnectRetryInfo = {
   previousAttemptNumber: number;
 };
 
+export class AuthShellTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthShellTimeoutError";
+  }
+}
+
 type ResolveAuthShellGateOptions = {
   connectRpcTransport: () => Promise<void>;
+  disconnectRpcTransport?: () => void;
+  connectRetryBaseDelayMs?: number;
+  connectRetryMaxAttempts?: number;
+  connectRetryMaxDelayMs?: number;
+  connectRetryWait?: (delayMs: number) => Promise<void>;
+  connectTimeoutMs?: number;
   getAuthStatus: () => Promise<AuthStatus>;
   onAuthenticatedConnectRetry?: (info: InitialRpcConnectRetryInfo) => void;
   onAuthenticatedConnectStart?: () => void;
   prepareSetupEnrollment: () => Promise<TotpEnrollment>;
+  setupTimeoutMs?: number;
+  statusTimeoutMs?: number;
 };
 
 function defaultRetryWait(delayMs: number): Promise<void> {
@@ -57,6 +82,31 @@ export function shouldRetryInitialRpcConnect(error: unknown): boolean {
     (error instanceof AuthApiError && isAuthRequiredError(error)) ||
     isAuthRequiredRpcError(error)
   );
+}
+
+function withTimeout<T>(options: {
+  message: string;
+  operation: Promise<T>;
+  timeoutMs: number;
+}): Promise<T> {
+  const timeoutMs = Math.max(1, Math.trunc(options.timeoutMs) || 1);
+
+  return new Promise<T>((resolve, reject) => {
+    const timeout = globalThis.setTimeout(() => {
+      reject(new AuthShellTimeoutError(options.message));
+    }, timeoutMs);
+
+    void options.operation.then(
+      (value) => {
+        globalThis.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        globalThis.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 export async function connectRpcTransportWithRetry(options: {
@@ -127,16 +177,66 @@ export async function connectRpcTransportWithRetry(options: {
 export async function resolveAuthShellGate(
   options: ResolveAuthShellGateOptions,
 ): Promise<AuthShellGateResolution> {
-  const status = await options.getAuthStatus();
+  const statusTimeoutMs =
+    options.statusTimeoutMs ?? AUTH_SHELL_STATUS_TIMEOUT_MS;
+  const setupTimeoutMs = options.setupTimeoutMs ?? AUTH_SHELL_SETUP_TIMEOUT_MS;
+  const connectTimeoutMs =
+    options.connectTimeoutMs ?? INITIAL_RPC_CONNECT_TIMEOUT_MS;
+  const getTimedAuthStatus = () =>
+    withTimeout({
+      message: AUTH_STATUS_TIMEOUT_MESSAGE,
+      operation: options.getAuthStatus(),
+      timeoutMs: statusTimeoutMs,
+    });
+  const prepareTimedSetupEnrollment = () =>
+    withTimeout({
+      message: AUTH_SETUP_TIMEOUT_MESSAGE,
+      operation: options.prepareSetupEnrollment(),
+      timeoutMs: setupTimeoutMs,
+    });
+  const connectAuthenticatedTransport = async () => {
+    try {
+      await withTimeout({
+        message: INITIAL_RPC_CONNECT_TIMEOUT_MESSAGE,
+        operation: options.connectRpcTransport(),
+        timeoutMs: connectTimeoutMs,
+      });
+    } catch (error) {
+      options.disconnectRpcTransport?.();
+      throw error;
+    }
+  };
+
+  const status = await getTimedAuthStatus();
 
   if (status.authenticated) {
     try {
       options.onAuthenticatedConnectStart?.();
       await connectRpcTransportWithRetry({
-        connect: options.connectRpcTransport,
+        connect: connectAuthenticatedTransport,
+        ...(typeof options.connectRetryBaseDelayMs === "number"
+          ? {
+              baseDelayMs: options.connectRetryBaseDelayMs,
+            }
+          : {}),
+        ...(typeof options.connectRetryMaxAttempts === "number"
+          ? {
+              maxAttempts: options.connectRetryMaxAttempts,
+            }
+          : {}),
+        ...(typeof options.connectRetryMaxDelayMs === "number"
+          ? {
+              maxDelayMs: options.connectRetryMaxDelayMs,
+            }
+          : {}),
         ...(options.onAuthenticatedConnectRetry
           ? {
               onRetry: options.onAuthenticatedConnectRetry,
+            }
+          : {}),
+        ...(options.connectRetryWait
+          ? {
+              wait: options.connectRetryWait,
             }
           : {}),
       });
@@ -146,11 +246,11 @@ export async function resolveAuthShellGate(
       };
     } catch (error) {
       if (!shouldRetryInitialRpcConnect(error)) {
-        const refreshedStatus = await options.getAuthStatus();
+        const refreshedStatus = await getTimedAuthStatus();
         if (!refreshedStatus.authenticated) {
           if (!refreshedStatus.configured) {
             return {
-              enrollment: await options.prepareSetupEnrollment(),
+              enrollment: await prepareTimedSetupEnrollment(),
               kind: "setup",
               notice: DISCARDED_SESSION_NOTICE,
               status: refreshedStatus,
@@ -170,7 +270,7 @@ export async function resolveAuthShellGate(
 
   if (!status.configured) {
     return {
-      enrollment: await options.prepareSetupEnrollment(),
+      enrollment: await prepareTimedSetupEnrollment(),
       kind: "setup",
       status,
     };

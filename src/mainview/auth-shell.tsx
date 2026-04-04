@@ -272,6 +272,7 @@ export default function AuthShell({
       try {
         const gate = await resolveAuthShellGate({
           connectRpcTransport,
+          disconnectRpcTransport,
           getAuthStatus,
           onAuthenticatedConnectRetry: ({ nextAttemptNumber, maxAttempts }) => {
             if (loadGateRequestIdRef.current !== requestId) {
