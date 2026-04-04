@@ -253,7 +253,7 @@ Done when:
 
 ### Slice P2.2: Add append-only fast path to thread message merging
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `mergeThreadMessageHistory()` rebuilds a `Map` and sorts the whole message set even when incoming messages are strictly newer.

@@ -135,6 +135,23 @@ function mergeThreadMessageHistory(
     return incoming;
   }
 
+  const currentLastMessageId = current[current.length - 1]?.id ?? 0;
+  const incomingFirstMessageId = incoming[0]?.id ?? 0;
+  if (currentLastMessageId < incomingFirstMessageId) {
+    let canAppendIncomingRange = true;
+    let previousMessageId = currentLastMessageId;
+    for (const message of incoming) {
+      if (message.id <= previousMessageId) {
+        canAppendIncomingRange = false;
+        break;
+      }
+      previousMessageId = message.id;
+    }
+    if (canAppendIncomingRange) {
+      return [...current, ...incoming];
+    }
+  }
+
   const messagesById = new Map<number, RpcThreadMessage>();
   for (const message of current) {
     messagesById.set(message.id, message);
