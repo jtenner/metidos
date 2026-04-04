@@ -6,6 +6,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -116,6 +117,8 @@ const DESKTOP_CHAT_TRANSCRIPT_GAP_PX = 40;
 const DESKTOP_CHAT_TRANSCRIPT_OVERSCAN = 6;
 const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
 const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
+const UNSAFE_MODE_DESCRIPTION =
+  "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
 
 /**
  * Group assistant-visible messages into adjacent assistant-only rows to render as
@@ -157,38 +160,47 @@ function UnsafeModeToggle({
 }: UnsafeModeToggleProps): JSX.Element {
   // Compact mode reduces horizontal space on narrow viewports and keeps controls readable.
   const compact = variant === "mobile";
+  const popoverId = useId();
   return (
-    <label
-      className={[
-        "inline-flex items-center gap-2 rounded-full border transition-colors",
-        compact ? "px-2.5 py-1.5" : "px-3 py-1.5",
-        checked
-          ? "border-[#d89256] bg-[#2d1d12] text-[#ffd3a6]"
-          : "border-[#3d3d3d] bg-[#171717] text-[#b3afad]",
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-      ].join(" ")}
-      title="Uses the danger-full-access sandbox for this thread. Unsafe-mode changes are also recorded in the local security audit log."
-    >
-      <input
-        checked={checked}
-        className="h-3.5 w-3.5 accent-[#d89256]"
-        disabled={disabled}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        type="checkbox"
-      />
-      <span className="font-body text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-        Unsafe
-      </span>
-    </label>
-  );
-}
-
-function UnsafeModeWarningBanner(): JSX.Element {
-  return (
-    <div className="mt-2 border border-[#6d5930] bg-[#261f12] px-3 py-3 text-xs text-[#f2d79b]">
-      Unsafe mode is enabled for this thread. Codex can use the
-      danger-full-access sandbox, and unsafe-mode changes are recorded in the
-      local security audit log.
+    <div className="group relative inline-flex overflow-visible">
+      <label
+        className={[
+          "inline-flex items-center gap-2 rounded-full border transition-colors",
+          compact ? "px-2.5 py-1.5" : "px-3 py-1.5",
+          checked
+            ? "border-[#d89256] bg-[#2d1d12] text-[#ffd3a6]"
+            : "border-[#3d3d3d] bg-[#171717] text-[#b3afad]",
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        ].join(" ")}
+      >
+        <input
+          aria-describedby={checked ? popoverId : undefined}
+          checked={checked}
+          className="h-3.5 w-3.5 accent-[#d89256]"
+          disabled={disabled}
+          onChange={(event) => onChange(event.currentTarget.checked)}
+          type="checkbox"
+        />
+        <span className="font-body text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
+          Unsafe
+        </span>
+      </label>
+      {checked ? (
+        <div
+          className={[
+            "absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+            compact
+              ? "w-[18rem] max-w-[calc(100vw-2rem)]"
+              : "w-[28rem] max-w-[calc(100vw-4rem)]",
+          ].join(" ")}
+          id={popoverId}
+          role="tooltip"
+        >
+          <div className="border border-[#6d5930] bg-[#261f12] px-3 py-2 text-xs leading-5 text-[#f2d79b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+            {UNSAFE_MODE_DESCRIPTION}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -694,7 +706,6 @@ export function DesktopChatView({
               {unsafeModeControlError}
             </div>
           ) : null}
-          {activeUnsafeMode ? <UnsafeModeWarningBanner /> : null}
           <ChatComposerControl
             actionDisabled={composerActionDisabled}
             actionLabel={composerActionLabel}
@@ -920,7 +931,6 @@ export function MobileChatView({
               {unsafeModeControlError}
             </div>
           ) : null}
-          {activeUnsafeMode ? <UnsafeModeWarningBanner /> : null}
         </form>
       </footer>
     </>
