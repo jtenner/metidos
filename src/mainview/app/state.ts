@@ -998,6 +998,24 @@ export function sortThreads(items: RpcThread[]): RpcThread[] {
   return [...items].sort(compareThreadsByRecency);
 }
 
+function findThreadInsertionIndex(
+  items: RpcThread[],
+  thread: RpcThread,
+): number {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const midThread = items[mid];
+    if (midThread && compareThreadsByRecency(midThread, thread) <= 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
 /**
  * Order threads by pinned timestamp first, then by last updated date.
  */
@@ -1137,9 +1155,44 @@ export function upsertThreadList(
   items: RpcThread[],
   thread: RpcThread,
 ): RpcThread[] {
-  const next = items.filter((entry) => entry.id !== thread.id);
-  next.push(thread);
-  return sortThreads(next);
+  const existingIndex = items.findIndex((entry) => entry.id === thread.id);
+  if (existingIndex === -1) {
+    const insertionIndex = findThreadInsertionIndex(items, thread);
+    const next = items.slice();
+    next.splice(insertionIndex, 0, thread);
+    return next;
+  }
+
+  const existingThread = items[existingIndex];
+  if (!existingThread) {
+    return items;
+  }
+
+  if (existingThread === thread) {
+    return items;
+  }
+
+  const previousThread =
+    existingIndex > 0 ? (items[existingIndex - 1] ?? null) : null;
+  const nextThread =
+    existingIndex < items.length - 1
+      ? (items[existingIndex + 1] ?? null)
+      : null;
+  const staysInPlace =
+    (previousThread === null ||
+      compareThreadsByRecency(previousThread, thread) <= 0) &&
+    (nextThread === null || compareThreadsByRecency(thread, nextThread) <= 0);
+  if (staysInPlace) {
+    const next = items.slice();
+    next[existingIndex] = thread;
+    return next;
+  }
+
+  const next = items.slice();
+  next.splice(existingIndex, 1);
+  const insertionIndex = findThreadInsertionIndex(next, thread);
+  next.splice(insertionIndex, 0, thread);
+  return next;
 }
 
 function compareProjects(left: RpcProject, right: RpcProject): number {

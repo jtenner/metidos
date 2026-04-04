@@ -1,11 +1,22 @@
 import { describe, expect, it } from "bun:test";
 
 import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";
+import { upsertThreadList } from "./app/state";
 import { resolveThreadStatusRefreshOutcome } from "./thread-status-refresh";
 
 function thread(threadId: number): RpcThread {
+  return sortableThread(threadId, "2026-04-04T12:00:00.000Z");
+}
+
+function sortableThread(
+  threadId: number,
+  updatedAt: string,
+  pinnedAt: string | null = null,
+): RpcThread {
   return {
     id: threadId,
+    pinnedAt,
+    updatedAt,
   } as unknown as RpcThread;
 }
 
@@ -57,5 +68,65 @@ describe("thread status refresh helpers", () => {
 
     expect(outcome.shouldApplySelectedDetail).toBeFalse();
     expect(outcome.nextThreads).toBe(loadedThreads);
+  });
+});
+
+describe("upsertThreadList", () => {
+  it("inserts new threads without resorting the entire list", () => {
+    const threads = [
+      sortableThread(1, "2026-04-04T12:00:00.000Z"),
+      sortableThread(2, "2026-04-04T11:00:00.000Z"),
+    ];
+
+    const next = upsertThreadList(
+      threads,
+      sortableThread(3, "2026-04-04T11:30:00.000Z"),
+    );
+
+    expect(next.map((entry) => entry.id)).toEqual([1, 3, 2]);
+  });
+
+  it("replaces a thread in place when the sort position does not change", () => {
+    const threads = [
+      sortableThread(1, "2026-04-04T12:00:00.000Z"),
+      sortableThread(2, "2026-04-04T11:00:00.000Z"),
+      sortableThread(3, "2026-04-04T10:00:00.000Z"),
+    ];
+
+    const updatedThread = sortableThread(2, "2026-04-04T11:00:00.000Z");
+    const next = upsertThreadList(threads, updatedThread);
+
+    expect(next.map((entry) => entry.id)).toEqual([1, 2, 3]);
+    expect(next[1]).toBe(updatedThread);
+  });
+
+  it("moves a thread forward when recency changes", () => {
+    const threads = [
+      sortableThread(1, "2026-04-04T12:00:00.000Z"),
+      sortableThread(2, "2026-04-04T11:00:00.000Z"),
+      sortableThread(3, "2026-04-04T10:00:00.000Z"),
+    ];
+
+    const next = upsertThreadList(
+      threads,
+      sortableThread(3, "2026-04-04T12:30:00.000Z"),
+    );
+
+    expect(next.map((entry) => entry.id)).toEqual([3, 1, 2]);
+  });
+
+  it("moves a thread into the pinned section when pinnedAt changes", () => {
+    const threads = [
+      sortableThread(1, "2026-04-04T12:00:00.000Z", "2026-04-04T12:15:00.000Z"),
+      sortableThread(2, "2026-04-04T11:00:00.000Z"),
+      sortableThread(3, "2026-04-04T10:00:00.000Z"),
+    ];
+
+    const next = upsertThreadList(
+      threads,
+      sortableThread(3, "2026-04-04T10:00:00.000Z", "2026-04-04T12:20:00.000Z"),
+    );
+
+    expect(next.map((entry) => entry.id)).toEqual([3, 1, 2]);
   });
 });

@@ -158,7 +158,7 @@ Done when:
 
 ### Slice P1.2: Stop full re-sort churn on every thread mutation
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `upsertThreadList()` filters, pushes, and re-sorts the whole thread list for many mutations.
