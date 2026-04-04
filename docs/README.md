@@ -22,6 +22,7 @@ The files are primarily for maintainers and contributors to understand tradeoffs
 - `2026-04-04-correctness-audit-2.md`
   - April 4 follow-up correctness audit snapshot from a fresh full-codebase pass later the same day.
   - Focuses on project lifecycle request races, task-run orphan threads, security-audit scope drift, post-login RPC bootstrap fragility, and sidecar/live-app metadata divergence.
+  - The document now also records the remediation outcome for the full five-finding pass completed on 2026-04-04.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.
   - Documents expected thread/session behavior and the integration surface the backend uses.

@@ -7,20 +7,15 @@ import {
   enforceBoundThreadScope,
   enforceTargetScope,
 } from "./codex-sidecar-scope";
-import {
-  getThreadById,
-  initAppDatabase,
-  renameThread as renameThreadRecord,
-  setThreadPinned as setThreadPinnedRecord,
-  type ThreadRecord,
-} from "./db";
 import type {
   AppRPCSchema,
   RpcProcedureCallOptions,
   RpcRequestPriority,
+  RpcThread,
   RpcThreadDetail,
   RpcThreadStartRequest,
 } from "./rpc-schema";
+import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
 
 const DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
 /** Default request timeout in milliseconds when no timeout override is supplied. */
@@ -69,7 +64,6 @@ const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
 const projectIdContext = readIntegerEnv("JOLT_PROJECT_ID");
 const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
-const db = initAppDatabase();
 
 /** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {
@@ -480,98 +474,6 @@ function requireThreadId(threadId?: number | null): number {
   throw new Error("threadId is required.");
 }
 
-/**
- * Normalize summary values so callers can clear with blank input.
- */
-function normalizeOptionalSummary(
-  summary: string | null | undefined,
-): string | null | undefined {
-  if (typeof summary === "undefined") {
-    return undefined;
-  }
-  return summary?.trim() || null;
-}
-
-/**
- * Apply thread updates directly to local sqlite metadata as a local-first step.
- */
-function updateThreadMetadataLocally(
-  threadId: number,
-  title?: string,
-  summary?: string | null,
-  pinned?: boolean,
-) {
-  // Local cache must exist before updates so we can preserve unchanged fields.
-  const existingThread = getThreadById(db, threadId);
-  if (!existingThread) {
-    throw new Error(`Thread not found: ${threadId}`);
-  }
-
-  const normalizedSummary = normalizeOptionalSummary(summary);
-  if (
-    typeof title !== "undefined" ||
-    typeof normalizedSummary !== "undefined"
-  ) {
-    renameThreadRecord(
-      db,
-      threadId,
-      title ?? existingThread.title,
-      normalizedSummary,
-    );
-  }
-
-  if (typeof pinned === "boolean") {
-    setThreadPinnedRecord(db, threadId, pinned);
-  }
-
-  // Re-fetch after writes so caller always receives the current record.
-  const thread = getThreadById(db, threadId);
-  if (!thread) {
-    throw new Error(`Thread not found: ${threadId}`);
-  }
-  return thread;
-}
-
-/**
- * Schedule non-blocking background RPC updates for thread metadata changes.
- */
-function refreshThreadMetadataInApp(
-  thread: ThreadRecord,
-  title?: string,
-  summary?: string | null,
-  pinned?: boolean,
-): void {
-  const normalizedSummary = normalizeOptionalSummary(summary);
-  if (
-    typeof title !== "undefined" ||
-    typeof normalizedSummary !== "undefined"
-  ) {
-    void rpcClient
-      .call(
-        "renameThread",
-        {
-          threadId: thread.id,
-          title: thread.title,
-          ...(typeof normalizedSummary === "undefined"
-            ? {}
-            : { summary: thread.summary }),
-        },
-        { priority: "background", timeoutMs: 1_500 },
-      )
-      .catch(() => {});
-  }
-
-  if (typeof pinned === "boolean") {
-    void rpcClient
-      .call(
-        "setThreadPinned",
-        { threadId: thread.id, pinned },
-        { priority: "background", timeoutMs: 1_500 },
-      )
-      .catch(() => {});
-  }
-}
-
 /** Map low-level run state into a concise, UI-oriented label. */
 function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
   switch (detail.thread.runStatus.state) {
@@ -587,14 +489,7 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
 }
 
 /** Build metadata payload for thread details from db rows or rpc thread objects. */
-function threadMetadataPayload(
-  thread:
-    | RpcThreadDetail["thread"]
-    | Pick<
-        ThreadRecord,
-        "id" | "projectId" | "worktreePath" | "title" | "summary" | "pinnedAt"
-      >,
-) {
+function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
   return {
     threadId: thread.id,
     projectId: thread.projectId,
@@ -714,22 +609,19 @@ server.registerTool(
   },
   async ({ pinned, summary, threadId, title }) => {
     const resolvedThreadId = requireThreadId(threadId);
-    if (
-      typeof title === "undefined" &&
-      typeof summary === "undefined" &&
-      typeof pinned === "undefined"
-    ) {
-      throw new Error("At least one of title, summary, or pinned is required.");
-    }
-
-    const thread = updateThreadMetadataLocally(
-      resolvedThreadId,
-      title,
-      summary,
-      pinned,
+    const thread = await updateThreadMetadataFromSidecar(
+      (params, options) =>
+        rpcClient.call("updateThreadMetadata", params, options),
+      {
+        threadId: resolvedThreadId,
+        ...(typeof title === "undefined" ? {} : { title }),
+        ...(typeof summary === "undefined" ? {} : { summary }),
+        ...(typeof pinned === "undefined" ? {} : { pinned }),
+      },
+      {
+        priority: "foreground",
+      },
     );
-    // Refresh the live app cache without blocking the tool result.
-    refreshThreadMetadataInApp(thread, title, summary, pinned);
     return textResult(`Updated thread ${thread.id}.`, {
       threadId: thread.id,
       title: thread.title,

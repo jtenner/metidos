@@ -3110,9 +3110,30 @@ export async function stopThreadTurnProcedure(
 export async function renameThreadProcedure(
   params: AppRPCSchema["requests"]["renameThread"]["params"],
 ): Promise<RpcThread> {
+  return updateThreadMetadataProcedure({
+    threadId: params.threadId,
+    title: params.title,
+    ...(typeof params.summary === "undefined"
+      ? {}
+      : { summary: params.summary }),
+  });
+}
+
+export async function updateThreadMetadataProcedure(
+  params: AppRPCSchema["requests"]["updateThreadMetadata"]["params"],
+): Promise<RpcThread> {
   const thread = threadById(params.threadId);
-  const title = params.title.trim();
-  if (!title) {
+  if (
+    typeof params.title === "undefined" &&
+    typeof params.summary === "undefined" &&
+    typeof params.pinned === "undefined"
+  ) {
+    throw new Error("At least one thread metadata field is required.");
+  }
+
+  const normalizedTitle =
+    typeof params.title === "undefined" ? undefined : params.title.trim();
+  if (typeof normalizedTitle !== "undefined" && !normalizedTitle) {
     throw new Error("Thread title is required.");
   }
 
@@ -3120,7 +3141,22 @@ export async function renameThreadProcedure(
     typeof params.summary === "undefined"
       ? undefined
       : params.summary?.trim() || null;
-  renameThread(db, thread.id, title, normalizedSummary);
+  if (
+    typeof normalizedTitle !== "undefined" ||
+    typeof normalizedSummary !== "undefined"
+  ) {
+    renameThread(
+      db,
+      thread.id,
+      normalizedTitle ?? thread.title,
+      normalizedSummary,
+    );
+  }
+
+  if (typeof params.pinned === "boolean") {
+    setThreadPinned(db, thread.id, params.pinned);
+  }
+
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
@@ -3128,10 +3164,7 @@ export async function renameThreadProcedure(
 export async function setThreadPinnedProcedure(
   params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
-  setThreadPinned(db, thread.id, params.pinned);
-  invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return updateThreadMetadataProcedure(params);
 }
 
 export async function updateThreadModelProcedure(

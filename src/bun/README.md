@@ -35,6 +35,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `project-procedures.ts`
   - Exposes all RPC procedure implementations consumed by the frontend.
   - Coordinates projects, worktrees, threads, tasks, file content reads/diffs, git history, and thread lifecycle operations.
+  - Centralizes authoritative thread metadata mutations so the UI and sidecar invalidate caches through the same backend path.
   - Maintains in-memory caches/polling state, manages worktree/task background refresh loops, and publishes change events to connected clients.
   - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
@@ -105,11 +106,17 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `codex-sidecar-mcp.ts`
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
+  - Routes thread metadata writes through authoritative RPC updates so tool success matches visible app state.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
 
 - `codex-sidecar-scope.ts`
   - Provides the scope-enforcement helpers used by the MCP sidecar.
   - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes.
+
+- `sidecar-thread-metadata.ts`
+  - Shared helper for sidecar thread metadata mutations.
+  - Normalizes optional summary/title inputs and routes updates through `updateThreadMetadata(...)`.
+  - Surfaces timeout and connection failures instead of silently falling back to local-only writes.
 
 - `auth.ts`
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.

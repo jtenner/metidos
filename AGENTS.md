@@ -99,6 +99,8 @@
 │  │  ├─ rpc-authz.test.ts
 │  │  ├─ rpc-authz.ts
 │  │  ├─ rpc-schema.ts
+│  │  ├─ sidecar-thread-metadata.test.ts
+│  │  ├─ sidecar-thread-metadata.ts
 │  │  ├─ rpc-websocket-auth.test.ts
 │  │  ├─ rpc-websocket-auth.ts
 │  │  ├─ security-audit-cli.test.ts
@@ -109,6 +111,7 @@
 │  │  ├─ server-security.ts
 │  │  ├─ static-server.ts
 │  │  ├─ starvation-harness.ts
+│  │  ├─ thread-metadata.test.ts
 │  │  ├─ tls-config.test.ts
 │  │  └─ tls-config.ts
 │  └─ mainview/

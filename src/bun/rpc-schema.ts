@@ -629,6 +629,15 @@ export type AppRPCSchema = {
       };
       response: RpcThreadDetail;
     };
+    updateThreadMetadata: {
+      params: {
+        threadId: number;
+        title?: string;
+        summary?: string | null;
+        pinned?: boolean;
+      };
+      response: RpcThread;
+    };
     renameThread: {
       params: { threadId: number; title: string; summary?: string | null };
       response: RpcThread;
@@ -800,6 +809,10 @@ export interface ProjectProcedures {
   runProjectTask: RpcProcedureCall<
     AppRPCSchema["requests"]["runProjectTask"]["params"],
     AppRPCSchema["requests"]["runProjectTask"]["response"]
+  >;
+  updateThreadMetadata: RpcProcedureCall<
+    AppRPCSchema["requests"]["updateThreadMetadata"]["params"],
+    AppRPCSchema["requests"]["updateThreadMetadata"]["response"]
   >;
   renameThread: RpcProcedureCall<
     AppRPCSchema["requests"]["renameThread"]["params"],

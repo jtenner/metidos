@@ -4,15 +4,16 @@
 
 ## Active Correctness Slices
 
+No active correctness slices at the moment.
+
+## Recently Completed
+
 ### Slice 5
 
 - Title: Make sidecar thread metadata updates authoritative
-- Description: Stop treating direct SQLite writes plus silent best-effort RPC refresh as success. The sidecar should either mutate through RPC first or reliably invalidate backend/UI state when the local-first path is used.
+- Completed: 2026-04-04
+- Outcome: The sidecar no longer writes thread title, summary, or pin state directly into SQLite and then hopes a short background RPC refresh succeeds later. `modify_thread` now routes through a shared `updateThreadMetadata(...)` RPC mutation, which preserves unspecified fields, invalidates backend caches through the normal procedure path, and only reports success when the live app mutation succeeds. A dedicated sidecar helper now surfaces timeout and connection failures instead of silently drifting the app, and focused regression coverage exercises both those failure cases and the backend procedure behavior for combined metadata updates.
 - Source: [Finding 5](docs/2026-04-04-correctness-audit-2.md#5-medium-sidecar-thread-metadata-writes-can-diverge-from-the-live-app)
-- Scope: `src/bun/codex-sidecar-mcp.ts`, `src/bun/project-procedures.ts`, any related sidecar tests
-- Verify: Add coverage for metadata updates while the RPC transport is temporarily unavailable or timing out.
-
-## Recently Completed
 
 ### Slice 2
 

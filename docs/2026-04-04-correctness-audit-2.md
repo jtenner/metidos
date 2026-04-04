@@ -168,6 +168,12 @@ Recommended fix:
 - If local-first writes remain, add a reliable cache-invalidation/event path and surface refresh failures instead of swallowing them.
 - Add a regression test for sidecar metadata updates while RPC refresh is temporarily unavailable.
 
+Update on 2026-04-04:
+
+- `modify_thread` now routes through a shared `updateThreadMetadata(...)` RPC mutation instead of writing SQLite first.
+- Timeout and connection failures now fail the tool call instead of returning local-only success.
+- Regression coverage now exercises both the sidecar helper failure path and the backend metadata procedure.
+
 ## Recommended Fix Order
 
 1. Serialize project lifecycle transitions so stale open results cannot overwrite newer close state.
@@ -179,4 +185,5 @@ Recommended fix:
 ## Notes
 
 - This document is the current correctness snapshot from the additional April 4 pass.
+- All five findings in this follow-up snapshot were addressed in code on 2026-04-04; use `agent-todo.md` for any newer active slices after this pass.
 - The earlier docs remain useful historical context, but they should not be treated as an authoritative list of what is still broken now.

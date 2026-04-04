@@ -72,6 +72,7 @@ import {
   startProcedureCacheMaintenance,
   stopThreadTurnProcedure,
   suspendActiveWorktreePolling,
+  updateThreadMetadataProcedure,
   updateThreadModelProcedure,
   updateThreadReasoningEffortProcedure,
   updateThreadUnsafeModeProcedure,
@@ -356,6 +357,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
     requireFreshStepUpForRpcAction(context, "run project tasks");
     return runProjectTaskProcedure(params);
   },
+  updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
   renameThread: (params) => renameThreadProcedure(params),
   setThreadPinned: (params) => setThreadPinnedProcedure(params),
   updateThreadModel: (params) => updateThreadModelProcedure(params),

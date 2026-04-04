@@ -773,6 +773,7 @@ const procedures: ProjectProcedures = {
   sendThreadMessage: createProcedure("sendThreadMessage"),
   stopThreadTurn: createProcedure("stopThreadTurn"),
   runProjectTask: createProcedure("runProjectTask"),
+  updateThreadMetadata: createProcedure("updateThreadMetadata"),
   renameThread: createProcedure("renameThread"),
   setThreadPinned: createProcedure("setThreadPinned"),
   updateThreadModel: createProcedure("updateThreadModel"),
