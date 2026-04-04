@@ -547,15 +547,26 @@ export function useMainviewDerivedState({
     supportsTildePath,
   ]);
 
-  const filteredWorkspacePinnedThreads = useMemo(() => {
-    // Pinned threads are rendered as a separate, prioritized list.
-    return sortThreads(threads.filter((thread) => thread.pinnedAt !== null));
-  }, [threads]);
+  const { filteredWorkspaceActiveThreads, filteredWorkspacePinnedThreads } =
+    useMemo(() => {
+      // Sort once for stable recency ordering, then partition into pinned/recent lists.
+      const sortedThreads = sortThreads(threads);
+      const pinnedThreads: RpcThread[] = [];
+      const activeThreads: RpcThread[] = [];
 
-  const filteredWorkspaceActiveThreads = useMemo(() => {
-    // Active threads exclude pinned items to support split sidebar sections.
-    return sortThreads(threads.filter((thread) => thread.pinnedAt === null));
-  }, [threads]);
+      for (const thread of sortedThreads) {
+        if (thread.pinnedAt !== null) {
+          pinnedThreads.push(thread);
+          continue;
+        }
+        activeThreads.push(thread);
+      }
+
+      return {
+        filteredWorkspaceActiveThreads: activeThreads,
+        filteredWorkspacePinnedThreads: pinnedThreads,
+      };
+    }, [threads]);
 
   const filteredGitHistoryEntries = useMemo(() => {
     return gitHistory?.entries ?? [];

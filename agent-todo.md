@@ -217,7 +217,7 @@ Done when:
 
 ### Slice P1.5: Sort workspace threads once, then partition
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Pinned and recent workspace thread sections each sort independently.
