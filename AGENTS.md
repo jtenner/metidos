@@ -26,6 +26,7 @@
 │  ├─ 2026-04-03-security-audit.md
 │  ├─ 2026-04-03-security-audit-followup.md
 │  ├─ 2026-04-03-security-remediation-plan.md
+│  ├─ 2026-04-04-correctness-audit.md
 │  ├─ codex.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md

@@ -11,8 +11,14 @@ The files are primarily for maintainers and contributors to understand tradeoffs
   - Historical follow-up/round 2 correctness audit snapshot with additional findings and refined severity list.
 - `2026-04-03-security-audit.md`
   - Historical security audit snapshot covering transport, RPC surface, filesystem access, Codex/MCP execution model, and local persistence.
+- `2026-04-03-security-audit-followup.md`
+  - Follow-up security audit snapshot after the first remediation pass.
+  - Focuses on remaining auth write-surface, task-file containment, default privilege, and sidecar isolation risks.
 - `2026-04-03-security-remediation-plan.md`
   - Security implementation sequence drafted from that audit; includes auth model, step-up auth, transport hardening, TLS handling, and least-privilege defaults.
+- `2026-04-04-correctness-audit.md`
+  - Current correctness audit snapshot for the April 4 recheck.
+  - Focuses on startup restore drift, active-worktree validation, project close rollback, sidecar scope contract drift, and initial RPC boot resilience.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.
   - Documents expected thread/session behavior and the integration surface the backend uses.
