@@ -341,7 +341,7 @@ Done when:
 
 ### Slice P2.7: Avoid unnecessary diff-file patch reloads on background snapshot refresh
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Background snapshot refresh can cascade into focused-file patch reloads more often than necessary.

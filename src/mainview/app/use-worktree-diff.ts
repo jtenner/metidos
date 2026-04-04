@@ -14,6 +14,24 @@ import { createAbortError, isAbortError } from "./state";
 
 const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
 
+function worktreeChangeMetadataMatches(
+  left: RpcWorktreeChange | null,
+  right: RpcWorktreeChange | null,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.path === right.path &&
+    left.previousPath === right.previousPath &&
+    left.stagedStatus === right.stagedStatus &&
+    left.unstagedStatus === right.unstagedStatus
+  );
+}
+
 /** Parameters controlling worktree snapshot and diff polling behavior. */
 type UseWorktreeDiffParams = {
   /** Whether the active worktree is currently opened in the workspace panel. */
@@ -274,10 +292,28 @@ export function useWorktreeDiff({
         setWorktreeDiffError("");
 
         if (options?.background && selectedDiffFileChangePath) {
-          // Refresh patch in the background to keep diff pane responsive.
-          void loadSelectedDiffFilePatch({
-            background: true,
-          });
+          const refreshedSelectedChange =
+            snapshot.changes.find(
+              (change) => change.path === selectedDiffFileChangePath,
+            ) ?? null;
+          const currentSelectedChange: RpcWorktreeChange | null = {
+            path: selectedDiffFileChangePath,
+            previousPath: selectedDiffFilePreviousPath,
+            stagedStatus: selectedDiffFileStagedStatus,
+            unstagedStatus: selectedDiffFileUnstagedStatus,
+          };
+          if (
+            refreshedSelectedChange &&
+            !worktreeChangeMetadataMatches(
+              currentSelectedChange,
+              refreshedSelectedChange,
+            )
+          ) {
+            // Refresh patch only when the selected change metadata actually changed.
+            void loadSelectedDiffFilePatch({
+              background: true,
+            });
+          }
         }
       } catch (error) {
         // Ignore abort races; otherwise record and show the latest error.
@@ -309,6 +345,9 @@ export function useWorktreeDiff({
       loadSelectedDiffFilePatch,
       procedures,
       selectedDiffFileChangePath,
+      selectedDiffFilePreviousPath,
+      selectedDiffFileStagedStatus,
+      selectedDiffFileUnstagedStatus,
       selectedProject,
       setWorktreeState,
     ],
