@@ -1,5 +1,6 @@
 import type { AuthStatus, TotpEnrollment } from "./auth-client";
 import { AuthApiError, isAuthRequiredError } from "./auth-client";
+import { isAuthRequiredRpcError } from "./rpc-errors";
 
 export const INITIAL_RPC_CONNECT_MAX_ATTEMPTS = 4;
 export const INITIAL_RPC_CONNECT_BASE_DELAY_MS = 250;
@@ -13,12 +14,17 @@ export type AuthShellGateResolution =
   | {
       enrollment: TotpEnrollment;
       kind: "setup";
+      notice?: string;
       status: AuthStatus;
     }
   | {
       kind: "login";
+      notice?: string;
       status: AuthStatus;
     };
+
+export const DISCARDED_SESSION_NOTICE =
+  "The previous session was discarded. Sign in again to continue.";
 
 export type InitialRpcConnectRetryInfo = {
   delayMs: number;
@@ -47,7 +53,10 @@ function defaultRetryWait(delayMs: number): Promise<void> {
 }
 
 export function shouldRetryInitialRpcConnect(error: unknown): boolean {
-  return !(error instanceof AuthApiError && isAuthRequiredError(error));
+  return !(
+    (error instanceof AuthApiError && isAuthRequiredError(error)) ||
+    isAuthRequiredRpcError(error)
+  );
 }
 
 export async function connectRpcTransportWithRetry(options: {
@@ -121,19 +130,42 @@ export async function resolveAuthShellGate(
   const status = await options.getAuthStatus();
 
   if (status.authenticated) {
-    options.onAuthenticatedConnectStart?.();
-    await connectRpcTransportWithRetry({
-      connect: options.connectRpcTransport,
-      ...(options.onAuthenticatedConnectRetry
-        ? {
-            onRetry: options.onAuthenticatedConnectRetry,
+    try {
+      options.onAuthenticatedConnectStart?.();
+      await connectRpcTransportWithRetry({
+        connect: options.connectRpcTransport,
+        ...(options.onAuthenticatedConnectRetry
+          ? {
+              onRetry: options.onAuthenticatedConnectRetry,
+            }
+          : {}),
+      });
+      return {
+        kind: "authenticated",
+        status,
+      };
+    } catch (error) {
+      if (!shouldRetryInitialRpcConnect(error)) {
+        const refreshedStatus = await options.getAuthStatus();
+        if (!refreshedStatus.authenticated) {
+          if (!refreshedStatus.configured) {
+            return {
+              enrollment: await options.prepareSetupEnrollment(),
+              kind: "setup",
+              notice: DISCARDED_SESSION_NOTICE,
+              status: refreshedStatus,
+            };
           }
-        : {}),
-    });
-    return {
-      kind: "authenticated",
-      status,
-    };
+
+          return {
+            kind: "login",
+            notice: DISCARDED_SESSION_NOTICE,
+            status: refreshedStatus,
+          };
+        }
+      }
+      throw error;
+    }
   }
 
   if (!status.configured) {

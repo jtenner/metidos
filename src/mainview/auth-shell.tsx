@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ProjectProcedures } from "../bun/rpc-schema";
@@ -245,6 +246,7 @@ export default function AuthShell({
   );
   const [isBusy, setIsBusy] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState("");
+  const loadGateRequestIdRef = useRef(0);
 
   const lockedUntilLabel = useMemo(
     () => formatDateTime(status?.lockedUntil ?? null),
@@ -259,6 +261,8 @@ export default function AuthShell({
 
   const loadGateState = useCallback(
     async (options?: { preserveError?: boolean }) => {
+      const requestId = loadGateRequestIdRef.current + 1;
+      loadGateRequestIdRef.current = requestId;
       setView("loading");
       setLoadingMessage("Checking local authorization state…");
       if (!options?.preserveError) {
@@ -270,15 +274,24 @@ export default function AuthShell({
           connectRpcTransport,
           getAuthStatus,
           onAuthenticatedConnectRetry: ({ nextAttemptNumber, maxAttempts }) => {
+            if (loadGateRequestIdRef.current !== requestId) {
+              return;
+            }
             setLoadingMessage(
               `Opening authenticated workspace… retrying connection (${nextAttemptNumber}/${maxAttempts})…`,
             );
           },
           onAuthenticatedConnectStart: () => {
+            if (loadGateRequestIdRef.current !== requestId) {
+              return;
+            }
             setLoadingMessage("Opening authenticated workspace…");
           },
           prepareSetupEnrollment,
         });
+        if (loadGateRequestIdRef.current !== requestId) {
+          return;
+        }
         setStatus(gate.status);
 
         if (gate.kind === "authenticated") {
@@ -288,6 +301,9 @@ export default function AuthShell({
 
         disconnectRpcTransport();
         if (gate.kind === "setup") {
+          if (gate.notice) {
+            setError(gate.notice);
+          }
           setLoadingMessage("Preparing first-run setup…");
           setEnrollment(gate.enrollment);
           setSetupPrimaryFactor("");
@@ -298,11 +314,17 @@ export default function AuthShell({
           return;
         }
 
+        if (gate.notice) {
+          setError(gate.notice);
+        }
         setLoginPrimaryFactor("");
         setLoginRecoveryCode("");
         setLoginTotpCode("");
         setView("login");
       } catch (nextError) {
+        if (loadGateRequestIdRef.current !== requestId) {
+          return;
+        }
         disconnectRpcTransport();
         setError(errorMessage(nextError));
       }

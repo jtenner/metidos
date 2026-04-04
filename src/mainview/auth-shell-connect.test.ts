@@ -4,10 +4,12 @@ import type { AuthStatus } from "./auth-client";
 import { AuthApiError } from "./auth-client";
 import {
   connectRpcTransportWithRetry,
+  DISCARDED_SESSION_NOTICE,
   INITIAL_RPC_CONNECT_BASE_DELAY_MS,
   resolveAuthShellGate,
   shouldRetryInitialRpcConnect,
 } from "./auth-shell-connect";
+import { RpcError } from "./rpc-errors";
 
 function buildAuthStatus(overrides: Partial<AuthStatus> = {}): AuthStatus {
   return {
@@ -101,6 +103,32 @@ describe("auth shell connect retry helpers", () => {
       "session_required",
       "Sign in required.",
       401,
+      null,
+    );
+
+    await expect(
+      connectRpcTransportWithRetry({
+        connect: async () => {
+          attempts += 1;
+          throw failure;
+        },
+        wait: async (delayMs) => {
+          waits.push(delayMs);
+        },
+      }),
+    ).rejects.toBe(failure);
+
+    expect(attempts).toBe(1);
+    expect(waits).toEqual([]);
+    expect(shouldRetryInitialRpcConnect(failure)).toBeFalse();
+  });
+
+  it("does not retry auth-required websocket failures", async () => {
+    const waits: number[] = [];
+    let attempts = 0;
+    const failure = new RpcError(
+      "The websocket ticket is invalid or expired.",
+      "invalid_websocket_ticket",
       null,
     );
 
@@ -236,6 +264,47 @@ describe("auth shell connect retry helpers", () => {
     });
     expect(connectAttempts).toBe(0);
     expect(setupLoads).toBe(1);
+  });
+
+  it("returns the login gate with a discarded-session notice when authenticated bootstrap loses the session", async () => {
+    const statuses = [
+      buildAuthStatus({
+        authenticated: true,
+      }),
+      buildAuthStatus(),
+    ];
+    let connectAttempts = 0;
+
+    const result = await resolveAuthShellGate({
+      connectRpcTransport: async () => {
+        connectAttempts += 1;
+        throw new AuthApiError(
+          "session_required",
+          "A valid authenticated session is required.",
+          401,
+          null,
+        );
+      },
+      getAuthStatus: async () => {
+        const nextStatus = statuses.shift();
+        if (!nextStatus) {
+          throw new Error("unexpected extra auth status request");
+        }
+        return nextStatus;
+      },
+      prepareSetupEnrollment: async () => {
+        throw new Error(
+          "setup enrollment should not load after a discarded session",
+        );
+      },
+    });
+
+    expect(result).toEqual({
+      kind: "login",
+      notice: DISCARDED_SESSION_NOTICE,
+      status: buildAuthStatus(),
+    });
+    expect(connectAttempts).toBe(1);
   });
 
   it("returns the login gate when auth is configured but no session is active", async () => {
