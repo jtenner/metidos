@@ -173,34 +173,36 @@ function UnsafeModeToggle({
           disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
         ].join(" ")}
       >
-        <input
-          aria-describedby={checked ? popoverId : undefined}
-          checked={checked}
-          className="h-3.5 w-3.5 accent-[#d89256]"
-          disabled={disabled}
-          onChange={(event) => onChange(event.currentTarget.checked)}
-          type="checkbox"
-        />
+        <span className="relative inline-flex overflow-visible">
+          <input
+            aria-describedby={checked ? popoverId : undefined}
+            checked={checked}
+            className="h-3.5 w-3.5 accent-[#d89256]"
+            disabled={disabled}
+            onChange={(event) => onChange(event.currentTarget.checked)}
+            type="checkbox"
+          />
+          {checked ? (
+            <div
+              className={[
+                "absolute z-50 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+                compact
+                  ? "bottom-[calc(100%+0.5rem)] right-0 w-[18rem] max-w-[calc(100vw-2rem)]"
+                  : "bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 w-[28rem] max-w-[calc(100vw-4rem)]",
+              ].join(" ")}
+              id={popoverId}
+              role="tooltip"
+            >
+              <div className="border border-[#6d5930] bg-[#261f12] px-3 py-2 text-xs leading-5 text-[#f2d79b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+                {UNSAFE_MODE_DESCRIPTION}
+              </div>
+            </div>
+          ) : null}
+        </span>
         <span className="font-body text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
           Unsafe
         </span>
       </label>
-      {checked ? (
-        <div
-          className={[
-            "absolute bottom-[calc(100%+0.5rem)] left-1/2 z-50 -translate-x-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
-            compact
-              ? "w-[18rem] max-w-[calc(100vw-2rem)]"
-              : "w-[28rem] max-w-[calc(100vw-4rem)]",
-          ].join(" ")}
-          id={popoverId}
-          role="tooltip"
-        >
-          <div className="border border-[#6d5930] bg-[#261f12] px-3 py-2 text-xs leading-5 text-[#f2d79b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-            {UNSAFE_MODE_DESCRIPTION}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
