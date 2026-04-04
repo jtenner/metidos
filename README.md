@@ -171,6 +171,20 @@ bun run typecheck             # TypeScript check
 bun run harness:starvation    # run starvation harness utility
 ```
 
+### Nginx TLS helper
+
+```bash
+./scripts/fix-jolt-nginx-tls.sh \
+  --site-file /etc/nginx/sites-available/<your-site> \
+  --domain <your-domain> \
+  --ssl-cert /path/to/fullchain.pem \
+  --ssl-key /path/to/privkey.pem \
+  --public-port 7599 \
+  --rpc-port 7600
+```
+
+The script replaces the full site config so `/` points to the static server and `/rpc` points to the RPC backend for websocket-aware proxying.
+
 ## Environment and startup flags
 
 - `--port` / `-p` or `JOLT_PORT` for custom server port selection.
@@ -203,6 +217,8 @@ bun run harness:starvation    # run starvation harness utility
   - Tooling + dependency + compiler + Bun execution config.
 - `docs/`
   - Repository design notes, audits, and migration references.
+- `scripts/`
+  - `fix-jolt-nginx-tls.sh` for reverse-proxy TLS configuration replacement with `/` and `/rpc` routing.
 - `src/`
   - Source of truth for backend and frontend architecture.
 - `stitch.zip`

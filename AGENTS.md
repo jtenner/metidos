@@ -175,6 +175,8 @@
 │     ├─ index.html
 │     ├─ index.ts
 │     └─ input.css
+├─ scripts/
+│  └─ fix-jolt-nginx-tls.sh
 ├─ tsconfig.json
 └─ stitch.zip
 ```
