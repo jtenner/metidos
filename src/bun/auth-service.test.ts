@@ -239,6 +239,130 @@ describe("auth service", () => {
     });
   }
 
+  it("does not lock out for invalid TOTP when the primary factor is correct", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+    const setupCode = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs,
+    );
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: setupCode,
+      totpSecret: enrollment.totpSecret,
+    });
+
+    const validTotp = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs + 1_000,
+    );
+    const invalidTotp =
+      validTotp === "000000" || validTotp === "111111" ? "222222" : "111111";
+
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 1_000,
+        primaryFactor: "123456",
+        totpCode: invalidTotp,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 2_000,
+        primaryFactor: "123456",
+        totpCode: invalidTotp,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 3_000,
+        primaryFactor: "123456",
+        totpCode: invalidTotp,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(0);
+    expect(
+      listSecurityAuditEvents(database).some(
+        (event) => event.eventType === "auth_lockout_started",
+      ),
+    ).toBeFalse();
+
+    const successCode = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs + 4_000,
+    );
+    const loginResult = await login(database, {
+      appDataDir,
+      nowMs: setupTimeMs + 4_000,
+      primaryFactor: "123456",
+      totpCode: successCode,
+    });
+    expect(loginResult.session.id.length).toBeGreaterThan(10);
+  });
+
+  it("does not lock out for invalid recovery code when the primary factor is correct", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "local-user",
+    });
+    const setupCode = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs,
+    );
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: setupCode,
+      totpSecret: enrollment.totpSecret,
+    });
+
+    await expect(
+      loginWithRecoveryCode(database, {
+        nowMs: setupTimeMs + 1_000,
+        primaryFactor: "123456",
+        recoveryCode: "INVALID-CODE-1",
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    await expect(
+      loginWithRecoveryCode(database, {
+        nowMs: setupTimeMs + 2_000,
+        primaryFactor: "123456",
+        recoveryCode: "INVALID-CODE-2",
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    await expect(
+      loginWithRecoveryCode(database, {
+        nowMs: setupTimeMs + 3_000,
+        primaryFactor: "123456",
+        recoveryCode: "INVALID-CODE-3",
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(0);
+    expect(
+      listSecurityAuditEvents(database).some(
+        (event) => event.eventType === "auth_lockout_started",
+      ),
+    ).toBeFalse();
+  });
+
   it("issues and consumes websocket tickets for valid sessions", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();

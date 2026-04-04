@@ -467,20 +467,7 @@ export async function verifyPrimaryFactorAndTotp(
     input.primaryFactor,
     settings.primaryFactorHash,
   );
-  const totpSecret = primaryFactorValid
-    ? await decryptAuthSecret(
-        settings.totpSecretCiphertext,
-        buildAuthSecretOptions(input.appDataDir),
-      )
-    : null;
-  const totpValid =
-    totpSecret === null
-      ? false
-      : await verifyTotpCode(totpSecret, input.totpCode, {
-          atMs: now.getTime(),
-        });
-
-  if (!primaryFactorValid || !totpValid) {
+  if (!primaryFactorValid) {
     const failure = incrementFailedAttempts(
       database,
       settings.failedPrimaryFactorAttempts,
@@ -502,6 +489,33 @@ export async function verifyPrimaryFactorAndTotp(
         },
       );
     }
+
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  const totpSecret = primaryFactorValid
+    ? await decryptAuthSecret(
+        settings.totpSecretCiphertext,
+        buildAuthSecretOptions(input.appDataDir),
+      )
+    : null;
+  const totpValid =
+    totpSecret === null
+      ? false
+      : await verifyTotpCode(totpSecret, input.totpCode, {
+          atMs: now.getTime(),
+        });
+
+  if (!totpValid) {
+    recordInvalidAuthAttempt(database, {
+      lockedUntil: null,
+      method: "totp",
+      primaryFactorType: settings.primaryFactorType,
+    });
 
     throw new AuthServiceError(
       "invalid_credentials",
@@ -542,26 +556,34 @@ export async function verifyPrimaryFactorAndRecoveryCode(
   }
 
   if (!primaryFactorValid || !matchingCodeHash) {
-    const failure = incrementFailedAttempts(
-      database,
-      settings.failedPrimaryFactorAttempts,
-      now,
-    );
-    recordInvalidAuthAttempt(database, {
-      lockedUntil: failure.lockedUntil,
-      method: "recovery_code",
-      primaryFactorType: settings.primaryFactorType,
-    });
-
-    if (failure.lockedUntil) {
-      throw new AuthServiceError(
-        "auth_locked",
-        `Authentication is locked until ${failure.lockedUntil}.`,
-        423,
-        {
-          lockedUntil: failure.lockedUntil,
-        },
+    if (!primaryFactorValid) {
+      const failure = incrementFailedAttempts(
+        database,
+        settings.failedPrimaryFactorAttempts,
+        now,
       );
+      recordInvalidAuthAttempt(database, {
+        lockedUntil: failure.lockedUntil,
+        method: "recovery_code",
+        primaryFactorType: settings.primaryFactorType,
+      });
+
+      if (failure.lockedUntil) {
+        throw new AuthServiceError(
+          "auth_locked",
+          `Authentication is locked until ${failure.lockedUntil}.`,
+          423,
+          {
+            lockedUntil: failure.lockedUntil,
+          },
+        );
+      }
+    } else {
+      recordInvalidAuthAttempt(database, {
+        lockedUntil: null,
+        method: "recovery_code",
+        primaryFactorType: settings.primaryFactorType,
+      });
     }
 
     throw new AuthServiceError(
