@@ -25,7 +25,7 @@ Status legend
 
 ### Slice P0.1: Fix weak memoization in model selector
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `groupCodexModels(models)` is recomputed every render, which weakens downstream memoization and keeps filtered model groups hot even when nothing meaningful changed.

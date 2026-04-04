@@ -4,12 +4,7 @@ import type {
   RpcCodexReasoningEffort,
   RpcCodexReasoningEffortOption,
 } from "../../bun/rpc-schema";
-import {
-  codexModelLabel,
-  findCodexModel,
-  findReasoningEffortOption,
-  groupCodexModels,
-} from "./codex-utils";
+import { codexModelLabel, groupCodexModels } from "./codex-utils";
 import { DropdownControl } from "./dropdown";
 import { materialSymbol } from "./icons";
 import { matchesSearchQuery, normalizeSearchQuery } from "./search-utils";
@@ -45,9 +40,18 @@ export function CodexModelSelector({
   variant,
 }: CodexModelSelectorProps): JSX.Element {
   // Group by provider/category to keep dropdown scannable for larger catalogs.
-  const groupedModels = groupCodexModels(models);
+  const groupedModels = useMemo(() => groupCodexModels(models), [models]);
+  const modelById = useMemo(
+    () => new Map(models.map((model) => [model.id, model] as const)),
+    [models],
+  );
+  const reasoningOptionById = useMemo(
+    () =>
+      new Map(reasoningOptions.map((option) => [option.id, option] as const)),
+    [reasoningOptions],
+  );
   // Keep local title/selection display in sync with a stable model id.
-  const activeModel = findCodexModel(models, value);
+  const activeModel = modelById.get(value) ?? null;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const [submenuTop, setSubmenuTop] = useState(0);
@@ -68,7 +72,7 @@ export function CodexModelSelector({
   const activeReasoningOption =
     reasoningValue == null
       ? null
-      : findReasoningEffortOption(reasoningOptions, reasoningValue);
+      : (reasoningOptionById.get(reasoningValue) ?? null);
 
   // Mobile-only combined selector is used when we can set both model + reasoning effort
   // in one control flow and avoid opening a second popover.
@@ -111,9 +115,8 @@ export function CodexModelSelector({
     [filteredGroups],
   );
   const expandedModel = useMemo(
-    () =>
-      expandedModelId == null ? null : findCodexModel(models, expandedModelId),
-    [expandedModelId, models],
+    () => (expandedModelId == null ? null : modelById.get(expandedModelId)),
+    [expandedModelId, modelById],
   );
 
   useEffect(() => {
