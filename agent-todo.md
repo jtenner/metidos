@@ -4,14 +4,6 @@
 
 ## Active Correctness Slices
 
-### Slice 1
-
-- Title: Serialize project lifecycle request application
-- Description: Add per-project transition guards so late `openProject(...)` and `listProjectWorktrees(...)` results cannot repopulate worktrees or reopen a project after a newer close/collapse already committed.
-- Source: [Finding 1](docs/2026-04-04-correctness-audit-2.md#1-high-project-lifecycle-transitions-are-not-serialized)
-- Scope: `src/mainview/App.tsx`
-- Verify: Add a regression test for expand-then-immediate-close ordering and manual verification that collapsed projects stay closed under rapid toggling.
-
 ### Slice 2
 
 - Title: Validate task targets before creating new task threads
@@ -29,6 +21,13 @@
 - Verify: Add coverage for metadata updates while the RPC transport is temporarily unavailable or timing out.
 
 ## Recently Completed
+
+### Slice 1
+
+- Title: Serialize project lifecycle request application
+- Completed: 2026-04-04
+- Outcome: Project expand/collapse now runs through a per-project lifecycle request tracker that invalidates older transition and worktree-list responses as soon as a newer request starts. `App.tsx` now suppresses stale `openProject(...)`, `closeProject(...)`, and `listProjectWorktrees(...)` completions after a later close or reopen wins, and the worktree-request cache no longer reuses requests from an older lifecycle generation. Focused regression tests cover expand-then-close invalidation, close-then-reopen invalidation, and per-project request isolation.
+- Source: [Finding 1](docs/2026-04-04-correctness-audit-2.md#1-high-project-lifecycle-transitions-are-not-serialized)
 
 ### Slice 4
 

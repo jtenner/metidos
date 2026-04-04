@@ -119,6 +119,8 @@
 │     ├─ auth-shell.tsx
 │     ├─ project-close.test.ts
 │     ├─ project-close.ts
+│     ├─ project-lifecycle.test.ts
+│     ├─ project-lifecycle.ts
 │     ├─ rpc-errors.ts
 │     ├─ security-audit-refresh.test.ts
 │     ├─ security-audit-refresh.ts

@@ -16,6 +16,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `project-close.ts` isolates the rollback-safe project-collapse sequencing so the UI only commits local close state after the backend confirms the project has closed.
 
+`project-lifecycle.ts` isolates the per-project lifecycle request tracker used to invalidate stale expand, collapse, and worktree-list completions once a newer transition wins.
+
 `security-audit-refresh.ts` isolates the superseding refresh queue used by the security audit panel so scope changes that happen during an in-flight fetch still settle on the newest requested dataset.
 
 `startup-project-restore.ts` isolates startup restore reconciliation for project reopen state so the UI keeps projects closed until batch restore confirms them and can roll back failed restore targets cleanly.

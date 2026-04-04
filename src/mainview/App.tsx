@@ -106,6 +106,7 @@ import {
 } from "./controls/chat-composer-control";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { runRollbackSafeProjectClose } from "./project-close";
+import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
 import { isStepUpRequiredError } from "./rpc-errors";
 import { createSupersedingSecurityAuditRefreshRunner } from "./security-audit-refresh";
 import {
@@ -120,6 +121,11 @@ import {
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
   procedures: ProjectProcedures;
+};
+
+type ProjectWorktreeRequestCacheEntry = {
+  lifecycleRequestId: number;
+  promise: Promise<RpcWorktree[]>;
 };
 
 /**
@@ -502,7 +508,7 @@ export default function App({
   const threadOpenAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryLoadingMoreRef = useRef(false);
   const projectWorktreeRequestCacheRef = useRef(
-    new Map<number, Promise<RpcWorktree[]>>(),
+    new Map<number, ProjectWorktreeRequestCacheEntry>(),
   );
   const gitHistoryDiffCacheRef = useRef(
     new Map<string, GitHistoryDiffCacheEntry>(),
@@ -540,6 +546,10 @@ export default function App({
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
     new Map<number, RpcThreadRunStatus["state"]>(),
+  );
+  const projectLifecycleRequestTracker = useMemo(
+    () => createProjectLifecycleRequestTracker(),
+    [],
   );
   const getProjectState = useCallback(
     (projectId: number): ProjectNodeState =>
@@ -1432,30 +1442,67 @@ export default function App({
     [],
   );
 
+  const beginProjectLifecycleRequest = useCallback(
+    (projectId: number) => {
+      projectWorktreeRequestCacheRef.current.delete(projectId);
+      return projectLifecycleRequestTracker.begin(projectId);
+    },
+    [projectLifecycleRequestTracker],
+  );
+
+  const snapshotProjectLifecycleRequest = useCallback(
+    (projectId: number) => projectLifecycleRequestTracker.snapshot(projectId),
+    [projectLifecycleRequestTracker],
+  );
+
   const requestProjectWorktrees = useCallback(
     async (projectId: number): Promise<RpcWorktree[]> => {
+      const lifecycleRequest = snapshotProjectLifecycleRequest(projectId);
       const existing = projectWorktreeRequestCacheRef.current.get(projectId);
-      if (existing) {
-        return existing;
+      if (
+        existing &&
+        existing.lifecycleRequestId === lifecycleRequest.requestId
+      ) {
+        return existing.promise;
       }
 
-      const request = procedures
-        .listProjectWorktrees({ projectId })
-        .then((result) => {
-          setProjectState(projectId, {
-            worktrees: result.worktrees,
-            loadingWorktrees: false,
-            error: "",
-          });
-          return result.worktrees;
-        })
-        .finally(() => {
-          projectWorktreeRequestCacheRef.current.delete(projectId);
-        });
-      projectWorktreeRequestCacheRef.current.set(projectId, request);
-      return request;
+      const requestEntry: ProjectWorktreeRequestCacheEntry = {
+        lifecycleRequestId: lifecycleRequest.requestId,
+        promise: procedures
+          .listProjectWorktrees({ projectId })
+          .then((result) => {
+            if (!lifecycleRequest.isCurrent()) {
+              return result.worktrees;
+            }
+            setProjectState(projectId, {
+              worktrees: result.worktrees,
+              loadingWorktrees: false,
+              error: "",
+            });
+            return result.worktrees;
+          })
+          .catch((error) => {
+            if (lifecycleRequest.isCurrent()) {
+              setProjectState(projectId, {
+                loadingWorktrees: false,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+            throw error;
+          })
+          .finally(() => {
+            if (
+              projectWorktreeRequestCacheRef.current.get(projectId) ===
+              requestEntry
+            ) {
+              projectWorktreeRequestCacheRef.current.delete(projectId);
+            }
+          }),
+      };
+      projectWorktreeRequestCacheRef.current.set(projectId, requestEntry);
+      return requestEntry.promise;
     },
-    [procedures, setProjectState],
+    [procedures, setProjectState, snapshotProjectLifecycleRequest],
   );
 
   const loadProjectWorktrees = useCallback(
@@ -3887,6 +3934,7 @@ export default function App({
 
   const refreshProject = useCallback(
     async (project: RpcProject, expanded: boolean) => {
+      const lifecycleRequest = beginProjectLifecycleRequest(project.id);
       const current = getProjectState(project.id);
       const hasCachedWorktrees = current.worktrees.length > 0;
       if (expanded) {
@@ -3903,6 +3951,9 @@ export default function App({
             await procedures.closeProject({ projectId: project.id });
           },
           commitLocalClose: () => {
+            if (!lifecycleRequest.isCurrent()) {
+              return;
+            }
             clearProjectWorktreeToggleRequests(project.id);
             setWorktreeStates((prev) => {
               const next = { ...prev } as WorktreeStateMap;
@@ -3932,6 +3983,9 @@ export default function App({
             }
           },
           onCloseError: (error) => {
+            if (!lifecycleRequest.isCurrent()) {
+              return;
+            }
             setProjectState(project.id, {
               loadingWorktrees: false,
               error: error instanceof Error ? error.message : String(error),
@@ -3951,6 +4005,9 @@ export default function App({
             name: project.name,
           })
           .then((result) => {
+            if (!lifecycleRequest.isCurrent()) {
+              return;
+            }
             setProjects((prev) => upsertProjectList(prev, result.project));
             setProjectState(project.id, {
               worktrees: result.worktrees,
@@ -3959,6 +4016,9 @@ export default function App({
             });
           })
           .catch((error) => {
+            if (!lifecycleRequest.isCurrent()) {
+              return;
+            }
             setProjectState(project.id, {
               loadingWorktrees: false,
               error: error instanceof Error ? error.message : String(error),
@@ -3972,6 +4032,9 @@ export default function App({
           projectPath: project.path,
           name: project.name,
         });
+        if (!lifecycleRequest.isCurrent()) {
+          return;
+        }
         setProjects((prev) => upsertProjectList(prev, result.project));
         setProjectState(project.id, {
           worktrees: result.worktrees,
@@ -3982,6 +4045,9 @@ export default function App({
           selectProject(project);
         }
       } catch (error) {
+        if (!lifecycleRequest.isCurrent()) {
+          return;
+        }
         setProjectState(project.id, {
           loadingWorktrees: false,
           error: error instanceof Error ? error.message : String(error),
@@ -3989,6 +4055,7 @@ export default function App({
       }
     },
     [
+      beginProjectLifecycleRequest,
       clearProjectWorktreeToggleRequests,
       getProjectState,
       setProjectState,
