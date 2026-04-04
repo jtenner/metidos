@@ -4,6 +4,8 @@ Source audit: [docs/2026-04-04-correctness-audit-current-tree.md](docs/2026-04-0
 
 ## Slice 1: Fix active-worktree sync ordering and cancellation
 
+Status: completed on 2026-04-04
+
 Audit reference: [Correctness audit - 2026-04-04](docs/2026-04-04-correctness-audit-current-tree.md)
 Finding: `1. High: active-worktree synchronization can apply out of order and retarget backend polling to the wrong worktree`
 

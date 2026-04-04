@@ -3634,7 +3634,9 @@ export async function getWorktreeGitCommitDiffProcedure(
 
 export async function setActiveWorktreeProcedure(
   params: AppRPCSchema["requests"]["setActiveWorktree"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["setActiveWorktree"]["response"]> {
+  const requestGitOptions = gitCommandOptionsFromRequest(context);
   const hasProjectId = typeof params.projectId === "number";
   const hasWorktreePath =
     typeof params.worktreePath === "string" &&
@@ -3649,6 +3651,7 @@ export async function setActiveWorktreeProcedure(
   const requestedWorktreePath = hasWorktreePath
     ? normalizePath(params.worktreePath ?? "")
     : null;
+  throwIfAborted(context?.signal, "Active worktree update was aborted.");
   let projectId: number | null = null;
   let worktreePath: string | null = null;
   if (requestedProjectId !== null) {
@@ -3659,16 +3662,25 @@ export async function setActiveWorktreeProcedure(
       // Validate against a fresh worktree listing so stale UI selections do not
       // become the backend's active worktree.
       try {
-        const worktrees = await readProjectWorktrees(project.path, project.id, {
-          forceRefresh: true,
-          priority: "background",
-        });
+        const worktrees = await awaitAbortableResult(
+          readProjectWorktrees(project.path, project.id, {
+            ...requestGitOptions,
+            forceRefresh: true,
+            priority: "background",
+          }),
+          context?.signal,
+          "Active worktree update was aborted.",
+        );
+        throwIfAborted(context?.signal, "Active worktree update was aborted.");
         worktreePath = worktrees.some(
           (worktree) => worktree.path === requestedWorktreePath,
         )
           ? requestedWorktreePath
           : null;
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
         worktreePath = null;
       }
     } else {
@@ -3676,6 +3688,7 @@ export async function setActiveWorktreeProcedure(
     }
   }
 
+  throwIfAborted(context?.signal, "Active worktree update was aborted.");
   for (const state of projectPollMap.values()) {
     const nextActiveWorktreePath = state.id === projectId ? worktreePath : null;
     if (state.activeWorktreePath === nextActiveWorktreePath) {

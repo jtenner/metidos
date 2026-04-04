@@ -97,6 +97,37 @@ afterAll(async () => {
 });
 
 describe("project task execution", () => {
+  it("rejects an aborted active-worktree update before validation completes", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-active-worktree-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Active Worktree Repo",
+      projectPath: repoPath,
+    });
+
+    await expect(
+      procedures.setActiveWorktreeProcedure(
+        {
+          projectId: opened.project.id,
+          worktreePath: repoPath,
+        },
+        {
+          auth: {
+            authBypass: true,
+            sessionId: null,
+          },
+          priority: "default",
+          signal: AbortSignal.abort(
+            new Error("Active worktree update was aborted."),
+          ),
+          timeoutMs: null,
+        },
+      ),
+    ).rejects.toThrow("Active worktree update was aborted.");
+  });
+
   it("returns package script tasks on the first worktree open", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("jolt-worktree-open-script-");
