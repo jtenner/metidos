@@ -1105,7 +1105,7 @@ export default function App({
           if (isAbortError(error)) {
             return;
           }
-          // Hover preloads should never surface errors ahead of explicit open.
+          // Ignore hover preload failures; only explicit open actions report errors.
         })
         .finally(() => {
           if (
@@ -1513,7 +1513,7 @@ export default function App({
               threadId: detail.thread.id,
             })
             .catch(() => {
-              // Best effort; stale auto-created threads should not break the UI.
+              // Ignore stale auto-thread cleanup failures; UI state stays tied to current selection.
             });
           return null;
         }
@@ -1528,7 +1528,7 @@ export default function App({
         try {
           await loadProjectWorktrees(detail.thread.projectId);
         } catch {
-          // Best effort; thread creation should still succeed even if the worktree refresh fails.
+          // Ignore worktree refresh failures; thread creation flow remains functional.
         }
         return detail;
       } catch (error) {
@@ -2130,7 +2130,7 @@ export default function App({
       syncThreadContext(detail.thread);
       if (sessionStateReady) {
         void loadProjectWorktrees(detail.thread.projectId).catch(() => {
-          // Best effort; thread history should still open even if the worktree metadata refresh fails.
+          // Ignore metadata refresh failures; still render loaded thread history.
         });
       }
       setMobileProjectListOpen(false);
@@ -3066,7 +3066,7 @@ export default function App({
         if (isAbortError(error)) {
           return;
         }
-        // Best effort; active worktree polling will resync on the next selection or visibility change.
+        // Ignore sync failures here; active worktree state refreshes on next poll/selection.
       });
 
     return () => {
@@ -3745,7 +3745,7 @@ export default function App({
         try {
           await loadProjectWorktrees(detail.thread.projectId);
         } catch {
-          // Best effort; task execution should still succeed without a worktree refresh.
+          // Ignore worktree-refresh failures so task execution remains available.
         }
       } catch (error) {
         setTaskControlError(

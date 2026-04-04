@@ -454,7 +454,7 @@ export function getAuthStatus(
 
 /**
  * Verify the configured primary factor and TOTP code without creating a session.
- * Shared by login, CLI recovery flows, and future step-up paths.
+ * Shared by login, CLI recovery flows, and step-up verification paths.
  */
 export async function verifyPrimaryFactorAndTotp(
   database: Database,

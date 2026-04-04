@@ -784,7 +784,7 @@ async function measureStartupSequence(
 }
 
 /**
- * Cleanup created threads/projects from test run as best effort.
+ * Cleanup created threads/projects from test run, but keep test results authoritative.
  */
 async function cleanupHarness(
   client: RpcHarnessClient,
@@ -820,7 +820,7 @@ async function cleanupHarness(
         },
       );
     } catch {
-      // Leave harness cleanup best-effort; failures should not mask the test result.
+      // Ignore cleanup failures so benchmark timing and assertions remain authoritative.
     }
   }
 
