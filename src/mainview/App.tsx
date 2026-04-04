@@ -105,6 +105,7 @@ import {
   setChatComposerDraft,
 } from "./controls/chat-composer-control";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
+import { runRollbackSafeProjectClose } from "./project-close";
 import { isStepUpRequiredError } from "./rpc-errors";
 
 type AppProps = {
@@ -1405,6 +1406,18 @@ export default function App({
     (key: string, requestId: number): void => {
       if (worktreeToggleRequestIdRef.current.get(key) === requestId) {
         worktreeToggleRequestIdRef.current.delete(key);
+      }
+    },
+    [],
+  );
+
+  const clearProjectWorktreeToggleRequests = useCallback(
+    (projectId: number) => {
+      const keyPrefix = `${projectId}::`;
+      for (const key of [...worktreeToggleRequestIdRef.current.keys()]) {
+        if (key.startsWith(keyPrefix)) {
+          worktreeToggleRequestIdRef.current.delete(key);
+        }
       }
     },
     [],
@@ -3807,49 +3820,55 @@ export default function App({
     async (project: RpcProject, expanded: boolean) => {
       const current = getProjectState(project.id);
       const hasCachedWorktrees = current.worktrees.length > 0;
+      if (expanded) {
+        setProjectTreeOpen(project.path, true);
+      }
       setProjectState(project.id, {
         loadingWorktrees: expanded && !hasCachedWorktrees,
         error: "",
       });
 
       if (!expanded) {
-        const removed = [...current.openWorktrees];
-        for (const path of removed) {
-          try {
-            await procedures.closeWorktree({
-              projectId: project.id,
-              worktreePath: path,
+        await runRollbackSafeProjectClose({
+          closeProject: async () => {
+            await procedures.closeProject({ projectId: project.id });
+          },
+          commitLocalClose: () => {
+            clearProjectWorktreeToggleRequests(project.id);
+            setWorktreeStates((prev) => {
+              const next = { ...prev } as WorktreeStateMap;
+              const keyPrefix = `${project.id}::`;
+              for (const key of Object.keys(next)) {
+                if (key.startsWith(keyPrefix)) {
+                  delete next[key];
+                }
+              }
+              return next;
             });
-          } catch {
-            // Ignore close-worktree failures; collapse stays responsive with local state.
-          }
-        }
-        setWorktreeStates((prev) => {
-          const next = { ...prev } as WorktreeStateMap;
-          for (const path of removed) {
-            delete next[worktreeKey(project.id, path)];
-          }
-          return next;
+            setProjectState(project.id, {
+              openWorktrees: new Set(),
+              loadingWorktrees: false,
+              error: "",
+            });
+            setProjects((prev) =>
+              upsertProjectList(prev, {
+                ...project,
+                isOpen: 0,
+              }),
+            );
+            setProjectTreeOpen(project.path, false);
+            if (selectedProjectIdRef.current === project.id) {
+              selectedWorktreePathRef.current = project.path;
+              setSelectedWorktreePath(project.path);
+            }
+          },
+          onCloseError: (error) => {
+            setProjectState(project.id, {
+              loadingWorktrees: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          },
         });
-        setProjectState(project.id, {
-          openWorktrees: new Set(),
-          loadingWorktrees: false,
-        });
-        try {
-          await procedures.closeProject({ projectId: project.id });
-          setProjects((prev) =>
-            upsertProjectList(prev, {
-              ...project,
-              isOpen: 0,
-            }),
-          );
-        } catch {
-          // Ignore project-close errors; local UI state is already updated.
-        }
-        if (selectedProjectId === project.id) {
-          selectedWorktreePathRef.current = project.path;
-          setSelectedWorktreePath(project.path);
-        }
         return;
       }
 
@@ -3901,6 +3920,7 @@ export default function App({
       }
     },
     [
+      clearProjectWorktreeToggleRequests,
       getProjectState,
       setProjectState,
       procedures,

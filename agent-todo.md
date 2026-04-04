@@ -16,13 +16,14 @@
 - Description: Prevent persisted `selectedWorktreePath` and persisted open-worktree entries from surviving failed `openWorktreesBatch(...)` results. Startup should prune missing worktrees and fall back to a valid selection before git history, task loading, or active-worktree sync runs.
 - Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
 
+## Recently Completed
+
 ### Slice 4
 
 - Title: Make project close/collapse rollback-safe
-- Description: Rework the collapse flow so local close state is committed only after `closeProject(...)` succeeds, or is restored if the RPC fails. Do not silently ignore backend close failures once local state has already been mutated.
+- Completed: 2026-04-04
+- Outcome: Project collapse now keeps the sidebar tree open and preserves local worktree/project state until `closeProject(...)` succeeds. Failed closes surface a project error instead of being swallowed, while successful closes invalidate in-flight worktree-open requests, clear local worktree snapshots, persist the collapsed tree state, and retarget the selected worktree path only after the backend transition is confirmed.
 - Source: [Finding 3](docs/2026-04-04-correctness-audit.md#3-medium-project-collapseclose-can-leave-local-and-backend-lifecycle-state-out-of-sync)
-
-## Recently Completed
 
 ### Slice 6
 

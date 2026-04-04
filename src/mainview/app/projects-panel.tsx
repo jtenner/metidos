@@ -4,7 +4,6 @@ import { materialSymbol } from "../controls/icons";
 import { matchesSearchQuery } from "../controls/search-utils";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";
 import {
-  setProjectTreeOpen,
   toggleProjectsPanelOpen,
   useOpenProjectPaths,
   useProjectsPanelOpen,
@@ -229,7 +228,7 @@ type ProjectsPanelProps = {
   onDirectorySuggestionLeave: (directory: string) => void;
   onOpenProjectActionMenu: (project: RpcProject, x: number, y: number) => void;
   onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
-  onRefreshProject: (project: RpcProject, expanded: boolean) => void;
+  onRefreshProject: (project: RpcProject, expanded: boolean) => Promise<void>;
   onSelectDirectorySuggestion: (directory: string) => void;
   onSubmitAddProject: (event: FormEvent<HTMLFormElement>) => void;
   onToggleAddProjectForm: () => void;
@@ -578,10 +577,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                             : "text-[#d7d7d7] hover:bg-[#171a1b]"
                         }`}
                         onClick={() => {
-                          // Toggling the project header changes local UI state and refreshes project state.
+                          // App-level refresh logic owns project open/close persistence so failed closes can roll back cleanly.
                           const nextOpen = !projectTreeOpen;
-                          setProjectTreeOpen(project.path, nextOpen);
-                          onRefreshProject(project, nextOpen);
+                          void onRefreshProject(project, nextOpen);
                         }}
                         onContextMenu={(event) => {
                           // Right-click opens custom context menu anchored near the cursor.

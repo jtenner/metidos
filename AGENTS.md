@@ -116,6 +116,8 @@
 │     ├─ auth-shell-connect.test.ts
 │     ├─ auth-shell-connect.ts
 │     ├─ auth-shell.tsx
+│     ├─ project-close.test.ts
+│     ├─ project-close.ts
 │     ├─ rpc-errors.ts
 │     ├─ app/
 │     │  ├─ README.md
