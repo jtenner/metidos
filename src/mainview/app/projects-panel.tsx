@@ -1,7 +1,7 @@
 import { type FormEvent, memo, useMemo } from "react";
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
-import { matchesSearchQuery } from "../controls/search-utils";
+import { matchesNormalizedSearchText } from "../controls/search-utils";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";
 import {
   toggleProjectsPanelOpen,
@@ -16,6 +16,7 @@ import {
   shortName,
   type ThreadErrorLevel,
   type WorktreeNodeState,
+  worktreeKey,
   worktreeThreadPopoverAnchorId,
 } from "./state";
 
@@ -50,18 +51,13 @@ type ProjectWorktreeRowProps = {
  */
 function worktreeMatchesProjectsSearch(
   normalizedSidebarSearchQuery: string,
-  project: RpcProject,
+  worktreeSearchTextByKey: ReadonlyMap<string, string>,
+  projectId: number,
   worktree: RpcWorktree,
-  homeDirectory: string,
-  supportsTildePath: boolean,
 ): boolean {
-  return matchesSearchQuery(
+  return matchesNormalizedSearchText(
     normalizedSidebarSearchQuery,
-    project.name,
-    worktree.branch,
-    worktree.path,
-    shortName(worktree.path),
-    formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
+    worktreeSearchTextByKey.get(worktreeKey(projectId, worktree.path)) ?? "",
   );
 }
 
@@ -246,6 +242,7 @@ type ProjectsPanelProps = {
   supportsTildePath: boolean;
   sidebarActionButtonClass: string;
   worktreePinBusyPath: string | null;
+  worktreeSearchTextByKey: ReadonlyMap<string, string>;
   worktreeThreadErrorLevel: (
     projectId: number,
     worktreePath: string,
@@ -291,6 +288,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   sidebarActionButtonClass,
   supportsTildePath,
   worktreePinBusyPath,
+  worktreeSearchTextByKey,
   worktreeThreadErrorLevel,
 }: ProjectsPanelProps) {
   // Panel visibility and expansion state are shared across components via hooks.
@@ -306,10 +304,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               worktree.pinnedAt !== null &&
               worktreeMatchesProjectsSearch(
                 normalizedSidebarSearchQuery,
-                project,
+                worktreeSearchTextByKey,
+                project.id,
                 worktree,
-                homeDirectory,
-                supportsTildePath,
               ),
           )
           .map((worktree) => ({
@@ -323,10 +320,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   }, [
     filteredProjects,
     getProjectState,
-    homeDirectory,
     normalizedSidebarSearchQuery,
     projectById,
-    supportsTildePath,
+    worktreeSearchTextByKey,
   ]);
 
   return (
@@ -551,10 +547,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                     worktree.pinnedAt !== null &&
                     worktreeMatchesProjectsSearch(
                       normalizedSidebarSearchQuery,
-                      project,
+                      worktreeSearchTextByKey,
+                      project.id,
                       worktree,
-                      homeDirectory,
-                      supportsTildePath,
                     ),
                 );
                 const visibleWorktrees = orderedWorktrees.filter(
@@ -562,10 +557,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                     worktree.pinnedAt === null &&
                     worktreeMatchesProjectsSearch(
                       normalizedSidebarSearchQuery,
-                      project,
+                      worktreeSearchTextByKey,
+                      project.id,
                       worktree,
-                      homeDirectory,
-                      supportsTildePath,
                     ),
                 );
                 const showWorktrees =

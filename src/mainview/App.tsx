@@ -871,6 +871,7 @@ export default function App({
     threadActionMenuThread,
     unsafeModeToggleDisabled,
     worktreeByProjectAndPath,
+    worktreeSearchTextByKey,
     worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
     chatError,
@@ -5005,6 +5006,7 @@ export default function App({
                     sidebarActionButtonClass,
                     supportsTildePath,
                     worktreePinBusyPath,
+                    worktreeSearchTextByKey,
                     worktreeThreadErrorLevel,
                   }}
                   securityAuditPanelProps={{
@@ -5236,6 +5238,7 @@ export default function App({
                 sidebarActionButtonClass,
                 supportsTildePath,
                 worktreePinBusyPath,
+                worktreeSearchTextByKey,
                 worktreeThreadErrorLevel,
               }}
               securityAuditPanelProps={{

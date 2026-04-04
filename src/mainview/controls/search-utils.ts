@@ -10,6 +10,34 @@ export function normalizeSearchQuery(value: string): string {
 }
 
 /**
+ * Build one normalized searchable text blob from many candidate values.
+ *
+ * Values are trimmed, lowercased, and joined with spaces so callers can cache
+ * one normalized haystack instead of re-normalizing many strings on every
+ * search pass.
+ */
+export function buildNormalizedSearchText(
+  ...values: Array<string | null | undefined>
+): string {
+  return values
+    .flatMap((value) => {
+      const normalized = normalizeSearchQuery(value ?? "");
+      return normalized ? [normalized] : [];
+    })
+    .join(" ");
+}
+
+/**
+ * Determine whether a pre-normalized searchable text blob matches the query.
+ */
+export function matchesNormalizedSearchText(
+  query: string,
+  searchText: string,
+): boolean {
+  return !query || searchText.includes(query);
+}
+
+/**
  * Determine whether any of the provided values match the normalized query.
  *
  * @param query - A normalized (trimmed/lowercase) search query.

@@ -11,7 +11,8 @@ import type {
 } from "../../bun/rpc-schema";
 import { findCodexModel } from "../controls/codex-utils";
 import {
-  matchesSearchQuery,
+  buildNormalizedSearchText,
+  matchesNormalizedSearchText,
   normalizeSearchQuery,
 } from "../controls/search-utils";
 import { buildDiffFileTree } from "./diff-workspace";
@@ -149,6 +150,42 @@ export function useMainviewDerivedState({
     }
     return next;
   }, [getProjectState, projects]);
+  const projectSearchTextById = useMemo(() => {
+    const next = new Map<number, string>();
+    for (const project of projects) {
+      next.set(
+        project.id,
+        buildNormalizedSearchText(
+          project.name,
+          project.path,
+          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
+        ),
+      );
+    }
+    return next;
+  }, [homeDirectory, projects, supportsTildePath]);
+  const worktreeSearchTextByKey = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const project of projects) {
+      for (const worktree of getProjectState(project.id).worktrees) {
+        next.set(
+          worktreeKey(project.id, worktree.path),
+          buildNormalizedSearchText(
+            project.name,
+            worktree.branch,
+            worktree.path,
+            shortName(worktree.path),
+            formatPathForDisplay(
+              worktree.path,
+              homeDirectory,
+              supportsTildePath,
+            ),
+          ),
+        );
+      }
+    }
+    return next;
+  }, [getProjectState, homeDirectory, projects, supportsTildePath]);
 
   const selectedProject = useMemo(() => {
     // Resolve the selected project by ID from the full project list.
@@ -518,33 +555,26 @@ export function useMainviewDerivedState({
     return projects.filter((project) => {
       const projectState = getProjectState(project.id);
       const matchingWorktree = projectState.worktrees.some((worktree) =>
-        matchesSearchQuery(
+        matchesNormalizedSearchText(
           normalizedSidebarSearchQuery,
-          project.name,
-          project.path,
-          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
-          worktree.branch,
-          worktree.path,
-          shortName(worktree.path),
-          formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
+          worktreeSearchTextByKey.get(worktreeKey(project.id, worktree.path)) ??
+            "",
         ),
       );
 
       return (
-        matchesSearchQuery(
+        matchesNormalizedSearchText(
           normalizedSidebarSearchQuery,
-          project.name,
-          project.path,
-          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
+          projectSearchTextById.get(project.id) ?? "",
         ) || matchingWorktree
       );
     });
   }, [
     getProjectState,
-    homeDirectory,
     normalizedSidebarSearchQuery,
+    projectSearchTextById,
     projects,
-    supportsTildePath,
+    worktreeSearchTextByKey,
   ]);
 
   const { filteredWorkspaceActiveThreads, filteredWorkspacePinnedThreads } =
@@ -644,6 +674,7 @@ export function useMainviewDerivedState({
     threadActionMenuThread,
     unsafeModeToggleDisabled,
     worktreeByProjectAndPath,
+    worktreeSearchTextByKey,
     worktreeThreadErrorLevel,
   };
 }

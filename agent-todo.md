@@ -198,7 +198,7 @@ Done when:
 
 ### Slice P1.4: Precompute sidebar search tokens
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Sidebar filtering repeatedly formats paths and scans worktrees for every keystroke and rerender.
