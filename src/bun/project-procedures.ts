@@ -3292,14 +3292,24 @@ async function openWorktreeWithGitOptions(
   });
 
   const worktreeState = ensureWorktreePollState(state, worktreePath);
-  const tasks = worktreeState.tasks ?? [];
-  if (shouldRefreshWorktreeTaskCache(worktreeState)) {
+  const shouldRefreshTasks = shouldRefreshWorktreeTaskCache(worktreeState);
+  const tasksPromise =
+    worktreeState.tasks === null && shouldRefreshTasks
+      ? awaitAbortableResult(
+          refreshWorktreeTaskCache(state, worktreePath, {
+            startWatching: true,
+          }),
+          signal ?? null,
+          "Worktree open was aborted.",
+        )
+      : Promise.resolve(worktreeState.tasks ?? []);
+  if (worktreeState.tasks !== null && shouldRefreshTasks) {
     queueBackgroundWorkWhenIdle(
       `task-cache-refresh:${project.id}:${worktreePath}`,
       () => {
         void refreshWorktreeTaskCache(state, worktreePath, {
           notify: true,
-          startWatching: false,
+          startWatching: true,
         }).catch((error) => {
           logBackgroundTaskFailure(
             `Task cache warm failed for ${worktreePath}`,
@@ -3309,20 +3319,27 @@ async function openWorktreeWithGitOptions(
       },
     );
   }
-  const [{ history, summary, signature }, snapshot] =
-    await runWorktreeOpenLimited(
-      () =>
-        Promise.all([
-          readGitHistoryFirstPage(
-            project.id,
-            worktreePath,
-            DEFAULT_GIT_HISTORY_PAGE_SIZE,
-            requestGitOptions,
-          ),
-          readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions),
-        ]),
-      signal,
-    );
+  const [[{ history, summary, signature }, snapshot], tasks] =
+    await Promise.all([
+      runWorktreeOpenLimited(
+        () =>
+          Promise.all([
+            readGitHistoryFirstPage(
+              project.id,
+              worktreePath,
+              DEFAULT_GIT_HISTORY_PAGE_SIZE,
+              requestGitOptions,
+            ),
+            readAndStoreWorktreeSnapshot(
+              state,
+              worktreePath,
+              requestGitOptions,
+            ),
+          ]),
+        signal,
+      ),
+      tasksPromise,
+    ]);
   worktreeState.history = summary;
   worktreeState.historyEntries = history.entries;
   worktreeState.historyNextOffset = history.nextOffset;

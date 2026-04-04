@@ -28,6 +28,8 @@ Done when:
 
 ## Slice 2: Fix cold-open task cache priming so tasks do not appear permanently empty
 
+Status: completed on 2026-04-04
+
 Audit reference: [Correctness audit - 2026-04-04](docs/2026-04-04-correctness-audit-current-tree.md)
 Finding: `2. High: cold worktree opens can cache an empty task list as if it were fresh`
 

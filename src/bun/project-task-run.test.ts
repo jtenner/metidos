@@ -97,6 +97,86 @@ afterAll(async () => {
 });
 
 describe("project task execution", () => {
+  it("returns package script tasks on the first worktree open", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-worktree-open-script-");
+    initializeGitRepository(repoPath);
+    writeFileSync(
+      join(repoPath, "package.json"),
+      JSON.stringify(
+        {
+          name: "repo",
+          scripts: {
+            test: "echo ok",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Script Repo",
+      projectPath: repoPath,
+    });
+    const openedWorktree = await procedures.openWorktreeProcedure({
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+    });
+    const scriptTask = openedWorktree.tasks.find(
+      (task): task is RpcProjectTask =>
+        task.kind === "script" && task.scriptName === "test",
+    );
+
+    expect(scriptTask).toBeDefined();
+  });
+
+  it("returns package script tasks on the first batch worktree open", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-worktree-open-batch-script-");
+    initializeGitRepository(repoPath);
+    writeFileSync(
+      join(repoPath, "package.json"),
+      JSON.stringify(
+        {
+          name: "repo",
+          scripts: {
+            test: "echo ok",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Batch Script Repo",
+      projectPath: repoPath,
+    });
+    const results = await procedures.openWorktreesBatchProcedure({
+      worktrees: [
+        {
+          projectId: opened.project.id,
+          worktreePath: repoPath,
+        },
+      ],
+    });
+    const result = results[0];
+
+    expect(result).toBeDefined();
+    expect(result?.ok).toBeTrue();
+    if (!result?.ok) {
+      throw new Error("Expected batch worktree open to succeed.");
+    }
+
+    const scriptTask = result.tasks.find(
+      (task): task is RpcProjectTask =>
+        task.kind === "script" && task.scriptName === "test",
+    );
+
+    expect(scriptTask).toBeDefined();
+  });
+
   it("does not create a new thread when a cached package script task disappears before run", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("jolt-task-repo-script-");
