@@ -1,9 +1,9 @@
-# Docs
+# Docs Archive
 
-This folder holds internal notes, design decisions, and migration/audit documents about the architecture and observed behavior over time.
-The files are primarily for maintainers and contributors to understand tradeoffs, known risks, and expected behavior before making UI/runtime changes.
+This folder archives the internal notes, design decisions, and migration/audit documents that used to live directly under `docs/`.
+The files are kept for maintainers and contributors who need historical context on tradeoffs, known risks, and expected behavior before making UI/runtime changes.
 
-## Files
+## Archive contents
 
 - `2026-03-31-correctness-issues.md`
   - Historical correctness/performance audit snapshot; findings tied to async orchestration, polling, and UI state races.
@@ -42,7 +42,7 @@ The files are primarily for maintainers and contributors to understand tradeoffs
   - Alternative migration plan using `@tanstack/react-virtual`.
   - Documents compatibility tradeoffs, implementation shape, and list rendering strategy.
 
-## Subfolder: `docs/references/`
+## Subfolder: `references/`
 
 The `references` directory stores design screenshots and captured HTML snapshots used for UI behavior comparison and visual context.
 

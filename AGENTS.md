@@ -20,46 +20,47 @@
 ├─ bun.lock
 ├─ bunfig.toml
 ├─ docs/
-│  ├─ README.md
-│  ├─ 2026-03-31-correctness-issues.md
-│  ├─ 2026-03-31-correctness-issues-2.md
-│  ├─ 2026-04-03-security-audit.md
-│  ├─ 2026-04-03-security-audit-followup.md
-│  ├─ 2026-04-03-security-remediation-plan.md
-│  ├─ 2026-04-04-correctness-audit.md
-│  ├─ 2026-04-04-correctness-audit-2.md
-│  ├─ 2026-04-04-correctness-audit-current-tree.md
-│  ├─ codex.md
-│  ├─ codex-context-management.md
-│  ├─ data-request-priority-audit.md
-│  ├─ react-virtuoso-chat-migration.md
-│  ├─ tanstack-virtual-chat-migration.md
-│  └─ references/
-    │     ├─ README.md
-    │     ├─ ai_chat_mobile/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ codex_view/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ compact_diff_view_desktop/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ compact_diff_view_mobile/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ file_editor_mobile/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ file_tree_view/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     ├─ task_list_mobile/
-│     │  ├─ code.html
-│     │  └─ screen.png
-│     └─ updated_tasks_view/
-│        ├─ code.html
-│        └─ screen.png
+│  └─ archive/
+│     ├─ README.md
+│     ├─ 2026-03-31-correctness-issues.md
+│     ├─ 2026-03-31-correctness-issues-2.md
+│     ├─ 2026-04-03-security-audit.md
+│     ├─ 2026-04-03-security-audit-followup.md
+│     ├─ 2026-04-03-security-remediation-plan.md
+│     ├─ 2026-04-04-correctness-audit.md
+│     ├─ 2026-04-04-correctness-audit-2.md
+│     ├─ 2026-04-04-correctness-audit-current-tree.md
+│     ├─ codex.md
+│     ├─ codex-context-management.md
+│     ├─ data-request-priority-audit.md
+│     ├─ react-virtuoso-chat-migration.md
+│     ├─ tanstack-virtual-chat-migration.md
+│     └─ references/
+│        ├─ README.md
+│        ├─ ai_chat_mobile/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ codex_view/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ compact_diff_view_desktop/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ compact_diff_view_mobile/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ file_editor_mobile/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ file_tree_view/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        ├─ task_list_mobile/
+│        │  ├─ code.html
+│        │  └─ screen.png
+│        └─ updated_tasks_view/
+│           ├─ code.html
+│           └─ screen.png
 ├─ package.json
 ├─ src/
 │  ├─ README.md
