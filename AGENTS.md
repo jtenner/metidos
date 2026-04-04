@@ -27,6 +27,7 @@
 │  ├─ 2026-04-03-security-audit-followup.md
 │  ├─ 2026-04-03-security-remediation-plan.md
 │  ├─ 2026-04-04-correctness-audit.md
+│  ├─ 2026-04-04-correctness-audit-2.md
 │  ├─ codex.md
 │  ├─ codex-context-management.md
 │  ├─ data-request-priority-audit.md
@@ -119,6 +120,8 @@
 │     ├─ project-close.test.ts
 │     ├─ project-close.ts
 │     ├─ rpc-errors.ts
+│     ├─ security-audit-refresh.test.ts
+│     ├─ security-audit-refresh.ts
 │     ├─ startup-project-restore.test.ts
 │     ├─ startup-project-restore.ts
 │     ├─ startup-worktree-restore.test.ts

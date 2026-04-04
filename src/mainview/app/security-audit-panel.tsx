@@ -174,7 +174,7 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
             className="flex h-7 w-7 items-center justify-center border border-[#243038] bg-[#161d21] text-[#8ca6b9] transition-colors hover:border-[#385062] hover:text-[#d6e5f0] disabled:cursor-default disabled:opacity-60"
             disabled={loading}
             onClick={() => {
-              void onRefresh();
+              void onRefresh(refreshOptions);
             }}
             title="Refresh security audit log"
           >

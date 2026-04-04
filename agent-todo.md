@@ -1,49 +1,46 @@
 # Agent TODO
 
-> Last reviewed: 2026-04-04
+> Last refreshed: 2026-04-04
 
 ## Active Correctness Slices
 
-## Recently Completed
+### Slice 1
+
+- Title: Serialize project lifecycle request application
+- Description: Add per-project transition guards so late `openProject(...)` and `listProjectWorktrees(...)` results cannot repopulate worktrees or reopen a project after a newer close/collapse already committed.
+- Source: [Finding 1](docs/2026-04-04-correctness-audit-2.md#1-high-project-lifecycle-transitions-are-not-serialized)
+- Scope: `src/mainview/App.tsx`
+- Verify: Add a regression test for expand-then-immediate-close ordering and manual verification that collapsed projects stay closed under rapid toggling.
 
 ### Slice 2
 
-- Title: Roll back stale restored worktree selections
-- Completed: 2026-04-04
-- Outcome: Startup now filters worktree restore requests down to projects that actually reopened, and it validates the selected worktree path against the reopened project's current worktree list plus the worktree-restore results. Failed or missing persisted worktree selections now fall back to the project's primary worktree before startup completes, so persisted open-worktree state and active-worktree sync no longer keep stale missing paths alive.
-- Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
-
-### Slice 1
-
-- Title: Revalidate restored project openness during startup
-- Completed: 2026-04-04
-- Outcome: Startup now initializes every project as closed, then reconciles `openProjectsBatch(...)` results back into the project list so only confirmed restores become open in the UI. Failed restore targets are collapsed out of persisted sidebar-open state, and project-only startup selection can fall back to a successfully reopened project instead of staying pinned to an unconfirmed restore target.
-- Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
+- Title: Validate task targets before creating new task threads
+- Description: Reorder `runProjectTask(...)` so script/file task validation happens before `createThreadRecord(...)`, or roll back the created thread on every pre-run failure path.
+- Source: [Finding 2](docs/2026-04-04-correctness-audit-2.md#2-high-runprojecttask-leaks-empty-threads-on-stale-task-definitions)
+- Scope: `src/bun/project-procedures.ts`, `src/bun/project-procedures/project-tasks.ts`, targeted UI coverage in `src/mainview/App.tsx` if needed
+- Verify: Add coverage for stale `.tasks` files and stale `package.json` scripts after the task list was already loaded.
 
 ### Slice 4
 
-- Title: Make project close/collapse rollback-safe
-- Completed: 2026-04-04
-- Outcome: Project collapse now keeps the sidebar tree open and preserves local worktree/project state until `closeProject(...)` succeeds. Failed closes surface a project error instead of being swallowed, while successful closes invalidate in-flight worktree-open requests, clear local worktree snapshots, persist the collapsed tree state, and retarget the selected worktree path only after the backend transition is confirmed.
-- Source: [Finding 3](docs/2026-04-04-correctness-audit.md#3-medium-project-collapseclose-can-leave-local-and-backend-lifecycle-state-out-of-sync)
-
-### Slice 6
-
-- Title: Add automatic recovery for initial authenticated RPC boot
-- Completed: 2026-04-04
-- Outcome: The authenticated startup path in `auth-shell.tsx` now uses a bounded RPC connect retry helper instead of failing immediately on the first transient transport error. Auth-required failures still fail fast, while transient initial ticket/socket failures get automatic retry attempts with visible loading-state updates, and the retry helper has focused regression tests.
-- Source: [Finding 5](docs/2026-04-04-correctness-audit.md#5-low-initial-authenticated-rpc-boot-has-no-automatic-recovery-path-on-first-connect-failure)
-
-### Slice 3
-
-- Title: Validate active worktree sync requests on the backend
-- Completed: 2026-04-04
-- Outcome: `setActiveWorktree(...)` now refreshes the selected project's worktree list before accepting an active worktree path. Unknown or unrefreshable paths are cleared instead of becoming backend-active state, and regression coverage now exercises both the valid-path and stale-path cases.
-- Source: [Finding 2](docs/2026-04-04-correctness-audit.md#2-high-setactiveworktree-accepts-stale-worktree-paths-for-open-projects)
+- Title: Reuse RPC bootstrap retry logic after successful auth
+- Description: Route login, recovery-code login, and post-setup recovery continue through the same retrying connect bootstrap used by authenticated startup so a transient websocket/ticket failure does not strand an already-authenticated user on the login shell.
+- Source: [Finding 4](docs/2026-04-04-correctness-audit-2.md#4-medium-fresh-login-and-recovery-flows-still-fail-on-the-first-transient-rpc-connect-error)
+- Scope: `src/mainview/auth-shell.tsx`, `src/mainview/auth-shell-connect.ts`, related tests in `src/mainview/auth-shell-connect.test.ts`
+- Verify: Add coverage for transient connect failures after successful login and recovery-code login.
 
 ### Slice 5
 
-- Title: Reconcile the sidecar scope contract and restore a green test suite
+- Title: Make sidecar thread metadata updates authoritative
+- Description: Stop treating direct SQLite writes plus silent best-effort RPC refresh as success. The sidecar should either mutate through RPC first or reliably invalidate backend/UI state when the local-first path is used.
+- Source: [Finding 5](docs/2026-04-04-correctness-audit-2.md#5-medium-sidecar-thread-metadata-writes-can-diverge-from-the-live-app)
+- Scope: `src/bun/codex-sidecar-mcp.ts`, `src/bun/project-procedures.ts`, any related sidecar tests
+- Verify: Add coverage for metadata updates while the RPC transport is temporarily unavailable or timing out.
+
+## Recently Completed
+
+### Slice 3
+
+- Title: Make security audit refreshes supersedable
 - Completed: 2026-04-04
-- Outcome: Removed the dead `allowCrossProject` affordance from the sidecar schema/helpers, aligned the scope tests with the now-strict bound-project and bound-worktree contract, and restored a clean `bun test` run.
-- Source: [Finding 4](docs/2026-04-04-correctness-audit.md#4-medium-sidecar-scope-contract-is-internally-inconsistent-and-keeps-the-test-suite-red)
+- Outcome: Security-audit refreshes now run through a superseding queue that preserves only the newest requested scope while a prior fetch is in flight, and stale intermediate responses are ignored once a newer scope is requested. The panel’s manual refresh action now respects the active `All`/`Project`/`Thread` scope, and focused regression tests cover queued scope replacement, stale-request invalidation, and duplicate-scope no-op behavior.
+- Source: [Finding 3](docs/2026-04-04-correctness-audit-2.md#3-medium-security-audit-scope-changes-can-leave-the-panel-on-stale-results)

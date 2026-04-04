@@ -107,6 +107,7 @@ import {
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { runRollbackSafeProjectClose } from "./project-close";
 import { isStepUpRequiredError } from "./rpc-errors";
+import { createSupersedingSecurityAuditRefreshRunner } from "./security-audit-refresh";
 import {
   closeProjectsForStartupRestore,
   reconcileStartupProjectRestore,
@@ -411,8 +412,6 @@ export default function App({
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryRequestIdRef = useRef(0);
   const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
-  const securityAuditRequestIdRef = useRef(0);
-  const securityAuditLoadingRef = useRef(false);
 
   const closeStepUpDialog = useCallback((authorized: boolean) => {
     setStepUpDialogOpen(false);
@@ -570,55 +569,57 @@ export default function App({
     [getProjectState],
   );
 
+  const securityAuditRefreshRunner = useMemo(
+    () =>
+      createSupersedingSecurityAuditRefreshRunner({
+        load: async (request) => {
+          setSecurityAuditError("");
+
+          try {
+            const nextEvents = await procedures.listSecurityAuditEvents({
+              limit: 100,
+              ...(typeof request.options.projectId === "number"
+                ? {
+                    projectId: request.options.projectId,
+                  }
+                : {}),
+              ...(typeof request.options.threadId === "number"
+                ? {
+                    threadId: request.options.threadId,
+                  }
+                : {}),
+            });
+            if (!request.isLatestRequest()) {
+              return;
+            }
+            setSecurityAuditEvents(nextEvents);
+          } catch (error) {
+            if (!request.isLatestRequest()) {
+              return;
+            }
+            setSecurityAuditError(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        },
+        onLoadingChange: (loading) => {
+          setSecurityAuditLoading(loading);
+          if (!loading) {
+            setSecurityAuditLoaded(true);
+          }
+        },
+      }),
+    [procedures],
+  );
+
   const refreshSecurityAuditEvents = useCallback(
     async (options?: {
       projectId?: number | null;
       threadId?: number | null;
     }): Promise<void> => {
-      if (securityAuditLoadingRef.current) {
-        return;
-      }
-
-      const requestId = securityAuditRequestIdRef.current + 1;
-      securityAuditRequestIdRef.current = requestId;
-      securityAuditLoadingRef.current = true;
-      setSecurityAuditLoading(true);
-      setSecurityAuditError("");
-
-      try {
-        const nextEvents = await procedures.listSecurityAuditEvents({
-          limit: 100,
-          ...(typeof options?.projectId === "number"
-            ? {
-                projectId: options.projectId,
-              }
-            : {}),
-          ...(typeof options?.threadId === "number"
-            ? {
-                threadId: options.threadId,
-              }
-            : {}),
-        });
-        if (securityAuditRequestIdRef.current !== requestId) {
-          return;
-        }
-        setSecurityAuditEvents(nextEvents);
-      } catch (error) {
-        if (securityAuditRequestIdRef.current !== requestId) {
-          return;
-        }
-        setSecurityAuditError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        if (securityAuditRequestIdRef.current === requestId) {
-          setSecurityAuditLoaded(true);
-          setSecurityAuditLoading(false);
-        }
-        securityAuditLoadingRef.current = false;
-      }
+      await securityAuditRefreshRunner.request(options);
     },
-    [procedures],
+    [securityAuditRefreshRunner],
   );
 
   // Derive normalized UI state in one pass so child props stay internally
