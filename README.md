@@ -97,10 +97,10 @@ flowchart TD
 
 1. **Startup**
    - `bun run src/bun/index.ts` (or `bun run start:monolith`) boots the server.
-   - Outside dev mode, startup now requires loopback TLS material; run `bun run tls:bootstrap --trust` first on a fresh machine.
+   - `bun run start:tls` starts the isolated server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets (`index.html`, css, fonts)
-     - `ws(s)://.../rpc` for bidirectional UI/backend calls
+     - `ws://.../rpc` on loopback, with `wss://.../rpc` expected only through a TLS-terminating reverse proxy
      - event-driven push updates for tasks/history changes
    - Runtime config is injected so the frontend connects back to the correct RPC endpoint.
 
@@ -159,13 +159,13 @@ Useful scripts from `package.json`:
 
 ```bash
 bun run start                 # build CSS + run isolated server
+bun run start:tls             # build CSS + run isolated server in reverse-proxy TLS mode
 bun run start:monolith        # build CSS + run full monolith backend
 bun run dev                   # build CSS + run main dev server with CSS watch
 bun run build:dev             # install + build mainview bundle
 bun run validate              # biome format check + typecheck
 bun run format                # auto-format with biome
 bun run typecheck             # TypeScript check
-bun run tls:bootstrap         # create default loopback TLS files under the per-user app-data dir
 bun run harness:starvation    # run starvation harness utility
 ```
 
@@ -174,7 +174,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--port` / `-p` or `JOLT_PORT` for custom server port selection.
 - `--backend-only` or `JOLT_BACKEND_ONLY=1` to restrict backend mode.
 - `--dev` or `JOLT_DEV=1` for development reconnect behavior and refresh hooks.
-- `JOLT_TLS_CERT_PATH`, `JOLT_TLS_KEY_PATH`, and optional `JOLT_TLS_CA_PATH` to override the default loopback TLS material.
+- `--tls` or `JOLT_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
 
 ## Data and performance characteristics
 
