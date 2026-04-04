@@ -484,6 +484,56 @@ function isSecureRequest(request: Request): boolean {
   return new URL(request.url).protocol === "https:";
 }
 
+function normalizeBrowserOrigin(origin: string): string | null {
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    if (parsed.username || parsed.password) {
+      return null;
+    }
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolveRpcClientOriginFromRequest(request: Request): string | null {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const protocol =
+    forwardedProto === "http" || forwardedProto === "https"
+      ? `${forwardedProto}:`
+      : TLS_RUNTIME.publicTls
+        ? "https:"
+        : "http:";
+
+  if (forwardedHost) {
+    return normalizeBrowserOrigin(`${protocol}://${forwardedHost}`);
+  }
+
+  if (TLS_RUNTIME.publicTls) {
+    const host = request.headers.get("host")?.trim();
+    if (!host) {
+      return null;
+    }
+    return normalizeBrowserOrigin(`${protocol}://${host}`);
+  }
+
+  return null;
+}
+
 function normalizeAuthRouteOrigin(origin: string): string | null {
   try {
     const url = new URL(origin);
@@ -1736,6 +1786,10 @@ async function bootstrap(): Promise<void> {
           }),
           ...CONFIGURED_ALLOWED_WS_ORIGINS,
         ]);
+        const proxyOrigin = resolveRpcClientOriginFromRequest(request);
+        if (proxyOrigin) {
+          allowedOrigins.add(proxyOrigin);
+        }
         if (
           !isWebSocketOriginAllowed(
             request.headers.get("origin"),
