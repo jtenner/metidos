@@ -22,13 +22,14 @@
 - Description: Rework the collapse flow so local close state is committed only after `closeProject(...)` succeeds, or is restored if the RPC fails. Do not silently ignore backend close failures once local state has already been mutated.
 - Source: [Finding 3](docs/2026-04-04-correctness-audit.md#3-medium-project-collapseclose-can-leave-local-and-backend-lifecycle-state-out-of-sync)
 
+## Recently Completed
+
 ### Slice 6
 
 - Title: Add automatic recovery for initial authenticated RPC boot
-- Description: Give the first authenticated `connectRpcTransport()` path a bounded retry/recovery strategy so transient websocket or ticket failures do not strand the app in the auth shell with only a manual retry path.
+- Completed: 2026-04-04
+- Outcome: The authenticated startup path in `auth-shell.tsx` now uses a bounded RPC connect retry helper instead of failing immediately on the first transient transport error. Auth-required failures still fail fast, while transient initial ticket/socket failures get automatic retry attempts with visible loading-state updates, and the retry helper has focused regression tests.
 - Source: [Finding 5](docs/2026-04-04-correctness-audit.md#5-low-initial-authenticated-rpc-boot-has-no-automatic-recovery-path-on-first-connect-failure)
-
-## Recently Completed
 
 ### Slice 3
 

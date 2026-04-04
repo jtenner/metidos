@@ -113,6 +113,8 @@
 │     ├─ README.md
 │     ├─ App.tsx
 │     ├─ auth-client.ts
+│     ├─ auth-shell-connect.test.ts
+│     ├─ auth-shell-connect.ts
 │     ├─ auth-shell.tsx
 │     ├─ rpc-errors.ts
 │     ├─ app/

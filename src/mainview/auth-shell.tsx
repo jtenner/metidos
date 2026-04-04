@@ -21,6 +21,7 @@ import {
   prepareSetupEnrollment,
   type TotpEnrollment,
 } from "./auth-client";
+import { connectRpcTransportWithRetry } from "./auth-shell-connect";
 
 type AuthShellProps = {
   connectRpcTransport: () => Promise<void>;
@@ -270,7 +271,14 @@ export default function AuthShell({
 
         if (nextStatus.authenticated) {
           setLoadingMessage("Opening authenticated workspace…");
-          await connectRpcTransport();
+          await connectRpcTransportWithRetry({
+            connect: connectRpcTransport,
+            onRetry: ({ nextAttemptNumber, maxAttempts }) => {
+              setLoadingMessage(
+                `Opening authenticated workspace… retrying connection (${nextAttemptNumber}/${maxAttempts})…`,
+              );
+            },
+          });
           setView("app");
           return;
         }

@@ -12,6 +12,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and websocket ticket acquisition.
 
+`auth-shell-connect.ts` isolates the bounded retry logic used when the UI boots into an already-authenticated session and the first RPC transport connect needs transient recovery.
+
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 
 `index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.
