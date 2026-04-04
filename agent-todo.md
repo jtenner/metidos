@@ -287,7 +287,7 @@ Done when:
 
 ### Slice P2.4: Memoize markdown rendering per message
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Visible markdown/code-heavy assistant messages can still be expensive to rerender.

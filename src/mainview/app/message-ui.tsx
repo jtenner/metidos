@@ -1,4 +1,4 @@
-import { type CSSProperties, type JSX, useMemo, useState } from "react";
+import { type CSSProperties, type JSX, memo, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { BeatLoader } from "react-spinners";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -97,7 +97,11 @@ const markdownComponents: Components = {
   },
 };
 
-export function MarkdownMessage({ text }: { text: string }): JSX.Element {
+export const MarkdownMessage = memo(function MarkdownMessage({
+  text,
+}: {
+  text: string;
+}): JSX.Element {
   // React-markdown handles rich text rendering from assistant output with GFM support.
   return (
     <div className="message-markdown">
@@ -109,7 +113,7 @@ export function MarkdownMessage({ text }: { text: string }): JSX.Element {
       </ReactMarkdown>
     </div>
   );
-}
+});
 
 export function ContextUsageMeter({
   inputTokens,
