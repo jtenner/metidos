@@ -20,6 +20,8 @@
 ├─ bun.lock
 ├─ bunfig.toml
 ├─ docs/
+│  ├─ 2026-04-04-frontend-feedback-inventory.md
+│  ├─ 2026-04-04-frontend-performance-inventory.md
 │  └─ archive/
 │     ├─ README.md
 │     ├─ 2026-03-31-correctness-issues.md
