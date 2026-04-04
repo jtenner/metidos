@@ -29,12 +29,11 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   acknowledgeThreadErrorSeenInBackground,
   clearCompletedThreadIndicator,
   dismissThreadStatus,
-  getProjectState,
   homeDirectory,
   isThreadStatusDismissed,
   onOpenThread,
   onOpenThreadActionMenu,
-  projects,
+  projectById,
   selectedThreadId,
   supportsTildePath,
   threadPreviewsDisabled,
@@ -42,6 +41,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   threadsError,
   workspaceActiveThreads,
   workspacePinnedThreads,
+  worktreeByProjectAndPath,
 }: WorkspacePanelProps) {
   // Global panel + section open state is shared with the sidebar panel reducer.
   const workspaceOpen = useWorkspacePanelOpen();
@@ -77,18 +77,18 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 anchorIdPrefix="workspace-thread"
                 clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                 dismissThreadStatus={dismissThreadStatus}
-                getProjectState={getProjectState}
                 homeDirectory={homeDirectory}
                 isThreadStatusDismissed={isThreadStatusDismissed}
                 onOpenThread={onOpenThread}
                 onOpenThreadActionMenu={onOpenThreadActionMenu}
                 previewDisabled={threadPreviewsDisabled}
-                projects={projects}
+                projectById={projectById}
                 selectedThreadId={selectedThreadId}
                 showLocation
                 supportsTildePath={supportsTildePath}
                 threadActivityIndicator={threadActivityIndicator}
                 threads={workspacePinnedThreads}
+                worktreeByProjectAndPath={worktreeByProjectAndPath}
               />
             </div>
           ) : null}
@@ -119,18 +119,18 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   anchorIdPrefix="workspace-thread"
                   clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                   dismissThreadStatus={dismissThreadStatus}
-                  getProjectState={getProjectState}
                   homeDirectory={homeDirectory}
                   isThreadStatusDismissed={isThreadStatusDismissed}
                   onOpenThread={onOpenThread}
                   onOpenThreadActionMenu={onOpenThreadActionMenu}
                   previewDisabled={threadPreviewsDisabled}
-                  projects={projects}
+                  projectById={projectById}
                   selectedThreadId={selectedThreadId}
                   showLocation
                   supportsTildePath={supportsTildePath}
                   threadActivityIndicator={threadActivityIndicator}
                   threads={workspaceActiveThreads}
+                  worktreeByProjectAndPath={worktreeByProjectAndPath}
                 />
               ) : null}
             </div>

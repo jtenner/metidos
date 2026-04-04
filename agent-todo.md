@@ -137,7 +137,7 @@ Done when:
 
 ### Slice P1.1: Build shared lookup maps for projects, threads, and worktrees
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Render paths repeatedly use `find` and `some` for metadata lookups.

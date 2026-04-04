@@ -729,6 +729,7 @@ export default function App({
     modelSelectorDisabled,
     normalizedSidebarSearchQuery,
     projectActionMenuProject,
+    projectById,
     projectThreadErrorLevel,
     reasoningEffortSelectorDisabled,
     selectedDiffFileChange,
@@ -738,6 +739,7 @@ export default function App({
     taskSelectorDisabled,
     threadActionMenuThread,
     unsafeModeToggleDisabled,
+    worktreeByProjectAndPath,
     worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
     chatError,
@@ -4883,6 +4885,7 @@ export default function App({
                     onSubmitAddProject: submitAddProject,
                     onToggleAddProjectForm: toggleAddProjectForm,
                     onToggleWorktreePinned: handleToggleWorktreePinned,
+                    projectById,
                     projectThreadErrorLevel,
                     selectedProjectId,
                     sidebarActionButtonClass,
@@ -4906,12 +4909,11 @@ export default function App({
                     acknowledgeThreadErrorSeenInBackground,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
-                    getProjectState,
                     homeDirectory,
                     isThreadStatusDismissed,
                     onOpenThread: handleOpenThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
-                    projects,
+                    projectById,
                     selectedThreadId,
                     supportsTildePath,
                     threadPreviewsDisabled: threadActionMenu !== null,
@@ -4919,6 +4921,7 @@ export default function App({
                     threadsError,
                     workspaceActiveThreads: filteredWorkspaceActiveThreads,
                     workspacePinnedThreads: filteredWorkspacePinnedThreads,
+                    worktreeByProjectAndPath,
                   }}
                 />
               </div>
@@ -5113,6 +5116,7 @@ export default function App({
                 onSubmitAddProject: submitAddProject,
                 onToggleAddProjectForm: toggleAddProjectForm,
                 onToggleWorktreePinned: handleToggleWorktreePinned,
+                projectById,
                 projectThreadErrorLevel,
                 selectedProjectId,
                 sidebarActionButtonClass,
@@ -5136,12 +5140,11 @@ export default function App({
                 acknowledgeThreadErrorSeenInBackground,
                 clearCompletedThreadIndicator,
                 dismissThreadStatus,
-                getProjectState,
                 homeDirectory,
                 isThreadStatusDismissed,
                 onOpenThread: handleOpenThread,
                 onOpenThreadActionMenu: openThreadActionMenu,
-                projects,
+                projectById,
                 selectedThreadId,
                 supportsTildePath,
                 threadPreviewsDisabled: threadActionMenu !== null,
@@ -5149,6 +5152,7 @@ export default function App({
                 threadsError,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
+                worktreeByProjectAndPath,
               }}
             />
           </aside>
@@ -5363,17 +5367,17 @@ export default function App({
                 anchorIdPrefix="worktree-thread"
                 clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                 dismissThreadStatus={dismissThreadStatus}
-                getProjectState={getProjectState}
                 homeDirectory={homeDirectory}
                 isThreadStatusDismissed={isThreadStatusDismissed}
                 onOpenThread={handleOpenThread}
                 onOpenThreadActionMenu={openThreadActionMenu}
                 previewDisabled={threadActionMenu !== null}
-                projects={projects}
+                projectById={projectById}
                 selectedThreadId={selectedThreadId}
                 supportsTildePath={supportsTildePath}
                 threadActivityIndicator={threadActivityIndicator}
                 threads={selectedWorktreeThreads}
+                worktreeByProjectAndPath={worktreeByProjectAndPath}
               />
             ) : (
               <div className="px-3 py-3 text-xs text-[#8f8d8b]">

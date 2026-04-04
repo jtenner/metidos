@@ -36,7 +36,6 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   clearCompletedThreadIndicator,
   dismissThreadStatus,
   filteredVisibleThreads,
-  getProjectState,
   homeDirectory,
   isCreatingThread,
   isThreadStatusDismissed,
@@ -44,7 +43,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   onCreateThread,
   onOpenThread,
   onOpenThreadActionMenu,
-  projects,
+  projectById,
   selectedProject,
   selectedThreadId,
   sidebarActionButtonClass,
@@ -52,6 +51,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   threadPreviewsDisabled,
   threadActivityIndicator,
   threadsError,
+  worktreeByProjectAndPath,
 }: ThreadsPanelProps) {
   // Panel open state comes from shared sidebar state persisted by user preference.
   const threadsOpen = useThreadsPanelOpen();
@@ -105,17 +105,17 @@ export const ThreadsPanel = memo(function ThreadsPanel({
               anchorIdPrefix="threads-thread"
               clearCompletedThreadIndicator={clearCompletedThreadIndicator}
               dismissThreadStatus={dismissThreadStatus}
-              getProjectState={getProjectState}
               homeDirectory={homeDirectory}
               isThreadStatusDismissed={isThreadStatusDismissed}
               onOpenThread={onOpenThread}
               onOpenThreadActionMenu={onOpenThreadActionMenu}
               previewDisabled={threadPreviewsDisabled}
-              projects={projects}
+              projectById={projectById}
               selectedThreadId={selectedThreadId}
               supportsTildePath={supportsTildePath}
               threadActivityIndicator={threadActivityIndicator}
               threads={filteredVisibleThreads}
+              worktreeByProjectAndPath={worktreeByProjectAndPath}
             />
           )}
           {/* Keep error messaging visible beneath the list so list context remains visible. */}

@@ -6,6 +6,7 @@ import type {
   RpcProject,
   RpcThread,
   RpcThreadRunStatus,
+  RpcWorktree,
   RpcWorktreeGitHistoryResult,
 } from "../../bun/rpc-schema";
 import { findCodexModel } from "../controls/codex-utils";
@@ -131,22 +132,39 @@ export function useMainviewDerivedState({
   const [dismissedThreadStatusKeys, setDismissedThreadStatusKeys] = useState<
     Record<number, string>
   >({});
+  const projectById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project] as const)),
+    [projects],
+  );
+  const threadById = useMemo(
+    () => new Map(threads.map((thread) => [thread.id, thread] as const)),
+    [threads],
+  );
+  const worktreeByProjectAndPath = useMemo(() => {
+    const next = new Map<string, RpcWorktree>();
+    for (const project of projects) {
+      for (const worktree of getProjectState(project.id).worktrees) {
+        next.set(worktreeKey(project.id, worktree.path), worktree);
+      }
+    }
+    return next;
+  }, [getProjectState, projects]);
 
   const selectedProject = useMemo(() => {
     // Resolve the selected project by ID from the full project list.
     if (!selectedProjectId) {
       return null;
     }
-    return projects.find((entry) => entry.id === selectedProjectId) ?? null;
-  }, [projects, selectedProjectId]);
+    return projectById.get(selectedProjectId) ?? null;
+  }, [projectById, selectedProjectId]);
 
   const selectedThread = useMemo(() => {
     // Resolve the selected thread by ID from the full thread list.
     if (!selectedThreadId) {
       return null;
     }
-    return threads.find((entry) => entry.id === selectedThreadId) ?? null;
-  }, [selectedThreadId, threads]);
+    return threadById.get(selectedThreadId) ?? null;
+  }, [selectedThreadId, threadById]);
 
   const selectedThreadRunStatus = useMemo(
     () => threadRunStatus(selectedThread),
@@ -248,8 +266,7 @@ export function useMainviewDerivedState({
     setDismissedThreadStatusKeys((prev) => {
       const nextEntries = Object.entries(prev).filter(
         ([threadId, statusKey]) => {
-          const thread =
-            threads.find((entry) => entry.id === Number(threadId)) ?? null;
+          const thread = threadById.get(Number(threadId)) ?? null;
           return thread
             ? dismissibleThreadStatusKey(thread.runStatus) === statusKey
             : false;
@@ -261,7 +278,7 @@ export function useMainviewDerivedState({
 
       return Object.fromEntries(nextEntries) as Record<number, string>;
     });
-  }, [threads]);
+  }, [threadById]);
 
   const dismissThreadStatus = useCallback((thread: RpcThread): void => {
     // Record dismissal only when thread has a terminal/dismissible status.
@@ -325,20 +342,15 @@ export function useMainviewDerivedState({
     if (!projectActionMenu) {
       return null;
     }
-    return (
-      projects.find((project) => project.id === projectActionMenu.projectId) ??
-      null
-    );
-  }, [projectActionMenu, projects]);
+    return projectById.get(projectActionMenu.projectId) ?? null;
+  }, [projectActionMenu, projectById]);
 
   const threadActionMenuThread = useMemo(() => {
     if (!threadActionMenu) {
       return null;
     }
-    return (
-      threads.find((thread) => thread.id === threadActionMenu.threadId) ?? null
-    );
-  }, [threadActionMenu, threads]);
+    return threadById.get(threadActionMenu.threadId) ?? null;
+  }, [threadActionMenu, threadById]);
 
   const selectedProjectWorktrees = useMemo(() => {
     // Worktrees are sourced from project state cache, then ordered for UI display.
@@ -386,11 +398,16 @@ export function useMainviewDerivedState({
       return null;
     }
     return (
-      selectedProjectWorktrees.find(
-        (worktree) => worktree.path === activeSelectedWorktreePath,
+      worktreeByProjectAndPath.get(
+        worktreeKey(selectedProject.id, activeSelectedWorktreePath),
       ) ?? findPrimaryWorktree(selectedProject, selectedProjectWorktrees)
     );
-  }, [activeSelectedWorktreePath, selectedProject, selectedProjectWorktrees]);
+  }, [
+    activeSelectedWorktreePath,
+    selectedProject,
+    selectedProjectWorktrees,
+    worktreeByProjectAndPath,
+  ]);
 
   const activeSelectedWorktreeOpened = useMemo(() => {
     if (!selectedProject || !activeSelectedWorktreePath) {
@@ -603,6 +620,7 @@ export function useMainviewDerivedState({
     modelSelectorDisabled,
     normalizedSidebarSearchQuery,
     projectActionMenuProject,
+    projectById,
     projectThreadErrorLevel,
     reasoningEffortSelectorDisabled,
     selectedDiffFileChange,
@@ -614,6 +632,7 @@ export function useMainviewDerivedState({
     taskSelectorDisabled,
     threadActionMenuThread,
     unsafeModeToggleDisabled,
+    worktreeByProjectAndPath,
     worktreeThreadErrorLevel,
   };
 }

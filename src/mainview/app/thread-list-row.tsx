@@ -1,12 +1,12 @@
 import { type HTMLAttributes, type JSX, memo } from "react";
 import { createPortal } from "react-dom";
-import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
+import type { RpcProject, RpcThread, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
   type ErrorPreviewPopoverState,
   formatPathForDisplay,
-  type ProjectNodeState,
   type ThreadSummaryPopoverState,
+  worktreeKey,
 } from "./state";
 import { useThreadPreviews } from "./use-thread-previews";
 
@@ -17,8 +17,6 @@ export type SharedThreadListProps = {
   clearCompletedThreadIndicator: (threadId: number) => void;
   /** Dismisses the inline run-status badge for a thread from persistent state. */
   dismissThreadStatus: (thread: RpcThread) => void;
-  /** Resolves project state buckets (including worktree/branch info) by project id. */
-  getProjectState: (projectId: number) => ProjectNodeState;
   /** User home directory for display-friendly worktree path formatting. */
   homeDirectory: string;
   /** Returns whether status chips and errors are already dismissed for a thread. */
@@ -27,8 +25,8 @@ export type SharedThreadListProps = {
   onOpenThread: (threadId: number) => void;
   /** Opens context menu for a thread row at pixel coordinates. */
   onOpenThreadActionMenu: (thread: RpcThread, x: number, y: number) => void;
-  /** Known projects list used to attach project and worktree metadata to thread rows. */
-  projects: RpcProject[];
+  /** Memoized project metadata keyed by project id. */
+  projectById: ReadonlyMap<number, RpcProject>;
   /** Currently selected thread id to apply active state styling to matching row. */
   selectedThreadId: number | null;
   /** Feature flag controlling whether `~` is used for home-directory path display. */
@@ -37,6 +35,8 @@ export type SharedThreadListProps = {
   threadActivityIndicator: (
     threadId: number,
   ) => "none" | "working" | "completed";
+  /** Memoized worktree metadata keyed by `worktreeKey(projectId, path)`. */
+  worktreeByProjectAndPath: ReadonlyMap<string, RpcWorktree>;
 };
 
 type ThreadListPreviewProps = {
@@ -107,18 +107,18 @@ export const ThreadList = memo(function ThreadList({
   anchorIdPrefix = "thread",
   clearCompletedThreadIndicator,
   dismissThreadStatus,
-  getProjectState,
   homeDirectory,
   isThreadStatusDismissed,
   onOpenThread,
   onOpenThreadActionMenu,
   previewDisabled = false,
-  projects,
+  projectById,
   selectedThreadId,
   showLocation = false,
   supportsTildePath,
   threadActivityIndicator,
   threads,
+  worktreeByProjectAndPath,
 }: ThreadListProps): JSX.Element {
   const errorPreviewPopoverId = `${anchorIdPrefix}-error-popover`;
   const threadSummaryPopoverId = `${anchorIdPrefix}-summary-popover`;
@@ -148,14 +148,13 @@ export const ThreadList = memo(function ThreadList({
           errorPreviewHandlers={errorPreviewHandlers}
           errorPreviewPopover={errorPreviewPopover}
           errorPreviewPopoverId={errorPreviewPopoverId}
-          getProjectState={getProjectState}
           hideErrorPreview={hideErrorPreview}
           hideThreadSummaryPreview={hideThreadSummaryPreview}
           homeDirectory={homeDirectory}
           isActive={selectedThreadId === thread.id}
           onOpenThread={onOpenThread}
           onOpenThreadActionMenu={onOpenThreadActionMenu}
-          projects={projects}
+          projectById={projectById}
           showLocation={showLocation}
           supportsTildePath={supportsTildePath}
           thread={thread}
@@ -163,6 +162,7 @@ export const ThreadList = memo(function ThreadList({
           threadSummaryPopover={threadSummaryPopover}
           threadSummaryPopoverId={threadSummaryPopoverId}
           threadSummaryPreviewHandlers={threadSummaryPreviewHandlers}
+          worktreeByProjectAndPath={worktreeByProjectAndPath}
         />
       ))}
       <ThreadListPreviewPortal>
@@ -230,14 +230,13 @@ const ThreadListRow = memo(function ThreadListRow({
   errorPreviewHandlers,
   errorPreviewPopover,
   errorPreviewPopoverId,
-  getProjectState,
   hideErrorPreview,
   hideThreadSummaryPreview,
   homeDirectory,
   isActive,
   onOpenThread,
   onOpenThreadActionMenu,
-  projects,
+  projectById,
   showLocation = false,
   supportsTildePath,
   thread,
@@ -245,15 +244,14 @@ const ThreadListRow = memo(function ThreadListRow({
   threadSummaryPopover,
   threadSummaryPopoverId,
   threadSummaryPreviewHandlers,
+  worktreeByProjectAndPath,
 }: ThreadListRowProps): JSX.Element {
   // Resolve thread project/worktree context to compute branch and display path.
-  const threadProject =
-    projects.find((project) => project.id === thread.projectId) ?? null;
-  const threadWorktree = threadProject
-    ? (getProjectState(thread.projectId).worktrees.find(
-        (worktree) => worktree.path === thread.worktreePath,
-      ) ?? null)
-    : null;
+  const threadProject = projectById.get(thread.projectId) ?? null;
+  const threadWorktree =
+    worktreeByProjectAndPath.get(
+      worktreeKey(thread.projectId, thread.worktreePath),
+    ) ?? null;
   const threadBranchName =
     threadWorktree?.branch?.trim() ||
     (threadProject && thread.worktreePath === threadProject.path
@@ -441,11 +439,11 @@ function areThreadListRowPropsEqual(
     previous.anchorIdPrefix !== next.anchorIdPrefix ||
     previous.errorPreviewPopoverId !== next.errorPreviewPopoverId ||
     previous.showLocation !== next.showLocation ||
-    previous.projects !== next.projects ||
-    previous.getProjectState !== next.getProjectState ||
+    previous.projectById !== next.projectById ||
     previous.homeDirectory !== next.homeDirectory ||
     previous.supportsTildePath !== next.supportsTildePath ||
     previous.threadSummaryPopoverId !== next.threadSummaryPopoverId ||
+    previous.worktreeByProjectAndPath !== next.worktreeByProjectAndPath ||
     previous.acknowledgeThreadErrorSeenInBackground !==
       next.acknowledgeThreadErrorSeenInBackground ||
     previous.clearCompletedThreadIndicator !==

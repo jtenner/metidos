@@ -20,7 +20,7 @@ import {
 } from "./state";
 
 type PinnedWorktreeEntry = {
-  project: RpcProject;
+  projectId: number;
   worktree: RpcWorktree;
 };
 
@@ -71,6 +71,7 @@ function worktreeMatchesProjectsSearch(
 function comparePinnedWorktreeEntries(
   left: PinnedWorktreeEntry,
   right: PinnedWorktreeEntry,
+  projectById: ReadonlyMap<number, RpcProject>,
 ): number {
   const leftPinnedAt = left.worktree.pinnedAt ?? "";
   const rightPinnedAt = right.worktree.pinnedAt ?? "";
@@ -78,7 +79,9 @@ function comparePinnedWorktreeEntries(
     return rightPinnedAt.localeCompare(leftPinnedAt);
   }
 
-  const projectNameOrder = left.project.name.localeCompare(right.project.name);
+  const leftProjectName = projectById.get(left.projectId)?.name ?? "";
+  const rightProjectName = projectById.get(right.projectId)?.name ?? "";
+  const projectNameOrder = leftProjectName.localeCompare(rightProjectName);
   if (projectNameOrder !== 0) {
     return projectNameOrder;
   }
@@ -237,6 +240,7 @@ type ProjectsPanelProps = {
     worktreePath: string,
     pinned: boolean,
   ) => void;
+  projectById: ReadonlyMap<number, RpcProject>;
   projectThreadErrorLevel: (projectId: number) => ThreadErrorLevel;
   selectedProjectId: number | null;
   supportsTildePath: boolean;
@@ -281,6 +285,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   onSubmitAddProject,
   onToggleAddProjectForm,
   onToggleWorktreePinned,
+  projectById,
   projectThreadErrorLevel,
   selectedProjectId,
   sidebarActionButtonClass,
@@ -308,16 +313,19 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               ),
           )
           .map((worktree) => ({
-            project,
+            projectId: project.id,
             worktree,
           })),
       )
-      .sort(comparePinnedWorktreeEntries);
+      .sort((left, right) =>
+        comparePinnedWorktreeEntries(left, right, projectById),
+      );
   }, [
     filteredProjects,
     getProjectState,
     homeDirectory,
     normalizedSidebarSearchQuery,
+    projectById,
     supportsTildePath,
   ]);
 
@@ -484,31 +492,38 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               </div>
               <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
                 <div className="space-y-1">
-                  {pinnedWorktreeEntries.map(({ project, worktree }) => (
-                    <ProjectWorktreeRow
-                      key={`${project.id}:${worktree.path}`}
-                      activeWorktree={isActiveWorktree(
-                        project.id,
-                        worktree.path,
-                      )}
-                      homeDirectory={homeDirectory}
-                      onProjectWorktreeClick={onProjectWorktreeClick}
-                      onToggleWorktreePinned={onToggleWorktreePinned}
-                      project={project}
-                      showProjectName
-                      supportsTildePath={supportsTildePath}
-                      worktree={worktree}
-                      worktreeErrorLevel={worktreeThreadErrorLevel(
-                        project.id,
-                        worktree.path,
-                      )}
-                      worktreePinBusyPath={worktreePinBusyPath}
-                      worktreeState={getWorktreeState(
-                        project.id,
-                        worktree.path,
-                      )}
-                    />
-                  ))}
+                  {pinnedWorktreeEntries.map(({ projectId, worktree }) => {
+                    const project = projectById.get(projectId);
+                    if (!project) {
+                      return null;
+                    }
+
+                    return (
+                      <ProjectWorktreeRow
+                        key={`${project.id}:${worktree.path}`}
+                        activeWorktree={isActiveWorktree(
+                          project.id,
+                          worktree.path,
+                        )}
+                        homeDirectory={homeDirectory}
+                        onProjectWorktreeClick={onProjectWorktreeClick}
+                        onToggleWorktreePinned={onToggleWorktreePinned}
+                        project={project}
+                        showProjectName
+                        supportsTildePath={supportsTildePath}
+                        worktree={worktree}
+                        worktreeErrorLevel={worktreeThreadErrorLevel(
+                          project.id,
+                          worktree.path,
+                        )}
+                        worktreePinBusyPath={worktreePinBusyPath}
+                        worktreeState={getWorktreeState(
+                          project.id,
+                          worktree.path,
+                        )}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
