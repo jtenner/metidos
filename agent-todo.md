@@ -305,7 +305,7 @@ Done when:
 
 ### Slice P2.5: Defer or gate syntax highlighting
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Prism highlighting is expensive for large code blocks and is loaded/rendered eagerly for visible code fences.

@@ -30,12 +30,21 @@ const codeBlockStyle = {
 const codeTagStyle = {
   fontFamily: CODE_FONT_STACK,
 } satisfies CSSProperties;
+const MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS = 12_000;
+const MAX_HIGHLIGHTED_CODE_BLOCK_LINES = 240;
 
 type DiffLine = {
   kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
   key: string;
   text: string;
 };
+
+function shouldSkipSyntaxHighlighting(code: string): boolean {
+  if (code.length > MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS) {
+    return true;
+  }
+  return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
+}
 
 /**
  * Custom markdown renderers:
@@ -62,6 +71,20 @@ const markdownComponents: Components = {
     const languageMatch = /language-([\w-]+)/.exec(className ?? "");
     const isBlockCode = Boolean(languageMatch) || code.includes("\n");
     if (isBlockCode) {
+      if (shouldSkipSyntaxHighlighting(code)) {
+        return (
+          <div style={codeBlockStyle}>
+            <code
+              {...props}
+              className={`block whitespace-pre-wrap break-words ${className ?? ""}`.trim()}
+              style={codeTagStyle}
+            >
+              {code}
+            </code>
+          </div>
+        );
+      }
+
       return (
         <SyntaxHighlighter
           PreTag="div"
