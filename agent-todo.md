@@ -4,13 +4,14 @@
 
 ## Active Correctness Slices
 
+## Recently Completed
+
 ### Slice 2
 
 - Title: Roll back stale restored worktree selections
-- Description: Prevent persisted `selectedWorktreePath` and persisted open-worktree entries from surviving failed `openWorktreesBatch(...)` results. Startup should prune missing worktrees and fall back to a valid selection before git history, task loading, or active-worktree sync runs.
+- Completed: 2026-04-04
+- Outcome: Startup now filters worktree restore requests down to projects that actually reopened, and it validates the selected worktree path against the reopened project's current worktree list plus the worktree-restore results. Failed or missing persisted worktree selections now fall back to the project's primary worktree before startup completes, so persisted open-worktree state and active-worktree sync no longer keep stale missing paths alive.
 - Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
-
-## Recently Completed
 
 ### Slice 1
 

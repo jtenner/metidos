@@ -111,6 +111,10 @@ import {
   closeProjectsForStartupRestore,
   reconcileStartupProjectRestore,
 } from "./startup-project-restore";
+import {
+  filterStartupWorktreeRestoreRequests,
+  reconcileStartupSelectedWorktreePath,
+} from "./startup-worktree-restore";
 
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
@@ -2533,6 +2537,8 @@ export default function App({
         });
       }
 
+      let startupProjectsAfterRestore = startupProjects;
+      const restoredProjectWorktreesById = new Map<number, RpcWorktree[]>();
       if (restoredProjects.length > 0) {
         const restoredProjectResults = await procedures.openProjectsBatch(
           {
@@ -2553,6 +2559,7 @@ export default function App({
           selectedProjectId: selectedProjectIdRef.current,
           selectedWorktreePath: selectedWorktreePathRef.current,
         });
+        startupProjectsAfterRestore = reconciledRestore.projects;
         setProjects(reconciledRestore.projects);
         for (const path of reconciledRestore.failedProjectPaths) {
           setProjectTreeOpen(path, false);
@@ -2571,6 +2578,10 @@ export default function App({
         }
         for (const result of restoredProjectResults) {
           if (result.ok) {
+            restoredProjectWorktreesById.set(
+              result.project.id,
+              result.worktrees,
+            );
             setProjectState(result.project.id, {
               worktrees: result.worktrees,
               loadingWorktrees: false,
@@ -2586,14 +2597,26 @@ export default function App({
         }
       }
 
-      const restoredOpenWorktrees = await procedures.openWorktreesBatch(
-        {
-          worktrees: [...startupWorktreesToOpen.values()],
-        },
-        {
-          priority: "foreground",
-        },
+      const confirmedRestoredOpenProjectIds = new Set(
+        startupProjectsAfterRestore
+          .filter((project) => project.isOpen === 1)
+          .map((project) => project.id),
       );
+      const worktreesToRestore = filterStartupWorktreeRestoreRequests(
+        [...startupWorktreesToOpen.values()],
+        confirmedRestoredOpenProjectIds,
+      );
+      const restoredOpenWorktrees =
+        worktreesToRestore.length > 0
+          ? await procedures.openWorktreesBatch(
+              {
+                worktrees: worktreesToRestore,
+              },
+              {
+                priority: "foreground",
+              },
+            )
+          : [];
 
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
@@ -2638,6 +2661,30 @@ export default function App({
           }
           return next;
         });
+      }
+
+      const selectedProjectAfterRestore =
+        selectedProjectIdRef.current === null
+          ? null
+          : (startupProjectsAfterRestore.find(
+              (project) => project.id === selectedProjectIdRef.current,
+            ) ?? null);
+      const selectedProjectWorktreesAfterRestore =
+        selectedProjectAfterRestore === null
+          ? []
+          : (restoredProjectWorktreesById.get(selectedProjectAfterRestore.id) ??
+            getProjectState(selectedProjectAfterRestore.id).worktrees);
+      const reconciledSelectedWorktreePath =
+        reconcileStartupSelectedWorktreePath({
+          allowFallback: initialThread === null,
+          project: selectedProjectAfterRestore,
+          restoredOpenWorktrees,
+          selectedWorktreePath: selectedWorktreePathRef.current,
+          worktrees: selectedProjectWorktreesAfterRestore,
+        });
+      if (reconciledSelectedWorktreePath !== selectedWorktreePathRef.current) {
+        selectedWorktreePathRef.current = reconciledSelectedWorktreePath;
+        setSelectedWorktreePath(reconciledSelectedWorktreePath);
       }
 
       if (initialThread) {

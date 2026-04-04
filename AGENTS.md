@@ -121,6 +121,8 @@
 │     ├─ rpc-errors.ts
 │     ├─ startup-project-restore.test.ts
 │     ├─ startup-project-restore.ts
+│     ├─ startup-worktree-restore.test.ts
+│     ├─ startup-worktree-restore.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx
