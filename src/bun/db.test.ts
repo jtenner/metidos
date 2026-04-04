@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -123,5 +124,53 @@ describe("app database storage", () => {
         threadId: 12,
       }),
     ).toHaveLength(1);
+  });
+
+  it("clears stale active worktree sync paths instead of storing them", async () => {
+    const repoPath = createTempDirectory();
+    execFileSync("git", ["init"], {
+      cwd: repoPath,
+      stdio: "ignore",
+    });
+
+    const appDataDir = createTempDirectory();
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+
+    const {
+      openProjectProcedure,
+      setActiveWorktreeProcedure,
+      shutdownProjectPolling,
+    } = await import("./project-procedures");
+
+    try {
+      const opened = await openProjectProcedure({
+        name: "Repo",
+        projectPath: repoPath,
+      });
+
+      expect(
+        await setActiveWorktreeProcedure({
+          projectId: opened.project.id,
+          worktreePath: repoPath,
+        }),
+      ).toEqual({
+        success: true,
+        projectId: opened.project.id,
+        worktreePath: repoPath,
+      });
+
+      expect(
+        await setActiveWorktreeProcedure({
+          projectId: opened.project.id,
+          worktreePath: join(repoPath, "missing-worktree"),
+        }),
+      ).toEqual({
+        success: true,
+        projectId: opened.project.id,
+        worktreePath: null,
+      });
+    } finally {
+      shutdownProjectPolling();
+    }
   });
 });

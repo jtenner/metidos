@@ -3612,7 +3612,21 @@ export async function setActiveWorktreeProcedure(
     if (project.isOpen === 1) {
       ensureProjectPoller(project);
       projectId = project.id;
-      worktreePath = requestedWorktreePath;
+      // Validate against a fresh worktree listing so stale UI selections do not
+      // become the backend's active worktree.
+      try {
+        const worktrees = await readProjectWorktrees(project.path, project.id, {
+          forceRefresh: true,
+          priority: "background",
+        });
+        worktreePath = worktrees.some(
+          (worktree) => worktree.path === requestedWorktreePath,
+        )
+          ? requestedWorktreePath
+          : null;
+      } catch {
+        worktreePath = null;
+      }
     } else {
       stopProjectPoller(project.id);
     }

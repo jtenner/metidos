@@ -16,12 +16,6 @@
 - Description: Prevent persisted `selectedWorktreePath` and persisted open-worktree entries from surviving failed `openWorktreesBatch(...)` results. Startup should prune missing worktrees and fall back to a valid selection before git history, task loading, or active-worktree sync runs.
 - Source: [Finding 1](docs/2026-04-04-correctness-audit.md#1-high-startup-restore-applies-stale-persisted-project-and-worktree-state)
 
-### Slice 3
-
-- Title: Validate active worktree sync requests on the backend
-- Description: Harden `setActiveWorktree(...)` so it only accepts worktree paths that are currently known for the selected open project. If the client sends a stale path, reject it or clear the active worktree instead of storing invalid backend state.
-- Source: [Finding 2](docs/2026-04-04-correctness-audit.md#2-high-setactiveworktree-accepts-stale-worktree-paths-for-open-projects)
-
 ### Slice 4
 
 - Title: Make project close/collapse rollback-safe
@@ -35,6 +29,13 @@
 - Source: [Finding 5](docs/2026-04-04-correctness-audit.md#5-low-initial-authenticated-rpc-boot-has-no-automatic-recovery-path-on-first-connect-failure)
 
 ## Recently Completed
+
+### Slice 3
+
+- Title: Validate active worktree sync requests on the backend
+- Completed: 2026-04-04
+- Outcome: `setActiveWorktree(...)` now refreshes the selected project's worktree list before accepting an active worktree path. Unknown or unrefreshable paths are cleared instead of becoming backend-active state, and regression coverage now exercises both the valid-path and stale-path cases.
+- Source: [Finding 2](docs/2026-04-04-correctness-audit.md#2-high-setactiveworktree-accepts-stale-worktree-paths-for-open-projects)
 
 ### Slice 5
 
