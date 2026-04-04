@@ -213,4 +213,4 @@ bun run harness:starvation    # run starvation harness utility
 - Keep frontend and backend RPC contracts aligned in `src/bun/rpc-schema.ts`.
 - Prefer clear comments for edge-case behavior (cancellations, open/close sequencing, stale-response handling).
 - Run docs + format/style checks according to `bun run validate` before non-doc code changes.
-- Use `agent-todo.md` for new documentation or process work so the repo task list stays accurate.
+- Use `agent-todo.md` for short-lived documentation/process work; leave it intentionally empty when there are no active housekeeping tasks.

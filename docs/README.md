@@ -1,18 +1,18 @@
 # Docs
 
-This folder holds internal notes, design decisions, and migration/audit documents that describe current architecture and planned work.  
+This folder holds internal notes, design decisions, and migration/audit documents about the architecture and observed behavior over time.
 The files are primarily for maintainers and contributors to understand tradeoffs, known risks, and expected behavior before making UI/runtime changes.
 
 ## Files
 
 - `2026-03-31-correctness-issues.md`
-  - Initial correctness/performance audit with findings tied to async orchestration, polling, and UI state races.
+  - Historical correctness/performance audit snapshot; findings tied to async orchestration, polling, and UI state races.
 - `2026-03-31-correctness-issues-2.md`
-  - Follow-up/round 2 correctness audit with additional findings and refined severity list.
+  - Historical follow-up/round 2 correctness audit snapshot with additional findings and refined severity list.
 - `2026-04-03-security-audit.md`
-  - Security audit of the app's transport, RPC surface, filesystem access, Codex/MCP execution model, and local persistence.
+  - Historical security audit snapshot covering transport, RPC surface, filesystem access, Codex/MCP execution model, and local persistence.
 - `2026-04-03-security-remediation-plan.md`
-  - Implementation plan for locking down access, adding password plus TOTP authentication, step-up auth, reverse-proxy TLS mode, and backend default-deny behavior.
+  - Security implementation sequence drafted from that audit; includes auth model, step-up auth, transport hardening, TLS handling, and least-privilege defaults.
 - `codex.md`
   - Notes on the `@openai/codex-sdk` and how the app wires it to a local CLI-sidecar model runtime.
   - Documents expected thread/session behavior and the integration surface the backend uses.
