@@ -80,6 +80,8 @@ Done when:
 
 ## Slice 4: Make thread-status polling resilient to selected-thread detail fetch failures
 
+Status: completed on 2026-04-04
+
 Audit reference: [Correctness audit - 2026-04-04](docs/2026-04-04-correctness-audit-current-tree.md)
 Finding: `4. Medium: thread-status polling drops a successful summary refresh if selected-thread detail fetch fails`
 

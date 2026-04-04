@@ -135,6 +135,8 @@
 │     ├─ startup-worktree-restore.ts
 │     ├─ thread-send.test.ts
 │     ├─ thread-send.ts
+│     ├─ thread-status-refresh.test.ts
+│     ├─ thread-status-refresh.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx

@@ -121,6 +121,7 @@ import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
+import { resolveThreadStatusRefreshOutcome } from "./thread-status-refresh";
 
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
@@ -2175,18 +2176,38 @@ export default function App({
       return;
     }
 
-    const detail = prepareOpenedThreadDetail(
-      await procedures.getThread({
-        threadId: selectedSummary.id,
-      }),
-    );
-    if (selectedThreadIdRef.current !== selectedSummary.id) {
-      setThreads(loadedThreads);
+    try {
+      const detail = prepareOpenedThreadDetail(
+        await procedures.getThread({
+          threadId: selectedSummary.id,
+        }),
+      );
+      const resolution = resolveThreadStatusRefreshOutcome({
+        detail,
+        loadedThreads,
+        selectedSummaryThreadId: selectedSummary.id,
+        selectedThreadId: selectedThreadIdRef.current,
+      });
+      setThreads(resolution.nextThreads);
+      if (!resolution.shouldApplySelectedDetail) {
+        return;
+      }
+      selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+      setThreadMessages(detail.messages);
+    } catch (error) {
+      const resolution = resolveThreadStatusRefreshOutcome({
+        detail: null,
+        loadedThreads,
+        selectedSummaryThreadId: selectedSummary.id,
+        selectedThreadId: selectedThreadIdRef.current,
+      });
+      setThreads(resolution.nextThreads);
+      console.error(
+        `Failed to refresh selected thread detail for ${selectedSummary.id}`,
+        error,
+      );
       return;
     }
-    selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-    setThreads(upsertThreadList(loadedThreads, detail.thread));
-    setThreadMessages(detail.messages);
   }, [
     applyOptimisticThreadErrorSeenToList,
     prepareOpenedThreadDetail,
