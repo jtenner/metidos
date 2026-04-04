@@ -278,6 +278,7 @@ export const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
 export const COMPOSER_MAX_HEIGHT_PX = 240;
 export const MAINVIEW_STATE_STORAGE_KEY = "jolt:mainview-state";
 export const MAINVIEW_STATE_STORAGE_VERSION = 1;
+export const MAINVIEW_STATE_WRITE_DEBOUNCE_MS = 160;
 export const TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
 export const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 export const APP_TITLE = "Jolt";

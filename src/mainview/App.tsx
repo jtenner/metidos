@@ -60,6 +60,7 @@ import {
   isAbortError,
   isCodexReasoningEffort,
   MAINVIEW_STATE_STORAGE_VERSION,
+  MAINVIEW_STATE_WRITE_DEBOUNCE_MS,
   mergeResetGitHistory,
   type OpenThreadOptions,
   type PendingSharedRequest,
@@ -447,6 +448,9 @@ export default function App({
   const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryRequestIdRef = useRef(0);
   const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
+  const persistedMainviewStateWriteTimeoutRef = useRef<number | null>(null);
+  const pendingPersistedMainviewStateRef =
+    useRef<PersistedMainviewState | null>(null);
 
   const closeStepUpDialog = useCallback((authorized: boolean) => {
     setStepUpDialogOpen(false);
@@ -458,6 +462,29 @@ export default function App({
     stepUpRequestResolveRef.current = null;
     resolveStepUp?.(authorized);
   }, []);
+  const flushPersistedMainviewStateWrite = useCallback((): void => {
+    if (persistedMainviewStateWriteTimeoutRef.current !== null) {
+      window.clearTimeout(persistedMainviewStateWriteTimeoutRef.current);
+      persistedMainviewStateWriteTimeoutRef.current = null;
+    }
+    if (pendingPersistedMainviewStateRef.current === null) {
+      return;
+    }
+    writePersistedMainviewState(pendingPersistedMainviewStateRef.current);
+    pendingPersistedMainviewStateRef.current = null;
+  }, []);
+  const schedulePersistedMainviewStateWrite = useCallback(
+    (nextState: PersistedMainviewState): void => {
+      pendingPersistedMainviewStateRef.current = nextState;
+      if (persistedMainviewStateWriteTimeoutRef.current !== null) {
+        window.clearTimeout(persistedMainviewStateWriteTimeoutRef.current);
+      }
+      persistedMainviewStateWriteTimeoutRef.current = window.setTimeout(() => {
+        flushPersistedMainviewStateWrite();
+      }, MAINVIEW_STATE_WRITE_DEBOUNCE_MS);
+    },
+    [flushPersistedMainviewStateWrite],
+  );
 
   const requestStepUp = useCallback((actionLabel: string): Promise<boolean> => {
     setStepUpActionLabel(actionLabel);
@@ -3391,12 +3418,12 @@ export default function App({
     };
   }, [activePollingProjectId, activePollingWorktreePath, procedures]);
 
-  useEffect(() => {
+  const persistedMainviewState = useMemo<PersistedMainviewState | null>(() => {
     if (!sessionStateReady) {
-      return;
+      return null;
     }
 
-    writePersistedMainviewState({
+    return {
       version: MAINVIEW_STATE_STORAGE_VERSION,
       selectedProjectId,
       selectedWorktreePath,
@@ -3405,10 +3432,10 @@ export default function App({
       pendingThreadReasoningEffort,
       pendingThreadUnsafeMode: false,
       chatInput: "",
-      sidebarCollapsed: sidebarCollapsedRef.current,
+      sidebarCollapsed,
       sidebarSearchQuery,
       openWorktrees: serializeOpenWorktrees(projectStates),
-    });
+    };
   }, [
     pendingThreadModel,
     pendingThreadReasoningEffort,
@@ -3417,8 +3444,43 @@ export default function App({
     selectedThreadId,
     selectedWorktreePath,
     sessionStateReady,
+    sidebarCollapsed,
     sidebarSearchQuery,
   ]);
+
+  useEffect(() => {
+    if (persistedMainviewState === null) {
+      return;
+    }
+
+    schedulePersistedMainviewStateWrite(persistedMainviewState);
+  }, [persistedMainviewState, schedulePersistedMainviewStateWrite]);
+
+  useEffect(() => {
+    if (!sessionStateReady) {
+      return;
+    }
+
+    const flushPendingPersistedState = (): void => {
+      flushPersistedMainviewStateWrite();
+    };
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState !== "visible") {
+        flushPersistedMainviewStateWrite();
+      }
+    };
+
+    window.addEventListener("beforeunload", flushPendingPersistedState);
+    window.addEventListener("pagehide", flushPendingPersistedState);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", flushPendingPersistedState);
+      window.removeEventListener("pagehide", flushPendingPersistedState);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      flushPersistedMainviewStateWrite();
+    };
+  }, [flushPersistedMainviewStateWrite, sessionStateReady]);
 
   useEffect(() => {
     if (selectedThread?.model) {

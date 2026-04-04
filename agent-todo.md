@@ -116,7 +116,7 @@ Done when:
 
 ### Slice P0.6: Debounce persisted UI-state writes
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Persisted mainview state writes happen eagerly as selection/open-worktree state changes.
