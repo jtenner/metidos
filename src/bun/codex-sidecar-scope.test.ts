@@ -34,7 +34,6 @@ describe("codex sidecar scope helpers", () => {
   it("allows in-scope project and worktree targets without override", () => {
     expect(() =>
       enforceTargetScope({
-        allowCrossProject: false,
         projectIdContext: 7,
         targetProjectId: 7,
         targetWorktreePath: "/repo/worktree",
@@ -43,17 +42,19 @@ describe("codex sidecar scope helpers", () => {
     ).not.toThrow();
   });
 
-  it("rejects cross-project targets without explicit override", () => {
+  it("rejects cross-project targets from a bound sidecar project", () => {
     expect(() =>
       enforceTargetScope({
         projectIdContext: 7,
         targetProjectId: 9,
         targetWorktreePath: "/repo/worktree",
       }),
-    ).toThrow("Cross-project access requires allowCrossProject=true.");
+    ).toThrow(
+      "Cross-project access is not allowed from bound sidecar project 7.",
+    );
   });
 
-  it("rejects cross-worktree targets without explicit override", () => {
+  it("rejects cross-worktree targets from a bound sidecar worktree", () => {
     expect(() =>
       enforceTargetScope({
         baseDirectory: "/repo",
@@ -62,17 +63,17 @@ describe("codex sidecar scope helpers", () => {
         targetWorktreePath: "/repo/feature-b",
         worktreePathContext: "/repo/feature-a",
       }),
-    ).toThrow("Cross-worktree access requires allowCrossProject=true.");
+    ).toThrow(
+      "Cross-worktree access is not allowed from bound sidecar worktree /repo/feature-a.",
+    );
   });
 
-  it("allows cross-scope targets when override is explicit", () => {
+  it("allows same-project targets when no worktree binding exists", () => {
     expect(() =>
       enforceTargetScope({
-        allowCrossProject: true,
         projectIdContext: 7,
-        targetProjectId: 9,
+        targetProjectId: 7,
         targetWorktreePath: "/repo/feature-b",
-        worktreePathContext: "/repo/feature-a",
       }),
     ).not.toThrow();
   });

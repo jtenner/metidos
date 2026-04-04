@@ -423,7 +423,6 @@ async function resolveProjectIdForWorktreePath(
  * Resolve worktree target used by thread operations, using explicit args or context.
  */
 async function resolveWorktreeTarget(params?: {
-  allowCrossProject?: boolean;
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
   worktreePath?: string | null | undefined;
@@ -749,7 +748,7 @@ server.registerTool(
   {
     title: "New Thread",
     description:
-      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree. Set autoStart to true to ask the UI for permission before creating the thread; if unsafeMode is true, the thread starts immediately instead of waiting for a popup.",
+      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree. Bound sidecar sessions cannot escape their current project or worktree. Set autoStart to true to ask the UI for permission before creating the thread; if unsafeMode is true, the thread starts immediately instead of waiting for a popup.",
     inputSchema: {
       input: z.string().trim().min(1).describe("Initial prompt."),
       projectId: z
@@ -795,12 +794,6 @@ server.registerTool(
         .optional()
         .describe(
           "When true, request permission in the UI before creating the thread. If unsafeMode is true, the thread starts immediately. Omit for null metadata.",
-        ),
-      allowCrossProject: z
-        .boolean()
-        .optional()
-        .describe(
-          "Deprecated and ignored. Bound sidecar contexts cannot cross project or worktree boundaries.",
         ),
     },
     annotations: {

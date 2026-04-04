@@ -28,14 +28,17 @@
 - Description: Rework the collapse flow so local close state is committed only after `closeProject(...)` succeeds, or is restored if the RPC fails. Do not silently ignore backend close failures once local state has already been mutated.
 - Source: [Finding 3](docs/2026-04-04-correctness-audit.md#3-medium-project-collapseclose-can-leave-local-and-backend-lifecycle-state-out-of-sync)
 
-### Slice 5
-
-- Title: Reconcile the sidecar scope contract and restore a green test suite
-- Description: Make `codex-sidecar-scope.ts`, `codex-sidecar-scope.test.ts`, and the `new_thread` MCP schema agree about whether `allowCrossProject` still has meaning. The likely end state is strict enforcement with updated tests and cleaned-up obsolete affordance language.
-- Source: [Finding 4](docs/2026-04-04-correctness-audit.md#4-medium-sidecar-scope-contract-is-internally-inconsistent-and-keeps-the-test-suite-red)
-
 ### Slice 6
 
 - Title: Add automatic recovery for initial authenticated RPC boot
 - Description: Give the first authenticated `connectRpcTransport()` path a bounded retry/recovery strategy so transient websocket or ticket failures do not strand the app in the auth shell with only a manual retry path.
 - Source: [Finding 5](docs/2026-04-04-correctness-audit.md#5-low-initial-authenticated-rpc-boot-has-no-automatic-recovery-path-on-first-connect-failure)
+
+## Recently Completed
+
+### Slice 5
+
+- Title: Reconcile the sidecar scope contract and restore a green test suite
+- Completed: 2026-04-04
+- Outcome: Removed the dead `allowCrossProject` affordance from the sidecar schema/helpers, aligned the scope tests with the now-strict bound-project and bound-worktree contract, and restored a clean `bun test` run.
+- Source: [Finding 4](docs/2026-04-04-correctness-audit.md#4-medium-sidecar-scope-contract-is-internally-inconsistent-and-keeps-the-test-suite-red)

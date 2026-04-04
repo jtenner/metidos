@@ -109,7 +109,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `codex-sidecar-scope.ts`
   - Provides the scope-enforcement helpers used by the MCP sidecar.
-  - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes unless an explicit override is supplied.
+  - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes.
 
 - `auth.ts`
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.

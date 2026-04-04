@@ -6,7 +6,6 @@ type CanonicalizePathOptions = {
 };
 
 type SidecarScopeOptions = CanonicalizePathOptions & {
-  allowCrossProject?: boolean;
   projectIdContext?: number | null;
   targetProjectId: number;
   targetWorktreePath: string;
