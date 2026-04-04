@@ -173,6 +173,14 @@ bun run harness:starvation    # run starvation harness utility
 
 ### Nginx TLS helper
 
+Run it directly and it will auto-derive from existing nginx config, with no prompts:
+
+```bash
+./scripts/fix-jolt-nginx-tls.sh
+```
+
+Or run with explicit arguments if you want full control:
+
 ```bash
 ./scripts/fix-jolt-nginx-tls.sh \
   --site-file /etc/nginx/sites-available/<your-site> \
