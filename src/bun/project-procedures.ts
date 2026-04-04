@@ -379,6 +379,7 @@ const WORKTREE_OPEN_CONCURRENCY = 2;
 const GIT_HISTORY_READ_CONCURRENCY = 2;
 const TASK_CACHE_REFRESH_CONCURRENCY = 1;
 const DIFF_LOAD_CONCURRENCY = 2;
+const WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS = 30_000;
 
 /**
  * Per-worktree command options, including an explicit refresh override.
@@ -406,6 +407,7 @@ type WorktreePollState = {
   taskWatchers: FSWatcher[];
   taskRefreshPromise: Promise<RpcProjectTask[]> | null;
   taskRefreshQueued: boolean;
+  taskCacheRefreshedAt: number;
   lastUpdatedAt: string;
 };
 
@@ -462,6 +464,14 @@ let worktreeGitHistoryChangeListener:
 
 function hasForegroundReadPressure(): boolean {
   return foregroundReadCount > 0;
+}
+
+function shouldRefreshWorktreeTaskCache(state: WorktreePollState): boolean {
+  return (
+    state.taskCacheRefreshedAt === 0 ||
+    Date.now() - state.taskCacheRefreshedAt >=
+      WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS
+  );
 }
 
 function flushDeferredBackgroundWork(): void {
@@ -1890,6 +1900,7 @@ function createWorktreePollState(
     taskWatchers: [],
     taskRefreshPromise: null,
     taskRefreshQueued: false,
+    taskCacheRefreshedAt: 0,
     lastUpdatedAt,
   };
 }
@@ -2000,6 +2011,7 @@ async function refreshWorktreeTaskCache(
     );
     worktreeState.taskWatchTargets = taskWatchTargets;
     worktreeState.tasks = tasks;
+    worktreeState.taskCacheRefreshedAt = Date.now();
     worktreeState.lastUpdatedAt = getNow();
 
     if (hadTaskWatchers || options?.startWatching === true) {
@@ -2450,7 +2462,22 @@ export async function listProjectTasksProcedure(
       requestGitOptions,
     );
     const worktreeState = ensureWorktreePollState(projectState, worktreePath);
-    if (worktreeState.tasks !== null) {
+    const shouldRefresh = shouldRefreshWorktreeTaskCache(worktreeState);
+    if (worktreeState.tasks !== null && !shouldRefresh) {
+      startWorktreeTaskPolling(projectState, worktreePath);
+      return worktreeState.tasks;
+    }
+
+    if (worktreeState.tasks !== null && shouldRefresh) {
+      void refreshWorktreeTaskCache(projectState, worktreePath, {
+        notify: true,
+        startWatching: true,
+      }).catch((error) => {
+        logBackgroundTaskFailure(
+          `Task cache refresh failed for ${worktreePath}`,
+          error,
+        );
+      });
       startWorktreeTaskPolling(projectState, worktreePath);
       return worktreeState.tasks;
     }
@@ -3168,20 +3195,27 @@ async function openWorktreeWithGitOptions(
   const worktreePath = normalizePath(params.worktreePath);
   await ensureTrackedProjectWorktree(project, state, worktreePath, {
     ...requestGitOptions,
-    forceRefresh: true,
   });
 
   const worktreeState = ensureWorktreePollState(state, worktreePath);
-  const tasksPromise = refreshWorktreeTaskCache(state, worktreePath, {
-    startWatching: true,
-  }).catch((error) => {
-    logBackgroundTaskFailure(
-      `Task cache warm failed for ${worktreePath}`,
-      error,
+  const tasks = worktreeState.tasks ?? [];
+  if (shouldRefreshWorktreeTaskCache(worktreeState)) {
+    queueBackgroundWorkWhenIdle(
+      `task-cache-refresh:${project.id}:${worktreePath}`,
+      () => {
+        void refreshWorktreeTaskCache(state, worktreePath, {
+          notify: true,
+          startWatching: false,
+        }).catch((error) => {
+          logBackgroundTaskFailure(
+            `Task cache warm failed for ${worktreePath}`,
+            error,
+          );
+        });
+      },
     );
-    return worktreeState.tasks ?? [];
-  });
-  const [{ history, summary, signature }, snapshot, tasks] =
+  }
+  const [{ history, summary, signature }, snapshot] =
     await runWorktreeOpenLimited(
       () =>
         Promise.all([
@@ -3192,7 +3226,6 @@ async function openWorktreeWithGitOptions(
             requestGitOptions,
           ),
           readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions),
-          tasksPromise,
         ]),
       signal,
     );
@@ -3264,7 +3297,6 @@ export async function getWorktreeSnapshotProcedure(
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
-      forceRefresh: true,
     });
 
     return runWorktreeOpenLimited(
@@ -3286,7 +3318,6 @@ export async function readWorktreeFileContentPageProcedure(
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
-      forceRefresh: true,
     });
 
     const page = await readWorktreeFileContentPage(worktreePath, params.path, {
@@ -3316,7 +3347,6 @@ export async function readWorktreeFileDiffProcedure(
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
-      forceRefresh: true,
     });
 
     const diffText = await runDiffLoadLimited(
