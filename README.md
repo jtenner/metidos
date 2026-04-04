@@ -98,6 +98,8 @@ flowchart TD
 1. **Startup**
    - `bun run src/bun/index.ts` (or `bun run start:monolith`) boots the server.
    - `bun run start:tls` starts the isolated server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
+     By default that means public HTTP on `127.0.0.1:7599` and the RPC backend on `127.0.0.1:7600`, so a reverse proxy must send `/rpc` to the backend port instead of reusing the static-server upstream.
+     If you want one upstream for both `/` and `/rpc`, run the monolith entrypoint with `--tls` instead.
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets (`index.html`, css, fonts)
      - `ws://.../rpc` on loopback, with `wss://.../rpc` expected only through a TLS-terminating reverse proxy

@@ -1,12 +1,17 @@
 const LOOPBACK_BROWSER_HOSTS = ["127.0.0.1", "localhost"] as const;
 const LOCAL_APP_PROTOCOLS = ["http:", "https:"] as const;
 const RUNTIME_CONFIG_SCRIPT_TYPE = "application/json";
+const DEFAULT_BROWSER_PORT_BY_PROTOCOL = {
+  "http:": 80,
+  "https:": 443,
+} as const;
 
 /**
  * Canonical loopback bind target for local-only Bun listeners.
  */
 export const LOOPBACK_HOSTNAME = "127.0.0.1";
 export const RUNTIME_CONFIG_ELEMENT_ID = "jolt-runtime-config";
+export type BrowserOriginProtocol = (typeof LOCAL_APP_PROTOCOLS)[number];
 
 export type InjectedRuntimeConfig = {
   devServer: boolean;
@@ -14,6 +19,18 @@ export type InjectedRuntimeConfig = {
   preferTls?: boolean;
   rpcWebSocketUrl?: string;
 };
+
+function formatBrowserOrigin(
+  protocol: BrowserOriginProtocol,
+  host: (typeof LOOPBACK_BROWSER_HOSTS)[number],
+  port: number,
+): string {
+  const url = new URL(`${protocol}//${host}`);
+  if (port !== DEFAULT_BROWSER_PORT_BY_PROTOCOL[protocol]) {
+    url.port = String(port);
+  }
+  return url.origin;
+}
 
 /**
  * Normalize a browser origin for exact allowlist comparison.
@@ -39,9 +56,15 @@ function normalizeBrowserOrigin(origin: string): string | null {
 /**
  * Build the default browser origins that may legitimately connect to a local port.
  */
-export function buildLoopbackBrowserOrigins(port: number): string[] {
+export function buildLoopbackBrowserOrigins(
+  port: number,
+  options?: {
+    protocols?: readonly BrowserOriginProtocol[];
+  },
+): string[] {
+  const protocols = options?.protocols ?? LOCAL_APP_PROTOCOLS;
   return LOOPBACK_BROWSER_HOSTS.flatMap((host) =>
-    LOCAL_APP_PROTOCOLS.map((protocol) => `${protocol}//${host}:${port}`),
+    protocols.map((protocol) => formatBrowserOrigin(protocol, host, port)),
   );
 }
 
@@ -86,7 +109,13 @@ export function isWebSocketOriginAllowed(
     return false;
   }
 
-  const allowed = new Set(allowedOrigins);
+  const allowed = new Set<string>();
+  for (const entry of allowedOrigins) {
+    const normalizedEntry = normalizeBrowserOrigin(entry);
+    if (normalizedEntry) {
+      allowed.add(normalizedEntry);
+    }
+  }
   return allowed.has(normalizedOrigin);
 }
 

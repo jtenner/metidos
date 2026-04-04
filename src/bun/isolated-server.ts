@@ -1,6 +1,10 @@
 import { resolve } from "node:path";
 
 import {
+  buildLoopbackBrowserOrigins,
+  parseAllowedBrowserOrigins,
+} from "./server-security";
+import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
   isPublicTlsEnabled,
@@ -138,6 +142,10 @@ const staticEntry = resolve(process.cwd(), "src/bun/static-server.ts");
  */
 const rpcWebSocketUrl = formatLoopbackWebSocketUrl(RPC_PORT, false);
 const rpcHttpOrigin = formatLoopbackHttpOrigin(RPC_PORT, false);
+const allowedBrowserOrigins = new Set<string>([
+  ...parseAllowedBrowserOrigins(process.env.JOLT_ALLOWED_WS_ORIGINS),
+  ...buildLoopbackBrowserOrigins(PUBLIC_PORT),
+]);
 
 /**
  * Launch the API/backend process first; it becomes the RPC service dependency
@@ -147,12 +155,7 @@ const backend = spawnRole(
   "backend",
   [backendEntry, "--backend-only", "--port", String(RPC_PORT)],
   {
-    JOLT_ALLOWED_WS_ORIGINS: [
-      `http://127.0.0.1:${PUBLIC_PORT}`,
-      `https://127.0.0.1:${PUBLIC_PORT}`,
-      `http://localhost:${PUBLIC_PORT}`,
-      `https://localhost:${PUBLIC_PORT}`,
-    ].join(","),
+    JOLT_ALLOWED_WS_ORIGINS: [...allowedBrowserOrigins].join(","),
     JOLT_BACKEND_ONLY: "1",
     JOLT_DEV: IS_DEV_SERVER ? "1" : process.env.JOLT_DEV || "",
     JOLT_PORT: String(RPC_PORT),

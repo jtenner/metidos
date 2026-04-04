@@ -132,6 +132,8 @@ const SERVER_OVERLOAD_LOG_INTERVAL_MS = 10_000;
 const EVENT_LOOP_LAG_WARN_MS = 150;
 const PENDING_RPC_WARN_COUNT = 8;
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+const DEFAULT_HTTP_PROXY_PORT = 80;
+const DEFAULT_HTTPS_PROXY_PORT = 443;
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -1621,6 +1623,12 @@ async function bootstrap(): Promise<void> {
       if (pathname === "/rpc") {
         const allowedOrigins = new Set([
           ...buildLoopbackBrowserOrigins(activeServerPort),
+          ...buildLoopbackBrowserOrigins(DEFAULT_HTTP_PROXY_PORT, {
+            protocols: ["http:"],
+          }),
+          ...buildLoopbackBrowserOrigins(DEFAULT_HTTPS_PROXY_PORT, {
+            protocols: ["https:"],
+          }),
           ...CONFIGURED_ALLOWED_WS_ORIGINS,
         ]);
         if (

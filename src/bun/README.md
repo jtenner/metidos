@@ -147,3 +147,4 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
 - Bun listeners stay on loopback HTTP/WS. Use `--tls` or `JOLT_TLS=1` only when an upstream reverse proxy is terminating TLS for browser traffic.
+- Default reverse-proxy loopback origins on `http://localhost`, `https://localhost`, `http://127.0.0.1`, and `https://127.0.0.1` are accepted automatically; set `JOLT_ALLOWED_WS_ORIGINS` to add any non-default browser-facing origin or port.

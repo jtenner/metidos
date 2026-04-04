@@ -21,6 +21,19 @@ describe("server security helpers", () => {
     ]);
   });
 
+  it("canonicalizes default browser ports when building loopback origins", () => {
+    expect(
+      buildLoopbackBrowserOrigins(443, {
+        protocols: ["https:"],
+      }),
+    ).toEqual(["https://127.0.0.1", "https://localhost"]);
+    expect(
+      buildLoopbackBrowserOrigins(80, {
+        protocols: ["http:"],
+      }),
+    ).toEqual(["http://127.0.0.1", "http://localhost"]);
+  });
+
   it("parses and normalizes configured origins", () => {
     expect(
       parseAllowedBrowserOrigins(
@@ -47,6 +60,12 @@ describe("server security helpers", () => {
         "https://localhost:7599",
         buildLoopbackBrowserOrigins(7599),
       ),
+    ).toBeTrue();
+  });
+
+  it("normalizes allowlisted browser origins before comparison", () => {
+    expect(
+      isWebSocketOriginAllowed("https://localhost", ["https://localhost:443"]),
     ).toBeTrue();
   });
 
