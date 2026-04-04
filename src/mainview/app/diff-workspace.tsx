@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { type JSX, useMemo } from "react";
 import type { RpcProject, RpcWorktreeChange } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import { DiffViewer } from "./message-ui";
@@ -259,7 +259,10 @@ export function DiffWorkspace({
 }: DiffWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
   // Recompute additions/deletions/hunk counts from current patch text only when needed.
-  const diffStats = summarizeDiffText(diffFilePatchState.diffText);
+  const diffStats = useMemo(
+    () => summarizeDiffText(diffFilePatchState.diffText),
+    [diffFilePatchState.diffText],
+  );
 
   // Left panel renders a single fallback/content state using ordered branches.
   const selectorContent =

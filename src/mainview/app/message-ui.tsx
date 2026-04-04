@@ -1,4 +1,4 @@
-import { type CSSProperties, type JSX, useState } from "react";
+import { type CSSProperties, type JSX, useMemo, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { BeatLoader } from "react-spinners";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -294,7 +294,7 @@ export function DiffViewer({
   diffText: string;
   viewportClassName?: string;
 }): JSX.Element {
-  const lines = parseUnifiedDiff(diffText);
+  const lines = useMemo(() => parseUnifiedDiff(diffText), [diffText]);
   if (lines.length === 0) {
     return (
       <div className="border border-[#252f36] bg-[#111518] px-3 py-3 text-xs text-[#7f8c95]">

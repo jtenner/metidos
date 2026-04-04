@@ -44,7 +44,7 @@ Done when:
 
 ### Slice P0.2: Memoize diff stats and parsed diff lines
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Diff stats and unified-diff line parsing are recalculated on every render for the same `diffText`.
