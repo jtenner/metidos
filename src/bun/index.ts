@@ -447,9 +447,20 @@ function currentNowMs(): number {
 }
 
 class RequestValidationError extends Error {
-  constructor(message: string) {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(
+    message: string,
+    options?: {
+      code?: string;
+      status?: number;
+    },
+  ) {
     super(message);
     this.name = "RequestValidationError";
+    this.code = options?.code ?? "invalid_request";
+    this.status = options?.status ?? 400;
   }
 }
 
@@ -469,6 +480,94 @@ function isSecureRequest(request: Request): boolean {
     return true;
   }
   return new URL(request.url).protocol === "https:";
+}
+
+function normalizeAuthRouteOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+    if (url.username || url.password) {
+      return null;
+    }
+    if (url.pathname !== "/" || url.search || url.hash) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolveExpectedAuthRouteOrigin(request: Request): string | null {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  if (
+    forwardedHost &&
+    (forwardedProto === "http" || forwardedProto === "https")
+  ) {
+    return normalizeAuthRouteOrigin(`${forwardedProto}://${forwardedHost}`);
+  }
+
+  return normalizeAuthRouteOrigin(new URL(request.url).origin);
+}
+
+function requireJsonAuthRequest(request: Request): void {
+  const contentType = request.headers
+    .get("content-type")
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
+  if (contentType !== "application/json") {
+    throw new RequestValidationError(
+      'Auth requests must use "Content-Type: application/json".',
+      {
+        code: "invalid_content_type",
+        status: 415,
+      },
+    );
+  }
+}
+
+function enforceAuthMutationRequestSecurity(request: Request): void {
+  requireJsonAuthRequest(request);
+
+  const fetchSite = request.headers.get("sec-fetch-site")?.trim().toLowerCase();
+  if (fetchSite === "cross-site") {
+    throw new RequestValidationError(
+      "Cross-site auth requests are not allowed.",
+      {
+        code: "origin_not_allowed",
+        status: 403,
+      },
+    );
+  }
+
+  const originHeader = request.headers.get("origin");
+  if (!originHeader) {
+    return;
+  }
+
+  const normalizedOrigin = normalizeAuthRouteOrigin(originHeader.trim());
+  const expectedOrigin = resolveExpectedAuthRouteOrigin(request);
+  if (
+    !normalizedOrigin ||
+    !expectedOrigin ||
+    normalizedOrigin !== expectedOrigin
+  ) {
+    throw new RequestValidationError("Auth request origin not allowed.", {
+      code: "origin_not_allowed",
+      status: 403,
+    });
+  }
 }
 
 function sessionCookieMaxAgeSeconds(expiresAt: string, nowMs: number): number {
@@ -604,13 +703,13 @@ function authErrorResponse(
     return jsonResponse(
       {
         error: {
-          code: "invalid_request",
+          code: error.code,
           details: null,
           message: error.message,
         },
         ok: false,
       },
-      400,
+      error.status,
       headers,
     );
   }
@@ -649,6 +748,10 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     });
 
   try {
+    if (request.method === "POST") {
+      enforceAuthMutationRequestSecurity(request);
+    }
+
     if (pathname === "/auth/status" && request.method === "GET") {
       const status = getCurrentAuthStatus();
       return jsonResponse(

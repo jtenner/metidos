@@ -718,7 +718,7 @@ function codexThreadOptions(
     approvalPolicy: "never" as const,
     model,
     modelReasoningEffort: reasoningEffort,
-    networkAccessEnabled: true,
+    networkAccessEnabled: unsafeMode,
     sandboxMode: unsafeMode
       ? ("danger-full-access" as const)
       : ("workspace-write" as const),

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { readdir, readFile, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
@@ -24,6 +24,43 @@ function tasksDirectoryPath(worktreePath: string): string {
  */
 function normalizeRelativeTaskPath(taskPath: string): string {
   return taskPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
+  const relativePath = relative(rootPath, candidatePath);
+  if (!relativePath) {
+    return false;
+  }
+
+  return (
+    relativePath === ".." ||
+    relativePath.split(/[\\/]/).includes("..") ||
+    isAbsolute(relativePath)
+  );
+}
+
+async function safeRealPathInsideRootAsync(
+  rootRealPath: string,
+  candidatePath: string,
+): Promise<boolean> {
+  try {
+    const realCandidatePath = await realpath(candidatePath);
+    return !pathEscapesRoot(rootRealPath, realCandidatePath);
+  } catch {
+    return false;
+  }
+}
+
+function assertRealPathInsideRoot(
+  rootPath: string,
+  candidatePath: string,
+  errorMessage: string,
+): void {
+  const realRootPath = realpathSync(rootPath);
+  const realCandidatePath = realpathSync(candidatePath);
+  if (pathEscapesRoot(realRootPath, realCandidatePath)) {
+    throw new Error(errorMessage);
+  }
 }
 
 /**
@@ -212,6 +249,9 @@ async function listProjectTaskFilesAsync(
     if (!(await isFileCandidate(entry, fullPath))) {
       continue;
     }
+    if (!(await safeRealPathInsideRootAsync(resolvedRootRealPath, fullPath))) {
+      continue;
+    }
     tasks.push({
       id: `file:${relativePath.replace(/\\/g, "/")}`,
       kind: "file",
@@ -256,7 +296,8 @@ async function listPackageJsonTasksAsync(
   const packageJsonPath = resolve(currentDirectory, "package.json");
   if (
     entries.some((entry) => entry.name === "package.json") &&
-    (await safeIsFileAsync(packageJsonPath))
+    (await safeIsFileAsync(packageJsonPath)) &&
+    (await safeRealPathInsideRootAsync(resolvedRootRealPath, packageJsonPath))
   ) {
     try {
       const parsed = JSON.parse(
@@ -471,8 +512,18 @@ function sortProjectTasks(tasks: RpcProjectTask[]): RpcProjectTask[] {
 export async function readProjectTasksFromDisk(
   worktreePath: string,
 ): Promise<RpcProjectTask[]> {
+  const worktreeRealPath = await safeDirectoryRealPathAsync(worktreePath);
+  const tasksDirectory = tasksDirectoryPath(worktreePath);
+  const tasksRealPath = await safeDirectoryRealPathAsync(tasksDirectory);
+  const fileTasks =
+    worktreeRealPath &&
+    tasksRealPath &&
+    !pathEscapesRoot(worktreeRealPath, tasksRealPath)
+      ? await listProjectTaskFilesAsync(tasksDirectory)
+      : [];
+
   return sortProjectTasks([
-    ...(await listProjectTaskFilesAsync(tasksDirectoryPath(worktreePath))),
+    ...fileTasks,
     ...(await listPackageJsonTasksAsync(worktreePath)),
   ]);
 }
@@ -493,6 +544,11 @@ export function resolveProjectTaskFilePath(
   if (!safeIsDirectory(tasksDirectory)) {
     throw new Error(`No .tasks directory found in ${worktreePath}.`);
   }
+  assertRealPathInsideRoot(
+    worktreePath,
+    tasksDirectory,
+    `Task path must stay within ${tasksDirectory}.`,
+  );
 
   const fullPath = resolve(tasksDirectory, normalizedTaskPath);
   const relativePath = relative(tasksDirectory, fullPath);
@@ -507,6 +563,11 @@ export function resolveProjectTaskFilePath(
   if (!safeIsFile(fullPath)) {
     throw new Error(`Task not found: ${normalizedTaskPath}`);
   }
+  assertRealPathInsideRoot(
+    tasksDirectory,
+    fullPath,
+    `Task path must stay within ${tasksDirectory}.`,
+  );
 
   return fullPath;
 }
@@ -544,6 +605,11 @@ export function resolvePackageJsonTask(
   if (!safeIsFile(packageJsonPath)) {
     throw new Error(`package.json not found: ${normalizedPackageJsonPath}`);
   }
+  assertRealPathInsideRoot(
+    worktreePath,
+    packageJsonPath,
+    `Package task path must stay within ${worktreePath}.`,
+  );
 
   let parsed: Partial<{ scripts: Record<string, unknown> }>;
   try {

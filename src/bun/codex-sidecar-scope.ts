@@ -54,16 +54,12 @@ export function enforceBoundThreadScope(
 }
 
 export function enforceTargetScope(options: SidecarScopeOptions): void {
-  if (options.allowCrossProject) {
-    return;
-  }
-
   if (
     typeof options.projectIdContext === "number" &&
     options.targetProjectId !== options.projectIdContext
   ) {
     throw new Error(
-      `Cross-project access requires allowCrossProject=true. Bound project: ${options.projectIdContext}.`,
+      `Cross-project access is not allowed from bound sidecar project ${options.projectIdContext}.`,
     );
   }
 
@@ -87,7 +83,7 @@ export function enforceTargetScope(options: SidecarScopeOptions): void {
     )
   ) {
     throw new Error(
-      `Cross-worktree access requires allowCrossProject=true. Bound worktree: ${options.worktreePathContext}.`,
+      `Cross-worktree access is not allowed from bound sidecar worktree ${options.worktreePathContext}.`,
     );
   }
 }

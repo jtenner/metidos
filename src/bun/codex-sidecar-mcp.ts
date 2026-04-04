@@ -454,11 +454,6 @@ async function resolveWorktreeTarget(params?: {
       targetProjectId: target.projectId,
       targetWorktreePath: target.worktreePath,
       worktreePathContext,
-      ...(params.allowCrossProject === true
-        ? {
-            allowCrossProject: true,
-          }
-        : {}),
     });
     return target;
   }
@@ -805,7 +800,7 @@ server.registerTool(
         .boolean()
         .optional()
         .describe(
-          "Required when intentionally targeting a different bound project or worktree than the current sidecar context.",
+          "Deprecated and ignored. Bound sidecar contexts cannot cross project or worktree boundaries.",
         ),
     },
     annotations: {
@@ -815,7 +810,6 @@ server.registerTool(
     },
   },
   async ({
-    allowCrossProject,
     autoStart,
     input,
     model,
@@ -829,11 +823,6 @@ server.registerTool(
       projectId,
       projectPath,
       worktreePath,
-      ...(allowCrossProject === true
-        ? {
-            allowCrossProject: true,
-          }
-        : {}),
     });
     const metadata = {
       input,
