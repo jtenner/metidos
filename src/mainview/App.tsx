@@ -165,6 +165,112 @@ function mergeThreadMessageHistory(
   );
 }
 
+type VisibleMessageCacheEntry = {
+  signature: string;
+  value: VisibleMessage;
+};
+
+function readCachedVisibleMessage(
+  cache: Map<string, VisibleMessageCacheEntry>,
+  cacheKey: string,
+  signature: string,
+  createValue: () => VisibleMessage,
+): VisibleMessage {
+  const existing = cache.get(cacheKey);
+  if (existing && existing.signature === signature) {
+    return existing.value;
+  }
+
+  const nextValue = createValue();
+  cache.set(cacheKey, {
+    signature,
+    value: nextValue,
+  });
+  return nextValue;
+}
+
+function threadMessageVisibleSignature(message: RpcThreadMessage): string {
+  switch (message.kind) {
+    case "reasoning":
+      return `reasoning:${message.state}:${message.text}`;
+    case "command":
+      return `command:${message.state}:${message.exitCode ?? "null"}:${message.command}:${message.output}`;
+    case "file_change":
+      return `file_change:${message.state}:${message.changeKind}:${message.path}:${message.diffText}`;
+    case "tool_call":
+      return `tool_call:${message.state}:${message.server}:${message.tool}:${message.argumentsText}:${message.output}`;
+    case "web_search":
+      return `web_search:${message.state}:${message.query}`;
+    case "error":
+      return `error:${message.state}:${message.text}`;
+    case "chat":
+      return `chat:${message.state}:${message.role}:${message.text}`;
+  }
+}
+
+function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
+  const key = `thread-message:${message.id}`;
+  switch (message.kind) {
+    case "reasoning":
+      return {
+        key,
+        kind: "reasoning",
+        text: message.text,
+        state: message.state,
+      };
+    case "command":
+      return {
+        key,
+        kind: "command",
+        command: message.command,
+        output: message.output,
+        state: message.state,
+        exitCode: message.exitCode,
+      };
+    case "file_change":
+      return {
+        key,
+        kind: "file_change",
+        path: message.path,
+        diffText: message.diffText,
+        changeKind: message.changeKind,
+        state: message.state,
+      };
+    case "tool_call":
+      return {
+        key,
+        kind: "tool_call",
+        server: message.server,
+        tool: message.tool,
+        argumentsText: message.argumentsText,
+        output: message.output,
+        state: message.state,
+      };
+    case "web_search":
+      return {
+        key,
+        kind: "web_search",
+        query: message.query,
+        state: message.state,
+      };
+    case "error":
+      return {
+        key,
+        kind: "error",
+        text: message.text,
+        state: message.state,
+      };
+    case "chat":
+      return {
+        key,
+        kind: "chat",
+        speaker: message.role,
+        tone: "normal",
+        text: message.text,
+      };
+  }
+}
+
 type AppProps = {
   primaryFactorType: AuthPrimaryFactorType | null;
   procedures: ProjectProcedures;
@@ -564,6 +670,11 @@ export default function App({
     };
   }, []);
 
+  useEffect(() => {
+    void selectedThreadId;
+    visibleMessageCacheRef.current.clear();
+  }, [selectedThreadId]);
+
   const gitHistoryDiffRequestIdRef = useRef(0);
   const gitHistoryDiffAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryDiffPreloadAbortControllerRef = useRef(
@@ -598,6 +709,9 @@ export default function App({
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const selectedThreadHistoryCursorRef = useRef<number | null>(null);
+  const visibleMessageCacheRef = useRef(
+    new Map<string, VisibleMessageCacheEntry>(),
+  );
   const previousSelectedThreadIdRef = useRef<number | null>(
     initialMainviewState.selectedThreadId,
   );
@@ -4563,6 +4677,7 @@ export default function App({
   );
 
   const visibleMessages = useMemo<VisibleMessage[]>(() => {
+    const visibleMessageCache = visibleMessageCacheRef.current;
     let messages: VisibleMessage[];
     const hasInProgressAssistantChat = threadMessages.some(
       (message) =>
@@ -4572,131 +4687,113 @@ export default function App({
     );
     if (isThreadLoading) {
       messages = [
-        {
-          key: `thread-loading:${selectedThreadId ?? "none"}`,
-          kind: "chat",
-          speaker: "assistant",
-          tone: "normal",
-          text: "Loading thread history...",
-        },
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-loading:${selectedThreadId ?? "none"}`,
+          "chat:normal:assistant:Loading thread history...",
+          () => ({
+            key: `thread-loading:${selectedThreadId ?? "none"}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "normal",
+            text: "Loading thread history...",
+          }),
+        ),
       ];
     } else if (!selectedThread) {
+      const emptyThreadMessageText = selectedProject
+        ? `Use the Threads panel or the selected worktree popover in the sidebar to create or open a ${APP_TITLE} thread.`
+        : "Add a project, choose a worktree, and create a thread to begin.";
       messages = [
-        {
-          key: `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
-          kind: "chat",
-          speaker: "assistant",
-          tone: "normal",
-          text: selectedProject
-            ? `Use the Threads panel or the selected worktree popover in the sidebar to create or open a ${APP_TITLE} thread.`
-            : "Add a project, choose a worktree, and create a thread to begin.",
-        },
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
+          `chat:normal:assistant:${emptyThreadMessageText}`,
+          () => ({
+            key: `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "normal",
+            text: emptyThreadMessageText,
+          }),
+        ),
       ];
     } else if (threadMessages.length === 0) {
+      const threadReadyMessageText = `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`;
       messages = [
-        {
-          key: `thread-ready:${selectedThread.id}`,
-          kind: "chat",
-          speaker: "assistant",
-          tone: "normal",
-          text: `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`,
-        },
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-ready:${selectedThread.id}`,
+          `chat:normal:assistant:${threadReadyMessageText}`,
+          () => ({
+            key: `thread-ready:${selectedThread.id}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "normal",
+            text: threadReadyMessageText,
+          }),
+        ),
       ];
     } else {
-      messages = threadMessages.map((message) => {
-        if (message.kind === "reasoning") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "reasoning",
-            text: message.text,
-            state: message.state,
-          };
-        }
-        if (message.kind === "command") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "command",
-            command: message.command,
-            output: message.output,
-            state: message.state,
-            exitCode: message.exitCode,
-          };
-        }
-        if (message.kind === "file_change") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "file_change",
-            path: message.path,
-            diffText: message.diffText,
-            changeKind: message.changeKind,
-            state: message.state,
-          };
-        }
-        if (message.kind === "tool_call") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "tool_call",
-            server: message.server,
-            tool: message.tool,
-            argumentsText: message.argumentsText,
-            output: message.output,
-            state: message.state,
-          };
-        }
-        if (message.kind === "web_search") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "web_search",
-            query: message.query,
-            state: message.state,
-          };
-        }
-        if (message.kind === "error") {
-          return {
-            key: `thread-message:${message.id}`,
-            kind: "error",
-            text: message.text,
-            state: message.state,
-          };
-        }
-        return {
-          key: `thread-message:${message.id}`,
-          kind: "chat",
-          speaker: message.role,
-          tone: "normal",
-          text: message.text,
-        };
-      });
+      messages = threadMessages.map((message) =>
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-message:${message.id}`,
+          threadMessageVisibleSignature(message),
+          () => buildThreadVisibleMessage(message),
+        ),
+      );
     }
     if (
       selectedThread?.runStatus.state === "working" &&
       !hasInProgressAssistantChat
     ) {
-      messages.push({
-        key: `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
-        kind: "chat",
-        speaker: "assistant",
-        tone: "working",
-        text: "Processing",
-      });
+      messages.push(
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
+          "chat:working:assistant:Processing",
+          () => ({
+            key: `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "working",
+            text: "Processing",
+          }),
+        ),
+      );
     }
     if (activeChatError) {
-      messages.push({
-        key: `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
-        kind: "chat",
-        speaker: "assistant",
-        tone: "error",
-        text: activeChatError,
-      });
+      messages.push(
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
+          `chat:error:assistant:${activeChatError}`,
+          () => ({
+            key: `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "error",
+            text: activeChatError,
+          }),
+        ),
+      );
     }
     if (activeChatNotice) {
-      messages.push({
-        key: `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
-        kind: "chat",
-        speaker: "assistant",
-        tone: "notice",
-        text: activeChatNotice,
-      });
+      messages.push(
+        readCachedVisibleMessage(
+          visibleMessageCache,
+          `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
+          `chat:notice:assistant:${activeChatNotice}`,
+          () => ({
+            key: `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
+            kind: "chat",
+            speaker: "assistant",
+            tone: "notice",
+            text: activeChatNotice,
+          }),
+        ),
+      );
     }
     return messages;
   }, [

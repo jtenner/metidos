@@ -236,7 +236,7 @@ Done when:
 
 ### Slice P2.1: Cache visible-message view models
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `threadMessages` are remapped into fresh `VisibleMessage` objects on each relevant render.
