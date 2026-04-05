@@ -104,6 +104,7 @@ export type GitHistoryDiffCacheEntry = {
  */
 export type ProjectNodeState = {
   worktrees: RpcWorktree[];
+  worktreesLoadedAt: number | null;
   loadingWorktrees: boolean;
   error: string;
   openWorktrees: Set<string>;
@@ -440,6 +441,7 @@ export function gitHistoryDiffCacheKey(
 export function defaultProjectState(): ProjectNodeState {
   return {
     worktrees: [],
+    worktreesLoadedAt: null,
     loadingWorktrees: false,
     error: "",
     openWorktrees: new Set(),

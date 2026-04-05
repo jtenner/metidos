@@ -108,6 +108,7 @@ import {
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { runRollbackSafeProjectClose } from "./project-close";
 import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
+import { shouldRefreshProjectActionMenuWorktrees } from "./project-worktree-refresh";
 import { isStepUpRequiredError } from "./rpc-errors";
 import { createSupersedingSecurityAuditRefreshRunner } from "./security-audit-refresh";
 import {
@@ -402,6 +403,21 @@ function areWorktreeSnapshotsEquivalent(
     areStringArraysEqual(left.diff, right.diff) &&
     areStringArraysEqual(left.files, right.files)
   );
+}
+
+function buildLoadedProjectWorktreesState(
+  worktrees: RpcWorktree[],
+  loadedAtMs: number = Date.now(),
+): Pick<
+  ProjectNodeState,
+  "error" | "loadingWorktrees" | "worktrees" | "worktreesLoadedAt"
+> {
+  return {
+    worktrees,
+    worktreesLoadedAt: loadedAtMs,
+    loadingWorktrees: false,
+    error: "",
+  };
 }
 
 declare global {
@@ -1671,11 +1687,10 @@ export default function App({
             if (!lifecycleRequest.isCurrent()) {
               return result.worktrees;
             }
-            setProjectState(projectId, {
-              worktrees: result.worktrees,
-              loadingWorktrees: false,
-              error: "",
-            });
+            setProjectState(
+              projectId,
+              buildLoadedProjectWorktreesState(result.worktrees),
+            );
             return result.worktrees;
           })
           .catch((error) => {
@@ -2975,11 +2990,10 @@ export default function App({
               result.project.id,
               result.worktrees,
             );
-            setProjectState(result.project.id, {
-              worktrees: result.worktrees,
-              loadingWorktrees: false,
-              error: "",
-            });
+            setProjectState(
+              result.project.id,
+              buildLoadedProjectWorktreesState(result.worktrees),
+            );
             continue;
           }
 
@@ -3134,6 +3148,12 @@ export default function App({
       setProjectActionMenuError("");
       setNewWorktreeName("");
 
+      if (
+        !shouldRefreshProjectActionMenuWorktrees(getProjectState(project.id))
+      ) {
+        return;
+      }
+
       try {
         await loadProjectWorktrees(project.id, {
           backgroundRefresh: true,
@@ -3146,7 +3166,7 @@ export default function App({
         }
       }
     },
-    [closeThreadActionMenu, loadProjectWorktrees],
+    [closeThreadActionMenu, getProjectState, loadProjectWorktrees],
   );
 
   const openThreadActionMenu = useCallback(
@@ -3256,11 +3276,10 @@ export default function App({
           worktreePath,
           pinned: !pinned,
         });
-        setProjectState(projectId, {
-          worktrees: result.worktrees,
-          loadingWorktrees: false,
-          error: "",
-        });
+        setProjectState(
+          projectId,
+          buildLoadedProjectWorktreesState(result.worktrees),
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setProjectState(projectId, { error: message });
@@ -3396,10 +3415,10 @@ export default function App({
           projectId: projectActionMenu.projectId,
           name,
         });
-        setProjectState(projectActionMenu.projectId, {
-          worktrees: result.worktrees,
-          error: "",
-        });
+        setProjectState(
+          projectActionMenu.projectId,
+          buildLoadedProjectWorktreesState(result.worktrees),
+        );
         setNewWorktreeName("");
       } catch (error) {
         setProjectActionMenuError(
@@ -4403,11 +4422,10 @@ export default function App({
               return;
             }
             setProjects((prev) => upsertProjectList(prev, result.project));
-            setProjectState(project.id, {
-              worktrees: result.worktrees,
-              loadingWorktrees: false,
-              error: "",
-            });
+            setProjectState(
+              project.id,
+              buildLoadedProjectWorktreesState(result.worktrees),
+            );
           })
           .catch((error) => {
             if (!lifecycleRequest.isCurrent()) {
@@ -4430,11 +4448,10 @@ export default function App({
           return;
         }
         setProjects((prev) => upsertProjectList(prev, result.project));
-        setProjectState(project.id, {
-          worktrees: result.worktrees,
-          loadingWorktrees: false,
-          error: "",
-        });
+        setProjectState(
+          project.id,
+          buildLoadedProjectWorktreesState(result.worktrees),
+        );
         if (!selectedProjectId) {
           selectProject(project);
         }

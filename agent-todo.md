@@ -438,7 +438,7 @@ Done when:
 
 ### Slice P3.5: Revisit project action menu background refresh policy
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Opening the project action menu triggers a background worktree refresh even when data may already be fresh enough.

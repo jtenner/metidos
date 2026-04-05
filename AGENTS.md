@@ -129,6 +129,8 @@
 │     ├─ project-close.ts
 │     ├─ project-lifecycle.test.ts
 │     ├─ project-lifecycle.ts
+│     ├─ project-worktree-refresh.test.ts
+│     ├─ project-worktree-refresh.ts
 │     ├─ rpc-errors.ts
 │     ├─ security-audit-refresh.test.ts
 │     ├─ security-audit-refresh.ts
