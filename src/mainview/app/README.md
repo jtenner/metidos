@@ -71,7 +71,7 @@ Owns persisted open/closed state for sidebar panels and exposes toggle/read hook
 Central shared types/constants for mainview logic. Includes domain types for threads/projects/worktrees, persisted state schemas, cache constants, formatting helpers, error/preview helpers, and utility operations for sorting/upserting state and persisting UI settings.
 
 `use-mainview-derived-state.ts`
-Combines backend and runtime state into memoized derived props used by workspace and sidebar components.
+Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including preformatted worktree display paths reused across hot sidebar renders.
 
 `use-thread-previews.ts`
 Builds compact thread-preview data for list rendering and summary widgets.

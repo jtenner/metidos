@@ -890,6 +890,7 @@ export default function App({
     threadActionMenuThread,
     unsafeModeToggleDisabled,
     worktreeByProjectAndPath,
+    worktreeDisplayPathByKey,
     worktreeSearchTextByKey,
     worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
@@ -5034,6 +5035,7 @@ export default function App({
                     sidebarActionButtonClass,
                     supportsTildePath,
                     worktreePinBusyPath,
+                    worktreeDisplayPathByKey,
                     worktreeSearchTextByKey,
                     worktreeThreadErrorLevel,
                   }}
@@ -5053,16 +5055,15 @@ export default function App({
                     acknowledgeThreadErrorSeenInBackground,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
-                    homeDirectory,
                     isThreadStatusDismissed,
                     onOpenThread: handleOpenThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
                     projectById,
                     selectedThreadId,
-                    supportsTildePath,
                     threadPreviewsDisabled: threadActionMenu !== null,
                     threadActivityIndicator,
                     threadsError,
+                    worktreeDisplayPathByKey,
                     workspaceActiveThreads: filteredWorkspaceActiveThreads,
                     workspacePinnedThreads: filteredWorkspacePinnedThreads,
                     worktreeByProjectAndPath,
@@ -5266,6 +5267,7 @@ export default function App({
                 sidebarActionButtonClass,
                 supportsTildePath,
                 worktreePinBusyPath,
+                worktreeDisplayPathByKey,
                 worktreeSearchTextByKey,
                 worktreeThreadErrorLevel,
               }}
@@ -5285,16 +5287,15 @@ export default function App({
                 acknowledgeThreadErrorSeenInBackground,
                 clearCompletedThreadIndicator,
                 dismissThreadStatus,
-                homeDirectory,
                 isThreadStatusDismissed,
                 onOpenThread: handleOpenThread,
                 onOpenThreadActionMenu: openThreadActionMenu,
                 projectById,
                 selectedThreadId,
-                supportsTildePath,
                 threadPreviewsDisabled: threadActionMenu !== null,
                 threadActivityIndicator,
                 threadsError,
+                worktreeDisplayPathByKey,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
                 worktreeByProjectAndPath,
@@ -5512,16 +5513,15 @@ export default function App({
                 anchorIdPrefix="worktree-thread"
                 clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                 dismissThreadStatus={dismissThreadStatus}
-                homeDirectory={homeDirectory}
                 isThreadStatusDismissed={isThreadStatusDismissed}
                 onOpenThread={handleOpenThread}
                 onOpenThreadActionMenu={openThreadActionMenu}
                 previewDisabled={threadActionMenu !== null}
                 projectById={projectById}
                 selectedThreadId={selectedThreadId}
-                supportsTildePath={supportsTildePath}
                 threadActivityIndicator={threadActivityIndicator}
                 threads={selectedWorktreeThreads}
+                worktreeDisplayPathByKey={worktreeDisplayPathByKey}
                 worktreeByProjectAndPath={worktreeByProjectAndPath}
               />
             ) : (

@@ -256,6 +256,8 @@ export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
 export const DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS = 50;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES = 128;
 export const DIRECTORY_SUGGESTION_RESULT_CACHE_TTL_MS = 30_000;
+const FORMAT_PATH_FOR_DISPLAY_CACHE_MAX_ENTRIES = 2_048;
+const formatPathForDisplayCache = new Map<string, string>();
 /**
  * Git history pagination/window constants used by list rendering and requests.
  */
@@ -968,18 +970,35 @@ export function formatPathForDisplay(
   homeDirectory: string,
   supportsTildePath: boolean,
 ): string {
-  if (!supportsTildePath || !homeDirectory) {
-    return path;
+  const cacheKey = `${supportsTildePath ? "1" : "0"}\u0000${homeDirectory}\u0000${path}`;
+  const cached = formatPathForDisplayCache.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  const normalizedHomeDirectory = homeDirectory.replace(/[\\/]+$/, "");
-  if (path === normalizedHomeDirectory) {
-    return "~";
+  let formattedPath = path;
+  if (supportsTildePath && homeDirectory) {
+    const normalizedHomeDirectory = homeDirectory.replace(/[\\/]+$/, "");
+    if (path === normalizedHomeDirectory) {
+      formattedPath = "~";
+    } else if (
+      path.startsWith(`${normalizedHomeDirectory}${pathSeparator(path)}`)
+    ) {
+      formattedPath = `~${path.slice(normalizedHomeDirectory.length)}`;
+    }
   }
-  if (path.startsWith(`${normalizedHomeDirectory}${pathSeparator(path)}`)) {
-    return `~${path.slice(normalizedHomeDirectory.length)}`;
+
+  formatPathForDisplayCache.set(cacheKey, formattedPath);
+  if (
+    formatPathForDisplayCache.size > FORMAT_PATH_FOR_DISPLAY_CACHE_MAX_ENTRIES
+  ) {
+    const firstKey = formatPathForDisplayCache.keys().next().value;
+    if (firstKey !== undefined) {
+      formatPathForDisplayCache.delete(firstKey);
+    }
   }
-  return path;
+
+  return formattedPath;
 }
 
 export function formatGitHistoryTimestamp(value: string): string {

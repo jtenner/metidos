@@ -36,7 +36,6 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   clearCompletedThreadIndicator,
   dismissThreadStatus,
   filteredVisibleThreads,
-  homeDirectory,
   isCreatingThread,
   isThreadStatusDismissed,
   normalizedSidebarSearchQuery,
@@ -47,10 +46,10 @@ export const ThreadsPanel = memo(function ThreadsPanel({
   selectedProject,
   selectedThreadId,
   sidebarActionButtonClass,
-  supportsTildePath,
   threadPreviewsDisabled,
   threadActivityIndicator,
   threadsError,
+  worktreeDisplayPathByKey,
   worktreeByProjectAndPath,
 }: ThreadsPanelProps) {
   // Panel open state comes from shared sidebar state persisted by user preference.
@@ -105,16 +104,15 @@ export const ThreadsPanel = memo(function ThreadsPanel({
               anchorIdPrefix="threads-thread"
               clearCompletedThreadIndicator={clearCompletedThreadIndicator}
               dismissThreadStatus={dismissThreadStatus}
-              homeDirectory={homeDirectory}
               isThreadStatusDismissed={isThreadStatusDismissed}
               onOpenThread={onOpenThread}
               onOpenThreadActionMenu={onOpenThreadActionMenu}
               previewDisabled={threadPreviewsDisabled}
               projectById={projectById}
               selectedThreadId={selectedThreadId}
-              supportsTildePath={supportsTildePath}
               threadActivityIndicator={threadActivityIndicator}
               threads={filteredVisibleThreads}
+              worktreeDisplayPathByKey={worktreeDisplayPathByKey}
               worktreeByProjectAndPath={worktreeByProjectAndPath}
             />
           )}

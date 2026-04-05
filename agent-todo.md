@@ -509,7 +509,7 @@ Done when:
 
 ### Slice P4.4: Cache path-display formatting for hot UI surfaces
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `formatPathForDisplay()` is called often in thread rows, project rows, git history, tasks, and workspace chrome.

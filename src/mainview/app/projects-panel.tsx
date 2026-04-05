@@ -10,7 +10,6 @@ import {
 } from "./sidebar-panels-state";
 import {
   formatDirectoryPathForInput,
-  formatPathForDisplay,
   orderProjectWorktrees,
   type ProjectNodeState,
   shortName,
@@ -42,7 +41,7 @@ type ProjectsPanelWorktreeData = {
  */
 type ProjectWorktreeRowProps = {
   activeWorktree: boolean;
-  homeDirectory: string;
+  displayPath: string;
   onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
   onToggleWorktreePinned: (
     projectId: number,
@@ -51,7 +50,6 @@ type ProjectWorktreeRowProps = {
   ) => void;
   project: RpcProject;
   showProjectName?: boolean;
-  supportsTildePath: boolean;
   worktree: RpcWorktree;
   worktreeErrorLevel: ThreadErrorLevel;
   worktreePinBusyPath: string | null;
@@ -171,12 +169,11 @@ export function deriveProjectsPanelWorktreeData(
  */
 function ProjectWorktreeRow({
   activeWorktree,
-  homeDirectory,
+  displayPath,
   onProjectWorktreeClick,
   onToggleWorktreePinned,
   project,
   showProjectName = false,
-  supportsTildePath,
   worktree,
   worktreeErrorLevel,
   worktreePinBusyPath,
@@ -184,11 +181,6 @@ function ProjectWorktreeRow({
 }: ProjectWorktreeRowProps) {
   const worktreePinned = Boolean(worktree.pinnedAt);
   const togglingPin = worktreePinBusyPath === worktree.path;
-  const displayPath = formatPathForDisplay(
-    worktree.path,
-    homeDirectory,
-    supportsTildePath,
-  );
 
   // Worktree row carries both row-level actions (open) and pin/unpin control.
   return (
@@ -323,6 +315,7 @@ type ProjectsPanelProps = {
   supportsTildePath: boolean;
   sidebarActionButtonClass: string;
   worktreePinBusyPath: string | null;
+  worktreeDisplayPathByKey: ReadonlyMap<string, string>;
   worktreeSearchTextByKey: ReadonlyMap<string, string>;
   worktreeThreadErrorLevel: (
     projectId: number,
@@ -369,6 +362,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   sidebarActionButtonClass,
   supportsTildePath,
   worktreePinBusyPath,
+  worktreeDisplayPathByKey,
   worktreeSearchTextByKey,
   worktreeThreadErrorLevel,
 }: ProjectsPanelProps) {
@@ -568,12 +562,15 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                           project.id,
                           worktree.path,
                         )}
-                        homeDirectory={homeDirectory}
+                        displayPath={
+                          worktreeDisplayPathByKey.get(
+                            worktreeKey(project.id, worktree.path),
+                          ) ?? worktree.path
+                        }
                         onProjectWorktreeClick={onProjectWorktreeClick}
                         onToggleWorktreePinned={onToggleWorktreePinned}
                         project={project}
                         showProjectName
-                        supportsTildePath={supportsTildePath}
                         worktree={worktree}
                         worktreeErrorLevel={worktreeThreadErrorLevel(
                           project.id,
@@ -742,7 +739,14 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                         project.id,
                                         worktree.path,
                                       )}
-                                      homeDirectory={homeDirectory}
+                                      displayPath={
+                                        worktreeDisplayPathByKey.get(
+                                          worktreeKey(
+                                            project.id,
+                                            worktree.path,
+                                          ),
+                                        ) ?? worktree.path
+                                      }
                                       onProjectWorktreeClick={
                                         onProjectWorktreeClick
                                       }
@@ -750,7 +754,6 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                         onToggleWorktreePinned
                                       }
                                       project={project}
-                                      supportsTildePath={supportsTildePath}
                                       worktree={worktree}
                                       worktreeErrorLevel={worktreeThreadErrorLevel(
                                         project.id,

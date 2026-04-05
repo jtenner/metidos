@@ -29,16 +29,15 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   acknowledgeThreadErrorSeenInBackground,
   clearCompletedThreadIndicator,
   dismissThreadStatus,
-  homeDirectory,
   isThreadStatusDismissed,
   onOpenThread,
   onOpenThreadActionMenu,
   projectById,
   selectedThreadId,
-  supportsTildePath,
   threadPreviewsDisabled,
   threadActivityIndicator,
   threadsError,
+  worktreeDisplayPathByKey,
   workspaceActiveThreads,
   workspacePinnedThreads,
   worktreeByProjectAndPath,
@@ -77,7 +76,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 anchorIdPrefix="workspace-thread"
                 clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                 dismissThreadStatus={dismissThreadStatus}
-                homeDirectory={homeDirectory}
                 isThreadStatusDismissed={isThreadStatusDismissed}
                 onOpenThread={onOpenThread}
                 onOpenThreadActionMenu={onOpenThreadActionMenu}
@@ -85,9 +83,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 projectById={projectById}
                 selectedThreadId={selectedThreadId}
                 showLocation
-                supportsTildePath={supportsTildePath}
                 threadActivityIndicator={threadActivityIndicator}
                 threads={workspacePinnedThreads}
+                worktreeDisplayPathByKey={worktreeDisplayPathByKey}
                 worktreeByProjectAndPath={worktreeByProjectAndPath}
               />
             </div>
@@ -119,7 +117,6 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   anchorIdPrefix="workspace-thread"
                   clearCompletedThreadIndicator={clearCompletedThreadIndicator}
                   dismissThreadStatus={dismissThreadStatus}
-                  homeDirectory={homeDirectory}
                   isThreadStatusDismissed={isThreadStatusDismissed}
                   onOpenThread={onOpenThread}
                   onOpenThreadActionMenu={onOpenThreadActionMenu}
@@ -127,9 +124,9 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   projectById={projectById}
                   selectedThreadId={selectedThreadId}
                   showLocation
-                  supportsTildePath={supportsTildePath}
                   threadActivityIndicator={threadActivityIndicator}
                   threads={workspaceActiveThreads}
+                  worktreeDisplayPathByKey={worktreeDisplayPathByKey}
                   worktreeByProjectAndPath={worktreeByProjectAndPath}
                 />
               ) : null}

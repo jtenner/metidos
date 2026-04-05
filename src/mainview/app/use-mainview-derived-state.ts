@@ -96,6 +96,26 @@ type UseMainviewDerivedStateParams = {
 /**
  * Computes derived mainview state and memoized selectors from raw state inputs.
  */
+export function deriveWorktreeDisplayPathByKey(
+  projects: RpcProject[],
+  getProjectWorktrees: (projectId: number) => RpcWorktree[],
+  homeDirectory: string,
+  supportsTildePath: boolean,
+): ReadonlyMap<string, string> {
+  const next = new Map<string, string>();
+
+  for (const project of projects) {
+    for (const worktree of getProjectWorktrees(project.id)) {
+      next.set(
+        worktreeKey(project.id, worktree.path),
+        formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
+      );
+    }
+  }
+
+  return next;
+}
+
 export function useMainviewDerivedState({
   chatError,
   codexModels,
@@ -164,28 +184,35 @@ export function useMainviewDerivedState({
     }
     return next;
   }, [homeDirectory, projects, supportsTildePath]);
+  const worktreeDisplayPathByKey = useMemo(
+    () =>
+      deriveWorktreeDisplayPathByKey(
+        projects,
+        (projectId) => getProjectState(projectId).worktrees,
+        homeDirectory,
+        supportsTildePath,
+      ),
+    [getProjectState, homeDirectory, projects, supportsTildePath],
+  );
   const worktreeSearchTextByKey = useMemo(() => {
     const next = new Map<string, string>();
     for (const project of projects) {
       for (const worktree of getProjectState(project.id).worktrees) {
+        const key = worktreeKey(project.id, worktree.path);
         next.set(
-          worktreeKey(project.id, worktree.path),
+          key,
           buildNormalizedSearchText(
             project.name,
             worktree.branch,
             worktree.path,
             shortName(worktree.path),
-            formatPathForDisplay(
-              worktree.path,
-              homeDirectory,
-              supportsTildePath,
-            ),
+            worktreeDisplayPathByKey.get(key) ?? worktree.path,
           ),
         );
       }
     }
     return next;
-  }, [getProjectState, homeDirectory, projects, supportsTildePath]);
+  }, [getProjectState, projects, worktreeDisplayPathByKey]);
 
   const selectedProject = useMemo(() => {
     // Resolve the selected project by ID from the full project list.
@@ -523,11 +550,20 @@ export function useMainviewDerivedState({
     ? activeSelectedWorktreeFolder
     : "No project selected";
   const activeScreenSubtitleSecondary = activeSelectedWorktreePath
-    ? formatPathForDisplay(
-        activeSelectedWorktreePath,
-        homeDirectory,
-        supportsTildePath,
-      )
+    ? selectedProject
+      ? (worktreeDisplayPathByKey.get(
+          worktreeKey(selectedProject.id, activeSelectedWorktreePath),
+        ) ??
+        formatPathForDisplay(
+          activeSelectedWorktreePath,
+          homeDirectory,
+          supportsTildePath,
+        ))
+      : formatPathForDisplay(
+          activeSelectedWorktreePath,
+          homeDirectory,
+          supportsTildePath,
+        )
     : "No worktree selected";
 
   const taskSelectorDisabled =
@@ -674,6 +710,7 @@ export function useMainviewDerivedState({
     threadActionMenuThread,
     unsafeModeToggleDisabled,
     worktreeByProjectAndPath,
+    worktreeDisplayPathByKey,
     worktreeSearchTextByKey,
     worktreeThreadErrorLevel,
   };
