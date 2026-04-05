@@ -179,8 +179,8 @@ export const WorkspacePanel = memo(function WorkspacePanel({
               }}
               disabled={isCreatingThread}
               aria-disabled={createThreadDisabled}
-              aria-label="Create thread for selected worktree"
-              title={
+              aria-busy={isCreatingThread}
+              aria-label={
                 canCreateThread
                   ? "Create thread for selected worktree"
                   : "Select an open worktree first"
