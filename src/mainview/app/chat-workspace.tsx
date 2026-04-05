@@ -1083,7 +1083,7 @@ export function DesktopChatView({
         onToggleItemExpanded={onToggleItemExpanded}
         paddingEndPx={DESKTOP_CHAT_PADDING_PX}
         paddingStartPx={DESKTOP_CHAT_PADDING_PX}
-        scrollContainerClassName="flex-1 overflow-y-auto px-6 hide-scrollbar"
+        scrollContainerClassName="app-scrollbar flex-1 overflow-y-auto px-6"
         topContent={headerContent}
         variant="desktop"
       />
