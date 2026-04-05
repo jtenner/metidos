@@ -14,7 +14,6 @@
 ├─ .git
 ├─ .gitignore
 ├─ AGENTS.md
-├─ agent-todo.md
 ├─ biome.json
 ├─ bun-plugin-react-compiler.ts
 ├─ bun.lock
@@ -199,8 +198,5 @@
 │     ├─ index.html
 │     ├─ index.ts
 │     └─ input.css
-├─ scripts/
-│  └─ fix-jolt-nginx-tls.sh
-├─ tsconfig.json
-└─ stitch.zip
+└─ tsconfig.json
 ```

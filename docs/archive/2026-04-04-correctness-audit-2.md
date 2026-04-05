@@ -185,5 +185,5 @@ Update on 2026-04-04:
 ## Notes
 
 - This document is the current correctness snapshot from the additional April 4 pass.
-- All five findings in this follow-up snapshot were addressed in code on 2026-04-04; use `agent-todo.md` for any newer active slices after this pass.
+- All five findings in this follow-up snapshot were addressed in code on 2026-04-04; use newer repo docs and commit history for any later active slices after this pass.
 - The earlier docs remain useful historical context, but they should not be treated as an authoritative list of what is still broken now.

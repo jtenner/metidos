@@ -21,76 +21,18 @@ The goal is to keep coding sessions, project state, and tool outputs tightly cou
 
 ```mermaid
 flowchart TD
-  %% Frontend layer
-  subgraph Client["Browser client (mainview)"]
-    UI["mainview index.ts\n- boots WS transport\n- pending request map + reconnect + type map"]
-    APP["App.tsx\n- shell + route-like workspace composition\n- orchestrates selected project/worktree/thread state"]
-    DER["app/* hooks + derived state\n- maps RPC data into panels\n- memoized selectors + thread/workspace views"]
-    CTRL["controls/* UI controls\n- composer, menus, selectors, search\n- model/effort toggles and actions"]
-    ROUT["frontend event bridge\n- coalesced invalidation subscriptions + targeted custom events"]
-  end
+  Client["Browser UI\nsrc/mainview\nprojects, threads, tasks, diffs"]
+  Transport["RPC transport\nWebSocket request/response\nreconnect + cancellation"]
+  Server["Bun backend\nsrc/bun\nRPC dispatch + orchestration"]
 
-  %% transport boundary
-  subgraph Transport["UI <-> backend transport"]
-    WS["ws(s)://.../rpc\n- bidirectional request/response\n- timeout + cancellation + backoff"]
-  end
+  Client --> Transport
+  Transport --> Server
+  Server --> Transport
+  Transport --> Client
 
-  %% Backend process host
-  subgraph Server["Bun backend process (src/bun)"]
-    HOST["index.ts\n- HTTP routes for assets and fonts\n- WS upgrade + heartbeat + request envelope handling"]
-    DISPATCH["RPC dispatch in index.ts\n- validates request name\n- executes procedure\n- serializes ok/error replies"]
-    SCHEMA["rpc-schema.ts\n- shared TypeScript contract for UI/backend"]
-    ORCH["project-procedures.ts\n- orchestrates project/worktree/thread/task ops\n- cache warmup + background maintenance"]
-    DB["db.ts\n- sqlite persistence\n- projects/worktrees/threads/messages/usage"]
-    GIT["git.ts\n- git command execution\n- diffs, snapshots, history pages"]
-    SIDE["codex-sidecar-mcp.ts\n- MCP stdio process endpoint\n- tools for thread metadata + create/start flow"]
-    TASKS["project-procedures/project-tasks.ts\n- discover .tasks files & package scripts\n- build execution prompts"]
-    DIR["project-procedures/directory-suggestions.ts\n- directory autocomplete cache (LRU + TTL)\n- home/tilded path parsing"]
-    HISTRY["project-procedures/git-history.ts\n- paged history cache + prefetch + diff request dedupe"]
-    SHARED["project-procedures/shared.ts\n- LRU, abort-aware promises, concurrency limiter\n- safe path and fs helpers"]
-    DETAIL["project-procedures/thread-detail.ts\n- maps DB rows to RpcThread/RpcThreadMessage\n- run state + compaction signals"]
-    CATALOG["project-procedures/codex-catalog.ts\n- model + reasoning catalog\n- validation and normalization"]
-    BUILD["build-mainview.ts\n- bundles mainview entry to .jolt-build/index.js\n- production/dev artifact prep"]
-    WATCH["isolated-server.ts / static-server.ts\n- dev helper mode and static-only mode variants"]
-  end
-
-  %% external services
-  subgraph External["External/operating layers"]
-    OPENAI["OpenAI Codex SDK"]
-    SQLITE["SQLite file store"]
-    FS["Filesystem + git repo worktrees"]
-    PROC["Bun process spawns (package scripts / child tasks)"]
-  end
-
-  UI --> APP
-  APP --> DER
-  APP --> CTRL
-  APP --> ROUT
-  ROUT --> UI
-  APP -->|RPC requests| WS
-  WS <--> DISPATCH
-  DISPATCH --> SCHEMA
-  DISPATCH --> ORCH
-  ORCH --> DB
-  ORCH --> GIT
-  ORCH --> SIDE
-  ORCH --> TASKS
-  ORCH --> DIR
-  ORCH --> HISTRY
-  ORCH --> SHARED
-  ORCH --> DETAIL
-  ORCH --> CATALOG
-  HOST --> BUILD
-  HOST --> WATCH
-  ORCH -->|streams/updates| ROUT
-  ORCH -->|thread lifecycle events| ROUT
-  DB --> SQLITE
-  GIT --> FS
-  GIT --> PROC
-  SIDE -->|MCP IPC over stdio| OPENAI
-  CATALOG --> OPENAI
-  TASKS --> FS
-  DIR --> FS
+  Server --> Persistence["SQLite persistence\nprojects, worktrees, threads, messages"]
+  Server --> GitFs["Git + filesystem\nworktrees, diffs, history, file reads"]
+  Server --> Codex["Codex sidecar / OpenAI\nthread execution and tooling"]
 ```
 
 ## Runtime flow (how it works day-to-day)
@@ -171,28 +113,6 @@ bun run typecheck             # TypeScript check
 bun run harness:starvation    # run starvation harness utility
 ```
 
-### Nginx TLS helper
-
-Run it directly and it will auto-derive from existing nginx config, with no prompts:
-
-```bash
-./scripts/fix-jolt-nginx-tls.sh
-```
-
-Or run with explicit arguments if you want full control:
-
-```bash
-./scripts/fix-jolt-nginx-tls.sh \
-  --site-file /etc/nginx/sites-available/<your-site> \
-  --domain <your-domain> \
-  --ssl-cert /path/to/fullchain.pem \
-  --ssl-key /path/to/privkey.pem \
-  --public-port 7599 \
-  --rpc-port 7600
-```
-
-The script replaces the full site config so `/` points to the static server and `/rpc` points to the RPC backend for websocket-aware proxying.
-
 ## Environment and startup flags
 
 - `--port` / `-p` or `JOLT_PORT` for custom server port selection.
@@ -215,8 +135,6 @@ The script replaces the full site config so `/` points to the static server and 
   - Generated/build/runtime exclusions.
 - `AGENTS.md`
   - Repository instructions and canonical tree snapshot.
-- `agent-todo.md`
-  - Main frontend performance work tracker and slice status log.
 - `biome.json`
   - Linting/formatting rules.
 - `bun-plugin-react-compiler.ts`
@@ -225,16 +143,11 @@ The script replaces the full site config so `/` points to the static server and 
   - Tooling + dependency + compiler + Bun execution config.
 - `docs/`
   - Repository design notes, audits, and migration references.
-- `scripts/`
-  - `fix-jolt-nginx-tls.sh` for reverse-proxy TLS configuration replacement with `/` and `/rpc` routing.
 - `src/`
   - Source of truth for backend and frontend architecture.
-- `stitch.zip`
-  - Repository artifact currently included as a static file.
 
 ## Contributing notes
 
 - Keep frontend and backend RPC contracts aligned in `src/bun/rpc-schema.ts`.
 - Prefer clear comments for edge-case behavior (cancellations, open/close sequencing, stale-response handling).
 - Run docs + format/style checks according to `bun run validate` before non-doc code changes.
-- Keep `agent-todo.md` aligned with the current frontend performance slice status when that tracker changes.
