@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { deriveGroupedVisibleMessages } from "./chat-workspace";
+import {
+  deriveGroupedVisibleMessages,
+  deriveTranscriptMeasurementRows,
+} from "./chat-workspace";
 import type { VisibleMessage } from "./state";
 
 function assistantChatMessage(key: string, text: string): VisibleMessage {
@@ -130,5 +133,79 @@ describe("deriveGroupedVisibleMessages", () => {
         startIndex: 2,
       },
     ]);
+  });
+});
+
+describe("deriveTranscriptMeasurementRows", () => {
+  it("keeps row cache keys stable when transcript grouping boundaries stay the same", () => {
+    const messages = [
+      assistantChatMessage("assistant-1", "First"),
+      assistantChatMessage("assistant-2", "Second"),
+      userChatMessage("user-1", "Question"),
+    ];
+    const grouped = deriveGroupedVisibleMessages(9, messages, null).groups;
+
+    const initialRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 9,
+      expandedItemIds: new Set(),
+      groupedMessages: grouped,
+      hasTopContent: true,
+      messages,
+      variant: "desktop",
+    });
+    const updatedRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 9,
+      expandedItemIds: new Set(),
+      groupedMessages: grouped,
+      hasTopContent: true,
+      messages: [
+        assistantChatMessage("assistant-1", "First, but longer"),
+        assistantChatMessage("assistant-2", "Second"),
+        userChatMessage("user-1", "Question"),
+      ],
+      variant: "desktop",
+    });
+
+    expect(initialRows.map((row) => row.cacheKey)).toEqual(
+      updatedRows.map((row) => row.cacheKey),
+    );
+    expect(initialRows[1]?.contentKey).not.toBe(updatedRows[1]?.contentKey);
+    expect(initialRows[2]?.contentKey).toBe(updatedRows[2]?.contentKey);
+  });
+
+  it("invalidates file-change row measurement fingerprints when expansion changes", () => {
+    const fileChangeMessage: VisibleMessage = {
+      changeKind: "update",
+      diffText: "@@ -1 +1 @@\n-old\n+new",
+      key: "file-1",
+      kind: "file_change",
+      path: "src/example.ts",
+      state: "completed",
+    };
+    const grouped = deriveGroupedVisibleMessages(
+      11,
+      [fileChangeMessage],
+      null,
+    ).groups;
+
+    const collapsedRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 11,
+      expandedItemIds: new Set(),
+      groupedMessages: grouped,
+      hasTopContent: false,
+      messages: [fileChangeMessage],
+      variant: "desktop",
+    });
+    const expandedRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 11,
+      expandedItemIds: new Set(["file-1"]),
+      groupedMessages: grouped,
+      hasTopContent: false,
+      messages: [fileChangeMessage],
+      variant: "desktop",
+    });
+
+    expect(collapsedRows[0]?.cacheKey).toBe(expandedRows[0]?.cacheKey);
+    expect(collapsedRows[0]?.contentKey).not.toBe(expandedRows[0]?.contentKey);
   });
 });

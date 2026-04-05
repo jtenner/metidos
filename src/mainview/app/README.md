@@ -34,7 +34,7 @@ Defines the thread row component (`ThreadList`) and shared thread-listing prop s
 Hosts the active workspace panel shell and swaps between available workspace modes.
 
 `chat-workspace.tsx`
-Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior.
+Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization and cached row-height reuse for unchanged rows.
 
 `diff-workspace.tsx`
 Builds and renders the diff tree/panel view, including helpers like `emptyDiffFilePatchState` and `buildDiffFileTree`.

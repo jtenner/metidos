@@ -475,7 +475,7 @@ Done when:
 
 ### Slice P4.2: Revisit transcript measurement churn
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Transcript virtualization still depends on variable-height measurement for markdown/code-heavy rows.

@@ -42,7 +42,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/action-menus.tsx` defines context/action menus for project and thread operations.
 
-`app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile and coordinates composer + message flow.
+`app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile, coordinates composer + message flow, and now caches transcript row measurements so unchanged virtualized rows can reuse prior heights across ordinary rerenders.
 
 `app/desktop-sidebar.tsx` defines the desktop layout shell and sidebar affordances for wide screens.
 

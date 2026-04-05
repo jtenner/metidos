@@ -1,4 +1,8 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  measureElement as defaultMeasureElement,
+  useVirtualizer,
+  type Virtualizer,
+} from "@tanstack/react-virtual";
 import {
   type CSSProperties,
   type FormEvent,
@@ -8,6 +12,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -90,6 +95,17 @@ type GroupedVisibleMessagesCache = {
   messages: VisibleMessage[];
 };
 
+type TranscriptMeasurementRow = {
+  cacheKey: string;
+  contentKey: string;
+  estimatedSize: number;
+};
+
+type TranscriptMeasurementCacheEntry = {
+  contentKey: string;
+  size: number;
+};
+
 /**
  * Shared props for both desktop and mobile chat views.
  */
@@ -140,6 +156,157 @@ const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
 const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
 const UNSAFE_MODE_DESCRIPTION =
   "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
+
+function hashMeasurementText(text: string): string {
+  let hash = 5381;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 33) ^ text.charCodeAt(index);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function visibleMessageMeasurementFingerprint(
+  message: VisibleMessage,
+  expanded: boolean,
+): string {
+  if (message.kind === "chat") {
+    return [
+      message.kind,
+      message.speaker,
+      message.tone ?? "normal",
+      message.text.length,
+      hashMeasurementText(message.text),
+    ].join(":");
+  }
+
+  if (message.kind === "reasoning" || message.kind === "error") {
+    return [
+      message.kind,
+      message.state,
+      message.text.length,
+      hashMeasurementText(message.text),
+    ].join(":");
+  }
+
+  if (message.kind === "command") {
+    return [
+      message.kind,
+      message.state,
+      message.exitCode ?? "none",
+      expanded ? "expanded" : "collapsed",
+      message.command.length,
+      hashMeasurementText(message.command),
+      message.output.length,
+      hashMeasurementText(message.output),
+    ].join(":");
+  }
+
+  if (message.kind === "tool_call") {
+    return [
+      message.kind,
+      message.state,
+      message.server,
+      message.tool,
+      message.argumentsText.length,
+      hashMeasurementText(message.argumentsText),
+      message.output.length,
+      hashMeasurementText(message.output),
+    ].join(":");
+  }
+
+  if (message.kind === "web_search") {
+    return [
+      message.kind,
+      message.state,
+      message.query.length,
+      hashMeasurementText(message.query),
+    ].join(":");
+  }
+
+  return [
+    message.kind,
+    message.state,
+    message.changeKind,
+    expanded ? "expanded" : "collapsed",
+    message.path.length,
+    hashMeasurementText(message.path),
+    message.diffText.length,
+    hashMeasurementText(message.diffText),
+  ].join(":");
+}
+
+export function deriveTranscriptMeasurementRows({
+  activeThreadId,
+  expandedItemIds,
+  groupedMessages,
+  hasTopContent,
+  messages,
+  variant,
+}: {
+  activeThreadId: number | null;
+  expandedItemIds: ReadonlySet<string>;
+  groupedMessages: TranscriptMessageGroup[];
+  hasTopContent: boolean;
+  messages: VisibleMessage[];
+  variant: "desktop" | "mobile";
+}): TranscriptMeasurementRow[] {
+  const rows: TranscriptMeasurementRow[] = [];
+  const threadKey = activeThreadId ?? "none";
+
+  if (hasTopContent) {
+    rows.push({
+      cacheKey: `chat-header:${threadKey}:${variant}`,
+      contentKey: `chat-header:${threadKey}:${variant}`,
+      estimatedSize: 140,
+    });
+  }
+
+  for (const group of groupedMessages) {
+    if (group.kind === "assistant") {
+      const contentKey = Array.from(
+        { length: group.endIndex - group.startIndex },
+        (_, offset) => messages[group.startIndex + offset],
+      )
+        .filter((message): message is VisibleMessage => message !== undefined)
+        .map((message) =>
+          visibleMessageMeasurementFingerprint(
+            message,
+            expandedItemIds.has(message.key),
+          ),
+        )
+        .join("|");
+
+      rows.push({
+        cacheKey: `chat-group:${threadKey}:${group.key}`,
+        contentKey,
+        estimatedSize:
+          variant === "desktop"
+            ? DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX
+            : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX,
+      });
+      continue;
+    }
+
+    const message = messages[group.messageIndex];
+    rows.push({
+      cacheKey: `chat-group:${threadKey}:${group.key}`,
+      contentKey: message
+        ? visibleMessageMeasurementFingerprint(
+            message,
+            expandedItemIds.has(message.key),
+          )
+        : "missing",
+      estimatedSize:
+        variant === "desktop"
+          ? DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX
+          : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX,
+    });
+  }
+
+  return rows;
+}
 
 /**
  * Append assistant/user transcript group structure for one contiguous message range.
@@ -488,6 +655,39 @@ const ChatTranscript = memo(function ChatTranscript({
   const groupedMessages = groupedMessagesCache.groups;
   const hasTopContent = topContent !== null;
   const rowCount = groupedMessages.length + (hasTopContent ? 1 : 0);
+  const transcriptMeasurementRows = useMemo(
+    () =>
+      deriveTranscriptMeasurementRows({
+        activeThreadId,
+        expandedItemIds,
+        groupedMessages,
+        hasTopContent,
+        messages,
+        variant,
+      }),
+    [
+      activeThreadId,
+      expandedItemIds,
+      groupedMessages,
+      hasTopContent,
+      messages,
+      variant,
+    ],
+  );
+  const transcriptMeasurementCacheRef = useRef<
+    Map<string, TranscriptMeasurementCacheEntry>
+  >(new Map());
+
+  useEffect(() => {
+    const validCacheKeys = new Set(
+      transcriptMeasurementRows.map((row) => row.cacheKey),
+    );
+    for (const cacheKey of transcriptMeasurementCacheRef.current.keys()) {
+      if (!validCacheKeys.has(cacheKey)) {
+        transcriptMeasurementCacheRef.current.delete(cacheKey);
+      }
+    }
+  }, [transcriptMeasurementRows]);
 
   const renderAssistantMessageContent = useCallback(
     (message: VisibleMessage): JSX.Element => {
@@ -553,25 +753,59 @@ const ChatTranscript = memo(function ChatTranscript({
     [expandedItemIds, onToggleItemExpanded],
   );
 
+  const measureTranscriptRowElement = useCallback(
+    (
+      element: HTMLDivElement,
+      entry: ResizeObserverEntry | undefined,
+      instance: Virtualizer<HTMLDivElement, HTMLDivElement>,
+    ): number => {
+      const index = Number(element.dataset.index ?? "-1");
+      const row = transcriptMeasurementRows[index];
+      if (!row) {
+        return defaultMeasureElement(element, entry, instance);
+      }
+
+      const cached = transcriptMeasurementCacheRef.current.get(row.cacheKey);
+      if (
+        entry === undefined &&
+        cached &&
+        cached.contentKey === row.contentKey
+      ) {
+        return cached.size;
+      }
+
+      const size = defaultMeasureElement(element, entry, instance);
+      transcriptMeasurementCacheRef.current.set(row.cacheKey, {
+        contentKey: row.contentKey,
+        size,
+      });
+      return size;
+    },
+    [transcriptMeasurementRows],
+  );
+
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: rowCount,
     estimateSize: (index) => {
-      // Keep top content and row estimates separate because header height differs from messages.
-      if (hasTopContent && index === 0) {
-        return 140;
+      const row = transcriptMeasurementRows[index];
+      if (!row) {
+        return variant === "desktop"
+          ? DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX
+          : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX;
       }
-      return variant === "desktop"
-        ? DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX
-        : MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX;
+
+      const cached = transcriptMeasurementCacheRef.current.get(row.cacheKey);
+      if (cached && cached.contentKey === row.contentKey) {
+        return cached.size;
+      }
+
+      return row.estimatedSize;
     },
     getItemKey: (index) => {
-      // Row 0 may be header; otherwise map to groupedMessages with offset.
-      if (hasTopContent && index === 0) {
-        return `chat-header:${activeThreadId ?? "none"}`;
-      }
-      return groupedMessages[index - (hasTopContent ? 1 : 0)]?.key ?? index;
+      return transcriptMeasurementRows[index]?.cacheKey ?? index;
     },
     getScrollElement: () => scrollRef.current,
+    measureElement: measureTranscriptRowElement,
     overscan:
       variant === "desktop"
         ? DESKTOP_CHAT_TRANSCRIPT_OVERSCAN
