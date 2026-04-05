@@ -1,10 +1,7 @@
 import type { Database } from "bun:sqlite";
 
-import { initAppDatabase, listSecurityAuditEvents } from "./db";
-import type { AppRPCSchema, RpcSecurityAuditEvent } from "./rpc-schema";
-
-type ListSecurityAuditEventsParams =
-  AppRPCSchema["requests"]["listSecurityAuditEvents"]["params"];
+import { listSecurityAuditEvents } from "./db";
+import type { RpcSecurityAuditEvent } from "./rpc-schema";
 
 const DEFAULT_SECURITY_AUDIT_LIMIT = 100;
 const MAX_SECURITY_AUDIT_LIMIT = 200;
@@ -79,7 +76,11 @@ function parseSecurityAuditPayload(
 
 export function listSecurityAuditEventsFromDatabase(
   database: Database,
-  params: ListSecurityAuditEventsParams = {},
+  params: {
+    limit?: number;
+    projectId?: number | null;
+    threadId?: number | null;
+  } = {},
 ): RpcSecurityAuditEvent[] {
   const projectId = normalizeProjectId(params.projectId);
   const threadId = normalizeThreadId(params.threadId);
@@ -106,10 +107,4 @@ export function listSecurityAuditEventsFromDatabase(
     threadId: event.threadId,
     worktreePath: event.worktreePath,
   }));
-}
-
-export function listSecurityAuditEventsProcedure(
-  params: ListSecurityAuditEventsParams = {},
-): RpcSecurityAuditEvent[] {
-  return listSecurityAuditEventsFromDatabase(initAppDatabase(), params);
 }

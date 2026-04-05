@@ -574,14 +574,6 @@ export type AppRPCSchema = {
       params: { threadIds: number[] };
       response: RpcThread[];
     };
-    listSecurityAuditEvents: {
-      params: {
-        limit?: number;
-        projectId?: number | null;
-        threadId?: number | null;
-      };
-      response: RpcSecurityAuditEvent[];
-    };
     createThread: {
       params: {
         projectId: number;
@@ -786,10 +778,6 @@ export interface ProjectProcedures {
   listThreadStatuses: RpcProcedureCall<
     AppRPCSchema["requests"]["listThreadStatuses"]["params"],
     AppRPCSchema["requests"]["listThreadStatuses"]["response"]
-  >;
-  listSecurityAuditEvents: RpcProcedureCall<
-    AppRPCSchema["requests"]["listSecurityAuditEvents"]["params"],
-    AppRPCSchema["requests"]["listSecurityAuditEvents"]["response"]
   >;
   createThread: RpcProcedureCall<
     AppRPCSchema["requests"]["createThread"]["params"],

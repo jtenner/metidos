@@ -1,5 +1,5 @@
-import { closeAppDatabase } from "./db";
-import { listSecurityAuditEventsProcedure } from "./security-audit";
+import { closeAppDatabase, initAppDatabase } from "./db";
+import { listSecurityAuditEventsFromDatabase } from "./security-audit";
 
 export type SecurityAuditCliOptions = {
   format: "json" | "text";
@@ -126,7 +126,7 @@ export function parseSecurityAuditCliArgs(
 }
 
 export function formatSecurityAuditEventsForCli(
-  events: ReturnType<typeof listSecurityAuditEventsProcedure>,
+  events: ReturnType<typeof listSecurityAuditEventsFromDatabase>,
 ): string {
   if (events.length === 0) {
     return "No security audit events found.";
@@ -163,7 +163,7 @@ export async function runSecurityAuditCli(args: string[]): Promise<void> {
     return;
   }
 
-  const events = listSecurityAuditEventsProcedure({
+  const events = listSecurityAuditEventsFromDatabase(initAppDatabase(), {
     limit: options.limit,
     ...(typeof options.projectId === "number"
       ? {

@@ -778,7 +778,6 @@ const procedures: ProjectProcedures = {
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),
   listThreadStatuses: createProcedure("listThreadStatuses"),
-  listSecurityAuditEvents: createProcedure("listSecurityAuditEvents"),
   openProject: createProcedure("openProject"),
   openProjectsBatch: createProcedure("openProjectsBatch"),
   closeProject: createProcedure("closeProject"),
