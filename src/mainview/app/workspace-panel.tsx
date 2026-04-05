@@ -71,6 +71,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   // Global panel + section open state is shared with the sidebar panel reducer.
   const workspaceOpen = useWorkspacePanelOpen();
   const workspaceActiveOpen = useWorkspaceActiveSectionOpen();
+  const createThreadDisabled = isCreatingThread || !canCreateThread;
   // Empty-state is shown only when both pinned and recent lists are empty.
   const hasThreads =
     workspacePinnedThreads.length > 0 || workspaceActiveThreads.length > 0;
@@ -85,9 +86,17 @@ export const WorkspacePanel = memo(function WorkspacePanel({
           <div className="group relative">
             <button
               type="button"
-              className={sidebarActionButtonClass}
-              onClick={onCreateThread}
-              disabled={isCreatingThread || !canCreateThread}
+              className={`${sidebarActionButtonClass} ${
+                createThreadDisabled ? "cursor-not-allowed opacity-50" : ""
+              }`}
+              onClick={() => {
+                if (createThreadDisabled) {
+                  return;
+                }
+                onCreateThread();
+              }}
+              disabled={isCreatingThread}
+              aria-disabled={createThreadDisabled}
               aria-label="Create thread for selected worktree"
               title={
                 canCreateThread
@@ -97,33 +106,31 @@ export const WorkspacePanel = memo(function WorkspacePanel({
             >
               +
             </button>
-            {canCreateThread ? (
-              <div className="pointer-events-none absolute left-full top-1/2 z-30 ml-2 min-w-[220px] -translate-y-1/2 rounded-md border border-[#2b3b47] bg-[#14181a] px-2.5 py-2 text-[10px] text-[#dce6ec] opacity-0 transition-opacity duration-120 group-hover:opacity-100 group-focus-within:opacity-100">
-                <div className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
-                  New thread context
+            <div className="pointer-events-none absolute left-full top-1/2 z-[120] ml-2 min-w-[220px] -translate-y-1/2 rounded-md border border-[#2b3b47] bg-[#14181a] px-2.5 py-2 text-[10px] text-[#dce6ec] opacity-0 transition-opacity duration-120 group-hover:opacity-100 group-focus-within:opacity-100">
+              <div className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
+                New thread context
+              </div>
+              <div className="mt-1 space-y-0.5 text-[11px]">
+                <div>
+                  <span className="text-[#7c8f99]">Project:</span>{" "}
+                  <span className="truncate">
+                    {selectedProjectNameForThread}
+                  </span>
                 </div>
-                <div className="mt-1 space-y-0.5 text-[11px]">
-                  <div>
-                    <span className="text-[#7c8f99]">Project:</span>{" "}
-                    <span className="truncate">
-                      {selectedProjectNameForThread}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#7c8f99]">Branch:</span>{" "}
-                    <span className="truncate">
-                      {activeSelectedWorktreeBranch}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[#7c8f99]">Worktree:</span>{" "}
-                    <span className="truncate">
-                      {activeSelectedWorktreeFolder}
-                    </span>
-                  </div>
+                <div>
+                  <span className="text-[#7c8f99]">Branch:</span>{" "}
+                  <span className="truncate">
+                    {activeSelectedWorktreeBranch}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#7c8f99]">Worktree:</span>{" "}
+                  <span className="truncate">
+                    {activeSelectedWorktreeFolder}
+                  </span>
                 </div>
               </div>
-            ) : null}
+            </div>
           </div>
         }
       />

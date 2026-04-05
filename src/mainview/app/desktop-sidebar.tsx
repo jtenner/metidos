@@ -48,7 +48,7 @@ export function DesktopSidebar({
 
   return (
     <aside
-      className={`relative min-h-0 shrink-0 overflow-hidden border-r border-[#262626] bg-[#131313] transition-[width] duration-300 ${
+      className={`relative min-h-0 shrink-0 overflow-visible border-r border-[#262626] bg-[#131313] transition-[width] duration-300 ${
         collapsed ? "w-14" : "w-[21rem]"
       }`}
       style={{
