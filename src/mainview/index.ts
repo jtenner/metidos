@@ -117,6 +117,38 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function installSafePerformanceMeasure(): void {
+  if (
+    typeof performance === "undefined" ||
+    typeof performance.measure !== "function"
+  ) {
+    return;
+  }
+
+  const originalMeasure = performance.measure.bind(performance);
+
+  performance.measure = ((...args: Parameters<typeof performance.measure>) => {
+    try {
+      return originalMeasure(...args);
+    } catch (error) {
+      if (
+        !(error instanceof DOMException) ||
+        error.name !== "DataCloneError" ||
+        args.length < 2 ||
+        typeof args[1] !== "object" ||
+        args[1] === null ||
+        Array.isArray(args[1]) ||
+        !("detail" in args[1])
+      ) {
+        throw error;
+      }
+
+      const { detail: _detail, ...cloneSafeOptions } = args[1];
+      return originalMeasure(args[0], cloneSafeOptions);
+    }
+  }) as typeof performance.measure;
+}
+
 function readInjectedRuntimeConfig(): RuntimeConfig | null {
   const element = document.getElementById(RUNTIME_CONFIG_ELEMENT_ID);
   const raw = element?.textContent?.trim();
@@ -184,6 +216,8 @@ const runtimeConfig: RuntimeConfig = readInjectedRuntimeConfig() ??
   window.__joltRuntime ?? {
     devServer: false,
   };
+
+installSafePerformanceMeasure();
 
 const socketProtocol =
   runtimeConfig.preferTls || window.location.protocol === "https:"

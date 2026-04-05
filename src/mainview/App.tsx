@@ -1971,6 +1971,7 @@ export default function App({
       threadHistoryBackfillAbortControllerRef.current = controller;
       void (async () => {
         let nextCursor: number | null = initialCursor;
+        let backfilledMessages: RpcThreadMessage[] = [];
         while (nextCursor !== null) {
           const detail = await procedures.getThread(
             {
@@ -1986,12 +1987,24 @@ export default function App({
             return;
           }
 
-          setThreadMessages((current) =>
-            mergeThreadMessageHistory(current, detail.messages),
+          backfilledMessages = mergeThreadMessageHistory(
+            backfilledMessages,
+            detail.messages,
           );
           nextCursor =
             detail.nextCursor === nextCursor ? null : detail.nextCursor;
           selectedThreadHistoryCursorRef.current = nextCursor;
+        }
+
+        if (
+          backfilledMessages.length > 0 &&
+          selectedThreadIdRef.current === threadId
+        ) {
+          // Commit the full older-history backfill once so large threads do not
+          // repeatedly reflow and repaint while pagination is still in flight.
+          setThreadMessages((current) =>
+            mergeThreadMessageHistory(current, backfilledMessages),
+          );
         }
       })()
         .catch((error) => {

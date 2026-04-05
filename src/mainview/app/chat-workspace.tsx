@@ -1,5 +1,6 @@
 import {
   measureElement as defaultMeasureElement,
+  type ReactVirtualizerOptions,
   useVirtualizer,
   type Virtualizer,
 } from "@tanstack/react-virtual";
@@ -11,7 +12,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -104,6 +104,15 @@ type TranscriptMeasurementRow = {
 type TranscriptMeasurementCacheEntry = {
   contentKey: string;
   size: number;
+};
+
+type ChatVirtualizerOptions = ReactVirtualizerOptions<
+  HTMLDivElement,
+  HTMLDivElement
+> & {
+  shouldAdjustScrollPositionOnItemSizeChange?: (item: {
+    index: number;
+  }) => boolean;
 };
 
 /**
@@ -485,7 +494,55 @@ function UnsafeModeToggle({
   );
 }
 
-function DesktopTranscriptGroupRow({
+function areGroupRowPropsEqual(
+  previous: Readonly<GroupRowProps>,
+  next: Readonly<GroupRowProps>,
+): boolean {
+  if (
+    previous.group.kind !== next.group.kind ||
+    previous.isLast !== next.isLast ||
+    previous.localUserLabel !== next.localUserLabel ||
+    previous.renderAssistantMessageContent !==
+      next.renderAssistantMessageContent
+  ) {
+    return false;
+  }
+
+  if (previous.group.kind === "assistant" && next.group.kind === "assistant") {
+    if (
+      previous.group.startIndex !== next.group.startIndex ||
+      previous.group.endIndex !== next.group.endIndex ||
+      previous.group.key !== next.group.key
+    ) {
+      return false;
+    }
+
+    for (
+      let index = previous.group.startIndex;
+      index < previous.group.endIndex;
+      index += 1
+    ) {
+      if (previous.messages[index] !== next.messages[index]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (previous.group.kind === "user" && next.group.kind === "user") {
+    return (
+      previous.group.messageIndex === next.group.messageIndex &&
+      previous.group.key === next.group.key &&
+      previous.messages[previous.group.messageIndex] ===
+        next.messages[next.group.messageIndex]
+    );
+  }
+
+  return false;
+}
+
+const DesktopTranscriptGroupRow = memo(function DesktopTranscriptGroupRow({
   group,
   isLast,
   localUserLabel,
@@ -547,9 +604,9 @@ function DesktopTranscriptGroupRow({
       )}
     </div>
   );
-}
+}, areGroupRowPropsEqual);
 
-function MobileTranscriptGroupRow({
+const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
   group,
   isLast,
   localUserLabel,
@@ -620,7 +677,7 @@ function MobileTranscriptGroupRow({
       )}
     </div>
   );
-}
+}, areGroupRowPropsEqual);
 
 const ChatTranscript = memo(function ChatTranscript({
   activeThreadId,
@@ -646,6 +703,7 @@ const ChatTranscript = memo(function ChatTranscript({
   const groupedMessagesCacheRef = useRef<GroupedVisibleMessagesCache | null>(
     null,
   );
+  const autoscrollRafRef = useRef<number | null>(null);
   const groupedMessagesCache = deriveGroupedVisibleMessages(
     activeThreadId,
     messages,
@@ -810,13 +868,19 @@ const ChatTranscript = memo(function ChatTranscript({
       variant === "desktop"
         ? DESKTOP_CHAT_TRANSCRIPT_OVERSCAN
         : MOBILE_CHAT_TRANSCRIPT_OVERSCAN,
+    shouldAdjustScrollPositionOnItemSizeChange: (item: { index: number }) => {
+      if (!pinnedToBottomRef.current) {
+        return false;
+      }
+      return item.index === rowCount - 1;
+    },
     paddingEnd: paddingEndPx,
     paddingStart: paddingStartPx,
     scrollPaddingEnd: paddingEndPx,
     scrollPaddingStart: paddingStartPx,
     useAnimationFrameWithResizeObserver: true,
     useFlushSync: false,
-  });
+  } as ChatVirtualizerOptions);
 
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
@@ -842,8 +906,7 @@ const ChatTranscript = memo(function ChatTranscript({
     });
   }, [rowCount, virtualizer]);
 
-  useLayoutEffect(() => {
-    void totalSize;
+  useEffect(() => {
     // On thread change, force pin-to-bottom behavior so new thread opens scrolled to latest.
     const threadChanged = previousThreadIdRef.current !== activeThreadId;
     if (threadChanged) {
@@ -851,9 +914,21 @@ const ChatTranscript = memo(function ChatTranscript({
       previousThreadIdRef.current = activeThreadId;
     }
     if (pinnedToBottomRef.current) {
-      scrollToBottom();
+      if (autoscrollRafRef.current !== null) {
+        window.cancelAnimationFrame(autoscrollRafRef.current);
+      }
+      autoscrollRafRef.current = window.requestAnimationFrame(() => {
+        scrollToBottom();
+        autoscrollRafRef.current = null;
+      });
     }
-  }, [activeThreadId, scrollToBottom, totalSize]);
+    return () => {
+      if (autoscrollRafRef.current !== null) {
+        window.cancelAnimationFrame(autoscrollRafRef.current);
+        autoscrollRafRef.current = null;
+      }
+    };
+  }, [activeThreadId, scrollToBottom]);
 
   return (
     <div
