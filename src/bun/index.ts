@@ -33,6 +33,7 @@ import {
   resolveDevFlowMode,
 } from "./dev-flows";
 import { getGitSchedulerStats } from "./git";
+import { createSubsystemLogger, type LogDescription } from "./logging";
 import {
   closeProjectProcedure,
   closeWorktreeProcedure,
@@ -143,6 +144,8 @@ const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const DEFAULT_HTTP_PROXY_PORT = 80;
 const DEFAULT_HTTPS_PROXY_PORT = 443;
 
+const webServerLogger = createSubsystemLogger("Web Server");
+
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
 
@@ -217,6 +220,18 @@ type RpcRequestHandlerMap = {
 /** Indicates whether a string can be safely parsed as a decimal port number. */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
+}
+
+function normalizeErrorDescription(error: unknown): LogDescription {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null,
+    };
+  }
+
+  return String(error);
 }
 
 type PendingRpcRequest = {
@@ -879,7 +894,11 @@ function authErrorResponse(
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  console.error("Unhandled auth route failure", error);
+  webServerLogger.error({
+    message: "Unhandled auth route failure",
+    sourceMessage: message,
+    error: normalizeErrorDescription(error),
+  });
   return jsonResponse(
     {
       error: {
@@ -1261,7 +1280,10 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
       return;
     }
     lastOverloadLogAt = nowMs;
-    console.warn("Server overload pressure", JSON.stringify(health));
+    webServerLogger.warning({
+      message: "Server overload pressure",
+      health,
+    });
   }, SERVER_MONITOR_INTERVAL_MS);
 }
 
@@ -1782,10 +1804,11 @@ function flushPendingMainviewReloads(): void {
       try {
         await queueMainviewBundleBuild();
       } catch (error) {
-        console.error(
-          "Failed to rebuild the mainview bundle after a source change",
-          error,
-        );
+        webServerLogger.error({
+          message:
+            "Failed to rebuild the mainview bundle after a source change",
+          error: normalizeErrorDescription(error),
+        });
         return;
       }
     }
@@ -1924,11 +1947,19 @@ function shutdownDevWatchers(): void {
 async function bootstrap(): Promise<void> {
   if (DEV_FLOW_MODE.resetOnStartup) {
     resetLocalAppState({
-      logger: console,
+      logger: {
+        warn: (message: string, ...extra: unknown[]) => {
+          const detail =
+            extra.length > 0
+              ? `${String(message)} ${extra.map((item) => String(item)).join(" ")}`
+              : message;
+          webServerLogger.warning(detail);
+        },
+      },
     });
   }
   if (DEV_FLOW_MODE.authBypass) {
-    console.warn(
+    webServerLogger.warning(
       "[jolt] JOLT_DEV_BYPASS=1 is active. Auth and RPC login checks are bypassed in dev mode.",
     );
   }
@@ -2235,13 +2266,13 @@ async function bootstrap(): Promise<void> {
       port: 0,
     });
     activeServerPort = server.port ?? activeServerPort;
-    console.warn(
+    webServerLogger.warning(
       `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
     );
   }
   activeServerPort = server.port ?? activeServerPort;
 
-  console.log(
+  webServerLogger.info(
     BACKEND_ONLY
       ? `Jolt RPC backend listening on http://localhost:${server.port}`
       : `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}${TLS_RUNTIME.publicTls ? " with public HTTPS/WSS expected via reverse proxy" : ""}`,
@@ -2276,7 +2307,10 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
     await shutdownActiveThreadTurns();
   })()
     .catch((error) => {
-      console.error("Failed to cleanly shut down Jolt", error);
+      webServerLogger.error({
+        message: "Failed to cleanly shut down Jolt",
+        error: normalizeErrorDescription(error),
+      });
     })
     .finally(() => {
       process.exit(exitCode);
@@ -2294,12 +2328,12 @@ process.on("SIGTERM", () => {
 });
 
 process.on("uncaughtException", (error) => {
-  console.error(error);
+  webServerLogger.error(normalizeErrorDescription(error));
   void shutdownAndExit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error(reason);
+  webServerLogger.error(normalizeErrorDescription(reason));
   void shutdownAndExit(1);
 });
 

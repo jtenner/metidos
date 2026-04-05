@@ -4,7 +4,7 @@
  */
 
 import { resolve } from "node:path";
-
+import { createSubsystemLogger } from "./logging";
 import {
   buildLoopbackBrowserOrigins,
   parseAllowedBrowserOrigins,
@@ -22,6 +22,7 @@ import {
  */
 
 const DEFAULT_PUBLIC_PORT = "7599";
+const isolatedServerLogger = createSubsystemLogger("Web Server");
 
 /**
  * Process role names that this launcher can start.
@@ -197,7 +198,7 @@ const staticServer = spawnRole(
   },
 );
 
-console.log(
+isolatedServerLogger.info(
   `Jolt isolated server listening on http://localhost:${PUBLIC_PORT} with RPC backend ${rpcHttpOrigin}${TLS_RUNTIME.publicTls ? " and public HTTPS/WSS expected via reverse proxy" : ""}`,
 );
 
@@ -246,12 +247,20 @@ process.on("SIGTERM", () => {
 });
 
 process.on("uncaughtException", (error) => {
-  console.error(error);
+  isolatedServerLogger.error(
+    error instanceof Error
+      ? `Jolt isolated server uncaught exception: ${error.message}`
+      : "Jolt isolated server uncaught exception",
+  );
   void shutdownAndExit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error(reason);
+  isolatedServerLogger.error(
+    reason instanceof Error
+      ? `Jolt isolated server unhandled rejection: ${reason.message}`
+      : "Jolt isolated server unhandled rejection",
+  );
   void shutdownAndExit(1);
 });
 
@@ -269,7 +278,7 @@ const exitedProcess = await Promise.race([
 ]);
 
 if (!shuttingDown) {
-  console.error(
+  isolatedServerLogger.error(
     `Jolt isolated server child "${exitedProcess.role}" exited with code ${exitedProcess.code}.`,
   );
   await shutdownAndExit(exitedProcess.code === 0 ? 1 : exitedProcess.code);

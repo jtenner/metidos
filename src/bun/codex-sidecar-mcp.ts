@@ -12,6 +12,7 @@ import {
   enforceBoundThreadScope,
   enforceTargetScope,
 } from "./codex-sidecar-scope";
+import { createSubsystemLogger } from "./logging";
 import type {
   AppRPCSchema,
   RpcProcedureCallOptions,
@@ -77,6 +78,7 @@ const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
 const rpcHttpOrigin =
   readStringEnv("JOLT_RPC_HTTP_ORIGIN") ?? deriveRpcHttpOrigin(rpcUrl);
 const sessionIdContext = readStringEnv("JOLT_SESSION_ID");
+const sidecarLogger = createSubsystemLogger("MCP Sidecar");
 
 /** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {
@@ -1453,7 +1455,11 @@ async function main(): Promise<void> {
 
 if (import.meta.main) {
   void main().catch((error) => {
-    console.error("Jolt sidecar MCP server failed", error);
+    sidecarLogger.error(
+      error instanceof Error
+        ? `Jolt sidecar MCP server failed: ${error.message}`
+        : "Jolt sidecar MCP server failed",
+    );
     process.exit(1);
   });
 }
