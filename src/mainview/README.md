@@ -60,9 +60,15 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/message-markdown.tsx` contains the lazily loaded rich markdown and syntax-highlighting renderer used only for markdown-heavy transcript content.
 
-`app/message-markdown-loader.ts` exposes the shared dynamic-import loader used to defer and warm the rich markdown renderer after initial app mount.
+`app/message-markdown-loader.ts` exposes the shared dynamic-import loader used to defer and warm the rich markdown renderer after initial app mount, including the prepared-block renderer for huge worker-preprocessed transcript messages.
 
 `app/message-markdown-routing.ts` isolates the plain-text versus rich-markdown routing heuristics and bare-link splitting used by transcript message rendering.
+
+`app/message-preprocessing.ts` contains the shared preprocessing plan and threshold used to segment huge assistant responses before rendering.
+
+`app/message-preprocessing-client.ts` exposes the cached request manager and hook that offload huge markdown/code-heavy assistant-response preprocessing to a browser worker.
+
+`app/message-preprocessing-worker.ts` is the dedicated web worker entrypoint for preparing very large assistant responses away from the UI thread.
 
 `app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, notices, and the shared diff viewer used across transcript and history surfaces.
 

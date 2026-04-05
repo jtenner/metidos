@@ -66,10 +66,19 @@ Contains every major message renderer used in the chat stream, including the lig
 Contains the rich markdown renderer and syntax-highlighting path, isolated behind a lazy import so heavy transcript dependencies stay out of the initial UI bundle.
 
 `message-markdown-loader.ts`
-Exports the shared lazy loader used by the main message UI and startup warmup path to fetch the rich markdown renderer on demand.
+Exports the shared lazy loader used by the main message UI and startup warmup path to fetch the rich markdown renderer on demand, including the prepared-block renderer used for worker-preprocessed huge assistant responses.
 
 `message-markdown-routing.ts`
 Defines the lightweight heuristics and bare-link splitting used to keep ordinary chat messages on the plain-text path until richer markdown features are present.
+
+`message-preprocessing.ts`
+Defines the worker-threshold heuristic and shared preprocessing plan for huge assistant responses, including markdown/code block segmentation and code-highlight skip decisions.
+
+`message-preprocessing-client.ts`
+Provides the cached worker-backed request manager and React hook that preprocess very large markdown-heavy messages off the main thread.
+
+`message-preprocessing-worker.ts`
+Implements the browser worker entrypoint that prepares large markdown/code-heavy assistant responses away from the UI thread.
 
 `sidebar-panels-state.ts`
 Owns persisted open/closed state for sidebar panels and exposes toggle/read hooks for each section.

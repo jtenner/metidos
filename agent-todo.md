@@ -546,7 +546,7 @@ Done when:
 
 ### Slice P5.2: Workerize markdown/code preprocessing for huge assistant responses
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Markdown and code-heavy assistant output can still be expensive for the main thread.

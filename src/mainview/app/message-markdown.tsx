@@ -3,14 +3,15 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
+import {
+  type PreparedMessageRenderPlan,
+  shouldSkipSyntaxHighlighting,
+} from "./message-preprocessing";
 
 const CODE_FONT_STACK =
   '"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const LINK_CLASS_NAME =
   "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
-const MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS = 12_000;
-const MAX_HIGHLIGHTED_CODE_BLOCK_LINES = 240;
-
 const codeBlockStyle = {
   margin: 0,
   border: "1px solid rgba(153, 190, 217, 0.18)",
@@ -25,12 +26,40 @@ const codeTagStyle = {
   fontFamily: CODE_FONT_STACK,
 } satisfies CSSProperties;
 
-function shouldSkipSyntaxHighlighting(code: string): boolean {
-  if (code.length > MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS) {
-    return true;
+function renderPreparedCodeBlock({
+  code,
+  language,
+  shouldHighlight,
+}: {
+  code: string;
+  language: string | null;
+  shouldHighlight: boolean;
+}): JSX.Element {
+  if (!shouldHighlight) {
+    return (
+      <div style={codeBlockStyle}>
+        <code
+          className="block whitespace-pre-wrap break-words"
+          style={codeTagStyle}
+        >
+          {code}
+        </code>
+      </div>
+    );
   }
 
-  return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
+  return (
+    <SyntaxHighlighter
+      PreTag="div"
+      language={language ?? "text"}
+      style={vscDarkPlus}
+      customStyle={codeBlockStyle}
+      codeTagProps={{ style: codeTagStyle }}
+      wrapLongLines
+    >
+      {code}
+    </SyntaxHighlighter>
+  );
 }
 
 const markdownComponents: Components = {
@@ -111,6 +140,32 @@ export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
       >
         {text}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+export function PreparedRichMarkdownMessage({
+  plan,
+}: {
+  plan: Extract<PreparedMessageRenderPlan, { kind: "rich" }>;
+}): JSX.Element {
+  return (
+    <div className="message-markdown">
+      {plan.blocks.map((block) =>
+        block.kind === "markdown" ? (
+          <ReactMarkdown
+            key={block.key}
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {block.text}
+          </ReactMarkdown>
+        ) : (
+          <div className="my-3 overflow-x-auto" key={block.key}>
+            {renderPreparedCodeBlock(block)}
+          </div>
+        ),
+      )}
     </div>
   );
 }

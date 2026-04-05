@@ -16,11 +16,17 @@ import {
   type DiffParseSnapshot,
   useDiffParseResult,
 } from "./diff-parsing-client";
-import { LazyRichMarkdownMessage } from "./message-markdown-loader";
 import {
+  LazyPreparedRichMarkdownMessage,
+  LazyRichMarkdownMessage,
+} from "./message-markdown-loader";
+import {
+  type PlainTextMessageSegment,
   shouldUseRichMarkdownRenderer,
   splitPlainTextMessage,
 } from "./message-markdown-routing";
+import { shouldWorkerizeMessagePreprocessing } from "./message-preprocessing";
+import { usePreparedMessageRenderPlan } from "./message-preprocessing-client";
 import type {
   GitHistoryModalState,
   MessageGroup,
@@ -35,15 +41,20 @@ const MARKDOWN_LINK_CLASS_NAME =
   "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
 
 const PlainTextMessage = memo(function PlainTextMessage({
+  segments,
   text,
 }: {
+  segments?: PlainTextMessageSegment[];
   text: string;
 }): JSX.Element {
-  const segments = useMemo(() => splitPlainTextMessage(text), [text]);
+  const resolvedSegments = useMemo(
+    () => segments ?? splitPlainTextMessage(text),
+    [segments, text],
+  );
 
   return (
     <div className="whitespace-pre-wrap break-words">
-      {segments.map((segment) =>
+      {resolvedSegments.map((segment) =>
         segment.kind === "link" ? (
           <a
             href={segment.href}
@@ -62,11 +73,46 @@ const PlainTextMessage = memo(function PlainTextMessage({
   );
 });
 
+function PreparingLargeMarkdownMessage(): JSX.Element {
+  return (
+    <div className="border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">
+      Preparing formatted response...
+    </div>
+  );
+}
+
+function LargeMarkdownMessage({ text }: { text: string }): JSX.Element {
+  const preprocessedMessage = usePreparedMessageRenderPlan(text);
+
+  if (preprocessedMessage.isLoading) {
+    return <PreparingLargeMarkdownMessage />;
+  }
+
+  if (preprocessedMessage.plan.kind === "plain") {
+    return (
+      <PlainTextMessage
+        segments={preprocessedMessage.plan.segments}
+        text={text}
+      />
+    );
+  }
+
+  return (
+    <Suspense fallback={<PreparingLargeMarkdownMessage />}>
+      <LazyPreparedRichMarkdownMessage plan={preprocessedMessage.plan} />
+    </Suspense>
+  );
+}
+
 export const MarkdownMessage = memo(function MarkdownMessage({
   text,
 }: {
   text: string;
 }): JSX.Element {
+  if (shouldWorkerizeMessagePreprocessing(text)) {
+    return <LargeMarkdownMessage text={text} />;
+  }
+
   if (!shouldUseRichMarkdownRenderer(text)) {
     return <PlainTextMessage text={text} />;
   }

@@ -1,10 +1,15 @@
 import { lazy } from "react";
 
 type RichMarkdownModule = typeof import("./message-markdown");
+type PreparedRichMarkdownMessageComponent =
+  typeof import("./message-markdown").PreparedRichMarkdownMessage;
 
 export type RichMarkdownMessageProps = {
   text: string;
 };
+
+export type PreparedRichMarkdownMessageProps =
+  Parameters<PreparedRichMarkdownMessageComponent>[0];
 
 let richMarkdownModulePromise: Promise<RichMarkdownModule> | null = null;
 
@@ -21,5 +26,12 @@ export const LazyRichMarkdownMessage = lazy(async () => {
   const module = await loadRichMarkdownModule();
   return {
     default: module.RichMarkdownMessage,
+  };
+});
+
+export const LazyPreparedRichMarkdownMessage = lazy(async () => {
+  const module = await loadRichMarkdownModule();
+  return {
+    default: module.PreparedRichMarkdownMessage,
   };
 });
