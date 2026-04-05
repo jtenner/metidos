@@ -48,10 +48,15 @@ import {
   APP_TITLE,
   appendGitHistoryPage,
   awaitAbortableResult,
+  buildProjectWorktreeIndex,
   clampProjectMenuCoordinate,
   createAbortError,
+  createProjectStore,
+  createThreadStore,
   defaultProjectState,
   defaultWorktreeState,
+  emptyProjectStore,
+  emptyThreadStore,
   formatDirectoryPathForInput,
   GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
   GIT_HISTORY_PAGE_SIZE,
@@ -71,20 +76,24 @@ import {
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
+  type ProjectStore,
   patchPersistedMainviewState,
   pickInitialThread,
   preferredThreadForWorktree,
   primaryWorktreePath,
+  projectStateWorktrees,
+  projectStoreItems,
   readLruValue,
   readPersistedMainviewState,
-  removeThreadFromList,
+  removeThreadFromStore,
   serializeOpenWorktrees,
-  sortThreads,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
   THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
-  upsertProjectList,
-  upsertThreadList,
+  type ThreadStore,
+  threadStoreItems,
+  upsertProjectStore,
+  upsertThreadStore,
   type VisibleMessage,
   type WorktreeNodeState,
   type WorktreeStateMap,
@@ -410,10 +419,14 @@ function buildLoadedProjectWorktreesState(
   loadedAtMs: number = Date.now(),
 ): Pick<
   ProjectNodeState,
-  "error" | "loadingWorktrees" | "worktrees" | "worktreesLoadedAt"
+  | "error"
+  | "loadingWorktrees"
+  | "worktreeByPath"
+  | "worktreePaths"
+  | "worktreesLoadedAt"
 > {
   return {
-    worktrees,
+    ...buildProjectWorktreeIndex(worktrees),
     worktreesLoadedAt: loadedAtMs,
     loadingWorktrees: false,
     error: "",
@@ -444,7 +457,9 @@ export default function App({
   }
   const initialMainviewState = initialMainviewStateRef.current;
 
-  const [projects, setProjects] = useState<RpcProject[]>([]);
+  const [projectStore, setProjectStore] = useState<ProjectStore>(() =>
+    emptyProjectStore(),
+  );
   const [projectStates, setProjectStates] = useState<ProjectStateMap>({});
   const [worktreeStates, setWorktreeStates] = useState<WorktreeStateMap>({});
   const [homeDirectory, setHomeDirectory] = useState("");
@@ -462,7 +477,9 @@ export default function App({
   const [worktreePinBusyPath, setWorktreePinBusyPath] = useState<string | null>(
     null,
   );
-  const [threads, setThreads] = useState<RpcThread[]>([]);
+  const [threadStore, setThreadStore] = useState<ThreadStore>(() =>
+    emptyThreadStore(),
+  );
   const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
   const [securityAuditEvents, setSecurityAuditEvents] = useState<
     RpcSecurityAuditEvent[]
@@ -565,6 +582,11 @@ export default function App({
   const [worktreeThreadPopover, setWorktreeThreadPopover] =
     useState<WorktreeThreadPopoverState | null>(null);
   const isDesktopViewport = useDesktopViewport();
+  const projects = useMemo(
+    () => projectStoreItems(projectStore),
+    [projectStore],
+  );
+  const threads = useMemo(() => threadStoreItems(threadStore), [threadStore]);
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
@@ -779,7 +801,10 @@ export default function App({
     (project: RpcProject, worktreePath?: string | null): void => {
       const nextWorktreePath =
         worktreePath ??
-        primaryWorktreePath(project, getProjectState(project.id).worktrees);
+        primaryWorktreePath(
+          project,
+          projectStateWorktrees(getProjectState(project.id)),
+        );
       // Keep both refs and state aligned so all async handlers observe new selection.
       selectedProjectIdRef.current = project.id;
       selectedWorktreePathRef.current = nextWorktreePath;
@@ -934,9 +959,7 @@ export default function App({
   const currentThreadStartRequestProject =
     currentThreadStartRequest === null
       ? null
-      : (projects.find(
-          (project) => project.id === currentThreadStartRequest.projectId,
-        ) ?? null);
+      : (projectById.get(currentThreadStartRequest.projectId) ?? null);
   const currentThreadStartRequestWorkspace = currentThreadStartRequest
     ? formatDirectoryPathForInput(
         currentThreadStartRequest.worktreePath,
@@ -983,12 +1006,11 @@ export default function App({
         return "completed";
       }
 
-      return threads.find((thread) => thread.id === threadId)?.runStatus
-        .state === "working"
+      return threadStore.byId[threadId]?.runStatus.state === "working"
         ? "working"
         : "none";
     },
-    [completedThreadIndicatorIds, threads],
+    [completedThreadIndicatorIds, threadStore],
   );
   const toggleTranscriptItemExpanded = useCallback((messageKey: string) => {
     setExpandedTranscriptItemIds((current) => {
@@ -1560,6 +1582,26 @@ export default function App({
     });
   }, []);
 
+  const replaceProjects = useCallback((items: RpcProject[]): void => {
+    setProjectStore(createProjectStore(items));
+  }, []);
+
+  const upsertProject = useCallback((project: RpcProject): void => {
+    setProjectStore((prev) => upsertProjectStore(prev, project));
+  }, []);
+
+  const replaceThreads = useCallback((items: RpcThread[]): void => {
+    setThreadStore(createThreadStore(items));
+  }, []);
+
+  const upsertThread = useCallback((thread: RpcThread): void => {
+    setThreadStore((prev) => upsertThreadStore(prev, thread));
+  }, []);
+
+  const removeThread = useCallback((threadId: number): void => {
+    setThreadStore((prev) => removeThreadFromStore(prev, threadId));
+  }, []);
+
   const {
     addProjectError,
     addProjectInputIsPreviewing,
@@ -1586,9 +1628,9 @@ export default function App({
     procedures,
     selectProject,
     setMobileProjectListOpen,
-    setProjects,
     setProjectState,
     supportsTildePath,
+    upsertProject,
   });
 
   const clearProjectState = useCallback((projectId: number) => {
@@ -1727,7 +1769,8 @@ export default function App({
       },
     ): Promise<RpcWorktree[]> => {
       const current = getProjectState(projectId);
-      if ((options?.preferCached ?? true) && current.worktrees.length > 0) {
+      const currentWorktrees = projectStateWorktrees(current);
+      if ((options?.preferCached ?? true) && currentWorktrees.length > 0) {
         setProjectState(projectId, {
           loadingWorktrees: false,
           error: "",
@@ -1737,7 +1780,7 @@ export default function App({
             // Keep rendering the cached worktree list if the background refresh fails.
           });
         }
-        return current.worktrees;
+        return currentWorktrees;
       }
 
       setProjectState(projectId, {
@@ -1800,7 +1843,7 @@ export default function App({
           return null;
         }
 
-        setThreads((prev) => upsertThreadList(prev, detail.thread));
+        upsertThread(detail.thread);
         setSelectedThreadId(detail.thread.id);
         selectedThreadIdRef.current = detail.thread.id;
         selectedThreadRunStateRef.current = detail.thread.runStatus.state;
@@ -1841,6 +1884,7 @@ export default function App({
       loadProjectWorktrees,
       procedures,
       syncThreadContext,
+      upsertThread,
     ],
   );
 
@@ -2005,12 +2049,12 @@ export default function App({
         if (!result.discarded) {
           return;
         }
-        setThreads((prev) => removeThreadFromList(prev, result.threadId));
+        removeThread(result.threadId);
       } catch (error) {
         console.error(`Failed to discard empty thread ${threadId}`, error);
       }
     },
-    [procedures],
+    [procedures, removeThread],
   );
 
   const loadProjectTasks = useCallback(
@@ -2359,6 +2403,25 @@ export default function App({
     [applyOptimisticThreadErrorSeen],
   );
 
+  const applyOptimisticThreadErrorSeenToStore = useCallback(
+    (store: ThreadStore): ThreadStore => {
+      if (optimisticallyAcknowledgedThreadIdsRef.current.size === 0) {
+        return store;
+      }
+
+      let nextStore = store;
+      for (const thread of threadStoreItems(store)) {
+        const nextThread = applyOptimisticThreadErrorSeen(thread);
+        if (nextThread !== thread) {
+          nextStore = upsertThreadStore(nextStore, nextThread);
+        }
+      }
+
+      return nextStore;
+    },
+    [applyOptimisticThreadErrorSeen],
+  );
+
   const requestThreadErrorSeen = useCallback(
     (threadId: number): Promise<RpcThreadDetail> => {
       const existing = threadErrorSeenRequestCacheRef.current.get(threadId);
@@ -2386,15 +2449,15 @@ export default function App({
   const acknowledgeThreadErrorSeenInBackground = useCallback(
     (threadId: number) => {
       optimisticallyAcknowledgedThreadIdsRef.current.add(threadId);
-      setThreads((prev) => applyOptimisticThreadErrorSeenToList(prev));
+      setThreadStore((prev) => applyOptimisticThreadErrorSeenToStore(prev));
       void requestThreadErrorSeen(threadId)
         .then((detail) => {
           optimisticallyAcknowledgedThreadIdsRef.current.delete(threadId);
 
           const settledDetail = applyOptimisticThreadErrorSeenToDetail(detail);
-          setThreads((prev) =>
-            prev.some((entry) => entry.id === settledDetail.thread.id)
-              ? upsertThreadList(prev, settledDetail.thread)
+          setThreadStore((prev) =>
+            prev.byId[settledDetail.thread.id]
+              ? upsertThreadStore(prev, settledDetail.thread)
               : prev,
           );
           if (selectedThreadIdRef.current === threadId) {
@@ -2413,7 +2476,7 @@ export default function App({
     },
     [
       applyOptimisticThreadErrorSeenToDetail,
-      applyOptimisticThreadErrorSeenToList,
+      applyOptimisticThreadErrorSeenToStore,
       mergeSelectedThreadMessageHistory,
       requestThreadErrorSeen,
     ],
@@ -2453,9 +2516,9 @@ export default function App({
             ) ?? null);
 
       if (!selectedSummary) {
-        setThreads((currentThreads) =>
+        setThreadStore((currentThreadStore) =>
           mergeThreadStatusSummaries({
-            currentThreads,
+            currentThreadStore,
             loadedThreadStatuses,
           }),
         );
@@ -2472,9 +2535,9 @@ export default function App({
 
       if (!shouldRefreshSelectedDetail) {
         selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
-        setThreads((currentThreads) =>
+        setThreadStore((currentThreadStore) =>
           mergeThreadStatusSummaries({
-            currentThreads,
+            currentThreadStore,
             loadedThreadStatuses,
           }),
         );
@@ -2488,15 +2551,15 @@ export default function App({
           }),
         );
         const selectedThreadIdForCommit = selectedThreadIdRef.current;
-        setThreads(
-          (currentThreads) =>
+        setThreadStore(
+          (currentThreadStore) =>
             resolveThreadStatusRefreshOutcome({
-              currentThreads,
+              currentThreadStore,
               detail,
               loadedThreadStatuses,
               selectedSummaryThreadId: selectedSummary.id,
               selectedThreadId: selectedThreadIdForCommit,
-            }).nextThreads,
+            }).nextThreadStore,
         );
         if (selectedThreadIdForCommit !== selectedSummary.id) {
           return;
@@ -2505,15 +2568,15 @@ export default function App({
         mergeSelectedThreadMessageHistory(detail);
       } catch (error) {
         const selectedThreadIdForCommit = selectedThreadIdRef.current;
-        setThreads(
-          (currentThreads) =>
+        setThreadStore(
+          (currentThreadStore) =>
             resolveThreadStatusRefreshOutcome({
-              currentThreads,
+              currentThreadStore,
               detail: null,
               loadedThreadStatuses,
               selectedSummaryThreadId: selectedSummary.id,
               selectedThreadId: selectedThreadIdForCommit,
-            }).nextThreads,
+            }).nextThreadStore,
         );
         console.error(
           `Failed to refresh selected thread detail for ${selectedSummary.id}`,
@@ -2532,7 +2595,7 @@ export default function App({
 
   const applyOpenedThreadDetail = useCallback(
     (detail: RpcThreadDetail) => {
-      setThreads((prev) => upsertThreadList(prev, detail.thread));
+      upsertThread(detail.thread);
       setSelectedThreadId(detail.thread.id);
       selectedThreadIdRef.current = detail.thread.id;
       selectedThreadRunStateRef.current = detail.thread.runStatus.state;
@@ -2550,6 +2613,7 @@ export default function App({
       replaceSelectedThreadMessageHistory,
       sessionStateReady,
       syncThreadContext,
+      upsertThread,
     ],
   );
 
@@ -2654,8 +2718,7 @@ export default function App({
   const openThread = useCallback(
     async (threadId: number, options?: OpenThreadOptions) => {
       const requestId = ++threadOpenRequestIdRef.current;
-      const optimisticThread =
-        threads.find((thread) => thread.id === threadId) ?? null;
+      const optimisticThread = threadStore.byId[threadId] ?? null;
       abortThreadOpenRequest("Thread open request was superseded.");
       abortThreadHistoryBackfill("Thread open request was superseded.");
       const controller = new AbortController();
@@ -2686,7 +2749,7 @@ export default function App({
             selectedWorktreePathRef.current !==
               options.selectionGuard.worktreePath)
         ) {
-          setThreads((prev) => upsertThreadList(prev, detail.thread));
+          upsertThread(detail.thread);
           return;
         }
         applyOpenedThreadDetail(detail);
@@ -2714,7 +2777,8 @@ export default function App({
       loadThreadDetailForOpen,
       prepareOpenedThreadDetail,
       syncThreadContext,
-      threads,
+      threadStore,
+      upsertThread,
     ],
   );
 
@@ -2787,7 +2851,7 @@ export default function App({
           priority: "foreground",
         },
       );
-      let startupThreads = sortThreads(loadedThreads);
+      let startupThreads = threadStoreItems(createThreadStore(loadedThreads));
       let initialThread = pickInitialThread(startupThreads, persistedState);
       let initialThreadDetailPromise: Promise<RpcThreadDetail> | null = null;
       if (initialThread) {
@@ -2866,8 +2930,8 @@ export default function App({
             ? persistedState.selectedWorktreePath
             : initialProject.path);
 
-      setProjects(startupProjects);
-      setThreads(startupThreads);
+      replaceProjects(startupProjects);
+      replaceThreads(startupThreads);
       setCodexModels(modelCatalog.models);
       setDefaultCodexModel(modelCatalog.defaultModel);
       setReasoningEfforts(modelCatalog.reasoningEfforts);
@@ -2941,7 +3005,7 @@ export default function App({
         setProjectState(project.id, {
           loadingWorktrees:
             initiallyOpenProjectTreePaths.has(project.path) &&
-            getProjectState(project.id).worktrees.length === 0,
+            projectStateWorktrees(getProjectState(project.id)).length === 0,
           error: "",
         });
       }
@@ -2969,7 +3033,7 @@ export default function App({
           selectedWorktreePath: selectedWorktreePathRef.current,
         });
         startupProjectsAfterRestore = reconciledRestore.projects;
-        setProjects(reconciledRestore.projects);
+        replaceProjects(reconciledRestore.projects);
         for (const path of reconciledRestore.failedProjectPaths) {
           setProjectTreeOpen(path, false);
         }
@@ -3081,7 +3145,9 @@ export default function App({
         selectedProjectAfterRestore === null
           ? []
           : (restoredProjectWorktreesById.get(selectedProjectAfterRestore.id) ??
-            getProjectState(selectedProjectAfterRestore.id).worktrees);
+            projectStateWorktrees(
+              getProjectState(selectedProjectAfterRestore.id),
+            ));
       const reconciledSelectedWorktreePath =
         reconcileStartupSelectedWorktreePath({
           allowFallback: initialThread === null,
@@ -3113,6 +3179,8 @@ export default function App({
     primeProjectTasks,
     primeGitHistoryResult,
     procedures,
+    replaceProjects,
+    replaceThreads,
     seedAddProjectPath,
     setProjectState,
     setWorktreeState,
@@ -3193,8 +3261,7 @@ export default function App({
 
   const deleteTrackedProject = useCallback(
     async (projectId: number) => {
-      const removedProjectPath =
-        projects.find((project) => project.id === projectId)?.path ?? null;
+      const removedProjectPath = projectStore.byId[projectId]?.path ?? null;
       try {
         const deletedProject = await executeWithStepUp(
           "delete this project",
@@ -3207,8 +3274,8 @@ export default function App({
           procedures.listProjects({ includeClosed: true }),
           procedures.listThreads(),
         ]);
-        setProjects(loaded);
-        setThreads(sortThreads(loadedThreads));
+        replaceProjects(loaded);
+        replaceThreads(loadedThreads);
         hydrateProjectRows(loaded);
         clearProjectState(projectId);
         if (removedProjectPath) {
@@ -3253,9 +3320,11 @@ export default function App({
       executeWithStepUp,
       hydrateProjectRows,
       openThread,
-      projects,
+      projectStore,
       procedures,
       projectActionMenu,
+      replaceProjects,
+      replaceThreads,
       selectedProjectId,
       selectedThreadId,
       setProjectState,
@@ -3321,7 +3390,7 @@ export default function App({
           title,
           summary: threadRenameSummary,
         });
-        setThreads((prev) => upsertThreadList(prev, updatedThread));
+        upsertThread(updatedThread);
         setThreadRenameTitle(updatedThread.title);
         setThreadRenameSummary(updatedThread.summary ?? "");
       } catch (error) {
@@ -3338,6 +3407,7 @@ export default function App({
       threadActionMenuThread,
       threadRenameSummary,
       threadRenameTitle,
+      upsertThread,
     ],
   );
 
@@ -3353,7 +3423,7 @@ export default function App({
         threadId: threadActionMenuThread.id,
         pinned: !threadActionMenuThread.pinnedAt,
       });
-      setThreads((prev) => upsertThreadList(prev, updatedThread));
+      upsertThread(updatedThread);
     } catch (error) {
       setThreadActionMenuError(
         error instanceof Error ? error.message : String(error),
@@ -3361,7 +3431,7 @@ export default function App({
     } finally {
       setThreadActionBusy(null);
     }
-  }, [procedures, threadActionBusy, threadActionMenuThread]);
+  }, [procedures, threadActionBusy, threadActionMenuThread, upsertThread]);
 
   const deleteSelectedThread = useCallback(async () => {
     if (!threadActionMenuThread || threadActionBusy) {
@@ -3374,9 +3444,7 @@ export default function App({
       await procedures.deleteThread({
         threadId: threadActionMenuThread.id,
       });
-      setThreads((prev) =>
-        removeThreadFromList(prev, threadActionMenuThread.id),
-      );
+      removeThread(threadActionMenuThread.id);
       if (selectedThreadId === threadActionMenuThread.id) {
         clearThreadSelection();
       }
@@ -3391,6 +3459,7 @@ export default function App({
     clearThreadSelection,
     closeThreadActionMenu,
     procedures,
+    removeThread,
     selectedThreadId,
     threadActionBusy,
     threadActionMenuThread,
@@ -4146,7 +4215,7 @@ export default function App({
           threadId: selectedThread.id,
           model,
         });
-        setThreads((prev) => upsertThreadList(prev, updatedThread));
+        upsertThread(updatedThread);
         setPendingThreadModel(updatedThread.model);
       } catch (error) {
         setModelControlError(
@@ -4156,7 +4225,7 @@ export default function App({
         setIsUpdatingThreadModel(false);
       }
     },
-    [isUpdatingThreadModel, procedures, selectedThread],
+    [isUpdatingThreadModel, procedures, selectedThread, upsertThread],
   );
 
   const updateActiveReasoningEffort = useCallback(
@@ -4184,7 +4253,7 @@ export default function App({
           threadId: selectedThread.id,
           reasoningEffort,
         });
-        setThreads((prev) => upsertThreadList(prev, updatedThread));
+        upsertThread(updatedThread);
         setPendingThreadReasoningEffort(updatedThread.reasoningEffort);
       } catch (error) {
         setReasoningEffortControlError(
@@ -4194,7 +4263,7 @@ export default function App({
         setIsUpdatingThreadReasoningEffort(false);
       }
     },
-    [isUpdatingThreadReasoningEffort, procedures, selectedThread],
+    [isUpdatingThreadReasoningEffort, procedures, selectedThread, upsertThread],
   );
 
   const updateActiveUnsafeMode = useCallback(
@@ -4219,7 +4288,7 @@ export default function App({
           threadId: selectedThread.id,
           unsafeMode,
         });
-        setThreads((prev) => upsertThreadList(prev, updatedThread));
+        upsertThread(updatedThread);
         setPendingThreadUnsafeMode(updatedThread.unsafeMode);
       } catch (error) {
         setUnsafeModeControlError(
@@ -4229,7 +4298,7 @@ export default function App({
         setIsUpdatingThreadUnsafeMode(false);
       }
     },
-    [isUpdatingThreadUnsafeMode, procedures, selectedThread],
+    [isUpdatingThreadUnsafeMode, procedures, selectedThread, upsertThread],
   );
 
   const runSelectedTask = useCallback(
@@ -4266,7 +4335,7 @@ export default function App({
         if (!detail) {
           return;
         }
-        setThreads((prev) => upsertThreadList(prev, detail.thread));
+        upsertThread(detail.thread);
         if (
           selectedProjectIdRef.current !== requestedProjectId ||
           selectedWorktreePathRef.current !== requestedWorktreePath
@@ -4311,6 +4380,7 @@ export default function App({
       selectedProject,
       selectedThread,
       syncThreadContext,
+      upsertThread,
     ],
   );
 
@@ -4350,7 +4420,7 @@ export default function App({
     async (project: RpcProject, expanded: boolean) => {
       const lifecycleRequest = beginProjectLifecycleRequest(project.id);
       const current = getProjectState(project.id);
-      const hasCachedWorktrees = current.worktrees.length > 0;
+      const hasCachedWorktrees = projectStateWorktrees(current).length > 0;
       if (expanded) {
         setProjectTreeOpen(project.path, true);
       }
@@ -4384,12 +4454,10 @@ export default function App({
               loadingWorktrees: false,
               error: "",
             });
-            setProjects((prev) =>
-              upsertProjectList(prev, {
-                ...project,
-                isOpen: 0,
-              }),
-            );
+            upsertProject({
+              ...project,
+              isOpen: 0,
+            });
             setProjectTreeOpen(project.path, false);
             if (selectedProjectIdRef.current === project.id) {
               selectedWorktreePathRef.current = project.path;
@@ -4422,7 +4490,7 @@ export default function App({
             if (!lifecycleRequest.isCurrent()) {
               return;
             }
-            setProjects((prev) => upsertProjectList(prev, result.project));
+            upsertProject(result.project);
             setProjectState(
               project.id,
               buildLoadedProjectWorktreesState(result.worktrees),
@@ -4448,7 +4516,7 @@ export default function App({
         if (!lifecycleRequest.isCurrent()) {
           return;
         }
-        setProjects((prev) => upsertProjectList(prev, result.project));
+        upsertProject(result.project);
         setProjectState(
           project.id,
           buildLoadedProjectWorktreesState(result.worktrees),
@@ -4474,6 +4542,7 @@ export default function App({
       procedures,
       selectedProjectId,
       selectProject,
+      upsertProject,
     ],
   );
 
@@ -4622,7 +4691,7 @@ export default function App({
           threadId: sendingThreadId,
           input: pendingInput,
         });
-        setThreads((prev) => upsertThreadList(prev, detail.thread));
+        upsertThread(detail.thread);
         if (
           shouldApplySentThreadDetailToSelection({
             detail,
@@ -4661,6 +4730,7 @@ export default function App({
     procedures,
     selectedThreadId,
     selectedThreadIsWorking,
+    upsertThread,
   ]);
 
   const stopSelectedThreadTurn = useCallback(() => {
@@ -4675,7 +4745,7 @@ export default function App({
         const detail = await procedures.stopThreadTurn({
           threadId: selectedThreadId,
         });
-        setThreads((prev) => upsertThreadList(prev, detail.thread));
+        upsertThread(detail.thread);
         if (selectedThreadIdRef.current === detail.thread.id) {
           selectedThreadRunStateRef.current = detail.thread.runStatus.state;
           mergeSelectedThreadMessageHistory(detail);
@@ -4692,6 +4762,7 @@ export default function App({
     procedures,
     selectedThreadId,
     selectedThreadIsWorking,
+    upsertThread,
   ]);
 
   const onSubmit = useCallback(

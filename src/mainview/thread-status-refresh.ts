@@ -1,31 +1,31 @@
 import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";
-import { upsertThreadList } from "./app/state";
+import { type ThreadStore, upsertThreadStore } from "./app/state";
 
 export type ThreadStatusRefreshOutcome = {
-  nextThreads: RpcThread[];
+  nextThreadStore: ThreadStore;
   shouldApplySelectedDetail: boolean;
 };
 
 type MergeThreadStatusSummariesOptions = {
-  currentThreads: RpcThread[];
+  currentThreadStore: ThreadStore;
   loadedThreadStatuses: RpcThread[];
 };
 
 export function mergeThreadStatusSummaries(
   options: MergeThreadStatusSummariesOptions,
-): RpcThread[] {
-  let nextThreads = options.currentThreads;
+): ThreadStore {
+  let nextThreadStore = options.currentThreadStore;
 
   for (const thread of options.loadedThreadStatuses) {
-    nextThreads = upsertThreadList(nextThreads, thread);
+    nextThreadStore = upsertThreadStore(nextThreadStore, thread);
   }
 
-  return nextThreads;
+  return nextThreadStore;
 }
 
 type ResolveThreadStatusRefreshOutcomeOptions = {
   detail: RpcThreadDetail | null;
-  currentThreads: RpcThread[];
+  currentThreadStore: ThreadStore;
   loadedThreadStatuses: RpcThread[];
   selectedSummaryThreadId: number;
   selectedThreadId: number | null;
@@ -38,8 +38,8 @@ type ResolveThreadStatusRefreshOutcomeOptions = {
 export function resolveThreadStatusRefreshOutcome(
   options: ResolveThreadStatusRefreshOutcomeOptions,
 ): ThreadStatusRefreshOutcome {
-  const mergedThreads = mergeThreadStatusSummaries({
-    currentThreads: options.currentThreads,
+  const mergedThreadStore = mergeThreadStatusSummaries({
+    currentThreadStore: options.currentThreadStore,
     loadedThreadStatuses: options.loadedThreadStatuses,
   });
 
@@ -48,13 +48,16 @@ export function resolveThreadStatusRefreshOutcome(
     options.selectedThreadId !== options.selectedSummaryThreadId
   ) {
     return {
-      nextThreads: mergedThreads,
+      nextThreadStore: mergedThreadStore,
       shouldApplySelectedDetail: false,
     };
   }
 
   return {
-    nextThreads: upsertThreadList(mergedThreads, options.detail.thread),
+    nextThreadStore: upsertThreadStore(
+      mergedThreadStore,
+      options.detail.thread,
+    ),
     shouldApplySelectedDetail: true,
   };
 }

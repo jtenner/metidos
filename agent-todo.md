@@ -564,7 +564,7 @@ Done when:
 
 ### Slice P5.3: Rework frontend state shape around indexed stores
 
-Status: `blocked`
+Status: `done`
 
 Problem:
 - The app still uses array-of-records structures in many places where indexed stores would cut lookup and update churn.

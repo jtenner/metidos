@@ -24,6 +24,7 @@ import {
   type ProjectActionMenuState,
   type ProjectNodeState,
   primaryWorktreePath,
+  projectStateWorktrees,
   shortName,
   sortThreads,
   type ThreadActionMenuState,
@@ -164,7 +165,9 @@ export function useMainviewDerivedState({
   const worktreeByProjectAndPath = useMemo(() => {
     const next = new Map<string, RpcWorktree>();
     for (const project of projects) {
-      for (const worktree of getProjectState(project.id).worktrees) {
+      for (const worktree of projectStateWorktrees(
+        getProjectState(project.id),
+      )) {
         next.set(worktreeKey(project.id, worktree.path), worktree);
       }
     }
@@ -188,7 +191,7 @@ export function useMainviewDerivedState({
     () =>
       deriveWorktreeDisplayPathByKey(
         projects,
-        (projectId) => getProjectState(projectId).worktrees,
+        (projectId) => projectStateWorktrees(getProjectState(projectId)),
         homeDirectory,
         supportsTildePath,
       ),
@@ -197,7 +200,9 @@ export function useMainviewDerivedState({
   const worktreeSearchTextByKey = useMemo(() => {
     const next = new Map<string, string>();
     for (const project of projects) {
-      for (const worktree of getProjectState(project.id).worktrees) {
+      for (const worktree of projectStateWorktrees(
+        getProjectState(project.id),
+      )) {
         const key = worktreeKey(project.id, worktree.path);
         next.set(
           key,
@@ -423,7 +428,7 @@ export function useMainviewDerivedState({
     }
     return orderProjectWorktrees(
       selectedProject,
-      getProjectState(selectedProject.id).worktrees,
+      projectStateWorktrees(getProjectState(selectedProject.id)),
     );
   }, [getProjectState, selectedProject]);
 
@@ -590,12 +595,14 @@ export function useMainviewDerivedState({
 
     return projects.filter((project) => {
       const projectState = getProjectState(project.id);
-      const matchingWorktree = projectState.worktrees.some((worktree) =>
-        matchesNormalizedSearchText(
-          normalizedSidebarSearchQuery,
-          worktreeSearchTextByKey.get(worktreeKey(project.id, worktree.path)) ??
-            "",
-        ),
+      const matchingWorktree = projectStateWorktrees(projectState).some(
+        (worktree) =>
+          matchesNormalizedSearchText(
+            normalizedSidebarSearchQuery,
+            worktreeSearchTextByKey.get(
+              worktreeKey(project.id, worktree.path),
+            ) ?? "",
+          ),
       );
 
       return (

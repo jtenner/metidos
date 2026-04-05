@@ -172,6 +172,7 @@
 │     │  ├─ security-audit-panel.tsx
 │     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts
+│     │  ├─ state.test.ts
 │     │  ├─ state.ts
 │     │  ├─ tasks-workspace.tsx
 │     │  ├─ thread-list-row.tsx

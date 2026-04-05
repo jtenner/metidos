@@ -12,6 +12,7 @@ import {
   formatDirectoryPathForInput,
   orderProjectWorktrees,
   type ProjectNodeState,
+  projectStateWorktrees,
   shortName,
   type ThreadErrorLevel,
   type WorktreeNodeState,
@@ -373,7 +374,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
     // Reuse one derivation for pinned rows and each project tree to avoid repeated worktree scans.
     return deriveProjectsPanelWorktreeData(
       filteredProjects,
-      (projectId) => getProjectState(projectId).worktrees,
+      (projectId) => projectStateWorktrees(getProjectState(projectId)),
       normalizedSidebarSearchQuery,
       worktreeSearchTextByKey,
       projectById,

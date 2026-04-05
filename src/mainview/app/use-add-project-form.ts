@@ -8,6 +8,7 @@ import type {
 import { setProjectTreeOpen } from "./sidebar-panels-state";
 import {
   awaitAbortableResult,
+  buildProjectWorktreeIndex,
   createAbortError,
   DIRECTORY_SUGGESTION_PREFETCH_DELAY_MS,
   DIRECTORY_SUGGESTION_RESULT_CACHE_MAX_ENTRIES,
@@ -18,7 +19,6 @@ import {
   type PendingSharedRequest,
   type ProjectNodeState,
   readLruValue,
-  upsertProjectList,
   writeLruValue,
 } from "./state";
 
@@ -35,8 +35,8 @@ type UseAddProjectFormParams = {
   selectProject: (project: RpcProject, worktreePath?: string | null) => void;
   /** Controls whether the mobile project list panel is visible. */
   setMobileProjectListOpen: Dispatch<SetStateAction<boolean>>;
-  /** Updates the global project list state. */
-  setProjects: Dispatch<SetStateAction<RpcProject[]>>;
+  /** Upserts one project into the global project store. */
+  upsertProject: (project: RpcProject) => void;
   /** Applies project detail updates after opening project worktrees. */
   setProjectState: (
     projectId: number,
@@ -57,7 +57,7 @@ export function useAddProjectForm({
   procedures,
   selectProject,
   setMobileProjectListOpen,
-  setProjects,
+  upsertProject,
   setProjectState,
   supportsTildePath,
 }: UseAddProjectFormParams) {
@@ -381,12 +381,12 @@ export function useAddProjectForm({
         const result = await procedures.openProject({ projectPath });
         // Hydrate project rows and select the project immediately after open.
         const existingState = getProjectState(result.project.id);
-        setProjects((prev) => upsertProjectList(prev, result.project));
+        upsertProject(result.project);
         hydrateProjectRows([result.project]);
         setProjectState(result.project.id, {
           loadingWorktrees: false,
           error: "",
-          worktrees: result.worktrees,
+          ...buildProjectWorktreeIndex(result.worktrees),
           openWorktrees: existingState.openWorktrees,
         });
         setProjectTreeOpen(result.project.path, true);
@@ -410,8 +410,8 @@ export function useAddProjectForm({
       resetAddProjectPath,
       selectProject,
       setMobileProjectListOpen,
-      setProjects,
       setProjectState,
+      upsertProject,
     ],
   );
 

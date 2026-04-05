@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { RpcWorktree } from "../bun/rpc-schema";
-import type { ProjectNodeState } from "./app/state";
+import { buildProjectWorktreeIndex, type ProjectNodeState } from "./app/state";
 import {
   PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS,
   shouldRefreshProjectActionMenuWorktrees,
@@ -23,7 +23,7 @@ function projectState(overrides?: Partial<ProjectNodeState>): ProjectNodeState {
     error: "",
     loadingWorktrees: false,
     openWorktrees: new Set(),
-    worktrees: [],
+    ...buildProjectWorktreeIndex([]),
     worktreesLoadedAt: null,
     ...overrides,
   };
@@ -34,7 +34,7 @@ describe("project worktree refresh helpers", () => {
     expect(
       shouldRefreshProjectActionMenuWorktrees(
         projectState({
-          worktrees: [worktree()],
+          ...buildProjectWorktreeIndex([worktree()]),
           worktreesLoadedAt: 100,
         }),
         100 + PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS - 1,
@@ -46,7 +46,7 @@ describe("project worktree refresh helpers", () => {
     expect(
       shouldRefreshProjectActionMenuWorktrees(
         projectState({
-          worktrees: [worktree()],
+          ...buildProjectWorktreeIndex([worktree()]),
           worktreesLoadedAt: 100,
         }),
         100 + PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS,
@@ -60,7 +60,7 @@ describe("project worktree refresh helpers", () => {
       shouldRefreshProjectActionMenuWorktrees(
         projectState({
           error: "refresh failed",
-          worktrees: [worktree()],
+          ...buildProjectWorktreeIndex([worktree()]),
           worktreesLoadedAt: Date.now(),
         }),
       ),

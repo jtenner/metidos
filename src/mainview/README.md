@@ -6,7 +6,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 ## Top-level entry files
 
-`App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries.
+`App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries. It now keeps the source-of-truth project and thread collections in indexed stores so hot mutation paths can update incrementally while memoized ordered arrays remain available for component APIs.
 
 `auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
 
@@ -80,7 +80,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/sidebar-panels-state.ts` owns persisted sidebar panel open/closed state and cross-panel toggle synchronization.
 
-`app/state.ts` defines shared mainview state shapes, formatting helpers, and state-caching utilities used across panels and hooks.
+`app/state.ts` defines shared mainview state shapes, indexed store helpers, formatting helpers, and state-caching utilities used across panels and hooks, including the indexed per-project worktree cache shape used by `App.tsx` and derived-state helpers.
 
 `app/tasks-workspace.tsx` renders the tasks workspace, including task list state and filtering behavior.
 

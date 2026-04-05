@@ -1,4 +1,4 @@
-import type { ProjectNodeState } from "./app/state";
+import { type ProjectNodeState, projectStateWorktreeCount } from "./app/state";
 
 export const PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS = 12_000;
 
@@ -14,7 +14,7 @@ export function shouldRefreshProjectActionMenuWorktrees(
     return false;
   }
 
-  if (projectState.worktrees.length === 0) {
+  if (projectStateWorktreeCount(projectState) === 0) {
     return true;
   }
 

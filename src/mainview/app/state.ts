@@ -103,7 +103,8 @@ export type GitHistoryDiffCacheEntry = {
  * In-memory tree state for a single project and its worktrees.
  */
 export type ProjectNodeState = {
-  worktrees: RpcWorktree[];
+  worktreeByPath: Record<string, RpcWorktree>;
+  worktreePaths: string[];
   worktreesLoadedAt: number | null;
   loadingWorktrees: boolean;
   error: string;
@@ -122,6 +123,16 @@ export type WorktreeNodeState = {
 
 export type ProjectStateMap = Record<number, ProjectNodeState>;
 export type WorktreeStateMap = Record<string, WorktreeNodeState>;
+
+export type ProjectStore = {
+  byId: Record<number, RpcProject>;
+  orderedIds: number[];
+};
+
+export type ThreadStore = {
+  byId: Record<number, RpcThread>;
+  orderedIds: number[];
+};
 
 /**
  * UI anchor for project context menu rendering.
@@ -442,7 +453,8 @@ export function gitHistoryDiffCacheKey(
  */
 export function defaultProjectState(): ProjectNodeState {
   return {
-    worktrees: [],
+    worktreeByPath: {},
+    worktreePaths: [],
     worktreesLoadedAt: null,
     loadingWorktrees: false,
     error: "",
@@ -459,6 +471,98 @@ export function defaultWorktreeState(): WorktreeNodeState {
     opened: false,
     error: "",
   };
+}
+
+export function buildProjectWorktreeIndex(
+  worktrees: RpcWorktree[],
+): Pick<ProjectNodeState, "worktreeByPath" | "worktreePaths"> {
+  const worktreeByPath: Record<string, RpcWorktree> = {};
+  const worktreePaths: string[] = [];
+
+  for (const worktree of worktrees) {
+    worktreeByPath[worktree.path] = worktree;
+    worktreePaths.push(worktree.path);
+  }
+
+  return {
+    worktreeByPath,
+    worktreePaths,
+  };
+}
+
+export function projectStateWorktrees(
+  state: Pick<ProjectNodeState, "worktreeByPath" | "worktreePaths">,
+): RpcWorktree[] {
+  const worktrees: RpcWorktree[] = [];
+
+  for (const path of state.worktreePaths) {
+    const worktree = state.worktreeByPath[path];
+    if (worktree) {
+      worktrees.push(worktree);
+    }
+  }
+
+  return worktrees;
+}
+
+export function projectStateWorktreeCount(
+  state: Pick<ProjectNodeState, "worktreePaths">,
+): number {
+  return state.worktreePaths.length;
+}
+
+export function emptyProjectStore(): ProjectStore {
+  return {
+    byId: {},
+    orderedIds: [],
+  };
+}
+
+export function emptyThreadStore(): ThreadStore {
+  return {
+    byId: {},
+    orderedIds: [],
+  };
+}
+
+export function projectStoreItems(store: ProjectStore): RpcProject[] {
+  const items: RpcProject[] = [];
+
+  for (const projectId of store.orderedIds) {
+    const project = store.byId[projectId];
+    if (project) {
+      items.push(project);
+    }
+  }
+
+  return items;
+}
+
+export function threadStoreItems(store: ThreadStore): RpcThread[] {
+  const items: RpcThread[] = [];
+
+  for (const threadId of store.orderedIds) {
+    const thread = store.byId[threadId];
+    if (thread) {
+      items.push(thread);
+    }
+  }
+
+  return items;
+}
+
+export function projectStoreGet(
+  store: ProjectStore,
+  projectId: number,
+): RpcProject | null {
+  return store.byId[projectId] ?? null;
+}
+
+export function threadStoreGet(
+  store: ThreadStore,
+  threadId: number,
+): RpcThread | null {
+  return store.byId[threadId] ?? null;
 }
 
 /**
@@ -1031,6 +1135,26 @@ function findThreadInsertionIndex(
   return low;
 }
 
+function findThreadStoreInsertionIndex(
+  orderedIds: number[],
+  byId: Record<number, RpcThread>,
+  thread: RpcThread,
+): number {
+  let low = 0;
+  let high = orderedIds.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const midThreadId = orderedIds[mid];
+    const midThread = midThreadId ? byId[midThreadId] : undefined;
+    if (midThread && compareThreadsByRecency(midThread, thread) <= 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
 /**
  * Order threads by pinned timestamp first, then by last updated date.
  */
@@ -1217,6 +1341,26 @@ function compareProjects(left: RpcProject, right: RpcProject): number {
   });
 }
 
+function findProjectInsertionIndex(
+  orderedIds: number[],
+  byId: Record<number, RpcProject>,
+  project: RpcProject,
+): number {
+  let low = 0;
+  let high = orderedIds.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const midProjectId = orderedIds[mid];
+    const midProject = midProjectId ? byId[midProjectId] : undefined;
+    if (midProject && compareProjects(midProject, project) <= 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
 /**
  * Insert/replace a project preserving sorted order by project name.
  */
@@ -1227,6 +1371,104 @@ export function upsertProjectList(
   const next = items.filter((entry) => entry.id !== project.id);
   next.push(project);
   return next.sort(compareProjects);
+}
+
+export function createProjectStore(items: RpcProject[]): ProjectStore {
+  let nextStore = emptyProjectStore();
+
+  for (const project of items) {
+    nextStore = upsertProjectStore(nextStore, project);
+  }
+
+  return nextStore;
+}
+
+export function upsertProjectStore(
+  store: ProjectStore,
+  project: RpcProject,
+): ProjectStore {
+  const existingProject = store.byId[project.id];
+  if (existingProject === project) {
+    return store;
+  }
+
+  if (!existingProject) {
+    const orderedIds = store.orderedIds.slice();
+    const insertionIndex = findProjectInsertionIndex(
+      orderedIds,
+      store.byId,
+      project,
+    );
+    orderedIds.splice(insertionIndex, 0, project.id);
+    return {
+      byId: {
+        ...store.byId,
+        [project.id]: project,
+      },
+      orderedIds,
+    };
+  }
+
+  const existingIndex = store.orderedIds.indexOf(project.id);
+  if (existingIndex === -1) {
+    return createProjectStore([...projectStoreItems(store), project]);
+  }
+
+  const previousProjectId =
+    existingIndex > 0 ? (store.orderedIds[existingIndex - 1] ?? null) : null;
+  const nextProjectId =
+    existingIndex < store.orderedIds.length - 1
+      ? (store.orderedIds[existingIndex + 1] ?? null)
+      : null;
+  const previousProject =
+    previousProjectId === null ? null : (store.byId[previousProjectId] ?? null);
+  const nextProject =
+    nextProjectId === null ? null : (store.byId[nextProjectId] ?? null);
+  const staysInPlace =
+    (previousProject === null ||
+      compareProjects(previousProject, project) <= 0) &&
+    (nextProject === null || compareProjects(project, nextProject) <= 0);
+  if (staysInPlace) {
+    return {
+      byId: {
+        ...store.byId,
+        [project.id]: project,
+      },
+      orderedIds: store.orderedIds,
+    };
+  }
+
+  const orderedIds = store.orderedIds.slice();
+  orderedIds.splice(existingIndex, 1);
+  const byId = {
+    ...store.byId,
+    [project.id]: project,
+  };
+  const insertionIndex = findProjectInsertionIndex(orderedIds, byId, project);
+  orderedIds.splice(insertionIndex, 0, project.id);
+  return {
+    byId,
+    orderedIds,
+  };
+}
+
+export function removeProjectFromStore(
+  store: ProjectStore,
+  projectId: number,
+): ProjectStore {
+  if (!store.byId[projectId]) {
+    return store;
+  }
+
+  const byId = {
+    ...store.byId,
+  };
+  delete byId[projectId];
+
+  return {
+    byId,
+    orderedIds: store.orderedIds.filter((entryId) => entryId !== projectId),
+  };
 }
 
 export function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
@@ -1264,6 +1506,108 @@ export function removeThreadFromList(
   threadId: number,
 ): RpcThread[] {
   return items.filter((thread) => thread.id !== threadId);
+}
+
+export function createThreadStore(items: RpcThread[]): ThreadStore {
+  let nextStore = emptyThreadStore();
+
+  for (const thread of items) {
+    nextStore = upsertThreadStore(nextStore, thread);
+  }
+
+  return nextStore;
+}
+
+export function upsertThreadStore(
+  store: ThreadStore,
+  thread: RpcThread,
+): ThreadStore {
+  const existingThread = store.byId[thread.id];
+  if (existingThread === thread) {
+    return store;
+  }
+
+  if (!existingThread) {
+    const orderedIds = store.orderedIds.slice();
+    const insertionIndex = findThreadStoreInsertionIndex(
+      orderedIds,
+      store.byId,
+      thread,
+    );
+    orderedIds.splice(insertionIndex, 0, thread.id);
+    return {
+      byId: {
+        ...store.byId,
+        [thread.id]: thread,
+      },
+      orderedIds,
+    };
+  }
+
+  const existingIndex = store.orderedIds.indexOf(thread.id);
+  if (existingIndex === -1) {
+    return createThreadStore([...threadStoreItems(store), thread]);
+  }
+
+  const previousThreadId =
+    existingIndex > 0 ? (store.orderedIds[existingIndex - 1] ?? null) : null;
+  const nextThreadId =
+    existingIndex < store.orderedIds.length - 1
+      ? (store.orderedIds[existingIndex + 1] ?? null)
+      : null;
+  const previousThread =
+    previousThreadId === null ? null : (store.byId[previousThreadId] ?? null);
+  const nextThread =
+    nextThreadId === null ? null : (store.byId[nextThreadId] ?? null);
+  const staysInPlace =
+    (previousThread === null ||
+      compareThreadsByRecency(previousThread, thread) <= 0) &&
+    (nextThread === null || compareThreadsByRecency(thread, nextThread) <= 0);
+  if (staysInPlace) {
+    return {
+      byId: {
+        ...store.byId,
+        [thread.id]: thread,
+      },
+      orderedIds: store.orderedIds,
+    };
+  }
+
+  const orderedIds = store.orderedIds.slice();
+  orderedIds.splice(existingIndex, 1);
+  const byId = {
+    ...store.byId,
+    [thread.id]: thread,
+  };
+  const insertionIndex = findThreadStoreInsertionIndex(
+    orderedIds,
+    byId,
+    thread,
+  );
+  orderedIds.splice(insertionIndex, 0, thread.id);
+  return {
+    byId,
+    orderedIds,
+  };
+}
+
+export function removeThreadFromStore(
+  store: ThreadStore,
+  threadId: number,
+): ThreadStore {
+  if (!store.byId[threadId]) {
+    return store;
+  }
+
+  const byId = {
+    ...store.byId,
+  };
+  delete byId[threadId];
+
+  return {
+    byId,
+    orderedIds: store.orderedIds.filter((entryId) => entryId !== threadId),
+  };
 }
 
 /**
