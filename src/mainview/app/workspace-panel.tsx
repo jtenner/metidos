@@ -3,7 +3,10 @@
  * @description Module for workspace panel.
  */
 
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
+import type { JSX } from "react";
+import type { FocusEvent as ReactFocusEvent, MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import type { RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";
@@ -13,6 +16,7 @@ import {
   useWorkspaceActiveSectionOpen,
   useWorkspacePanelOpen,
 } from "./sidebar-panels-state";
+import { clampProjectMenuCoordinate } from "./state";
 import { type SharedThreadListProps, ThreadList } from "./thread-list-row";
 
 type WorkspacePanelProps = SharedThreadListProps & {
@@ -39,6 +43,34 @@ type WorkspacePanelProps = SharedThreadListProps & {
   /** Creates a thread for the currently selected open worktree. */
   onCreateThread: () => void;
 };
+
+type CreateThreadPopoverState = {
+  /** Coordinates used for fixed positioning of the create-thread popover. */
+  x: number;
+  /** Coordinates used for fixed positioning of the create-thread popover. */
+  y: number;
+};
+
+const CREATE_THREAD_POPOVER_ANCHOR_ID = "workspace-create-thread-button";
+
+function createThreadAnchorStillActive(anchorId: string): boolean {
+  // Keep the popover visible when hover/focus remains on the anchor.
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  const anchor = document.getElementById(anchorId);
+  if (!(anchor instanceof HTMLElement)) {
+    return false;
+  }
+
+  const activeElement = document.activeElement;
+  return (
+    anchor.matches(":hover") ||
+    anchor === activeElement ||
+    anchor.contains(activeElement)
+  );
+}
 
 /**
  * Renders the threads workspace section in the left panel.
@@ -72,9 +104,58 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   const workspaceOpen = useWorkspacePanelOpen();
   const workspaceActiveOpen = useWorkspaceActiveSectionOpen();
   const createThreadDisabled = isCreatingThread || !canCreateThread;
+  const [createThreadPopover, setCreateThreadPopover] =
+    useState<CreateThreadPopoverState | null>(null);
   // Empty-state is shown only when both pinned and recent lists are empty.
   const hasThreads =
     workspacePinnedThreads.length > 0 || workspaceActiveThreads.length > 0;
+
+  const showCreateThreadPopover = useCallback(
+    (
+      event:
+        | ReactMouseEvent<HTMLElement>
+        | ReactFocusEvent<HTMLElement>,
+    ): void => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const x = clampProjectMenuCoordinate(rect.right + 12, viewportWidth, 240);
+      const y = clampProjectMenuCoordinate(
+        rect.top + rect.height / 2 - 60,
+        viewportHeight,
+        160,
+      );
+
+      setCreateThreadPopover({
+        x,
+        y,
+      });
+    },
+    [],
+  );
+
+  const hideCreateThreadPopover = useCallback((): void => {
+    setCreateThreadPopover(null);
+  }, []);
+
+  const deferHideCreateThreadPopover = useCallback((): void => {
+    if (typeof window === "undefined") {
+      hideCreateThreadPopover();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (createThreadAnchorStillActive(CREATE_THREAD_POPOVER_ANCHOR_ID)) {
+        return;
+      }
+
+      hideCreateThreadPopover();
+    });
+  }, [hideCreateThreadPopover]);
 
   return (
     <section className="select-none">
@@ -85,6 +166,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
         action={
           <div className="group relative">
             <button
+              id={CREATE_THREAD_POPOVER_ANCHOR_ID}
               type="button"
               className={`${sidebarActionButtonClass} ${
                 createThreadDisabled ? "cursor-not-allowed opacity-50" : ""
@@ -103,37 +185,45 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                   ? "Create thread for selected worktree"
                   : "Select an open worktree first"
               }
+              onMouseEnter={showCreateThreadPopover}
+              onMouseLeave={deferHideCreateThreadPopover}
+              onFocus={showCreateThreadPopover}
+              onBlur={deferHideCreateThreadPopover}
             >
               +
             </button>
-            <div className="pointer-events-none absolute left-full top-1/2 z-[120] ml-2 min-w-[220px] -translate-y-1/2 rounded-md border border-[#2b3b47] bg-[#14181a] px-2.5 py-2 text-[10px] text-[#dce6ec] opacity-0 transition-opacity duration-120 group-hover:opacity-100 group-focus-within:opacity-100">
-              <div className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
-                New thread context
-              </div>
-              <div className="mt-1 space-y-0.5 text-[11px]">
-                <div>
-                  <span className="text-[#7c8f99]">Project:</span>{" "}
-                  <span className="truncate">
-                    {selectedProjectNameForThread}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#7c8f99]">Branch:</span>{" "}
-                  <span className="truncate">
-                    {activeSelectedWorktreeBranch}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#7c8f99]">Worktree:</span>{" "}
-                  <span className="truncate">
-                    {activeSelectedWorktreeFolder}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         }
       />
+      <CreateThreadPopoverPortal>
+        {createThreadPopover ? (
+          <div
+            className="pointer-events-none fixed z-[150] max-w-[240px] border border-[#2b3b47] bg-[#14181a]/96 px-2.5 py-2 text-[10px] text-[#dce6ec] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+            style={{
+              left: createThreadPopover.x,
+              top: createThreadPopover.y,
+            }}
+          >
+            <div className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
+              New thread context
+            </div>
+            <div className="mt-1 space-y-0.5 text-[11px]">
+              <div>
+                <span className="text-[#7c8f99]">Project:</span>{" "}
+                <span className="truncate">{selectedProjectNameForThread}</span>
+              </div>
+              <div>
+                <span className="text-[#7c8f99]">Branch:</span>{" "}
+                <span className="truncate">{activeSelectedWorktreeBranch}</span>
+              </div>
+              <div>
+                <span className="text-[#7c8f99]">Worktree:</span>{" "}
+                <span className="truncate">{activeSelectedWorktreeFolder}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </CreateThreadPopoverPortal>
       {workspaceOpen ? (
         <div className="mt-3 space-y-4">
           {!hasThreads ? (
@@ -221,3 +311,15 @@ export const WorkspacePanel = memo(function WorkspacePanel({
     </section>
   );
 });
+
+function CreateThreadPopoverPortal({
+  children,
+}: {
+  children: JSX.Element | null | false;
+}): JSX.Element | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(children, document.body);
+}
