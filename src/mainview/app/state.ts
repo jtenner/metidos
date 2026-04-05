@@ -247,12 +247,6 @@ export type OpenThreadOptions = {
   } | null;
 };
 
-export const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
-/**
- * Notifies subscribers when worktree task metadata changed.
- */
-export const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
-  "jolt:worktree-git-history-changed";
 export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "jolt:thread-start-request-created";
 /**

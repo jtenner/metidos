@@ -16,6 +16,10 @@ import {
   RUNTIME_CONFIG_ELEMENT_ID,
 } from "../bun/server-security";
 import {
+  publishWorktreeGitHistoryChanged,
+  publishWorktreeTasksChanged,
+} from "./app/invalidation-events";
+import {
   AuthApiError,
   dispatchAuthRequired,
   isAuthRequiredError,
@@ -90,10 +94,6 @@ type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
 type RuntimeConfig = InjectedRuntimeConfig;
 
-/** Mainview event names that bridge websocket worktree/thread updates into DOM events. */
-const WORKTREE_TASKS_CHANGED_EVENT_NAME = "jolt:worktree-tasks-changed";
-const WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME =
-  "jolt:worktree-git-history-changed";
 const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "jolt:thread-start-request-created";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
@@ -101,8 +101,6 @@ const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 
 declare global {
   interface WindowEventMap {
-    "jolt:worktree-tasks-changed": CustomEvent<RpcWorktreeTasksChanged>;
-    "jolt:worktree-git-history-changed": CustomEvent<RpcWorktreeGitHistoryChanged>;
     "jolt:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
   }
 
@@ -444,31 +442,17 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         return;
       }
       if (payload.type === "tasks-changed") {
-        window.dispatchEvent(
-          new CustomEvent<RpcWorktreeTasksChanged>(
-            WORKTREE_TASKS_CHANGED_EVENT_NAME,
-            {
-              detail: {
-                projectId: payload.projectId,
-                worktreePath: payload.worktreePath,
-              },
-            },
-          ),
-        );
+        publishWorktreeTasksChanged({
+          projectId: payload.projectId,
+          worktreePath: payload.worktreePath,
+        });
         return;
       }
       if (payload.type === "git-history-changed") {
-        window.dispatchEvent(
-          new CustomEvent<RpcWorktreeGitHistoryChanged>(
-            WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-            {
-              detail: {
-                projectId: payload.projectId,
-                worktreePath: payload.worktreePath,
-              },
-            },
-          ),
-        );
+        publishWorktreeGitHistoryChanged({
+          projectId: payload.projectId,
+          worktreePath: payload.worktreePath,
+        });
         return;
       }
       if (payload.type === "thread-start-request-created") {

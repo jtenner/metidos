@@ -26,16 +26,18 @@ import type {
   RpcThreadStartRequest,
   RpcWorktree,
   RpcWorktreeChange,
-  RpcWorktreeGitHistoryChanged,
   RpcWorktreeGitHistoryResult,
   RpcWorktreeSnapshot,
-  RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import { ProjectActionMenu, ThreadActionMenu } from "./app/action-menus";
 import { AuthStepUpDialog } from "./app/auth-step-up-dialog";
 import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
 import { DiffWorkspace } from "./app/diff-workspace";
+import {
+  subscribeToWorktreeGitHistoryChanged,
+  subscribeToWorktreeTasksChanged,
+} from "./app/invalidation-events";
 import { GitHistoryDiffModal } from "./app/message-ui";
 import { SidebarContent } from "./app/sidebar-content";
 import {
@@ -84,8 +86,6 @@ import {
   upsertProjectList,
   upsertThreadList,
   type VisibleMessage,
-  WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-  WORKTREE_TASKS_CHANGED_EVENT_NAME,
   type WorktreeNodeState,
   type WorktreeStateMap,
   withAcknowledgedUnreadThread,
@@ -3780,9 +3780,7 @@ export default function App({
   ]);
 
   useEffect(() => {
-    const handleWorktreeTasksChanged = (
-      event: CustomEvent<RpcWorktreeTasksChanged>,
-    ) => {
+    const unsubscribe = subscribeToWorktreeTasksChanged((payload) => {
       if (!sessionStateReady) {
         return;
       }
@@ -3794,26 +3792,16 @@ export default function App({
         return;
       }
       if (
-        event.detail.projectId !== selectedProject.id ||
-        event.detail.worktreePath !== activeSelectedWorktreePath
+        payload.projectId !== selectedProject.id ||
+        payload.worktreePath !== activeSelectedWorktreePath
       ) {
         return;
       }
-      void loadProjectTasks(event.detail.projectId, event.detail.worktreePath, {
+      void loadProjectTasks(payload.projectId, payload.worktreePath, {
         priority: "default",
       });
-    };
-
-    window.addEventListener(
-      WORKTREE_TASKS_CHANGED_EVENT_NAME,
-      handleWorktreeTasksChanged,
-    );
-    return () => {
-      window.removeEventListener(
-        WORKTREE_TASKS_CHANGED_EVENT_NAME,
-        handleWorktreeTasksChanged,
-      );
-    };
+    });
+    return unsubscribe;
   }, [
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
@@ -3823,33 +3811,21 @@ export default function App({
   ]);
 
   useEffect(() => {
-    const handleWorktreeGitHistoryChanged = (
-      event: CustomEvent<RpcWorktreeGitHistoryChanged>,
-    ) => {
+    const unsubscribe = subscribeToWorktreeGitHistoryChanged((payload) => {
       if (!selectedProject || !activeSelectedWorktreePath) {
         return;
       }
       if (
-        event.detail.projectId !== selectedProject.id ||
-        event.detail.worktreePath !== activeSelectedWorktreePath
+        payload.projectId !== selectedProject.id ||
+        payload.worktreePath !== activeSelectedWorktreePath
       ) {
         return;
       }
-      void loadGitHistory(event.detail.projectId, event.detail.worktreePath, {
+      void loadGitHistory(payload.projectId, payload.worktreePath, {
         silent: true,
       });
-    };
-
-    window.addEventListener(
-      WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-      handleWorktreeGitHistoryChanged,
-    );
-    return () => {
-      window.removeEventListener(
-        WORKTREE_GIT_HISTORY_CHANGED_EVENT_NAME,
-        handleWorktreeGitHistoryChanged,
-      );
-    };
+    });
+    return unsubscribe;
   }, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
 
   useEffect(() => {

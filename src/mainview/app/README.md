@@ -42,6 +42,9 @@ Builds and renders the diff tree/panel view, including helpers like `emptyDiffFi
 `git-history-panel.tsx`
 Displays commit/history data for active workspace context in a memoized panel view.
 
+`invalidation-events.ts`
+Provides coalesced subscription channels for websocket-driven worktree invalidations so task and git-history refreshes can batch repeated same-worktree signals on one tick.
+
 `tasks-workspace.tsx`
 Renders the tasks-specific workspace and task-related controls.
 
@@ -56,7 +59,7 @@ Owns persisted open/closed state for sidebar panels and exposes toggle/read hook
 ## Derived state and hooks
 
 `state.ts`
-Central shared types/constants for mainview logic. Includes domain types for threads/projects/worktrees, persisted state schemas, event names, cache constants, formatting helpers, error/preview helpers, and utility operations for sorting/upserting state and persisting UI settings.
+Central shared types/constants for mainview logic. Includes domain types for threads/projects/worktrees, persisted state schemas, cache constants, formatting helpers, error/preview helpers, and utility operations for sorting/upserting state and persisting UI settings.
 
 `use-mainview-derived-state.ts`
 Combines backend and runtime state into memoized derived props used by workspace and sidebar components.

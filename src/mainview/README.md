@@ -48,6 +48,8 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/git-history-panel.tsx` displays per-thread and project git history in a dedicated sidebar panel.
 
+`app/invalidation-events.ts` coalesces worktree invalidation notifications from the websocket transport into batched in-process subscriptions consumed by the app shell.
+
 `app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, and notices.
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.

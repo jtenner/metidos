@@ -420,7 +420,7 @@ Done when:
 
 ### Slice P3.4: Coalesce websocket invalidation fan-out
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Websocket messages are parsed and then immediately re-emitted as DOM `CustomEvent`s.
