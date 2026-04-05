@@ -864,6 +864,15 @@ function authErrorResponse(
   }
 
   if (error instanceof AuthServiceError) {
+    webServerLogger.warning({
+      description: "Auth request failed",
+      method: request.method,
+      pathname: new URL(request.url).pathname,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+      details: error.details,
+    });
     return jsonResponse(
       {
         error: {
@@ -879,6 +888,14 @@ function authErrorResponse(
   }
 
   if (error instanceof RequestValidationError) {
+    webServerLogger.warning({
+      description: "Auth request validation failed",
+      method: request.method,
+      pathname: new URL(request.url).pathname,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
     return jsonResponse(
       {
         error: {
@@ -919,14 +936,41 @@ function authErrorResponse(
  */
 
 async function handleAuthRequest(request: Request): Promise<Response | null> {
-  const { pathname } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { pathname } = requestUrl;
   if (!pathname.startsWith("/auth/")) {
     return null;
   }
 
-  const database = initAppDatabase();
-  const secureCookie = isSecureRequest(request);
+  const requestId = request.headers.get("x-request-id")?.trim();
   const sessionId = readSessionCookie(request.headers.get("cookie"));
+  const secureCookie = isSecureRequest(request);
+  webServerLogger.trace({
+    message: "Auth request received",
+    method: request.method,
+    pathname,
+    requestId: requestId ?? null,
+    authBypass: DEV_FLOW_MODE.authBypass,
+    hasSession: !!sessionId,
+    source: requestUrl.origin,
+  });
+
+  const respondAuthJson = (
+    payload: Record<string, unknown>,
+    status = 200,
+    headers?: HeadersInit,
+  ): Response => {
+    webServerLogger.trace({
+      message: "Auth route completed",
+      method: request.method,
+      pathname,
+      status,
+      requestId: requestId ?? null,
+    });
+    return jsonResponse(payload, status, headers);
+  };
+
+  const database = initAppDatabase();
   const nowMs = currentNowMs();
   const getCurrentAuthStatus = () =>
     getAuthStatus(database, sessionId, {
@@ -941,7 +985,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/status" && request.method === "GET") {
       const status = getCurrentAuthStatus();
-      return jsonResponse(
+      return respondAuthJson(
         {
           ok: true,
           status,
@@ -982,7 +1026,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
               accountName,
             },
       );
-      return jsonResponse({
+      return respondAuthJson({
         enrollment,
         ok: true,
       });
@@ -1004,7 +1048,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
           : {}),
       });
 
-      return jsonResponse(
+      return respondAuthJson(
         {
           ok: true,
           recoveryCodes: result.recoveryCodes,
@@ -1034,7 +1078,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         totpCode: readRequiredString(body, "totpCode"),
       });
 
-      return jsonResponse(
+      return respondAuthJson(
         {
           ok: true,
           status: getAuthStatus(database, result.session.id, {
@@ -1063,7 +1107,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         recoveryCode: readRequiredString(body, "recoveryCode"),
       });
 
-      return jsonResponse(
+      return respondAuthJson(
         {
           ok: true,
           status: getAuthStatus(database, result.session.id, {
@@ -1086,7 +1130,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/step-up" && request.method === "POST") {
       if (DEV_FLOW_MODE.authBypass) {
-        return jsonResponse({
+        return respondAuthJson({
           ok: true,
           status: getCurrentAuthStatus(),
           stepUpValidUntil: new Date(
@@ -1110,7 +1154,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         totpCode: readRequiredString(body, "totpCode"),
       });
 
-      return jsonResponse({
+      return respondAuthJson({
         ok: true,
         status: getCurrentAuthStatus(),
         stepUpValidUntil: result.stepUpValidUntil,
@@ -1119,7 +1163,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/logout" && request.method === "POST") {
       logout(database, sessionId);
-      return jsonResponse(
+      return respondAuthJson(
         {
           ok: true,
           status: getCurrentAuthStatus(),
@@ -1133,7 +1177,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/ws-ticket" && request.method === "POST") {
       if (DEV_FLOW_MODE.authBypass) {
-        return jsonResponse({
+        return respondAuthJson({
           ok: true,
           ticket: issueDevWebSocketTicket(nowMs),
         });
@@ -1151,13 +1195,13 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         nowMs,
         sessionId,
       });
-      return jsonResponse({
+      return respondAuthJson({
         ok: true,
         ticket,
       });
     }
 
-    return jsonResponse(
+    return respondAuthJson(
       {
         error: {
           code: "method_not_allowed",
@@ -1169,6 +1213,14 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
       405,
     );
   } catch (error) {
+    webServerLogger.warning({
+      message: "Auth request failed before response",
+      method: request.method,
+      pathname,
+      requestId: requestId ?? null,
+      requestUrl: requestUrl.toString(),
+      error: normalizeErrorDescription(error),
+    });
     const clearSessionCookie =
       error instanceof AuthServiceError &&
       (error.code === "session_required" ||
@@ -1329,13 +1381,34 @@ async function htmlResponse(): Promise<Response> {
  */
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
   // Parse first, then validate shape so runtime schema errors are surfaced consistently.
-  const parsed = JSON.parse(raw) as Partial<RpcRequestMessage>;
+  let parsed: Partial<RpcRequestMessage>;
+  try {
+    parsed = JSON.parse(raw) as Partial<RpcRequestMessage>;
+  } catch (error) {
+    webServerLogger.warning({
+      message: "Invalid RPC request JSON",
+      payloadPreview: raw.slice(0, 200),
+      error: normalizeErrorDescription(error),
+    });
+    throw new Error("Invalid RPC request payload");
+  }
+
+  const method = parsed.method;
   if (
     parsed.type !== "request" ||
     typeof parsed.id !== "number" ||
-    typeof parsed.method !== "string" ||
-    !(parsed.method in rpcHandlers)
+    typeof method !== "string" ||
+    !(method in rpcHandlers)
   ) {
+    webServerLogger.warning({
+      message: "Invalid RPC request payload",
+      payload: {
+        type: parsed.type,
+        id: parsed.id,
+        method,
+      },
+      hasMethod: typeof method === "string",
+    });
     throw new Error("Invalid RPC request payload");
   }
 
@@ -1356,13 +1429,31 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
  * @param raw - raw argument for raw.
  */
 function parseRpcClientMessage(raw: string): RpcClientMessage {
-  const parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
+  let parsed: Partial<RpcClientMessage>;
+  try {
+    parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
+  } catch {
+    webServerLogger.warning({
+      message: "Invalid RPC client message JSON",
+      payloadPreview: raw.slice(0, 200),
+    });
+    throw new Error("Invalid RPC request payload");
+  }
   if (parsed.type === "cancel" && typeof parsed.id === "number") {
+    webServerLogger.trace({
+      message: "RPC client cancel received",
+      requestId: parsed.id,
+    });
     return {
       type: "cancel",
       id: parsed.id,
     };
   }
+
+  webServerLogger.trace({
+    message: "RPC client request payload received",
+    payloadType: parsed.type,
+  });
   return parseRpcRequestMessage(raw);
 }
 
@@ -1485,10 +1576,22 @@ function abortPendingRpcRequest(
   const pendingRequests = pendingRpcRequestsByClient.get(client);
   const pending = pendingRequests?.get(requestId);
   if (!pending) {
+    webServerLogger.trace({
+      message: "RPC request cancel ignored",
+      requestId,
+      authBypass: client.data.authBypass,
+      sessionId: client.data.sessionId,
+    });
     return;
   }
 
   pending.canceledByClient = true;
+  webServerLogger.trace({
+    message: "RPC request canceled by client",
+    requestId,
+    authBypass: client.data.authBypass,
+    sessionId: client.data.sessionId,
+  });
   pending.controller.abort(
     createAbortError(
       null,
@@ -1510,6 +1613,13 @@ function abortAllPendingRpcRequests(
     return;
   }
 
+  webServerLogger.trace({
+    message: "Aborting all pending RPC requests",
+    requestCount: pendingRequests.size,
+    reason,
+    authBypass: client.data.authBypass,
+    sessionId: client.data.sessionId,
+  });
   for (const pending of pendingRequests.values()) {
     pending.canceledByClient = true;
     pending.controller.abort(createAbortError(null, reason));
@@ -1989,10 +2099,31 @@ async function bootstrap(): Promise<void> {
      */,
 
     async fetch(request, serverInstance) {
-      const { pathname } = new URL(request.url);
+      const requestUrl = new URL(request.url);
+      const { pathname } = requestUrl;
+      const requestId = request.headers.get("x-request-id")?.trim();
+      const source = requestUrl.origin;
+      const requestStartMs = Date.now();
+
+      webServerLogger.trace({
+        message: "HTTP request received",
+        method: request.method,
+        pathname,
+        source,
+        requestId: requestId ?? null,
+      });
 
       const authResponse = await handleAuthRequest(request);
       if (authResponse) {
+        webServerLogger.trace({
+          message: "HTTP request handled by auth route",
+          method: request.method,
+          pathname,
+          status: authResponse.status,
+          source,
+          requestId: requestId ?? null,
+          durationMs: Date.now() - requestStartMs,
+        });
         return authResponse;
       }
 
@@ -2018,6 +2149,14 @@ async function bootstrap(): Promise<void> {
             allowedOrigins,
           )
         ) {
+          webServerLogger.warning({
+            message: "WebSocket origin not allowed",
+            method: request.method,
+            pathname,
+            source,
+            requestId: requestId ?? null,
+            origin: request.headers.get("origin"),
+          });
           return stringResponse(
             "WebSocket origin not allowed",
             "text/plain; charset=utf-8",
@@ -2035,23 +2174,65 @@ async function bootstrap(): Promise<void> {
         });
         if (!websocketAuth.ok) {
           if (websocketAuth.failure.kind === "auth_error") {
+            webServerLogger.warning({
+              message: "WebSocket auth failed",
+              method: request.method,
+              pathname,
+              status: "auth_error",
+              source,
+              requestId: requestId ?? null,
+              reason: normalizeErrorDescription(websocketAuth.failure.error),
+            });
             return authErrorResponse(request, websocketAuth.failure.error, {
               clearSessionCookie: websocketAuth.failure.clearSessionCookie,
             });
           }
+          webServerLogger.warning({
+            message: "WebSocket upgrade rejected",
+            method: request.method,
+            pathname,
+            status: websocketAuth.failure.status,
+            source,
+            requestId: requestId ?? null,
+          });
           return new Response(websocketAuth.failure.body, {
             headers: buildResponseHeaders("text/plain; charset=utf-8"),
             status: websocketAuth.failure.status,
           });
         }
 
+        webServerLogger.trace({
+          message: "WebSocket auth passed",
+          method: request.method,
+          pathname,
+          authBypass: websocketAuth.socketData.authBypass,
+          sessionId: websocketAuth.socketData.sessionId,
+          source,
+          requestId: requestId ?? null,
+        });
+
         if (
           serverInstance.upgrade(request, {
             data: websocketAuth.socketData,
           })
         ) {
+          webServerLogger.info({
+            message: "WebSocket upgrade accepted",
+            method: request.method,
+            pathname,
+            source,
+            requestId: requestId ?? null,
+          });
           return;
         }
+
+        webServerLogger.warning({
+          message: "WebSocket upgrade failed",
+          method: request.method,
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return stringResponse(
           "WebSocket upgrade failed",
           "text/plain; charset=utf-8",
@@ -2060,14 +2241,32 @@ async function bootstrap(): Promise<void> {
       }
 
       if (!BACKEND_ONLY && (pathname === "/" || pathname === "/index.html")) {
+        webServerLogger.trace({
+          message: "Serving HTML entrypoint",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return htmlResponse();
       }
 
       if (!BACKEND_ONLY && pathname === "/index.css") {
+        webServerLogger.trace({
+          message: "Serving mainview css",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return fileResponse(MAINVIEW_CSS_PATH, "text/css; charset=utf-8");
       }
 
       if (!BACKEND_ONLY && pathname === "/index.js") {
+        webServerLogger.trace({
+          message: "Serving mainview bundle",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return fileResponse(
           mainviewBundlePath,
           "application/javascript; charset=utf-8",
@@ -2075,6 +2274,12 @@ async function bootstrap(): Promise<void> {
       }
 
       if (!BACKEND_ONLY && pathname === "/fonts/fira-code-vf.woff2") {
+        webServerLogger.trace({
+          message: "Serving font asset",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return fileResponse(FIRA_CODE_VARIABLE_FONT_PATH, "font/woff2");
       }
 
@@ -2082,6 +2287,12 @@ async function bootstrap(): Promise<void> {
         !BACKEND_ONLY &&
         pathname === "/fonts/inter-latin-wght-normal.woff2"
       ) {
+        webServerLogger.trace({
+          message: "Serving font asset",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return fileResponse(INTER_VARIABLE_FONT_LATIN_PATH, "font/woff2");
       }
 
@@ -2089,16 +2300,35 @@ async function bootstrap(): Promise<void> {
         !BACKEND_ONLY &&
         pathname === "/fonts/inter-latin-ext-wght-normal.woff2"
       ) {
+        webServerLogger.trace({
+          message: "Serving font asset",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return fileResponse(INTER_VARIABLE_FONT_LATIN_EXT_PATH, "font/woff2");
       }
 
       if (pathname === "/health") {
+        webServerLogger.trace({
+          message: "Serving health endpoint",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
         return stringResponse(
           JSON.stringify(buildLivenessPayload(true)),
           "application/json; charset=utf-8",
         );
       }
 
+      webServerLogger.warning({
+        message: "HTTP route not found",
+        method: request.method,
+        pathname,
+        source,
+        requestId: requestId ?? null,
+      });
       return stringResponse("Not found", "text/plain; charset=utf-8", 404);
     },
     websocket: {
@@ -2110,6 +2340,12 @@ async function bootstrap(): Promise<void> {
       open(ws) {
         rpcClients.add(ws);
         getPendingRpcRequests(ws);
+        webServerLogger.trace({
+          message: "WebSocket client connected",
+          authBypass: ws.data.authBypass,
+          sessionId: ws.data.sessionId,
+          totalClients: rpcClients.size,
+        });
       } /**
        * Closes .
        * @param ws - ws argument for close.
@@ -2118,7 +2354,17 @@ async function bootstrap(): Promise<void> {
       close(ws) {
         rpcClients.delete(ws);
         abortAllPendingRpcRequests(ws, "RPC connection closed.");
+        webServerLogger.trace({
+          message: "WebSocket client disconnected",
+          authBypass: ws.data.authBypass,
+          sessionId: ws.data.sessionId,
+          totalClients: rpcClients.size,
+        });
         if (rpcClients.size === 0) {
+          webServerLogger.trace({
+            message: "RPC client set empty, suspending polling",
+            totalClients: rpcClients.size,
+          });
           suspendActiveWorktreePolling();
         }
       } /**
@@ -2129,20 +2375,54 @@ async function bootstrap(): Promise<void> {
 
       message(ws, rawMessage) {
         void (async () => {
+          const messageStartedAt = Date.now();
           const payload = parseRawSocketMessage(rawMessage);
           let requestId = -1;
+          const messageByteLength =
+            typeof rawMessage === "string"
+              ? rawMessage.length
+              : rawMessage.byteLength;
+          webServerLogger.trace({
+            message: "WebSocket message received",
+            payloadType: typeof rawMessage,
+            authBypass: ws.data.authBypass,
+            sessionId: ws.data.sessionId,
+            messageByteLength,
+          });
           try {
             // Each websocket message is treated as either cancel or request and resolved independently.
             const message = parseRpcClientMessage(payload);
             if (message.type === "cancel") {
+              webServerLogger.trace({
+                message: "RPC client cancel message",
+                requestId: message.id,
+                authBypass: ws.data.authBypass,
+                sessionId: ws.data.sessionId,
+              });
               abortPendingRpcRequest(ws, message.id);
               return;
             }
 
             const request = message;
             requestId = request.id;
+            webServerLogger.trace({
+              message: "RPC request processing started",
+              requestId: request.id,
+              method: request.method,
+              priority: request.priority,
+              timeoutMs: request.timeoutMs ?? null,
+              authBypass: ws.data.authBypass,
+              sessionId: ws.data.sessionId,
+            });
             const pendingRequests = getPendingRpcRequests(ws);
             if (pendingRequests.has(request.id)) {
+              webServerLogger.warning({
+                message: "Duplicate RPC request received while pending",
+                requestId: request.id,
+                method: request.method,
+                authBypass: ws.data.authBypass,
+                sessionId: ws.data.sessionId,
+              });
               throw new Error(`RPC request ${request.id} is already pending.`);
             }
 
@@ -2157,6 +2437,12 @@ async function bootstrap(): Promise<void> {
             };
             pendingRequests.set(request.id, pending);
             incrementPendingRpcRequestCount();
+            webServerLogger.trace({
+              message: "RPC request registered",
+              requestId: request.id,
+              pendingForClient: pendingRequests.size,
+              globalPending: pendingRpcRequestCount,
+            });
 
             if (!ws.data.authBypass) {
               const session = resolveSession(initAppDatabase(), {
@@ -2198,10 +2484,35 @@ async function bootstrap(): Promise<void> {
                 type: "response",
               };
               ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+              webServerLogger.trace({
+                message: "RPC request completed",
+                requestId: request.id,
+                method: request.method,
+                durationMs: Date.now() - messageStartedAt,
+                authBypass: ws.data.authBypass,
+                sessionId: ws.data.sessionId,
+              });
             } catch (error) {
               if (pending.canceledByClient) {
                 return;
               }
+
+              const isTimeout =
+                isAbortError(error) &&
+                pending.timeoutMs !== null &&
+                isTimeoutAbort(pending.signal);
+              const rpcError = isTimeout
+                ? toRpcAbortMessage(request, pending, error)
+                : normalizeErrorDescription(error);
+              webServerLogger.warning({
+                message: isTimeout
+                  ? "RPC request timed out"
+                  : "RPC request failed",
+                requestId: request.id,
+                method: request.method,
+                durationMs: Date.now() - messageStartedAt,
+                error: rpcError,
+              });
 
               const response: RpcResponseMessage = {
                 id: request.id,
@@ -2218,6 +2529,12 @@ async function bootstrap(): Promise<void> {
               if (pendingRequests.get(request.id) === pending) {
                 pendingRequests.delete(request.id);
                 decrementPendingRpcRequestCount();
+                webServerLogger.trace({
+                  message: "RPC request cleaned up",
+                  requestId: request.id,
+                  globalPending: pendingRpcRequestCount,
+                  pendingForClient: pendingRequests.size,
+                });
               }
             }
           } catch (error) {
@@ -2232,6 +2549,11 @@ async function bootstrap(): Promise<void> {
             if (requestId < 0) {
               return;
             }
+            webServerLogger.warning({
+              message: "RPC message handling failed",
+              requestId,
+              error: normalizeErrorDescription(error),
+            });
             const response: RpcResponseMessage = {
               id: requestId,
               ok: false,

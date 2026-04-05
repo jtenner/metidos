@@ -1131,6 +1131,49 @@ function safeMetadataAnnotations() {
   };
 }
 
+function normalizeToolError(error: unknown): unknown {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null,
+    };
+  }
+  return String(error);
+}
+
+function withToolLogging<TArgs, TResult>(
+  toolName: string,
+  handler: (args: TArgs) => Promise<TResult> | TResult,
+): (args: TArgs) => Promise<TResult> {
+  return async (args: TArgs): Promise<TResult> => {
+    const startedAt = Date.now();
+    sidecarLogger.trace({
+      message: `MCP tool call started: ${toolName}`,
+      tool: toolName,
+      args,
+    });
+
+    try {
+      const result = await handler(args);
+      sidecarLogger.trace({
+        message: `MCP tool call completed: ${toolName}`,
+        tool: toolName,
+        durationMs: Date.now() - startedAt,
+      });
+      return result;
+    } catch (error) {
+      sidecarLogger.error({
+        message: `MCP tool call failed: ${toolName}`,
+        tool: toolName,
+        durationMs: Date.now() - startedAt,
+        error: normalizeToolError(error),
+      });
+      throw error;
+    }
+  };
+}
+
 const server = new McpServer({
   name: "jolt",
   version: "0.0.1",
@@ -1173,29 +1216,32 @@ server.registerTool(
     // Treat metadata updates as safe UI changes so Codex can run them freely.
     annotations: safeMetadataAnnotations(),
   },
-  async ({ pinned, summary, threadId, title }) => {
-    const resolvedThreadId = requireThreadId(threadId);
-    const thread = await updateThreadMetadataFromSidecar(
-      (params, options) =>
-        rpcClient.call("updateThreadMetadata", params, options),
-      {
-        threadId: resolvedThreadId,
-        ...(typeof title === "undefined" ? {} : { title }),
-        ...(typeof summary === "undefined" ? {} : { summary }),
-        ...(typeof pinned === "undefined" ? {} : { pinned }),
-      },
-      {
-        priority: "foreground",
-      },
-    );
-    return textResult(`Updated thread ${thread.id}.`, {
-      threadId: thread.id,
-      title: thread.title,
-      summary: thread.summary,
-      pinned: thread.pinnedAt !== null,
-      pinnedAt: thread.pinnedAt,
-    });
-  },
+  withToolLogging(
+    "modify_thread",
+    async ({ pinned, summary, threadId, title }) => {
+      const resolvedThreadId = requireThreadId(threadId);
+      const thread = await updateThreadMetadataFromSidecar(
+        (params, options) =>
+          rpcClient.call("updateThreadMetadata", params, options),
+        {
+          threadId: resolvedThreadId,
+          ...(typeof title === "undefined" ? {} : { title }),
+          ...(typeof summary === "undefined" ? {} : { summary }),
+          ...(typeof pinned === "undefined" ? {} : { pinned }),
+        },
+        {
+          priority: "foreground",
+        },
+      );
+      return textResult(`Updated thread ${thread.id}.`, {
+        threadId: thread.id,
+        title: thread.title,
+        summary: thread.summary,
+        pinned: thread.pinnedAt !== null,
+        pinnedAt: thread.pinnedAt,
+      });
+    },
+  ),
 );
 
 /** Tool: list project threads with optional workspace filtering. */
@@ -1224,7 +1270,7 @@ server.registerTool(
       readOnlyHint: true,
     },
   },
-  async ({ projectName, workspaceName }) => {
+  withToolLogging("list_threads", async ({ projectName, workspaceName }) => {
     const { project, rows, workspace } = await buildThreadListRows({
       projectName,
       workspaceName,
@@ -1258,7 +1304,7 @@ server.registerTool(
         threads: rows,
       },
     );
-  },
+  }),
 );
 
 /** Tool: focus the UI on a project/workspace/thread context. */
@@ -1292,7 +1338,7 @@ server.registerTool(
       readOnlyHint: false,
     },
   },
-  async ({ project, threadId, workspace }) => {
+  withToolLogging("set_context", async ({ project, threadId, workspace }) => {
     const target = await resolveFocusContextTarget({
       project,
       threadId,
@@ -1319,7 +1365,7 @@ server.registerTool(
         threadId: result.threadId,
       },
     );
-  },
+  }),
 );
 
 /**
@@ -1385,66 +1431,69 @@ server.registerTool(
       readOnlyHint: false,
     },
   },
-  async ({
-    autoStart,
-    input,
-    model,
-    projectId,
-    projectPath,
-    reasoningEffort,
-    unsafeMode,
-    worktreePath,
-  }) => {
-    const target = await resolveWorktreeTarget({
+  withToolLogging(
+    "new_thread",
+    async ({
+      autoStart,
+      input,
+      model,
       projectId,
       projectPath,
+      reasoningEffort,
+      unsafeMode,
       worktreePath,
-    });
-    const metadata = {
-      input,
-      model: model ?? null,
-      reasoningEffort: reasoningEffort ?? null,
-      unsafeMode: unsafeMode ?? null,
-      autoStart: autoStart ?? null,
-      projectPath: target.projectPath,
-    };
+    }) => {
+      const target = await resolveWorktreeTarget({
+        projectId,
+        projectPath,
+        worktreePath,
+      });
+      const metadata = {
+        input,
+        model: model ?? null,
+        reasoningEffort: reasoningEffort ?? null,
+        unsafeMode: unsafeMode ?? null,
+        autoStart: autoStart ?? null,
+        projectPath: target.projectPath,
+      };
 
-    if (autoStart === true && unsafeMode !== true) {
-      // For approved flow, request permission first instead of creating immediately.
-      const request = await rpcClient.call("requestThreadStart", {
+      if (autoStart === true && unsafeMode !== true) {
+        // For approved flow, request permission first instead of creating immediately.
+        const request = await rpcClient.call("requestThreadStart", {
+          projectId: target.projectId,
+          worktreePath: target.worktreePath,
+          input,
+          model: metadata.model,
+          reasoningEffort: metadata.reasoningEffort,
+          unsafeMode: metadata.unsafeMode,
+          autoStart: metadata.autoStart,
+        });
+        const payload = threadStartRequestPayload(request);
+        return textResult(
+          `Requested permission to start a thread for ${target.worktreePath}.`,
+          payload,
+        );
+      }
+
+      // Default path: create thread and send first message in one end-to-end operation.
+      const created = await rpcClient.call("createThread", {
         projectId: target.projectId,
         worktreePath: target.worktreePath,
-        input,
         model: metadata.model,
         reasoningEffort: metadata.reasoningEffort,
         unsafeMode: metadata.unsafeMode,
-        autoStart: metadata.autoStart,
       });
-      const payload = threadStartRequestPayload(request);
+      const started = await rpcClient.call("sendThreadMessage", {
+        threadId: created.thread.id,
+        input,
+      });
+      const payload = threadStatusPayload(started, metadata);
       return textResult(
-        `Requested permission to start a thread for ${target.worktreePath}.`,
+        `Started thread ${payload.threadId} (${payload.status}).`,
         payload,
       );
-    }
-
-    // Default path: create thread and send first message in one end-to-end operation.
-    const created = await rpcClient.call("createThread", {
-      projectId: target.projectId,
-      worktreePath: target.worktreePath,
-      model: metadata.model,
-      reasoningEffort: metadata.reasoningEffort,
-      unsafeMode: metadata.unsafeMode,
-    });
-    const started = await rpcClient.call("sendThreadMessage", {
-      threadId: created.thread.id,
-      input,
-    });
-    const payload = threadStatusPayload(started, metadata);
-    return textResult(
-      `Started thread ${payload.threadId} (${payload.status}).`,
-      payload,
-    );
-  },
+    },
+  ),
 );
 
 /** Start MCP stdio server and begin listening for tool invocations. */
