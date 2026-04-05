@@ -6,6 +6,7 @@
 - Scope: current repository snapshot in `/home/jtenner/Projects/jt-ide`
 - Method: static source review of Bun backend, RPC transport, Codex/MCP integration, persistence, and browser UI; targeted runtime check of Bun bind behavior; dependency advisory check with `bun audit`
 - Overall result: high risk
+- Historical note: this is a point-in-time report from 2026-04-03. It predates later websocket-auth hardening for session cookies + short-lived tickets and should be read as historical context rather than current state.
 - Most important issues:
   - unauthenticated websocket RPC can be driven by any local process and by arbitrary web pages through cross-site websocket hijacking
   - worktree file reads are vulnerable to path traversal and can disclose arbitrary local files outside the repository

@@ -1,6 +1,9 @@
 /**
  * @file src/bun/rpc-websocket-auth.ts
  * @description Module for rpc websocket auth.
+ *
+ * Upgrades are only accepted when both a valid session cookie (`jolt_session`) and
+ * short-lived websocket ticket are present, unless auth bypass is explicitly enabled.
  */
 
 import { AuthServiceError, readSessionCookie } from "./auth-service";
@@ -39,7 +42,9 @@ export type RpcWebSocketAuthResult =
     };
 
 /**
- * Performs authorizeRpcWebSocketUpgrade operation.
+ * Performs websocket-auth upgrade authorization.
+ *
+ * In normal mode, the request must include a valid session cookie and ticket pair.
  * @param options - Configuration options used by this operation.
  */
 export function authorizeRpcWebSocketUpgrade(options: {

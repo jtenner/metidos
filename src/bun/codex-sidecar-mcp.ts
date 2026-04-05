@@ -110,6 +110,9 @@ function defaultWorktreePathDescription(): string {
 
 /**
  * Derives the HTTP origin paired with a websocket RPC URL.
+ *
+ * The derived origin is used for `/auth/ws-ticket` so ticket exchange happens on the same
+ * server family (http/https vs ws/wss).
  * @param value - RPC websocket URL.
  */
 export function deriveRpcHttpOrigin(value: string): string {
@@ -123,6 +126,8 @@ export function deriveRpcHttpOrigin(value: string): string {
 
 /**
  * Builds a session cookie header value for websocket-authenticated requests.
+ *
+ * This is attached to both `/auth/ws-ticket` and authenticated `/rpc` connections.
  * @param sessionId - Session identifier.
  */
 export function buildSessionCookieHeader(sessionId: string): string {
@@ -189,6 +194,9 @@ function readWebSocketTicketErrorMessage(value: unknown): string | null {
 
 /**
  * Requests a fresh websocket ticket for the current authenticated session.
+ *
+ * The sidecar POSTs to `/auth/ws-ticket` on the same origin as the RPC URL and sends
+ * the active `jolt_session` cookie for authentication.
  * @param options - Configuration options used by this operation.
  */
 async function requestWebSocketTicket(options: {
@@ -231,6 +239,10 @@ async function requestWebSocketTicket(options: {
 
 /**
  * Build websocket connection details for the RPC client.
+ *
+ * If a `sessionId` is available, the client first exchanges it for a short-lived ticket
+ * and attaches both the ticket and session cookie. Without a session id, it falls back to
+ * a direct websocket URL.
  * @param options - Configuration options used by this operation.
  */
 export async function buildRpcSocketConnectionDetails(options: {

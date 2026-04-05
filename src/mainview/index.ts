@@ -293,6 +293,9 @@ function clearRpcReconnectTimer(): void {
 }
 /**
  * Builds socket url with ticket.
+ *
+ * The ticket is appended as a query param and is paired with the authenticated browser
+ * session via cookies during websocket upgrade.
  * @param ticket - ticket argument for buildSocketUrlWithTicket.
  */
 
@@ -448,6 +451,9 @@ function handleRpcAuthFailure(error: { message: string }): void {
 }
 /**
  * Connects rpc socket.
+ *
+ * Before opening the websocket, the client acquires a short-lived ticket from
+ * `issueWebSocketTicket()` and attaches it via `buildSocketUrlWithTicket`.
  * @param reason - Reason for this operation.
  */
 

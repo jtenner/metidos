@@ -727,6 +727,9 @@ function joltRpcUrl(): string {
 
 /**
  * Derives the HTTP origin that pairs with the configured RPC websocket URL.
+ *
+ * This keeps `/auth/ws-ticket` and `/rpc` aligned on the same scheme/host/port when the
+ * sidecar needs to exchange a session for a websocket ticket.
  * @param rpcUrl - RPC websocket URL.
  */
 function joltRpcHttpOrigin(rpcUrl: string): string {
@@ -740,8 +743,12 @@ function joltRpcHttpOrigin(rpcUrl: string): string {
 
 /**
  * Builds the environment passed to the Codex MCP sidecar for a thread.
- * @param thread - thread argument for buildCodexSidecarEnv.
- * @param options - Optional overrides used by tests and callers.
+ *
+ * The sidecar receives identifiers for thread/project/worktree context and, when present,
+ * the active `JOLT_SESSION_ID` used to request a websocket ticket before connecting.
+ * @param thread - Thread metadata needed to scope MCP sidecar access.
+ * @param options - Optional overrides used by tests and callers. `sessionId` is injected as
+ * `JOLT_SESSION_ID` only when present.
  */
 export function buildCodexSidecarEnv(
   thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,

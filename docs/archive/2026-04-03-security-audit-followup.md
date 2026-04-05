@@ -6,6 +6,7 @@
 - Scope: current repository snapshot in `/home/jtenner/Projects/jt-ide`
 - Method: static source review of the Bun backend, auth/session transport, Codex integration, sidecar scope controls, task execution paths, and task/worktree filesystem containment
 - Overall result: materially improved from the earlier 2026-04-03 audit, but still high risk
+- Historical note: this is a follow-up snapshot and does not represent the full current risk state. Review later code and audit notes for the latest posture.
 
 ## What Looks Fixed Since The Earlier Audit
 

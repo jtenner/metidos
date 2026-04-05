@@ -28,7 +28,9 @@ Creates a client for the local CLI process.
 ### Jolt sidecar MCP
 
 In this repo, each `Codex` client attaches the local `jolt` MCP sidecar through `config.mcp_servers`.
-The backend passes the current authenticated session id into that sidecar, which exchanges it for a fresh websocket ticket before opening `/rpc` with both the ticket and the session cookie header.
+The backend passes the current authenticated session id as `JOLT_SESSION_ID` into that sidecar. The sidecar calls `POST /auth/ws-ticket` on `JOLT_RPC_HTTP_ORIGIN` with `jolt_session=<session id>` to get a short-lived ticket, then opens `/rpc?ticket=...` with both the ticket and `Cookie: jolt_session=...`.
+
+If no session id is available, the sidecar falls back to a direct websocket connection to `JOLT_RPC_URL` without ticketed auth.
 
 The sidecar exposes these Jolt control tools:
 

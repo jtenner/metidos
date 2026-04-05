@@ -45,12 +45,14 @@ flowchart TD
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets (`index.html`, css, fonts)
      - `ws://.../rpc` on loopback, with `wss://.../rpc` expected only through a TLS-terminating reverse proxy
+     - The frontend obtains a short-lived `/auth/ws-ticket` and connects with `?ticket=...` plus authenticated session context.
      - event-driven push updates for tasks/history changes
    - Runtime config is injected so the frontend connects back to the correct RPC endpoint.
 
 2. **Frontend boot**
    - `src/mainview/index.ts` creates a WebSocket transport and pending request map.
-   - A typed request envelope (`type`, `id`, `method`, `params`, `priority`) is sent per RPC.
+   - It acquires a ticket through `/auth/ws-ticket` before opening `/rpc`, then reconnects/retries on transient failures.
+  - A typed request envelope (`type`, `id`, `method`, `params`, `priority`) is sent per RPC.
    - Pending calls can be canceled/retried; reconnect uses exponential backoff in production and reload logic in dev.
 
 3. **Request handling**
