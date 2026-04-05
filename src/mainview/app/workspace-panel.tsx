@@ -5,7 +5,10 @@
 
 import { memo, useCallback, useState } from "react";
 import type { JSX } from "react";
-import type { FocusEvent as ReactFocusEvent, MouseEvent as ReactMouseEvent } from "react";
+import type {
+  FocusEvent as ReactFocusEvent,
+  MouseEvent as ReactMouseEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import type { RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
@@ -112,9 +115,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
 
   const showCreateThreadPopover = useCallback(
     (
-      event:
-        | ReactMouseEvent<HTMLElement>
-        | ReactFocusEvent<HTMLElement>,
+      event: ReactMouseEvent<HTMLElement> | ReactFocusEvent<HTMLElement>,
     ): void => {
       if (typeof window === "undefined") {
         return;
@@ -207,18 +208,20 @@ export const WorkspacePanel = memo(function WorkspacePanel({
             <div className="font-label text-[9px] uppercase tracking-[0.16em] text-[#8ca6b9]">
               New thread context
             </div>
-            <div className="mt-1 space-y-0.5 text-[11px]">
-              <div>
-                <span className="text-[#7c8f99]">Project:</span>{" "}
-                <span className="truncate">{selectedProjectNameForThread}</span>
+            <div className="mt-1 text-[11px] leading-5">
+              <div className="truncate text-[#dce6ec]">
+                {selectedProjectNameForThread}{" "}
+                <span className="inline-flex items-center gap-1 text-[#8ca6b9]">
+                  <span className="material-symbols-outlined text-[12px] leading-none text-[#8ca6b9]">
+                    call_split
+                  </span>
+                  <span className="truncate">
+                    {activeSelectedWorktreeBranch}
+                  </span>
+                </span>
               </div>
-              <div>
-                <span className="text-[#7c8f99]">Branch:</span>{" "}
-                <span className="truncate">{activeSelectedWorktreeBranch}</span>
-              </div>
-              <div>
-                <span className="text-[#7c8f99]">Worktree:</span>{" "}
-                <span className="truncate">{activeSelectedWorktreeFolder}</span>
+              <div className="mt-0.5 truncate text-[#65737f]">
+                {activeSelectedWorktreeFolder}
               </div>
             </div>
           </div>
