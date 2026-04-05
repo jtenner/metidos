@@ -46,7 +46,13 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/desktop-sidebar.tsx` defines the desktop layout shell and sidebar affordances for wide screens.
 
-`app/diff-workspace.tsx` renders file patches and supports diff tree construction and state for patch inspection.
+`app/diff-workspace.tsx` renders file patches and supports diff tree construction and state for patch inspection, including worker-backed preparation for very large diffs.
+
+`app/diff-parsing.ts` contains the shared diff parse/summarize helpers and the threshold used to decide when to move large diff preparation off the main thread.
+
+`app/diff-parsing-client.ts` exposes the cached diff-parsing request manager and React hook that coordinate large-diff worker requests.
+
+`app/diff-parsing-worker.ts` is the dedicated web worker entrypoint for parsing and summarizing large diffs away from the UI thread.
 
 `app/git-history-panel.tsx` displays per-thread and project git history in a dedicated sidebar panel.
 
@@ -58,7 +64,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/message-markdown-routing.ts` isolates the plain-text versus rich-markdown routing heuristics and bare-link splitting used by transcript message rendering.
 
-`app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, and notices.
+`app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, notices, and the shared diff viewer used across transcript and history surfaces.
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
 

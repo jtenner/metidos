@@ -37,7 +37,16 @@ Hosts the active workspace panel shell and swaps between available workspace mod
 Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization and cached row-height reuse for unchanged rows.
 
 `diff-workspace.tsx`
-Builds and renders the diff tree/panel view, including helpers like `emptyDiffFilePatchState` and `buildDiffFileTree`.
+Builds and renders the diff tree/panel view, including helpers like `emptyDiffFilePatchState` and `buildDiffFileTree`, and now reuses shared parsed-diff state so large patches can prepare off the main thread.
+
+`diff-parsing.ts`
+Defines the shared one-pass diff parser, line classification, summary counts, and the threshold heuristic that decides when a diff is large enough to hand off to the worker path.
+
+`diff-parsing-client.ts`
+Provides the shared request manager and React hook that cache parsed diff results, offload large diff parsing to a web worker, and fall back to synchronous parsing when a worker is unavailable.
+
+`diff-parsing-worker.ts`
+Implements the browser worker entrypoint used to parse and summarize large diffs without monopolizing the UI thread.
 
 `git-history-panel.tsx`
 Displays commit/history data for active workspace context in a memoized panel view.
@@ -51,7 +60,7 @@ Renders the tasks-specific workspace and task-related controls.
 ## Message rendering modules
 
 `message-ui.tsx`
-Contains every major message renderer used in the chat stream, including the lightweight/plain-text message path, processing/error/notice states, tool/web search output, command output, reasoning traces, and file-change summaries. Also includes modal/popover helpers such as `GitHistoryDiffModal`, `ErrorPreviewPopover`, and `ThreadSummaryPopover`.
+Contains every major message renderer used in the chat stream, including the lightweight/plain-text message path, processing/error/notice states, tool/web search output, command output, reasoning traces, and file-change summaries. Diff rendering now consumes the shared parsed-diff cache/worker path for large diffs. Also includes modal/popover helpers such as `GitHistoryDiffModal`, `ErrorPreviewPopover`, and `ThreadSummaryPopover`.
 
 `message-markdown.tsx`
 Contains the rich markdown renderer and syntax-highlighting path, isolated behind a lazy import so heavy transcript dependencies stay out of the initial UI bundle.

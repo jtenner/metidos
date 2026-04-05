@@ -11,6 +11,11 @@ import {
 import { BeatLoader } from "react-spinners";
 
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
+import type { DiffLineKind } from "./diff-parsing";
+import {
+  type DiffParseSnapshot,
+  useDiffParseResult,
+} from "./diff-parsing-client";
 import { LazyRichMarkdownMessage } from "./message-markdown-loader";
 import {
   shouldUseRichMarkdownRenderer,
@@ -28,12 +33,6 @@ const DIFF_VIRTUALIZATION_OVERSCAN = 20;
 const MIN_VIRTUALIZED_DIFF_LINES = 400;
 const MARKDOWN_LINK_CLASS_NAME =
   "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
-
-type DiffLine = {
-  kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
-  key: string;
-  text: string;
-};
 
 const PlainTextMessage = memo(function PlainTextMessage({
   text,
@@ -167,33 +166,6 @@ export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   );
 }
 
-function parseUnifiedDiff(diffText: string): DiffLine[] {
-  // Parse diff one line at a time into a minimal display model for lightweight rendering.
-  if (!diffText.trim()) {
-    return [];
-  }
-
-  return diffText.split(/\r?\n/).map((line, index) => {
-    let kind: DiffLine["kind"] = "context";
-    if (line.startsWith("diff --git")) {
-      kind = "meta";
-    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
-      kind = "file";
-    } else if (line.startsWith("@@")) {
-      kind = "hunk";
-    } else if (line.startsWith("+")) {
-      kind = "add";
-    } else if (line.startsWith("-")) {
-      kind = "remove";
-    }
-    return {
-      kind,
-      key: `${index}:${line}`,
-      text: line,
-    };
-  });
-}
-
 function commandStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
   exitCode: number | null,
@@ -249,7 +221,7 @@ function errorItemStateLabel(
   return "Noted";
 }
 
-function diffLineClassName(kind: DiffLine["kind"]): string {
+function diffLineClassName(kind: DiffLineKind): string {
   if (kind === "meta") {
     return "bg-[#0f1418] text-[#8aa6ba]";
   }
@@ -275,13 +247,17 @@ function diffLineClassName(kind: DiffLine["kind"]): string {
 export function DiffViewer({
   className,
   diffText,
+  parsedDiffState,
   viewportClassName,
 }: {
   className?: string;
   diffText: string;
+  parsedDiffState?: DiffParseSnapshot;
   viewportClassName?: string;
 }): JSX.Element {
-  const lines = useMemo(() => parseUnifiedDiff(diffText), [diffText]);
+  const internalParsedDiffState = useDiffParseResult(diffText);
+  const effectiveParsedDiffState = parsedDiffState ?? internalParsedDiffState;
+  const lines = effectiveParsedDiffState.result.lines;
   const scrollRef = useRef<HTMLElement | null>(null);
   const useVirtualizedDiff = lines.length >= MIN_VIRTUALIZED_DIFF_LINES;
   const virtualizer = useVirtualizer({
@@ -293,6 +269,14 @@ export function DiffViewer({
   });
   const virtualRows = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
+
+  if (effectiveParsedDiffState.isLoading) {
+    return (
+      <div className="border border-[#283239] bg-[#151b20] px-3 py-3 text-xs text-[#d4e4ef]">
+        Preparing diff...
+      </div>
+    );
+  }
 
   if (lines.length === 0) {
     return (

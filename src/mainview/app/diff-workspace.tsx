@@ -1,6 +1,7 @@
-import { type JSX, useMemo } from "react";
+import type { JSX } from "react";
 import type { RpcProject, RpcWorktreeChange } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
+import { useDiffParseResult } from "./diff-parsing-client";
 import { DiffViewer } from "./message-ui";
 import { formatPathForDisplay } from "./state";
 
@@ -109,42 +110,6 @@ export function buildDiffFileTree(
       }));
 
   return materialize(root);
-}
-
-/**
- * Summarize unified diff body into hunk/addition/deletion totals for header stats.
- */
-function summarizeDiffText(diffText: string): {
-  additions: number;
-  deletions: number;
-  hunks: number;
-} {
-  let additions = 0;
-  let deletions = 0;
-  let hunks = 0;
-
-  for (const line of diffText.split(/\r?\n/)) {
-    if (line.startsWith("@@")) {
-      hunks += 1;
-      continue;
-    }
-    if (line.startsWith("+++ ") || line.startsWith("--- ")) {
-      continue;
-    }
-    if (line.startsWith("+")) {
-      additions += 1;
-      continue;
-    }
-    if (line.startsWith("-")) {
-      deletions += 1;
-    }
-  }
-
-  return {
-    additions,
-    deletions,
-    hunks,
-  };
 }
 
 function DiffFileTree({
@@ -258,11 +223,8 @@ export function DiffWorkspace({
   worktreeDiffError,
 }: DiffWorkspaceProps): JSX.Element {
   const mobile = variant === "mobile";
-  // Recompute additions/deletions/hunk counts from current patch text only when needed.
-  const diffStats = useMemo(
-    () => summarizeDiffText(diffFilePatchState.diffText),
-    [diffFilePatchState.diffText],
-  );
+  const parsedDiffState = useDiffParseResult(diffFilePatchState.diffText);
+  const diffStats = parsedDiffState.result.summary;
 
   // Left panel renders a single fallback/content state using ordered branches.
   const selectorContent =
@@ -327,6 +289,7 @@ export function DiffWorkspace({
     <DiffViewer
       className={mobile ? "" : "h-full"}
       diffText={diffFilePatchState.diffText}
+      parsedDiffState={parsedDiffState}
       viewportClassName={mobile ? "max-h-[48vh]" : "h-full"}
     />
   );
@@ -418,15 +381,23 @@ export function DiffWorkspace({
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {selectedDiffFileChange && diffFilePatchState.diffText.trim() ? (
-                <span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
-                  {diffStats.hunks} {diffStats.hunks === 1 ? "Hunk" : "Hunks"}
-                </span>
+                parsedDiffState.isLoading ? (
+                  <span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
+                    Preparing
+                  </span>
+                ) : (
+                  <span className="border border-[#31404a] bg-[#182025] px-2 py-0.5 font-label text-[9px] uppercase tracking-[0.16em] text-[#8f9aa2]">
+                    {diffStats.hunks} {diffStats.hunks === 1 ? "Hunk" : "Hunks"}
+                  </span>
+                )
               ) : null}
             </div>
           </div>
           {selectedDiffFileChange && diffFilePatchState.diffText.trim() ? (
             <div className="mt-3 text-xs text-[#6f7b83]">
-              {diffStats.additions} additions · {diffStats.deletions} deletions
+              {parsedDiffState.isLoading
+                ? "Preparing diff statistics..."
+                : `${diffStats.additions} additions · ${diffStats.deletions} deletions`}
             </div>
           ) : null}
         </div>

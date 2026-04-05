@@ -529,7 +529,7 @@ Done when:
 
 ### Slice P5.1: Workerize large diff parsing
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Large commit diffs or file diffs can still be expensive even after memoization.
