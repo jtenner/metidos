@@ -52,6 +52,12 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/invalidation-events.ts` coalesces worktree invalidation notifications from the websocket transport into batched in-process subscriptions consumed by the app shell.
 
+`app/message-markdown.tsx` contains the lazily loaded rich markdown and syntax-highlighting renderer used only for markdown-heavy transcript content.
+
+`app/message-markdown-loader.ts` exposes the shared dynamic-import loader used to defer and warm the rich markdown renderer after initial app mount.
+
+`app/message-markdown-routing.ts` isolates the plain-text versus rich-markdown routing heuristics and bare-link splitting used by transcript message rendering.
+
 `app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, and notices.
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.

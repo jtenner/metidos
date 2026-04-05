@@ -1,19 +1,21 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  type CSSProperties,
+  Fragment,
   type JSX,
   memo,
+  Suspense,
   useMemo,
   useRef,
   useState,
 } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
 import { BeatLoader } from "react-spinners";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import remarkGfm from "remark-gfm";
 
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
+import { LazyRichMarkdownMessage } from "./message-markdown-loader";
+import {
+  shouldUseRichMarkdownRenderer,
+  splitPlainTextMessage,
+} from "./message-markdown-routing";
 import type {
   GitHistoryModalState,
   MessageGroup,
@@ -21,28 +23,11 @@ import type {
 } from "./state";
 import { APP_TITLE, formatGitHistoryTimestamp } from "./state";
 
-const CODE_FONT_STACK =
-  '"Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-
-// Shared CSS objects for syntax highlighting used by markdown and diff rendering.
-const codeBlockStyle = {
-  margin: 0,
-  border: "1px solid rgba(153, 190, 217, 0.18)",
-  borderRadius: "0.5rem",
-  background: "#111213",
-  padding: "0.875rem 1rem",
-  fontSize: "0.8125rem",
-  lineHeight: "1.6",
-} satisfies CSSProperties;
-
-const codeTagStyle = {
-  fontFamily: CODE_FONT_STACK,
-} satisfies CSSProperties;
-const MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS = 12_000;
-const MAX_HIGHLIGHTED_CODE_BLOCK_LINES = 240;
 const DIFF_LINE_ESTIMATE_PX = 24;
 const DIFF_VIRTUALIZATION_OVERSCAN = 20;
 const MIN_VIRTUALIZED_DIFF_LINES = 400;
+const MARKDOWN_LINK_CLASS_NAME =
+  "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
 
 type DiffLine = {
   kind: "meta" | "file" | "hunk" | "context" | "add" | "remove";
@@ -50,102 +35,47 @@ type DiffLine = {
   text: string;
 };
 
-function shouldSkipSyntaxHighlighting(code: string): boolean {
-  if (code.length > MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS) {
-    return true;
-  }
-  return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
-}
+const PlainTextMessage = memo(function PlainTextMessage({
+  text,
+}: {
+  text: string;
+}): JSX.Element {
+  const segments = useMemo(() => splitPlainTextMessage(text), [text]);
 
-/**
- * Custom markdown renderers:
- * - anchor tags open in new tab
- * - fenced/inline code rendered with project visual style + syntax highlighting
- * - block elements wrapped for horizontal scrolling and table styling.
- */
-const markdownComponents: Components = {
-  a({ href, children, ...props }) {
-    return (
-      <a
-        {...props}
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]"
-      >
-        {children}
-      </a>
-    );
-  },
-  code({ children, className, node: _node, ...props }) {
-    const code = String(children).replace(/\n$/, "");
-    const languageMatch = /language-([\w-]+)/.exec(className ?? "");
-    const isBlockCode = Boolean(languageMatch) || code.includes("\n");
-    if (isBlockCode) {
-      if (shouldSkipSyntaxHighlighting(code)) {
-        return (
-          <div style={codeBlockStyle}>
-            <code
-              {...props}
-              className={`block whitespace-pre-wrap break-words ${className ?? ""}`.trim()}
-              style={codeTagStyle}
-            >
-              {code}
-            </code>
-          </div>
-        );
-      }
-
-      return (
-        <SyntaxHighlighter
-          PreTag="div"
-          language={languageMatch?.[1] ?? "text"}
-          style={vscDarkPlus}
-          customStyle={codeBlockStyle}
-          codeTagProps={{ style: codeTagStyle }}
-          wrapLongLines
-        >
-          {code}
-        </SyntaxHighlighter>
-      );
-    }
-
-    return (
-      <code
-        {...props}
-        className={`bg-[#1d2022] px-1.5 py-0.5 font-mono text-[0.8125rem] text-[#e1ecf3] ${className ?? ""}`.trim()}
-      >
-        {children}
-      </code>
-    );
-  },
-  pre({ children }) {
-    return <div className="my-3 overflow-x-auto">{children}</div>;
-  },
-  table({ children }) {
-    return (
-      <div className="my-3 overflow-x-auto">
-        <table className="message-markdown-table">{children}</table>
-      </div>
-    );
-  },
-};
+  return (
+    <div className="whitespace-pre-wrap break-words">
+      {segments.map((segment) =>
+        segment.kind === "link" ? (
+          <a
+            href={segment.href}
+            key={segment.key}
+            target="_blank"
+            rel="noreferrer"
+            className={`${MARKDOWN_LINK_CLASS_NAME} break-all`}
+          >
+            {segment.text}
+          </a>
+        ) : (
+          <Fragment key={segment.key}>{segment.text}</Fragment>
+        ),
+      )}
+    </div>
+  );
+});
 
 export const MarkdownMessage = memo(function MarkdownMessage({
   text,
 }: {
   text: string;
 }): JSX.Element {
-  // React-markdown handles rich text rendering from assistant output with GFM support.
+  if (!shouldUseRichMarkdownRenderer(text)) {
+    return <PlainTextMessage text={text} />;
+  }
+
   return (
-    <div className="message-markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={markdownComponents}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
+    <Suspense fallback={<PlainTextMessage text={text} />}>
+      <LazyRichMarkdownMessage text={text} />
+    </Suspense>
   );
 });
 

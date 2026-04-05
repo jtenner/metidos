@@ -51,7 +51,16 @@ Renders the tasks-specific workspace and task-related controls.
 ## Message rendering modules
 
 `message-ui.tsx`
-Contains every major message renderer used in the chat stream, including markdown, processing/error/notice states, tool/web search output, command output, reasoning traces, and file-change summaries. Also includes modal/popover helpers such as `GitHistoryDiffModal`, `ErrorPreviewPopover`, and `ThreadSummaryPopover`.
+Contains every major message renderer used in the chat stream, including the lightweight/plain-text message path, processing/error/notice states, tool/web search output, command output, reasoning traces, and file-change summaries. Also includes modal/popover helpers such as `GitHistoryDiffModal`, `ErrorPreviewPopover`, and `ThreadSummaryPopover`.
+
+`message-markdown.tsx`
+Contains the rich markdown renderer and syntax-highlighting path, isolated behind a lazy import so heavy transcript dependencies stay out of the initial UI bundle.
+
+`message-markdown-loader.ts`
+Exports the shared lazy loader used by the main message UI and startup warmup path to fetch the rich markdown renderer on demand.
+
+`message-markdown-routing.ts`
+Defines the lightweight heuristics and bare-link splitting used to keep ordinary chat messages on the plain-text path until richer markdown features are present.
 
 `sidebar-panels-state.ts`
 Owns persisted open/closed state for sidebar panels and exposes toggle/read hooks for each section.

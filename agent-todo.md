@@ -457,7 +457,7 @@ Done when:
 
 ### Slice P4.1: Lazy-load heavy transcript rendering dependencies
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - `react-markdown`, Prism highlighter, and related code are part of the upfront UI cost.

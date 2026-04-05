@@ -19,6 +19,7 @@ import {
   publishWorktreeGitHistoryChanged,
   publishWorktreeTasksChanged,
 } from "./app/invalidation-events";
+import { loadRichMarkdownModule } from "./app/message-markdown-loader";
 import {
   AuthApiError,
   dispatchAuthRequired,
@@ -98,6 +99,7 @@ const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "jolt:thread-start-request-created";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
+const RICH_MARKDOWN_WARMUP_DELAY_MS = 1_500;
 
 declare global {
   interface WindowEventMap {
@@ -799,6 +801,9 @@ if (!appRoot) {
       }),
     );
     window.__joltAppMountedAt = Date.now();
+    window.setTimeout(() => {
+      void loadRichMarkdownModule();
+    }, RICH_MARKDOWN_WARMUP_DELAY_MS);
   } catch (error) {
     console.error("Failed to mount auth shell", error);
     window.__joltAppMountedAt = Number.NaN;
