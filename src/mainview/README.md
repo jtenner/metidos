@@ -78,8 +78,6 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/state.ts` defines shared mainview state shapes, indexed store helpers, formatting helpers, and state-caching utilities used across panels and hooks, including the indexed per-project worktree cache shape used by `App.tsx` and derived-state helpers.
 
-`app/tasks-workspace.tsx` renders the tasks workspace, including task list state and filtering behavior.
-
 `app/thread-list-row.tsx` renders a single thread row and handles row-level status/actions behavior.
 
 `app/threads-panel.tsx` assembles the thread list, preview previews, and selection wiring.

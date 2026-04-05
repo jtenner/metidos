@@ -13,10 +13,10 @@ Provides contextual action menus (`ProjectActionMenu`, `ThreadActionMenu`) used 
 Renders the step-up confirmation dialog used when a privileged action requires a fresh primary-factor plus TOTP re-check.
 
 `desktop-sidebar.tsx`
-Implements the desktop sidebar shell and its integration points with project/thread/task workspaces.
+Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.
 
 `sidebar-content.tsx`
-Composes reusable sidebar sections (projects, threads, tasks) and controls their layout composition.
+Composes reusable sidebar sections (projects, threads) and controls their layout composition.
 
 `projects-panel.tsx`
 Renders project listings and project-focused interactions, including selection and project status actions.
@@ -50,9 +50,6 @@ Displays commit/history data for active workspace context in a memoized panel vi
 
 `invalidation-events.ts`
 Provides coalesced subscription channels for websocket-driven worktree invalidations so task and git-history refreshes can batch repeated same-worktree signals on one tick.
-
-`tasks-workspace.tsx`
-Renders the tasks-specific workspace and task-related controls.
 
 ## Message rendering modules
 

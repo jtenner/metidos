@@ -43,7 +43,7 @@ type UseWorktreeDiffParams = {
   /** Whether app is visible; hidden documents pause background polling. */
   isDocumentVisible: boolean;
   /** Active panel mode; diff effects only run in `diff` mode. */
-  primaryView: "chat" | "diff" | "tasks";
+  primaryView: "chat" | "diff";
   /** RPC procedures for fetching snapshot and file diffs. */
   procedures: ProjectProcedures;
   /** Selected worktree change that should render as the focused patch row. */

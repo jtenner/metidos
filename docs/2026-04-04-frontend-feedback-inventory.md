@@ -69,7 +69,7 @@ flowchart LR
 | Change model | Chat controls | Control disables while update is in flight; inline error below controls | `updateThreadModel()` RPC or pending local selection if no thread |
 | Change reasoning effort | Chat controls | Control disables while update is in flight; inline error below controls | `updateThreadReasoningEffort()` RPC or pending local selection |
 | Toggle unsafe mode | Chat controls | Toggle disables while update is in flight; inline error below controls | `updateThreadUnsafeMode()` RPC or pending local selection |
-| Run project task | Chat task selector or Tasks workspace | Task controls disable; task error shows inline; resulting thread opens/updates | `runProjectTask()` RPC, wrapped in step-up |
+| Run project task | Chat task selector | Task controls disable; task error shows inline; resulting thread opens/updates | `runProjectTask()` RPC, wrapped in step-up |
 | Refresh diff snapshot | Diff workspace | Refresh button changes to `Syncing`; loading/error surfaces depend on cached snapshot | `getWorktreeSnapshot()` RPC |
 | Load focused file diff | Diff workspace file selection | Selected file changes immediately; patch pane shows loading/error/empty states | `readWorktreeFileDiff()` RPC |
 | Load git history | Sidebar git history panel | Panel shows `Loading git history...` or cached list with silent refresh | `listWorktreeGitHistory()` RPC |
@@ -389,14 +389,13 @@ Immediate feedback now:
 Files:
 
 - `src/mainview/App.tsx`
-- `src/mainview/app/tasks-workspace.tsx`
 - `src/mainview/controls/project-task-selector.tsx`
 
 Current process:
 
 1. Task lists load whenever the selected open worktree changes.
 2. Requests are cached, abortable, and keyed per worktree.
-3. Selecting a task from the chat dropdown or clicking a task in the Tasks workspace calls `runSelectedTask()`.
+3. Selecting a task from the chat dropdown calls `runSelectedTask()`.
 4. The app validates project/worktree selection, sets `isRunningProjectTask`, clears task/chat/control errors, and calls `runProjectTask()` behind step-up.
 5. The returned thread is upserted into the thread list and becomes the selected thread when it still matches the active worktree selection.
 
@@ -404,7 +403,7 @@ Immediate feedback now:
 
 - Task list surfaces `Loading project tasks...`, empty, and error states
 - Task execution disables selectors/buttons through derived `taskSelectorDisabled`
-- Task errors render inline in both chat and tasks surfaces
+- Task errors render inline in chat controls
 
 ### 6. Diff Workspace
 
