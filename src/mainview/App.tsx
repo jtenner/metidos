@@ -18,7 +18,6 @@ import type {
   RpcProject,
   RpcProjectTask,
   RpcRequestPriority,
-  RpcSecurityAuditEvent,
   RpcThread,
   RpcThreadDetail,
   RpcThreadMessage,
@@ -119,7 +118,6 @@ import { runRollbackSafeProjectClose } from "./project-close";
 import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
 import { shouldRefreshProjectActionMenuWorktrees } from "./project-worktree-refresh";
 import { isStepUpRequiredError } from "./rpc-errors";
-import { createSupersedingSecurityAuditRefreshRunner } from "./security-audit-refresh";
 import {
   closeProjectsForStartupRestore,
   reconcileStartupProjectRestore,
@@ -481,12 +479,6 @@ export default function App({
     emptyThreadStore(),
   );
   const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
-  const [securityAuditEvents, setSecurityAuditEvents] = useState<
-    RpcSecurityAuditEvent[]
-  >([]);
-  const [securityAuditError, setSecurityAuditError] = useState("");
-  const [securityAuditLoading, setSecurityAuditLoading] = useState(false);
-  const [securityAuditLoaded, setSecurityAuditLoaded] = useState(false);
   const [gitHistory, setGitHistory] =
     useState<RpcWorktreeGitHistoryResult | null>(null);
   const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
@@ -809,59 +801,6 @@ export default function App({
       setSelectedWorktreePath(nextWorktreePath);
     },
     [getProjectState],
-  );
-
-  const securityAuditRefreshRunner = useMemo(
-    () =>
-      createSupersedingSecurityAuditRefreshRunner({
-        load: async (request) => {
-          setSecurityAuditError("");
-
-          try {
-            const nextEvents = await procedures.listSecurityAuditEvents({
-              limit: 100,
-              ...(typeof request.options.projectId === "number"
-                ? {
-                    projectId: request.options.projectId,
-                  }
-                : {}),
-              ...(typeof request.options.threadId === "number"
-                ? {
-                    threadId: request.options.threadId,
-                  }
-                : {}),
-            });
-            if (!request.isLatestRequest()) {
-              return;
-            }
-            setSecurityAuditEvents(nextEvents);
-          } catch (error) {
-            if (!request.isLatestRequest()) {
-              return;
-            }
-            setSecurityAuditError(
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        },
-        onLoadingChange: (loading) => {
-          setSecurityAuditLoading(loading);
-          if (!loading) {
-            setSecurityAuditLoaded(true);
-          }
-        },
-      }),
-    [procedures],
-  );
-
-  const refreshSecurityAuditEvents = useCallback(
-    async (options?: {
-      projectId?: number | null;
-      threadId?: number | null;
-    }): Promise<void> => {
-      await securityAuditRefreshRunner.request(options);
-    },
-    [securityAuditRefreshRunner],
   );
 
   // Derive normalized UI state in one pass so child props stay internally
@@ -5027,16 +4966,6 @@ export default function App({
                     worktreeSearchTextByKey,
                     worktreeThreadErrorLevel,
                   }}
-                  securityAuditPanelProps={{
-                    error: securityAuditError,
-                    events: securityAuditEvents,
-                    hasLoaded: securityAuditLoaded,
-                    loading: securityAuditLoading,
-                    onRefresh: refreshSecurityAuditEvents,
-                    projects,
-                    selectedProjectId,
-                    selectedThreadId,
-                  }}
                   selectedProjectName={selectedProject?.name ?? null}
                   sidebarSearchQuery={sidebarSearchQuery}
                   workspacePanelProps={{
@@ -5256,16 +5185,6 @@ export default function App({
                 worktreeDisplayPathByKey,
                 worktreeSearchTextByKey,
                 worktreeThreadErrorLevel,
-              }}
-              securityAuditPanelProps={{
-                error: securityAuditError,
-                events: securityAuditEvents,
-                hasLoaded: securityAuditLoaded,
-                loading: securityAuditLoading,
-                onRefresh: refreshSecurityAuditEvents,
-                projects,
-                selectedProjectId,
-                selectedThreadId,
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}

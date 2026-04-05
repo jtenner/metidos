@@ -12,7 +12,6 @@ type SidebarPanelsSnapshot = {
   gitHistoryOpen: boolean;
   openProjectPaths: Set<string>;
   projectsOpen: boolean;
-  securityAuditOpen: boolean;
   threadsOpen: boolean;
   workspaceActiveOpen: boolean;
   workspaceOpen: boolean;
@@ -35,7 +34,6 @@ function ensureSidebarPanelsSnapshot(): SidebarPanelsSnapshot {
     gitHistoryOpen: persistedState.gitSectionOpen,
     openProjectPaths: new Set(persistedState.openProjectPaths),
     projectsOpen: persistedState.projectsSectionOpen,
-    securityAuditOpen: persistedState.securityAuditSectionOpen,
     threadsOpen: persistedState.threadsSectionOpen,
     workspaceActiveOpen: persistedState.workspaceActiveSectionOpen,
     workspaceOpen: persistedState.workspaceSectionOpen,
@@ -63,7 +61,6 @@ function persistSidebarPanelsSnapshot(snapshot: SidebarPanelsSnapshot): void {
     projectsSectionOpen: snapshot.projectsOpen,
     threadsSectionOpen: snapshot.threadsOpen,
     gitSectionOpen: snapshot.gitHistoryOpen,
-    securityAuditSectionOpen: snapshot.securityAuditOpen,
     openProjectPaths: [...snapshot.openProjectPaths],
   });
 }
@@ -189,16 +186,6 @@ export function toggleGitHistoryPanelOpen(): void {
 }
 
 /**
- * Toggle security audit section open/closed state.
- */
-export function toggleSecurityAuditPanelOpen(): void {
-  updateSidebarPanelsSnapshot((current) => ({
-    ...current,
-    securityAuditOpen: !current.securityAuditOpen,
-  }));
-}
-
-/**
  * Subscribe to the projects section open state from the shared snapshot.
  */
 export function useProjectsPanelOpen(): boolean {
@@ -250,17 +237,6 @@ export function useGitHistoryPanelOpen(): boolean {
     subscribeToSidebarPanels,
     () => ensureSidebarPanelsSnapshot().gitHistoryOpen,
     () => ensureSidebarPanelsSnapshot().gitHistoryOpen,
-  );
-}
-
-/**
- * Subscribe to security audit section open state from the shared snapshot.
- */
-export function useSecurityAuditPanelOpen(): boolean {
-  return useSyncExternalStore(
-    subscribeToSidebarPanels,
-    () => ensureSidebarPanelsSnapshot().securityAuditOpen,
-    () => ensureSidebarPanelsSnapshot().securityAuditOpen,
   );
 }
 

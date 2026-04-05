@@ -2,7 +2,7 @@
 
 Summary
 
-The frontend has a clear pattern for most feedback-critical actions: a UI handler in `src/mainview/App.tsx` or `src/mainview/auth-shell.tsx` sets a local busy/error state immediately, calls an RPC or auth endpoint, then reconciles the result into shared React state. The strongest coverage is around auth, project/worktree lifecycle, thread lifecycle, chat send/stop, task execution, diff refresh, git history, and security-audit refresh.
+The frontend has a clear pattern for most feedback-critical actions: a UI handler in `src/mainview/App.tsx` or `src/mainview/auth-shell.tsx` sets a local busy/error state immediately, calls an RPC or auth endpoint, then reconciles the result into shared React state. The strongest coverage is around auth, project/worktree lifecycle, thread lifecycle, chat send/stop, task execution, diff refresh, and git history.
 
 The current implementation relies on three feedback channels:
 
@@ -20,7 +20,7 @@ Included:
 - Project, worktree, and thread lifecycle actions
 - Chat send/stop flows
 - Task execution
-- Diff, git-history, and security-audit actions
+- Diff and git-history actions
 - Background event paths that materially affect visible feedback
 
 Not included:
@@ -75,7 +75,6 @@ flowchart LR
 | Load git history | Sidebar git history panel | Panel shows `Loading git history...` or cached list with silent refresh | `listWorktreeGitHistory()` RPC |
 | Load more git history | Git history scroll | `Loading more commits...` footer | `listWorktreeGitHistory()` RPC with offset |
 | Open commit diff | Git history entry click | Modal opens immediately with cached or loading state; error stays in modal | `getWorktreeGitCommitDiff()` RPC |
-| Refresh security audit | Security panel | Refresh icon spins; loading/empty/error states update inline | `listSecurityAuditEvents()` RPC via superseding runner |
 
 ## Current Process By Area
 
@@ -451,28 +450,6 @@ Immediate feedback now:
 - Commit diff modal opens immediately instead of waiting for the RPC
 - Modal error stays scoped to the opened commit diff
 
-### 8. Security Audit
-
-Files:
-
-- `src/mainview/App.tsx`
-- `src/mainview/app/security-audit-panel.tsx`
-- `src/mainview/security-audit-refresh.ts`
-
-Current process:
-
-1. Opening the Security panel triggers the first refresh if data has not loaded yet.
-2. Switching `All` / `Project` / `Thread` scope triggers another refresh.
-3. A 15-second interval keeps the panel refreshed while it remains open.
-4. The refresh runner serializes requests and lets a newer scope replace an older queued one before it starts.
-5. The loader ignores stale completions with `isLatestRequest()`.
-
-Immediate feedback now:
-
-- Refresh button disables and spins while loading
-- Inline states for first-load, empty list, and error
-- Scope buttons disable when project/thread scope is unavailable
-
 ## Background Event Paths That Affect Feedback
 
 ### Websocket to DOM event bridge
@@ -518,4 +495,3 @@ Immediate feedback now:
 - The project close path is notably safer than many other flows because local collapse is deferred until backend success.
 - Chat send is the most optimistic user-facing flow: it clears the composer immediately and repairs state on failure by restoring the draft when appropriate.
 - Background event handling is important for correctness because not all visible feedback comes from the initiating click path.
-

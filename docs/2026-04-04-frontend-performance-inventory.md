@@ -30,7 +30,7 @@ It does not try to profile Bun server internals in depth, except where frontend 
 | Medium | Polling and invalidation model | Thread status still refreshes by polling whole thread lists |
 | Medium | Hover/layout churn | Some preview UI does layout reads on every pointer movement |
 | Medium | Search/filter precomputation | Sidebar search repeatedly formats paths and scans worktrees |
-| Low-Medium | Lazy formatting and event-bridge churn | A few panels stringify/dispatch eagerly when the data may never be opened |
+| Low-Medium | Lazy formatting and event-bridge churn | A few render paths stringify/dispatch eagerly when the data may never be opened |
 
 ## 1. Repeated Lookup Work In Render Paths
 
@@ -446,29 +446,7 @@ Expected impact:
 
 - Low to medium individually, but useful because the same maps would unlock other optimizations too
 
-## 8. Lazy Formatting Opportunities
-
-### 8.1 Security audit payloads are stringified for every visible row even when details stay collapsed
-
-Evidence:
-
-- [security-audit-panel.tsx](/home/jtenner/Projects/jt-ide/src/mainview/app/security-audit-panel.tsx#L235)
-
-Current behavior:
-
-- `JSON.stringify(event.payload, null, 2)` runs during row render
-- The details payload may never be expanded
-
-Likely improvements:
-
-- Stringify lazily only after `<details>` is opened
-- Or precompute on the backend and send a compact summary plus optional detail blob
-
-Expected impact:
-
-- Medium for large audit payloads or long event lists
-
-## 9. Event Bridge And Update Fan-Out
+## 8. Event Bridge And Update Fan-Out
 
 ### 9.1 Websocket messages are parsed and re-emitted as DOM `CustomEvent`s
 
@@ -492,14 +470,14 @@ Expected impact:
 - Low to medium now
 - More valuable if task/history invalidations become frequent
 
-## 10. Practical Optimization Order
+## 9. Practical Optimization Order
 
 ### Fast, low-risk wins
 
 1. Memoize grouped model data in [codex-model-selector.tsx](/home/jtenner/Projects/jt-ide/src/mainview/controls/codex-model-selector.tsx#L48).
 2. Add `useMemo` around diff stats in [diff-workspace.tsx](/home/jtenner/Projects/jt-ide/src/mainview/app/diff-workspace.tsx#L262).
 3. Remove or throttle `onMouseMove` preview updates in [use-thread-previews.ts](/home/jtenner/Projects/jt-ide/src/mainview/app/use-thread-previews.ts#L229).
-4. Make security-audit payload formatting lazy in [security-audit-panel.tsx](/home/jtenner/Projects/jt-ide/src/mainview/app/security-audit-panel.tsx#L235).
+4. Make payload formatting lazy in hot render paths that stringify large objects on demand.
 
 ### Medium-effort, high-payoff work
 
@@ -522,4 +500,3 @@ If the goal is to move quickly with low regression risk, the best sequence is:
 2. Add project/thread/worktree lookup maps.
 3. Reduce thread-list reorder churn.
 4. Profile again before taking on workerization or protocol changes.
-

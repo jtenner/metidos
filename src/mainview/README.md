@@ -20,8 +20,6 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `project-worktree-refresh.ts` isolates the freshness heuristic used when opening the project action menu so recent cached worktree lists are reused and only stale or incomplete lists trigger a background refresh.
 
-`security-audit-refresh.ts` isolates the superseding refresh queue used by the security audit panel so scope changes that happen during an in-flight fetch still settle on the newest requested dataset.
-
 `startup-project-restore.ts` isolates startup restore reconciliation for project reopen state so the UI keeps projects closed until batch restore confirms them and can roll back failed restore targets cleanly.
 
 `startup-worktree-restore.ts` isolates startup worktree-restore filtering and selection fallback so stale persisted worktree paths are pruned before the rest of the UI starts reading git history, tasks, or active-worktree state from them.
@@ -73,8 +71,6 @@ This contains the workspace feature modules that implement every visible workspa
 `app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, notices, and the shared diff viewer used across transcript and history surfaces.
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
-
-`app/security-audit-panel.tsx` displays the local security audit log in a dedicated sidebar panel and supports refresh-on-open, current-project/current-thread filtering, and virtualized rendering when the history grows large.
 
 `app/sidebar-content.tsx` composes shared sidebar sections and controls how project, thread, and task data are organized.
 

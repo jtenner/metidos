@@ -133,8 +133,6 @@
 │     ├─ project-worktree-refresh.test.ts
 │     ├─ project-worktree-refresh.ts
 │     ├─ rpc-errors.ts
-│     ├─ security-audit-refresh.test.ts
-│     ├─ security-audit-refresh.ts
 │     ├─ startup-project-restore.test.ts
 │     ├─ startup-project-restore.ts
 │     ├─ startup-worktree-restore.test.ts
@@ -169,8 +167,6 @@
 │     │  ├─ message-ui.tsx
 │     │  ├─ projects-panel.tsx
 │     │  ├─ projects-panel.test.ts
-│     │  ├─ security-audit-panel.test.ts
-│     │  ├─ security-audit-panel.tsx
 │     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts
 │     │  ├─ state.test.ts
