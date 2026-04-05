@@ -2650,12 +2650,18 @@ process.on("SIGTERM", () => {
 });
 
 process.on("uncaughtException", (error) => {
-  webServerLogger.error(normalizeErrorDescription(error));
+  webServerLogger.error({
+    message: "Uncaught exception",
+    error: normalizeErrorDescription(error),
+  });
   void shutdownAndExit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  webServerLogger.error(normalizeErrorDescription(reason));
+  webServerLogger.error({
+    message: "Unhandled promise rejection",
+    error: normalizeErrorDescription(reason),
+  });
   void shutdownAndExit(1);
 });
 
