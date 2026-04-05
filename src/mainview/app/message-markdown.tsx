@@ -33,7 +33,9 @@ const codeTagStyle = {
 
 /**
  * Function of renderPreparedCodeBlock.
- * @param options - The value of `options`.
+ * @param code - The value of `code`.
+ * @param language - The value of `language`.
+ * @param shouldHighlight - The value of `shouldHighlight`.
  */
 function renderPreparedCodeBlock({
   code,
@@ -142,7 +144,7 @@ const markdownComponents: Components = {
 
 /**
  * Function of RichMarkdownMessage.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
  */
 export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -159,7 +161,7 @@ export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
 
 /**
  * Function of PreparedRichMarkdownMessage.
- * @param options - The value of `options`.
+ * @param plan - The value of `plan`.
  */
 export function PreparedRichMarkdownMessage({
   plan,

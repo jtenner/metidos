@@ -22,7 +22,17 @@ type AuthStepUpDialogProps = {
 
 /**
  * Function of AuthStepUpDialog.
- * @param options - The value of `options`.
+ * @param actionLabel - The value of `actionLabel`.
+ * @param busy - The value of `busy`.
+ * @param error - The value of `error`.
+ * @param onCancel - The value of `onCancel`.
+ * @param onPrimaryFactorChange - The value of `onPrimaryFactorChange`.
+ * @param onSubmit - The value of `onSubmit`.
+ * @param onTotpCodeChange - The value of `onTotpCodeChange`.
+ * @param open - The value of `open`.
+ * @param primaryFactorType - The value of `primaryFactorType`.
+ * @param primaryFactorValue - The value of `primaryFactorValue`.
+ * @param totpCodeValue - The value of `totpCodeValue`.
  */
 export function AuthStepUpDialog({
   actionLabel,

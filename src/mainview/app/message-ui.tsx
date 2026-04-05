@@ -88,7 +88,7 @@ function PreparingLargeMarkdownMessage(): JSX.Element {
 
 /**
  * Function of LargeMarkdownMessage.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
  */
 function LargeMarkdownMessage({ text }: { text: string }): JSX.Element {
   const preprocessedMessage = usePreparedMessageRenderPlan(text);
@@ -135,7 +135,8 @@ export const MarkdownMessage = memo(function MarkdownMessage({
 
 /**
  * Function of ContextUsageMeter.
- * @param options - The value of `options`.
+ * @param inputTokens - The value of `inputTokens`.
+ * @param contextWindowTokens - The value of `contextWindowTokens`.
  */
 export function ContextUsageMeter({
   inputTokens,
@@ -219,7 +220,7 @@ export function ProcessingMessage(): JSX.Element {
 
 /**
  * Function of ChatErrorMessage.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
  */
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -231,7 +232,7 @@ export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 
 /**
  * Function of ChatNoticeMessage.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
  */
 export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -438,7 +439,11 @@ export function DiffViewer({
 
 /**
  * Function of ToolCallMessage.
- * @param options - The value of `options`.
+ * @param server - The value of `server`.
+ * @param tool - The value of `tool`.
+ * @param argumentsText - The value of `argumentsText`.
+ * @param output - The value of `output`.
+ * @param state - The value of `state`.
  */
 export function ToolCallMessage({
   server,
@@ -496,7 +501,8 @@ export function ToolCallMessage({
 
 /**
  * Function of WebSearchMessage.
- * @param options - The value of `options`.
+ * @param query - The value of `query`.
+ * @param state - The value of `state`.
  */
 export function WebSearchMessage({
   query,
@@ -525,7 +531,8 @@ export function WebSearchMessage({
 
 /**
  * Function of ErrorItemMessage.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
+ * @param state - The value of `state`.
  */
 export function ErrorItemMessage({
   text,
@@ -554,7 +561,12 @@ export function ErrorItemMessage({
 
 /**
  * Function of CommandExecutionMessage.
- * @param options - The value of `options`.
+ * @param command - The value of `command`.
+ * @param output - The value of `output`.
+ * @param state - The value of `state`.
+ * @param exitCode - The value of `exitCode`.
+ * @param expanded - The value of `expanded`.
+ * @param onToggleExpanded - The value of `onToggleExpanded`.
  */
 export function CommandExecutionMessage({
   command,
@@ -639,7 +651,8 @@ export function CommandExecutionMessage({
 
 /**
  * Function of ReasoningMessage.
- * @param options - The value of `options`.
+ * @param state - The value of `state`.
+ * @param text - The value of `text`.
  */
 export function ReasoningMessage({
   state,
@@ -670,7 +683,12 @@ export function ReasoningMessage({
 
 /**
  * Function of FileChangeMessage.
- * @param options - The value of `options`.
+ * @param path - The value of `path`.
+ * @param diffText - The value of `diffText`.
+ * @param changeKind - The value of `changeKind`.
+ * @param state - The value of `state`.
+ * @param expanded - The value of `expanded`.
+ * @param onToggleExpanded - The value of `onToggleExpanded`.
  */
 export function FileChangeMessage({
   path,
@@ -777,7 +795,8 @@ export function FileChangeMessage({
 
 /**
  * Function of GitHistoryDiffModal.
- * @param options - The value of `options`.
+ * @param state - The value of `state`.
+ * @param onClose - The value of `onClose`.
  */
 export function GitHistoryDiffModal({
   state,
@@ -859,7 +878,9 @@ export function GitHistoryDiffModal({
 
 /**
  * Function of DesktopMessageGroups.
- * @param options - The value of `options`.
+ * @param groups - The value of `groups`.
+ * @param localUserLabel - The value of `localUserLabel`.
+ * @param renderAssistantMessageContent - The value of `renderAssistantMessageContent`.
  */
 export function DesktopMessageGroups({
   groups,
@@ -933,7 +954,9 @@ export function DesktopMessageGroups({
 
 /**
  * Function of MobileMessageGroups.
- * @param options - The value of `options`.
+ * @param groups - The value of `groups`.
+ * @param localUserLabel - The value of `localUserLabel`.
+ * @param renderAssistantMessageContent - The value of `renderAssistantMessageContent`.
  */
 export function MobileMessageGroups({
   groups,
@@ -1005,7 +1028,9 @@ export function MobileMessageGroups({
 
 /**
  * Function of ErrorPreviewPopover.
- * @param options - The value of `options`.
+ * @param text - The value of `text`.
+ * @param x - The value of `x`.
+ * @param y - The value of `y`.
  */
 export function ErrorPreviewPopover({
   text,
@@ -1035,7 +1060,10 @@ export function ErrorPreviewPopover({
 
 /**
  * Function of ThreadSummaryPopover.
- * @param options - The value of `options`.
+ * @param title - The value of `title`.
+ * @param summary - The value of `summary`.
+ * @param x - The value of `x`.
+ * @param y - The value of `y`.
  */
 export function ThreadSummaryPopover({
   title,

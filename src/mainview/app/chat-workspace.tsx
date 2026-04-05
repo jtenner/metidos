@@ -262,7 +262,12 @@ function visibleMessageMeasurementFingerprint(
 
 /**
  * Function of deriveTranscriptMeasurementRows.
- * @param options - The value of `options`.
+ * @param activeThreadId - The value of `activeThreadId`.
+ * @param expandedItemIds - The value of `expandedItemIds`.
+ * @param groupedMessages - The value of `groupedMessages`.
+ * @param hasTopContent - The value of `hasTopContent`.
+ * @param messages - The value of `messages`.
+ * @param variant - The value of `variant`.
  */
 export function deriveTranscriptMeasurementRows({
   activeThreadId,
@@ -470,7 +475,10 @@ function readUserGroupText(
 
 /**
  * Function of UnsafeModeToggle.
- * @param options - The value of `options`.
+ * @param checked - The value of `checked`.
+ * @param disabled - The value of `disabled`.
+ * @param onChange - The value of `onChange`.
+ * @param variant - The value of `variant`.
  */
 function UnsafeModeToggle({
   checked,

@@ -210,7 +210,7 @@ export const ThreadList = memo(function ThreadList({
 
 /**
  * Function of ThreadListPreviewPortal.
- * @param options - The value of `options`.
+ * @param children - The value of `children`.
  */
 function ThreadListPreviewPortal({
   children,

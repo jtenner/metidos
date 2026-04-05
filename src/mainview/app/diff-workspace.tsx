@@ -127,7 +127,9 @@ export function buildDiffFileTree(
 
 /**
  * Function of DiffFileTree.
- * @param options - The value of `options`.
+ * @param nodes - The value of `nodes`.
+ * @param onSelectedDiffFilePathChange - The value of `onSelectedDiffFilePathChange`.
+ * @param selectedDiffFilePath - The value of `selectedDiffFilePath`.
  */
 function DiffFileTree({
   nodes,

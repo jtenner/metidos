@@ -259,7 +259,9 @@ function authConsoleShell(props: {
 
 /**
  * Function of AuthShell.
- * @param options - The value of `options`.
+ * @param connectRpcTransport - The value of `connectRpcTransport`.
+ * @param disconnectRpcTransport - The value of `disconnectRpcTransport`.
+ * @param procedures - The value of `procedures`.
  */
 export default function AuthShell({
   connectRpcTransport,
