@@ -28,10 +28,8 @@ type GitHistoryPanelProps = {
   gitHistoryError: string;
   gitHistoryLoading: boolean;
   gitHistoryLoadingMore: boolean;
-  onCancelPreloadGitHistoryDiff: (entry: RpcGitHistoryEntry) => void;
   onLoadMoreGitHistory: () => void;
   onOpenGitHistoryDiff: (entry: RpcGitHistoryEntry) => void;
-  onPreloadGitHistoryDiff: (entry: RpcGitHistoryEntry) => void;
   selectedProject: RpcProject | null;
 };
 
@@ -45,10 +43,8 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
   gitHistoryError,
   gitHistoryLoading,
   gitHistoryLoadingMore,
-  onCancelPreloadGitHistoryDiff,
   onLoadMoreGitHistory,
   onOpenGitHistoryDiff,
-  onPreloadGitHistoryDiff,
   selectedProject,
 }: GitHistoryPanelProps) {
   const gitHistoryOpen = useGitHistoryPanelOpen();
@@ -143,24 +139,8 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                       key={entry.hash}
                       className="w-full px-3 py-2 text-left transition-colors hover:bg-[#171a1b]"
                       style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
-                      onMouseEnter={() => {
-                        // Prefetch diff while hovering/focusing to make open feel instant.
-                        onPreloadGitHistoryDiff(entry);
-                      }}
-                      onFocus={() => {
-                        onPreloadGitHistoryDiff(entry);
-                      }}
-                      onBlur={() => {
-                        onCancelPreloadGitHistoryDiff(entry);
-                      }}
-                      onPointerDown={() => {
-                        onPreloadGitHistoryDiff(entry);
-                      }}
-                      onMouseLeave={() => {
-                        onCancelPreloadGitHistoryDiff(entry);
-                      }}
                       onClick={() => {
-                        // Open selected commit diff and keep it in view via persisted preload state.
+                        // Open only the selected commit diff.
                         onOpenGitHistoryDiff(entry);
                       }}
                     >

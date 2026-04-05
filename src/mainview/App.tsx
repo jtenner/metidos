@@ -718,9 +718,6 @@ export default function App({
 
   const gitHistoryDiffRequestIdRef = useRef(0);
   const gitHistoryDiffAbortControllerRef = useRef<AbortController | null>(null);
-  const gitHistoryDiffPreloadAbortControllerRef = useRef(
-    new Map<string, AbortController>(),
-  );
   const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
     null,
   );
@@ -1210,13 +1207,6 @@ export default function App({
     controller.abort(createAbortError(null, reason));
   }, []);
 
-  const abortAllGitHistoryDiffPreloads = useCallback((reason: string) => {
-    for (const controller of gitHistoryDiffPreloadAbortControllerRef.current.values()) {
-      controller.abort(createAbortError(null, reason));
-    }
-    gitHistoryDiffPreloadAbortControllerRef.current.clear();
-  }, []);
-
   const closeGitHistoryModal = useCallback(() => {
     gitHistoryDiffRequestIdRef.current += 1;
     abortGitHistoryDiffRequest("Commit diff request was cleared.");
@@ -1329,75 +1319,6 @@ export default function App({
       }
     },
     [procedures],
-  );
-
-  const preloadGitHistoryDiff = useCallback(
-    (entry: RpcGitHistoryEntry) => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-
-      const cacheKey = gitHistoryDiffCacheKey(
-        selectedProject.id,
-        activeSelectedWorktreePath,
-        entry.hash,
-      );
-      if (gitHistoryDiffPreloadAbortControllerRef.current.has(cacheKey)) {
-        return;
-      }
-
-      const controller = new AbortController();
-      gitHistoryDiffPreloadAbortControllerRef.current.set(cacheKey, controller);
-      void loadGitHistoryDiff(
-        selectedProject.id,
-        activeSelectedWorktreePath,
-        entry,
-        {
-          priority: "default",
-          signal: controller.signal,
-        },
-      )
-        .catch((error) => {
-          if (isAbortError(error)) {
-            return;
-          }
-          // Ignore hover preload failures; only explicit open actions report errors.
-        })
-        .finally(() => {
-          if (
-            gitHistoryDiffPreloadAbortControllerRef.current.get(cacheKey) ===
-            controller
-          ) {
-            gitHistoryDiffPreloadAbortControllerRef.current.delete(cacheKey);
-          }
-        });
-    },
-    [activeSelectedWorktreePath, loadGitHistoryDiff, selectedProject],
-  );
-
-  const cancelPreloadGitHistoryDiff = useCallback(
-    (entry: RpcGitHistoryEntry) => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-
-      const cacheKey = gitHistoryDiffCacheKey(
-        selectedProject.id,
-        activeSelectedWorktreePath,
-        entry.hash,
-      );
-      const controller =
-        gitHistoryDiffPreloadAbortControllerRef.current.get(cacheKey);
-      if (!controller) {
-        return;
-      }
-
-      gitHistoryDiffPreloadAbortControllerRef.current.delete(cacheKey);
-      controller.abort(
-        createAbortError(null, "Commit diff preload was aborted."),
-      );
-    },
-    [activeSelectedWorktreePath, selectedProject],
   );
 
   const openGitHistoryDiff = useCallback(
@@ -3978,21 +3899,6 @@ export default function App({
     selectedProject,
   ]);
 
-  useEffect(() => {
-    const preloadScope = `${selectedProject?.id ?? "none"}::${
-      activeSelectedWorktreePath ?? "none"
-    }`;
-    return () => {
-      abortAllGitHistoryDiffPreloads(
-        `Commit diff preload was cleared for ${preloadScope}.`,
-      );
-    };
-  }, [
-    abortAllGitHistoryDiffPreloads,
-    activeSelectedWorktreePath,
-    selectedProject?.id,
-  ]);
-
   useEffect(
     () => () => {
       gitHistoryDiffRequestIdRef.current += 1;
@@ -5079,10 +4985,8 @@ export default function App({
                     gitHistoryError,
                     gitHistoryLoading,
                     gitHistoryLoadingMore,
-                    onCancelPreloadGitHistoryDiff: cancelPreloadGitHistoryDiff,
                     onLoadMoreGitHistory: handleLoadMoreGitHistory,
                     onOpenGitHistoryDiff: handleOpenGitHistoryDiff,
-                    onPreloadGitHistoryDiff: preloadGitHistoryDiff,
                     selectedProject,
                   }}
                   onSidebarSearchQueryChange={setSidebarSearchQuery}
@@ -5311,10 +5215,8 @@ export default function App({
                 gitHistoryError,
                 gitHistoryLoading,
                 gitHistoryLoadingMore,
-                onCancelPreloadGitHistoryDiff: cancelPreloadGitHistoryDiff,
                 onLoadMoreGitHistory: handleLoadMoreGitHistory,
                 onOpenGitHistoryDiff: handleOpenGitHistoryDiff,
-                onPreloadGitHistoryDiff: preloadGitHistoryDiff,
                 selectedProject,
               }}
               onSidebarSearchQueryChange={setSidebarSearchQuery}
