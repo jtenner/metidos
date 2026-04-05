@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures.ts
+ * @description Module for project procedures.
+ */
+
 import { existsSync, type FSWatcher, watch } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
@@ -148,21 +153,25 @@ import type {
 /**
  * Shared DB handle for all RPC procedures in this process.
  */
+
 const db = initAppDatabase();
 
 /**
  * Default RPC websocket URL used when no MCP override is supplied.
  */
+
 const JOLT_DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
 
 /**
  * Stable MCP server identity for Codex sidecar integration.
  */
+
 const JOLT_MCP_SERVER_NAME = "jolt";
 
 /**
  * Entry point used by procedures that launch/connect to the MCP wrapper script.
  */
+
 const JOLT_SIDECAR_SERVER_PATH = resolve(
   process.cwd(),
   "src/bun/codex-sidecar-mcp.ts",
@@ -172,6 +181,7 @@ const JOLT_SIDECAR_SERVER_PATH = resolve(
  * RPC procedure: returns OS home directory and whether shell-like `~` expansion
  * is supported on this platform.
  */
+
 export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResult> {
   return {
     homeDirectory: homedir(),
@@ -183,6 +193,7 @@ export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResul
 /**
  * RPC procedure: fetch all known projects from the local DB.
  */
+
 export async function listProjectsProcedure(
   _params?: AppRPCSchema["requests"]["listProjects"]["params"],
 ): Promise<RpcProject[]> {
@@ -192,6 +203,7 @@ export async function listProjectsProcedure(
 /**
  * RPC procedure: list threads with a live run-status snapshot for each thread.
  */
+
 export async function listThreadsProcedure(
   _params?: AppRPCSchema["requests"]["listThreads"]["params"],
 ): Promise<RpcThread[]> {
@@ -203,6 +215,7 @@ export async function listThreadsProcedure(
 /**
  * RPC procedure: list live status summaries for a targeted thread subset.
  */
+
 export async function listThreadStatusesProcedure(
   params: AppRPCSchema["requests"]["listThreadStatuses"]["params"],
 ): Promise<RpcThread[]> {
@@ -219,6 +232,7 @@ export async function listThreadStatusesProcedure(
 /**
  * Start shared background cache warmup/maintenance tasks.
  */
+
 export function startProcedureCacheMaintenance(): void {
   startDirectorySuggestionCacheMaintenance();
 }
@@ -226,6 +240,7 @@ export function startProcedureCacheMaintenance(): void {
 /**
  * Warm likely-on-startup caches so early UI requests avoid first-hit latency.
  */
+
 export function warmProcedureStartupCaches(): void {
   warmDirectorySuggestionCache();
 
@@ -237,6 +252,7 @@ export function warmProcedureStartupCaches(): void {
 
 /**
  * Return the latest terminal timestamp from a thread (run or error), if any.
+ * @param thread - The value of `thread`.
  */
 function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
   if (thread.lastRunAt && thread.lastErrorAt) {
@@ -251,6 +267,7 @@ function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
 /**
  * Detect threads that should be marked interrupted after a crash/restart.
  */
+
 function shouldRecoverInterruptedThread(
   thread: ThreadRecord,
   lastInProgressMessageUpdatedAt: string | null,
@@ -276,6 +293,7 @@ function shouldRecoverInterruptedThread(
  * - explicit `threadIdHint`
  * - project + worktree match
  */
+
 function pickBootstrapThreadRecord(
   threads: ThreadRecord[],
   params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
@@ -312,6 +330,7 @@ function pickBootstrapThreadRecord(
 /**
  * On startup, recover threads left mid-turn by previous shutdown/crash.
  */
+
 export function recoverInterruptedThreadTurnsOnStartup(): void {
   const threads = listThreads(db);
   if (threads.length === 0) {
@@ -346,6 +365,7 @@ export function recoverInterruptedThreadTurnsOnStartup(): void {
 /**
  * RPC procedure: return the current codex model catalog.
  */
+
 export async function getCodexModelCatalogProcedure(
   _params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
 ): Promise<RpcCodexModelCatalog> {
@@ -356,6 +376,7 @@ export async function getCodexModelCatalogProcedure(
  * Compose startup bootstrap payload (home, model catalog, projects, and thread detail).
  * Thread detail errors are non-fatal to allow UI to continue booting.
  */
+
 export async function getAppBootstrapProcedure(
   params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
 ): Promise<RpcAppBootstrapResult> {
@@ -384,6 +405,7 @@ export async function getAppBootstrapProcedure(
 /**
  * Polling/caching/ticker constants for project/worktree refresh loops.
  */
+
 const PROJECT_POLL_INTERVAL_MS = 4_000;
 const PROJECT_WORKTREE_CACHE_STALE_MS = 12_000;
 const GIT_HISTORY_POLL_INTERVAL_MS = 2_000;
@@ -400,6 +422,7 @@ const TASK_WATCH_RETRY_DELAY_MS = 60_000;
 /**
  * Per-worktree command options, including an explicit refresh override.
  */
+
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
 };
@@ -407,6 +430,7 @@ type ProjectWorktreeReadOptions = GitCommandOptions & {
 /**
  * Mutable per-worktree polling/caching state while worktree details are open.
  */
+
 type WorktreePollState = {
   changes: RpcWorktreeChange[];
   diff: string[];
@@ -431,6 +455,7 @@ type WorktreePollState = {
 /**
  * Mutable per-project polling/caching state while project is active in UI.
  */
+
 type ProjectPollState = {
   id: number;
   project: ProjectRecord;
@@ -445,6 +470,7 @@ type ProjectPollState = {
 /**
  * Process-local caches shared by multiple procedure calls.
  */
+
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, CodexThread>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
@@ -1424,6 +1450,11 @@ function createBufferedThreadActivityWriter(): {
     }, COMMAND_ACTIVITY_FLUSH_INTERVAL_MS);
   };
 
+  /**
+   * Function of flushEntries.
+   * @param force - The value of `force`.
+   */
+
   const flushEntries = async (force: boolean): Promise<void> => {
     const now = Date.now();
     let needsReschedule = false;
@@ -1518,6 +1549,11 @@ function createBufferedThreadActivityWriter(): {
       scheduleFlush();
     }
   };
+
+  /**
+   * Function of enqueueFlush.
+   * @param force - The value of `force`.
+   */
 
   const enqueueFlush = (force: boolean): Promise<void> => {
     flushChain = flushChain.then(() => flushEntries(force));
@@ -2132,6 +2168,11 @@ function startWorktreeTaskPolling(
       continue;
     }
 
+    /**
+     * Function of unregisterWatcher.
+     * @param watcherToRemove - The value of `watcherToRemove`.
+     */
+
     const unregisterWatcher = (watcherToRemove: FSWatcher | null) => {
       if (!watcherToRemove) {
         return;
@@ -2144,6 +2185,11 @@ function startWorktreeTaskPolling(
     };
 
     let watcher: FSWatcher | null = null;
+    /**
+     * Function of onWatchError.
+     * @param error - The value of `error`.
+     */
+
     const onWatchError = (error: unknown) => {
       const watchErrorCode =
         error instanceof Error ? (error as NodeJS.ErrnoException).code : null;
@@ -2892,6 +2938,12 @@ async function runPackageScriptTaskInBackground(
   let exitCode: number | null = null;
   const bufferedActivityWriter = createBufferedThreadActivityWriter();
 
+  /**
+   * Function of queueCommandActivity.
+   * @param state - The value of `state`.
+   * @param options - The value of `options`.
+   */
+
   const queueCommandActivity = async (
     state: "in_progress" | "completed" | "failed" | "stopped",
     options?: {
@@ -2931,6 +2983,11 @@ async function runPackageScriptTaskInBackground(
       stderr: "pipe",
       signal: controller.signal,
     });
+
+    /**
+     * Function of appendOutput.
+     * @param chunk - The value of `chunk`.
+     */
 
     const appendOutput = async (chunk: string) => {
       output += chunk;

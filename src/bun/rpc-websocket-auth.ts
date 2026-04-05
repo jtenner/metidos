@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/rpc-websocket-auth.ts
+ * @description Module for rpc websocket auth.
+ */
+
 import { AuthServiceError, readSessionCookie } from "./auth-service";
 
 export type RpcWebSocketSocketData = {

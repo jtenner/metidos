@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/security-audit-cli.ts
+ * @description Module for security audit cli.
+ */
+
 import { closeAppDatabase, initAppDatabase } from "./db";
 import { listSecurityAuditEventsFromDatabase } from "./security-audit";
 

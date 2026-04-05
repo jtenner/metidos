@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/auth-shell-connect.test.ts
+ * @description Test file for auth shell connect.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { AuthStatus } from "./auth-client";

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/threads-panel.tsx
+ * @description Module for threads panel.
+ */
+
 import { memo } from "react";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/index.ts
+ * @description Module for index.
+ */
+
 import { readdirSync, realpathSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
@@ -224,6 +229,7 @@ type PendingRpcRequest = {
 /**
  * Resolve an explicit --port/-p override from process args.
  * Supports --port 3000, -p 3000, --port=3000, and -p=3000.
+ * @param args - The value of `args`.
  */
 function readCliPort(args: string[]): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -252,6 +258,8 @@ function readCliPort(args: string[]): string | null {
 /**
  * Resolve and validate server port from CLI arguments and optional env value.
  * @throws if port is non-numeric or outside 1..65535.
+ * @param args - The value of `args`.
+ * @param envPort - The value of `envPort`.
  */
 function resolveServerPort(args: string[], envPort?: string): number {
   const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
@@ -448,6 +456,8 @@ function jsonResponse(
 
 /**
  * Build a file-backed HTTP response with explicit no-cache header.
+ * @param path - The value of `path`.
+ * @param contentType - The value of `contentType`.
  */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
@@ -1054,6 +1064,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 /**
  * Track active RPC requests globally and capture peak concurrency.
  */
+
 function incrementPendingRpcRequestCount(): void {
   pendingRpcRequestCount += 1;
   peakPendingRpcRequestCount = Math.max(
@@ -1064,6 +1075,7 @@ function incrementPendingRpcRequestCount(): void {
 
 /**
  * Lower pending RPC request count safely without underflow.
+ * @param count - The value of `count`.
  */
 function decrementPendingRpcRequestCount(count = 1): void {
   pendingRpcRequestCount = Math.max(0, pendingRpcRequestCount - count);
@@ -1071,6 +1083,7 @@ function decrementPendingRpcRequestCount(count = 1): void {
 
 /**
  * Create a diagnostic snapshot used for overload warning logs.
+ * @param activeServerPort - The value of `activeServerPort`.
  */
 function buildServerHealthSnapshot(activeServerPort: number): {
   backendOnly: boolean;
@@ -1113,6 +1126,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
 
 /**
  * Periodically emit overload telemetry for backlog and event loop lag conditions.
+ * @param activeServerPort - The value of `activeServerPort`.
  */
 function startOverloadMonitoring(activeServerPort: () => number): void {
   if (overloadMonitorTimer) {
@@ -1154,6 +1168,7 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
 
 /**
  * Detect port binding collisions without relying on a concrete error class.
+ * @param error - The value of `error`.
  */
 function isAddressInUseError(error: unknown): boolean {
   return (
@@ -1167,6 +1182,7 @@ function isAddressInUseError(error: unknown): boolean {
 /**
  * Render the HTML entrypoint and inject runtime flags.
  */
+
 async function htmlResponse(): Promise<Response> {
   const runtimeConfig: InjectedRuntimeConfig = {
     devServer: IS_DEV_SERVER,
@@ -1188,6 +1204,7 @@ async function htmlResponse(): Promise<Response> {
 
 /**
  * Parse and validate inbound websocket request messages.
+ * @param raw - The value of `raw`.
  */
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
   // Parse first, then validate shape so runtime schema errors are surfaced consistently.
@@ -1215,6 +1232,7 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
 
 /**
  * Parse either a request or cancel message from a websocket payload.
+ * @param raw - The value of `raw`.
  */
 function parseRpcClientMessage(raw: string): RpcClientMessage {
   const parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
@@ -1229,6 +1247,7 @@ function parseRpcClientMessage(raw: string): RpcClientMessage {
 
 /**
  * Convert exceptions into user-facing string payloads.
+ * @param error - The value of `error`.
  */
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -1258,6 +1277,8 @@ function buildRpcErrorPayload(
 
 /**
  * Build cancellation `Error` with causal metadata while preserving names.
+ * @param reason - The value of `reason`.
+ * @param fallbackMessage - The value of `fallbackMessage`.
  */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
@@ -1280,6 +1301,7 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
 
 /**
  * Distinguish timeout/cancel style abort errors.
+ * @param error - The value of `error`.
  */
 function isAbortError(error: unknown): boolean {
   return (
@@ -1290,6 +1312,7 @@ function isAbortError(error: unknown): boolean {
 
 /**
  * Coerce raw timeout values into normalized positive integers.
+ * @param value - The value of `value`.
  */
 function normalizeTimeoutMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -1300,6 +1323,7 @@ function normalizeTimeoutMs(value: unknown): number | null {
 
 /**
  * Normalize unknown priorities to a valid RPC priority enum value.
+ * @param value - The value of `value`.
  */
 function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
   if (value === "background" || value === "default" || value === "foreground") {
@@ -1311,6 +1335,7 @@ function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
 /**
  * Return (or create) a per-client map for pending RPC operations.
  */
+
 function getPendingRpcRequests(
   client: ServerWebSocket<RpcWebSocketSocketData>,
 ): Map<number, PendingRpcRequest> {
@@ -1327,6 +1352,7 @@ function getPendingRpcRequests(
 /**
  * Cancel one request for a client when a matching cancel packet arrives.
  */
+
 function abortPendingRpcRequest(
   client: ServerWebSocket<RpcWebSocketSocketData>,
   requestId: number,
@@ -1349,6 +1375,7 @@ function abortPendingRpcRequest(
 /**
  * Abort all outstanding requests for a socket (cleanup on disconnect/error paths).
  */
+
 function abortAllPendingRpcRequests(
   client: ServerWebSocket<RpcWebSocketSocketData>,
   reason: string,
@@ -1370,6 +1397,7 @@ function abortAllPendingRpcRequests(
 /**
  * Await request completion while short-circuiting on abort/timeout signal events.
  */
+
 async function awaitRequestResult<T>(
   promise: Promise<T>,
   signal: AbortSignal,
@@ -1401,6 +1429,7 @@ async function awaitRequestResult<T>(
 
 /**
  * Normalize raw websocket data to a string payload.
+ * @param rawMessage - The value of `rawMessage`.
  */
 function parseRawSocketMessage(rawMessage: string | Buffer): string {
   return typeof rawMessage === "string"
@@ -1410,6 +1439,7 @@ function parseRawSocketMessage(rawMessage: string | Buffer): string {
 
 /**
  * Create an abort controller and optionally attach timeout behavior.
+ * @param timeoutMs - The value of `timeoutMs`.
  */
 function buildRequestSignal(timeoutMs: number | null): {
   controller: AbortController;
@@ -1434,6 +1464,7 @@ function buildRequestSignal(timeoutMs: number | null): {
 
 /**
  * Check whether an abort signal came from timeout signal expiry.
+ * @param signal - The value of `signal`.
  */
 function isTimeoutAbort(signal: AbortSignal): boolean {
   return (
@@ -1445,6 +1476,7 @@ function isTimeoutAbort(signal: AbortSignal): boolean {
 /**
  * Convert aborted execution into a user-facing RPC timeout message when appropriate.
  */
+
 function toRpcAbortMessage(
   request: RpcRequestMessage,
   pending: PendingRpcRequest,
@@ -1459,6 +1491,7 @@ function toRpcAbortMessage(
 /**
  * Queue/reuse rebuilds for mainview bundle so rapid file edits only rebuild once.
  */
+
 function queueMainviewBundleBuild(): Promise<string> {
   if (mainviewBuildPromise) {
     mainviewRebuildQueued = true;
@@ -1483,6 +1516,7 @@ function queueMainviewBundleBuild(): Promise<string> {
 
 /**
  * Broadcast a dev reload event to connected clients (frontend hot reload path).
+ * @param reason - The value of `reason`.
  */
 function broadcastReload(reason: string): void {
   if (!IS_DEV_SERVER || rpcClients.size === 0) {
@@ -1505,6 +1539,8 @@ function broadcastReload(reason: string): void {
 
 /**
  * Broadcast that a worktree task list changed.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
  */
 function broadcastTasksChanged(projectId: number, worktreePath: string): void {
   if (rpcClients.size === 0) {
@@ -1529,6 +1565,7 @@ function broadcastTasksChanged(projectId: number, worktreePath: string): void {
 /**
  * Broadcast that git history changed for a tracked worktree.
  */
+
 function broadcastGitHistoryChanged(
   projectId: number,
   worktreePath: string,
@@ -1554,6 +1591,7 @@ function broadcastGitHistoryChanged(
 
 /**
  * Broadcast that the UI should focus a specific project/worktree/thread context.
+ * @param payload - The value of `payload`.
  */
 function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
   if (rpcClients.size === 0) {
@@ -1577,6 +1615,7 @@ function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
 /**
  * Broadcast that a background thread start request was created.
  */
+
 function broadcastThreadStartRequestCreated(
   request: RpcThreadStartRequest,
 ): void {
@@ -1611,6 +1650,7 @@ function normalizeWatchFilename(filename?: string | Buffer | null): string {
 /**
  * Flush pending file change events and decide whether to rebuild or just reload assets.
  */
+
 function flushPendingMainviewReloads(): void {
   pendingMainviewReloadTimer = null;
   const changedFiles = [...pendingMainviewChanges].map((entry) =>
@@ -1649,6 +1689,7 @@ function flushPendingMainviewReloads(): void {
 
 /**
  * Debounce file change reload notifications to reduce event fan-out.
+ * @param filename - The value of `filename`.
  */
 function enqueueMainviewReload(filename?: string | Buffer | null): void {
   const normalizedFilename = normalizeWatchFilename(filename);
@@ -1666,9 +1707,15 @@ function enqueueMainviewReload(filename?: string | Buffer | null): void {
 /**
  * Read mainview directory mtimes and return a normalized path->mtime map.
  */
+
 function readMainviewFileStamps(): Map<string, number> {
   const nextStamps = new Map<string, number>();
   const visitedRealPaths = new Set<string>();
+
+  /**
+   * Function of readDirectory.
+   * @param directoryPath - The value of `directoryPath`.
+   */
 
   const readDirectory = (directoryPath: string) => {
     let realPath: string;
@@ -1721,6 +1768,7 @@ function readMainviewFileStamps(): Map<string, number> {
 /**
  * Start polling-based file watching in dev mode and enqueue debounced reloads on drift.
  */
+
 function startDevMainviewWatcher(): void {
   if (!IS_DEV_SERVER || devMainviewPollTimer) {
     return;
@@ -1747,6 +1795,7 @@ function startDevMainviewWatcher(): void {
 /**
  * Stop active polling/reload timers and clear pending file state.
  */
+
 function shutdownDevWatchers(): void {
   if (devMainviewPollTimer) {
     clearInterval(devMainviewPollTimer);
@@ -1764,6 +1813,7 @@ function shutdownDevWatchers(): void {
 /**
  * Start DB recovery, background listeners, and HTTP/WebSocket server bootstrap.
  */
+
 async function bootstrap(): Promise<void> {
   if (DEV_FLOW_MODE.resetOnStartup) {
     resetLocalAppState({
@@ -2080,6 +2130,7 @@ let shutdownPromise: Promise<void> | null = null;
 
 /**
  * Run coordinated shutdown steps once, then exit with the requested process code.
+ * @param exitCode - The value of `exitCode`.
  */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shutdownPromise) {

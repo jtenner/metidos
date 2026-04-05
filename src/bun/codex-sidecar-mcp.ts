@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/codex-sidecar-mcp.ts
+ * @description Module for codex sidecar mcp.
+ */
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
@@ -24,6 +29,7 @@ const DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
 const DEFAULT_RPC_TIMEOUT_MS = 30_000;
 
 /** RPC request mapping from the shared schema, used for typed method dispatch. */
+
 type RpcRequestMap = AppRPCSchema["requests"];
 /** Known RPC method names supported by the sidecar client. */
 type RpcMethodName = keyof RpcRequestMap;
@@ -38,6 +44,7 @@ type RpcRequestMessage<K extends RpcMethodName = RpcMethodName> = {
 };
 
 /** Response message shapes emitted by RPC for successful and failed calls. */
+
 type RpcResponseMessage =
   | {
       type: "response";
@@ -60,6 +67,7 @@ type PendingRpcRequest = {
 };
 
 /** Localized lifecycle label used by tool-facing payloads. */
+
 type ThreadLifecycleStatus = "Turning" | "Errored" | "Stopped" | "Created";
 
 const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
@@ -75,6 +83,7 @@ function boundThreadSentence(): string {
 }
 
 /** Input description for thread id with explicit context fallback text. */
+
 function explicitThreadIdDescription(): string {
   return typeof threadIdContext === "number"
     ? `Required. Use thread ${threadIdContext} for this Codex thread.`
@@ -89,6 +98,7 @@ function defaultProjectIdDescription(): string {
 }
 
 /** Description text for worktree path defaults in generated tool schemas. */
+
 function defaultWorktreePathDescription(): string {
   return worktreePathContext
     ? `Defaults to git worktree ${worktreePathContext}.`
@@ -110,6 +120,7 @@ class JoltRpcClient {
    * Serializes the payload, tracks the request for response correlation, and
    * enforces an optional timeout per request.
    */
+
   async call<K extends RpcMethodName>(
     method: K,
     params: RpcRequestMap[K]["params"],
@@ -167,6 +178,7 @@ class JoltRpcClient {
   /**
    * Remove one pending request from tracking and cancel any pending timeout timer.
    */
+
   private clearPendingRequest(requestId: number): PendingRpcRequest | null {
     const pending = this.pendingRequests.get(requestId) ?? null;
     if (!pending) {
@@ -182,6 +194,7 @@ class JoltRpcClient {
   /**
    * Reuse one shared websocket when open, otherwise connect once and fan-in callers.
    */
+
   private async waitForOpenSocket(): Promise<WebSocket> {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       return this.socket;
@@ -192,6 +205,11 @@ class JoltRpcClient {
 
     this.connecting = new Promise<WebSocket>((resolveSocket, reject) => {
       const nextSocket = new WebSocket(this.url);
+
+      /**
+       * Function of resetSocket.
+       * @param reason - The value of `reason`.
+       */
 
       const resetSocket = (reason: unknown) => {
         // Centralized reset path so callers awaiting open/requests fail consistently.
@@ -257,6 +275,7 @@ const rpcClient = new JoltRpcClient(rpcUrl);
 
 /**
  * Read and parse an environment variable as an integer project/thread id.
+ * @param name - The value of `name`.
  */
 function readIntegerEnv(name: string): number | null {
   const raw = process.env[name]?.trim();
@@ -268,6 +287,7 @@ function readIntegerEnv(name: string): number | null {
 
 /**
  * Read and trim an environment variable, returning null for missing/empty values.
+ * @param name - The value of `name`.
  */
 function readStringEnv(name: string): string | null {
   const raw = process.env[name]?.trim();
@@ -276,6 +296,7 @@ function readStringEnv(name: string): string | null {
 
 /**
  * Normalize RPC timeout values with fallback to default for invalid/empty input.
+ * @param value - The value of `value`.
  */
 function normalizeTimeoutMs(value: number | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -311,7 +332,9 @@ function samePath(left: string, right: string): boolean {
   return canonicalPath(left) === canonicalPath(right);
 }
 
-/** Normalize a free-form lookup string for stable name comparisons. */
+/** Normalize a free-form lookup string for stable name comparisons.
+ * @param value - The value of `value`.
+ */
 function normalizeLookupValue(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -324,6 +347,7 @@ function shortName(value: string): string {
 }
 
 /** List all project/worktree records for a resolved project id. */
+
 async function resolveProjectWorktrees(
   projectId: number,
 ): Promise<RpcWorktree[]> {
@@ -339,6 +363,7 @@ async function resolveProjectWorktrees(
  * Returns the matched project plus a fresh worktree listing for downstream
  * workspace resolution.
  */
+
 async function resolveProjectByName(
   projectName: string,
 ): Promise<{ project: RpcProject; worktrees: RpcWorktree[] }> {
@@ -389,6 +414,7 @@ async function resolveProjectByName(
  * Resolve a workspace identifier within one project using either a path or a
  * human-readable worktree label.
  */
+
 function resolveWorkspaceForProject(
   project: RpcProject,
   worktrees: RpcWorktree[],
@@ -487,6 +513,7 @@ function normalizeThreadIdInput(
 }
 
 /** Resolve the project/workspace/thread context for a focus request. */
+
 async function resolveFocusContextTarget(options: {
   project: string;
   workspace?: string | null | undefined;
@@ -631,6 +658,7 @@ async function listKnownProjects() {
 /**
  * Resolve a project id from explicit inputs, env context, or project path lookup.
  */
+
 async function resolveProjectId(params?: {
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
@@ -664,6 +692,7 @@ async function resolveProjectId(params?: {
  *
  * Checks explicit project preference first, then active project context, then all projects.
  */
+
 async function resolveProjectIdForWorktreePath(
   worktreePath: string,
   preferredProjectId?: number | null,
@@ -730,6 +759,7 @@ async function resolveProjectIdForWorktreePath(
 /**
  * Resolve worktree target used by thread operations, using explicit args or context.
  */
+
 async function resolveWorktreeTarget(params?: {
   projectId?: number | null | undefined;
   projectPath?: string | null | undefined;
@@ -802,7 +832,9 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
   }
 }
 
-/** Build metadata payload for thread details from db rows or rpc thread objects. */
+/** Build metadata payload for thread details from db rows or rpc thread objects.
+ * @param thread - The value of `thread`.
+ */
 function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
   return {
     threadId: thread.id,
@@ -818,6 +850,7 @@ function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
 /**
  * Build a detailed thread payload for new threads and send-message status responses.
  */
+
 function threadStatusPayload(
   detail: RpcThreadDetail,
   metadata: {
@@ -863,6 +896,8 @@ function threadStartRequestPayload(request: RpcThreadStartRequest) {
 
 /**
  * Build MCP text output with optional structured payload for downstream clients.
+ * @param text - The value of `text`.
+ * @param structuredContent - The value of `structuredContent`.
  */
 function textResult(text: string, structuredContent?: Record<string, unknown>) {
   return {
@@ -886,6 +921,7 @@ const server = new McpServer({
 });
 
 /** Tool: update existing thread metadata (title, summary, pinned). */
+
 server.registerTool(
   "modify_thread",
   {
@@ -1010,6 +1046,7 @@ server.registerTool(
 );
 
 /** Tool: focus the UI on a project/workspace/thread context. */
+
 server.registerTool(
   "set_context",
   {
@@ -1072,6 +1109,7 @@ server.registerTool(
 /**
  * Tool: create threads with optional start/request workflow for deferred approval.
  */
+
 server.registerTool(
   "new_thread",
   {

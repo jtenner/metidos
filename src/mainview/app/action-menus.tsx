@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/action-menus.tsx
+ * @description Module for action menus.
+ */
+
 import type { FormEvent, JSX, RefObject } from "react";
 import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-security-audit.ts
+ * @description Module for project security audit.
+ */
+
 import type { Database } from "bun:sqlite";
 
 import {

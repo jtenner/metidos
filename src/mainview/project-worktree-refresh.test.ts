@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-worktree-refresh.test.ts
+ * @description Test file for project worktree refresh.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcWorktree } from "../bun/rpc-schema";

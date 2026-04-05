@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/auth-step-up-dialog.tsx
+ * @description Module for auth step up dialog.
+ */
+
 import type { FormEvent, JSX } from "react";
 import type { AuthPrimaryFactorType } from "../../bun/db";
 
@@ -15,6 +20,10 @@ type AuthStepUpDialogProps = {
   totpCodeValue: string;
 };
 
+/**
+ * Function of AuthStepUpDialog.
+ * @param options - The value of `options`.
+ */
 export function AuthStepUpDialog({
   actionLabel,
   busy,

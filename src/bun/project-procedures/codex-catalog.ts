@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/codex-catalog.ts
+ * @description Module for codex catalog.
+ */
+
 import type { ModelReasoningEffort } from "@openai/codex-sdk";
 
 import { DEFAULT_THREAD_MODEL, DEFAULT_THREAD_REASONING_EFFORT } from "../db";
@@ -11,7 +16,7 @@ import type {
 const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
 
 /**
- * Sourced from OpenAI's official models docs on March 29, 2026.
+ * Sourced from OpenAI's official models docs and kept aligned with active model IDs.
  * The SDK accepts raw model IDs but does not expose a discovery API,
  * so this list is treated as the source of truth for UI/model validation.
  */

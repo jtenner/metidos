@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-preprocessing-worker.ts
+ * @description Module for message preprocessing worker.
+ */
+
 import {
   type PreparedMessageRenderPlan,
   prepareMessageRenderPlan,

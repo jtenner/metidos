@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/build-mainview.ts
+ * @description Module for build mainview.
+ */
+
 import { resolve } from "node:path";
 
 import reactCompiler from "../../bun-plugin-react-compiler";

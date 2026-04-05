@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/rpc-authz.ts
+ * @description Module for rpc authz.
+ */
+
 import { resolve } from "node:path";
 
 import type { AppRPCSchema, RpcRequestContext } from "./rpc-schema";

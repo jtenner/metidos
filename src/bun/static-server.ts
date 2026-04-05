@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/static-server.ts
+ * @description Module for static server.
+ */
+
 import { resolve } from "node:path";
 
 import { buildMainviewBundle } from "./build-mainview";
@@ -39,12 +44,14 @@ const BACKEND_HEALTH_TIMEOUT_MS = 1_500;
  * Runtime config passed to the browser so the client can discover RPC endpoints and
  * health route details without additional round trips.
  */
+
 type RuntimeConfig = InjectedRuntimeConfig & {
   healthUrl: string;
 };
 
 /**
  * Returns true when a CLI string value is an unsigned decimal integer.
+ * @param value - The value of `value`.
  */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
@@ -53,6 +60,8 @@ function isStringInteger(value: string): boolean {
 /**
  * Reads a string flag from `bun` CLI args. Supports both `--flag value` and
  * `--flag=value` forms and returns null if not provided.
+ * @param args - The value of `args`.
+ * @param flag - The value of `flag`.
  */
 function readCliValue(args: string[], flag: string): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -79,6 +88,7 @@ function readCliValue(args: string[], flag: string): string | null {
  * Resolves a validated port number from CLI arg, environment variable, and a fallback.
  * Throws if the resolved value is missing or outside the TCP port range.
  */
+
 function resolvePort(
   args: string[],
   flag: string,
@@ -101,6 +111,7 @@ function resolvePort(
 /**
  * Creates an HTTP response with a plain text body and explicit content type.
  */
+
 function stringResponse(
   body: string,
   contentType: string,
@@ -124,6 +135,7 @@ function stringResponse(
  * Creates an HTTP response by streaming the file at `path` and forcing no-cache
  * behavior to ensure UI updates are immediately visible during development.
  */
+
 function fileResponse(
   path: string,
   contentType: string,
@@ -144,6 +156,7 @@ function fileResponse(
 /**
  * Builds the application HTML response by injecting inert runtime bootstrap data.
  */
+
 async function buildHtmlResponse(
   runtimeConfig: RuntimeConfig,
   connectUrls: string[],
@@ -161,6 +174,7 @@ async function buildHtmlResponse(
  * Probes the backend health endpoint with a short timeout.
  * Returns true only when the backend emits an explicit liveness success.
  */
+
 async function readBackendHealthSnapshot(
   backendHealthUrl: string,
 ): Promise<boolean> {
@@ -461,6 +475,7 @@ console.log(
 
 /**
  * Stops the Bun server and exits the process.
+ * @param exitCode - The value of `exitCode`.
  */
 function shutdownAndExit(exitCode: number): void {
   try {

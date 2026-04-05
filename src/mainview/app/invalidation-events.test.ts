@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/invalidation-events.test.ts
+ * @description Test file for invalidation events.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import { createCoalescedWorktreeInvalidationChannel } from "./invalidation-events";

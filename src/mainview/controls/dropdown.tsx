@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/dropdown.tsx
+ * @description Module for dropdown.
+ */
+
 import {
   type JSX,
   type ReactNode,
@@ -90,12 +95,20 @@ export function DropdownControl({
       return;
     }
 
+    /**
+     * Function of handlePointerDown.
+     * @param event - The value of `event`.
+     */
     const handlePointerDown = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
 
+    /**
+     * Function of handleKeyDown.
+     * @param event - The value of `event`.
+     */
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);

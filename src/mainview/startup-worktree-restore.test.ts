@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/startup-worktree-restore.test.ts
+ * @description Test file for startup worktree restore.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type {

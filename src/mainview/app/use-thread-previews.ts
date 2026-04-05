@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/use-thread-previews.ts
+ * @description Module for use thread previews.
+ */
+
 import type {
   HTMLAttributes,
   FocusEvent as ReactFocusEvent,

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/thread-list-row.tsx
+ * @description Module for thread list row.
+ */
+
 import { type HTMLAttributes, type JSX, memo } from "react";
 import { createPortal } from "react-dom";
 import type { RpcProject, RpcThread, RpcWorktree } from "../../bun/rpc-schema";
@@ -203,6 +208,10 @@ export const ThreadList = memo(function ThreadList({
   );
 });
 
+/**
+ * Function of ThreadListPreviewPortal.
+ * @param options - The value of `options`.
+ */
 function ThreadListPreviewPortal({
   children,
 }: {
@@ -409,6 +418,11 @@ const ThreadListRow = memo(function ThreadListRow({
   );
 }, areThreadListRowPropsEqual);
 
+/**
+ * Function of isPreviewAnchorActive.
+ * @param anchorId - The value of `anchorId`.
+ * @param popover - The value of `popover`.
+ */
 function isPreviewAnchorActive(
   anchorId: string,
   popover: ErrorPreviewPopoverState | ThreadSummaryPopoverState | null,

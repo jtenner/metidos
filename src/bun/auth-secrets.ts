@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth-secrets.ts
+ * @description Module for auth secrets.
+ */
+
 import {
   chmodSync,
   existsSync,

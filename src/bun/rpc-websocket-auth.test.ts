@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/rpc-websocket-auth.test.ts
+ * @description Test file for rpc websocket auth.
+ */
+
 import { describe, expect, it, mock } from "bun:test";
 
 import { AuthServiceError } from "./auth-service";

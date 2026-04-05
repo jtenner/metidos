@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/workspace-panel.tsx
+ * @description Module for workspace panel.
+ */
+
 import { memo } from "react";
 import type { RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";

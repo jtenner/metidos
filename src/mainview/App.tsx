@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/App.tsx
+ * @description Module for app.
+ */
+
 import {
   type FormEvent,
   type JSX,
@@ -136,6 +141,12 @@ import {
   resolveThreadStatusRefreshOutcome,
 } from "./thread-status-refresh";
 
+/**
+ * Function of mergeThreadMessageHistory.
+ * @param current - The value of `current`.
+ * @param incoming - The value of `incoming`.
+ */
+
 function mergeThreadMessageHistory(
   current: RpcThreadMessage[],
   incoming: RpcThreadMessage[],
@@ -182,6 +193,14 @@ type VisibleMessageCacheEntry = {
   value: VisibleMessage;
 };
 
+/**
+ * Function of readCachedVisibleMessage.
+ * @param cache - The value of `cache`.
+ * @param cacheKey - The value of `cacheKey`.
+ * @param signature - The value of `signature`.
+ * @param createValue - The value of `createValue`.
+ */
+
 function readCachedVisibleMessage(
   cache: Map<string, VisibleMessageCacheEntry>,
   cacheKey: string,
@@ -201,6 +220,11 @@ function readCachedVisibleMessage(
   return nextValue;
 }
 
+/**
+ * Function of threadMessageVisibleSignature.
+ * @param message - The value of `message`.
+ */
+
 function threadMessageVisibleSignature(message: RpcThreadMessage): string {
   switch (message.kind) {
     case "reasoning":
@@ -219,6 +243,11 @@ function threadMessageVisibleSignature(message: RpcThreadMessage): string {
       return `chat:${message.state}:${message.role}:${message.text}`;
   }
 }
+
+/**
+ * Function of buildThreadVisibleMessage.
+ * @param message - The value of `message`.
+ */
 
 function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
   const key = `thread-message:${message.id}`;
@@ -296,6 +325,7 @@ type ProjectWorktreeRequestCacheEntry = {
 /**
  * App-level sizing and interaction constants for responsive layout decisions.
  */
+
 const WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX = 360;
 const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
 const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
@@ -311,6 +341,7 @@ type MobileNavigationIndicatorState = "none" | "working" | "completed";
 
 /**
  * Stable sort for thread collections by updated timestamp, newest-first.
+ * @param items - The value of `items`.
  */
 function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
   return [...items].sort((left, right) =>
@@ -321,6 +352,7 @@ function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
 /**
  * Subscribes to a media query and keeps a boolean in sync with viewport width.
  */
+
 function useDesktopViewport(): boolean {
   const [matches, setMatches] = useState(
     () => window.matchMedia(DESKTOP_MEDIA_QUERY).matches,
@@ -328,6 +360,11 @@ function useDesktopViewport(): boolean {
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    /**
+     * Function of handleChange.
+     * @param event - The value of `event`.
+     */
+
     const handleChange = (event: MediaQueryListEvent): void => {
       setMatches(event.matches);
     };
@@ -345,6 +382,7 @@ function useDesktopViewport(): boolean {
 
 /**
  * Normalizes backend thread errors to a quick classification predicate.
+ * @param error - The value of `error`.
  */
 function isThreadNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -354,6 +392,7 @@ function isThreadNotFoundError(error: unknown): boolean {
 /**
  * Compares worktree change arrays by field values and array order.
  */
+
 function areWorktreeChangesEqual(
   left: RpcWorktreeChange[],
   right: RpcWorktreeChange[],
@@ -378,6 +417,8 @@ function areWorktreeChangesEqual(
 
 /**
  * Compares simple string arrays in a deterministic, order-sensitive way.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
  */
 function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left === right) {
@@ -394,6 +435,7 @@ function areStringArraysEqual(left: string[], right: string[]): boolean {
  * Compares worktree snapshots by path and change/diff metadata before deciding to
  * trigger refresh work.
  */
+
 function areWorktreeSnapshotsEquivalent(
   left: RpcWorktreeSnapshot | undefined,
   right: RpcWorktreeSnapshot | undefined,
@@ -412,6 +454,12 @@ function areWorktreeSnapshotsEquivalent(
     areStringArraysEqual(left.files, right.files)
   );
 }
+
+/**
+ * Function of buildLoadedProjectWorktreesState.
+ * @param worktrees - The value of `worktrees`.
+ * @param loadedAtMs - The value of `loadedAtMs`.
+ */
 
 function buildLoadedProjectWorktreesState(
   worktrees: RpcWorktree[],
@@ -444,6 +492,7 @@ declare global {
  * It composes sidebar/workspace panels, thread/project state derivation, and
  * RPC-driven update handlers into a single interface.
  */
+
 export default function App({
   primaryFactorType,
   procedures,
@@ -1111,6 +1160,11 @@ export default function App({
       selectedProject.id,
       activeSelectedWorktreePath,
     );
+
+    /**
+     * Function of handlePointerDown.
+     * @param event - The value of `event`.
+     */
 
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -3387,6 +3441,11 @@ export default function App({
       return;
     }
 
+    /**
+     * Function of handlePointerDown.
+     * @param event - The value of `event`.
+     */
+
     const handlePointerDown = (event: MouseEvent) => {
       if (
         projectActionMenuRef.current &&
@@ -3395,6 +3454,11 @@ export default function App({
         closeProjectActionMenu();
       }
     };
+
+    /**
+     * Function of handleKeyDown.
+     * @param event - The value of `event`.
+     */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -3421,6 +3485,11 @@ export default function App({
       return;
     }
 
+    /**
+     * Function of handlePointerDown.
+     * @param event - The value of `event`.
+     */
+
     const handlePointerDown = (event: MouseEvent) => {
       if (
         threadActionMenuRef.current &&
@@ -3429,6 +3498,11 @@ export default function App({
         closeThreadActionMenu();
       }
     };
+
+    /**
+     * Function of handleKeyDown.
+     * @param event - The value of `event`.
+     */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -3792,6 +3866,11 @@ export default function App({
   }, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
 
   useEffect(() => {
+    /**
+     * Function of handleThreadStartRequestCreated.
+     * @param event - The value of `event`.
+     */
+
     const handleThreadStartRequestCreated = (
       event: CustomEvent<RpcThreadStartRequest>,
     ) => {
@@ -3851,6 +3930,11 @@ export default function App({
     if (!gitHistoryModal) {
       return;
     }
+
+    /**
+     * Function of handleKeyDown.
+     * @param event - The value of `event`.
+     */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -4468,6 +4552,11 @@ export default function App({
   );
 
   useEffect(() => {
+    /**
+     * Function of handleContextFocusChanged.
+     * @param event - The value of `event`.
+     */
+
     const handleContextFocusChanged = (
       event: CustomEvent<RpcContextFocusChanged>,
     ) => {

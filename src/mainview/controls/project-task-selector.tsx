@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/project-task-selector.tsx
+ * @description Module for project task selector.
+ */
+
 import { type JSX, useId } from "react";
 import type { RpcProjectTask } from "../../bun/rpc-schema";
 import { DropdownControl } from "./dropdown";

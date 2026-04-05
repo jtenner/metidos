@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/git.test.ts
+ * @description Test file for git.
+ */
+
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,

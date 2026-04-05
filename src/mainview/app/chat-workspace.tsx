@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/chat-workspace.tsx
+ * @description Module for chat workspace.
+ */
+
 import {
   measureElement as defaultMeasureElement,
   type ReactVirtualizerOptions,
@@ -166,6 +171,10 @@ const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
 const UNSAFE_MODE_DESCRIPTION =
   "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
 
+/**
+ * Function of hashMeasurementText.
+ * @param text - The value of `text`.
+ */
 function hashMeasurementText(text: string): string {
   let hash = 5381;
 
@@ -176,6 +185,11 @@ function hashMeasurementText(text: string): string {
   return (hash >>> 0).toString(36);
 }
 
+/**
+ * Function of visibleMessageMeasurementFingerprint.
+ * @param message - The value of `message`.
+ * @param expanded - The value of `expanded`.
+ */
 function visibleMessageMeasurementFingerprint(
   message: VisibleMessage,
   expanded: boolean,
@@ -246,6 +260,10 @@ function visibleMessageMeasurementFingerprint(
   ].join(":");
 }
 
+/**
+ * Function of deriveTranscriptMeasurementRows.
+ * @param options - The value of `options`.
+ */
 export function deriveTranscriptMeasurementRows({
   activeThreadId,
   expandedItemIds,
@@ -370,6 +388,12 @@ function groupVisibleMessages(
   return appendGroupedVisibleMessages([], messages, 0);
 }
 
+/**
+ * Function of deriveGroupedVisibleMessages.
+ * @param activeThreadId - The value of `activeThreadId`.
+ * @param messages - The value of `messages`.
+ * @param previousCache - The value of `previousCache`.
+ */
 export function deriveGroupedVisibleMessages(
   activeThreadId: number | null,
   messages: VisibleMessage[],
@@ -431,6 +455,11 @@ export function deriveGroupedVisibleMessages(
   };
 }
 
+/**
+ * Function of readUserGroupText.
+ * @param group - The value of `group`.
+ * @param messages - The value of `messages`.
+ */
 function readUserGroupText(
   group: Extract<TranscriptMessageGroup, { kind: "user" }>,
   messages: VisibleMessage[],
@@ -439,6 +468,10 @@ function readUserGroupText(
   return message?.kind === "chat" ? message.text : "";
 }
 
+/**
+ * Function of UnsafeModeToggle.
+ * @param options - The value of `options`.
+ */
 function UnsafeModeToggle({
   checked,
   disabled,
@@ -494,6 +527,11 @@ function UnsafeModeToggle({
   );
 }
 
+/**
+ * Function of areGroupRowPropsEqual.
+ * @param previous - The value of `previous`.
+ * @param next - The value of `next`.
+ */
 function areGroupRowPropsEqual(
   previous: Readonly<GroupRowProps>,
   next: Readonly<GroupRowProps>,

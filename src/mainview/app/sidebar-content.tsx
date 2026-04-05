@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/sidebar-content.tsx
+ * @description Module for sidebar content.
+ */
+
 import type { ComponentProps, JSX } from "react";
 import { materialSymbol } from "../controls/icons";
 import { SidebarSearchControl } from "../controls/sidebar-search-control";

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/diff-parsing-client.ts
+ * @description Module for diff parsing client.
+ */
+
 import { useEffect, useState } from "react";
 
 import {

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth.test.ts
+ * @description Test file for auth.
+ */
+
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 

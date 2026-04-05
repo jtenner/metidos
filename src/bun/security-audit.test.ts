@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/security-audit.test.ts
+ * @description Test file for security audit.
+ */
+
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 

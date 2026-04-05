@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-ui.tsx
+ * @description Module for message ui.
+ */
+
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Fragment,
@@ -81,6 +86,10 @@ function PreparingLargeMarkdownMessage(): JSX.Element {
   );
 }
 
+/**
+ * Function of LargeMarkdownMessage.
+ * @param options - The value of `options`.
+ */
 function LargeMarkdownMessage({ text }: { text: string }): JSX.Element {
   const preprocessedMessage = usePreparedMessageRenderPlan(text);
 
@@ -124,6 +133,10 @@ export const MarkdownMessage = memo(function MarkdownMessage({
   );
 });
 
+/**
+ * Function of ContextUsageMeter.
+ * @param options - The value of `options`.
+ */
 export function ContextUsageMeter({
   inputTokens,
   contextWindowTokens,
@@ -171,11 +184,19 @@ export function ContextUsageMeter({
   );
 }
 
+/**
+ * Function of isAssistantVisibleMessage.
+ * @param message - The value of `message`.
+ */
 export function isAssistantVisibleMessage(message: VisibleMessage): boolean {
   // Non-chat entries (system/tool messages etc.) are always shown in conversation history.
   return message.kind !== "chat" || message.speaker === "assistant";
 }
 
+/**
+ * Function of isPlainAssistantTextMessage.
+ * @param message - The value of `message`.
+ */
 export function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
   // Exclude status-like tones so plain text bubbles keep spacing consistent.
   return (
@@ -196,6 +217,10 @@ export function ProcessingMessage(): JSX.Element {
   );
 }
 
+/**
+ * Function of ChatErrorMessage.
+ * @param options - The value of `options`.
+ */
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
   return (
     <div className="border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
@@ -204,6 +229,10 @@ export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
   );
 }
 
+/**
+ * Function of ChatNoticeMessage.
+ * @param options - The value of `options`.
+ */
 export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   return (
     <div className="border border-[#6d5930] bg-[#261f12] px-3 py-3 text-sm text-[#f2d79b]">
@@ -212,6 +241,11 @@ export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   );
 }
 
+/**
+ * Function of commandStateLabel.
+ * @param state - The value of `state`.
+ * @param exitCode - The value of `exitCode`.
+ */
 function commandStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
   exitCode: number | null,
@@ -228,6 +262,10 @@ function commandStateLabel(
   return exitCode === null ? "Completed" : `Completed (${exitCode})`;
 }
 
+/**
+ * Function of toolCallStateLabel.
+ * @param state - The value of `state`.
+ */
 function toolCallStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
 ): string {
@@ -243,6 +281,10 @@ function toolCallStateLabel(
   return "Completed";
 }
 
+/**
+ * Function of webSearchStateLabel.
+ * @param state - The value of `state`.
+ */
 function webSearchStateLabel(
   state: "in_progress" | "completed" | "stopped",
 ): string {
@@ -255,6 +297,10 @@ function webSearchStateLabel(
   return "Completed";
 }
 
+/**
+ * Function of errorItemStateLabel.
+ * @param state - The value of `state`.
+ */
 function errorItemStateLabel(
   state: "in_progress" | "completed" | "stopped",
 ): string {
@@ -267,6 +313,10 @@ function errorItemStateLabel(
   return "Noted";
 }
 
+/**
+ * Function of diffLineClassName.
+ * @param kind - The value of `kind`.
+ */
 function diffLineClassName(kind: DiffLineKind): string {
   if (kind === "meta") {
     return "bg-[#0f1418] text-[#8aa6ba]";
@@ -386,6 +436,10 @@ export function DiffViewer({
   );
 }
 
+/**
+ * Function of ToolCallMessage.
+ * @param options - The value of `options`.
+ */
 export function ToolCallMessage({
   server,
   tool,
@@ -440,6 +494,10 @@ export function ToolCallMessage({
   );
 }
 
+/**
+ * Function of WebSearchMessage.
+ * @param options - The value of `options`.
+ */
 export function WebSearchMessage({
   query,
   state,
@@ -465,6 +523,10 @@ export function WebSearchMessage({
   );
 }
 
+/**
+ * Function of ErrorItemMessage.
+ * @param options - The value of `options`.
+ */
 export function ErrorItemMessage({
   text,
   state,
@@ -490,6 +552,10 @@ export function ErrorItemMessage({
   );
 }
 
+/**
+ * Function of CommandExecutionMessage.
+ * @param options - The value of `options`.
+ */
 export function CommandExecutionMessage({
   command,
   output,
@@ -571,6 +637,10 @@ export function CommandExecutionMessage({
   );
 }
 
+/**
+ * Function of ReasoningMessage.
+ * @param options - The value of `options`.
+ */
 export function ReasoningMessage({
   state,
   text,
@@ -598,6 +668,10 @@ export function ReasoningMessage({
   );
 }
 
+/**
+ * Function of FileChangeMessage.
+ * @param options - The value of `options`.
+ */
 export function FileChangeMessage({
   path,
   diffText,
@@ -701,6 +775,10 @@ export function FileChangeMessage({
   );
 }
 
+/**
+ * Function of GitHistoryDiffModal.
+ * @param options - The value of `options`.
+ */
 export function GitHistoryDiffModal({
   state,
   onClose,
@@ -779,6 +857,10 @@ export function GitHistoryDiffModal({
   );
 }
 
+/**
+ * Function of DesktopMessageGroups.
+ * @param options - The value of `options`.
+ */
 export function DesktopMessageGroups({
   groups,
   localUserLabel,
@@ -849,6 +931,10 @@ export function DesktopMessageGroups({
   );
 }
 
+/**
+ * Function of MobileMessageGroups.
+ * @param options - The value of `options`.
+ */
 export function MobileMessageGroups({
   groups,
   localUserLabel,
@@ -917,6 +1003,10 @@ export function MobileMessageGroups({
   );
 }
 
+/**
+ * Function of ErrorPreviewPopover.
+ * @param options - The value of `options`.
+ */
 export function ErrorPreviewPopover({
   text,
   x,
@@ -943,6 +1033,10 @@ export function ErrorPreviewPopover({
   );
 }
 
+/**
+ * Function of ThreadSummaryPopover.
+ * @param options - The value of `options`.
+ */
 export function ThreadSummaryPopover({
   title,
   summary,

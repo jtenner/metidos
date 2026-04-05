@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/shared.ts
+ * @description Module for shared.
+ */
+
 import { statSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";

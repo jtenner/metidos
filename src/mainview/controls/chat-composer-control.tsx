@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/chat-composer-control.tsx
+ * @description Module for chat composer control.
+ */
+
 import {
   type ChangeEvent,
   type JSX,

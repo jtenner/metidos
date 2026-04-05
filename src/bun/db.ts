@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/db.ts
+ * @description Module for db.
+ */
+
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import {
   chmodSync,
@@ -13,10 +18,12 @@ const APP_NAME = ".jolt";
 /** Database filename under the app data directory. */
 const DB_FILE_NAME = "app.db";
 /** Default thread model used when no explicit model is provided. */
+
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
 /** Default reasoning effort used for thread creation and migration repair. */
 export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
 /** Lazily-initialized singleton db handle for the process lifetime. */
+
 let appDatabase: Database | null = null;
 
 type ProjectInput = {
@@ -42,6 +49,7 @@ type ThreadUsageInput = {
 };
 
 /** Input for compaction metric updates persisted with token usage. */
+
 type ThreadCompactionStatsInput = {
   maxInputTokens: number;
   estimatedCompactionTriggerTokens: number | null;
@@ -126,6 +134,7 @@ export type ProjectRecord = {
 };
 
 /** Public DB shape for thread rows returned from queries. */
+
 export type ThreadRecord = {
   id: number;
   projectId: number;
@@ -239,6 +248,7 @@ const DEFAULT_APP_DATA_DIR =
           APP_NAME,
         );
 /** Cached app-data directory path resolved for this process. */
+
 let resolvedAppDataDir: string | null = null;
 
 export type AppDataPathOptions = {
@@ -259,6 +269,7 @@ function runStatement(
 /**
  * Run operations inside a transaction and rollback on exceptions.
  */
+
 function runInTransaction<T>(database: Database, callback: () => T): T {
   runStatement(database, "BEGIN IMMEDIATE");
   try {
@@ -291,7 +302,10 @@ function ensureAppDirectory(appDataPath: string): void {
   }
 }
 
-/** Probe directory by writing and deleting a temp file. */
+/**
+ * Probe directory by writing and deleting a temp file.
+ * @param path - The value of `path`.
+ */
 function isWritableDirectory(path: string): boolean {
   try {
     ensureAppDirectory(path);
@@ -348,6 +362,7 @@ export function selectWritableAppDataDirectory(options: {
 /**
  * Resolve an existing writable app-data directory using env and platform defaults.
  */
+
 function resolveAppDataDirectory(): string {
   if (resolvedAppDataDir) {
     return resolvedAppDataDir;
@@ -394,6 +409,7 @@ function tableHasColumn(
  * Ensure `threads` has a column for evolving schema versions.
  * This lets older databases safely add newer nullable/default fields.
  */
+
 function ensureThreadColumn(
   db: Database,
   columnName: string,
@@ -409,6 +425,7 @@ function ensureThreadColumn(
  * Ensure `thread_messages` has a column for evolving schema versions.
  * This is used for backfills and zero-downtime schema updates.
  */
+
 function ensureThreadMessageColumn(
   db: Database,
   columnName: string,
@@ -426,6 +443,7 @@ function ensureThreadMessageColumn(
 /**
  * Migrate/create schema and apply incremental column backfills on startup.
  * Keeps the on-disk DB in sync with expected runtime shape.
+ * @param db - The value of `db`.
  */
 export function migrateDatabase(db: Database): void {
   runStatement(
@@ -737,6 +755,7 @@ export function getAppDatabasePath(options?: AppDataPathOptions): string {
 
 export function closeAppDatabase(): void {
   /** Close the singleton database handle so maintenance/reset flows can remove the file safely. */
+
   if (!appDatabase) {
     return;
   }
@@ -753,6 +772,7 @@ export function resetResolvedAppDataDirectory(): void {
  * Initialize and cache the singleton app database handle.
  * Applies migrations to repair/upgrade user data stores in place.
  */
+
 export function initAppDatabase(): Database {
   if (appDatabase) {
     return appDatabase;
@@ -797,6 +817,7 @@ export function upsertAuthSettings(
   input: AuthSettingsInput,
 ): AuthSettingsRecord {
   /** Create or replace the singleton auth configuration row. */
+
   runStatement(
     database,
     `
@@ -863,6 +884,7 @@ export function setAuthFailureState(
 
 export function resetAuthFailureState(database: Database): void {
   /** Clear any stored failed-attempt counters and lockout state. */
+
   setAuthFailureState(database, 0, null);
 }
 
@@ -893,6 +915,7 @@ export function replaceAuthRecoveryCodeHashes(
    * Replace the full recovery-code set atomically so setup/regeneration never leaves
    * a partial code list behind.
    */
+
   return runInTransaction(database, () => {
     runStatement(database, "DELETE FROM auth_recovery_codes");
     for (const codeHash of codeHashes) {
@@ -935,6 +958,7 @@ export function createAuthSession(
   input: AuthSessionInput,
 ): AuthSessionRecord {
   /** Insert one authenticated session row and return the stored record. */
+
   runStatement(
     database,
     `
@@ -989,6 +1013,7 @@ export function touchAuthSession(
   expiresAt?: string,
 ): void {
   /** Refresh session activity and optionally extend its expiry. */
+
   if (typeof expiresAt === "string") {
     runStatement(
       database,
@@ -1038,6 +1063,7 @@ export function setAuthSessionStepUpValidUntil(
 
 export function deleteAuthSession(database: Database, sessionId: string): void {
   /** Remove one session and cascade any dependent websocket tickets. */
+
   runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
 }
 
@@ -1052,6 +1078,7 @@ export function deleteExpiredAuthSessions(
   now: string,
 ): number {
   /** Remove sessions that are already past their expiry. */
+
   const result = runStatement(
     database,
     `
@@ -1098,6 +1125,7 @@ export function getAuthWebSocketTicket(
   ticketId: string,
 ): AuthWebSocketTicketRecord | null {
   /** Fetch one websocket ticket row by opaque ticket id. */
+
   return database
     .query<AuthWebSocketTicketRecord, [string]>(
       `
@@ -1142,6 +1170,7 @@ export function deleteExpiredAuthWebSocketTickets(
   now: string,
 ): number {
   /** Remove websocket tickets that are expired or already consumed. */
+
   const result = runStatement(
     database,
     `
@@ -1212,6 +1241,7 @@ export function listSecurityAuditEvents(
   },
 ): SecurityAuditEventRecord[] {
   /** Return persisted security audit events ordered newest-first, optionally scoped to one thread or project. */
+
   const limit =
     typeof options?.limit === "number" &&
     Number.isInteger(options.limit) &&
@@ -1373,6 +1403,7 @@ export function getProjectById(
   projectId: number,
 ): ProjectRecord | null {
   /** Load a single project row by primary key id. */
+
   return database
     .query<ProjectRecord, [number]>(
       `
@@ -1421,6 +1452,7 @@ export function upsertProject(
    * Create-or-update a project row and refresh its open/timestamp state.
    * Returns the canonical row after write to avoid stale callers.
    */
+
   runStatement(
     database,
     `
@@ -1466,6 +1498,7 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 
 export function setProjectClosed(database: Database, projectId: number): void {
   /** Soft-close a project by unsetting its open flag. */
+
   runStatement(
     database,
     `UPDATE projects SET is_open = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`,
@@ -1483,6 +1516,7 @@ export function listProjectWorktreePins(
   projectId: number,
 ): ProjectWorktreePinRecord[] {
   /** Fetch pinned worktree entries for project workspace recall. */
+
   return database
     .query<ProjectWorktreePinRecord, [number]>(
       `
@@ -1507,6 +1541,7 @@ export function setProjectWorktreePinned(
    * Add or remove a pinned worktree marker.
    * Insert updates pin timestamps; delete unpins and removes history.
    */
+
   if (pinned) {
     runStatement(
       database,
@@ -1590,6 +1625,7 @@ export function getThreadById(
   threadId: number,
 ): ThreadRecord | null {
   /** Fetch one thread record with token/compaction/error metadata mapped to camelCase. */
+
   return database
     .query<ThreadRecord, [number]>(
       `
@@ -1635,6 +1671,7 @@ export function createThread(
    * Insert a thread row and return the inserted record.
    * Throws if readback fails, which indicates write/read consistency issues.
    */
+
   const result = runStatement(
     database,
     `
@@ -1702,6 +1739,7 @@ export function renameThread(
   summary?: string | null,
 ): void {
   /** Rename a thread; includes optional summary persistence. */
+
   if (typeof summary !== "undefined") {
     runStatement(
       database,
@@ -1757,6 +1795,7 @@ export function setThreadReasoningEffort(
   reasoningEffort: string,
 ): void {
   /** Persist selected reasoning effort and refresh update time. */
+
   runStatement(
     database,
     `
@@ -1800,6 +1839,7 @@ export function setThreadPinned(
    * Toggle pinned state by setting or clearing `pinned_at`.
    * Pinned threads sort above unpinned in listQueries.
    */
+
   runStatement(
     database,
     `
@@ -1822,6 +1862,7 @@ export function deleteThread(database: Database, threadId: number): void {
 
 export function markThreadRan(database: Database, threadId: number): void {
   /** Mark a thread successfully executed and clear transient error state. */
+
   runStatement(
     database,
     `
@@ -1848,6 +1889,7 @@ export function markThreadRunStarted(
    * Mark a thread turn as in-progress with a caller-provided start timestamp.
    * Mirrors start times across restart/resume scenarios.
    */
+
   runStatement(
     database,
     `
@@ -1894,6 +1936,7 @@ export function setThreadUsage(
   compactionStats: ThreadCompactionStatsInput,
 ): void {
   /** Store latest token usage and compaction telemetry for thread analytics. */
+
   runStatement(
     database,
     `
@@ -1955,6 +1998,7 @@ export function markThreadErrorSeen(
    * Mark last error as acknowledged by user.
    * If no prior error exists, leave `last_error_seen_at` null.
    */
+
   runStatement(
     database,
     `
@@ -1993,6 +2037,7 @@ export function listThreadMessages(
   threadId: number,
 ): ThreadMessageRecord[] {
   /** Return all messages in canonical order for a thread. */
+
   return database
     .query<ThreadMessageRecord, [number]>(
       `
@@ -2143,6 +2188,7 @@ export function upsertThreadActivity(
    * Convenience one-item wrapper around multi-activity upsert.
    * Keeps caller code simple when only a single activity update is needed.
    */
+
   upsertThreadActivities(database, [input]);
 }
 
@@ -2175,6 +2221,7 @@ function updateThreadActivityById(
    * Apply a full activity upsert payload into an existing row.
    * Returns true when at least one database row changed.
    */
+
   const result = runStatement(
     database,
     `
@@ -2237,6 +2284,7 @@ export function upsertThreadActivities(
    * Upsert many activity events in one atomic transaction.
    * Reuses known message ids within the batch to avoid duplicate rows for same item.
    */
+
   if (inputs.length === 0) {
     return [];
   }

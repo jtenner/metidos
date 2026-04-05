@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-task-run.test.ts
+ * @description Test file for project task run.
+ */
+
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

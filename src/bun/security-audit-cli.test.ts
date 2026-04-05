@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/security-audit-cli.test.ts
+ * @description Test file for security audit cli.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

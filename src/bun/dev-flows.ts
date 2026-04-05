@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/dev-flows.ts
+ * @description Module for dev flows.
+ */
+
 import { existsSync, rmSync } from "node:fs";
 
 import { deleteAuthSecretKey, getAuthSecretKeyPath } from "./auth-secrets";

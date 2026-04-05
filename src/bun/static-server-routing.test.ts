@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/static-server-routing.test.ts
+ * @description Test file for static server routing.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import { buildBrowserFacingRpcWebSocketUrl } from "./static-server-routing";

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/sidecar-thread-metadata.ts
+ * @description Module for sidecar thread metadata.
+ */
+
 import type {
   AppRPCSchema,
   RpcProcedureCallOptions,

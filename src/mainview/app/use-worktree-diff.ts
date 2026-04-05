@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/use-worktree-diff.ts
+ * @description Module for use worktree diff.
+ */
+
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {

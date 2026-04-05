@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/projects-panel.test.ts
+ * @description Test file for projects panel.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/sidebar-section-header.tsx
+ * @description Module for sidebar section header.
+ */
+
 import type { JSX, ReactNode } from "react";
 import { materialSymbol } from "./icons";
 

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/startup-project-restore.ts
+ * @description Module for startup project restore.
+ */
+
 import type {
   RpcOpenProjectsBatchResultItem,
   RpcProject,

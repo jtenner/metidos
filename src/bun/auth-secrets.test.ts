@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth-secrets.test.ts
+ * @description Test file for auth secrets.
+ */
+
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

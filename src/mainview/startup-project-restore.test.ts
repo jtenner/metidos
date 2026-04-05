@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/startup-project-restore.test.ts
+ * @description Test file for startup project restore.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type {

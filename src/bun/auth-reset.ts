@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth-reset.ts
+ * @description Module for auth reset.
+ */
+
 import type { Database } from "bun:sqlite";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";

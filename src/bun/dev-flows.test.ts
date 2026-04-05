@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/dev-flows.test.ts
+ * @description Test file for dev flows.
+ */
+
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

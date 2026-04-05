@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/directory-suggestions.ts
+ * @description Module for directory suggestions.
+ */
+
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";

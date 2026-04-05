@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/server-security.test.ts
+ * @description Test file for server security.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

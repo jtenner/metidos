@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/project-tasks.ts
+ * @description Module for project tasks.
+ */
+
 import { readFileSync, realpathSync } from "node:fs";
 import { readdir, readFile, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";

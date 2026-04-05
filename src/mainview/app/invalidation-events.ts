@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/invalidation-events.ts
+ * @description Module for invalidation events.
+ */
+
 import type {
   RpcWorktreeGitHistoryChanged,
   RpcWorktreeTasksChanged,

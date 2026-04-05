@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/thread-send.ts
+ * @description Module for thread send.
+ */
+
 import type { RpcThreadDetail } from "../bun/rpc-schema";
 
 type ThreadSendFailureSelectionOptions = {

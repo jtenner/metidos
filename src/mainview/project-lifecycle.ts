@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-lifecycle.ts
+ * @description Module for project lifecycle.
+ */
+
 export type ProjectLifecycleRequest = {
   isCurrent: () => boolean;
   projectId: number;
@@ -14,6 +19,11 @@ export function createProjectLifecycleRequestTracker(): {
 } {
   const requestIds = new Map<number, number>();
 
+  /**
+   * Function of buildRequest.
+   * @param projectId - The value of `projectId`.
+   * @param requestId - The value of `requestId`.
+   */
   const buildRequest = (
     projectId: number,
     requestId: number,

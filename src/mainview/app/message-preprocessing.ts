@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-preprocessing.ts
+ * @description Module for message preprocessing.
+ */
+
 import {
   type PlainTextMessageSegment,
   shouldUseRichMarkdownRenderer,

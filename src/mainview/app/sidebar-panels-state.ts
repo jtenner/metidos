@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/sidebar-panels-state.ts
+ * @description Module for sidebar panels state.
+ */
+
 import { useSyncExternalStore } from "react";
 import {
   readPersistedTreeViewState,

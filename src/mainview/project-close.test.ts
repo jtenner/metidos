@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-close.test.ts
+ * @description Test file for project close.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import { runRollbackSafeProjectClose } from "./project-close";

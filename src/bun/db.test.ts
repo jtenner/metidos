@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/db.test.ts
+ * @description Test file for db.
+ */
+
 import { afterEach, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from "node:fs";

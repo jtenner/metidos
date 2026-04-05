@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/security-audit.ts
+ * @description Module for security audit.
+ */
+
 import type { Database } from "bun:sqlite";
 
 import { listSecurityAuditEvents } from "./db";

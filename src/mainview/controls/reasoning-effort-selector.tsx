@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/reasoning-effort-selector.tsx
+ * @description Module for reasoning effort selector.
+ */
+
 import type { JSX } from "react";
 import type {
   RpcCodexReasoningEffort,

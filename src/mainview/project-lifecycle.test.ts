@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-lifecycle.test.ts
+ * @description Test file for project lifecycle.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import { createProjectLifecycleRequestTracker } from "./project-lifecycle";

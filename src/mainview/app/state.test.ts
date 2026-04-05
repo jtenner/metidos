@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/state.test.ts
+ * @description Test file for state.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcProject, RpcThread, RpcWorktree } from "../../bun/rpc-schema";

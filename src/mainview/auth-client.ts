@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/auth-client.ts
+ * @description Module for auth client.
+ */
+
 import type { AuthPrimaryFactorType } from "../bun/db";
 
 export const AUTH_REQUIRED_EVENT_NAME = "jolt:auth-required";

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-markdown-routing.test.ts
+ * @description Test file for message markdown routing.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

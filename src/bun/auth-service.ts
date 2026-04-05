@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth-service.ts
+ * @description Module for auth service.
+ */
+
 import type { Database } from "bun:sqlite";
 
 import {
@@ -363,6 +368,7 @@ function parseCookieHeaderValue(
 
 /**
  * Parse the session cookie from an incoming Cookie header.
+ * @param cookieHeader - The value of `cookieHeader`.
  */
 export function readSessionCookie(cookieHeader: string | null): string | null {
   if (!cookieHeader) {
@@ -374,6 +380,7 @@ export function readSessionCookie(cookieHeader: string | null): string | null {
 /**
  * Serialize the authenticated session cookie.
  */
+
 export function buildSessionCookieHeader(
   sessionId: string,
   options: SessionCookieOptions,
@@ -393,6 +400,7 @@ export function buildSessionCookieHeader(
 
 /**
  * Serialize an expired session cookie so browsers remove it immediately.
+ * @param secure - The value of `secure`.
  */
 export function buildClearedSessionCookieHeader(secure: boolean): string {
   const parts = [
@@ -412,6 +420,7 @@ export function buildClearedSessionCookieHeader(secure: boolean): string {
 /**
  * Create the TOTP secret and URI needed for QR-code enrollment.
  */
+
 export function prepareTotpEnrollment(
   input: PrepareTotpEnrollmentInput,
 ): Pick<AuthSetupMaterial, "totpSecret" | "totpUri"> {
@@ -429,6 +438,7 @@ export function prepareTotpEnrollment(
 /**
  * Return the current auth status for the app and an optional session cookie.
  */
+
 export function getAuthStatus(
   database: Database,
   sessionId: string | null,
@@ -456,6 +466,7 @@ export function getAuthStatus(
  * Verify the configured primary factor and TOTP code without creating a session.
  * Shared by login, CLI recovery flows, and step-up verification paths.
  */
+
 export async function verifyPrimaryFactorAndTotp(
   database: Database,
   input: LoginInput,
@@ -531,6 +542,7 @@ export async function verifyPrimaryFactorAndTotp(
 /**
  * Verify the configured primary factor and consume one recovery code in place of TOTP.
  */
+
 export async function verifyPrimaryFactorAndRecoveryCode(
   database: Database,
   input: RecoveryLoginInput,
@@ -613,6 +625,7 @@ export async function verifyPrimaryFactorAndRecoveryCode(
 /**
  * Complete first-run auth setup, persist settings, and create an authenticated session.
  */
+
 export async function setupAuth(
   database: Database,
   input: SetupAuthInput,
@@ -680,6 +693,7 @@ export async function setupAuth(
 /**
  * Authenticate a user with their primary factor and mandatory TOTP code.
  */
+
 export async function login(
   database: Database,
   input: LoginInput,
@@ -707,6 +721,7 @@ export async function login(
 /**
  * Authenticate a user with their primary factor plus a single-use recovery code.
  */
+
 export async function loginWithRecoveryCode(
   database: Database,
   input: RecoveryLoginInput,
@@ -735,6 +750,7 @@ export async function loginWithRecoveryCode(
 /**
  * Resolve a valid session row from a session id, pruning expired rows first.
  */
+
 export function resolveSession(
   database: Database,
   input: ResolveSessionInput,
@@ -770,6 +786,8 @@ export function resolveSession(
 
 /**
  * Delete one authenticated session.
+ * @param database - The value of `database`.
+ * @param sessionId - The value of `sessionId`.
  */
 export function logout(database: Database, sessionId: string | null): void {
   if (!sessionId) {
@@ -789,6 +807,7 @@ export function logout(database: Database, sessionId: string | null): void {
 /**
  * Re-verify the configured primary factor plus TOTP for a live session and open a short freshness window.
  */
+
 export async function stepUpSession(
   database: Database,
   input: StepUpInput,
@@ -831,6 +850,7 @@ export async function stepUpSession(
 /**
  * Ensure the current session has a fresh step-up window for a high-risk action.
  */
+
 export function requireFreshStepUp(
   database: Database,
   input: RequireFreshStepUpInput,
@@ -874,6 +894,7 @@ export function requireFreshStepUp(
 /**
  * Create a short-lived single-use websocket ticket for an authenticated session.
  */
+
 export function issueWebSocketTicket(
   database: Database,
   input: IssueWebSocketTicketInput,
@@ -913,6 +934,7 @@ export function issueWebSocketTicket(
 /**
  * Consume a websocket ticket, ensuring it belongs to the expected live session.
  */
+
 export function validateAndConsumeWebSocketTicket(
   database: Database,
   input: ConsumeWebSocketTicketInput,

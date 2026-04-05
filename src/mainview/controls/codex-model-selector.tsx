@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/codex-model-selector.tsx
+ * @description Module for codex model selector.
+ */
+
 import { type JSX, useEffect, useMemo, useRef, useState } from "react";
 import type {
   RpcCodexModelOption,

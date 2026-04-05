@@ -1,3 +1,8 @@
+/**
+ * @file bun-plugin-react-compiler.ts
+ * @description Module for bun plugin react compiler.
+ */
+
 import babel from "@babel/core";
 import BabelPluginReactCompiler from "babel-plugin-react-compiler";
 
@@ -5,7 +10,7 @@ import BabelPluginReactCompiler from "babel-plugin-react-compiler";
 const options = {};
 
 /**
- * Bun plugin that pipes .js/.ts React files through Babel's React compiler.
+ * Bun plugin that runs Babel's React compiler for JSX/TSX source files.
  *
  * This keeps the rest of the toolchain on Bun while ensuring JSX/TSX inputs
  * are transformed with React compiler optimizations at load time.

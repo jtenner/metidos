@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/projects-panel.tsx
+ * @description Module for projects panel.
+ */
+
 import { type FormEvent, memo, useMemo } from "react";
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
@@ -96,6 +101,14 @@ function comparePinnedWorktreeEntries(
   return left.worktree.path.localeCompare(right.worktree.path);
 }
 
+/**
+ * Function of deriveProjectsPanelWorktreeData.
+ * @param filteredProjects - The value of `filteredProjects`.
+ * @param getProjectWorktrees - The value of `getProjectWorktrees`.
+ * @param normalizedSidebarSearchQuery - The value of `normalizedSidebarSearchQuery`.
+ * @param worktreeSearchTextByKey - The value of `worktreeSearchTextByKey`.
+ * @param projectById - The value of `projectById`.
+ */
 export function deriveProjectsPanelWorktreeData(
   filteredProjects: RpcProject[],
   getProjectWorktrees: (projectId: number) => RpcWorktree[],

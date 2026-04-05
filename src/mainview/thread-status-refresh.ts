@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/thread-status-refresh.ts
+ * @description Module for thread status refresh.
+ */
+
 import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";
 import { type ThreadStore, upsertThreadStore } from "./app/state";
 

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/codex-sidecar-scope.ts
+ * @description Module for codex sidecar scope.
+ */
+
 import { isAbsolute, resolve } from "node:path";
 
 type CanonicalizePathOptions = {

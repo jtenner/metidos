@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/codex-sidecar-scope.test.ts
+ * @description Test file for codex sidecar scope.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

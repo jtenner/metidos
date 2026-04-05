@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/index.ts
+ * @description Module for index.
+ */
+
 import * as React from "react";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -238,6 +243,10 @@ const pendingRequests = new Map<number, PendingRequest>();
 let socket: WebSocket | null = null;
 let nextRequestId = 1;
 let resolveConnection = () => {};
+/**
+ * Function of rejectConnection.
+ * @param _reason - The value of `_reason`.
+ */
 let rejectConnection = (_reason?: unknown) => {};
 let connectionReadyResolved = false;
 let isPageUnloading = false;
@@ -702,6 +711,10 @@ async function sendRequest<K extends RpcMethodName>(
     (resolve, reject) => {
       let settled = false;
       let removeAbortListener = () => {};
+      /**
+       * Function of finalize.
+       * @param callback - The value of `callback`.
+       */
       const finalize = (callback: () => void) => {
         if (settled) {
           return;

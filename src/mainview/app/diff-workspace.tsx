@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/diff-workspace.tsx
+ * @description Module for diff workspace.
+ */
+
 import type { JSX } from "react";
 import type { RpcProject, RpcWorktreeChange } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
@@ -38,6 +43,10 @@ export function emptyDiffFilePatchState(
   };
 }
 
+/**
+ * Function of buildDiffFileTree.
+ * @param changes - The value of `changes`.
+ */
 export function buildDiffFileTree(
   changes: RpcWorktreeChange[],
 ): DiffFileTreeNode[] {
@@ -91,6 +100,10 @@ export function buildDiffFileTree(
 
   // Materialize map-backed tree into deterministic arrays:
   // directories before files, both sorted lexicographically by label.
+  /**
+   * Function of materialize.
+   * @param nodes - The value of `nodes`.
+   */
   const materialize = (nodes: Map<string, MutableNode>): DiffFileTreeNode[] =>
     [...nodes.values()]
       .sort((left, right) => {
@@ -112,6 +125,10 @@ export function buildDiffFileTree(
   return materialize(root);
 }
 
+/**
+ * Function of DiffFileTree.
+ * @param options - The value of `options`.
+ */
 function DiffFileTree({
   nodes,
   onSelectedDiffFilePathChange,
@@ -122,6 +139,11 @@ function DiffFileTree({
   selectedDiffFilePath: string | null;
 }): JSX.Element {
   // Recursive renderer that increases left padding by depth for visual hierarchy.
+  /**
+   * Function of renderNodes.
+   * @param currentNodes - The value of `currentNodes`.
+   * @param depth - The value of `depth`.
+   */
   const renderNodes = (
     currentNodes: DiffFileTreeNode[],
     depth = 0,

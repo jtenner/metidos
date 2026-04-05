@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/auth-shell.tsx
+ * @description Module for auth shell.
+ */
+
 import QRCode from "qrcode";
 import {
   type FormEvent,
@@ -44,6 +49,10 @@ const AUTH_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
+/**
+ * Function of formatDateTime.
+ * @param value - The value of `value`.
+ */
 function formatDateTime(value: string | null): string | null {
   if (!value) {
     return null;
@@ -57,6 +66,10 @@ function formatDateTime(value: string | null): string | null {
   return AUTH_DATE_TIME_FORMATTER.format(timestamp);
 }
 
+/**
+ * Function of errorMessage.
+ * @param error - The value of `error`.
+ */
 function errorMessage(error: unknown): string {
   if (error instanceof AuthApiError) {
     return error.message;
@@ -67,6 +80,11 @@ function errorMessage(error: unknown): string {
   return "An unexpected authentication error occurred.";
 }
 
+/**
+ * Function of readLockedUntil.
+ * @param status - The value of `status`.
+ * @param error - The value of `error`.
+ */
 function readLockedUntil(
   status: AuthStatus | null,
   error: unknown,
@@ -80,6 +98,10 @@ function readLockedUntil(
   return status?.lockedUntil ?? null;
 }
 
+/**
+ * Function of AuthActionButton.
+ * @param props - The value of `props`.
+ */
 function AuthActionButton(props: {
   children: JSX.Element | string;
   disabled?: boolean;
@@ -106,6 +128,10 @@ function AuthActionButton(props: {
   );
 }
 
+/**
+ * Function of AuthChoiceButton.
+ * @param props - The value of `props`.
+ */
 function AuthChoiceButton(props: {
   active: boolean;
   body: string;
@@ -136,6 +162,10 @@ function AuthChoiceButton(props: {
   );
 }
 
+/**
+ * Function of AuthInput.
+ * @param props - The value of `props`.
+ */
 function AuthInput(props: {
   autoComplete?: string;
   inputMode?: "numeric" | "text";
@@ -173,6 +203,10 @@ function AuthInput(props: {
   );
 }
 
+/**
+ * Function of authConsoleShell.
+ * @param props - The value of `props`.
+ */
 function authConsoleShell(props: {
   children: JSX.Element;
   error: string;
@@ -223,6 +257,10 @@ function authConsoleShell(props: {
   );
 }
 
+/**
+ * Function of AuthShell.
+ * @param options - The value of `options`.
+ */
 export default function AuthShell({
   connectRpcTransport,
   disconnectRpcTransport,
@@ -339,6 +377,10 @@ export default function AuthShell({
   }, [loadGateState]);
 
   useEffect(() => {
+    /**
+     * Function of handleAuthRequired.
+     * @param event - The value of `event`.
+     */
     const handleAuthRequired = (
       event: WindowEventMap["jolt:auth-required"],
     ): void => {

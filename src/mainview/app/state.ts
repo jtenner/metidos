@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/state.ts
+ * @description Module for state.
+ */
+
 import type { UIEvent } from "react";
 
 import type {

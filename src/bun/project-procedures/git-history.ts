@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/git-history.ts
+ * @description Module for git history.
+ */
+
 import {
   DEFAULT_GIT_HISTORY_PAGE_SIZE,
   type GitCommandOptions,

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth.ts
+ * @description Module for auth.
+ */
+
 import { timingSafeEqual } from "node:crypto";
 
 import type { AuthPrimaryFactorType } from "./db";
@@ -134,6 +139,7 @@ function validateTotpPeriodSeconds(periodSeconds: number): void {
 /**
  * Enforce the setup-time policy for the selected primary factor.
  */
+
 export function validatePrimaryFactor(
   primaryFactorType: AuthPrimaryFactorType,
   value: string,
@@ -156,6 +162,7 @@ export function validatePrimaryFactor(
 /**
  * Hash a primary-factor secret with Argon2id.
  */
+
 export async function hashPrimaryFactor(
   primaryFactorType: AuthPrimaryFactorType,
   value: string,
@@ -167,6 +174,7 @@ export async function hashPrimaryFactor(
 /**
  * Verify a PIN or password against the stored Argon2id hash.
  */
+
 export async function verifyPrimaryFactor(
   value: string,
   hash: string,
@@ -176,6 +184,7 @@ export async function verifyPrimaryFactor(
 
 /**
  * Generate a new RFC 4648 base32 TOTP secret.
+ * @param byteLength - The value of `byteLength`.
  */
 export function generateTotpSecret(byteLength = 20): string {
   if (!Number.isInteger(byteLength) || byteLength < 10) {
@@ -187,6 +196,7 @@ export function generateTotpSecret(byteLength = 20): string {
 /**
  * Build the otpauth:// URI consumed by authenticator apps and QR encoders.
  */
+
 export function buildTotpUri({
   accountName,
   issuer = "Jolt",
@@ -258,6 +268,7 @@ async function hotp(
 /**
  * Generate the current TOTP code for a secret and timestamp.
  */
+
 export async function generateTotpCode(
   secret: string,
   atMs = Date.now(),
@@ -273,6 +284,7 @@ export async function generateTotpCode(
 /**
  * Verify a TOTP code within a small +/- window of time steps.
  */
+
 export async function verifyTotpCode(
   secret: string,
   code: string,
@@ -307,6 +319,7 @@ export async function verifyTotpCode(
 /**
  * Generate the view-once recovery codes shown during initial setup.
  */
+
 export function generateRecoveryCodes(
   count = DEFAULT_RECOVERY_CODE_COUNT,
 ): string[] {
@@ -323,6 +336,7 @@ export function generateRecoveryCodes(
 
 /**
  * Hash one recovery code for storage.
+ * @param code - The value of `code`.
  */
 export async function hashRecoveryCode(code: string): Promise<string> {
   return Bun.password.hash(
@@ -334,6 +348,7 @@ export async function hashRecoveryCode(code: string): Promise<string> {
 /**
  * Verify a recovery code against the stored hash.
  */
+
 export async function verifyRecoveryCode(
   code: string,
   hash: string,
@@ -344,6 +359,7 @@ export async function verifyRecoveryCode(
 /**
  * Create the setup material the UI needs for first-run enrollment.
  */
+
 export function createAuthSetupMaterial(
   input: TotpEnrollmentInput,
 ): AuthSetupMaterial {
@@ -361,6 +377,7 @@ export function createAuthSetupMaterial(
 /**
  * Generate a new opaque session token.
  */
+
 export function generateSessionId(): string {
   return generateRandomToken();
 }
@@ -368,6 +385,7 @@ export function generateSessionId(): string {
 /**
  * Generate a new opaque websocket ticket token.
  */
+
 export function generateWebSocketTicketId(): string {
   return generateRandomToken();
 }

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/startup-worktree-restore.ts
+ * @description Module for startup worktree restore.
+ */
+
 import type {
   RpcOpenWorktreeRequest,
   RpcOpenWorktreesBatchResultItem,

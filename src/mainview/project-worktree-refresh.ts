@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-worktree-refresh.ts
+ * @description Module for project worktree refresh.
+ */
+
 import { type ProjectNodeState, projectStateWorktreeCount } from "./app/state";
 
 export const PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS = 12_000;

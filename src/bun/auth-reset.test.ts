@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/auth-reset.test.ts
+ * @description Test file for auth reset.
+ */
+
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";

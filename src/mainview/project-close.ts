@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/project-close.ts
+ * @description Module for project close.
+ */
+
 export type RollbackSafeProjectCloseOptions = {
   closeProject: () => Promise<void>;
   commitLocalClose: () => void;

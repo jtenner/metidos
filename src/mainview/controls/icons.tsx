@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/icons.tsx
+ * @description Module for icons.
+ */
+
 import type { JSX, SVGProps } from "react";
 
 /**

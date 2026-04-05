@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-markdown-loader.ts
+ * @description Module for message markdown loader.
+ */
+
 import { lazy } from "react";
 
 type RichMarkdownModule = typeof import("./message-markdown");

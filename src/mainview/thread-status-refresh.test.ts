@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/thread-status-refresh.test.ts
+ * @description Test file for thread status refresh.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";

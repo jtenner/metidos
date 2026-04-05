@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-preprocessing.test.ts
+ * @description Test file for message preprocessing.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

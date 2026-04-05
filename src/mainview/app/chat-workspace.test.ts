@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/chat-workspace.test.ts
+ * @description Test file for chat workspace.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

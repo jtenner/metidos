@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/diff-parsing.ts
+ * @description Module for diff parsing.
+ */
+
 export const LARGE_DIFF_WORKER_TEXT_LENGTH = 24_000;
 
 export type DiffLineKind =

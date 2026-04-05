@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/server-security.ts
+ * @description Module for server security.
+ */
+
 const LOOPBACK_BROWSER_HOSTS = ["127.0.0.1", "localhost"] as const;
 const LOCAL_APP_PROTOCOLS = ["http:", "https:"] as const;
 const RUNTIME_CONFIG_SCRIPT_TYPE = "application/json";
@@ -9,6 +14,7 @@ const DEFAULT_BROWSER_PORT_BY_PROTOCOL = {
 /**
  * Canonical loopback bind target for local-only Bun listeners.
  */
+
 export const LOOPBACK_HOSTNAME = "127.0.0.1";
 export const RUNTIME_CONFIG_ELEMENT_ID = "jolt-runtime-config";
 export type BrowserOriginProtocol = (typeof LOCAL_APP_PROTOCOLS)[number];
@@ -34,6 +40,7 @@ function formatBrowserOrigin(
 
 /**
  * Normalize a browser origin for exact allowlist comparison.
+ * @param origin - The value of `origin`.
  */
 function normalizeBrowserOrigin(origin: string): string | null {
   try {
@@ -56,6 +63,7 @@ function normalizeBrowserOrigin(origin: string): string | null {
 /**
  * Build the default browser origins that may legitimately connect to a local port.
  */
+
 export function buildLoopbackBrowserOrigins(
   port: number,
   options?: {
@@ -71,6 +79,7 @@ export function buildLoopbackBrowserOrigins(
 /**
  * Parse a comma/newline/space separated origin list from configuration.
  */
+
 export function parseAllowedBrowserOrigins(
   value: string | undefined,
 ): string[] {
@@ -96,6 +105,7 @@ export function parseAllowedBrowserOrigins(
 /**
  * Allow missing Origin for non-browser local clients but validate browser origins strictly.
  */
+
 export function isWebSocketOriginAllowed(
   origin: string | null,
   allowedOrigins: Iterable<string>,
@@ -192,6 +202,7 @@ export function buildRuntimeConfigElement(
 
 /**
  * Smallest health payload allowed before authentication exists.
+ * @param ok - The value of `ok`.
  */
 export function buildLivenessPayload(ok: boolean): { ok: boolean } {
   return {

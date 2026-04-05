@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/tls-config.test.ts
+ * @description Test file for tls config.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

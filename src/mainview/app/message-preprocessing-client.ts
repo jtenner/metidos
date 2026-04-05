@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-preprocessing-client.ts
+ * @description Module for message preprocessing client.
+ */
+
 import { useEffect, useState } from "react";
 
 import {

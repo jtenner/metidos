@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/thread-send.test.ts
+ * @description Test file for thread send.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcThreadDetail } from "../bun/rpc-schema";

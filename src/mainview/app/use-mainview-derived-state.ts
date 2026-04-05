@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/use-mainview-derived-state.ts
+ * @description Module for use mainview derived state.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   RpcCodexModelOption,

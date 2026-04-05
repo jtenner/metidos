@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/rpc-errors.ts
+ * @description Module for rpc errors.
+ */
+
 type RpcErrorDetails = Record<string, string | null>;
 
 export class RpcError extends Error {

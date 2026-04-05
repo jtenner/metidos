@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/rpc-authz.test.ts
+ * @description Test file for rpc authz.
+ */
+
 import { describe, expect, it, mock } from "bun:test";
 
 import { createThreadRequiresStepUp, enforceRpcStepUp } from "./rpc-authz";

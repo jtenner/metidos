@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/use-mainview-derived-state.test.ts
+ * @description Test file for use mainview derived state.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";

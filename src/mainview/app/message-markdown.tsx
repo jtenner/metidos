@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-markdown.tsx
+ * @description Module for message markdown.
+ */
+
 import type { CSSProperties, JSX } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -26,6 +31,10 @@ const codeTagStyle = {
   fontFamily: CODE_FONT_STACK,
 } satisfies CSSProperties;
 
+/**
+ * Function of renderPreparedCodeBlock.
+ * @param options - The value of `options`.
+ */
 function renderPreparedCodeBlock({
   code,
   language,
@@ -131,6 +140,10 @@ const markdownComponents: Components = {
   },
 };
 
+/**
+ * Function of RichMarkdownMessage.
+ * @param options - The value of `options`.
+ */
 export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
   return (
     <div className="message-markdown">
@@ -144,6 +157,10 @@ export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
   );
 }
 
+/**
+ * Function of PreparedRichMarkdownMessage.
+ * @param options - The value of `options`.
+ */
 export function PreparedRichMarkdownMessage({
   plan,
 }: {

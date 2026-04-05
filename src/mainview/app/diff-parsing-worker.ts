@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/diff-parsing-worker.ts
+ * @description Module for diff parsing worker.
+ */
+
 import { type DiffParseResult, parseUnifiedDiffText } from "./diff-parsing";
 
 export type DiffParsingWorkerRequest = {

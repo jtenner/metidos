@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/codex-utils.ts
+ * @description Module for codex utils.
+ */
+
 import type {
   RpcCodexModelOption,
   RpcCodexReasoningEffort,

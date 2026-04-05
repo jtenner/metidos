@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/auth-shell-connect.ts
+ * @description Module for auth shell connect.
+ */
+
 import type { AuthStatus, TotpEnrollment } from "./auth-client";
 import { AuthApiError, isAuthRequiredError } from "./auth-client";
 import { isAuthRequiredRpcError } from "./rpc-errors";

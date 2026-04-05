@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/controls/sidebar-search-control.tsx
+ * @description Module for sidebar search control.
+ */
+
 import type { ChangeEvent, JSX } from "react";
 import { materialSymbol } from "./icons";
 

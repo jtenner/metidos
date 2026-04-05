@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/diff-parsing.test.ts
+ * @description Test file for diff parsing.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {

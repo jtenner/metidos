@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/project-procedures/thread-detail.ts
+ * @description Module for thread detail.
+ */
+
 import type { ThreadMessageRecord, ThreadRecord } from "../db";
 import type {
   RpcThread,

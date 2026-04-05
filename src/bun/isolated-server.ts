@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/isolated-server.ts
+ * @description Module for isolated server.
+ */
+
 import { resolve } from "node:path";
 
 import {
@@ -15,17 +20,20 @@ import {
 /**
  * Default port for the public static server when no CLI/env override is provided.
  */
+
 const DEFAULT_PUBLIC_PORT = "7599";
 
 /**
  * Process role names that this launcher can start.
  * "backend" runs the API process, "static" runs the HTTP UI process.
  */
+
 type ChildRole = "backend" | "static";
 
 /**
  * Validate a value looks like a non-negative whole-number string for port parsing.
  * Parsing accepts only a non-empty decimal integer without whitespace/sign characters.
+ * @param value - The value of `value`.
  */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
@@ -34,6 +42,8 @@ function isStringInteger(value: string): boolean {
 /**
  * Read `--flag value` or `--flag=value` style CLI args.
  * Returns the matching value and skips malformed/unknown args safely.
+ * @param args - The value of `args`.
+ * @param flag - The value of `flag`.
  */
 function readCliValue(args: string[], flag: string): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -60,6 +70,7 @@ function readCliValue(args: string[], flag: string): string | null {
  * Resolve a TCP port from CLI args, then env, then fallback.
  * Parsing is strict: invalid or out-of-range values throw at startup.
  */
+
 function resolvePort(
   args: string[],
   flag: string,
@@ -83,6 +94,7 @@ function resolvePort(
  * Spawn one side of the isolated server with inherited stdio and merged env.
  * Environment from this process is inherited, then role-specific settings override.
  */
+
 function spawnRole(
   _role: ChildRole,
   args: string[],
@@ -103,6 +115,7 @@ function spawnRole(
 /**
  * Parse startup args once and calculate both ports before any subprocess starts.
  */
+
 const SERVER_ARGS = Bun.argv.slice(2);
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
@@ -113,6 +126,7 @@ const TLS_RUNTIME = resolveTlsRuntimeConfig({
 /**
  * Public port supports either --port/CLI, JOLT_PUBLIC_PORT/JOLT_PORT, then default.
  */
+
 const PUBLIC_PORT = resolvePort(
   SERVER_ARGS,
   "--port",
@@ -140,6 +154,7 @@ const staticEntry = resolve(process.cwd(), "src/bun/static-server.ts");
 /**
  * Origin/URL pair used by the static server for health checks and websocket client.
  */
+
 const rpcWebSocketUrl = formatLoopbackWebSocketUrl(RPC_PORT, false);
 const rpcHttpOrigin = formatLoopbackHttpOrigin(RPC_PORT, false);
 const allowedBrowserOrigins = new Set<string>([
@@ -151,6 +166,7 @@ const allowedBrowserOrigins = new Set<string>([
  * Launch the API/backend process first; it becomes the RPC service dependency
  * for the static UI process.
  */
+
 const backend = spawnRole(
   "backend",
   [backendEntry, "--backend-only", "--port", String(RPC_PORT)],
@@ -167,6 +183,7 @@ const backend = spawnRole(
 /**
  * Launch the UI/static process and point it at the running backend RPC service.
  */
+
 const staticServer = spawnRole(
   "static",
   [staticEntry, "--port", String(PUBLIC_PORT), "--rpc-port", String(RPC_PORT)],
@@ -189,6 +206,7 @@ let shuttingDown = false;
 /**
  * Best-effort shutdown of a subprocess; failures here are ignored intentionally.
  */
+
 function stopChild(
   child: Bun.Subprocess<"inherit", "inherit", "inherit">,
 ): void {
@@ -202,6 +220,7 @@ function stopChild(
 /**
  * Mark shutdown in progress, stop both subprocesses, wait for exit signals, then exit.
  * If shutdown is already underway, avoid double-calling process exit logic.
+ * @param exitCode - The value of `exitCode`.
  */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shuttingDown) {
@@ -217,6 +236,7 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
 /**
  * Exit cleanly on SIGINT/SIGTERM and ensure both subprocesses are terminated.
  */
+
 process.on("SIGINT", () => {
   void shutdownAndExit(0);
 });

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/thread-metadata.test.ts
+ * @description Test file for thread metadata.
+ */
+
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";

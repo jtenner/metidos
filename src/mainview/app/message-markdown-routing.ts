@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/message-markdown-routing.ts
+ * @description Module for message markdown routing.
+ */
+
 export type PlainTextMessageSegment =
   | {
       kind: "text";

@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/sidecar-thread-metadata.test.ts
+ * @description Test file for sidecar thread metadata.
+ */
+
 import { describe, expect, it } from "bun:test";
 
 import {
@@ -18,6 +23,11 @@ describe("sidecar thread metadata updates", () => {
       params: Parameters<UpdateThreadMetadataRpc>[0];
       options: Parameters<UpdateThreadMetadataRpc>[1];
     }> = [];
+    /**
+     * Function of rpcCall.
+     * @param params - The value of `params`.
+     * @param options - The value of `options`.
+     */
     const rpcCall: UpdateThreadMetadataRpc = async (params, options) => {
       calls.push({ options, params });
       return {

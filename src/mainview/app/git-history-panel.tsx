@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/git-history-panel.tsx
+ * @description Module for git history panel.
+ */
+
 import {
   memo,
   type UIEvent,

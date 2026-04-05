@@ -1,3 +1,8 @@
+/**
+ * @file src/bun/tls-config.ts
+ * @description Module for tls config.
+ */
+
 export const TLS_PUBLIC_TRANSPORT_ENV = "JOLT_TLS";
 
 export type ResolvedTlsRuntimeConfig = {

@@ -1,3 +1,8 @@
+/**
+ * @file src/mainview/app/desktop-sidebar.tsx
+ * @description Module for desktop sidebar.
+ */
+
 import { type JSX, useCallback, useState } from "react";
 import { materialSymbol } from "../controls/icons";
 
