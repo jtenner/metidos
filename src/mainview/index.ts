@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import type {
   AppRPCSchema,
   ProjectProcedures,
+  RpcContextFocusChanged,
   RpcProcedureCallOptions,
   RpcRequestPriority,
   RpcThreadStartRequest,
@@ -20,6 +21,7 @@ import {
   publishWorktreeTasksChanged,
 } from "./app/invalidation-events";
 import { loadRichMarkdownModule } from "./app/message-markdown-loader";
+import { CONTEXT_FOCUS_CHANGED_EVENT_NAME } from "./app/state";
 import {
   AuthApiError,
   dispatchAuthRequired,
@@ -80,6 +82,10 @@ type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
 
+type RpcContextFocusChangedMessage = RpcContextFocusChanged & {
+  type: "context-focus-changed";
+};
+
 type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
   type: "thread-start-request-created";
 };
@@ -89,6 +95,7 @@ type RpcSocketMessage =
   | RpcReloadMessage
   | RpcTasksChangedMessage
   | RpcGitHistoryChangedMessage
+  | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
@@ -491,6 +498,17 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         });
         return;
       }
+      if (payload.type === "context-focus-changed") {
+        window.dispatchEvent(
+          new CustomEvent<RpcContextFocusChanged>(
+            CONTEXT_FOCUS_CHANGED_EVENT_NAME,
+            {
+              detail: payload,
+            },
+          ),
+        );
+        return;
+      }
       if (payload.type === "thread-start-request-created") {
         window.dispatchEvent(
           new CustomEvent<RpcThreadStartRequest>(
@@ -806,6 +824,7 @@ const procedures: ProjectProcedures = {
   readWorktreeFileContentPage: createProcedure("readWorktreeFileContentPage"),
   readWorktreeFileDiff: createProcedure("readWorktreeFileDiff"),
   setActiveWorktree: createProcedure("setActiveWorktree"),
+  focusContext: createProcedure("focusContext"),
   listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),
   getWorktreeGitCommitDiff: createProcedure("getWorktreeGitCommitDiff"),
   closeWorktree: createProcedure("closeWorktree"),

@@ -146,6 +146,14 @@ export type RpcWorktreeGitHistoryChanged = {
   worktreePath: string;
 };
 
+export type RpcContextFocusChanged = {
+  projectId: number;
+  projectPath: string;
+  projectName: string;
+  worktreePath: string;
+  threadId: number | null;
+};
+
 /**
  * Thread start request is also used as queued payload and runtime response details.
  */
@@ -541,6 +549,14 @@ export type AppRPCSchema = {
       };
       response: RpcSetActiveWorktreeResult;
     };
+    focusContext: {
+      params: {
+        projectId: number;
+        worktreePath: string;
+        threadId?: number | null;
+      };
+      response: RpcContextFocusChanged;
+    };
     listWorktreeGitHistory: {
       params: {
         projectId: number;
@@ -754,6 +770,10 @@ export interface ProjectProcedures {
   setActiveWorktree: RpcProcedureCall<
     AppRPCSchema["requests"]["setActiveWorktree"]["params"],
     AppRPCSchema["requests"]["setActiveWorktree"]["response"]
+  >;
+  focusContext: RpcProcedureCall<
+    AppRPCSchema["requests"]["focusContext"]["params"],
+    AppRPCSchema["requests"]["focusContext"]["response"]
   >;
   listWorktreeGitHistory: RpcProcedureCall<
     AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],

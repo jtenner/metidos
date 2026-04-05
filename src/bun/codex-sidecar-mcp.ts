@@ -10,10 +10,12 @@ import {
 import type {
   AppRPCSchema,
   RpcProcedureCallOptions,
+  RpcProject,
   RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
   RpcThreadStartRequest,
+  RpcWorktree,
 } from "./rpc-schema";
 import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
 
@@ -89,8 +91,8 @@ function defaultProjectIdDescription(): string {
 /** Description text for worktree path defaults in generated tool schemas. */
 function defaultWorktreePathDescription(): string {
   return worktreePathContext
-    ? `Defaults to ${worktreePathContext}.`
-    : "Required with no worktree context.";
+    ? `Defaults to git worktree ${worktreePathContext}.`
+    : "Git worktree path.";
 }
 
 class JoltRpcClient {
@@ -307,6 +309,318 @@ function canonicalPath(value: string): string {
 /** Compare two paths after canonical normalization for robust equality checks. */
 function samePath(left: string, right: string): boolean {
   return canonicalPath(left) === canonicalPath(right);
+}
+
+/** Normalize a free-form lookup string for stable name comparisons. */
+function normalizeLookupValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/** Return a stable leaf label for a worktree path. */
+function shortName(value: string): string {
+  const normalized = value.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.at(-1) ?? normalized;
+}
+
+/** List all project/worktree records for a resolved project id. */
+async function resolveProjectWorktrees(
+  projectId: number,
+): Promise<RpcWorktree[]> {
+  const result = await rpcClient.call("listProjectWorktrees", {
+    projectId,
+  });
+  return result.worktrees;
+}
+
+/**
+ * Resolve a project by name, basename, or path-like input.
+ *
+ * Returns the matched project plus a fresh worktree listing for downstream
+ * workspace resolution.
+ */
+async function resolveProjectByName(
+  projectName: string,
+): Promise<{ project: RpcProject; worktrees: RpcWorktree[] }> {
+  const normalizedName = normalizeLookupValue(projectName);
+  const looksLikePath =
+    /[\\/]/.test(projectName) ||
+    projectName.startsWith(".") ||
+    projectName.startsWith("~");
+  const projects = await listKnownProjects();
+  const exactNameMatches = projects.filter(
+    (project) =>
+      normalizeLookupValue(project.name) === normalizedName ||
+      normalizeLookupValue(shortName(project.path)) === normalizedName,
+  );
+  const pathMatches = looksLikePath
+    ? projects.filter((project) => samePath(project.path, projectName))
+    : [];
+  const matches =
+    pathMatches.length > 0
+      ? pathMatches
+      : exactNameMatches.length > 0
+        ? exactNameMatches
+        : [];
+
+  if (matches.length === 0) {
+    throw new Error(`Project not found: ${projectName}`);
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `Project name is ambiguous: ${projectName}. Matches: ${matches
+        .map((project) => `${project.name} (${project.path})`)
+        .join(", ")}.`,
+    );
+  }
+
+  const project = matches[0];
+  if (!project) {
+    throw new Error(`Project not found: ${projectName}`);
+  }
+  const worktrees = await resolveProjectWorktrees(project.id);
+  return {
+    project,
+    worktrees,
+  };
+}
+
+/**
+ * Resolve a workspace identifier within one project using either a path or a
+ * human-readable worktree label.
+ */
+function resolveWorkspaceForProject(
+  project: RpcProject,
+  worktrees: RpcWorktree[],
+  workspaceName?: string | null,
+): RpcWorktree {
+  if (typeof workspaceName !== "string" || !workspaceName.trim()) {
+    if (worktrees.length === 0) {
+      throw new Error(`No worktrees found in project ${project.name}.`);
+    }
+    const primaryWorktree =
+      worktrees.find((worktree) => samePath(worktree.path, project.path)) ??
+      worktrees[0];
+    if (!primaryWorktree) {
+      throw new Error(`No worktrees found in project ${project.name}.`);
+    }
+    return primaryWorktree;
+  }
+
+  const trimmedWorkspaceName = workspaceName.trim();
+  const normalizedWorkspaceName = normalizeLookupValue(trimmedWorkspaceName);
+  const candidates = worktrees.filter((worktree) => {
+    if (samePath(worktree.path, trimmedWorkspaceName)) {
+      return true;
+    }
+
+    if (
+      normalizeLookupValue(worktree.branch ?? "") === normalizedWorkspaceName
+    ) {
+      return true;
+    }
+
+    if (
+      normalizeLookupValue(shortName(worktree.path)) === normalizedWorkspaceName
+    ) {
+      return true;
+    }
+
+    if (
+      samePath(worktree.path, project.path) &&
+      normalizedWorkspaceName === "primary"
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (candidates.length === 0) {
+    throw new Error(
+      `Workspace not found in project ${project.name}: ${workspaceName}`,
+    );
+  }
+  if (candidates.length > 1) {
+    throw new Error(
+      `Workspace name is ambiguous in project ${project.name}: ${workspaceName}. Matches: ${candidates
+        .map((worktree) => `${worktree.branch ?? "Primary"} (${worktree.path})`)
+        .join(", ")}.`,
+    );
+  }
+
+  const workspace = candidates[0];
+  if (!workspace) {
+    throw new Error(`Workspace not found in project ${project.name}.`);
+  }
+  return workspace;
+}
+
+/** Extract a numeric thread id from loose tool input. */
+function normalizeThreadIdInput(
+  threadId: string | number | null | undefined,
+): number | null {
+  if (typeof threadId === "number") {
+    if (!Number.isInteger(threadId) || threadId <= 0) {
+      throw new Error("threadId must be a positive integer.");
+    }
+    return threadId;
+  }
+
+  if (typeof threadId !== "string") {
+    return null;
+  }
+
+  const trimmed = threadId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error("threadId must be a positive integer.");
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error("threadId must be a positive integer.");
+  }
+  return parsed;
+}
+
+/** Resolve the project/workspace/thread context for a focus request. */
+async function resolveFocusContextTarget(options: {
+  project: string;
+  workspace?: string | null | undefined;
+  threadId?: string | number | null | undefined;
+}): Promise<{
+  project: RpcProject;
+  worktree: RpcWorktree;
+  threadId: number | null;
+}> {
+  const projectResolution = await resolveProjectByName(options.project);
+  const requestedThreadId = normalizeThreadIdInput(options.threadId);
+  if (requestedThreadId !== null) {
+    enforceBoundThreadScope(requestedThreadId, threadIdContext);
+  }
+  let resolvedThread: RpcThread | null = null;
+  if (requestedThreadId !== null) {
+    const threads = await rpcClient.call("listThreads", undefined);
+    resolvedThread =
+      threads.find((thread) => thread.id === requestedThreadId) ?? null;
+    if (!resolvedThread) {
+      throw new Error(`Thread not found: ${requestedThreadId}`);
+    }
+    if (resolvedThread.projectId !== projectResolution.project.id) {
+      throw new Error(
+        `Thread ${requestedThreadId} does not belong to project ${projectResolution.project.name}.`,
+      );
+    }
+  }
+
+  const workspace =
+    requestedThreadId !== null && !options.workspace
+      ? (projectResolution.worktrees.find((worktree) =>
+          samePath(worktree.path, resolvedThread?.worktreePath ?? ""),
+        ) ??
+        resolveWorkspaceForProject(
+          projectResolution.project,
+          projectResolution.worktrees,
+          resolvedThread?.worktreePath ?? null,
+        ))
+      : resolveWorkspaceForProject(
+          projectResolution.project,
+          projectResolution.worktrees,
+          options.workspace ?? null,
+        );
+
+  enforceTargetScope({
+    projectIdContext,
+    targetProjectId: projectResolution.project.id,
+    targetWorktreePath: workspace.path,
+    worktreePathContext,
+  });
+
+  if (
+    resolvedThread &&
+    !samePath(workspace.path, resolvedThread.worktreePath)
+  ) {
+    throw new Error(
+      `Thread ${requestedThreadId} does not belong to workspace ${workspace.path}.`,
+    );
+  }
+
+  return {
+    project: projectResolution.project,
+    worktree: workspace,
+    threadId: resolvedThread?.id ?? null,
+  };
+}
+
+type ListThreadsRow = {
+  threadId: number;
+  title: string;
+  summary: string | null;
+  pinned: boolean;
+  projectId: number;
+  projectName: string;
+  projectPath: string;
+  workspacePath: string;
+  workspaceName: string;
+  runState: RpcThread["runStatus"]["state"];
+  updatedAt: string;
+};
+
+async function buildThreadListRows(options: {
+  projectName: string;
+  workspaceName?: string | null | undefined;
+}): Promise<{
+  project: RpcProject;
+  workspace: RpcWorktree | null;
+  rows: ListThreadsRow[];
+}> {
+  const projectResolution = await resolveProjectByName(options.projectName);
+  const workspace = options.workspaceName
+    ? resolveWorkspaceForProject(
+        projectResolution.project,
+        projectResolution.worktrees,
+        options.workspaceName,
+      )
+    : null;
+  const threads = await rpcClient.call("listThreads", undefined);
+  const threadRows = threads
+    .filter(
+      (thread) =>
+        thread.projectId === projectResolution.project.id &&
+        (workspace === null || samePath(thread.worktreePath, workspace.path)),
+    )
+    .map((thread) => {
+      const worktree =
+        projectResolution.worktrees.find((entry) =>
+          samePath(entry.path, thread.worktreePath),
+        ) ?? null;
+      return {
+        threadId: thread.id,
+        title: thread.title,
+        summary: thread.summary,
+        pinned: thread.pinnedAt !== null,
+        projectId: thread.projectId,
+        projectName: projectResolution.project.name,
+        projectPath: projectResolution.project.path,
+        workspacePath: thread.worktreePath,
+        workspaceName:
+          worktree?.branch?.trim() ||
+          (samePath(thread.worktreePath, projectResolution.project.path)
+            ? "Primary"
+            : shortName(thread.worktreePath)),
+        runState: thread.runStatus.state,
+        updatedAt: thread.updatedAt,
+      };
+    });
+
+  return {
+    project: projectResolution.project,
+    workspace,
+    rows: threadRows,
+  };
 }
 
 /** List all known projects including closed ones for robust resolution fallback. */
@@ -632,6 +946,129 @@ server.registerTool(
   },
 );
 
+/** Tool: list project threads with optional workspace filtering. */
+server.registerTool(
+  "list_threads",
+  {
+    title: "List Threads",
+    description:
+      "List Jolt threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
+    inputSchema: {
+      projectName: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("Project name or path to inspect."),
+      workspaceName: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Optional git worktree name or path."),
+    },
+    annotations: {
+      idempotentHint: true,
+      openWorldHint: false,
+      readOnlyHint: true,
+    },
+  },
+  async ({ projectName, workspaceName }) => {
+    const { project, rows, workspace } = await buildThreadListRows({
+      projectName,
+      workspaceName,
+    });
+    const textLines = rows.length
+      ? rows.map(
+          (row) =>
+            `- [${row.threadId}] ${row.title} (${row.workspaceName} · ${row.workspacePath})${row.pinned ? " [pinned]" : ""}${row.summary ? ` - ${row.summary}` : ""}`,
+        )
+      : [
+          workspace
+            ? `No threads found in ${project.name} / ${workspace.branch?.trim() || shortName(workspace.path)}.`
+            : `No threads found in ${project.name}.`,
+        ];
+    return textResult(
+      [
+        `Threads for ${project.name}${workspace ? ` / ${workspace.branch?.trim() || shortName(workspace.path)}` : ""}:`,
+        ...textLines,
+      ].join("\n"),
+      {
+        projectId: project.id,
+        projectName: project.name,
+        projectPath: project.path,
+        workspacePath: workspace?.path ?? null,
+        workspaceName: workspace
+          ? workspace.branch?.trim() ||
+            (samePath(workspace.path, project.path)
+              ? "Primary"
+              : shortName(workspace.path))
+          : null,
+        threads: rows,
+      },
+    );
+  },
+);
+
+/** Tool: focus the UI on a project/workspace/thread context. */
+server.registerTool(
+  "set_context",
+  {
+    title: "Set Context",
+    description:
+      "Focus the UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
+    inputSchema: {
+      project: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("Project name or path to focus."),
+      workspace: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Optional git worktree name or path."),
+      threadId: z
+        .union([z.number().int().positive(), z.string().trim().min(1)])
+        .optional()
+        .describe("Optional thread id to focus."),
+    },
+    annotations: {
+      idempotentHint: false,
+      openWorldHint: false,
+      readOnlyHint: false,
+    },
+  },
+  async ({ project, threadId, workspace }) => {
+    const target = await resolveFocusContextTarget({
+      project,
+      threadId,
+      workspace,
+    });
+    const result = await rpcClient.call(
+      "focusContext",
+      {
+        projectId: target.project.id,
+        worktreePath: target.worktree.path,
+        ...(target.threadId === null ? {} : { threadId: target.threadId }),
+      },
+      {
+        priority: "foreground",
+      },
+    );
+    return textResult(
+      `Focused ${result.projectName} / ${shortName(result.worktreePath)}${result.threadId ? ` / thread ${result.threadId}` : ""}.`,
+      {
+        projectId: result.projectId,
+        projectName: result.projectName,
+        projectPath: result.projectPath,
+        worktreePath: result.worktreePath,
+        threadId: result.threadId,
+      },
+    );
+  },
+);
+
 /**
  * Tool: create threads with optional start/request workflow for deferred approval.
  */
@@ -640,7 +1077,7 @@ server.registerTool(
   {
     title: "New Thread",
     description:
-      "Start a separate Jolt thread. Use sparingly for distinct work or a different worktree. Bound sidecar sessions cannot escape their current project or worktree. Set autoStart to true to ask the UI for permission before creating the thread; if unsafeMode is true, the thread starts immediately instead of waiting for a popup.",
+      "Start a separate Jolt thread for distinct work or another git worktree. Bound sidecar sessions cannot escape their current project/worktree. Set autoStart=true to ask the UI first; unsafeMode skips the popup.",
     inputSchema: {
       input: z.string().trim().min(1).describe("Initial prompt."),
       projectId: z

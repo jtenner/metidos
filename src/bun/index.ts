@@ -36,6 +36,7 @@ import {
   deleteProjectProcedure,
   deleteThreadProcedure,
   discardEmptyThreadProcedure,
+  focusContextProcedure,
   getAppBootstrapProcedure,
   getCodexModelCatalogProcedure,
   getHomeDirectoryProcedure,
@@ -82,6 +83,7 @@ import {
 import { createThreadRequiresStepUp, enforceRpcStepUp } from "./rpc-authz";
 import type {
   AppRPCSchema,
+  RpcContextFocusChanged,
   RpcRequestContext,
   RpcRequestPriority,
   RpcThreadStartRequest,
@@ -182,6 +184,10 @@ type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
 
+type RpcContextFocusChangedMessage = RpcContextFocusChanged & {
+  type: "context-focus-changed";
+};
+
 type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
   type: "thread-start-request-created";
 };
@@ -191,6 +197,7 @@ type RpcSocketMessage =
   | RpcReloadMessage
   | RpcTasksChangedMessage
   | RpcGitHistoryChangedMessage
+  | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
@@ -373,6 +380,11 @@ const rpcHandlers: RpcRequestHandlerMap = {
   readWorktreeFileDiff: (params, context) =>
     readWorktreeFileDiffProcedure(params, context),
   setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
+  focusContext: async (params, context) => {
+    const result = await focusContextProcedure(params, context);
+    broadcastContextFocusChanged(result);
+    return result;
+  },
   listWorktreeGitHistory: (params, context) =>
     listWorktreeGitHistoryProcedure(params, context),
   getWorktreeGitCommitDiff: (params, context) =>
@@ -1531,6 +1543,28 @@ function broadcastGitHistoryChanged(
     worktreePath,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  for (const client of rpcClients) {
+    try {
+      client.send(raw);
+    } catch {
+      rpcClients.delete(client);
+    }
+  }
+}
+
+/**
+ * Broadcast that the UI should focus a specific project/worktree/thread context.
+ */
+function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
+  if (rpcClients.size === 0) {
+    return;
+  }
+
+  const message: RpcContextFocusChangedMessage = {
+    type: "context-focus-changed",
+    ...payload,
+  };
+  const raw = JSON.stringify(message satisfies RpcSocketMessage);
   for (const client of rpcClients) {
     try {
       client.send(raw);

@@ -118,6 +118,7 @@ import type {
   RpcAppBootstrapResult,
   RpcCodexModelCatalog,
   RpcCodexReasoningEffort,
+  RpcContextFocusChanged,
   RpcCreateWorktreeResult,
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
@@ -3739,6 +3740,77 @@ export async function setActiveWorktreeProcedure(
     projectId,
     worktreePath,
   };
+}
+
+export async function focusContextProcedure(
+  params: AppRPCSchema["requests"]["focusContext"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcContextFocusChanged> {
+  return withForegroundRead(async () => {
+    const requestGitOptions = gitCommandOptionsFromRequest(context);
+    const project = projectByIdForPath(params.projectId);
+    const openedProject = await awaitAbortableResult(
+      openProjectWithGitOptions(
+        {
+          projectPath: project.path,
+          name: project.name,
+        },
+        requestGitOptions,
+      ),
+      context?.signal,
+      "Context focus was aborted.",
+    );
+    throwIfAborted(context?.signal, "Context focus was aborted.");
+
+    const normalizedWorktreePath = normalizePath(params.worktreePath);
+    const openedWorktree = await awaitAbortableResult(
+      openWorktreeWithGitOptions(
+        {
+          projectId: openedProject.project.id,
+          worktreePath: normalizedWorktreePath,
+        },
+        requestGitOptions,
+        context?.signal,
+      ),
+      context?.signal,
+      "Context focus was aborted.",
+    );
+    throwIfAborted(context?.signal, "Context focus was aborted.");
+
+    await setActiveWorktreeProcedure(
+      {
+        projectId: openedProject.project.id,
+        worktreePath: normalizedWorktreePath,
+      },
+      context,
+    );
+
+    if (typeof params.threadId === "number") {
+      const thread = threadById(params.threadId);
+      if (
+        thread.projectId !== openedProject.project.id ||
+        normalizePath(thread.worktreePath) !== normalizedWorktreePath
+      ) {
+        throw new Error(
+          `Thread ${params.threadId} does not belong to project ${openedProject.project.id} and worktree ${normalizedWorktreePath}.`,
+        );
+      }
+    }
+
+    // Keep the project poller in sync with the refreshed open-project result.
+    const state = ensureProjectPoller(project);
+    state.worktrees = openedProject.worktrees;
+    state.worktreesLoadedAt = Date.now();
+    state.activeWorktreePath = normalizedWorktreePath;
+    ensureWorktreePollState(state, normalizedWorktreePath);
+    return {
+      projectId: openedProject.project.id,
+      projectPath: openedProject.project.path,
+      projectName: openedProject.project.name,
+      worktreePath: openedWorktree.worktree.path,
+      threadId: params.threadId ?? null,
+    };
+  });
 }
 
 export async function closeWorktreeProcedure(

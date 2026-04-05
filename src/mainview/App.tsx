@@ -14,6 +14,7 @@ import type {
   RpcCodexModelOption,
   RpcCodexReasoningEffort,
   RpcCodexReasoningEffortOption,
+  RpcContextFocusChanged,
   RpcGitHistoryEntry,
   RpcProject,
   RpcProjectTask,
@@ -48,6 +49,7 @@ import {
   appendGitHistoryPage,
   awaitAbortableResult,
   buildProjectWorktreeIndex,
+  CONTEXT_FOCUS_CHANGED_EVENT_NAME,
   clampProjectMenuCoordinate,
   createAbortError,
   createProjectStore,
@@ -4464,6 +4466,70 @@ export default function App({
       updateProjectState,
     ],
   );
+
+  useEffect(() => {
+    const handleContextFocusChanged = (
+      event: CustomEvent<RpcContextFocusChanged>,
+    ) => {
+      if (!sessionStateReady) {
+        return;
+      }
+
+      const payload = event.detail;
+      void (async () => {
+        try {
+          const openedProject = await procedures.openProject(
+            {
+              projectPath: payload.projectPath,
+              name: payload.projectName,
+            },
+            {
+              priority: "foreground",
+            },
+          );
+          upsertProject(openedProject.project);
+          setProjectState(
+            openedProject.project.id,
+            buildLoadedProjectWorktreesState(openedProject.worktrees),
+          );
+
+          const targetWorktreePath =
+            payload.worktreePath ??
+            primaryWorktreePath(openedProject.project, openedProject.worktrees);
+          selectProject(openedProject.project, targetWorktreePath);
+          await ensureWorktreeOpen(
+            openedProject.project.id,
+            targetWorktreePath,
+          );
+
+          if (payload.threadId !== null) {
+            await openThread(payload.threadId);
+          }
+        } catch (error) {
+          console.error("Failed to apply focused Jolt context", error);
+        }
+      })();
+    };
+
+    window.addEventListener(
+      CONTEXT_FOCUS_CHANGED_EVENT_NAME,
+      handleContextFocusChanged as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        CONTEXT_FOCUS_CHANGED_EVENT_NAME,
+        handleContextFocusChanged as EventListener,
+      );
+    };
+  }, [
+    ensureWorktreeOpen,
+    openThread,
+    procedures,
+    selectProject,
+    sessionStateReady,
+    setProjectState,
+    upsertProject,
+  ]);
 
   const handleProjectWorktreeClick = useCallback(
     (project: RpcProject, worktreePath: string) => {
