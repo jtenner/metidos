@@ -4334,6 +4334,22 @@ export default function App({
     [createThreadForWorktree],
   );
 
+  const handleCreateThreadForActiveWorktree = useCallback(() => {
+    if (
+      !selectedProject ||
+      !activeSelectedWorktreePath ||
+      !activeSelectedWorktreeOpened
+    ) {
+      return;
+    }
+    void createThreadForWorktree(selectedProject.id, activeSelectedWorktreePath);
+  }, [
+    activeSelectedWorktreeOpened,
+    activeSelectedWorktreePath,
+    createThreadForWorktree,
+    selectedProject,
+  ]);
+
   const handleToggleWorktreePinned = useCallback(
     (projectId: number, worktreePath: string, pinned: boolean) => {
       void toggleWorktreePinned(projectId, worktreePath, pinned);
@@ -5111,13 +5127,22 @@ export default function App({
                   sidebarSearchQuery={sidebarSearchQuery}
                   workspacePanelProps={{
                     acknowledgeThreadErrorSeenInBackground,
+                    canCreateThread:
+                      Boolean(
+                        selectedProject &&
+                          activeSelectedWorktreePath &&
+                          activeSelectedWorktreeOpened,
+                      ),
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     isThreadStatusDismissed,
+                    isCreatingThread,
+                    onCreateThread: handleCreateThreadForActiveWorktree,
                     onOpenThread: handleOpenThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
                     projectById,
                     selectedThreadId,
+                    sidebarActionButtonClass,
                     threadPreviewsDisabled: threadActionMenu !== null,
                     threadActivityIndicator,
                     threadsError,
@@ -5259,7 +5284,7 @@ export default function App({
             id="mobile-navigation-drawer"
             ref={mobileSidebarScrollRef}
           >
-            <SidebarContent
+                <SidebarContent
               activeSidebarBranchLabel={activeSidebarBranchLabel}
               collapseControl={null}
               gitHistoryPanelKey={`${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`}
@@ -5313,19 +5338,28 @@ export default function App({
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}
-              workspacePanelProps={{
-                acknowledgeThreadErrorSeenInBackground,
-                clearCompletedThreadIndicator,
-                dismissThreadStatus,
-                isThreadStatusDismissed,
-                onOpenThread: handleOpenThread,
-                onOpenThreadActionMenu: openThreadActionMenu,
-                projectById,
-                selectedThreadId,
-                threadPreviewsDisabled: threadActionMenu !== null,
-                threadActivityIndicator,
-                threadsError,
-                worktreeDisplayPathByKey,
+                  workspacePanelProps={{
+                    acknowledgeThreadErrorSeenInBackground,
+                    canCreateThread:
+                      Boolean(
+                        selectedProject &&
+                          activeSelectedWorktreePath &&
+                          activeSelectedWorktreeOpened,
+                      ),
+                    clearCompletedThreadIndicator,
+                    dismissThreadStatus,
+                    isThreadStatusDismissed,
+                    isCreatingThread,
+                    onCreateThread: handleCreateThreadForActiveWorktree,
+                    onOpenThread: handleOpenThread,
+                    onOpenThreadActionMenu: openThreadActionMenu,
+                    projectById,
+                    selectedThreadId,
+                    sidebarActionButtonClass,
+                    threadPreviewsDisabled: threadActionMenu !== null,
+                    threadActivityIndicator,
+                    threadsError,
+                    worktreeDisplayPathByKey,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
                 worktreeByProjectAndPath,

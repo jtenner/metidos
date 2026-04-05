@@ -20,10 +20,18 @@ type WorkspacePanelProps = SharedThreadListProps & {
   threadPreviewsDisabled: boolean;
   /** Error text shown at the bottom of the threads panel. */
   threadsError: string;
+  /** Indicates whether a thread can be started from the currently selected worktree. */
+  canCreateThread: boolean;
+  /** Disables the create-thread button while a new thread request is pending. */
+  isCreatingThread: boolean;
+  /** Shared class names for the header action button. */
+  sidebarActionButtonClass: string;
   /** Threads marked as pinned in workspace state. */
   workspaceActiveThreads: RpcThread[];
   /** Unpinned recent threads in workspace state. */
   workspacePinnedThreads: RpcThread[];
+  /** Creates a thread for the currently selected open worktree. */
+  onCreateThread: () => void;
 };
 
 /**
@@ -40,12 +48,16 @@ export const WorkspacePanel = memo(function WorkspacePanel({
   projectById,
   selectedThreadId,
   threadPreviewsDisabled,
-  threadActivityIndicator,
-  threadsError,
-  worktreeDisplayPathByKey,
-  workspaceActiveThreads,
-  workspacePinnedThreads,
-  worktreeByProjectAndPath,
+    threadActivityIndicator,
+    canCreateThread,
+    isCreatingThread,
+    onCreateThread,
+    threadsError,
+    sidebarActionButtonClass,
+    worktreeDisplayPathByKey,
+    workspaceActiveThreads,
+    workspacePinnedThreads,
+    worktreeByProjectAndPath,
 }: WorkspacePanelProps) {
   // Global panel + section open state is shared with the sidebar panel reducer.
   const workspaceOpen = useWorkspacePanelOpen();
@@ -60,6 +72,20 @@ export const WorkspacePanel = memo(function WorkspacePanel({
         title="Threads"
         open={workspaceOpen}
         onToggle={toggleWorkspacePanelOpen}
+        action={
+          <button
+            type="button"
+            className={sidebarActionButtonClass}
+            onClick={onCreateThread}
+            disabled={isCreatingThread || !canCreateThread}
+            aria-label="Create thread for selected worktree"
+            title={
+              canCreateThread ? "Create thread for selected worktree" : "Select an open worktree first"
+            }
+          >
+            +
+          </button>
+        }
       />
       {workspaceOpen ? (
         <div className="mt-3 space-y-4">
