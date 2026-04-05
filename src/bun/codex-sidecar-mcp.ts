@@ -74,6 +74,9 @@ const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
 const projectIdContext = readIntegerEnv("JOLT_PROJECT_ID");
 const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
+const rpcHttpOrigin =
+  readStringEnv("JOLT_RPC_HTTP_ORIGIN") ?? deriveRpcHttpOrigin(rpcUrl);
+const sessionIdContext = readStringEnv("JOLT_SESSION_ID");
 
 /** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {
@@ -105,6 +108,159 @@ function defaultWorktreePathDescription(): string {
     : "Git worktree path.";
 }
 
+/**
+ * Derives the HTTP origin paired with a websocket RPC URL.
+ * @param value - RPC websocket URL.
+ */
+export function deriveRpcHttpOrigin(value: string): string {
+  const url = new URL(value);
+  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.origin;
+}
+
+/**
+ * Builds a session cookie header value for websocket-authenticated requests.
+ * @param sessionId - Session identifier.
+ */
+export function buildSessionCookieHeader(sessionId: string): string {
+  return `jolt_session=${sessionId}`;
+}
+
+type RpcSocketConnectionDetails = {
+  headers?: Record<string, string>;
+  url: string;
+};
+
+type WebSocketTicket = {
+  expiresAt: string;
+  ticket: string;
+};
+
+/**
+ * Parses a websocket-ticket response payload.
+ * @param value - Response payload.
+ */
+function readWebSocketTicket(value: unknown): WebSocketTicket | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  if (payload.ok !== true || typeof payload.ticket !== "object") {
+    return null;
+  }
+  const ticket = payload.ticket as Record<string, unknown>;
+  if (
+    typeof ticket.ticket !== "string" ||
+    typeof ticket.expiresAt !== "string"
+  ) {
+    return null;
+  }
+  return {
+    expiresAt: ticket.expiresAt,
+    ticket: ticket.ticket,
+  };
+}
+
+/**
+ * Extracts a readable failure message from a websocket-ticket response.
+ * @param value - Response payload.
+ */
+function readWebSocketTicketErrorMessage(value: unknown): string | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const payload = value as Record<string, unknown>;
+  const error = payload.error;
+  if (typeof error !== "object" || error === null || Array.isArray(error)) {
+    return null;
+  }
+  const errorRecord = error as Record<string, unknown>;
+  if (typeof errorRecord.message === "string") {
+    return errorRecord.message;
+  }
+  if (typeof errorRecord.code === "string") {
+    return errorRecord.code;
+  }
+  return null;
+}
+
+/**
+ * Requests a fresh websocket ticket for the current authenticated session.
+ * @param options - Configuration options used by this operation.
+ */
+async function requestWebSocketTicket(options: {
+  fetchImpl?: typeof fetch;
+  httpOrigin: string;
+  sessionId: string;
+}): Promise<WebSocketTicket> {
+  const ticketUrl = new URL("/auth/ws-ticket", options.httpOrigin);
+  const response = await (options.fetchImpl ?? fetch)(ticketUrl, {
+    cache: "no-store",
+    headers: {
+      Cookie: buildSessionCookieHeader(options.sessionId),
+    },
+    method: "POST",
+  });
+  const rawText = await response.text();
+  let payload: unknown = null;
+  if (rawText.trim()) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = rawText;
+    }
+  }
+
+  const ticket = readWebSocketTicket(payload);
+  if (!response.ok || !ticket) {
+    const message =
+      readWebSocketTicketErrorMessage(payload) ??
+      rawText.trim() ??
+      response.statusText ??
+      `HTTP ${response.status}`;
+    throw new Error(
+      `Failed to obtain websocket ticket from ${ticketUrl.origin}: ${message}`,
+    );
+  }
+
+  return ticket;
+}
+
+/**
+ * Build websocket connection details for the RPC client.
+ * @param options - Configuration options used by this operation.
+ */
+export async function buildRpcSocketConnectionDetails(options: {
+  fetchImpl?: typeof fetch;
+  httpOrigin: string;
+  rpcUrl: string;
+  sessionId: string | null;
+}): Promise<RpcSocketConnectionDetails> {
+  if (!options.sessionId) {
+    return {
+      url: options.rpcUrl,
+    };
+  }
+
+  const ticket = await requestWebSocketTicket({
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    httpOrigin: options.httpOrigin,
+    sessionId: options.sessionId,
+  });
+  const url = new URL(options.rpcUrl);
+  url.searchParams.set("ticket", ticket.ticket);
+
+  return {
+    headers: {
+      Cookie: buildSessionCookieHeader(options.sessionId),
+    },
+    url: url.toString(),
+  };
+}
+
 class JoltRpcClient {
   private connecting: Promise<WebSocket> | null = null;
   private nextRequestId = 1;
@@ -112,7 +268,11 @@ class JoltRpcClient {
   private socket: WebSocket | null = null;
 
   /** Create a websocket-backed RPC client for a specific endpoint. */
-  constructor(private readonly url: string) {}
+  constructor(
+    private readonly url: string,
+    private readonly httpOrigin: string,
+    private readonly sessionId: string | null,
+  ) {}
 
   /**
    * Send a typed request and await typed result.
@@ -204,74 +364,104 @@ class JoltRpcClient {
     }
 
     this.connecting = new Promise<WebSocket>((resolveSocket, reject) => {
-      const nextSocket = new WebSocket(this.url);
+      void (async () => {
+        try {
+          const connectionDetails = await buildRpcSocketConnectionDetails({
+            fetchImpl: fetch as typeof fetch,
+            httpOrigin: this.httpOrigin,
+            rpcUrl: this.url,
+            sessionId: this.sessionId,
+          });
+          const nextSocket = connectionDetails.headers
+            ? new (
+                WebSocket as unknown as {
+                  new (
+                    url: string | URL,
+                    options?: Bun.WebSocketOptions,
+                  ): WebSocket;
+                }
+              )(connectionDetails.url, {
+                headers: connectionDetails.headers,
+              })
+            : new WebSocket(connectionDetails.url);
 
-      /**
-       * Resets socket.
-       * @param reason - Reason for this operation.
-       */
+          /**
+           * Resets socket.
+           * @param reason - Reason for this operation.
+           */
 
-      const resetSocket = (reason: unknown) => {
-        // Centralized reset path so callers awaiting open/requests fail consistently.
-        if (this.socket === nextSocket) {
-          this.socket = null;
-        }
-        if (this.connecting) {
-          this.connecting = null;
-        }
-        reject(reason);
-      };
+          const resetSocket = (reason: unknown) => {
+            // Centralized reset path so callers awaiting open/requests fail consistently.
+            if (this.socket === nextSocket) {
+              this.socket = null;
+            }
+            if (this.connecting) {
+              this.connecting = null;
+            }
+            reject(reason);
+          };
 
-      nextSocket.addEventListener("open", () => {
-        // Cache the live socket and clear the shared in-flight connect promise.
-        this.socket = nextSocket;
-        this.connecting = null;
-        resolveSocket(nextSocket);
-      });
+          nextSocket.addEventListener("open", () => {
+            // Cache the live socket and clear the shared in-flight connect promise.
+            this.socket = nextSocket;
+            this.connecting = null;
+            resolveSocket(nextSocket);
+          });
 
-      nextSocket.addEventListener("message", (event) => {
-        // Ignore non-response frames; this socket may carry unrelated payload types.
-        const message = JSON.parse(String(event.data)) as RpcResponseMessage;
-        if (message.type !== "response") {
-          return;
-        }
-        const pending = this.clearPendingRequest(message.id);
-        if (!pending) {
-          return;
-        }
-        if (message.ok) {
-          pending.resolve(message.result);
-          return;
-        }
-        pending.reject(new Error(message.error));
-      });
+          nextSocket.addEventListener("message", (event) => {
+            // Ignore non-response frames; this socket may carry unrelated payload types.
+            const message = JSON.parse(
+              String(event.data),
+            ) as RpcResponseMessage;
+            if (message.type !== "response") {
+              return;
+            }
+            const pending = this.clearPendingRequest(message.id);
+            if (!pending) {
+              return;
+            }
+            if (message.ok) {
+              pending.resolve(message.result);
+              return;
+            }
+            pending.reject(new Error(message.error));
+          });
 
-      nextSocket.addEventListener("close", () => {
-        // On socket close, reject all pending calls so callers don’t hang forever.
-        if (this.socket === nextSocket) {
-          this.socket = null;
-        }
-        if (this.connecting) {
-          this.connecting = null;
-        }
-        const pending = [...this.pendingRequests.keys()];
-        for (const requestId of pending) {
-          this.clearPendingRequest(requestId)?.reject(
-            new Error("Jolt RPC connection closed."),
-          );
-        }
-      });
+          nextSocket.addEventListener("close", () => {
+            // On socket close, reject all pending calls so callers don’t hang forever.
+            if (this.socket === nextSocket) {
+              this.socket = null;
+            }
+            if (this.connecting) {
+              this.connecting = null;
+            }
+            const pending = [...this.pendingRequests.keys()];
+            for (const requestId of pending) {
+              this.clearPendingRequest(requestId)?.reject(
+                new Error("Jolt RPC connection closed."),
+              );
+            }
+          });
 
-      nextSocket.addEventListener("error", () => {
-        resetSocket(new Error(`Could not connect to Jolt RPC at ${this.url}.`));
-      });
+          nextSocket.addEventListener("error", () => {
+            resetSocket(
+              new Error(`Could not connect to Jolt RPC at ${this.url}.`),
+            );
+          });
+        } catch (error) {
+          if (this.connecting) {
+            this.connecting = null;
+          }
+          reject(error);
+        }
+      })();
     });
 
     return this.connecting;
   }
 }
 
-const rpcClient = new JoltRpcClient(rpcUrl);
+const rpcClient = new JoltRpcClient(rpcUrl, rpcHttpOrigin, sessionIdContext);
 
 /**
  * Read and parse an environment variable as an integer project/thread id.
@@ -1249,7 +1439,9 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-void main().catch((error) => {
-  console.error("Jolt sidecar MCP server failed", error);
-  process.exit(1);
-});
+if (import.meta.main) {
+  void main().catch((error) => {
+    console.error("Jolt sidecar MCP server failed", error);
+    process.exit(1);
+  });
+}

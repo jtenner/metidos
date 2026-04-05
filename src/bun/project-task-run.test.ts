@@ -110,6 +110,32 @@ afterAll(async () => {
 });
 
 describe("project task execution", () => {
+  it("builds a sidecar environment with the active session id", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexSidecarEnv(
+        {
+          id: 17,
+          projectId: 9,
+          worktreePath: "/repo/worktree",
+        },
+        {
+          rpcHttpOrigin: "http://127.0.0.1:7599",
+          rpcUrl: "ws://127.0.0.1:7599/rpc",
+          sessionId: "session-123",
+        },
+      ),
+    ).toEqual({
+      JOLT_PROJECT_ID: "9",
+      JOLT_RPC_HTTP_ORIGIN: "http://127.0.0.1:7599",
+      JOLT_RPC_URL: "ws://127.0.0.1:7599/rpc",
+      JOLT_SESSION_ID: "session-123",
+      JOLT_THREAD_ID: "17",
+      JOLT_WORKTREE_PATH: "/repo/worktree",
+    });
+  });
+
   it("rejects an aborted active-worktree update before validation completes", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("jolt-active-worktree-repo-");

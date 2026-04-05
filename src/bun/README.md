@@ -107,6 +107,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
   - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
   - Routes thread metadata writes through authoritative RPC updates so tool success matches visible app state.
+  - Reuses the active authenticated session id to fetch a fresh websocket ticket, then opens `/rpc` with that ticket plus the session cookie header.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
 
 - `codex-sidecar-scope.ts`

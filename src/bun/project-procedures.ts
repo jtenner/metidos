@@ -427,6 +427,10 @@ type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
 };
 
+type CreateThreadRecordOptions = ProjectWorktreeReadOptions & {
+  sessionId?: string | null;
+};
+
 /**
  * Mutable per-worktree polling/caching state while worktree details are open.
  */
@@ -720,6 +724,51 @@ function joltRpcUrl(): string {
 
   return JOLT_DEFAULT_RPC_URL;
 }
+
+/**
+ * Derives the HTTP origin that pairs with the configured RPC websocket URL.
+ * @param rpcUrl - RPC websocket URL.
+ */
+function joltRpcHttpOrigin(rpcUrl: string): string {
+  const url = new URL(rpcUrl);
+  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.origin;
+}
+
+/**
+ * Builds the environment passed to the Codex MCP sidecar for a thread.
+ * @param thread - thread argument for buildCodexSidecarEnv.
+ * @param options - Optional overrides used by tests and callers.
+ */
+export function buildCodexSidecarEnv(
+  thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
+  options?: {
+    rpcHttpOrigin?: string | null;
+    rpcUrl?: string | null;
+    sessionId?: string | null;
+  },
+): Record<string, string> {
+  const rpcUrl = options?.rpcUrl?.trim() || joltRpcUrl();
+  const rpcHttpOrigin =
+    options?.rpcHttpOrigin?.trim() || joltRpcHttpOrigin(rpcUrl);
+  const sessionId = options?.sessionId?.trim() || null;
+
+  return {
+    JOLT_PROJECT_ID: String(thread.projectId),
+    JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
+    JOLT_RPC_URL: rpcUrl,
+    JOLT_THREAD_ID: String(thread.id),
+    JOLT_WORKTREE_PATH: thread.worktreePath,
+    ...(sessionId
+      ? {
+          JOLT_SESSION_ID: sessionId,
+        }
+      : {}),
+  };
+}
 /**
  * Creates codex client.
  * @param thread - thread argument for createCodexClient.
@@ -727,6 +776,9 @@ function joltRpcUrl(): string {
 
 function createCodexClient(
   thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
+  options?: {
+    sessionId?: string | null;
+  },
 ): Codex {
   return new Codex({
     config: {
@@ -734,12 +786,9 @@ function createCodexClient(
         [JOLT_MCP_SERVER_NAME]: {
           command: process.execPath,
           args: [JOLT_SIDECAR_SERVER_PATH],
-          env: {
-            JOLT_PROJECT_ID: String(thread.projectId),
-            JOLT_THREAD_ID: String(thread.id),
-            JOLT_WORKTREE_PATH: thread.worktreePath,
-            JOLT_RPC_URL: joltRpcUrl(),
-          },
+          env: buildCodexSidecarEnv(thread, {
+            sessionId: options?.sessionId ?? null,
+          }),
         },
       },
     },
@@ -870,8 +919,13 @@ function codexThreadOptions(
  * @param thread - thread argument for createManagedCodexThread.
  */
 
-function createManagedCodexThread(thread: ThreadRecord): CodexThread {
-  const client = createCodexClient(thread);
+function createManagedCodexThread(
+  thread: ThreadRecord,
+  sessionId: string | null,
+): CodexThread {
+  const client = createCodexClient(thread, {
+    sessionId,
+  });
   const model = normalizeStoredCodexModel(thread.model);
   const normalizedReasoningEffort = normalizeStoredCodexReasoningEffort(
     thread.reasoningEffort,
@@ -901,13 +955,16 @@ function createManagedCodexThread(thread: ThreadRecord): CodexThread {
  * @param thread - thread argument for ensureCodexThread.
  */
 
-async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
+async function ensureCodexThread(
+  thread: ThreadRecord,
+  sessionId: string | null,
+): Promise<CodexThread> {
   const active = codexThreadMap.get(thread.id);
   if (active) {
     return active;
   }
 
-  const next = createManagedCodexThread(thread);
+  const next = createManagedCodexThread(thread, sessionId);
   codexThreadMap.set(thread.id, next);
   return next;
 }
@@ -1068,6 +1125,7 @@ async function runThreadMessageInBackground(
   input: string,
   startedAt: string,
   controller: AbortController,
+  sessionId: string | null,
 ): Promise<void> {
   let lastAssistantText = "";
   let lastAssistantItemId: string | null = null;
@@ -1077,7 +1135,7 @@ async function runThreadMessageInBackground(
 
   try {
     const thread = threadById(threadId);
-    const codexThread = await ensureCodexThread(thread);
+    const codexThread = await ensureCodexThread(thread, sessionId);
     const { events } = await codexThread.runStreamed(input, {
       signal: controller.signal,
     });
@@ -2803,7 +2861,7 @@ async function createThreadRecord(
   model: string,
   reasoningEffort: RpcCodexReasoningEffort,
   unsafeMode: boolean,
-  options?: ProjectWorktreeReadOptions,
+  options?: CreateThreadRecordOptions,
 ): Promise<ThreadRecord> {
   const worktree = await assertProjectWorktree(project, worktreePath, {
     ...options,
@@ -2820,7 +2878,10 @@ async function createThreadRecord(
     codexThreadId: null,
   });
   try {
-    const codexThread = createManagedCodexThread(thread);
+    const codexThread = createManagedCodexThread(
+      thread,
+      options?.sessionId ?? null,
+    );
     codexThreadMap.set(thread.id, codexThread);
     if (unsafeMode) {
       recordUnsafeModeAuditEvent(thread, true, "thread_create");
@@ -3109,6 +3170,7 @@ export async function setWorktreePinnedProcedure(
 
 export async function createThreadProcedure(
   params: AppRPCSchema["requests"]["createThread"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
   const project = projectByIdForPath(params.projectId);
   const worktreePath = normalizePath(params.worktreePath);
@@ -3123,6 +3185,7 @@ export async function createThreadProcedure(
     unsafeMode,
     {
       forceRefresh: true,
+      sessionId: context?.auth.sessionId ?? null,
     },
   );
   recordCrossWorkspaceThreadAuditEvent(db, {
@@ -3210,6 +3273,7 @@ export async function markThreadErrorSeenProcedure(
 
 export async function sendThreadMessageProcedure(
   params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
   const thread = threadById(params.threadId);
   const input = params.input.trim();
@@ -3217,7 +3281,7 @@ export async function sendThreadMessageProcedure(
     throw new Error("Thread input is required.");
   }
 
-  return queueThreadMessage(thread, input);
+  return queueThreadMessage(thread, input, context?.auth.sessionId ?? null);
 }
 /**
  * Performs queueThreadMessage operation.
@@ -3228,6 +3292,7 @@ export async function sendThreadMessageProcedure(
 async function queueThreadMessage(
   thread: ThreadRecord,
   input: string,
+  sessionId: string | null,
 ): Promise<RpcThreadDetail> {
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error("Thread is already processing a message.");
@@ -3257,6 +3322,7 @@ async function queueThreadMessage(
     input,
     startedAt,
     controller,
+    sessionId,
   );
   threadTurnCompletionMap.set(thread.id, completion);
   void completion;
@@ -3585,6 +3651,7 @@ async function readAndStoreWorktreeSnapshot(
 
 export async function runProjectTaskProcedure(
   params: AppRPCSchema["requests"]["runProjectTask"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
   const project = projectByIdForPath(params.projectId);
   const worktreePath = normalizePath(params.worktreePath);
@@ -3614,6 +3681,7 @@ export async function runProjectTaskProcedure(
       resolveUnsafeMode(params.unsafeMode),
       {
         forceRefresh: true,
+        sessionId: context?.auth.sessionId ?? null,
       },
     );
   }
@@ -3630,7 +3698,11 @@ export async function runProjectTaskProcedure(
         return detail;
       }
       case "file": {
-        const detail = await queueThreadMessage(thread, resolvedTask.prompt);
+        const detail = await queueThreadMessage(
+          thread,
+          resolvedTask.prompt,
+          context?.auth.sessionId ?? null,
+        );
         recordProjectTaskQueuedAuditEvent(db, {
           createdThread,
           params,

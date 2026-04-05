@@ -361,7 +361,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
         "create a thread outside the current workspace",
       );
     }
-    return createThreadProcedure(params);
+    return createThreadProcedure(params, context);
   },
   requestThreadStart: async (params) => {
     const request = await requestThreadStartProcedure(params);
@@ -370,11 +370,12 @@ const rpcHandlers: RpcRequestHandlerMap = {
   },
   getThread: (params) => getThreadProcedure(params),
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
-  sendThreadMessage: (params) => sendThreadMessageProcedure(params),
+  sendThreadMessage: (params, context) =>
+    sendThreadMessageProcedure(params, context),
   stopThreadTurn: (params) => stopThreadTurnProcedure(params),
   runProjectTask: (params, context) => {
     requireFreshStepUpForRpcAction(context, "run project tasks");
-    return runProjectTaskProcedure(params);
+    return runProjectTaskProcedure(params, context);
   },
   updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
   renameThread: (params) => renameThreadProcedure(params),

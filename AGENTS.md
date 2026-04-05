@@ -78,6 +78,7 @@
 │  │  ├─ build-mainview.ts
 │  │  ├─ codex-sidecar-scope.test.ts
 │  │  ├─ codex-sidecar-scope.ts
+│  │  ├─ codex-sidecar-mcp.test.ts
 │  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ db.ts
 │  │  ├─ db.test.ts
