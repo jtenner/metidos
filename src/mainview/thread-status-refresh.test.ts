@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 
 import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";
 import { upsertThreadList } from "./app/state";
-import { resolveThreadStatusRefreshOutcome } from "./thread-status-refresh";
+import {
+  mergeThreadStatusSummaries,
+  resolveThreadStatusRefreshOutcome,
+} from "./thread-status-refresh";
 
 function thread(threadId: number): RpcThread {
   return sortableThread(threadId, "2026-04-04T12:00:00.000Z");
@@ -28,12 +31,28 @@ function threadDetail(threadId: number): RpcThreadDetail {
 }
 
 describe("thread status refresh helpers", () => {
+  it("merges polled thread statuses into the existing thread list", () => {
+    const currentThreads = [thread(3), thread(7), thread(9)];
+    const loadedThreadStatuses = [
+      sortableThread(7, "2026-04-04T12:30:00.000Z"),
+    ];
+
+    const nextThreads = mergeThreadStatusSummaries({
+      currentThreads,
+      loadedThreadStatuses,
+    });
+
+    expect(nextThreads.map((entry) => entry.id)).toEqual([7, 3, 9]);
+  });
+
   it("applies selected-thread detail when the same thread is still selected", () => {
-    const loadedThreads = [thread(3), thread(7)];
+    const currentThreads = [thread(3), thread(7)];
+    const loadedThreadStatuses = [thread(7)];
 
     const outcome = resolveThreadStatusRefreshOutcome({
+      currentThreads,
       detail: threadDetail(7),
-      loadedThreads,
+      loadedThreadStatuses,
       selectedSummaryThreadId: 7,
       selectedThreadId: 7,
     });
@@ -43,31 +62,35 @@ describe("thread status refresh helpers", () => {
   });
 
   it("keeps the summary refresh when selection changed before detail commit", () => {
-    const loadedThreads = [thread(3), thread(7)];
+    const currentThreads = [thread(3), thread(7)];
+    const loadedThreadStatuses = [thread(7)];
 
     const outcome = resolveThreadStatusRefreshOutcome({
+      currentThreads,
       detail: threadDetail(7),
-      loadedThreads,
+      loadedThreadStatuses,
       selectedSummaryThreadId: 7,
       selectedThreadId: 3,
     });
 
     expect(outcome.shouldApplySelectedDetail).toBeFalse();
-    expect(outcome.nextThreads).toBe(loadedThreads);
+    expect(outcome.nextThreads.map((entry) => entry.id)).toEqual([3, 7]);
   });
 
   it("keeps the summary refresh when selected-thread detail loading fails", () => {
-    const loadedThreads = [thread(3), thread(7)];
+    const currentThreads = [thread(3), thread(7)];
+    const loadedThreadStatuses = [thread(7)];
 
     const outcome = resolveThreadStatusRefreshOutcome({
+      currentThreads,
       detail: null,
-      loadedThreads,
+      loadedThreadStatuses,
       selectedSummaryThreadId: 7,
       selectedThreadId: 7,
     });
 
     expect(outcome.shouldApplySelectedDetail).toBeFalse();
-    expect(outcome.nextThreads).toBe(loadedThreads);
+    expect(outcome.nextThreads.map((entry) => entry.id)).toEqual([3, 7]);
   });
 });
 

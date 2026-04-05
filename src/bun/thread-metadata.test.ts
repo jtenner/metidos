@@ -89,6 +89,40 @@ afterAll(async () => {
 });
 
 describe("thread metadata procedures", () => {
+  it("returns live status summaries for only the requested thread ids", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-thread-status-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Status Repo",
+      projectPath: repoPath,
+    });
+    const firstThread = await procedures.createThreadProcedure({
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+      model: "gpt-5.4",
+      reasoningEffort: "medium",
+      unsafeMode: false,
+    });
+    const secondThread = await procedures.createThreadProcedure({
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+      model: "gpt-5.4",
+      reasoningEffort: "medium",
+      unsafeMode: false,
+    });
+
+    const loadedStatuses = await procedures.listThreadStatusesProcedure({
+      threadIds: [secondThread.thread.id, secondThread.thread.id],
+    });
+
+    expect(loadedStatuses).toHaveLength(1);
+    expect(loadedStatuses[0]?.id).toBe(secondThread.thread.id);
+    expect(loadedStatuses[0]?.runStatus.state).toBe("idle");
+    expect(loadedStatuses[0]?.id).not.toBe(firstThread.thread.id);
+  });
+
   it("preserves unspecified fields and applies combined metadata updates", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("jolt-thread-metadata-repo-");

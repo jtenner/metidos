@@ -360,7 +360,7 @@ Done when:
 
 ### Slice P3.1: Narrow thread-status polling
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Current thread polling refreshes the whole thread list, then may fetch selected-thread detail too.

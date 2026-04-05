@@ -122,7 +122,10 @@ import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
-import { resolveThreadStatusRefreshOutcome } from "./thread-status-refresh";
+import {
+  mergeThreadStatusSummaries,
+  resolveThreadStatusRefreshOutcome,
+} from "./thread-status-refresh";
 
 function mergeThreadMessageHistory(
   current: RpcThreadMessage[],
@@ -2416,76 +2419,100 @@ export default function App({
     ],
   );
 
-  const refreshThreadStatuses = useCallback(async () => {
-    const activeSelectedThreadId = selectedThreadIdRef.current;
-    const loadedThreads = applyOptimisticThreadErrorSeenToList(
-      sortThreads(await procedures.listThreads()),
-    );
-    const selectedSummary =
-      activeSelectedThreadId === null
-        ? null
-        : (loadedThreads.find(
-            (thread) => thread.id === activeSelectedThreadId,
-          ) ?? null);
-
-    if (!selectedSummary) {
-      selectedThreadRunStateRef.current = "idle";
-      setThreads(loadedThreads);
-      return;
-    }
-
-    const shouldRefreshSelectedDetail =
-      selectedSummary.runStatus.state === "working" ||
-      selectedThreadRunStateRef.current === "working" ||
-      (selectedSummary.runStatus.state === "failed" &&
-        selectedThreadRunStateRef.current !== "failed") ||
-      (selectedSummary.runStatus.state === "stopped" &&
-        selectedThreadRunStateRef.current !== "stopped");
-
-    if (!shouldRefreshSelectedDetail) {
-      selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
-      setThreads(loadedThreads);
-      return;
-    }
-
-    try {
-      const detail = prepareOpenedThreadDetail(
-        await procedures.getThread({
-          threadId: selectedSummary.id,
-        }),
-      );
-      const resolution = resolveThreadStatusRefreshOutcome({
-        detail,
-        loadedThreads,
-        selectedSummaryThreadId: selectedSummary.id,
-        selectedThreadId: selectedThreadIdRef.current,
-      });
-      setThreads(resolution.nextThreads);
-      if (!resolution.shouldApplySelectedDetail) {
+  const refreshThreadStatuses = useCallback(
+    async (threadIds: number[]) => {
+      if (threadIds.length === 0) {
         return;
       }
-      selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-      mergeSelectedThreadMessageHistory(detail);
-    } catch (error) {
-      const resolution = resolveThreadStatusRefreshOutcome({
-        detail: null,
-        loadedThreads,
-        selectedSummaryThreadId: selectedSummary.id,
-        selectedThreadId: selectedThreadIdRef.current,
-      });
-      setThreads(resolution.nextThreads);
-      console.error(
-        `Failed to refresh selected thread detail for ${selectedSummary.id}`,
-        error,
+
+      const activeSelectedThreadId = selectedThreadIdRef.current;
+      const loadedThreadStatuses = applyOptimisticThreadErrorSeenToList(
+        await procedures.listThreadStatuses({ threadIds }),
       );
-      return;
-    }
-  }, [
-    applyOptimisticThreadErrorSeenToList,
-    mergeSelectedThreadMessageHistory,
-    prepareOpenedThreadDetail,
-    procedures,
-  ]);
+      const selectedSummary =
+        activeSelectedThreadId === null
+          ? null
+          : (loadedThreadStatuses.find(
+              (thread) => thread.id === activeSelectedThreadId,
+            ) ?? null);
+
+      if (!selectedSummary) {
+        setThreads((currentThreads) =>
+          mergeThreadStatusSummaries({
+            currentThreads,
+            loadedThreadStatuses,
+          }),
+        );
+        return;
+      }
+
+      const shouldRefreshSelectedDetail =
+        selectedSummary.runStatus.state === "working" ||
+        selectedThreadRunStateRef.current === "working" ||
+        (selectedSummary.runStatus.state === "failed" &&
+          selectedThreadRunStateRef.current !== "failed") ||
+        (selectedSummary.runStatus.state === "stopped" &&
+          selectedThreadRunStateRef.current !== "stopped");
+
+      if (!shouldRefreshSelectedDetail) {
+        selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
+        setThreads((currentThreads) =>
+          mergeThreadStatusSummaries({
+            currentThreads,
+            loadedThreadStatuses,
+          }),
+        );
+        return;
+      }
+
+      try {
+        const detail = prepareOpenedThreadDetail(
+          await procedures.getThread({
+            threadId: selectedSummary.id,
+          }),
+        );
+        const selectedThreadIdForCommit = selectedThreadIdRef.current;
+        setThreads(
+          (currentThreads) =>
+            resolveThreadStatusRefreshOutcome({
+              currentThreads,
+              detail,
+              loadedThreadStatuses,
+              selectedSummaryThreadId: selectedSummary.id,
+              selectedThreadId: selectedThreadIdForCommit,
+            }).nextThreads,
+        );
+        if (selectedThreadIdForCommit !== selectedSummary.id) {
+          return;
+        }
+        selectedThreadRunStateRef.current = detail.thread.runStatus.state;
+        mergeSelectedThreadMessageHistory(detail);
+      } catch (error) {
+        const selectedThreadIdForCommit = selectedThreadIdRef.current;
+        setThreads(
+          (currentThreads) =>
+            resolveThreadStatusRefreshOutcome({
+              currentThreads,
+              detail: null,
+              loadedThreadStatuses,
+              selectedSummaryThreadId: selectedSummary.id,
+              selectedThreadId: selectedThreadIdForCommit,
+            }).nextThreads,
+        );
+        console.error(
+          `Failed to refresh selected thread detail for ${selectedSummary.id}`,
+          error,
+        );
+        return;
+      }
+    },
+    [
+      applyOptimisticThreadErrorSeenToList,
+      mergeSelectedThreadMessageHistory,
+      prepareOpenedThreadDetail,
+      procedures,
+    ],
+  );
 
   const applyOpenedThreadDetail = useCallback(
     (detail: RpcThreadDetail) => {
@@ -3488,10 +3515,18 @@ export default function App({
     };
   }, []);
 
+  const polledThreadIds = useMemo(
+    () =>
+      threads
+        .filter((thread) => thread.runStatus.state === "working")
+        .map((thread) => thread.id),
+    [threads],
+  );
+
   useEffect(() => {
     const wasVisible = previousDocumentVisibilityRef.current;
     previousDocumentVisibilityRef.current = isDocumentVisible;
-    if (!isDocumentVisible || wasVisible || threads.length === 0) {
+    if (!isDocumentVisible || wasVisible || polledThreadIds.length === 0) {
       return;
     }
     if (threadStatusPollInFlightRef.current) {
@@ -3499,7 +3534,7 @@ export default function App({
     }
 
     threadStatusPollInFlightRef.current = true;
-    void refreshThreadStatuses()
+    void refreshThreadStatuses(polledThreadIds)
       .catch((error) => {
         console.error(
           "Failed to refresh thread statuses after document became visible",
@@ -3509,7 +3544,7 @@ export default function App({
       .finally(() => {
         threadStatusPollInFlightRef.current = false;
       });
-  }, [isDocumentVisible, refreshThreadStatuses, threads.length]);
+  }, [isDocumentVisible, polledThreadIds, refreshThreadStatuses]);
 
   useEffect(() => {
     activeWorktreeSyncAbortControllerRef.current?.abort(
@@ -4030,7 +4065,7 @@ export default function App({
   }, [mobileProjectListOpen]);
 
   useEffect(() => {
-    if (!hasWorkingThreads) {
+    if (polledThreadIds.length === 0) {
       if (threads.length === 0) {
         selectedThreadRunStateRef.current = "idle";
       }
@@ -4045,7 +4080,7 @@ export default function App({
 
       threadStatusPollInFlightRef.current = true;
       try {
-        await refreshThreadStatuses();
+        await refreshThreadStatuses(polledThreadIds);
       } catch (error) {
         if (!cancelled) {
           console.error("Failed to poll thread statuses", error);
@@ -4064,7 +4099,7 @@ export default function App({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasWorkingThreads, refreshThreadStatuses, threads.length]);
+  }, [polledThreadIds, refreshThreadStatuses, threads.length]);
 
   useEffect(() => {
     if (!homeDirectory) {

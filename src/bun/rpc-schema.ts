@@ -570,6 +570,10 @@ export type AppRPCSchema = {
       params: undefined;
       response: RpcThread[];
     };
+    listThreadStatuses: {
+      params: { threadIds: number[] };
+      response: RpcThread[];
+    };
     listSecurityAuditEvents: {
       params: {
         limit?: number;
@@ -778,6 +782,10 @@ export interface ProjectProcedures {
   listThreads: RpcProcedureCall<
     AppRPCSchema["requests"]["listThreads"]["params"],
     AppRPCSchema["requests"]["listThreads"]["response"]
+  >;
+  listThreadStatuses: RpcProcedureCall<
+    AppRPCSchema["requests"]["listThreadStatuses"]["params"],
+    AppRPCSchema["requests"]["listThreadStatuses"]["response"]
   >;
   listSecurityAuditEvents: RpcProcedureCall<
     AppRPCSchema["requests"]["listSecurityAuditEvents"]["params"],

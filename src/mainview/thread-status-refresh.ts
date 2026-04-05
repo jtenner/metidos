@@ -6,9 +6,27 @@ export type ThreadStatusRefreshOutcome = {
   shouldApplySelectedDetail: boolean;
 };
 
+type MergeThreadStatusSummariesOptions = {
+  currentThreads: RpcThread[];
+  loadedThreadStatuses: RpcThread[];
+};
+
+export function mergeThreadStatusSummaries(
+  options: MergeThreadStatusSummariesOptions,
+): RpcThread[] {
+  let nextThreads = options.currentThreads;
+
+  for (const thread of options.loadedThreadStatuses) {
+    nextThreads = upsertThreadList(nextThreads, thread);
+  }
+
+  return nextThreads;
+}
+
 type ResolveThreadStatusRefreshOutcomeOptions = {
   detail: RpcThreadDetail | null;
-  loadedThreads: RpcThread[];
+  currentThreads: RpcThread[];
+  loadedThreadStatuses: RpcThread[];
   selectedSummaryThreadId: number;
   selectedThreadId: number | null;
 };
@@ -20,18 +38,23 @@ type ResolveThreadStatusRefreshOutcomeOptions = {
 export function resolveThreadStatusRefreshOutcome(
   options: ResolveThreadStatusRefreshOutcomeOptions,
 ): ThreadStatusRefreshOutcome {
+  const mergedThreads = mergeThreadStatusSummaries({
+    currentThreads: options.currentThreads,
+    loadedThreadStatuses: options.loadedThreadStatuses,
+  });
+
   if (
     options.detail === null ||
     options.selectedThreadId !== options.selectedSummaryThreadId
   ) {
     return {
-      nextThreads: options.loadedThreads,
+      nextThreads: mergedThreads,
       shouldApplySelectedDetail: false,
     };
   }
 
   return {
-    nextThreads: upsertThreadList(options.loadedThreads, options.detail.thread),
+    nextThreads: upsertThreadList(mergedThreads, options.detail.thread),
     shouldApplySelectedDetail: true,
   };
 }

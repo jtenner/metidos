@@ -47,6 +47,7 @@ import {
   listProjectsProcedure,
   listProjectTasksProcedure,
   listProjectWorktreesProcedure,
+  listThreadStatusesProcedure,
   listThreadsProcedure,
   listWorktreeGitHistoryProcedure,
   markThreadErrorSeenProcedure,
@@ -318,6 +319,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
   getAppBootstrap: (params) => getAppBootstrapProcedure(params),
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),
+  listThreadStatuses: (params) => listThreadStatusesProcedure(params),
   listSecurityAuditEvents: async (params) =>
     listSecurityAuditEventsProcedure(params),
   openProject: (params, context) => openProjectProcedure(params, context),

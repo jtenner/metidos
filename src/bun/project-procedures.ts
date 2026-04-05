@@ -200,6 +200,22 @@ export async function listThreadsProcedure(
 }
 
 /**
+ * RPC procedure: list live status summaries for a targeted thread subset.
+ */
+export async function listThreadStatusesProcedure(
+  params: AppRPCSchema["requests"]["listThreadStatuses"]["params"],
+): Promise<RpcThread[]> {
+  const requestedThreadIds = new Set(params.threadIds);
+  if (requestedThreadIds.size === 0) {
+    return [];
+  }
+
+  return listThreads(db)
+    .filter((thread) => requestedThreadIds.has(thread.id))
+    .map((thread) => toRpcThread(thread, currentThreadRunStatus(thread)));
+}
+
+/**
  * Start shared background cache warmup/maintenance tasks.
  */
 export function startProcedureCacheMaintenance(): void {
