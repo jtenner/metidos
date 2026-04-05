@@ -14,8 +14,8 @@ type RequireStepUpInput = {
 
 type CreateThreadParams = AppRPCSchema["requests"]["createThread"]["params"];
 /**
- * Function of createThreadRequiresStepUp.
- * @param params - The value of `params`.
+ * Creates thread requires step up.
+ * @param params - Parameters object.
  */
 
 export function createThreadRequiresStepUp(
@@ -35,8 +35,8 @@ export function createThreadRequiresStepUp(
   );
 }
 /**
- * Function of enforceRpcStepUp.
- * @param options - The value of `options`.
+ * Performs enforceRpcStepUp operation.
+ * @param options - Configuration options used by this operation.
  */
 
 export function enforceRpcStepUp(options: {

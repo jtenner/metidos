@@ -13,8 +13,8 @@ import {
 } from "./project-worktree-refresh";
 
 /**
- * Function of worktree.
- * @param overrides - The value of `overrides`.
+ * Builds a worktree fixture.
+ * @param overrides - overrides argument for worktree.
  */
 
 function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
@@ -28,8 +28,8 @@ function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
   };
 }
 /**
- * Function of projectState.
- * @param overrides - The value of `overrides`.
+ * Performs projectState operation.
+ * @param overrides - overrides argument for projectState.
  */
 
 function projectState(overrides?: Partial<ProjectNodeState>): ProjectNodeState {

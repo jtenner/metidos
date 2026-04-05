@@ -15,10 +15,10 @@ import {
 } from "./startup-project-restore";
 
 /**
- * Function of project.
- * @param id - The value of `id`.
- * @param path - The value of `path`.
- * @param options - The value of `options`.
+ * Builds a project fixture.
+ * @param id - Identifier value.
+ * @param path - Filesystem path.
+ * @param options - Configuration options used by this operation.
  */
 
 function project(

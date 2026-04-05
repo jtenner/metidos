@@ -50,8 +50,8 @@ const AUTH_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
 });
 
 /**
- * Function of formatDateTime.
- * @param value - The value of `value`.
+ * Formats date time.
+ * @param value - Input value.
  */
 function formatDateTime(value: string | null): string | null {
   if (!value) {
@@ -67,8 +67,8 @@ function formatDateTime(value: string | null): string | null {
 }
 
 /**
- * Function of errorMessage.
- * @param error - The value of `error`.
+ * Performs errorMessage operation.
+ * @param error - Error value to process.
  */
 function errorMessage(error: unknown): string {
   if (error instanceof AuthApiError) {
@@ -81,9 +81,9 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Function of readLockedUntil.
- * @param status - The value of `status`.
- * @param error - The value of `error`.
+ * Reads locked until.
+ * @param status - status argument for readLockedUntil.
+ * @param error - Error value to process.
  */
 function readLockedUntil(
   status: AuthStatus | null,
@@ -99,8 +99,8 @@ function readLockedUntil(
 }
 
 /**
- * Function of AuthActionButton.
- * @param props - The value of `props`.
+ * Performs AuthActionButton operation.
+ * @param props - props argument for AuthActionButton.
  */
 function AuthActionButton(props: {
   children: JSX.Element | string;
@@ -129,8 +129,8 @@ function AuthActionButton(props: {
 }
 
 /**
- * Function of AuthChoiceButton.
- * @param props - The value of `props`.
+ * Performs AuthChoiceButton operation.
+ * @param props - props argument for AuthChoiceButton.
  */
 function AuthChoiceButton(props: {
   active: boolean;
@@ -163,8 +163,8 @@ function AuthChoiceButton(props: {
 }
 
 /**
- * Function of AuthInput.
- * @param props - The value of `props`.
+ * Performs AuthInput operation.
+ * @param props - props argument for AuthInput.
  */
 function AuthInput(props: {
   autoComplete?: string;
@@ -204,8 +204,8 @@ function AuthInput(props: {
 }
 
 /**
- * Function of authConsoleShell.
- * @param props - The value of `props`.
+ * Performs authConsoleShell operation.
+ * @param props - props argument for authConsoleShell.
  */
 function authConsoleShell(props: {
   children: JSX.Element;
@@ -258,10 +258,10 @@ function authConsoleShell(props: {
 }
 
 /**
- * Function of AuthShell.
- * @param connectRpcTransport - The value of `connectRpcTransport`.
- * @param disconnectRpcTransport - The value of `disconnectRpcTransport`.
- * @param procedures - The value of `procedures`.
+ * Performs AuthShell operation.
+ * @param connectRpcTransport - connectRpcTransport argument for AuthShell.
+ * @param disconnectRpcTransport - disconnectRpcTransport argument for AuthShell.
+ * @param procedures - procedures argument for AuthShell.
  */
 export default function AuthShell({
   connectRpcTransport,
@@ -380,8 +380,8 @@ export default function AuthShell({
 
   useEffect(() => {
     /**
-     * Function of handleAuthRequired.
-     * @param event - The value of `event`.
+     * Handles auth required.
+     * @param event - event argument for handleAuthRequired.
      */
     const handleAuthRequired = (
       event: WindowEventMap["jolt:auth-required"],

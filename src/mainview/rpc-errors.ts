@@ -7,10 +7,10 @@ type RpcErrorDetails = Record<string, string | null>;
 
 export class RpcError extends Error {
   /**
-   * Function of constructor.
-   * @param message - The value of `message`.
-   * @param code - The value of `code`.
-   * @param details - The value of `details`.
+   * Creates and initializes a new instance.
+   * @param message - Message payload.
+   * @param code - code argument for constructor.
+   * @param details - details argument for constructor.
    */
 
   constructor(
@@ -23,16 +23,16 @@ export class RpcError extends Error {
   }
 }
 /**
- * Function of isRecord.
- * @param value - The value of `value`.
+ * Is record.
+ * @param value - Input value.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 /**
- * Function of normalizeRpcErrorDetails.
- * @param value - The value of `value`.
+ * Normalizes rpc error details.
+ * @param value - Input value.
  */
 
 export function normalizeRpcErrorDetails(
@@ -49,16 +49,16 @@ export function normalizeRpcErrorDetails(
   return next;
 }
 /**
- * Function of isStepUpRequiredError.
- * @param error - The value of `error`.
+ * Is step up required error.
+ * @param error - Error value to process.
  */
 
 export function isStepUpRequiredError(error: unknown): boolean {
   return error instanceof RpcError && error.code === "step_up_required";
 }
 /**
- * Function of isAuthRequiredRpcError.
- * @param error - The value of `error`.
+ * Is auth required rpc error.
+ * @param error - Error value to process.
  */
 
 export function isAuthRequiredRpcError(error: unknown): boolean {

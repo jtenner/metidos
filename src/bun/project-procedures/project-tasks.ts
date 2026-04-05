@@ -35,8 +35,8 @@ export type ResolvedProjectTaskExecution =
       };
     };
 /**
- * Function of tasksDirectoryPath.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs tasksDirectoryPath operation.
+ * @param worktreePath - Worktree path.
  */
 
 function tasksDirectoryPath(worktreePath: string): string {
@@ -50,9 +50,9 @@ function normalizeRelativeTaskPath(taskPath: string): string {
   return taskPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
 }
 /**
- * Function of pathEscapesRoot.
- * @param rootPath - The value of `rootPath`.
- * @param candidatePath - The value of `candidatePath`.
+ * Performs pathEscapesRoot operation.
+ * @param rootPath - Root directory path.
+ * @param candidatePath - candidatePath path used by pathEscapesRoot.
  */
 
 function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
@@ -68,9 +68,9 @@ function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
   );
 }
 /**
- * Function of safeRealPathInsideRootAsync.
- * @param rootRealPath - The value of `rootRealPath`.
- * @param candidatePath - The value of `candidatePath`.
+ * Performs safeRealPathInsideRootAsync operation.
+ * @param rootRealPath - rootRealPath path used by safeRealPathInsideRootAsync.
+ * @param candidatePath - candidatePath path used by safeRealPathInsideRootAsync.
  */
 
 async function safeRealPathInsideRootAsync(
@@ -85,10 +85,10 @@ async function safeRealPathInsideRootAsync(
   }
 }
 /**
- * Function of assertRealPathInsideRoot.
- * @param rootPath - The value of `rootPath`.
- * @param candidatePath - The value of `candidatePath`.
- * @param errorMessage - The value of `errorMessage`.
+ * Performs assertRealPathInsideRoot operation.
+ * @param rootPath - Root directory path.
+ * @param candidatePath - candidatePath path used by assertRealPathInsideRoot.
+ * @param errorMessage - errorMessage argument for assertRealPathInsideRoot.
  */
 
 function assertRealPathInsideRoot(
@@ -155,8 +155,8 @@ function isIgnoredPackageDirectory(name: string): boolean {
   );
 }
 /**
- * Function of sortDirectoryEntries.
- * @param values - The value of `values`.
+ * Sorts directory entries.
+ * @param values - Input values.
  */
 
 function sortDirectoryEntries<
@@ -175,8 +175,8 @@ function sortDirectoryEntries<
   );
 }
 /**
- * Function of safeDirectoryRealPathAsync.
- * @param path - The value of `path`.
+ * Performs safeDirectoryRealPathAsync operation.
+ * @param path - Filesystem path.
  */
 
 async function safeDirectoryRealPathAsync(
@@ -222,9 +222,9 @@ async function visitDirectoryOnceAsync(
   return true;
 }
 /**
- * Function of isDirectoryCandidate.
- * @param entry - The value of `entry`.
- * @param fullPath - The value of `fullPath`.
+ * Is directory candidate.
+ * @param entry - entry argument for isDirectoryCandidate.
+ * @param fullPath - fullPath path used by isDirectoryCandidate.
  */
 
 async function isDirectoryCandidate(
@@ -256,11 +256,11 @@ async function isFileCandidate(
   return safeIsFileAsync(fullPath);
 }
 /**
- * Function of listProjectTaskFilesAsync.
- * @param tasksDirectory - The value of `tasksDirectory`.
- * @param prefix - The value of `prefix`.
- * @param rootRealPath - The value of `rootRealPath`.
- * @param visitedRealPaths - The value of `visitedRealPaths`.
+ * Lists project task files async.
+ * @param tasksDirectory - tasksDirectory argument for listProjectTaskFilesAsync.
+ * @param prefix - prefix argument for listProjectTaskFilesAsync.
+ * @param rootRealPath - rootRealPath path used by listProjectTaskFilesAsync.
+ * @param visitedRealPaths - visitedRealPaths path used by listProjectTaskFilesAsync.
  */
 
 async function listProjectTaskFilesAsync(
@@ -325,11 +325,11 @@ async function listProjectTaskFilesAsync(
   return tasks;
 }
 /**
- * Function of listPackageJsonTasksAsync.
- * @param rootDirectory - The value of `rootDirectory`.
- * @param currentDirectory - The value of `currentDirectory`.
- * @param rootRealPath - The value of `rootRealPath`.
- * @param visitedRealPaths - The value of `visitedRealPaths`.
+ * Lists package json tasks async.
+ * @param rootDirectory - rootDirectory argument for listPackageJsonTasksAsync.
+ * @param currentDirectory - currentDirectory argument for listPackageJsonTasksAsync.
+ * @param rootRealPath - rootRealPath path used by listPackageJsonTasksAsync.
+ * @param visitedRealPaths - visitedRealPaths path used by listPackageJsonTasksAsync.
  */
 
 async function listPackageJsonTasksAsync(

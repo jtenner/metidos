@@ -143,11 +143,11 @@ type StepUpResult = {
 
 export class AuthServiceError extends Error {
   /**
-   * Function of constructor.
-   * @param code - The value of `code`.
-   * @param message - The value of `message`.
-   * @param status - The value of `status`.
-   * @param details - The value of `details`.
+   * Creates and initializes a new instance.
+   * @param code - code argument for constructor.
+   * @param message - Message payload.
+   * @param status - status argument for constructor.
+   * @param details - details argument for constructor.
    */
 
   constructor(
@@ -169,35 +169,35 @@ export class AuthServiceError extends Error {
   }
 }
 /**
- * Function of nowDate.
- * @param nowMs - The value of `nowMs`.
+ * Performs nowDate operation.
+ * @param nowMs - nowMs argument for nowDate.
  */
 
 function nowDate(nowMs = Date.now()): Date {
   return new Date(nowMs);
 }
 /**
- * Function of addDays.
- * @param date - The value of `date`.
- * @param days - The value of `days`.
+ * Adds days.
+ * @param date - date argument for addDays.
+ * @param days - days argument for addDays.
  */
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 /**
- * Function of addMilliseconds.
- * @param date - The value of `date`.
- * @param milliseconds - The value of `milliseconds`.
+ * Adds milliseconds.
+ * @param date - date argument for addMilliseconds.
+ * @param milliseconds - milliseconds argument for addMilliseconds.
  */
 
 function addMilliseconds(date: Date, milliseconds: number): Date {
   return new Date(date.getTime() + milliseconds);
 }
 /**
- * Function of isSessionIdleExpired.
- * @param session - The value of `session`.
- * @param now - The value of `now`.
+ * Is session idle expired.
+ * @param session - session argument for isSessionIdleExpired.
+ * @param now - now argument for isSessionIdleExpired.
  */
 
 function isSessionIdleExpired(session: AuthSessionRecord, now: Date): boolean {
@@ -207,16 +207,16 @@ function isSessionIdleExpired(session: AuthSessionRecord, now: Date): boolean {
   );
 }
 /**
- * Function of formatHttpDate.
- * @param date - The value of `date`.
+ * Formats http date.
+ * @param date - date argument for formatHttpDate.
  */
 
 function formatHttpDate(date: Date): string {
   return date.toUTCString();
 }
 /**
- * Function of normalizeSessionLifetimeDays.
- * @param value - The value of `value`.
+ * Normalizes session lifetime days.
+ * @param value - Input value.
  */
 
 function normalizeSessionLifetimeDays(value?: number): number {
@@ -229,25 +229,25 @@ function normalizeSessionLifetimeDays(value?: number): number {
   return value;
 }
 /**
- * Function of buildTimestampOptions.
- * @param nowMs - The value of `nowMs`.
+ * Builds timestamp options.
+ * @param nowMs - nowMs argument for buildTimestampOptions.
  */
 
 function buildTimestampOptions(nowMs?: number): TimestampOptions {
   return typeof nowMs === "number" ? { nowMs } : {};
 }
 /**
- * Function of buildAuthSecretOptions.
- * @param appDataDir - The value of `appDataDir`.
+ * Builds auth secret options.
+ * @param appDataDir - appDataDir argument for buildAuthSecretOptions.
  */
 
 function buildAuthSecretOptions(appDataDir?: string): AuthSecretOptions {
   return typeof appDataDir === "string" ? { appDataDir } : {};
 }
 /**
- * Function of buildSession.
- * @param sessionLifetimeDays - The value of `sessionLifetimeDays`.
- * @param now - The value of `now`.
+ * Builds session.
+ * @param sessionLifetimeDays - sessionLifetimeDays argument for buildSession.
+ * @param now - now argument for buildSession.
  */
 
 function buildSession(
@@ -267,10 +267,10 @@ function buildSession(
   };
 }
 /**
- * Function of incrementFailedAttempts.
- * @param database - The value of `database`.
- * @param failedAttempts - The value of `failedAttempts`.
- * @param now - The value of `now`.
+ * Performs incrementFailedAttempts operation.
+ * @param database - database argument for incrementFailedAttempts.
+ * @param failedAttempts - failedAttempts argument for incrementFailedAttempts.
+ * @param now - now argument for incrementFailedAttempts.
  */
 
 function incrementFailedAttempts(
@@ -296,9 +296,9 @@ function incrementFailedAttempts(
   };
 }
 /**
- * Function of readCurrentAuthSettings.
- * @param database - The value of `database`.
- * @param now - The value of `now`.
+ * Reads current auth settings.
+ * @param database - database argument for readCurrentAuthSettings.
+ * @param now - now argument for readCurrentAuthSettings.
  */
 
 function readCurrentAuthSettings(
@@ -321,9 +321,9 @@ function readCurrentAuthSettings(
   return settings;
 }
 /**
- * Function of enforceConfigured.
- * @param database - The value of `database`.
- * @param now - The value of `now`.
+ * Performs enforceConfigured operation.
+ * @param database - database argument for enforceConfigured.
+ * @param now - now argument for enforceConfigured.
  */
 
 function enforceConfigured(
@@ -351,10 +351,10 @@ function enforceConfigured(
   return settings;
 }
 /**
- * Function of createSessionRecord.
- * @param database - The value of `database`.
- * @param sessionLifetimeDays - The value of `sessionLifetimeDays`.
- * @param now - The value of `now`.
+ * Creates session record.
+ * @param database - database argument for createSessionRecord.
+ * @param sessionLifetimeDays - sessionLifetimeDays argument for createSessionRecord.
+ * @param now - now argument for createSessionRecord.
  */
 
 async function createSessionRecord(
@@ -374,9 +374,9 @@ async function createSessionRecord(
   });
 }
 /**
- * Function of recordAuthAuditEvent.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs recordAuthAuditEvent operation.
+ * @param database - database argument for recordAuthAuditEvent.
+ * @param input - input argument for recordAuthAuditEvent.
  */
 
 function recordAuthAuditEvent(
@@ -394,9 +394,9 @@ function recordAuthAuditEvent(
   });
 }
 /**
- * Function of recordInvalidAuthAttempt.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs recordInvalidAuthAttempt operation.
+ * @param database - database argument for recordInvalidAuthAttempt.
+ * @param input - input argument for recordInvalidAuthAttempt.
  */
 
 function recordInvalidAuthAttempt(
@@ -432,9 +432,9 @@ function recordInvalidAuthAttempt(
   });
 }
 /**
- * Function of parseCookieHeaderValue.
- * @param cookieHeader - The value of `cookieHeader`.
- * @param name - The value of `name`.
+ * Parses cookie header value.
+ * @param cookieHeader - cookieHeader argument for parseCookieHeaderValue.
+ * @param name - Display or identifier name.
  */
 
 function parseCookieHeaderValue(
@@ -453,7 +453,7 @@ function parseCookieHeaderValue(
 
 /**
  * Parse the session cookie from an incoming Cookie header.
- * @param cookieHeader - The value of `cookieHeader`.
+ * @param cookieHeader - cookieHeader argument for cookieHeader.
  */
 export function readSessionCookie(cookieHeader: string | null): string | null {
   if (!cookieHeader) {
@@ -485,7 +485,7 @@ export function buildSessionCookieHeader(
 
 /**
  * Serialize an expired session cookie so browsers remove it immediately.
- * @param secure - The value of `secure`.
+ * @param secure - secure argument for secure.
  */
 export function buildClearedSessionCookieHeader(secure: boolean): string {
   const parts = [
@@ -871,8 +871,8 @@ export function resolveSession(
 
 /**
  * Delete one authenticated session.
- * @param database - The value of `database`.
- * @param sessionId - The value of `sessionId`.
+ * @param database - database argument for database.
+ * @param sessionId - sessionId identifier.
  */
 export function logout(database: Database, sessionId: string | null): void {
   if (!sessionId) {

@@ -15,16 +15,16 @@ type RpcSecurityAuditPayloadValue = NonNullable<
   RpcSecurityAuditEvent["payload"]
 >[string];
 /**
- * Function of isRecord.
- * @param value - The value of `value`.
+ * Is record.
+ * @param value - Input value.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 /**
- * Function of isRpcSecurityAuditPayloadValue.
- * @param value - The value of `value`.
+ * Is rpc security audit payload value.
+ * @param value - Input value.
  */
 
 function isRpcSecurityAuditPayloadValue(
@@ -38,8 +38,8 @@ function isRpcSecurityAuditPayloadValue(
   );
 }
 /**
- * Function of normalizeSecurityAuditLimit.
- * @param limit - The value of `limit`.
+ * Normalizes security audit limit.
+ * @param limit - limit argument for normalizeSecurityAuditLimit.
  */
 
 function normalizeSecurityAuditLimit(limit?: number): number {
@@ -49,8 +49,8 @@ function normalizeSecurityAuditLimit(limit?: number): number {
   return Math.max(1, Math.min(MAX_SECURITY_AUDIT_LIMIT, limit));
 }
 /**
- * Function of normalizeThreadId.
- * @param threadId - The value of `threadId`.
+ * Normalizes thread id.
+ * @param threadId - Thread identifier.
  */
 
 function normalizeThreadId(threadId?: number | null): number | undefined {
@@ -61,8 +61,8 @@ function normalizeThreadId(threadId?: number | null): number | undefined {
     : undefined;
 }
 /**
- * Function of normalizeProjectId.
- * @param projectId - The value of `projectId`.
+ * Normalizes project id.
+ * @param projectId - Project identifier.
  */
 
 function normalizeProjectId(projectId?: number | null): number | undefined {
@@ -73,8 +73,8 @@ function normalizeProjectId(projectId?: number | null): number | undefined {
     : undefined;
 }
 /**
- * Function of parseSecurityAuditPayload.
- * @param payloadJson - The value of `payloadJson`.
+ * Parses security audit payload.
+ * @param payloadJson - payloadJson argument for parseSecurityAuditPayload.
  */
 
 function parseSecurityAuditPayload(
@@ -103,9 +103,9 @@ function parseSecurityAuditPayload(
   }
 }
 /**
- * Function of listSecurityAuditEventsFromDatabase.
- * @param database - The value of `database`.
- * @param params - The value of `params`.
+ * Lists security audit events from database.
+ * @param database - database argument for listSecurityAuditEventsFromDatabase.
+ * @param params - Parameters object.
  */
 
 export function listSecurityAuditEventsFromDatabase(

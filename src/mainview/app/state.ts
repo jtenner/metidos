@@ -434,9 +434,9 @@ export function shortName(value: string): string {
   return parts.at(-1) ?? value;
 }
 /**
- * Function of worktreeKey.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs worktreeKey operation.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 export function worktreeKey(projectId: number, worktreePath: string): string {
@@ -450,10 +450,10 @@ export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 /**
- * Function of gitHistoryDiffCacheKey.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
- * @param commitHash - The value of `commitHash`.
+ * Performs gitHistoryDiffCacheKey operation.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
+ * @param commitHash - commitHash argument for gitHistoryDiffCacheKey.
  */
 
 export function gitHistoryDiffCacheKey(
@@ -489,8 +489,8 @@ export function defaultWorktreeState(): WorktreeNodeState {
   };
 }
 /**
- * Function of buildProjectWorktreeIndex.
- * @param worktrees - The value of `worktrees`.
+ * Builds project worktree index.
+ * @param worktrees - worktrees argument for buildProjectWorktreeIndex.
  */
 
 export function buildProjectWorktreeIndex(
@@ -510,8 +510,8 @@ export function buildProjectWorktreeIndex(
   };
 }
 /**
- * Function of projectStateWorktrees.
- * @param state - The value of `state`.
+ * Performs projectStateWorktrees operation.
+ * @param state - Current state value.
  */
 
 export function projectStateWorktrees(
@@ -529,8 +529,8 @@ export function projectStateWorktrees(
   return worktrees;
 }
 /**
- * Function of projectStateWorktreeCount.
- * @param state - The value of `state`.
+ * Performs projectStateWorktreeCount operation.
+ * @param state - Current state value.
  */
 
 export function projectStateWorktreeCount(
@@ -553,8 +553,8 @@ export function emptyThreadStore(): ThreadStore {
   };
 }
 /**
- * Function of projectStoreItems.
- * @param store - The value of `store`.
+ * Performs projectStoreItems operation.
+ * @param store - store argument for projectStoreItems.
  */
 
 export function projectStoreItems(store: ProjectStore): RpcProject[] {
@@ -570,8 +570,8 @@ export function projectStoreItems(store: ProjectStore): RpcProject[] {
   return items;
 }
 /**
- * Function of threadStoreItems.
- * @param store - The value of `store`.
+ * Performs threadStoreItems operation.
+ * @param store - store argument for threadStoreItems.
  */
 
 export function threadStoreItems(store: ThreadStore): RpcThread[] {
@@ -587,9 +587,9 @@ export function threadStoreItems(store: ThreadStore): RpcThread[] {
   return items;
 }
 /**
- * Function of projectStoreGet.
- * @param store - The value of `store`.
- * @param projectId - The value of `projectId`.
+ * Performs projectStoreGet operation.
+ * @param store - store argument for projectStoreGet.
+ * @param projectId - Project identifier.
  */
 
 export function projectStoreGet(
@@ -599,9 +599,9 @@ export function projectStoreGet(
   return store.byId[projectId] ?? null;
 }
 /**
- * Function of threadStoreGet.
- * @param store - The value of `store`.
- * @param threadId - The value of `threadId`.
+ * Performs threadStoreGet operation.
+ * @param store - store argument for threadStoreGet.
+ * @param threadId - Thread identifier.
  */
 
 export function threadStoreGet(
@@ -641,9 +641,9 @@ export function mergeResetGitHistory(
   };
 }
 /**
- * Function of appendGitHistoryPage.
- * @param current - The value of `current`.
- * @param nextPage - The value of `nextPage`.
+ * Performs appendGitHistoryPage operation.
+ * @param current - current argument for appendGitHistoryPage.
+ * @param nextPage - nextPage argument for appendGitHistoryPage.
  */
 
 export function appendGitHistoryPage(
@@ -667,9 +667,9 @@ export function appendGitHistoryPage(
   };
 }
 /**
- * Function of findPrimaryWorktree.
- * @param project - The value of `project`.
- * @param worktrees - The value of `worktrees`.
+ * Finds primary worktree.
+ * @param project - project argument for findPrimaryWorktree.
+ * @param worktrees - worktrees argument for findPrimaryWorktree.
  */
 
 export function findPrimaryWorktree(
@@ -689,9 +689,9 @@ export function primaryWorktreePath(
   return findPrimaryWorktree(project, worktrees)?.path ?? project.path;
 }
 /**
- * Function of orderProjectWorktrees.
- * @param project - The value of `project`.
- * @param worktrees - The value of `worktrees`.
+ * Performs orderProjectWorktrees operation.
+ * @param project - project argument for orderProjectWorktrees.
+ * @param worktrees - worktrees argument for orderProjectWorktrees.
  */
 
 export function orderProjectWorktrees(
@@ -724,8 +724,8 @@ export function orderProjectWorktrees(
   });
 }
 /**
- * Function of worktreeDisplayName.
- * @param worktree - The value of `worktree`.
+ * Performs worktreeDisplayName operation.
+ * @param worktree - worktree argument for worktreeDisplayName.
  */
 
 export function worktreeDisplayName(worktree: RpcWorktree | null): string {
@@ -782,8 +782,8 @@ function parsePositiveInteger(value: unknown): number | null {
     : null;
 }
 /**
- * Function of isCodexReasoningEffort.
- * @param value - The value of `value`.
+ * Is codex reasoning effort.
+ * @param value - Input value.
  */
 
 export function isCodexReasoningEffort(
@@ -836,8 +836,8 @@ function normalizePersistedOpenWorktrees(
   return next;
 }
 /**
- * Function of normalizePersistedOpenProjectPaths.
- * @param value - The value of `value`.
+ * Normalizes persisted open project paths.
+ * @param value - Input value.
  */
 
 function normalizePersistedOpenProjectPaths(value: unknown): string[] {
@@ -941,8 +941,8 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
   }
 }
 /**
- * Function of serializePersistedMainviewState.
- * @param state - The value of `state`.
+ * Performs serializePersistedMainviewState operation.
+ * @param state - Current state value.
  */
 
 function serializePersistedMainviewState(
@@ -971,8 +971,8 @@ export function writePersistedMainviewState(
   );
 }
 /**
- * Function of patchPersistedMainviewState.
- * @param patch - The value of `patch`.
+ * Performs patchPersistedMainviewState operation.
+ * @param patch - patch argument for patchPersistedMainviewState.
  */
 
 export function patchPersistedMainviewState(
@@ -989,8 +989,8 @@ export function patchPersistedMainviewState(
   });
 }
 /**
- * Function of writePersistedTreeViewState.
- * @param state - The value of `state`.
+ * Writes persisted tree view state.
+ * @param state - Current state value.
  */
 
 export function writePersistedTreeViewState(
@@ -1019,8 +1019,8 @@ export function resizeComposerTextarea(
   textarea.style.height = `${Math.max(textarea.scrollHeight, minHeight)}px`;
 }
 /**
- * Function of threadRunStatus.
- * @param thread - The value of `thread`.
+ * Performs threadRunStatus operation.
+ * @param thread - thread argument for threadRunStatus.
  */
 
 export function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
@@ -1035,8 +1035,8 @@ export function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
   );
 }
 /**
- * Function of threadErrorLevel.
- * @param thread - The value of `thread`.
+ * Performs threadErrorLevel operation.
+ * @param thread - thread argument for threadErrorLevel.
  */
 
 export function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
@@ -1052,9 +1052,9 @@ export function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
   return "none";
 }
 /**
- * Function of mergeThreadErrorLevel.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Merges thread error level.
+ * @param left - left argument for mergeThreadErrorLevel.
+ * @param right - right argument for mergeThreadErrorLevel.
  */
 
 export function mergeThreadErrorLevel(
@@ -1100,9 +1100,9 @@ export function threadErrorPreview(
   };
 }
 /**
- * Function of pickPreferredThreadErrorPreview.
- * @param current - The value of `current`.
- * @param next - The value of `next`.
+ * Performs pickPreferredThreadErrorPreview operation.
+ * @param current - current argument for pickPreferredThreadErrorPreview.
+ * @param next - next argument for pickPreferredThreadErrorPreview.
  */
 
 export function pickPreferredThreadErrorPreview(
@@ -1139,10 +1139,10 @@ export function ensureTrailingSeparator(value: string): string {
     : `${value}${separator}`;
 }
 /**
- * Function of formatDirectoryPathForInput.
- * @param value - The value of `value`.
- * @param homeDirectory - The value of `homeDirectory`.
- * @param supportsTildePath - The value of `supportsTildePath`.
+ * Formats directory path for input.
+ * @param value - Input value.
+ * @param homeDirectory - homeDirectory argument for formatDirectoryPathForInput.
+ * @param supportsTildePath - supportsTildePath path used by formatDirectoryPathForInput.
  */
 
 export function formatDirectoryPathForInput(
@@ -1212,8 +1212,8 @@ export function formatPathForDisplay(
   return formattedPath;
 }
 /**
- * Function of formatGitHistoryTimestamp.
- * @param value - The value of `value`.
+ * Formats git history timestamp.
+ * @param value - Input value.
  */
 
 export function formatGitHistoryTimestamp(value: string): string {
@@ -1224,17 +1224,17 @@ export function formatGitHistoryTimestamp(value: string): string {
   return GIT_HISTORY_TIMESTAMP_FORMATTER.format(timestamp);
 }
 /**
- * Function of sortThreads.
- * @param items - The value of `items`.
+ * Sorts threads.
+ * @param items - items argument for sortThreads.
  */
 
 export function sortThreads(items: RpcThread[]): RpcThread[] {
   return [...items].sort(compareThreadsByRecency);
 }
 /**
- * Function of findThreadInsertionIndex.
- * @param items - The value of `items`.
- * @param thread - The value of `thread`.
+ * Finds thread insertion index.
+ * @param items - items argument for findThreadInsertionIndex.
+ * @param thread - thread argument for findThreadInsertionIndex.
  */
 
 function findThreadInsertionIndex(
@@ -1255,10 +1255,10 @@ function findThreadInsertionIndex(
   return low;
 }
 /**
- * Function of findThreadStoreInsertionIndex.
- * @param orderedIds - The value of `orderedIds`.
- * @param byId - The value of `byId`.
- * @param thread - The value of `thread`.
+ * Finds thread store insertion index.
+ * @param orderedIds - orderedIds argument for findThreadStoreInsertionIndex.
+ * @param byId - byId identifier.
+ * @param thread - thread argument for findThreadStoreInsertionIndex.
  */
 
 function findThreadStoreInsertionIndex(
@@ -1304,10 +1304,10 @@ export function compareThreadsByRecency(
   return right.updatedAt.localeCompare(left.updatedAt);
 }
 /**
- * Function of preferredThreadForWorktree.
- * @param threads - The value of `threads`.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs preferredThreadForWorktree operation.
+ * @param threads - threads argument for preferredThreadForWorktree.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 export function preferredThreadForWorktree(
@@ -1334,10 +1334,10 @@ export function preferredThreadForWorktree(
   return preferredThread;
 }
 /**
- * Function of latestThreadForWorktree.
- * @param threads - The value of `threads`.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs latestThreadForWorktree operation.
+ * @param threads - threads argument for latestThreadForWorktree.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 export function latestThreadForWorktree(
@@ -1376,8 +1376,8 @@ export function pinnedThreadForWorktree(
   );
 }
 /**
- * Function of serializeOpenWorktrees.
- * @param projectStates - The value of `projectStates`.
+ * Performs serializeOpenWorktrees operation.
+ * @param projectStates - projectStates argument for serializeOpenWorktrees.
  */
 
 export function serializeOpenWorktrees(
@@ -1432,9 +1432,9 @@ export function pickInitialThread(
   return threads[0] ?? null;
 }
 /**
- * Function of upsertThreadList.
- * @param items - The value of `items`.
- * @param thread - The value of `thread`.
+ * Upserts thread list.
+ * @param items - items argument for upsertThreadList.
+ * @param thread - thread argument for upsertThreadList.
  */
 
 export function upsertThreadList(
@@ -1481,9 +1481,9 @@ export function upsertThreadList(
   return next;
 }
 /**
- * Function of compareProjects.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Compares projects.
+ * @param left - left argument for compareProjects.
+ * @param right - right argument for compareProjects.
  */
 
 function compareProjects(left: RpcProject, right: RpcProject): number {
@@ -1493,10 +1493,10 @@ function compareProjects(left: RpcProject, right: RpcProject): number {
   });
 }
 /**
- * Function of findProjectInsertionIndex.
- * @param orderedIds - The value of `orderedIds`.
- * @param byId - The value of `byId`.
- * @param project - The value of `project`.
+ * Finds project insertion index.
+ * @param orderedIds - orderedIds argument for findProjectInsertionIndex.
+ * @param byId - byId identifier.
+ * @param project - project argument for findProjectInsertionIndex.
  */
 
 function findProjectInsertionIndex(
@@ -1531,8 +1531,8 @@ export function upsertProjectList(
   return next.sort(compareProjects);
 }
 /**
- * Function of createProjectStore.
- * @param items - The value of `items`.
+ * Creates project store.
+ * @param items - items argument for createProjectStore.
  */
 
 export function createProjectStore(items: RpcProject[]): ProjectStore {
@@ -1545,9 +1545,9 @@ export function createProjectStore(items: RpcProject[]): ProjectStore {
   return nextStore;
 }
 /**
- * Function of upsertProjectStore.
- * @param store - The value of `store`.
- * @param project - The value of `project`.
+ * Upserts project store.
+ * @param store - store argument for upsertProjectStore.
+ * @param project - project argument for upsertProjectStore.
  */
 
 export function upsertProjectStore(
@@ -1619,9 +1619,9 @@ export function upsertProjectStore(
   };
 }
 /**
- * Function of removeProjectFromStore.
- * @param store - The value of `store`.
- * @param projectId - The value of `projectId`.
+ * Removes project from store.
+ * @param store - store argument for removeProjectFromStore.
+ * @param projectId - Project identifier.
  */
 
 export function removeProjectFromStore(
@@ -1643,8 +1643,8 @@ export function removeProjectFromStore(
   };
 }
 /**
- * Function of withAcknowledgedUnreadThread.
- * @param thread - The value of `thread`.
+ * Performs withAcknowledgedUnreadThread operation.
+ * @param thread - thread argument for withAcknowledgedUnreadThread.
  */
 
 export function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
@@ -1661,8 +1661,8 @@ export function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
   };
 }
 /**
- * Function of withAcknowledgedUnreadThreadDetail.
- * @param detail - The value of `detail`.
+ * Performs withAcknowledgedUnreadThreadDetail operation.
+ * @param detail - detail argument for withAcknowledgedUnreadThreadDetail.
  */
 
 export function withAcknowledgedUnreadThreadDetail(
@@ -1688,8 +1688,8 @@ export function removeThreadFromList(
   return items.filter((thread) => thread.id !== threadId);
 }
 /**
- * Function of createThreadStore.
- * @param items - The value of `items`.
+ * Creates thread store.
+ * @param items - items argument for createThreadStore.
  */
 
 export function createThreadStore(items: RpcThread[]): ThreadStore {
@@ -1702,9 +1702,9 @@ export function createThreadStore(items: RpcThread[]): ThreadStore {
   return nextStore;
 }
 /**
- * Function of upsertThreadStore.
- * @param store - The value of `store`.
- * @param thread - The value of `thread`.
+ * Upserts thread store.
+ * @param store - store argument for upsertThreadStore.
+ * @param thread - thread argument for upsertThreadStore.
  */
 
 export function upsertThreadStore(
@@ -1780,9 +1780,9 @@ export function upsertThreadStore(
   };
 }
 /**
- * Function of removeThreadFromStore.
- * @param store - The value of `store`.
- * @param threadId - The value of `threadId`.
+ * Removes thread from store.
+ * @param store - store argument for removeThreadFromStore.
+ * @param threadId - Thread identifier.
  */
 
 export function removeThreadFromStore(

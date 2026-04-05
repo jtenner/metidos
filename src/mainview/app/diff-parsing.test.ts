@@ -25,8 +25,8 @@ class FakeDiffWorker {
   requests: DiffParsingWorkerRequest[] = [];
   terminated = false;
   /**
-   * Function of postMessage.
-   * @param message - The value of `message`.
+   * Performs postMessage operation.
+   * @param message - Message payload.
    */
 
   postMessage(message: DiffParsingWorkerRequest): void {
@@ -37,8 +37,8 @@ class FakeDiffWorker {
     this.terminated = true;
   }
   /**
-   * Function of resolveLastRequest.
-   * @param response - The value of `response`.
+   * Resolves last request.
+   * @param response - Response payload.
    */
 
   resolveLastRequest(response: DiffParsingWorkerResponse): void {

@@ -33,7 +33,7 @@ type ChildRole = "backend" | "static";
 /**
  * Validate a value looks like a non-negative whole-number string for port parsing.
  * Parsing accepts only a non-empty decimal integer without whitespace/sign characters.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
@@ -42,8 +42,8 @@ function isStringInteger(value: string): boolean {
 /**
  * Read `--flag value` or `--flag=value` style CLI args.
  * Returns the matching value and skips malformed/unknown args safely.
- * @param args - The value of `args`.
- * @param flag - The value of `flag`.
+ * @param args - Argument list passed to args.
+ * @param flag - flag argument for flag.
  */
 function readCliValue(args: string[], flag: string): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -220,7 +220,7 @@ function stopChild(
 /**
  * Mark shutdown in progress, stop both subprocesses, wait for exit signals, then exit.
  * If shutdown is already underway, avoid double-calling process exit logic.
- * @param exitCode - The value of `exitCode`.
+ * @param exitCode - exitCode argument for exitCode.
  */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shuttingDown) {

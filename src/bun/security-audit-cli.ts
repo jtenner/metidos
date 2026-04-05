@@ -27,9 +27,9 @@ Options:
   --help, -h          Show this help text.
 `;
 /**
- * Function of parsePositiveIntegerFlag.
- * @param value - The value of `value`.
- * @param flagName - The value of `flagName`.
+ * Parses positive integer flag.
+ * @param value - Input value.
+ * @param flagName - flagName argument for parsePositiveIntegerFlag.
  */
 
 function parsePositiveIntegerFlag(value: string, flagName: string): number {
@@ -40,8 +40,8 @@ function parsePositiveIntegerFlag(value: string, flagName: string): number {
   return parsed;
 }
 /**
- * Function of parseSecurityAuditCliArgs.
- * @param args - The value of `args`.
+ * Parses security audit cli args.
+ * @param args - Argument list passed to parseSecurityAuditCliArgs.
  */
 
 export function parseSecurityAuditCliArgs(
@@ -139,8 +139,8 @@ export function parseSecurityAuditCliArgs(
   };
 }
 /**
- * Function of formatSecurityAuditEventsForCli.
- * @param events - The value of `events`.
+ * Formats security audit events for cli.
+ * @param events - Event list.
  */
 
 export function formatSecurityAuditEventsForCli(
@@ -174,8 +174,8 @@ export function formatSecurityAuditEventsForCli(
     .join("\n\n");
 }
 /**
- * Function of runSecurityAuditCli.
- * @param args - The value of `args`.
+ * Runs security audit cli.
+ * @param args - Argument list passed to runSecurityAuditCli.
  */
 
 export async function runSecurityAuditCli(args: string[]): Promise<void> {

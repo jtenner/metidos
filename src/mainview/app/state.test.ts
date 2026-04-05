@@ -18,9 +18,9 @@ import {
 } from "./state";
 
 /**
- * Function of project.
- * @param id - The value of `id`.
- * @param name - The value of `name`.
+ * Builds a project fixture.
+ * @param id - Identifier value.
+ * @param name - Display or identifier name.
  */
 
 function project(id: number, name: string): RpcProject {
@@ -35,10 +35,10 @@ function project(id: number, name: string): RpcProject {
   };
 }
 /**
- * Function of thread.
- * @param id - The value of `id`.
- * @param updatedAt - The value of `updatedAt`.
- * @param pinnedAt - The value of `pinnedAt`.
+ * Builds a thread fixture.
+ * @param id - Identifier value.
+ * @param updatedAt - updatedAt argument for thread.
+ * @param pinnedAt - pinnedAt argument for thread.
  */
 
 function thread(
@@ -53,8 +53,8 @@ function thread(
   } as unknown as RpcThread;
 }
 /**
- * Function of worktree.
- * @param path - The value of `path`.
+ * Builds a worktree fixture.
+ * @param path - Filesystem path.
  */
 
 function worktree(path: string): RpcWorktree {

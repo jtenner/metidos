@@ -229,7 +229,7 @@ type PendingRpcRequest = {
 /**
  * Resolve an explicit --port/-p override from process args.
  * Supports --port 3000, -p 3000, --port=3000, and -p=3000.
- * @param args - The value of `args`.
+ * @param args - Argument list passed to args.
  */
 function readCliPort(args: string[]): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -258,8 +258,8 @@ function readCliPort(args: string[]): string | null {
 /**
  * Resolve and validate server port from CLI arguments and optional env value.
  * @throws if port is non-numeric or outside 1..65535.
- * @param args - The value of `args`.
- * @param envPort - The value of `envPort`.
+ * @param args - Argument list passed to args.
+ * @param envPort - envPort argument for envPort.
  */
 function resolveServerPort(args: string[], envPort?: string): number {
   const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
@@ -306,9 +306,9 @@ const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
 );
 /**
- * Function of requireFreshStepUpForRpcAction.
- * @param context - The value of `context`.
- * @param actionDescription - The value of `actionDescription`.
+ * Requires fresh step up for rpc action.
+ * @param context - Execution context.
+ * @param actionDescription - actionDescription argument for requireFreshStepUpForRpcAction.
  */
 
 function requireFreshStepUpForRpcAction(
@@ -426,9 +426,9 @@ let lastEventLoopLagMs = 0;
 let peakEventLoopLagMs = 0;
 let lastOverloadLogAt = 0;
 /**
- * Function of buildResponseHeaders.
- * @param contentType - The value of `contentType`.
- * @param headers - The value of `headers`.
+ * Builds response headers.
+ * @param contentType - contentType argument for buildResponseHeaders.
+ * @param headers - HTTP headers.
  */
 
 function buildResponseHeaders(
@@ -441,11 +441,11 @@ function buildResponseHeaders(
   return applySecurityHeaders(responseHeaders);
 }
 /**
- * Function of stringResponse.
- * @param body - The value of `body`.
- * @param contentType - The value of `contentType`.
- * @param status - The value of `status`.
- * @param headers - The value of `headers`.
+ * Performs stringResponse operation.
+ * @param body - Request body payload.
+ * @param contentType - contentType argument for stringResponse.
+ * @param status - status argument for stringResponse.
+ * @param headers - HTTP headers.
  */
 
 function stringResponse(
@@ -460,10 +460,10 @@ function stringResponse(
   });
 }
 /**
- * Function of jsonResponse.
- * @param value - The value of `value`.
- * @param status - The value of `status`.
- * @param headers - The value of `headers`.
+ * Performs jsonResponse operation.
+ * @param value - Input value.
+ * @param status - status argument for jsonResponse.
+ * @param headers - HTTP headers.
  */
 
 function jsonResponse(
@@ -479,8 +479,8 @@ function jsonResponse(
 
 /**
  * Build a file-backed HTTP response with explicit no-cache header.
- * @param path - The value of `path`.
- * @param contentType - The value of `contentType`.
+ * @param path - Filesystem path.
+ * @param contentType - contentType argument for contentType.
  */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
@@ -496,9 +496,9 @@ class RequestValidationError extends Error {
   readonly code: string;
   readonly status: number;
   /**
-   * Function of constructor.
-   * @param message - The value of `message`.
-   * @param options - The value of `options`.
+   * Creates and initializes a new instance.
+   * @param message - Message payload.
+   * @param options - Configuration options used by this operation.
    */
 
   constructor(
@@ -515,8 +515,8 @@ class RequestValidationError extends Error {
   }
 }
 /**
- * Function of isSecureRequest.
- * @param request - The value of `request`.
+ * Is secure request.
+ * @param request - Incoming request payload.
  */
 
 function isSecureRequest(request: Request): boolean {
@@ -537,8 +537,8 @@ function isSecureRequest(request: Request): boolean {
   return new URL(request.url).protocol === "https:";
 }
 /**
- * Function of normalizeBrowserOrigin.
- * @param origin - The value of `origin`.
+ * Normalizes browser origin.
+ * @param origin - origin argument for normalizeBrowserOrigin.
  */
 
 function normalizeBrowserOrigin(origin: string): string | null {
@@ -559,8 +559,8 @@ function normalizeBrowserOrigin(origin: string): string | null {
   }
 }
 /**
- * Function of resolveRpcClientOriginFromRequest.
- * @param request - The value of `request`.
+ * Resolves rpc client origin from request.
+ * @param request - Incoming request payload.
  */
 
 function resolveRpcClientOriginFromRequest(request: Request): string | null {
@@ -591,8 +591,8 @@ function resolveRpcClientOriginFromRequest(request: Request): string | null {
   return normalizeBrowserOrigin(`${protocol}://${host}`);
 }
 /**
- * Function of normalizeAuthRouteOrigin.
- * @param origin - The value of `origin`.
+ * Normalizes auth route origin.
+ * @param origin - origin argument for normalizeAuthRouteOrigin.
  */
 
 function normalizeAuthRouteOrigin(origin: string): string | null {
@@ -613,8 +613,8 @@ function normalizeAuthRouteOrigin(origin: string): string | null {
   }
 }
 /**
- * Function of resolveExpectedAuthRouteOrigin.
- * @param request - The value of `request`.
+ * Resolves expected auth route origin.
+ * @param request - Incoming request payload.
  */
 
 function resolveExpectedAuthRouteOrigin(request: Request): string | null {
@@ -637,8 +637,8 @@ function resolveExpectedAuthRouteOrigin(request: Request): string | null {
   return normalizeAuthRouteOrigin(new URL(request.url).origin);
 }
 /**
- * Function of requireJsonAuthRequest.
- * @param request - The value of `request`.
+ * Requires json auth request.
+ * @param request - Incoming request payload.
  */
 
 function requireJsonAuthRequest(request: Request): void {
@@ -658,8 +658,8 @@ function requireJsonAuthRequest(request: Request): void {
   }
 }
 /**
- * Function of enforceAuthMutationRequestSecurity.
- * @param request - The value of `request`.
+ * Performs enforceAuthMutationRequestSecurity operation.
+ * @param request - Incoming request payload.
  */
 
 function enforceAuthMutationRequestSecurity(request: Request): void {
@@ -695,17 +695,17 @@ function enforceAuthMutationRequestSecurity(request: Request): void {
   }
 }
 /**
- * Function of sessionCookieMaxAgeSeconds.
- * @param expiresAt - The value of `expiresAt`.
- * @param nowMs - The value of `nowMs`.
+ * Performs sessionCookieMaxAgeSeconds operation.
+ * @param expiresAt - expiresAt argument for sessionCookieMaxAgeSeconds.
+ * @param nowMs - nowMs argument for sessionCookieMaxAgeSeconds.
  */
 
 function sessionCookieMaxAgeSeconds(expiresAt: string, nowMs: number): number {
   return Math.max(0, Math.floor((Date.parse(expiresAt) - nowMs) / 1000));
 }
 /**
- * Function of readJsonBody.
- * @param request - The value of `request`.
+ * Reads json body.
+ * @param request - Incoming request payload.
  */
 
 async function readJsonBody(
@@ -733,9 +733,9 @@ async function readJsonBody(
   }
 }
 /**
- * Function of readRequiredString.
- * @param body - The value of `body`.
- * @param fieldName - The value of `fieldName`.
+ * Reads required string.
+ * @param body - Request body payload.
+ * @param fieldName - fieldName argument for readRequiredString.
  */
 
 function readRequiredString(
@@ -751,9 +751,9 @@ function readRequiredString(
   return value;
 }
 /**
- * Function of readOptionalString.
- * @param body - The value of `body`.
- * @param fieldName - The value of `fieldName`.
+ * Reads optional string.
+ * @param body - Request body payload.
+ * @param fieldName - fieldName argument for readOptionalString.
  */
 
 function readOptionalString(
@@ -770,9 +770,9 @@ function readOptionalString(
   return value;
 }
 /**
- * Function of readOptionalInteger.
- * @param body - The value of `body`.
- * @param fieldName - The value of `fieldName`.
+ * Reads optional integer.
+ * @param body - Request body payload.
+ * @param fieldName - fieldName argument for readOptionalInteger.
  */
 
 function readOptionalInteger(
@@ -791,8 +791,8 @@ function readOptionalInteger(
   return value as number;
 }
 /**
- * Function of readOptionalSessionLifetimeDays.
- * @param body - The value of `body`.
+ * Reads optional session lifetime days.
+ * @param body - Request body payload.
  */
 
 function readOptionalSessionLifetimeDays(
@@ -810,8 +810,8 @@ function readOptionalSessionLifetimeDays(
   return value;
 }
 /**
- * Function of readPrimaryFactorType.
- * @param body - The value of `body`.
+ * Reads primary factor type.
+ * @param body - Request body payload.
  */
 
 function readPrimaryFactorType(
@@ -826,10 +826,10 @@ function readPrimaryFactorType(
   return value;
 }
 /**
- * Function of authErrorResponse.
- * @param request - The value of `request`.
- * @param error - The value of `error`.
- * @param options - The value of `options`.
+ * Performs authErrorResponse operation.
+ * @param request - Incoming request payload.
+ * @param error - Error value to process.
+ * @param options - Configuration options used by this operation.
  */
 
 function authErrorResponse(
@@ -894,8 +894,8 @@ function authErrorResponse(
   );
 }
 /**
- * Function of handleAuthRequest.
- * @param request - The value of `request`.
+ * Handles auth request.
+ * @param request - Incoming request payload.
  */
 
 async function handleAuthRequest(request: Request): Promise<Response | null> {
@@ -1173,7 +1173,7 @@ function incrementPendingRpcRequestCount(): void {
 
 /**
  * Lower pending RPC request count safely without underflow.
- * @param count - The value of `count`.
+ * @param count - Count limit or quantity.
  */
 function decrementPendingRpcRequestCount(count = 1): void {
   pendingRpcRequestCount = Math.max(0, pendingRpcRequestCount - count);
@@ -1181,7 +1181,7 @@ function decrementPendingRpcRequestCount(count = 1): void {
 
 /**
  * Create a diagnostic snapshot used for overload warning logs.
- * @param activeServerPort - The value of `activeServerPort`.
+ * @param activeServerPort - activeServerPort argument for activeServerPort.
  */
 function buildServerHealthSnapshot(activeServerPort: number): {
   backendOnly: boolean;
@@ -1224,7 +1224,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
 
 /**
  * Periodically emit overload telemetry for backlog and event loop lag conditions.
- * @param activeServerPort - The value of `activeServerPort`.
+ * @param activeServerPort - activeServerPort argument for activeServerPort.
  */
 function startOverloadMonitoring(activeServerPort: () => number): void {
   if (overloadMonitorTimer) {
@@ -1266,7 +1266,7 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
 
 /**
  * Detect port binding collisions without relying on a concrete error class.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function isAddressInUseError(error: unknown): boolean {
   return (
@@ -1302,7 +1302,7 @@ async function htmlResponse(): Promise<Response> {
 
 /**
  * Parse and validate inbound websocket request messages.
- * @param raw - The value of `raw`.
+ * @param raw - raw argument for raw.
  */
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
   // Parse first, then validate shape so runtime schema errors are surfaced consistently.
@@ -1330,7 +1330,7 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
 
 /**
  * Parse either a request or cancel message from a websocket payload.
- * @param raw - The value of `raw`.
+ * @param raw - raw argument for raw.
  */
 function parseRpcClientMessage(raw: string): RpcClientMessage {
   const parsed = JSON.parse(raw) as Partial<RpcClientMessage>;
@@ -1345,7 +1345,7 @@ function parseRpcClientMessage(raw: string): RpcClientMessage {
 
 /**
  * Convert exceptions into user-facing string payloads.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -1354,8 +1354,8 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 /**
- * Function of buildRpcErrorPayload.
- * @param error - The value of `error`.
+ * Builds rpc error payload.
+ * @param error - Error value to process.
  */
 
 function buildRpcErrorPayload(
@@ -1379,8 +1379,8 @@ function buildRpcErrorPayload(
 
 /**
  * Build cancellation `Error` with causal metadata while preserving names.
- * @param reason - The value of `reason`.
- * @param fallbackMessage - The value of `fallbackMessage`.
+ * @param reason - Reason for this operation.
+ * @param fallbackMessage - fallbackMessage argument for fallbackMessage.
  */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
@@ -1403,7 +1403,7 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
 
 /**
  * Distinguish timeout/cancel style abort errors.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function isAbortError(error: unknown): boolean {
   return (
@@ -1414,7 +1414,7 @@ function isAbortError(error: unknown): boolean {
 
 /**
  * Coerce raw timeout values into normalized positive integers.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function normalizeTimeoutMs(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -1425,7 +1425,7 @@ function normalizeTimeoutMs(value: unknown): number | null {
 
 /**
  * Normalize unknown priorities to a valid RPC priority enum value.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function normalizeRpcRequestPriority(value: unknown): RpcRequestPriority {
   if (value === "background" || value === "default" || value === "foreground") {
@@ -1531,7 +1531,7 @@ async function awaitRequestResult<T>(
 
 /**
  * Normalize raw websocket data to a string payload.
- * @param rawMessage - The value of `rawMessage`.
+ * @param rawMessage - rawMessage argument for rawMessage.
  */
 function parseRawSocketMessage(rawMessage: string | Buffer): string {
   return typeof rawMessage === "string"
@@ -1541,7 +1541,7 @@ function parseRawSocketMessage(rawMessage: string | Buffer): string {
 
 /**
  * Create an abort controller and optionally attach timeout behavior.
- * @param timeoutMs - The value of `timeoutMs`.
+ * @param timeoutMs - timeoutMs argument for timeoutMs.
  */
 function buildRequestSignal(timeoutMs: number | null): {
   controller: AbortController;
@@ -1566,7 +1566,7 @@ function buildRequestSignal(timeoutMs: number | null): {
 
 /**
  * Check whether an abort signal came from timeout signal expiry.
- * @param signal - The value of `signal`.
+ * @param signal - Abort signal for cancellation.
  */
 function isTimeoutAbort(signal: AbortSignal): boolean {
   return (
@@ -1618,7 +1618,7 @@ function queueMainviewBundleBuild(): Promise<string> {
 
 /**
  * Broadcast a dev reload event to connected clients (frontend hot reload path).
- * @param reason - The value of `reason`.
+ * @param reason - Reason for this operation.
  */
 function broadcastReload(reason: string): void {
   if (!IS_DEV_SERVER || rpcClients.size === 0) {
@@ -1641,8 +1641,8 @@ function broadcastReload(reason: string): void {
 
 /**
  * Broadcast that a worktree task list changed.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 function broadcastTasksChanged(projectId: number, worktreePath: string): void {
   if (rpcClients.size === 0) {
@@ -1693,7 +1693,7 @@ function broadcastGitHistoryChanged(
 
 /**
  * Broadcast that the UI should focus a specific project/worktree/thread context.
- * @param payload - The value of `payload`.
+ * @param payload - payload argument for payload.
  */
 function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
   if (rpcClients.size === 0) {
@@ -1739,8 +1739,8 @@ function broadcastThreadStartRequestCreated(
   }
 }
 /**
- * Function of normalizeWatchFilename.
- * @param filename - The value of `filename`.
+ * Normalizes watch filename.
+ * @param filename - Target filename.
  */
 
 function normalizeWatchFilename(filename?: string | Buffer | null): string {
@@ -1795,7 +1795,7 @@ function flushPendingMainviewReloads(): void {
 
 /**
  * Debounce file change reload notifications to reduce event fan-out.
- * @param filename - The value of `filename`.
+ * @param filename - Target filename.
  */
 function enqueueMainviewReload(filename?: string | Buffer | null): void {
   const normalizedFilename = normalizeWatchFilename(filename);
@@ -1819,8 +1819,8 @@ function readMainviewFileStamps(): Map<string, number> {
   const visitedRealPaths = new Set<string>();
 
   /**
-   * Function of readDirectory.
-   * @param directoryPath - The value of `directoryPath`.
+   * Reads directory.
+   * @param directoryPath - directoryPath path used by readDirectory.
    */
 
   const readDirectory = (directoryPath: string) => {
@@ -1951,9 +1951,9 @@ async function bootstrap(): Promise<void> {
   const serverOptions = {
     hostname: LOOPBACK_HOSTNAME,
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS /**
-     * Function of fetch.
-     * @param request - The value of `request`.
-     * @param serverInstance - The value of `serverInstance`.
+     * Fetches data from the configured endpoint.
+     * @param request - Incoming request payload.
+     * @param serverInstance - serverInstance argument for fetch.
      */,
 
     async fetch(request, serverInstance) {
@@ -2071,16 +2071,16 @@ async function bootstrap(): Promise<void> {
     },
     websocket: {
       /**
-       * Function of open.
-       * @param ws - The value of `ws`.
+       * Opens .
+       * @param ws - ws argument for open.
        */
 
       open(ws) {
         rpcClients.add(ws);
         getPendingRpcRequests(ws);
       } /**
-       * Function of close.
-       * @param ws - The value of `ws`.
+       * Closes .
+       * @param ws - ws argument for close.
        */,
 
       close(ws) {
@@ -2090,9 +2090,9 @@ async function bootstrap(): Promise<void> {
           suspendActiveWorktreePolling();
         }
       } /**
-       * Function of message.
-       * @param ws - The value of `ws`.
-       * @param rawMessage - The value of `rawMessage`.
+       * Processes message events.
+       * @param ws - ws argument for message.
+       * @param rawMessage - rawMessage argument for message.
        */,
 
       message(ws, rawMessage) {
@@ -2255,7 +2255,7 @@ let shutdownPromise: Promise<void> | null = null;
 
 /**
  * Run coordinated shutdown steps once, then exit with the requested process code.
- * @param exitCode - The value of `exitCode`.
+ * @param exitCode - exitCode argument for exitCode.
  */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shutdownPromise) {

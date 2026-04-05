@@ -16,10 +16,10 @@ import {
 } from "./startup-worktree-restore";
 
 /**
- * Function of project.
- * @param id - The value of `id`.
- * @param path - The value of `path`.
- * @param options - The value of `options`.
+ * Builds a project fixture.
+ * @param id - Identifier value.
+ * @param path - Filesystem path.
+ * @param options - Configuration options used by this operation.
  */
 
 function project(
@@ -38,9 +38,9 @@ function project(
   };
 }
 /**
- * Function of worktree.
- * @param path - The value of `path`.
- * @param branch - The value of `branch`.
+ * Builds a worktree fixture.
+ * @param path - Filesystem path.
+ * @param branch - Target git branch.
  */
 
 function worktree(path: string, branch = "feature"): RpcWorktree {

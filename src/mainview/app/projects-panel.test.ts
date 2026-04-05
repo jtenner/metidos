@@ -11,10 +11,10 @@ import { deriveProjectsPanelWorktreeData } from "./projects-panel";
 import { worktreeKey } from "./state";
 
 /**
- * Function of createProject.
- * @param id - The value of `id`.
- * @param name - The value of `name`.
- * @param path - The value of `path`.
+ * Creates project.
+ * @param id - Identifier value.
+ * @param name - Display or identifier name.
+ * @param path - Filesystem path.
  */
 
 function createProject(id: number, name: string, path: string): RpcProject {
@@ -29,10 +29,10 @@ function createProject(id: number, name: string, path: string): RpcProject {
   };
 }
 /**
- * Function of createWorktree.
- * @param path - The value of `path`.
- * @param branch - The value of `branch`.
- * @param pinnedAt - The value of `pinnedAt`.
+ * Creates worktree.
+ * @param path - Filesystem path.
+ * @param branch - Target git branch.
+ * @param pinnedAt - pinnedAt argument for createWorktree.
  */
 
 function createWorktree(
@@ -49,9 +49,9 @@ function createWorktree(
   };
 }
 /**
- * Function of buildWorktreeSearchText.
- * @param projects - The value of `projects`.
- * @param worktreesByProjectId - The value of `worktreesByProjectId`.
+ * Builds worktree search text.
+ * @param projects - projects argument for buildWorktreeSearchText.
+ * @param worktreesByProjectId - worktreesByProjectId identifier.
  */
 
 function buildWorktreeSearchText(

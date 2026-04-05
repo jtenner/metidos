@@ -17,18 +17,18 @@ import {
 } from "./thread-status-refresh";
 
 /**
- * Function of thread.
- * @param threadId - The value of `threadId`.
+ * Builds a thread fixture.
+ * @param threadId - Thread identifier.
  */
 
 function thread(threadId: number): RpcThread {
   return sortableThread(threadId, "2026-04-04T12:00:00.000Z");
 }
 /**
- * Function of sortableThread.
- * @param threadId - The value of `threadId`.
- * @param updatedAt - The value of `updatedAt`.
- * @param pinnedAt - The value of `pinnedAt`.
+ * Performs sortableThread operation.
+ * @param threadId - Thread identifier.
+ * @param updatedAt - updatedAt argument for sortableThread.
+ * @param pinnedAt - pinnedAt argument for sortableThread.
  */
 
 function sortableThread(
@@ -43,8 +43,8 @@ function sortableThread(
   } as unknown as RpcThread;
 }
 /**
- * Function of threadDetail.
- * @param threadId - The value of `threadId`.
+ * Performs threadDetail operation.
+ * @param threadId - Thread identifier.
  */
 
 function threadDetail(threadId: number): RpcThreadDetail {

@@ -123,8 +123,8 @@ class RpcHarnessClient {
   private nextId = 1;
   private readonly socket: WebSocket;
   /**
-   * Function of constructor.
-   * @param url - The value of `url`.
+   * Creates and initializes a new instance.
+   * @param url - Request URL.
    */
 
   constructor(url: string) {
@@ -226,8 +226,8 @@ class RpcHarnessClient {
     this.socket.close();
   }
   /**
-   * Function of handleMessage.
-   * @param raw - The value of `raw`.
+   * Handles message.
+   * @param raw - raw argument for handleMessage.
    */
 
   private handleMessage(raw: string): void {
@@ -257,8 +257,8 @@ class RpcHarnessClient {
   }
 }
 /**
- * Function of parseArgs.
- * @param argv - The value of `argv`.
+ * Parses args.
+ * @param argv - argv argument for parseArgs.
  */
 
 function parseArgs(argv: string[]): HarnessOptions {
@@ -400,7 +400,7 @@ Options:
 
 /**
  * Promise-based timer utility.
- * @param ms - The value of `ms`.
+ * @param ms - ms argument for ms.
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -410,7 +410,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Check for AbortError/TimeoutError values.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function isAbortError(error: unknown): boolean {
   return (
@@ -525,9 +525,9 @@ async function measureRpc<K extends RpcMethodName>(
   }
 }
 /**
- * Function of choosePreferredTask.
- * @param tasks - The value of `tasks`.
- * @param requestedTaskId - The value of `requestedTaskId`.
+ * Performs choosePreferredTask operation.
+ * @param tasks - tasks argument for choosePreferredTask.
+ * @param requestedTaskId - requestedTaskId identifier.
  */
 
 function choosePreferredTask(
@@ -923,7 +923,7 @@ async function waitForThreadIdle(
 
 /**
  * Normalize unknown error value into stable string label for output.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function toErrorLabel(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -934,7 +934,7 @@ function toErrorLabel(error: unknown): string {
 
 /**
  * Compose default websocket URL from port.
- * @param port - The value of `port`.
+ * @param port - port argument for port.
  */
 function websocketUrlFromPort(port: number): string {
   return `ws://127.0.0.1:${port}/rpc`;
@@ -942,7 +942,7 @@ function websocketUrlFromPort(port: number): string {
 
 /**
  * Parse rpcWebSocketUrl from runtime config when available.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function readRpcWebSocketUrl(value: unknown): string | null {
   if (typeof value !== "object" || value === null) {
@@ -958,7 +958,7 @@ function readRpcWebSocketUrl(value: unknown): string | null {
 
 /**
  * Extract the injected runtime config from the main HTML page.
- * @param html - The value of `html`.
+ * @param html - html argument for html.
  */
 function readRuntimeConfigFromHtml(html: string): unknown {
   const match = html.match(/window\.__joltRuntime=(\{.+?\});<\/script>/s);
@@ -1029,7 +1029,7 @@ async function resolveRpcUrl(
 
 /**
  * Combine per-worker pressure counts.
- * @param results - The value of `results`.
+ * @param results - results argument for results.
  */
 function summarizePressure(results: PressureSummary[]): PressureSummary {
   return results.reduce(

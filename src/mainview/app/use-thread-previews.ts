@@ -16,8 +16,8 @@ import {
 } from "./state";
 
 /**
- * Function of anchorStillActive.
- * @param anchorId - The value of `anchorId`.
+ * Performs anchorStillActive operation.
+ * @param anchorId - anchorId identifier.
  */
 
 function anchorStillActive(anchorId: string): boolean {

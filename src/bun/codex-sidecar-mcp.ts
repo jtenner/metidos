@@ -207,8 +207,8 @@ class JoltRpcClient {
       const nextSocket = new WebSocket(this.url);
 
       /**
-       * Function of resetSocket.
-       * @param reason - The value of `reason`.
+       * Resets socket.
+       * @param reason - Reason for this operation.
        */
 
       const resetSocket = (reason: unknown) => {
@@ -275,7 +275,7 @@ const rpcClient = new JoltRpcClient(rpcUrl);
 
 /**
  * Read and parse an environment variable as an integer project/thread id.
- * @param name - The value of `name`.
+ * @param name - Display or identifier name.
  */
 function readIntegerEnv(name: string): number | null {
   const raw = process.env[name]?.trim();
@@ -287,7 +287,7 @@ function readIntegerEnv(name: string): number | null {
 
 /**
  * Read and trim an environment variable, returning null for missing/empty values.
- * @param name - The value of `name`.
+ * @param name - Display or identifier name.
  */
 function readStringEnv(name: string): string | null {
   const raw = process.env[name]?.trim();
@@ -296,7 +296,7 @@ function readStringEnv(name: string): string | null {
 
 /**
  * Normalize RPC timeout values with fallback to default for invalid/empty input.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function normalizeTimeoutMs(value: number | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -321,8 +321,8 @@ function normalizeRpcRequestPriority(
   }
 }
 /**
- * Function of canonicalPath.
- * @param value - The value of `value`.
+ * Performs canonicalPath operation.
+ * @param value - Input value.
  */
 
 function canonicalPath(value: string): string {
@@ -337,7 +337,7 @@ function samePath(left: string, right: string): boolean {
 }
 
 /** Normalize a free-form lookup string for stable name comparisons.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function normalizeLookupValue(value: string): string {
   return value.trim().toLowerCase();
@@ -600,8 +600,8 @@ type ListThreadsRow = {
   updatedAt: string;
 };
 /**
- * Function of buildThreadListRows.
- * @param options - The value of `options`.
+ * Builds thread list rows.
+ * @param options - Configuration options used by this operation.
  */
 
 async function buildThreadListRows(options: {
@@ -818,8 +818,8 @@ async function resolveWorktreeTarget(params?: {
   throw new Error("worktreePath required with no active worktree.");
 }
 /**
- * Function of requireThreadId.
- * @param threadId - The value of `threadId`.
+ * Requires thread id.
+ * @param threadId - Thread identifier.
  */
 
 function requireThreadId(threadId?: number | null): number {
@@ -845,7 +845,7 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
 }
 
 /** Build metadata payload for thread details from db rows or rpc thread objects.
- * @param thread - The value of `thread`.
+ * @param thread - thread argument for thread.
  */
 function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
   return {
@@ -908,8 +908,8 @@ function threadStartRequestPayload(request: RpcThreadStartRequest) {
 
 /**
  * Build MCP text output with optional structured payload for downstream clients.
- * @param text - The value of `text`.
- * @param structuredContent - The value of `structuredContent`.
+ * @param text - Input text content.
+ * @param structuredContent - structuredContent argument for structuredContent.
  */
 function textResult(text: string, structuredContent?: Record<string, unknown>) {
   return {

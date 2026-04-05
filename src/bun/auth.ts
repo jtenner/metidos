@@ -41,8 +41,8 @@ export type AuthSetupMaterial = {
   totpUri: string;
 };
 /**
- * Function of encodeBase32.
- * @param bytes - The value of `bytes`.
+ * Encodes base32.
+ * @param bytes - bytes argument for encodeBase32.
  */
 
 function encodeBase32(bytes: Uint8Array): string {
@@ -66,8 +66,8 @@ function encodeBase32(bytes: Uint8Array): string {
   return output;
 }
 /**
- * Function of decodeBase32.
- * @param secret - The value of `secret`.
+ * Decodes base32.
+ * @param secret - secret argument for decodeBase32.
  */
 
 function decodeBase32(secret: string): Uint8Array {
@@ -96,9 +96,9 @@ function decodeBase32(secret: string): Uint8Array {
   return Uint8Array.from(bytes);
 }
 /**
- * Function of timingSafeTextEqual.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Performs timingSafeTextEqual operation.
+ * @param left - left argument for timingSafeTextEqual.
+ * @param right - right argument for timingSafeTextEqual.
  */
 
 function timingSafeTextEqual(left: string, right: string): boolean {
@@ -110,24 +110,24 @@ function timingSafeTextEqual(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 /**
- * Function of normalizeRecoveryCode.
- * @param code - The value of `code`.
+ * Normalizes recovery code.
+ * @param code - code argument for normalizeRecoveryCode.
  */
 
 function normalizeRecoveryCode(code: string): string {
   return code.toUpperCase().replace(/[\s-]/g, "");
 }
 /**
- * Function of randomBytes.
- * @param length - The value of `length`.
+ * Performs randomBytes operation.
+ * @param length - length argument for randomBytes.
  */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 /**
- * Function of toArrayBuffer.
- * @param bytes - The value of `bytes`.
+ * Converts array buffer value.
+ * @param bytes - bytes argument for toArrayBuffer.
  */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -136,8 +136,8 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 /**
- * Function of generateRandomToken.
- * @param length - The value of `length`.
+ * Generates random token.
+ * @param length - length argument for generateRandomToken.
  */
 
 function generateRandomToken(length = 32): string {
@@ -153,8 +153,8 @@ function generateRecoveryCode(): string {
   return `${raw.slice(0, 5)}-${raw.slice(5, 10)}`;
 }
 /**
- * Function of validateTotpDigits.
- * @param digits - The value of `digits`.
+ * Validates totp digits.
+ * @param digits - digits argument for validateTotpDigits.
  */
 
 function validateTotpDigits(digits: number): void {
@@ -163,8 +163,8 @@ function validateTotpDigits(digits: number): void {
   }
 }
 /**
- * Function of validateTotpPeriodSeconds.
- * @param periodSeconds - The value of `periodSeconds`.
+ * Validates totp period seconds.
+ * @param periodSeconds - periodSeconds argument for validateTotpPeriodSeconds.
  */
 
 function validateTotpPeriodSeconds(periodSeconds: number): void {
@@ -221,7 +221,7 @@ export async function verifyPrimaryFactor(
 
 /**
  * Generate a new RFC 4648 base32 TOTP secret.
- * @param byteLength - The value of `byteLength`.
+ * @param byteLength - byteLength argument for byteLength.
  */
 export function generateTotpSecret(byteLength = 20): string {
   if (!Number.isInteger(byteLength) || byteLength < 10) {
@@ -249,10 +249,10 @@ export function buildTotpUri({
   return `otpauth://totp/${label}?secret=${encodedSecret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=${DEFAULT_TOTP_DIGITS}&period=${DEFAULT_TOTP_PERIOD_SECONDS}`;
 }
 /**
- * Function of hotp.
- * @param secret - The value of `secret`.
- * @param counter - The value of `counter`.
- * @param digits - The value of `digits`.
+ * Generates an HMAC-based one-time password.
+ * @param secret - secret argument for hotp.
+ * @param counter - counter argument for hotp.
+ * @param digits - digits argument for hotp.
  */
 
 async function hotp(
@@ -379,7 +379,7 @@ export function generateRecoveryCodes(
 
 /**
  * Hash one recovery code for storage.
- * @param code - The value of `code`.
+ * @param code - code argument for code.
  */
 export async function hashRecoveryCode(code: string): Promise<string> {
   return Bun.password.hash(

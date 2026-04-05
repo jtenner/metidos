@@ -12,8 +12,8 @@ import {
 } from "./thread-send";
 
 /**
- * Function of threadDetail.
- * @param threadId - The value of `threadId`.
+ * Performs threadDetail operation.
+ * @param threadId - Thread identifier.
  */
 
 function threadDetail(threadId: number): RpcThreadDetail {

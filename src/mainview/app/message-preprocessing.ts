@@ -39,16 +39,16 @@ export type PreparedMessageRenderPlan =
       kind: "rich";
     };
 /**
- * Function of shouldWorkerizeMessagePreprocessing.
- * @param text - The value of `text`.
+ * Should workerize message preprocessing.
+ * @param text - Input text content.
  */
 
 export function shouldWorkerizeMessagePreprocessing(text: string): boolean {
   return text.length >= LARGE_MARKDOWN_PREPROCESS_TEXT_LENGTH;
 }
 /**
- * Function of shouldSkipSyntaxHighlighting.
- * @param code - The value of `code`.
+ * Should skip syntax highlighting.
+ * @param code - code argument for shouldSkipSyntaxHighlighting.
  */
 
 export function shouldSkipSyntaxHighlighting(code: string): boolean {
@@ -59,8 +59,8 @@ export function shouldSkipSyntaxHighlighting(code: string): boolean {
   return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
 }
 /**
- * Function of splitMarkdownTextForPreparedRendering.
- * @param text - The value of `text`.
+ * Performs splitMarkdownTextForPreparedRendering operation.
+ * @param text - Input text content.
  */
 
 function splitMarkdownTextForPreparedRendering(text: string): string[] {
@@ -97,10 +97,10 @@ function splitMarkdownTextForPreparedRendering(text: string): string[] {
   return chunks.length > 0 ? chunks : [text];
 }
 /**
- * Function of pushPreparedMarkdownBlocks.
- * @param blocks - The value of `blocks`.
- * @param text - The value of `text`.
- * @param startIndex - The value of `startIndex`.
+ * Performs pushPreparedMarkdownBlocks operation.
+ * @param blocks - blocks argument for pushPreparedMarkdownBlocks.
+ * @param text - Input text content.
+ * @param startIndex - startIndex argument for pushPreparedMarkdownBlocks.
  */
 
 function pushPreparedMarkdownBlocks(
@@ -126,8 +126,8 @@ function pushPreparedMarkdownBlocks(
   return nextIndex;
 }
 /**
- * Function of prepareRichMarkdownBlocks.
- * @param text - The value of `text`.
+ * Performs prepareRichMarkdownBlocks operation.
+ * @param text - Input text content.
  */
 
 function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
@@ -200,8 +200,8 @@ function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
   return blocks;
 }
 /**
- * Function of prepareMessageRenderPlan.
- * @param text - The value of `text`.
+ * Performs prepareMessageRenderPlan operation.
+ * @param text - Input text content.
  */
 
 export function prepareMessageRenderPlan(

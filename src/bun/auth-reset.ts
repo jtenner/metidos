@@ -62,10 +62,10 @@ Commands:
 class MutedOutput extends Writable {
   muted = false;
   /**
-   * Function of _write.
-   * @param chunk - The value of `chunk`.
-   * @param encoding - The value of `encoding`.
-   * @param callback - The value of `callback`.
+   * Writes .
+   * @param chunk - chunk argument for _write.
+   * @param encoding - encoding argument for _write.
+   * @param callback - Callback to invoke.
    */
 
   override _write(
@@ -80,8 +80,8 @@ class MutedOutput extends Writable {
   }
 }
 /**
- * Function of isAuthPrimaryFactorType.
- * @param value - The value of `value`.
+ * Is auth primary factor type.
+ * @param value - Input value.
  */
 
 function isAuthPrimaryFactorType(
@@ -90,8 +90,8 @@ function isAuthPrimaryFactorType(
   return value === "pin" || value === "password";
 }
 /**
- * Function of formatPrimaryFactorLabel.
- * @param primaryFactorType - The value of `primaryFactorType`.
+ * Formats primary factor label.
+ * @param primaryFactorType - primaryFactorType argument for formatPrimaryFactorLabel.
  */
 
 function formatPrimaryFactorLabel(
@@ -100,8 +100,8 @@ function formatPrimaryFactorLabel(
   return primaryFactorType === "pin" ? "PIN" : "password";
 }
 /**
- * Function of toCliErrorMessage.
- * @param error - The value of `error`.
+ * Converts cli error message value.
+ * @param error - Error value to process.
  */
 
 function toCliErrorMessage(error: unknown): string {
@@ -120,8 +120,8 @@ function toCliErrorMessage(error: unknown): string {
   return String(error);
 }
 /**
- * Function of parseArgs.
- * @param args - The value of `args`.
+ * Parses args.
+ * @param args - Argument list passed to parseArgs.
  */
 
 function parseArgs(args: string[]): ParsedArgs {
@@ -176,8 +176,8 @@ function parseArgs(args: string[]): ParsedArgs {
   };
 }
 /**
- * Function of buildCliAuthProofInput.
- * @param input - The value of `input`.
+ * Builds cli auth proof input.
+ * @param input - input argument for buildCliAuthProofInput.
  */
 
 function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
@@ -197,9 +197,9 @@ function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
   };
 }
 /**
- * Function of resetPrimaryFactorFromCli.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Resets primary factor from cli.
+ * @param database - database argument for resetPrimaryFactorFromCli.
+ * @param input - input argument for resetPrimaryFactorFromCli.
  */
 
 export async function resetPrimaryFactorFromCli(
@@ -240,9 +240,9 @@ export async function resetPrimaryFactorFromCli(
   };
 }
 /**
- * Function of regenerateRecoveryCodesFromCli.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs regenerateRecoveryCodesFromCli operation.
+ * @param database - database argument for regenerateRecoveryCodesFromCli.
+ * @param input - input argument for regenerateRecoveryCodesFromCli.
  */
 
 export async function regenerateRecoveryCodesFromCli(
@@ -266,9 +266,9 @@ export async function regenerateRecoveryCodesFromCli(
   return recoveryCodes;
 }
 /**
- * Function of promptVisible.
- * @param readlineInterface - The value of `readlineInterface`.
- * @param question - The value of `question`.
+ * Performs promptVisible operation.
+ * @param readlineInterface - readlineInterface argument for promptVisible.
+ * @param question - question argument for promptVisible.
  */
 
 async function promptVisible(
@@ -278,10 +278,10 @@ async function promptVisible(
   return (await readlineInterface.question(question)).trim();
 }
 /**
- * Function of promptSecret.
- * @param readlineInterface - The value of `readlineInterface`.
- * @param output - The value of `output`.
- * @param question - The value of `question`.
+ * Performs promptSecret operation.
+ * @param readlineInterface - readlineInterface argument for promptSecret.
+ * @param output - output argument for promptSecret.
+ * @param question - question argument for promptSecret.
  */
 
 async function promptSecret(
@@ -300,8 +300,8 @@ async function promptSecret(
   }
 }
 /**
- * Function of promptPrimaryFactorType.
- * @param readlineInterface - The value of `readlineInterface`.
+ * Performs promptPrimaryFactorType operation.
+ * @param readlineInterface - readlineInterface argument for promptPrimaryFactorType.
  */
 
 async function promptPrimaryFactorType(
@@ -321,8 +321,8 @@ async function promptPrimaryFactorType(
   }
 }
 /**
- * Function of runInteractiveCli.
- * @param args - The value of `args`.
+ * Runs interactive cli.
+ * @param args - Argument list passed to runInteractiveCli.
  */
 
 async function runInteractiveCli(args: string[]): Promise<void> {

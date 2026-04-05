@@ -87,8 +87,8 @@ function PreparingLargeMarkdownMessage(): JSX.Element {
 }
 
 /**
- * Function of LargeMarkdownMessage.
- * @param text - The value of `text`.
+ * Performs LargeMarkdownMessage operation.
+ * @param text - Input text content.
  */
 function LargeMarkdownMessage({ text }: { text: string }): JSX.Element {
   const preprocessedMessage = usePreparedMessageRenderPlan(text);
@@ -134,9 +134,9 @@ export const MarkdownMessage = memo(function MarkdownMessage({
 });
 
 /**
- * Function of ContextUsageMeter.
- * @param inputTokens - The value of `inputTokens`.
- * @param contextWindowTokens - The value of `contextWindowTokens`.
+ * Performs ContextUsageMeter operation.
+ * @param inputTokens - inputTokens argument for ContextUsageMeter.
+ * @param contextWindowTokens - contextWindowTokens argument for ContextUsageMeter.
  */
 export function ContextUsageMeter({
   inputTokens,
@@ -186,8 +186,8 @@ export function ContextUsageMeter({
 }
 
 /**
- * Function of isAssistantVisibleMessage.
- * @param message - The value of `message`.
+ * Is assistant visible message.
+ * @param message - Message payload.
  */
 export function isAssistantVisibleMessage(message: VisibleMessage): boolean {
   // Non-chat entries (system/tool messages etc.) are always shown in conversation history.
@@ -195,8 +195,8 @@ export function isAssistantVisibleMessage(message: VisibleMessage): boolean {
 }
 
 /**
- * Function of isPlainAssistantTextMessage.
- * @param message - The value of `message`.
+ * Is plain assistant text message.
+ * @param message - Message payload.
  */
 export function isPlainAssistantTextMessage(message: VisibleMessage): boolean {
   // Exclude status-like tones so plain text bubbles keep spacing consistent.
@@ -219,8 +219,8 @@ export function ProcessingMessage(): JSX.Element {
 }
 
 /**
- * Function of ChatErrorMessage.
- * @param text - The value of `text`.
+ * Performs ChatErrorMessage operation.
+ * @param text - Input text content.
  */
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -231,8 +231,8 @@ export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
 }
 
 /**
- * Function of ChatNoticeMessage.
- * @param text - The value of `text`.
+ * Performs ChatNoticeMessage operation.
+ * @param text - Input text content.
  */
 export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -243,9 +243,9 @@ export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
 }
 
 /**
- * Function of commandStateLabel.
- * @param state - The value of `state`.
- * @param exitCode - The value of `exitCode`.
+ * Performs commandStateLabel operation.
+ * @param state - Current state value.
+ * @param exitCode - exitCode argument for commandStateLabel.
  */
 function commandStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
@@ -264,8 +264,8 @@ function commandStateLabel(
 }
 
 /**
- * Function of toolCallStateLabel.
- * @param state - The value of `state`.
+ * Performs toolCallStateLabel operation.
+ * @param state - Current state value.
  */
 function toolCallStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
@@ -283,8 +283,8 @@ function toolCallStateLabel(
 }
 
 /**
- * Function of webSearchStateLabel.
- * @param state - The value of `state`.
+ * Performs webSearchStateLabel operation.
+ * @param state - Current state value.
  */
 function webSearchStateLabel(
   state: "in_progress" | "completed" | "stopped",
@@ -299,8 +299,8 @@ function webSearchStateLabel(
 }
 
 /**
- * Function of errorItemStateLabel.
- * @param state - The value of `state`.
+ * Performs errorItemStateLabel operation.
+ * @param state - Current state value.
  */
 function errorItemStateLabel(
   state: "in_progress" | "completed" | "stopped",
@@ -315,8 +315,8 @@ function errorItemStateLabel(
 }
 
 /**
- * Function of diffLineClassName.
- * @param kind - The value of `kind`.
+ * Performs diffLineClassName operation.
+ * @param kind - kind argument for diffLineClassName.
  */
 function diffLineClassName(kind: DiffLineKind): string {
   if (kind === "meta") {
@@ -438,12 +438,12 @@ export function DiffViewer({
 }
 
 /**
- * Function of ToolCallMessage.
- * @param server - The value of `server`.
- * @param tool - The value of `tool`.
- * @param argumentsText - The value of `argumentsText`.
- * @param output - The value of `output`.
- * @param state - The value of `state`.
+ * Performs ToolCallMessage operation.
+ * @param server - server argument for ToolCallMessage.
+ * @param tool - tool argument for ToolCallMessage.
+ * @param argumentsText - argumentsText argument for ToolCallMessage.
+ * @param output - output argument for ToolCallMessage.
+ * @param state - Current state value.
  */
 export function ToolCallMessage({
   server,
@@ -500,9 +500,9 @@ export function ToolCallMessage({
 }
 
 /**
- * Function of WebSearchMessage.
- * @param query - The value of `query`.
- * @param state - The value of `state`.
+ * Performs WebSearchMessage operation.
+ * @param query - Query string.
+ * @param state - Current state value.
  */
 export function WebSearchMessage({
   query,
@@ -530,9 +530,9 @@ export function WebSearchMessage({
 }
 
 /**
- * Function of ErrorItemMessage.
- * @param text - The value of `text`.
- * @param state - The value of `state`.
+ * Performs ErrorItemMessage operation.
+ * @param text - Input text content.
+ * @param state - Current state value.
  */
 export function ErrorItemMessage({
   text,
@@ -560,13 +560,13 @@ export function ErrorItemMessage({
 }
 
 /**
- * Function of CommandExecutionMessage.
- * @param command - The value of `command`.
- * @param output - The value of `output`.
- * @param state - The value of `state`.
- * @param exitCode - The value of `exitCode`.
- * @param expanded - The value of `expanded`.
- * @param onToggleExpanded - The value of `onToggleExpanded`.
+ * Performs CommandExecutionMessage operation.
+ * @param command - command argument for CommandExecutionMessage.
+ * @param output - output argument for CommandExecutionMessage.
+ * @param state - Current state value.
+ * @param exitCode - exitCode argument for CommandExecutionMessage.
+ * @param expanded - Whether the section is expanded.
+ * @param onToggleExpanded - Callback invoked when expansion changes.
  */
 export function CommandExecutionMessage({
   command,
@@ -650,9 +650,9 @@ export function CommandExecutionMessage({
 }
 
 /**
- * Function of ReasoningMessage.
- * @param state - The value of `state`.
- * @param text - The value of `text`.
+ * Performs ReasoningMessage operation.
+ * @param state - Current state value.
+ * @param text - Input text content.
  */
 export function ReasoningMessage({
   state,
@@ -682,13 +682,13 @@ export function ReasoningMessage({
 }
 
 /**
- * Function of FileChangeMessage.
- * @param path - The value of `path`.
- * @param diffText - The value of `diffText`.
- * @param changeKind - The value of `changeKind`.
- * @param state - The value of `state`.
- * @param expanded - The value of `expanded`.
- * @param onToggleExpanded - The value of `onToggleExpanded`.
+ * Performs FileChangeMessage operation.
+ * @param path - Filesystem path.
+ * @param diffText - Diff content to process.
+ * @param changeKind - changeKind argument for FileChangeMessage.
+ * @param state - Current state value.
+ * @param expanded - Whether the section is expanded.
+ * @param onToggleExpanded - Callback invoked when expansion changes.
  */
 export function FileChangeMessage({
   path,
@@ -794,9 +794,9 @@ export function FileChangeMessage({
 }
 
 /**
- * Function of GitHistoryDiffModal.
- * @param state - The value of `state`.
- * @param onClose - The value of `onClose`.
+ * Renders the GitHistoryDiffModal component.
+ * @param state - Current state value.
+ * @param onClose - onClose argument for GitHistoryDiffModal.
  */
 export function GitHistoryDiffModal({
   state,
@@ -877,10 +877,10 @@ export function GitHistoryDiffModal({
 }
 
 /**
- * Function of DesktopMessageGroups.
- * @param groups - The value of `groups`.
- * @param localUserLabel - The value of `localUserLabel`.
- * @param renderAssistantMessageContent - The value of `renderAssistantMessageContent`.
+ * Performs DesktopMessageGroups operation.
+ * @param groups - groups argument for DesktopMessageGroups.
+ * @param localUserLabel - localUserLabel argument for DesktopMessageGroups.
+ * @param renderAssistantMessageContent - renderAssistantMessageContent argument for DesktopMessageGroups.
  */
 export function DesktopMessageGroups({
   groups,
@@ -953,10 +953,10 @@ export function DesktopMessageGroups({
 }
 
 /**
- * Function of MobileMessageGroups.
- * @param groups - The value of `groups`.
- * @param localUserLabel - The value of `localUserLabel`.
- * @param renderAssistantMessageContent - The value of `renderAssistantMessageContent`.
+ * Performs MobileMessageGroups operation.
+ * @param groups - groups argument for MobileMessageGroups.
+ * @param localUserLabel - localUserLabel argument for MobileMessageGroups.
+ * @param renderAssistantMessageContent - renderAssistantMessageContent argument for MobileMessageGroups.
  */
 export function MobileMessageGroups({
   groups,
@@ -1027,10 +1027,10 @@ export function MobileMessageGroups({
 }
 
 /**
- * Function of ErrorPreviewPopover.
- * @param text - The value of `text`.
- * @param x - The value of `x`.
- * @param y - The value of `y`.
+ * Performs ErrorPreviewPopover operation.
+ * @param text - Input text content.
+ * @param x - x argument for ErrorPreviewPopover.
+ * @param y - y argument for ErrorPreviewPopover.
  */
 export function ErrorPreviewPopover({
   text,
@@ -1059,11 +1059,11 @@ export function ErrorPreviewPopover({
 }
 
 /**
- * Function of ThreadSummaryPopover.
- * @param title - The value of `title`.
- * @param summary - The value of `summary`.
- * @param x - The value of `x`.
- * @param y - The value of `y`.
+ * Performs ThreadSummaryPopover operation.
+ * @param title - title argument for ThreadSummaryPopover.
+ * @param summary - summary argument for ThreadSummaryPopover.
+ * @param x - x argument for ThreadSummaryPopover.
+ * @param y - y argument for ThreadSummaryPopover.
  */
 export function ThreadSummaryPopover({
   title,

@@ -12,9 +12,9 @@ import {
 import type { VisibleMessage } from "./state";
 
 /**
- * Function of assistantChatMessage.
- * @param key - The value of `key`.
- * @param text - The value of `text`.
+ * Performs assistantChatMessage operation.
+ * @param key - key argument for assistantChatMessage.
+ * @param text - Input text content.
  */
 
 function assistantChatMessage(key: string, text: string): VisibleMessage {
@@ -27,9 +27,9 @@ function assistantChatMessage(key: string, text: string): VisibleMessage {
   };
 }
 /**
- * Function of userChatMessage.
- * @param key - The value of `key`.
- * @param text - The value of `text`.
+ * Provides hook behavior for rChatMessage.
+ * @param key - key argument for userChatMessage.
+ * @param text - Input text content.
  */
 
 function userChatMessage(key: string, text: string): VisibleMessage {
@@ -41,9 +41,9 @@ function userChatMessage(key: string, text: string): VisibleMessage {
   };
 }
 /**
- * Function of reasoningMessage.
- * @param key - The value of `key`.
- * @param text - The value of `text`.
+ * Performs reasoningMessage operation.
+ * @param key - key argument for reasoningMessage.
+ * @param text - Input text content.
  */
 
 function reasoningMessage(key: string, text: string): VisibleMessage {

@@ -122,39 +122,39 @@ export function deriveWorktreeDisplayPathByKey(
   return next;
 }
 /**
- * Function of useMainviewDerivedState.
- * @param chatError - The value of `chatError`.
- * @param codexModels - The value of `codexModels`.
- * @param defaultCodexModel - The value of `defaultCodexModel`.
- * @param defaultCodexReasoningEffort - The value of `defaultCodexReasoningEffort`.
- * @param getProjectState - The value of `getProjectState`.
- * @param getWorktreeState - The value of `getWorktreeState`.
- * @param gitHistory - The value of `gitHistory`.
- * @param homeDirectory - The value of `homeDirectory`.
- * @param isCreatingThread - The value of `isCreatingThread`.
- * @param isDocumentVisible - The value of `isDocumentVisible`.
- * @param isLoadingProjectTasks - The value of `isLoadingProjectTasks`.
- * @param isRunningProjectTask - The value of `isRunningProjectTask`.
- * @param isSending - The value of `isSending`.
- * @param isStoppingThread - The value of `isStoppingThread`.
- * @param isThreadLoading - The value of `isThreadLoading`.
- * @param isUpdatingThreadModel - The value of `isUpdatingThreadModel`.
- * @param isUpdatingThreadReasoningEffort - The value of `isUpdatingThreadReasoningEffort`.
- * @param isUpdatingThreadUnsafeMode - The value of `isUpdatingThreadUnsafeMode`.
- * @param pendingThreadModel - The value of `pendingThreadModel`.
- * @param pendingThreadReasoningEffort - The value of `pendingThreadReasoningEffort`.
- * @param pendingThreadUnsafeMode - The value of `pendingThreadUnsafeMode`.
- * @param projectActionMenu - The value of `projectActionMenu`.
- * @param projects - The value of `projects`.
- * @param reasoningEfforts - The value of `reasoningEfforts`.
- * @param selectedDiffFilePath - The value of `selectedDiffFilePath`.
- * @param selectedProjectId - The value of `selectedProjectId`.
- * @param selectedThreadId - The value of `selectedThreadId`.
- * @param selectedWorktreePath - The value of `selectedWorktreePath`.
- * @param sidebarSearchQuery - The value of `sidebarSearchQuery`.
- * @param supportsTildePath - The value of `supportsTildePath`.
- * @param threadActionMenu - The value of `threadActionMenu`.
- * @param threads - The value of `threads`.
+ * Provides hook behavior for MainviewDerivedState.
+ * @param chatError - chatError argument for useMainviewDerivedState.
+ * @param codexModels - codexModels argument for useMainviewDerivedState.
+ * @param defaultCodexModel - defaultCodexModel argument for useMainviewDerivedState.
+ * @param defaultCodexReasoningEffort - defaultCodexReasoningEffort argument for useMainviewDerivedState.
+ * @param getProjectState - getProjectState argument for useMainviewDerivedState.
+ * @param getWorktreeState - getWorktreeState argument for useMainviewDerivedState.
+ * @param gitHistory - gitHistory argument for useMainviewDerivedState.
+ * @param homeDirectory - homeDirectory argument for useMainviewDerivedState.
+ * @param isCreatingThread - Boolean flag indicating isCreatingThread.
+ * @param isDocumentVisible - Boolean flag indicating isDocumentVisible.
+ * @param isLoadingProjectTasks - Boolean flag indicating isLoadingProjectTasks.
+ * @param isRunningProjectTask - Boolean flag indicating isRunningProjectTask.
+ * @param isSending - Boolean flag indicating isSending.
+ * @param isStoppingThread - Boolean flag indicating isStoppingThread.
+ * @param isThreadLoading - Boolean flag indicating isThreadLoading.
+ * @param isUpdatingThreadModel - Boolean flag indicating isUpdatingThreadModel.
+ * @param isUpdatingThreadReasoningEffort - Boolean flag indicating isUpdatingThreadReasoningEffort.
+ * @param isUpdatingThreadUnsafeMode - Boolean flag indicating isUpdatingThreadUnsafeMode.
+ * @param pendingThreadModel - pendingThreadModel argument for useMainviewDerivedState.
+ * @param pendingThreadReasoningEffort - pendingThreadReasoningEffort argument for useMainviewDerivedState.
+ * @param pendingThreadUnsafeMode - pendingThreadUnsafeMode argument for useMainviewDerivedState.
+ * @param projectActionMenu - projectActionMenu argument for useMainviewDerivedState.
+ * @param projects - projects argument for useMainviewDerivedState.
+ * @param reasoningEfforts - reasoningEfforts argument for useMainviewDerivedState.
+ * @param selectedDiffFilePath - selectedDiffFilePath path used by useMainviewDerivedState.
+ * @param selectedProjectId - selectedProjectId identifier.
+ * @param selectedThreadId - selectedThreadId identifier.
+ * @param selectedWorktreePath - selectedWorktreePath path used by useMainviewDerivedState.
+ * @param sidebarSearchQuery - sidebarSearchQuery argument for useMainviewDerivedState.
+ * @param supportsTildePath - supportsTildePath path used by useMainviewDerivedState.
+ * @param threadActionMenu - threadActionMenu argument for useMainviewDerivedState.
+ * @param threads - threads argument for useMainviewDerivedState.
  */
 
 export function useMainviewDerivedState({

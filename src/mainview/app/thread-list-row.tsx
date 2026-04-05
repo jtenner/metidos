@@ -209,8 +209,8 @@ export const ThreadList = memo(function ThreadList({
 });
 
 /**
- * Function of ThreadListPreviewPortal.
- * @param children - The value of `children`.
+ * Performs ThreadListPreviewPortal operation.
+ * @param children - Nested child content.
  */
 function ThreadListPreviewPortal({
   children,
@@ -419,9 +419,9 @@ const ThreadListRow = memo(function ThreadListRow({
 }, areThreadListRowPropsEqual);
 
 /**
- * Function of isPreviewAnchorActive.
- * @param anchorId - The value of `anchorId`.
- * @param popover - The value of `popover`.
+ * Is preview anchor active.
+ * @param anchorId - anchorId identifier.
+ * @param popover - popover argument for isPreviewAnchorActive.
  */
 function isPreviewAnchorActive(
   anchorId: string,

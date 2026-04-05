@@ -32,10 +32,10 @@ const codeTagStyle = {
 } satisfies CSSProperties;
 
 /**
- * Function of renderPreparedCodeBlock.
- * @param code - The value of `code`.
- * @param language - The value of `language`.
- * @param shouldHighlight - The value of `shouldHighlight`.
+ * Renders prepared code block.
+ * @param code - code argument for renderPreparedCodeBlock.
+ * @param language - language argument for renderPreparedCodeBlock.
+ * @param shouldHighlight - Boolean flag indicating shouldHighlight.
  */
 function renderPreparedCodeBlock({
   code,
@@ -75,10 +75,10 @@ function renderPreparedCodeBlock({
 
 const markdownComponents: Components = {
   /**
-   * Function of a.
-   * @param href - The value of `href`.
-   * @param children - The value of `children`.
-   * @param props - The value of `props`.
+   * Renders markdown link elements.
+   * @param href - href argument for a.
+   * @param children - Nested child content.
+   * @param props - props argument for a.
    */
 
   a({ href, children, ...props }) {
@@ -94,11 +94,11 @@ const markdownComponents: Components = {
       </a>
     );
   } /**
-   * Function of code.
-   * @param children - The value of `children`.
-   * @param className - The value of `className`.
-   * @param _node - The value of `_node`.
-   * @param props - The value of `props`.
+   * Renders inline and block markdown code elements.
+   * @param children - Nested child content.
+   * @param className - Optional CSS class names.
+   * @param _node - _node argument for code.
+   * @param props - props argument for code.
    */,
 
   code({ children, className, node: _node, ...props }) {
@@ -144,15 +144,15 @@ const markdownComponents: Components = {
       </code>
     );
   } /**
-   * Function of pre.
-   * @param children - The value of `children`.
+   * Renders preformatted markdown blocks.
+   * @param children - Nested child content.
    */,
 
   pre({ children }) {
     return <div className="my-3 overflow-x-auto">{children}</div>;
   } /**
-   * Function of table.
-   * @param children - The value of `children`.
+   * Renders markdown table blocks.
+   * @param children - Nested child content.
    */,
 
   table({ children }) {
@@ -165,8 +165,8 @@ const markdownComponents: Components = {
 };
 
 /**
- * Function of RichMarkdownMessage.
- * @param text - The value of `text`.
+ * Performs RichMarkdownMessage operation.
+ * @param text - Input text content.
  */
 export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -182,8 +182,8 @@ export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
 }
 
 /**
- * Function of PreparedRichMarkdownMessage.
- * @param plan - The value of `plan`.
+ * Performs PreparedRichMarkdownMessage operation.
+ * @param plan - plan argument for PreparedRichMarkdownMessage.
  */
 export function PreparedRichMarkdownMessage({
   plan,

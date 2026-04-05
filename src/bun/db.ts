@@ -304,7 +304,7 @@ function ensureAppDirectory(appDataPath: string): void {
 
 /**
  * Probe directory by writing and deleting a temp file.
- * @param path - The value of `path`.
+ * @param path - Filesystem path.
  */
 function isWritableDirectory(path: string): boolean {
   try {
@@ -321,8 +321,8 @@ function isWritableDirectory(path: string): boolean {
   }
 }
 /**
- * Function of applyOwnerOnlyFilePermissions.
- * @param path - The value of `path`.
+ * Applies owner only file permissions.
+ * @param path - Filesystem path.
  */
 
 function applyOwnerOnlyFilePermissions(path: string): void {
@@ -333,8 +333,8 @@ function applyOwnerOnlyFilePermissions(path: string): void {
   }
 }
 /**
- * Function of selectWritableAppDataDirectory.
- * @param options - The value of `options`.
+ * Selects writable app data directory.
+ * @param options - Configuration options used by this operation.
  */
 
 export function selectWritableAppDataDirectory(options: {
@@ -384,16 +384,16 @@ function resolveAppDataDirectory(): string {
   return resolvedAppDataDir;
 }
 /**
- * Function of getAppDataDirectoryPath.
- * @param options - The value of `options`.
+ * Gets app data directory path.
+ * @param options - Configuration options used by this operation.
  */
 
 export function getAppDataDirectoryPath(options?: AppDataPathOptions): string {
   return options?.appDataDir ?? resolveAppDataDirectory();
 }
 /**
- * Function of applyAppDatabasePermissions.
- * @param dbPath - The value of `dbPath`.
+ * Applies app database permissions.
+ * @param dbPath - dbPath path used by applyAppDatabasePermissions.
  */
 
 function applyAppDatabasePermissions(dbPath: string): void {
@@ -409,10 +409,10 @@ function applyAppDatabasePermissions(dbPath: string): void {
   }
 }
 /**
- * Function of tableHasColumn.
- * @param db - The value of `db`.
- * @param tableName - The value of `tableName`.
- * @param columnName - The value of `columnName`.
+ * Performs tableHasColumn operation.
+ * @param db - db argument for tableHasColumn.
+ * @param tableName - tableName argument for tableHasColumn.
+ * @param columnName - columnName argument for tableHasColumn.
  */
 
 function tableHasColumn(
@@ -465,7 +465,7 @@ function ensureThreadMessageColumn(
 /**
  * Migrate/create schema and apply incremental column backfills on startup.
  * Keeps the on-disk DB in sync with expected runtime shape.
- * @param db - The value of `db`.
+ * @param db - db argument for db.
  */
 export function migrateDatabase(db: Database): void {
   runStatement(
@@ -770,8 +770,8 @@ export function migrateDatabase(db: Database): void {
   );
 }
 /**
- * Function of getAppDatabasePath.
- * @param options - The value of `options`.
+ * Gets app database path.
+ * @param options - Configuration options used by this operation.
  */
 
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
@@ -816,8 +816,8 @@ export function initAppDatabase(): Database {
   return db;
 }
 /**
- * Function of getAuthSettings.
- * @param database - The value of `database`.
+ * Gets auth settings.
+ * @param database - database argument for getAuthSettings.
  */
 
 export function getAuthSettings(database: Database): AuthSettingsRecord | null {
@@ -842,9 +842,9 @@ export function getAuthSettings(database: Database): AuthSettingsRecord | null {
     .get();
 }
 /**
- * Function of upsertAuthSettings.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Upserts auth settings.
+ * @param database - database argument for upsertAuthSettings.
+ * @param input - input argument for upsertAuthSettings.
  */
 
 export function upsertAuthSettings(
@@ -896,10 +896,10 @@ export function upsertAuthSettings(
   return settings;
 }
 /**
- * Function of setAuthFailureState.
- * @param database - The value of `database`.
- * @param failedPrimaryFactorAttempts - The value of `failedPrimaryFactorAttempts`.
- * @param lockedUntil - The value of `lockedUntil`.
+ * Sets auth failure state.
+ * @param database - database argument for setAuthFailureState.
+ * @param failedPrimaryFactorAttempts - failedPrimaryFactorAttempts argument for setAuthFailureState.
+ * @param lockedUntil - lockedUntil argument for setAuthFailureState.
  */
 
 export function setAuthFailureState(
@@ -923,8 +923,8 @@ export function setAuthFailureState(
   );
 }
 /**
- * Function of resetAuthFailureState.
- * @param database - The value of `database`.
+ * Resets auth failure state.
+ * @param database - database argument for resetAuthFailureState.
  */
 
 export function resetAuthFailureState(database: Database): void {
@@ -933,8 +933,8 @@ export function resetAuthFailureState(database: Database): void {
   setAuthFailureState(database, 0, null);
 }
 /**
- * Function of listAuthRecoveryCodes.
- * @param database - The value of `database`.
+ * Lists auth recovery codes.
+ * @param database - database argument for listAuthRecoveryCodes.
  */
 
 export function listAuthRecoveryCodes(
@@ -956,9 +956,9 @@ export function listAuthRecoveryCodes(
     .all();
 }
 /**
- * Function of replaceAuthRecoveryCodeHashes.
- * @param database - The value of `database`.
- * @param codeHashes - The value of `codeHashes`.
+ * Replaces auth recovery code hashes.
+ * @param database - database argument for replaceAuthRecoveryCodeHashes.
+ * @param codeHashes - codeHashes argument for replaceAuthRecoveryCodeHashes.
  */
 
 export function replaceAuthRecoveryCodeHashes(
@@ -987,10 +987,10 @@ export function replaceAuthRecoveryCodeHashes(
   });
 }
 /**
- * Function of markAuthRecoveryCodeUsed.
- * @param database - The value of `database`.
- * @param codeHash - The value of `codeHash`.
- * @param usedAt - The value of `usedAt`.
+ * Marks auth recovery code used.
+ * @param database - database argument for markAuthRecoveryCodeUsed.
+ * @param codeHash - codeHash argument for markAuthRecoveryCodeUsed.
+ * @param usedAt - usedAt argument for markAuthRecoveryCodeUsed.
  */
 
 export function markAuthRecoveryCodeUsed(
@@ -1013,9 +1013,9 @@ export function markAuthRecoveryCodeUsed(
   return Number(result.changes) > 0;
 }
 /**
- * Function of createAuthSession.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Creates auth session.
+ * @param database - database argument for createAuthSession.
+ * @param input - input argument for createAuthSession.
  */
 
 export function createAuthSession(
@@ -1050,9 +1050,9 @@ export function createAuthSession(
   return session;
 }
 /**
- * Function of getAuthSession.
- * @param database - The value of `database`.
- * @param sessionId - The value of `sessionId`.
+ * Gets auth session.
+ * @param database - database argument for getAuthSession.
+ * @param sessionId - sessionId identifier.
  */
 
 export function getAuthSession(
@@ -1076,11 +1076,11 @@ export function getAuthSession(
     .get(sessionId);
 }
 /**
- * Function of touchAuthSession.
- * @param database - The value of `database`.
- * @param sessionId - The value of `sessionId`.
- * @param lastUsedAt - The value of `lastUsedAt`.
- * @param expiresAt - The value of `expiresAt`.
+ * Touches auth session.
+ * @param database - database argument for touchAuthSession.
+ * @param sessionId - sessionId identifier.
+ * @param lastUsedAt - lastUsedAt argument for touchAuthSession.
+ * @param expiresAt - expiresAt argument for touchAuthSession.
  */
 
 export function touchAuthSession(
@@ -1120,10 +1120,10 @@ export function touchAuthSession(
   );
 }
 /**
- * Function of setAuthSessionStepUpValidUntil.
- * @param database - The value of `database`.
- * @param sessionId - The value of `sessionId`.
- * @param stepUpValidUntil - The value of `stepUpValidUntil`.
+ * Sets auth session step up valid until.
+ * @param database - database argument for setAuthSessionStepUpValidUntil.
+ * @param sessionId - sessionId identifier.
+ * @param stepUpValidUntil - stepUpValidUntil argument for setAuthSessionStepUpValidUntil.
  */
 
 export function setAuthSessionStepUpValidUntil(
@@ -1144,9 +1144,9 @@ export function setAuthSessionStepUpValidUntil(
   );
 }
 /**
- * Function of deleteAuthSession.
- * @param database - The value of `database`.
- * @param sessionId - The value of `sessionId`.
+ * Deletes auth session.
+ * @param database - database argument for deleteAuthSession.
+ * @param sessionId - sessionId identifier.
  */
 
 export function deleteAuthSession(database: Database, sessionId: string): void {
@@ -1155,8 +1155,8 @@ export function deleteAuthSession(database: Database, sessionId: string): void {
   runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
 }
 /**
- * Function of deleteAllAuthSessions.
- * @param database - The value of `database`.
+ * Deletes all auth sessions.
+ * @param database - database argument for deleteAllAuthSessions.
  */
 
 export function deleteAllAuthSessions(database: Database): number {
@@ -1165,9 +1165,9 @@ export function deleteAllAuthSessions(database: Database): number {
   return Number(result.changes);
 }
 /**
- * Function of deleteExpiredAuthSessions.
- * @param database - The value of `database`.
- * @param now - The value of `now`.
+ * Deletes expired auth sessions.
+ * @param database - database argument for deleteExpiredAuthSessions.
+ * @param now - now argument for deleteExpiredAuthSessions.
  */
 
 export function deleteExpiredAuthSessions(
@@ -1187,9 +1187,9 @@ export function deleteExpiredAuthSessions(
   return Number(result.changes);
 }
 /**
- * Function of createAuthWebSocketTicket.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Creates auth web socket ticket.
+ * @param database - database argument for createAuthWebSocketTicket.
+ * @param input - input argument for createAuthWebSocketTicket.
  */
 
 export function createAuthWebSocketTicket(
@@ -1222,9 +1222,9 @@ export function createAuthWebSocketTicket(
   return ticket;
 }
 /**
- * Function of getAuthWebSocketTicket.
- * @param database - The value of `database`.
- * @param ticketId - The value of `ticketId`.
+ * Gets auth web socket ticket.
+ * @param database - database argument for getAuthWebSocketTicket.
+ * @param ticketId - ticketId identifier.
  */
 
 export function getAuthWebSocketTicket(
@@ -1249,10 +1249,10 @@ export function getAuthWebSocketTicket(
     .get(ticketId);
 }
 /**
- * Function of consumeAuthWebSocketTicket.
- * @param database - The value of `database`.
- * @param ticketId - The value of `ticketId`.
- * @param consumedAt - The value of `consumedAt`.
+ * Performs consumeAuthWebSocketTicket operation.
+ * @param database - database argument for consumeAuthWebSocketTicket.
+ * @param ticketId - ticketId identifier.
+ * @param consumedAt - consumedAt argument for consumeAuthWebSocketTicket.
  */
 
 export function consumeAuthWebSocketTicket(
@@ -1278,9 +1278,9 @@ export function consumeAuthWebSocketTicket(
   return getAuthWebSocketTicket(database, ticketId);
 }
 /**
- * Function of deleteExpiredAuthWebSocketTickets.
- * @param database - The value of `database`.
- * @param now - The value of `now`.
+ * Deletes expired auth web socket tickets.
+ * @param database - database argument for deleteExpiredAuthWebSocketTickets.
+ * @param now - now argument for deleteExpiredAuthWebSocketTickets.
  */
 
 export function deleteExpiredAuthWebSocketTickets(
@@ -1301,9 +1301,9 @@ export function deleteExpiredAuthWebSocketTickets(
   return Number(result.changes);
 }
 /**
- * Function of createSecurityAuditEvent.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Creates security audit event.
+ * @param database - database argument for createSecurityAuditEvent.
+ * @param input - input argument for createSecurityAuditEvent.
  */
 
 export function createSecurityAuditEvent(
@@ -1355,9 +1355,9 @@ export function createSecurityAuditEvent(
   return event;
 }
 /**
- * Function of listSecurityAuditEvents.
- * @param database - The value of `database`.
- * @param options - The value of `options`.
+ * Lists security audit events.
+ * @param database - database argument for listSecurityAuditEvents.
+ * @param options - Configuration options used by this operation.
  */
 
 export function listSecurityAuditEvents(
@@ -1502,9 +1502,9 @@ export function listSecurityAuditEvents(
     .all();
 }
 /**
- * Function of getProject.
- * @param database - The value of `database`.
- * @param projectPath - The value of `projectPath`.
+ * Gets project.
+ * @param database - database argument for getProject.
+ * @param projectPath - projectPath path used by getProject.
  */
 
 export function getProject(
@@ -1531,9 +1531,9 @@ export function getProject(
     .get(projectPath);
 }
 /**
- * Function of getProjectById.
- * @param database - The value of `database`.
- * @param projectId - The value of `projectId`.
+ * Gets project by id.
+ * @param database - database argument for getProjectById.
+ * @param projectId - Project identifier.
  */
 
 export function getProjectById(
@@ -1561,8 +1561,8 @@ export function getProjectById(
     .get(projectId);
 }
 /**
- * Function of listProjects.
- * @param database - The value of `database`.
+ * Lists projects.
+ * @param database - database argument for listProjects.
  */
 
 export function listProjects(database: Database): ProjectRecord[] {
@@ -1586,9 +1586,9 @@ export function listProjects(database: Database): ProjectRecord[] {
     .all();
 }
 /**
- * Function of upsertProject.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Upserts project.
+ * @param database - database argument for upsertProject.
+ * @param input - input argument for upsertProject.
  */
 
 export function upsertProject(
@@ -1621,8 +1621,8 @@ export function upsertProject(
   return project;
 }
 /**
- * Function of listOpenProjects.
- * @param database - The value of `database`.
+ * Lists open projects.
+ * @param database - database argument for listOpenProjects.
  */
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
@@ -1647,9 +1647,9 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
     .all();
 }
 /**
- * Function of setProjectClosed.
- * @param database - The value of `database`.
- * @param projectId - The value of `projectId`.
+ * Sets project closed.
+ * @param database - database argument for setProjectClosed.
+ * @param projectId - Project identifier.
  */
 
 export function setProjectClosed(database: Database, projectId: number): void {
@@ -1662,9 +1662,9 @@ export function setProjectClosed(database: Database, projectId: number): void {
   );
 }
 /**
- * Function of deleteProject.
- * @param database - The value of `database`.
- * @param projectId - The value of `projectId`.
+ * Deletes project.
+ * @param database - database argument for deleteProject.
+ * @param projectId - Project identifier.
  */
 
 export function deleteProject(database: Database, projectId: number): void {
@@ -1672,9 +1672,9 @@ export function deleteProject(database: Database, projectId: number): void {
   runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
 }
 /**
- * Function of listProjectWorktreePins.
- * @param database - The value of `database`.
- * @param projectId - The value of `projectId`.
+ * Lists project worktree pins.
+ * @param database - database argument for listProjectWorktreePins.
+ * @param projectId - Project identifier.
  */
 
 export function listProjectWorktreePins(
@@ -1697,11 +1697,11 @@ export function listProjectWorktreePins(
     .all(projectId);
 }
 /**
- * Function of setProjectWorktreePinned.
- * @param database - The value of `database`.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
- * @param pinned - The value of `pinned`.
+ * Sets project worktree pinned.
+ * @param database - database argument for setProjectWorktreePinned.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
+ * @param pinned - pinned argument for setProjectWorktreePinned.
  */
 
 export function setProjectWorktreePinned(
@@ -1749,8 +1749,8 @@ export function setProjectWorktreePinned(
   );
 }
 /**
- * Function of listThreads.
- * @param database - The value of `database`.
+ * Lists threads.
+ * @param database - database argument for listThreads.
  */
 
 export function listThreads(database: Database): ThreadRecord[] {
@@ -1797,9 +1797,9 @@ export function listThreads(database: Database): ThreadRecord[] {
     .all();
 }
 /**
- * Function of getThreadById.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Gets thread by id.
+ * @param database - database argument for getThreadById.
+ * @param threadId - Thread identifier.
  */
 
 export function getThreadById(
@@ -1845,9 +1845,9 @@ export function getThreadById(
     .get(threadId);
 }
 /**
- * Function of createThread.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Creates thread.
+ * @param database - database argument for createThread.
+ * @param input - input argument for createThread.
  */
 
 export function createThread(
@@ -1899,10 +1899,10 @@ export function createThread(
   return thread;
 }
 /**
- * Function of updateThreadCodexId.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param codexThreadId - The value of `codexThreadId`.
+ * Updates thread codex id.
+ * @param database - database argument for updateThreadCodexId.
+ * @param threadId - Thread identifier.
+ * @param codexThreadId - codexThreadId identifier.
  */
 
 export function updateThreadCodexId(
@@ -1925,11 +1925,11 @@ export function updateThreadCodexId(
   );
 }
 /**
- * Function of renameThread.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param title - The value of `title`.
- * @param summary - The value of `summary`.
+ * Performs renameThread operation.
+ * @param database - database argument for renameThread.
+ * @param threadId - Thread identifier.
+ * @param title - title argument for renameThread.
+ * @param summary - summary argument for renameThread.
  */
 
 export function renameThread(
@@ -1969,10 +1969,10 @@ export function renameThread(
   );
 }
 /**
- * Function of setThreadModel.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param model - The value of `model`.
+ * Sets thread model.
+ * @param database - database argument for setThreadModel.
+ * @param threadId - Thread identifier.
+ * @param model - model argument for setThreadModel.
  */
 
 export function setThreadModel(
@@ -1995,10 +1995,10 @@ export function setThreadModel(
   );
 }
 /**
- * Function of setThreadReasoningEffort.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param reasoningEffort - The value of `reasoningEffort`.
+ * Sets thread reasoning effort.
+ * @param database - database argument for setThreadReasoningEffort.
+ * @param threadId - Thread identifier.
+ * @param reasoningEffort - reasoningEffort argument for setThreadReasoningEffort.
  */
 
 export function setThreadReasoningEffort(
@@ -2022,10 +2022,10 @@ export function setThreadReasoningEffort(
   );
 }
 /**
- * Function of setThreadUnsafeMode.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param unsafeMode - The value of `unsafeMode`.
+ * Sets thread unsafe mode.
+ * @param database - database argument for setThreadUnsafeMode.
+ * @param threadId - Thread identifier.
+ * @param unsafeMode - unsafeMode argument for setThreadUnsafeMode.
  */
 
 export function setThreadUnsafeMode(
@@ -2048,10 +2048,10 @@ export function setThreadUnsafeMode(
   );
 }
 /**
- * Function of setThreadPinned.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param pinned - The value of `pinned`.
+ * Sets thread pinned.
+ * @param database - database argument for setThreadPinned.
+ * @param threadId - Thread identifier.
+ * @param pinned - pinned argument for setThreadPinned.
  */
 
 export function setThreadPinned(
@@ -2079,9 +2079,9 @@ export function setThreadPinned(
   );
 }
 /**
- * Function of deleteThread.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Deletes thread.
+ * @param database - database argument for deleteThread.
+ * @param threadId - Thread identifier.
  */
 
 export function deleteThread(database: Database, threadId: number): void {
@@ -2089,9 +2089,9 @@ export function deleteThread(database: Database, threadId: number): void {
   runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
 }
 /**
- * Function of markThreadRan.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Marks thread ran.
+ * @param database - database argument for markThreadRan.
+ * @param threadId - Thread identifier.
  */
 
 export function markThreadRan(database: Database, threadId: number): void {
@@ -2114,10 +2114,10 @@ export function markThreadRan(database: Database, threadId: number): void {
   );
 }
 /**
- * Function of markThreadRunStarted.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param startedAt - The value of `startedAt`.
+ * Marks thread run started.
+ * @param database - database argument for markThreadRunStarted.
+ * @param threadId - Thread identifier.
+ * @param startedAt - startedAt argument for markThreadRunStarted.
  */
 
 export function markThreadRunStarted(
@@ -2145,10 +2145,10 @@ export function markThreadRunStarted(
   );
 }
 /**
- * Function of markThreadStopped.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param message - The value of `message`.
+ * Marks thread stopped.
+ * @param database - database argument for markThreadStopped.
+ * @param threadId - Thread identifier.
+ * @param message - Message payload.
  */
 
 export function markThreadStopped(
@@ -2175,11 +2175,11 @@ export function markThreadStopped(
   );
 }
 /**
- * Function of setThreadUsage.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param usage - The value of `usage`.
- * @param compactionStats - The value of `compactionStats`.
+ * Sets thread usage.
+ * @param database - database argument for setThreadUsage.
+ * @param threadId - Thread identifier.
+ * @param usage - usage argument for setThreadUsage.
+ * @param compactionStats - compactionStats argument for setThreadUsage.
  */
 
 export function setThreadUsage(
@@ -2220,10 +2220,10 @@ export function setThreadUsage(
   );
 }
 /**
- * Function of markThreadFailed.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param errorMessage - The value of `errorMessage`.
+ * Marks thread failed.
+ * @param database - database argument for markThreadFailed.
+ * @param threadId - Thread identifier.
+ * @param errorMessage - errorMessage argument for markThreadFailed.
  */
 
 export function markThreadFailed(
@@ -2249,9 +2249,9 @@ export function markThreadFailed(
   );
 }
 /**
- * Function of markThreadErrorSeen.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Marks thread error seen.
+ * @param database - database argument for markThreadErrorSeen.
+ * @param threadId - Thread identifier.
  */
 
 export function markThreadErrorSeen(
@@ -2278,8 +2278,8 @@ export function markThreadErrorSeen(
   );
 }
 /**
- * Function of listThreadsWithInProgressMessages.
- * @param database - The value of `database`.
+ * Lists threads with in progress messages.
+ * @param database - database argument for listThreadsWithInProgressMessages.
  */
 
 export function listThreadsWithInProgressMessages(
@@ -2300,9 +2300,9 @@ export function listThreadsWithInProgressMessages(
     .all();
 }
 /**
- * Function of listThreadMessages.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Lists thread messages.
+ * @param database - database argument for listThreadMessages.
+ * @param threadId - Thread identifier.
  */
 
 export function listThreadMessages(
@@ -2333,10 +2333,10 @@ export function listThreadMessages(
     .all(threadId);
 }
 /**
- * Function of listThreadMessagesPage.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param options - The value of `options`.
+ * Lists thread messages page.
+ * @param database - database argument for listThreadMessagesPage.
+ * @param threadId - Thread identifier.
+ * @param options - Configuration options used by this operation.
  */
 
 export function listThreadMessagesPage(
@@ -2407,9 +2407,9 @@ export function listThreadMessagesPage(
   };
 }
 /**
- * Function of createThreadMessage.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Creates thread message.
+ * @param database - database argument for createThreadMessage.
+ * @param input - input argument for createThreadMessage.
  */
 
 export function createThreadMessage(
@@ -2464,9 +2464,9 @@ export function createThreadMessage(
   return message;
 }
 /**
- * Function of upsertThreadActivity.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Upserts thread activity.
+ * @param database - database argument for upsertThreadActivity.
+ * @param input - input argument for upsertThreadActivity.
  */
 
 export function upsertThreadActivity(
@@ -2481,10 +2481,10 @@ export function upsertThreadActivity(
   upsertThreadActivities(database, [input]);
 }
 /**
- * Function of findThreadActivityMessageId.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
+ * Finds thread activity message id.
+ * @param database - database argument for findThreadActivityMessageId.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
  */
 
 function findThreadActivityMessageId(
@@ -2507,10 +2507,10 @@ function findThreadActivityMessageId(
   return existing ? existing.id : null;
 }
 /**
- * Function of updateThreadActivityById.
- * @param database - The value of `database`.
- * @param messageId - The value of `messageId`.
- * @param input - The value of `input`.
+ * Updates thread activity by id.
+ * @param database - database argument for updateThreadActivityById.
+ * @param messageId - messageId identifier.
+ * @param input - input argument for updateThreadActivityById.
  */
 
 function updateThreadActivityById(
@@ -2546,9 +2546,9 @@ function updateThreadActivityById(
   return Number(result.changes) > 0;
 }
 /**
- * Function of insertThreadActivity.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Inserts thread activity.
+ * @param database - database argument for insertThreadActivity.
+ * @param input - input argument for insertThreadActivity.
  */
 
 function insertThreadActivity(
@@ -2582,9 +2582,9 @@ function insertThreadActivity(
   return Number(result.lastInsertRowid);
 }
 /**
- * Function of upsertThreadActivities.
- * @param database - The value of `database`.
- * @param inputs - The value of `inputs`.
+ * Upserts thread activities.
+ * @param database - database argument for upsertThreadActivities.
+ * @param inputs - inputs argument for upsertThreadActivities.
  */
 
 export function upsertThreadActivities(
@@ -2639,9 +2639,9 @@ export function upsertThreadActivities(
   });
 }
 /**
- * Function of stopInProgressThreadMessages.
- * @param database - The value of `database`.
- * @param threadId - The value of `threadId`.
+ * Performs stopInProgressThreadMessages operation.
+ * @param database - database argument for stopInProgressThreadMessages.
+ * @param threadId - Thread identifier.
  */
 
 export function stopInProgressThreadMessages(

@@ -252,7 +252,7 @@ export function warmProcedureStartupCaches(): void {
 
 /**
  * Return the latest terminal timestamp from a thread (run or error), if any.
- * @param thread - The value of `thread`.
+ * @param thread - thread argument for thread.
  */
 function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
   if (thread.lastRunAt && thread.lastErrorAt) {
@@ -510,8 +510,8 @@ function hasForegroundReadPressure(): boolean {
   return foregroundReadCount > 0;
 }
 /**
- * Function of shouldRefreshWorktreeTaskCache.
- * @param state - The value of `state`.
+ * Should refresh worktree task cache.
+ * @param state - Current state value.
  */
 
 function shouldRefreshWorktreeTaskCache(state: WorktreePollState): boolean {
@@ -534,9 +534,9 @@ function flushDeferredBackgroundWork(): void {
   }
 }
 /**
- * Function of queueBackgroundWorkWhenIdle.
- * @param key - The value of `key`.
- * @param callback - The value of `callback`.
+ * Performs queueBackgroundWorkWhenIdle operation.
+ * @param key - key argument for queueBackgroundWorkWhenIdle.
+ * @param callback - Callback to invoke.
  */
 
 function queueBackgroundWorkWhenIdle(key: string, callback: () => void): void {
@@ -555,8 +555,8 @@ function syncAllProjectBackgroundPolling(): void {
   }
 }
 /**
- * Function of withForegroundRead.
- * @param callback - The value of `callback`.
+ * Performs withForegroundRead operation.
+ * @param callback - Callback to invoke.
  */
 
 async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
@@ -572,8 +572,8 @@ async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
   }
 }
 /**
- * Function of runTaskCacheRefreshLimited.
- * @param callback - The value of `callback`.
+ * Runs task cache refresh limited.
+ * @param callback - Callback to invoke.
  */
 
 function runTaskCacheRefreshLimited<T>(callback: () => Promise<T>): Promise<T> {
@@ -582,9 +582,9 @@ function runTaskCacheRefreshLimited<T>(callback: () => Promise<T>): Promise<T> {
   });
 }
 /**
- * Function of runWorktreeOpenLimited.
- * @param callback - The value of `callback`.
- * @param signal - The value of `signal`.
+ * Runs worktree open limited.
+ * @param callback - Callback to invoke.
+ * @param signal - Abort signal for cancellation.
  */
 
 function runWorktreeOpenLimited<T>(
@@ -597,10 +597,10 @@ function runWorktreeOpenLimited<T>(
   });
 }
 /**
- * Function of runGitHistoryReadLimited.
- * @param callback - The value of `callback`.
- * @param signal - The value of `signal`.
- * @param abortMessage - The value of `abortMessage`.
+ * Runs git history read limited.
+ * @param callback - Callback to invoke.
+ * @param signal - Abort signal for cancellation.
+ * @param abortMessage - abortMessage argument for runGitHistoryReadLimited.
  */
 
 function runGitHistoryReadLimited<T>(
@@ -614,10 +614,10 @@ function runGitHistoryReadLimited<T>(
   });
 }
 /**
- * Function of runDiffLoadLimited.
- * @param callback - The value of `callback`.
- * @param signal - The value of `signal`.
- * @param abortMessage - The value of `abortMessage`.
+ * Runs diff load limited.
+ * @param callback - Callback to invoke.
+ * @param signal - Abort signal for cancellation.
+ * @param abortMessage - abortMessage argument for runDiffLoadLimited.
  */
 
 function runDiffLoadLimited<T>(
@@ -631,8 +631,8 @@ function runDiffLoadLimited<T>(
   });
 }
 /**
- * Function of recordTaskCacheRefreshDuration.
- * @param durationMs - The value of `durationMs`.
+ * Performs recordTaskCacheRefreshDuration operation.
+ * @param durationMs - durationMs argument for recordTaskCacheRefreshDuration.
  */
 
 function recordTaskCacheRefreshDuration(durationMs: number): void {
@@ -643,8 +643,8 @@ function recordTaskCacheRefreshDuration(durationMs: number): void {
   );
 }
 /**
- * Function of recordThreadActivityPersistenceDuration.
- * @param durationMs - The value of `durationMs`.
+ * Performs recordThreadActivityPersistenceDuration operation.
+ * @param durationMs - durationMs argument for recordThreadActivityPersistenceDuration.
  */
 
 function recordThreadActivityPersistenceDuration(durationMs: number): void {
@@ -721,8 +721,8 @@ function joltRpcUrl(): string {
   return JOLT_DEFAULT_RPC_URL;
 }
 /**
- * Function of createCodexClient.
- * @param thread - The value of `thread`.
+ * Creates codex client.
+ * @param thread - thread argument for createCodexClient.
  */
 
 function createCodexClient(
@@ -746,8 +746,8 @@ function createCodexClient(
   });
 }
 /**
- * Function of gitPriorityFromRpcRequest.
- * @param priority - The value of `priority`.
+ * Performs gitPriorityFromRpcRequest operation.
+ * @param priority - priority argument for gitPriorityFromRpcRequest.
  */
 
 function gitPriorityFromRpcRequest(
@@ -756,8 +756,8 @@ function gitPriorityFromRpcRequest(
   return priority === "background" ? "background" : "foreground";
 }
 /**
- * Function of gitCommandOptionsFromRequest.
- * @param context - The value of `context`.
+ * Performs gitCommandOptionsFromRequest operation.
+ * @param context - Execution context.
  */
 
 function gitCommandOptionsFromRequest(
@@ -773,16 +773,16 @@ function gitCommandOptionsFromRequest(
   };
 }
 /**
- * Function of invalidateThreadDetailCache.
- * @param threadId - The value of `threadId`.
+ * Performs invalidateThreadDetailCache operation.
+ * @param threadId - Thread identifier.
  */
 
 function invalidateThreadDetailCache(threadId: number): void {
   threadDetailCache.delete(threadId);
 }
 /**
- * Function of clearThreadRuntimeState.
- * @param threadId - The value of `threadId`.
+ * Performs clearThreadRuntimeState operation.
+ * @param threadId - Thread identifier.
  */
 
 function clearThreadRuntimeState(threadId: number): void {
@@ -799,8 +799,8 @@ function clearThreadRuntimeState(threadId: number): void {
   invalidateThreadDetailCache(threadId);
 }
 /**
- * Function of clearProjectThreadRuntimeState.
- * @param projectId - The value of `projectId`.
+ * Performs clearProjectThreadRuntimeState operation.
+ * @param projectId - Project identifier.
  */
 
 function clearProjectThreadRuntimeState(projectId: number): void {
@@ -812,9 +812,9 @@ function clearProjectThreadRuntimeState(projectId: number): void {
   }
 }
 /**
- * Function of setThreadRunStatus.
- * @param threadId - The value of `threadId`.
- * @param status - The value of `status`.
+ * Sets thread run status.
+ * @param threadId - Thread identifier.
+ * @param status - status argument for setThreadRunStatus.
  */
 
 function setThreadRunStatus(
@@ -825,27 +825,27 @@ function setThreadRunStatus(
   invalidateThreadDetailCache(threadId);
 }
 /**
- * Function of currentThreadRunStatus.
- * @param thread - The value of `thread`.
+ * Performs currentThreadRunStatus operation.
+ * @param thread - thread argument for currentThreadRunStatus.
  */
 
 function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
   return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
 /**
- * Function of resolveUnsafeMode.
- * @param unsafeMode - The value of `unsafeMode`.
+ * Resolves unsafe mode.
+ * @param unsafeMode - unsafeMode argument for resolveUnsafeMode.
  */
 
 function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
   return unsafeMode === true;
 }
 /**
- * Function of codexThreadOptions.
- * @param worktreePath - The value of `worktreePath`.
- * @param model - The value of `model`.
- * @param reasoningEffort - The value of `reasoningEffort`.
- * @param unsafeMode - The value of `unsafeMode`.
+ * Performs codexThreadOptions operation.
+ * @param worktreePath - Worktree path.
+ * @param model - model argument for codexThreadOptions.
+ * @param reasoningEffort - reasoningEffort argument for codexThreadOptions.
+ * @param unsafeMode - unsafeMode argument for codexThreadOptions.
  */
 
 function codexThreadOptions(
@@ -866,8 +866,8 @@ function codexThreadOptions(
   };
 }
 /**
- * Function of createManagedCodexThread.
- * @param thread - The value of `thread`.
+ * Creates managed codex thread.
+ * @param thread - thread argument for createManagedCodexThread.
  */
 
 function createManagedCodexThread(thread: ThreadRecord): CodexThread {
@@ -897,8 +897,8 @@ function createManagedCodexThread(thread: ThreadRecord): CodexThread {
       );
 }
 /**
- * Function of ensureCodexThread.
- * @param thread - The value of `thread`.
+ * Performs ensureCodexThread operation.
+ * @param thread - thread argument for ensureCodexThread.
  */
 
 async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
@@ -912,8 +912,8 @@ async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
   return next;
 }
 /**
- * Function of threadById.
- * @param threadId - The value of `threadId`.
+ * Performs threadById operation.
+ * @param threadId - Thread identifier.
  */
 
 function threadById(threadId: number): ThreadRecord {
@@ -924,8 +924,8 @@ function threadById(threadId: number): ThreadRecord {
   return thread;
 }
 /**
- * Function of rpcThreadById.
- * @param threadId - The value of `threadId`.
+ * Performs rpcThreadById operation.
+ * @param threadId - Thread identifier.
  */
 
 function rpcThreadById(threadId: number): RpcThread {
@@ -933,9 +933,9 @@ function rpcThreadById(threadId: number): RpcThread {
   return toRpcThread(thread, currentThreadRunStatus(thread));
 }
 /**
- * Function of buildThreadDetail.
- * @param threadId - The value of `threadId`.
- * @param options - The value of `options`.
+ * Builds thread detail.
+ * @param threadId - Thread identifier.
+ * @param options - Configuration options used by this operation.
  */
 
 async function buildThreadDetail(
@@ -956,8 +956,8 @@ async function buildThreadDetail(
   };
 }
 /**
- * Function of readThreadDetailCached.
- * @param threadId - The value of `threadId`.
+ * Reads thread detail cached.
+ * @param threadId - Thread identifier.
  */
 
 async function readThreadDetailCached(
@@ -978,8 +978,8 @@ async function readThreadDetailCached(
   return detail;
 }
 /**
- * Function of warmThreadDetailCache.
- * @param threadId - The value of `threadId`.
+ * Performs warmThreadDetailCache operation.
+ * @param threadId - Thread identifier.
  */
 
 function warmThreadDetailCache(threadId: number): void {
@@ -988,12 +988,12 @@ function warmThreadDetailCache(threadId: number): void {
   });
 }
 /**
- * Function of settleCanceledThreadTurn.
- * @param threadId - The value of `threadId`.
- * @param startedAt - The value of `startedAt`.
- * @param lastAssistantItemId - The value of `lastAssistantItemId`.
- * @param lastAssistantText - The value of `lastAssistantText`.
- * @param message - The value of `message`.
+ * Performs settleCanceledThreadTurn operation.
+ * @param threadId - Thread identifier.
+ * @param startedAt - startedAt argument for settleCanceledThreadTurn.
+ * @param lastAssistantItemId - lastAssistantItemId identifier.
+ * @param lastAssistantText - lastAssistantText argument for settleCanceledThreadTurn.
+ * @param message - Message payload.
  */
 
 async function settleCanceledThreadTurn(
@@ -1023,8 +1023,8 @@ async function settleCanceledThreadTurn(
   });
 }
 /**
- * Function of interruptionMessageFromAbort.
- * @param reason - The value of `reason`.
+ * Performs interruptionMessageFromAbort operation.
+ * @param reason - Reason for this operation.
  */
 
 function interruptionMessageFromAbort(reason: unknown): string {
@@ -1047,20 +1047,20 @@ function interruptionMessageFromAbort(reason: unknown): string {
   return THREAD_INTERRUPTED_MESSAGE;
 }
 /**
- * Function of buildThreadTurnActivityId.
- * @param startedAt - The value of `startedAt`.
- * @param itemId - The value of `itemId`.
+ * Builds thread turn activity id.
+ * @param startedAt - startedAt argument for buildThreadTurnActivityId.
+ * @param itemId - itemId identifier.
  */
 
 function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
   return `${startedAt}:${itemId}`;
 }
 /**
- * Function of runThreadMessageInBackground.
- * @param threadId - The value of `threadId`.
- * @param input - The value of `input`.
- * @param startedAt - The value of `startedAt`.
- * @param controller - The value of `controller`.
+ * Runs thread message in background.
+ * @param threadId - Thread identifier.
+ * @param input - input argument for runThreadMessageInBackground.
+ * @param startedAt - startedAt argument for runThreadMessageInBackground.
+ * @param controller - controller argument for runThreadMessageInBackground.
  */
 
 async function runThreadMessageInBackground(
@@ -1372,9 +1372,9 @@ async function runThreadMessageInBackground(
   }
 }
 /**
- * Function of worktreePathFromName.
- * @param projectPath - The value of `projectPath`.
- * @param worktreeName - The value of `worktreeName`.
+ * Performs worktreePathFromName operation.
+ * @param projectPath - projectPath path used by worktreePathFromName.
+ * @param worktreeName - worktreeName argument for worktreePathFromName.
  */
 
 function worktreePathFromName(
@@ -1393,10 +1393,10 @@ function worktreePathFromName(
   return resolve(dirname(projectPath), `${basename(projectPath)}-${token}`);
 }
 /**
- * Function of readProjectWorktrees.
- * @param projectPath - The value of `projectPath`.
- * @param projectId - The value of `projectId`.
- * @param options - The value of `options`.
+ * Reads project worktrees.
+ * @param projectPath - projectPath path used by readProjectWorktrees.
+ * @param projectId - Project identifier.
+ * @param options - Configuration options used by this operation.
  */
 
 async function readProjectWorktrees(
@@ -1442,8 +1442,8 @@ async function readProjectWorktrees(
   return worktrees;
 }
 /**
- * Function of listDirectorySuggestionsProcedure.
- * @param params - The value of `params`.
+ * Lists directory suggestions procedure.
+ * @param params - Parameters object.
  */
 
 export async function listDirectorySuggestionsProcedure(
@@ -1454,8 +1454,8 @@ export async function listDirectorySuggestionsProcedure(
   };
 }
 /**
- * Function of assertProjectDirectory.
- * @param projectPath - The value of `projectPath`.
+ * Performs assertProjectDirectory operation.
+ * @param projectPath - projectPath path used by assertProjectDirectory.
  */
 
 function assertProjectDirectory(projectPath: string): void {
@@ -1467,9 +1467,9 @@ function assertProjectDirectory(projectPath: string): void {
   }
 }
 /**
- * Function of logBackgroundGitFailure.
- * @param message - The value of `message`.
- * @param error - The value of `error`.
+ * Performs logBackgroundGitFailure operation.
+ * @param message - Message payload.
+ * @param error - Error value to process.
  */
 
 function logBackgroundGitFailure(message: string, error: unknown): void {
@@ -1509,8 +1509,8 @@ type BufferedThreadActivityWrite = {
   terminal: boolean;
 };
 /**
- * Function of stringifyActivityValue.
- * @param value - The value of `value`.
+ * Stringifies activity value.
+ * @param value - Input value.
  */
 
 function stringifyActivityValue(value: unknown): string {
@@ -1527,8 +1527,8 @@ function stringifyActivityValue(value: unknown): string {
   }
 }
 /**
- * Function of extractToolCallTextContent.
- * @param content - The value of `content`.
+ * Performs extractToolCallTextContent operation.
+ * @param content - content argument for extractToolCallTextContent.
  */
 
 function extractToolCallTextContent(content: unknown): string {
@@ -1554,8 +1554,8 @@ function extractToolCallTextContent(content: unknown): string {
     .join("\n\n");
 }
 /**
- * Function of formatToolCallOutput.
- * @param item - The value of `item`.
+ * Formats tool call output.
+ * @param item - item argument for formatToolCallOutput.
  */
 
 function formatToolCallOutput(
@@ -1626,8 +1626,8 @@ function createBufferedThreadActivityWriter(): {
   };
 
   /**
-   * Function of flushEntries.
-   * @param force - The value of `force`.
+   * Performs flushEntries operation.
+   * @param force - force argument for flushEntries.
    */
 
   const flushEntries = async (force: boolean): Promise<void> => {
@@ -1726,8 +1726,8 @@ function createBufferedThreadActivityWriter(): {
   };
 
   /**
-   * Function of enqueueFlush.
-   * @param force - The value of `force`.
+   * Performs enqueueFlush operation.
+   * @param force - force argument for enqueueFlush.
    */
 
   const enqueueFlush = (force: boolean): Promise<void> => {
@@ -1780,8 +1780,8 @@ function createBufferedThreadActivityWriter(): {
   };
 }
 /**
- * Function of persistThreadActivityInputs.
- * @param inputs - The value of `inputs`.
+ * Performs persistThreadActivityInputs operation.
+ * @param inputs - inputs argument for persistThreadActivityInputs.
  */
 
 function persistThreadActivityInputs(
@@ -1808,11 +1808,11 @@ function persistThreadActivityInputs(
   }
 }
 /**
- * Function of buildReasoningActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param item - The value of `item`.
- * @param state - The value of `state`.
+ * Builds reasoning activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param item - item argument for buildReasoningActivityInput.
+ * @param state - Current state value.
  */
 
 function buildReasoningActivityInput(
@@ -1830,11 +1830,11 @@ function buildReasoningActivityInput(
   };
 }
 /**
- * Function of buildAssistantChatActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param text - The value of `text`.
- * @param state - The value of `state`.
+ * Builds assistant chat activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param text - Input text content.
+ * @param state - Current state value.
  */
 
 function buildAssistantChatActivityInput(
@@ -1853,11 +1853,11 @@ function buildAssistantChatActivityInput(
   };
 }
 /**
- * Function of upsertAssistantChatActivity.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param text - The value of `text`.
- * @param state - The value of `state`.
+ * Upserts assistant chat activity.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param text - Input text content.
+ * @param state - Current state value.
  */
 
 async function upsertAssistantChatActivity(
@@ -1871,10 +1871,10 @@ async function upsertAssistantChatActivity(
   ]);
 }
 /**
- * Function of buildCommandActivityInputPayload.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param payload - The value of `payload`.
+ * Builds command activity input payload.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param payload - payload argument for buildCommandActivityInputPayload.
  */
 
 function buildCommandActivityInputPayload(
@@ -1898,10 +1898,10 @@ function buildCommandActivityInputPayload(
   };
 }
 /**
- * Function of buildCommandActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param item - The value of `item`.
+ * Builds command activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param item - item argument for buildCommandActivityInput.
  */
 
 function buildCommandActivityInput(
@@ -1917,11 +1917,11 @@ function buildCommandActivityInput(
   });
 }
 /**
- * Function of buildFileChangeActivityInputs.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param worktreePath - The value of `worktreePath`.
- * @param item - The value of `item`.
+ * Builds file change activity inputs.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param worktreePath - Worktree path.
+ * @param item - item argument for buildFileChangeActivityInputs.
  */
 
 async function buildFileChangeActivityInputs(
@@ -1953,10 +1953,10 @@ async function buildFileChangeActivityInputs(
   );
 }
 /**
- * Function of buildToolCallActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param item - The value of `item`.
+ * Builds tool call activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param item - item argument for buildToolCallActivityInput.
  */
 
 function buildToolCallActivityInput(
@@ -1979,11 +1979,11 @@ function buildToolCallActivityInput(
   };
 }
 /**
- * Function of buildWebSearchActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param item - The value of `item`.
- * @param state - The value of `state`.
+ * Builds web search activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param item - item argument for buildWebSearchActivityInput.
+ * @param state - Current state value.
  */
 
 function buildWebSearchActivityInput(
@@ -2001,11 +2001,11 @@ function buildWebSearchActivityInput(
   };
 }
 /**
- * Function of buildErrorActivityInput.
- * @param threadId - The value of `threadId`.
- * @param itemId - The value of `itemId`.
- * @param item - The value of `item`.
- * @param state - The value of `state`.
+ * Builds error activity input.
+ * @param threadId - Thread identifier.
+ * @param itemId - itemId identifier.
+ * @param item - item argument for buildErrorActivityInput.
+ * @param state - Current state value.
  */
 
 function buildErrorActivityInput(
@@ -2023,9 +2023,9 @@ function buildErrorActivityInput(
   };
 }
 /**
- * Function of mergeProjectWorktreePins.
- * @param projectId - The value of `projectId`.
- * @param worktrees - The value of `worktrees`.
+ * Merges project worktree pins.
+ * @param projectId - Project identifier.
+ * @param worktrees - worktrees argument for mergeProjectWorktreePins.
  */
 
 function mergeProjectWorktreePins(
@@ -2045,10 +2045,10 @@ function mergeProjectWorktreePins(
   }));
 }
 /**
- * Function of listFreshProjectWorktrees.
- * @param projectPath - The value of `projectPath`.
- * @param projectId - The value of `projectId`.
- * @param options - The value of `options`.
+ * Lists fresh project worktrees.
+ * @param projectPath - projectPath path used by listFreshProjectWorktrees.
+ * @param projectId - Project identifier.
+ * @param options - Configuration options used by this operation.
  */
 
 async function listFreshProjectWorktrees(
@@ -2063,9 +2063,9 @@ async function listFreshProjectWorktrees(
   return mergeProjectWorktreePins(projectId, worktrees);
 }
 /**
- * Function of findKnownProjectWorktree.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Finds known project worktree.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 function findKnownProjectWorktree(
@@ -2083,9 +2083,9 @@ function getNow(): string {
   return new Date().toISOString();
 }
 /**
- * Function of refreshProjectPoll.
- * @param projectId - The value of `projectId`.
- * @param options - The value of `options`.
+ * Performs refreshProjectPoll operation.
+ * @param projectId - Project identifier.
+ * @param options - Configuration options used by this operation.
  */
 
 async function refreshProjectPoll(
@@ -2118,8 +2118,8 @@ async function refreshProjectPoll(
   syncProjectRefreshPolling(state);
 }
 /**
- * Function of startProjectRefreshPolling.
- * @param state - The value of `state`.
+ * Performs startProjectRefreshPolling operation.
+ * @param state - Current state value.
  */
 
 function startProjectRefreshPolling(state: ProjectPollState): void {
@@ -2139,8 +2139,8 @@ function startProjectRefreshPolling(state: ProjectPollState): void {
   }, PROJECT_POLL_INTERVAL_MS);
 }
 /**
- * Function of stopProjectRefreshPolling.
- * @param state - The value of `state`.
+ * Performs stopProjectRefreshPolling operation.
+ * @param state - Current state value.
  */
 
 function stopProjectRefreshPolling(state: ProjectPollState): void {
@@ -2152,8 +2152,8 @@ function stopProjectRefreshPolling(state: ProjectPollState): void {
   state.projectTimer = null;
 }
 /**
- * Function of syncProjectRefreshPolling.
- * @param state - The value of `state`.
+ * Performs syncProjectRefreshPolling operation.
+ * @param state - Current state value.
  */
 
 function syncProjectRefreshPolling(state: ProjectPollState): void {
@@ -2170,8 +2170,8 @@ function syncProjectRefreshPolling(state: ProjectPollState): void {
   stopProjectRefreshPolling(state);
 }
 /**
- * Function of ensureProjectPoller.
- * @param project - The value of `project`.
+ * Performs ensureProjectPoller operation.
+ * @param project - project argument for ensureProjectPoller.
  */
 
 function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
@@ -2197,9 +2197,9 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
   return state;
 }
 /**
- * Function of stopWorktreePolling.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs stopWorktreePolling operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
  */
 
 function stopWorktreePolling(
@@ -2217,9 +2217,9 @@ function stopWorktreePolling(
   state.openWorktrees.delete(worktreePath);
 }
 /**
- * Function of createWorktreePollState.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Creates worktree poll state.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 function createWorktreePollState(
@@ -2256,9 +2256,9 @@ function createWorktreePollState(
   };
 }
 /**
- * Function of ensureWorktreePollState.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs ensureWorktreePollState operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
  */
 
 function ensureWorktreePollState(
@@ -2275,8 +2275,8 @@ function ensureWorktreePollState(
   return worktreeState;
 }
 /**
- * Function of closeTaskWatchers.
- * @param worktreeState - The value of `worktreeState`.
+ * Closes task watchers.
+ * @param worktreeState - worktreeState argument for closeTaskWatchers.
  */
 
 function closeTaskWatchers(worktreeState: WorktreePollState): void {
@@ -2290,9 +2290,9 @@ function closeTaskWatchers(worktreeState: WorktreePollState): void {
   worktreeState.taskWatchers = [];
 }
 /**
- * Function of areTaskWatchTargetsEqual.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Performs areTaskWatchTargetsEqual operation.
+ * @param left - left argument for areTaskWatchTargetsEqual.
+ * @param right - right argument for areTaskWatchTargetsEqual.
  */
 
 function areTaskWatchTargetsEqual(
@@ -2312,9 +2312,9 @@ function areTaskWatchTargetsEqual(
   );
 }
 /**
- * Function of areProjectTasksEqual.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Performs areProjectTasksEqual operation.
+ * @param left - left argument for areProjectTasksEqual.
+ * @param right - right argument for areProjectTasksEqual.
  */
 
 function areProjectTasksEqual(
@@ -2341,9 +2341,9 @@ function areProjectTasksEqual(
   });
 }
 /**
- * Function of logBackgroundTaskFailure.
- * @param message - The value of `message`.
- * @param error - The value of `error`.
+ * Performs logBackgroundTaskFailure operation.
+ * @param message - Message payload.
+ * @param error - Error value to process.
  */
 
 function logBackgroundTaskFailure(message: string, error: unknown): void {
@@ -2354,10 +2354,10 @@ function logBackgroundTaskFailure(message: string, error: unknown): void {
   console.error(message, error);
 }
 /**
- * Function of refreshWorktreeTaskCache.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
- * @param options - The value of `options`.
+ * Performs refreshWorktreeTaskCache operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
+ * @param options - Configuration options used by this operation.
  */
 
 async function refreshWorktreeTaskCache(
@@ -2433,9 +2433,9 @@ async function refreshWorktreeTaskCache(
   }
 }
 /**
- * Function of stopWorktreeBackgroundPolling.
- * @param worktreeState - The value of `worktreeState`.
- * @param reason - The value of `reason`.
+ * Performs stopWorktreeBackgroundPolling operation.
+ * @param worktreeState - worktreeState argument for stopWorktreeBackgroundPolling.
+ * @param reason - Reason for this operation.
  */
 
 function stopWorktreeBackgroundPolling(
@@ -2449,9 +2449,9 @@ function stopWorktreeBackgroundPolling(
   abortGitHistoryPrefetch(worktreeState, reason);
 }
 /**
- * Function of startWorktreeTaskPolling.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs startWorktreeTaskPolling operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
  */
 
 function startWorktreeTaskPolling(
@@ -2495,8 +2495,8 @@ function startWorktreeTaskPolling(
     }
 
     /**
-     * Function of unregisterWatcher.
-     * @param watcherToRemove - The value of `watcherToRemove`.
+     * Performs unregisterWatcher operation.
+     * @param watcherToRemove - watcherToRemove argument for unregisterWatcher.
      */
 
     const unregisterWatcher = (watcherToRemove: FSWatcher | null) => {
@@ -2512,8 +2512,8 @@ function startWorktreeTaskPolling(
 
     let watcher: FSWatcher | null = null;
     /**
-     * Function of onWatchError.
-     * @param error - The value of `error`.
+     * Handles the watch error event.
+     * @param error - Error value to process.
      */
 
     const onWatchError = (error: unknown) => {
@@ -2588,9 +2588,9 @@ function startWorktreeTaskPolling(
   return worktreeState;
 }
 /**
- * Function of startWorktreeGitHistoryPolling.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs startWorktreeGitHistoryPolling operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
  */
 
 function startWorktreeGitHistoryPolling(
@@ -2648,8 +2648,8 @@ function startWorktreeGitHistoryPolling(
   return worktreeState;
 }
 /**
- * Function of syncProjectWorktreeBackgroundPolling.
- * @param state - The value of `state`.
+ * Performs syncProjectWorktreeBackgroundPolling operation.
+ * @param state - Current state value.
  */
 
 function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
@@ -2676,8 +2676,8 @@ function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
   }
 }
 /**
- * Function of stopProjectPoller.
- * @param projectId - The value of `projectId`.
+ * Performs stopProjectPoller operation.
+ * @param projectId - Project identifier.
  */
 
 function stopProjectPoller(projectId: number): void {
@@ -2692,8 +2692,8 @@ function stopProjectPoller(projectId: number): void {
   projectPollMap.delete(projectId);
 }
 /**
- * Function of projectByIdForPath.
- * @param projectId - The value of `projectId`.
+ * Performs projectByIdForPath operation.
+ * @param projectId - Project identifier.
  */
 
 function projectByIdForPath(projectId: number): ProjectRecord {
@@ -2704,10 +2704,10 @@ function projectByIdForPath(projectId: number): ProjectRecord {
   return project;
 }
 /**
- * Function of findProjectWorktree.
- * @param project - The value of `project`.
- * @param worktreePath - The value of `worktreePath`.
- * @param options - The value of `options`.
+ * Finds project worktree.
+ * @param project - project argument for findProjectWorktree.
+ * @param worktreePath - Worktree path.
+ * @param options - Configuration options used by this operation.
  */
 
 async function findProjectWorktree(
@@ -2723,10 +2723,10 @@ async function findProjectWorktree(
   return worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
 /**
- * Function of assertProjectWorktree.
- * @param project - The value of `project`.
- * @param worktreePath - The value of `worktreePath`.
- * @param options - The value of `options`.
+ * Performs assertProjectWorktree operation.
+ * @param project - project argument for assertProjectWorktree.
+ * @param worktreePath - Worktree path.
+ * @param options - Configuration options used by this operation.
  */
 
 async function assertProjectWorktree(
@@ -2743,9 +2743,9 @@ async function assertProjectWorktree(
   return worktree;
 }
 /**
- * Function of trackedProjectWorktree.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
+ * Performs trackedProjectWorktree operation.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
  */
 
 function trackedProjectWorktree(
@@ -2755,11 +2755,11 @@ function trackedProjectWorktree(
   return state.worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
 /**
- * Function of ensureTrackedProjectWorktree.
- * @param project - The value of `project`.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
- * @param options - The value of `options`.
+ * Performs ensureTrackedProjectWorktree operation.
+ * @param project - project argument for ensureTrackedProjectWorktree.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
+ * @param options - Configuration options used by this operation.
  */
 
 async function ensureTrackedProjectWorktree(
@@ -2788,13 +2788,13 @@ async function ensureTrackedProjectWorktree(
   );
 }
 /**
- * Function of createThreadRecord.
- * @param project - The value of `project`.
- * @param worktreePath - The value of `worktreePath`.
- * @param model - The value of `model`.
- * @param reasoningEffort - The value of `reasoningEffort`.
- * @param unsafeMode - The value of `unsafeMode`.
- * @param options - The value of `options`.
+ * Creates thread record.
+ * @param project - project argument for createThreadRecord.
+ * @param worktreePath - Worktree path.
+ * @param model - model argument for createThreadRecord.
+ * @param reasoningEffort - reasoningEffort argument for createThreadRecord.
+ * @param unsafeMode - unsafeMode argument for createThreadRecord.
+ * @param options - Configuration options used by this operation.
  */
 
 async function createThreadRecord(
@@ -2833,10 +2833,10 @@ async function createThreadRecord(
   }
 }
 /**
- * Function of recordUnsafeModeAuditEvent.
- * @param thread - The value of `thread`.
- * @param unsafeMode - The value of `unsafeMode`.
- * @param source - The value of `source`.
+ * Performs recordUnsafeModeAuditEvent operation.
+ * @param thread - thread argument for recordUnsafeModeAuditEvent.
+ * @param unsafeMode - unsafeMode argument for recordUnsafeModeAuditEvent.
+ * @param source - source argument for recordUnsafeModeAuditEvent.
  */
 
 function recordUnsafeModeAuditEvent(
@@ -2859,9 +2859,9 @@ function recordUnsafeModeAuditEvent(
   });
 }
 /**
- * Function of openProjectProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Opens project procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function openProjectProcedure(
@@ -2880,9 +2880,9 @@ export async function openProjectProcedure(
   });
 }
 /**
- * Function of openProjectWithGitOptions.
- * @param params - The value of `params`.
- * @param requestGitOptions - The value of `requestGitOptions`.
+ * Opens project with git options.
+ * @param params - Parameters object.
+ * @param requestGitOptions - requestGitOptions argument for openProjectWithGitOptions.
  */
 
 async function openProjectWithGitOptions(
@@ -2921,9 +2921,9 @@ async function openProjectWithGitOptions(
   };
 }
 /**
- * Function of openProjectsBatchProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Opens projects batch procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function openProjectsBatchProcedure(
@@ -2961,9 +2961,9 @@ export async function openProjectsBatchProcedure(
   });
 }
 /**
- * Function of listProjectWorktreesProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Lists project worktrees procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function listProjectWorktreesProcedure(
@@ -2987,9 +2987,9 @@ export async function listProjectWorktreesProcedure(
   });
 }
 /**
- * Function of listProjectTasksProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Lists project tasks procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function listProjectTasksProcedure(
@@ -3041,8 +3041,8 @@ export async function listProjectTasksProcedure(
   });
 }
 /**
- * Function of createWorktreeProcedure.
- * @param params - The value of `params`.
+ * Creates worktree procedure.
+ * @param params - Parameters object.
  */
 
 export async function createWorktreeProcedure(
@@ -3077,8 +3077,8 @@ export async function createWorktreeProcedure(
   };
 }
 /**
- * Function of setWorktreePinnedProcedure.
- * @param params - The value of `params`.
+ * Sets worktree pinned procedure.
+ * @param params - Parameters object.
  */
 
 export async function setWorktreePinnedProcedure(
@@ -3103,8 +3103,8 @@ export async function setWorktreePinnedProcedure(
   };
 }
 /**
- * Function of createThreadProcedure.
- * @param params - The value of `params`.
+ * Creates thread procedure.
+ * @param params - Parameters object.
  */
 
 export async function createThreadProcedure(
@@ -3132,8 +3132,8 @@ export async function createThreadProcedure(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Function of requestThreadStartProcedure.
- * @param params - The value of `params`.
+ * Performs requestThreadStartProcedure operation.
+ * @param params - Parameters object.
  */
 
 export async function requestThreadStartProcedure(
@@ -3171,8 +3171,8 @@ export async function requestThreadStartProcedure(
   };
 }
 /**
- * Function of getThreadProcedure.
- * @param params - The value of `params`.
+ * Gets thread procedure.
+ * @param params - Parameters object.
  */
 
 export async function getThreadProcedure(
@@ -3187,8 +3187,8 @@ export async function getThreadProcedure(
   return readThreadDetailCached(params.threadId);
 }
 /**
- * Function of markThreadErrorSeenProcedure.
- * @param params - The value of `params`.
+ * Marks thread error seen procedure.
+ * @param params - Parameters object.
  */
 
 export async function markThreadErrorSeenProcedure(
@@ -3204,8 +3204,8 @@ export async function markThreadErrorSeenProcedure(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Function of sendThreadMessageProcedure.
- * @param params - The value of `params`.
+ * Sends thread message procedure.
+ * @param params - Parameters object.
  */
 
 export async function sendThreadMessageProcedure(
@@ -3220,9 +3220,9 @@ export async function sendThreadMessageProcedure(
   return queueThreadMessage(thread, input);
 }
 /**
- * Function of queueThreadMessage.
- * @param thread - The value of `thread`.
- * @param input - The value of `input`.
+ * Performs queueThreadMessage operation.
+ * @param thread - thread argument for queueThreadMessage.
+ * @param input - input argument for queueThreadMessage.
  */
 
 async function queueThreadMessage(
@@ -3264,8 +3264,8 @@ async function queueThreadMessage(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Function of packageScriptDisplayCommand.
- * @param task - The value of `task`.
+ * Performs packageScriptDisplayCommand operation.
+ * @param task - task argument for packageScriptDisplayCommand.
  */
 
 function packageScriptDisplayCommand(task: {
@@ -3277,10 +3277,10 @@ function packageScriptDisplayCommand(task: {
     : `cd ${task.packageDirectory} && bun run ${task.scriptName}`;
 }
 /**
- * Function of readProcessOutputStream.
- * @param stream - The value of `stream`.
- * @param onChunk - The value of `onChunk`.
- * @param signal - The value of `signal`.
+ * Reads process output stream.
+ * @param stream - stream argument for readProcessOutputStream.
+ * @param onChunk - onChunk argument for readProcessOutputStream.
+ * @param signal - Abort signal for cancellation.
  */
 
 async function readProcessOutputStream(
@@ -3328,9 +3328,9 @@ async function readProcessOutputStream(
   }
 }
 /**
- * Function of queuePackageScriptTask.
- * @param thread - The value of `thread`.
- * @param task - The value of `task`.
+ * Performs queuePackageScriptTask operation.
+ * @param thread - thread argument for queuePackageScriptTask.
+ * @param task - task argument for queuePackageScriptTask.
  */
 
 async function queuePackageScriptTask(
@@ -3372,12 +3372,12 @@ async function queuePackageScriptTask(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Function of runPackageScriptTaskInBackground.
- * @param threadId - The value of `threadId`.
- * @param worktreePath - The value of `worktreePath`.
- * @param task - The value of `task`.
- * @param startedAt - The value of `startedAt`.
- * @param controller - The value of `controller`.
+ * Runs package script task in background.
+ * @param threadId - Thread identifier.
+ * @param worktreePath - Worktree path.
+ * @param task - task argument for runPackageScriptTaskInBackground.
+ * @param startedAt - startedAt argument for runPackageScriptTaskInBackground.
+ * @param controller - controller argument for runPackageScriptTaskInBackground.
  */
 
 async function runPackageScriptTaskInBackground(
@@ -3402,9 +3402,9 @@ async function runPackageScriptTaskInBackground(
   const bufferedActivityWriter = createBufferedThreadActivityWriter();
 
   /**
-   * Function of queueCommandActivity.
-   * @param state - The value of `state`.
-   * @param options - The value of `options`.
+   * Performs queueCommandActivity operation.
+   * @param state - Current state value.
+   * @param options - Configuration options used by this operation.
    */
 
   const queueCommandActivity = async (
@@ -3448,8 +3448,8 @@ async function runPackageScriptTaskInBackground(
     });
 
     /**
-     * Function of appendOutput.
-     * @param chunk - The value of `chunk`.
+     * Performs appendOutput operation.
+     * @param chunk - chunk argument for appendOutput.
      */
 
     const appendOutput = async (chunk: string) => {
@@ -3555,10 +3555,10 @@ async function runPackageScriptTaskInBackground(
   }
 }
 /**
- * Function of readAndStoreWorktreeSnapshot.
- * @param state - The value of `state`.
- * @param worktreePath - The value of `worktreePath`.
- * @param options - The value of `options`.
+ * Reads and store worktree snapshot.
+ * @param state - Current state value.
+ * @param worktreePath - Worktree path.
+ * @param options - Configuration options used by this operation.
  */
 
 async function readAndStoreWorktreeSnapshot(
@@ -3579,8 +3579,8 @@ async function readAndStoreWorktreeSnapshot(
   };
 }
 /**
- * Function of runProjectTaskProcedure.
- * @param params - The value of `params`.
+ * Runs project task procedure.
+ * @param params - Parameters object.
  */
 
 export async function runProjectTaskProcedure(
@@ -3649,8 +3649,8 @@ export async function runProjectTaskProcedure(
   }
 }
 /**
- * Function of stopThreadTurnProcedure.
- * @param params - The value of `params`.
+ * Performs stopThreadTurnProcedure operation.
+ * @param params - Parameters object.
  */
 
 export async function stopThreadTurnProcedure(
@@ -3676,8 +3676,8 @@ export async function stopThreadTurnProcedure(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Function of renameThreadProcedure.
- * @param params - The value of `params`.
+ * Performs renameThreadProcedure operation.
+ * @param params - Parameters object.
  */
 
 export async function renameThreadProcedure(
@@ -3692,8 +3692,8 @@ export async function renameThreadProcedure(
   });
 }
 /**
- * Function of updateThreadMetadataProcedure.
- * @param params - The value of `params`.
+ * Updates thread metadata procedure.
+ * @param params - Parameters object.
  */
 
 export async function updateThreadMetadataProcedure(
@@ -3738,8 +3738,8 @@ export async function updateThreadMetadataProcedure(
   return rpcThreadById(thread.id);
 }
 /**
- * Function of setThreadPinnedProcedure.
- * @param params - The value of `params`.
+ * Sets thread pinned procedure.
+ * @param params - Parameters object.
  */
 
 export async function setThreadPinnedProcedure(
@@ -3748,8 +3748,8 @@ export async function setThreadPinnedProcedure(
   return updateThreadMetadataProcedure(params);
 }
 /**
- * Function of updateThreadModelProcedure.
- * @param params - The value of `params`.
+ * Updates thread model procedure.
+ * @param params - Parameters object.
  */
 
 export async function updateThreadModelProcedure(
@@ -3767,8 +3767,8 @@ export async function updateThreadModelProcedure(
   return rpcThreadById(thread.id);
 }
 /**
- * Function of updateThreadReasoningEffortProcedure.
- * @param params - The value of `params`.
+ * Updates thread reasoning effort procedure.
+ * @param params - Parameters object.
  */
 
 export async function updateThreadReasoningEffortProcedure(
@@ -3788,8 +3788,8 @@ export async function updateThreadReasoningEffortProcedure(
   return rpcThreadById(thread.id);
 }
 /**
- * Function of updateThreadUnsafeModeProcedure.
- * @param params - The value of `params`.
+ * Updates thread unsafe mode procedure.
+ * @param params - Parameters object.
  */
 
 export async function updateThreadUnsafeModeProcedure(
@@ -3814,8 +3814,8 @@ export async function updateThreadUnsafeModeProcedure(
   return rpcThreadById(thread.id);
 }
 /**
- * Function of deleteThreadProcedure.
- * @param params - The value of `params`.
+ * Deletes thread procedure.
+ * @param params - Parameters object.
  */
 
 export async function deleteThreadProcedure(
@@ -3835,8 +3835,8 @@ export async function deleteThreadProcedure(
   };
 }
 /**
- * Function of discardEmptyThreadProcedure.
- * @param params - The value of `params`.
+ * Performs discardEmptyThreadProcedure operation.
+ * @param params - Parameters object.
  */
 
 export async function discardEmptyThreadProcedure(
@@ -3866,9 +3866,9 @@ export async function discardEmptyThreadProcedure(
   };
 }
 /**
- * Function of openWorktreeProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Opens worktree procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function openWorktreeProcedure(
@@ -3885,10 +3885,10 @@ export async function openWorktreeProcedure(
   });
 }
 /**
- * Function of openWorktreeWithGitOptions.
- * @param params - The value of `params`.
- * @param requestGitOptions - The value of `requestGitOptions`.
- * @param signal - The value of `signal`.
+ * Opens worktree with git options.
+ * @param params - Parameters object.
+ * @param requestGitOptions - requestGitOptions argument for openWorktreeWithGitOptions.
+ * @param signal - Abort signal for cancellation.
  */
 
 async function openWorktreeWithGitOptions(
@@ -3973,9 +3973,9 @@ async function openWorktreeWithGitOptions(
   };
 }
 /**
- * Function of openWorktreesBatchProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Opens worktrees batch procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function openWorktreesBatchProcedure(
@@ -4014,9 +4014,9 @@ export async function openWorktreesBatchProcedure(
   });
 }
 /**
- * Function of getWorktreeSnapshotProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Gets worktree snapshot procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function getWorktreeSnapshotProcedure(
@@ -4040,9 +4040,9 @@ export async function getWorktreeSnapshotProcedure(
   });
 }
 /**
- * Function of readWorktreeFileContentPageProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Reads worktree file content page procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function readWorktreeFileContentPageProcedure(
@@ -4074,9 +4074,9 @@ export async function readWorktreeFileContentPageProcedure(
   });
 }
 /**
- * Function of readWorktreeFileDiffProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Reads worktree file diff procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function readWorktreeFileDiffProcedure(
@@ -4108,9 +4108,9 @@ export async function readWorktreeFileDiffProcedure(
   });
 }
 /**
- * Function of listWorktreeGitHistoryProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Lists worktree git history procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function listWorktreeGitHistoryProcedure(
@@ -4238,9 +4238,9 @@ export async function listWorktreeGitHistoryProcedure(
   });
 }
 /**
- * Function of getWorktreeGitCommitDiffProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Gets worktree git commit diff procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function getWorktreeGitCommitDiffProcedure(
@@ -4274,9 +4274,9 @@ export async function getWorktreeGitCommitDiffProcedure(
   });
 }
 /**
- * Function of setActiveWorktreeProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Sets active worktree procedure.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function setActiveWorktreeProcedure(
@@ -4354,9 +4354,9 @@ export async function setActiveWorktreeProcedure(
   };
 }
 /**
- * Function of focusContextProcedure.
- * @param params - The value of `params`.
- * @param context - The value of `context`.
+ * Performs focusContextProcedure operation.
+ * @param params - Parameters object.
+ * @param context - Execution context.
  */
 
 export async function focusContextProcedure(
@@ -4430,8 +4430,8 @@ export async function focusContextProcedure(
   });
 }
 /**
- * Function of closeWorktreeProcedure.
- * @param params - The value of `params`.
+ * Closes worktree procedure.
+ * @param params - Parameters object.
  */
 
 export async function closeWorktreeProcedure(
@@ -4454,8 +4454,8 @@ export async function closeWorktreeProcedure(
   };
 }
 /**
- * Function of closeProjectProcedure.
- * @param params - The value of `params`.
+ * Closes project procedure.
+ * @param params - Parameters object.
  */
 
 export async function closeProjectProcedure(
@@ -4471,8 +4471,8 @@ export async function closeProjectProcedure(
   };
 }
 /**
- * Function of deleteProjectProcedure.
- * @param params - The value of `params`.
+ * Deletes project procedure.
+ * @param params - Parameters object.
  */
 
 export async function deleteProjectProcedure(
@@ -4505,9 +4505,9 @@ export async function deleteProjectProcedure(
   };
 }
 /**
- * Function of getOpenWorktreeSnapshot.
- * @param projectId - The value of `projectId`.
- * @param worktreePath - The value of `worktreePath`.
+ * Gets open worktree snapshot.
+ * @param projectId - Project identifier.
+ * @param worktreePath - Worktree path.
  */
 
 export function getOpenWorktreeSnapshot(
@@ -4572,8 +4572,8 @@ export function shutdownProcedureCacheMaintenance(): void {
   shutdownDirectorySuggestionCacheMaintenance();
 }
 /**
- * Function of setWorktreeTaskChangeListener.
- * @param listener - The value of `listener`.
+ * Sets worktree task change listener.
+ * @param listener - Event listener callback.
  */
 
 export function setWorktreeTaskChangeListener(
@@ -4582,8 +4582,8 @@ export function setWorktreeTaskChangeListener(
   worktreeTaskChangeListener = listener;
 }
 /**
- * Function of setWorktreeGitHistoryChangeListener.
- * @param listener - The value of `listener`.
+ * Sets worktree git history change listener.
+ * @param listener - Event listener callback.
  */
 
 export function setWorktreeGitHistoryChangeListener(

@@ -77,11 +77,11 @@ export class MessagePreprocessingRequestManager {
   private worker: MessagePreprocessingWorkerLike | null = null;
   private workerFailed = false;
   /**
-   * Function of constructor.
-   * @param canUseWorker - The value of `canUseWorker`.
-   * @param createWorker - The value of `createWorker`.
-   * @param maxCacheEntries - The value of `maxCacheEntries`.
-   * @param prepareSynchronously - The value of `prepareSynchronously`.
+   * Creates and initializes a new instance.
+   * @param canUseWorker - canUseWorker argument for constructor.
+   * @param createWorker - createWorker argument for constructor.
+   * @param maxCacheEntries - maxCacheEntries argument for constructor.
+   * @param prepareSynchronously - prepareSynchronously argument for constructor.
    */
 
   constructor({
@@ -101,8 +101,8 @@ export class MessagePreprocessingRequestManager {
     this.prepareSynchronously = prepareSynchronously;
   }
   /**
-   * Function of read.
-   * @param text - The value of `text`.
+   * Reads data as part of processing.
+   * @param text - Input text content.
    */
 
   read(text: string): MessagePreprocessingSnapshot {
@@ -158,9 +158,9 @@ export class MessagePreprocessingRequestManager {
     return loadingSnapshot;
   }
   /**
-   * Function of subscribe.
-   * @param text - The value of `text`.
-   * @param listener - The value of `listener`.
+   * Subscribes to async worker events.
+   * @param text - Input text content.
+   * @param listener - Event listener callback.
    */
 
   subscribe(text: string, listener: MessagePreprocessingListener): () => void {
@@ -199,8 +199,8 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Function of handleWorkerMessage.
-   * @param data - The value of `data`.
+   * Handles worker message.
+   * @param data - data argument for handleWorkerMessage.
    */
 
   private handleWorkerMessage(data: MessagePreprocessingWorkerResponse): void {
@@ -234,8 +234,8 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Function of resolveSynchronously.
-   * @param text - The value of `text`.
+   * Resolves synchronously.
+   * @param text - Input text content.
    */
 
   private resolveSynchronously(text: string): void {
@@ -246,9 +246,9 @@ export class MessagePreprocessingRequestManager {
     this.finishPendingText(text, this.prepareSynchronously(text));
   }
   /**
-   * Function of finishPendingText.
-   * @param text - The value of `text`.
-   * @param plan - The value of `plan`.
+   * Performs finishPendingText operation.
+   * @param text - Input text content.
+   * @param plan - plan argument for finishPendingText.
    */
 
   private finishPendingText(
@@ -267,9 +267,9 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Function of storeReadySnapshot.
-   * @param text - The value of `text`.
-   * @param plan - The value of `plan`.
+   * Performs storeReadySnapshot operation.
+   * @param text - Input text content.
+   * @param plan - plan argument for storeReadySnapshot.
    */
 
   private storeReadySnapshot(
@@ -301,8 +301,8 @@ export class MessagePreprocessingRequestManager {
 const sharedMessagePreprocessingRequestManager =
   new MessagePreprocessingRequestManager();
 /**
- * Function of usePreparedMessageRenderPlan.
- * @param text - The value of `text`.
+ * Provides hook behavior for PreparedMessageRenderPlan.
+ * @param text - Input text content.
  */
 
 export function usePreparedMessageRenderPlan(

@@ -17,9 +17,9 @@ type SidecarScopeOptions = CanonicalizePathOptions & {
   worktreePathContext?: string | null;
 };
 /**
- * Function of canonicalizeSidecarPath.
- * @param value - The value of `value`.
- * @param options - The value of `options`.
+ * Performs canonicalizeSidecarPath operation.
+ * @param value - Input value.
+ * @param options - Configuration options used by this operation.
  */
 
 export function canonicalizeSidecarPath(
@@ -40,10 +40,10 @@ export function canonicalizeSidecarPath(
   return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 /**
- * Function of sidecarPathsEqual.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
- * @param options - The value of `options`.
+ * Performs sidecarPathsEqual operation.
+ * @param left - left argument for sidecarPathsEqual.
+ * @param right - right argument for sidecarPathsEqual.
+ * @param options - Configuration options used by this operation.
  */
 
 export function sidecarPathsEqual(
@@ -57,9 +57,9 @@ export function sidecarPathsEqual(
   );
 }
 /**
- * Function of enforceBoundThreadScope.
- * @param threadId - The value of `threadId`.
- * @param boundThreadId - The value of `boundThreadId`.
+ * Performs enforceBoundThreadScope operation.
+ * @param threadId - Thread identifier.
+ * @param boundThreadId - boundThreadId identifier.
  */
 
 export function enforceBoundThreadScope(
@@ -73,8 +73,8 @@ export function enforceBoundThreadScope(
   }
 }
 /**
- * Function of enforceTargetScope.
- * @param options - The value of `options`.
+ * Performs enforceTargetScope operation.
+ * @param options - Configuration options used by this operation.
  */
 
 export function enforceTargetScope(options: SidecarScopeOptions): void {

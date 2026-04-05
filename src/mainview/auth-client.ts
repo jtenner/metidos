@@ -25,11 +25,11 @@ export type TotpEnrollment = {
 
 export class AuthApiError extends Error {
   /**
-   * Function of constructor.
-   * @param code - The value of `code`.
-   * @param message - The value of `message`.
-   * @param status - The value of `status`.
-   * @param details - The value of `details`.
+   * Creates and initializes a new instance.
+   * @param code - code argument for constructor.
+   * @param message - Message payload.
+   * @param status - status argument for constructor.
+   * @param details - details argument for constructor.
    */
 
   constructor(
@@ -59,16 +59,16 @@ declare global {
   }
 }
 /**
- * Function of isRecord.
- * @param value - The value of `value`.
+ * Is record.
+ * @param value - Input value.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 /**
- * Function of normalizeAuthErrorDetails.
- * @param value - The value of `value`.
+ * Normalizes auth error details.
+ * @param value - Input value.
  */
 
 function normalizeAuthErrorDetails(value: unknown): AuthErrorDetails | null {
@@ -83,8 +83,8 @@ function normalizeAuthErrorDetails(value: unknown): AuthErrorDetails | null {
   return next;
 }
 /**
- * Function of readJsonBody.
- * @param response - The value of `response`.
+ * Reads json body.
+ * @param response - Response payload.
  */
 
 async function readJsonBody(response: Response): Promise<unknown> {
@@ -100,9 +100,9 @@ async function readJsonBody(response: Response): Promise<unknown> {
   }
 }
 /**
- * Function of toAuthApiError.
- * @param response - The value of `response`.
- * @param payload - The value of `payload`.
+ * Converts auth api error value.
+ * @param response - Response payload.
+ * @param payload - payload argument for toAuthApiError.
  */
 
 function toAuthApiError(response: Response, payload: unknown): AuthApiError {
@@ -121,9 +121,9 @@ function toAuthApiError(response: Response, payload: unknown): AuthApiError {
   );
 }
 /**
- * Function of requestAuthJson.
- * @param path - The value of `path`.
- * @param init - The value of `init`.
+ * Performs requestAuthJson operation.
+ * @param path - Filesystem path.
+ * @param init - init argument for requestAuthJson.
  */
 
 async function requestAuthJson<T>(
@@ -148,8 +148,8 @@ async function requestAuthJson<T>(
   return payload as T;
 }
 /**
- * Function of dispatchAuthRequired.
- * @param reason - The value of `reason`.
+ * Performs dispatchAuthRequired operation.
+ * @param reason - Reason for this operation.
  */
 
 export function dispatchAuthRequired(reason: string): void {
@@ -165,8 +165,8 @@ export function dispatchAuthRequired(reason: string): void {
   );
 }
 /**
- * Function of isAuthRequiredError.
- * @param error - The value of `error`.
+ * Is auth required error.
+ * @param error - Error value to process.
  */
 
 export function isAuthRequiredError(error: unknown): boolean {
@@ -197,8 +197,8 @@ export async function prepareSetupEnrollment(): Promise<TotpEnrollment> {
   return payload.enrollment;
 }
 /**
- * Function of completeAuthSetup.
- * @param input - The value of `input`.
+ * Performs completeAuthSetup operation.
+ * @param input - input argument for completeAuthSetup.
  */
 
 export async function completeAuthSetup(input: {
@@ -221,8 +221,8 @@ export async function completeAuthSetup(input: {
   });
 }
 /**
- * Function of loginAuth.
- * @param input - The value of `input`.
+ * Performs loginAuth operation.
+ * @param input - input argument for loginAuth.
  */
 
 export async function loginAuth(input: {
@@ -240,8 +240,8 @@ export async function loginAuth(input: {
   });
 }
 /**
- * Function of loginWithRecoveryCodeAuth.
- * @param input - The value of `input`.
+ * Performs loginWithRecoveryCodeAuth operation.
+ * @param input - input argument for loginWithRecoveryCodeAuth.
  */
 
 export async function loginWithRecoveryCodeAuth(input: {
@@ -270,8 +270,8 @@ export async function logoutAuth(): Promise<AuthStatus> {
   return payload.status;
 }
 /**
- * Function of stepUpAuth.
- * @param input - The value of `input`.
+ * Performs stepUpAuth operation.
+ * @param input - input argument for stepUpAuth.
  */
 
 export async function stepUpAuth(input: {

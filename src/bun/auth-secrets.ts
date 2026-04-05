@@ -23,24 +23,24 @@ type AuthSecretOptions = {
   appDataDir?: string;
 };
 /**
- * Function of authSecretDirectory.
- * @param options - The value of `options`.
+ * Performs authSecretDirectory operation.
+ * @param options - Configuration options used by this operation.
  */
 
 function authSecretDirectory(options?: AuthSecretOptions): string {
   return options?.appDataDir ?? dirname(getAppDatabasePath());
 }
 /**
- * Function of getAuthSecretKeyPath.
- * @param options - The value of `options`.
+ * Gets auth secret key path.
+ * @param options - Configuration options used by this operation.
  */
 
 export function getAuthSecretKeyPath(options?: AuthSecretOptions): string {
   return resolve(authSecretDirectory(options), AUTH_SECRET_KEY_FILE_NAME);
 }
 /**
- * Function of applyOwnerOnlyDirectoryPermissions.
- * @param path - The value of `path`.
+ * Applies owner only directory permissions.
+ * @param path - Filesystem path.
  */
 
 function applyOwnerOnlyDirectoryPermissions(path: string): void {
@@ -51,8 +51,8 @@ function applyOwnerOnlyDirectoryPermissions(path: string): void {
   }
 }
 /**
- * Function of ensureDirectory.
- * @param path - The value of `path`.
+ * Performs ensureDirectory operation.
+ * @param path - Filesystem path.
  */
 
 function ensureDirectory(path: string): void {
@@ -65,8 +65,8 @@ function ensureDirectory(path: string): void {
   applyOwnerOnlyDirectoryPermissions(path);
 }
 /**
- * Function of applyOwnerOnlyFilePermissions.
- * @param path - The value of `path`.
+ * Applies owner only file permissions.
+ * @param path - Filesystem path.
  */
 
 function applyOwnerOnlyFilePermissions(path: string): void {
@@ -77,32 +77,32 @@ function applyOwnerOnlyFilePermissions(path: string): void {
   }
 }
 /**
- * Function of base64UrlEncode.
- * @param bytes - The value of `bytes`.
+ * Performs base64UrlEncode operation.
+ * @param bytes - bytes argument for base64UrlEncode.
  */
 
 function base64UrlEncode(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
 /**
- * Function of base64UrlDecode.
- * @param value - The value of `value`.
+ * Performs base64UrlDecode operation.
+ * @param value - Input value.
  */
 
 function base64UrlDecode(value: string): Uint8Array {
   return new Uint8Array(Buffer.from(value, "base64url"));
 }
 /**
- * Function of randomBytes.
- * @param length - The value of `length`.
+ * Performs randomBytes operation.
+ * @param length - length argument for randomBytes.
  */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 /**
- * Function of toArrayBuffer.
- * @param bytes - The value of `bytes`.
+ * Converts array buffer value.
+ * @param bytes - bytes argument for toArrayBuffer.
  */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -111,8 +111,8 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 /**
- * Function of loadOrCreateRawKey.
- * @param options - The value of `options`.
+ * Loads or create raw key.
+ * @param options - Configuration options used by this operation.
  */
 
 function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
@@ -138,9 +138,9 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   return created;
 }
 /**
- * Function of importSecretKey.
- * @param usages - The value of `usages`.
- * @param options - The value of `options`.
+ * Performs importSecretKey operation.
+ * @param usages - usages argument for importSecretKey.
+ * @param options - Configuration options used by this operation.
  */
 
 async function importSecretKey(
@@ -159,8 +159,8 @@ async function importSecretKey(
   );
 }
 /**
- * Function of deleteAuthSecretKey.
- * @param options - The value of `options`.
+ * Deletes auth secret key.
+ * @param options - Configuration options used by this operation.
  */
 
 export function deleteAuthSecretKey(options?: AuthSecretOptions): boolean {

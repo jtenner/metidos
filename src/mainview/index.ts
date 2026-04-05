@@ -125,8 +125,8 @@ declare global {
   }
 }
 /**
- * Function of isRecord.
- * @param value - The value of `value`.
+ * Is record.
+ * @param value - Input value.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -248,8 +248,8 @@ let socket: WebSocket | null = null;
 let nextRequestId = 1;
 let resolveConnection = () => {};
 /**
- * Function of rejectConnection.
- * @param _reason - The value of `_reason`.
+ * Rejects connection.
+ * @param _reason - _reason argument for rejectConnection.
  */
 let rejectConnection = (_reason?: unknown) => {};
 let connectionReadyResolved = false;
@@ -292,8 +292,8 @@ function clearRpcReconnectTimer(): void {
   }
 }
 /**
- * Function of buildSocketUrlWithTicket.
- * @param ticket - The value of `ticket`.
+ * Builds socket url with ticket.
+ * @param ticket - ticket argument for buildSocketUrlWithTicket.
  */
 
 function buildSocketUrlWithTicket(ticket: string): string {
@@ -302,8 +302,8 @@ function buildSocketUrlWithTicket(ticket: string): string {
   return url.toString();
 }
 /**
- * Function of reloadWindow.
- * @param reason - The value of `reason`.
+ * Performs reloadWindow operation.
+ * @param reason - Reason for this operation.
  */
 
 function reloadWindow(reason: string): void {
@@ -343,8 +343,8 @@ async function waitForDevServer(): Promise<void> {
   }, 250);
 }
 /**
- * Function of scheduleDevRecovery.
- * @param reason - The value of `reason`.
+ * Performs scheduleDevRecovery operation.
+ * @param reason - Reason for this operation.
  */
 
 function scheduleDevRecovery(reason: string): void {
@@ -368,8 +368,8 @@ window.addEventListener("beforeunload", () => {
   clearRpcReconnectTimer();
 });
 /**
- * Function of rejectPendingRequests.
- * @param reason - The value of `reason`.
+ * Rejects pending requests.
+ * @param reason - Reason for this operation.
  */
 
 function rejectPendingRequests(reason: unknown): void {
@@ -380,8 +380,8 @@ function rejectPendingRequests(reason: unknown): void {
   pendingRequests.clear();
 }
 /**
- * Function of scheduleRpcReconnect.
- * @param reason - The value of `reason`.
+ * Performs scheduleRpcReconnect operation.
+ * @param reason - Reason for this operation.
  */
 
 function scheduleRpcReconnect(reason: string): void {
@@ -437,8 +437,8 @@ async function enableRpcTransport(): Promise<void> {
   await connectionReady;
 }
 /**
- * Function of handleRpcAuthFailure.
- * @param error - The value of `error`.
+ * Handles rpc auth failure.
+ * @param error - Error value to process.
  */
 
 function handleRpcAuthFailure(error: { message: string }): void {
@@ -447,8 +447,8 @@ function handleRpcAuthFailure(error: { message: string }): void {
   dispatchAuthRequired(error.message);
 }
 /**
- * Function of connectRpcSocket.
- * @param reason - The value of `reason`.
+ * Connects rpc socket.
+ * @param reason - Reason for this operation.
  */
 
 function connectRpcSocket(reason: "initial" | "reconnect"): void {
@@ -621,9 +621,9 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
   });
 }
 /**
- * Function of createAbortError.
- * @param reason - The value of `reason`.
- * @param fallbackMessage - The value of `fallbackMessage`.
+ * Creates abort error.
+ * @param reason - Reason for this operation.
+ * @param fallbackMessage - fallbackMessage argument for createAbortError.
  */
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
@@ -643,8 +643,8 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
   return error;
 }
 /**
- * Function of normalizeTimeoutMs.
- * @param timeoutMs - The value of `timeoutMs`.
+ * Normalizes timeout ms.
+ * @param timeoutMs - timeoutMs argument for normalizeTimeoutMs.
  */
 
 function normalizeTimeoutMs(timeoutMs?: number): number | null {
@@ -659,8 +659,8 @@ function normalizeTimeoutMs(timeoutMs?: number): number | null {
   return Math.max(1, Math.floor(timeoutMs));
 }
 /**
- * Function of buildRequestSignal.
- * @param options - The value of `options`.
+ * Builds request signal.
+ * @param options - Configuration options used by this operation.
  */
 
 function buildRequestSignal(
@@ -685,8 +685,8 @@ function buildRequestSignal(
   return AbortSignal.any(signals);
 }
 /**
- * Function of waitForConnection.
- * @param signal - The value of `signal`.
+ * Performs waitForConnection operation.
+ * @param signal - Abort signal for cancellation.
  */
 
 async function waitForConnection(signal: AbortSignal | null): Promise<void> {
@@ -716,8 +716,8 @@ async function waitForConnection(signal: AbortSignal | null): Promise<void> {
   ]);
 }
 /**
- * Function of waitForOpenSocket.
- * @param signal - The value of `signal`.
+ * Performs waitForOpenSocket operation.
+ * @param signal - Abort signal for cancellation.
  */
 
 async function waitForOpenSocket(
@@ -733,9 +733,9 @@ async function waitForOpenSocket(
   }
 }
 /**
- * Function of sendSocketMessage.
- * @param targetSocket - The value of `targetSocket`.
- * @param message - The value of `message`.
+ * Sends socket message.
+ * @param targetSocket - targetSocket argument for sendSocketMessage.
+ * @param message - Message payload.
  */
 
 function sendSocketMessage(
@@ -746,10 +746,10 @@ function sendSocketMessage(
   targetSocket.send(JSON.stringify(message));
 }
 /**
- * Function of sendRequest.
- * @param method - The value of `method`.
- * @param params - The value of `params`.
- * @param options - The value of `options`.
+ * Sends request.
+ * @param method - method argument for sendRequest.
+ * @param params - Parameters object.
+ * @param options - Configuration options used by this operation.
  */
 
 async function sendRequest<K extends RpcMethodName>(
@@ -776,8 +776,8 @@ async function sendRequest<K extends RpcMethodName>(
       let settled = false;
       let removeAbortListener = () => {};
       /**
-       * Function of finalize.
-       * @param callback - The value of `callback`.
+       * Finalizes request handling.
+       * @param callback - Callback to invoke.
        */
       const finalize = (callback: () => void) => {
         if (settled) {
@@ -850,8 +850,8 @@ async function sendRequest<K extends RpcMethodName>(
   return response;
 }
 /**
- * Function of createProcedure.
- * @param method - The value of `method`.
+ * Creates procedure.
+ * @param method - method argument for createProcedure.
  */
 
 function createProcedure<K extends RpcMethodName>(

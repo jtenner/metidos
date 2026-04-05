@@ -51,7 +51,7 @@ type RuntimeConfig = InjectedRuntimeConfig & {
 
 /**
  * Returns true when a CLI string value is an unsigned decimal integer.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function isStringInteger(value: string): boolean {
   return /^\d+$/.test(value);
@@ -60,8 +60,8 @@ function isStringInteger(value: string): boolean {
 /**
  * Reads a string flag from `bun` CLI args. Supports both `--flag value` and
  * `--flag=value` forms and returns null if not provided.
- * @param args - The value of `args`.
- * @param flag - The value of `flag`.
+ * @param args - Argument list passed to args.
+ * @param flag - flag argument for flag.
  */
 function readCliValue(args: string[], flag: string): string | null {
   for (let index = 0; index < args.length; index += 1) {
@@ -241,8 +241,8 @@ const RPC_WEBSOCKET_URL =
 const BACKEND_HEALTH_URL =
   process.env.JOLT_RPC_HEALTH_URL?.trim() || `${RPC_HTTP_ORIGIN}/health`;
 /**
- * Function of resolveForwardedProto.
- * @param request - The value of `request`.
+ * Resolves forwarded proto.
+ * @param request - Incoming request payload.
  */
 
 function resolveForwardedProto(request: Request): "http" | "https" {
@@ -263,8 +263,8 @@ function resolveForwardedProto(request: Request): "http" | "https" {
   return new URL(request.url).protocol === "https:" ? "https" : "http";
 }
 /**
- * Function of readBrowserFacingHost.
- * @param request - The value of `request`.
+ * Reads browser facing host.
+ * @param request - Incoming request payload.
  */
 
 function readBrowserFacingHost(request: Request): string | null {
@@ -288,8 +288,8 @@ function readBrowserFacingHost(request: Request): string | null {
   }
 }
 /**
- * Function of isLoopbackBrowserHost.
- * @param host - The value of `host`.
+ * Is loopback browser host.
+ * @param host - host argument for isLoopbackBrowserHost.
  */
 
 function isLoopbackBrowserHost(host: string | null): boolean {
@@ -305,8 +305,8 @@ function isLoopbackBrowserHost(host: string | null): boolean {
   }
 }
 /**
- * Function of buildDirectRpcWebSocketUrlForRequest.
- * @param request - The value of `request`.
+ * Builds direct rpc web socket url for request.
+ * @param request - Incoming request payload.
  */
 
 function buildDirectRpcWebSocketUrlForRequest(request: Request): string | null {
@@ -326,8 +326,8 @@ function buildDirectRpcWebSocketUrlForRequest(request: Request): string | null {
   });
 }
 /**
- * Function of buildConnectUrlsForRequest.
- * @param request - The value of `request`.
+ * Builds connect urls for request.
+ * @param request - Incoming request payload.
  */
 
 function buildConnectUrlsForRequest(request: Request): string[] {
@@ -340,8 +340,8 @@ function buildConnectUrlsForRequest(request: Request): string[] {
   return [...connectUrls];
 }
 /**
- * Function of buildRuntimeConfigForRequest.
- * @param request - The value of `request`.
+ * Builds runtime config for request.
+ * @param request - Incoming request payload.
  */
 
 function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
@@ -364,9 +364,9 @@ function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
   };
 }
 /**
- * Function of proxyBackendAuthRequest.
- * @param request - The value of `request`.
- * @param connectUrls - The value of `connectUrls`.
+ * Performs proxyBackendAuthRequest operation.
+ * @param request - Incoming request payload.
+ * @param connectUrls - connectUrls argument for proxyBackendAuthRequest.
  */
 
 async function proxyBackendAuthRequest(
@@ -410,8 +410,8 @@ server = Bun.serve({
   hostname: LOOPBACK_HOSTNAME,
   idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
   port: PUBLIC_PORT /**
-   * Function of fetch.
-   * @param request - The value of `request`.
+   * Fetches data from the configured endpoint.
+   * @param request - Incoming request payload.
    */,
 
   async fetch(request): Promise<Response> {
@@ -508,7 +508,7 @@ console.log(
 
 /**
  * Stops the Bun server and exits the process.
- * @param exitCode - The value of `exitCode`.
+ * @param exitCode - exitCode argument for exitCode.
  */
 function shutdownAndExit(exitCode: number): void {
   try {

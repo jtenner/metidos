@@ -172,8 +172,8 @@ const UNSAFE_MODE_DESCRIPTION =
   "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
 
 /**
- * Function of hashMeasurementText.
- * @param text - The value of `text`.
+ * Performs hashMeasurementText operation.
+ * @param text - Input text content.
  */
 function hashMeasurementText(text: string): string {
   let hash = 5381;
@@ -186,9 +186,9 @@ function hashMeasurementText(text: string): string {
 }
 
 /**
- * Function of visibleMessageMeasurementFingerprint.
- * @param message - The value of `message`.
- * @param expanded - The value of `expanded`.
+ * Performs visibleMessageMeasurementFingerprint operation.
+ * @param message - Message payload.
+ * @param expanded - Whether the section is expanded.
  */
 function visibleMessageMeasurementFingerprint(
   message: VisibleMessage,
@@ -261,13 +261,13 @@ function visibleMessageMeasurementFingerprint(
 }
 
 /**
- * Function of deriveTranscriptMeasurementRows.
- * @param activeThreadId - The value of `activeThreadId`.
- * @param expandedItemIds - The value of `expandedItemIds`.
- * @param groupedMessages - The value of `groupedMessages`.
- * @param hasTopContent - The value of `hasTopContent`.
- * @param messages - The value of `messages`.
- * @param variant - The value of `variant`.
+ * Derives transcript measurement rows.
+ * @param activeThreadId - activeThreadId identifier.
+ * @param expandedItemIds - expandedItemIds argument for deriveTranscriptMeasurementRows.
+ * @param groupedMessages - groupedMessages argument for deriveTranscriptMeasurementRows.
+ * @param hasTopContent - hasTopContent argument for deriveTranscriptMeasurementRows.
+ * @param messages - Message list.
+ * @param variant - variant argument for deriveTranscriptMeasurementRows.
  */
 export function deriveTranscriptMeasurementRows({
   activeThreadId,
@@ -394,10 +394,10 @@ function groupVisibleMessages(
 }
 
 /**
- * Function of deriveGroupedVisibleMessages.
- * @param activeThreadId - The value of `activeThreadId`.
- * @param messages - The value of `messages`.
- * @param previousCache - The value of `previousCache`.
+ * Derives grouped visible messages.
+ * @param activeThreadId - activeThreadId identifier.
+ * @param messages - Message list.
+ * @param previousCache - previousCache argument for deriveGroupedVisibleMessages.
  */
 export function deriveGroupedVisibleMessages(
   activeThreadId: number | null,
@@ -461,9 +461,9 @@ export function deriveGroupedVisibleMessages(
 }
 
 /**
- * Function of readUserGroupText.
- * @param group - The value of `group`.
- * @param messages - The value of `messages`.
+ * Reads user group text.
+ * @param group - group argument for readUserGroupText.
+ * @param messages - Message list.
  */
 function readUserGroupText(
   group: Extract<TranscriptMessageGroup, { kind: "user" }>,
@@ -474,11 +474,11 @@ function readUserGroupText(
 }
 
 /**
- * Function of UnsafeModeToggle.
- * @param checked - The value of `checked`.
- * @param disabled - The value of `disabled`.
- * @param onChange - The value of `onChange`.
- * @param variant - The value of `variant`.
+ * Performs UnsafeModeToggle operation.
+ * @param checked - checked argument for UnsafeModeToggle.
+ * @param disabled - disabled argument for UnsafeModeToggle.
+ * @param onChange - onChange argument for UnsafeModeToggle.
+ * @param variant - variant argument for UnsafeModeToggle.
  */
 function UnsafeModeToggle({
   checked,
@@ -536,9 +536,9 @@ function UnsafeModeToggle({
 }
 
 /**
- * Function of areGroupRowPropsEqual.
- * @param previous - The value of `previous`.
- * @param next - The value of `next`.
+ * Performs areGroupRowPropsEqual operation.
+ * @param previous - previous argument for areGroupRowPropsEqual.
+ * @param next - next argument for areGroupRowPropsEqual.
  */
 function areGroupRowPropsEqual(
   previous: Readonly<GroupRowProps>,

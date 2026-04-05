@@ -26,10 +26,10 @@ export type InjectedRuntimeConfig = {
   rpcWebSocketUrl?: string;
 };
 /**
- * Function of formatBrowserOrigin.
- * @param protocol - The value of `protocol`.
- * @param host - The value of `host`.
- * @param port - The value of `port`.
+ * Formats browser origin.
+ * @param protocol - protocol argument for formatBrowserOrigin.
+ * @param host - host argument for formatBrowserOrigin.
+ * @param port - port argument for formatBrowserOrigin.
  */
 
 function formatBrowserOrigin(
@@ -46,7 +46,7 @@ function formatBrowserOrigin(
 
 /**
  * Normalize a browser origin for exact allowlist comparison.
- * @param origin - The value of `origin`.
+ * @param origin - origin argument for origin.
  */
 function normalizeBrowserOrigin(origin: string): string | null {
   try {
@@ -135,8 +135,8 @@ export function isWebSocketOriginAllowed(
   return allowed.has(normalizedOrigin);
 }
 /**
- * Function of normalizeConnectSource.
- * @param url - The value of `url`.
+ * Normalizes connect source.
+ * @param url - Request URL.
  */
 
 function normalizeConnectSource(url: string): string | null {
@@ -161,8 +161,8 @@ function normalizeConnectSource(url: string): string | null {
   }
 }
 /**
- * Function of buildContentSecurityPolicy.
- * @param connectUrls - The value of `connectUrls`.
+ * Builds content security policy.
+ * @param connectUrls - connectUrls argument for buildContentSecurityPolicy.
  */
 
 export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
@@ -189,9 +189,9 @@ export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
   ].join("; ");
 }
 /**
- * Function of applySecurityHeaders.
- * @param headers - The value of `headers`.
- * @param options - The value of `options`.
+ * Applies security headers.
+ * @param headers - HTTP headers.
+ * @param options - Configuration options used by this operation.
  */
 
 export function applySecurityHeaders(
@@ -211,8 +211,8 @@ export function applySecurityHeaders(
   return headers;
 }
 /**
- * Function of buildRuntimeConfigElement.
- * @param runtimeConfig - The value of `runtimeConfig`.
+ * Builds runtime config element.
+ * @param runtimeConfig - runtimeConfig argument for buildRuntimeConfigElement.
  */
 
 export function buildRuntimeConfigElement(
@@ -225,7 +225,7 @@ export function buildRuntimeConfigElement(
 
 /**
  * Smallest health payload allowed before authentication exists.
- * @param ok - The value of `ok`.
+ * @param ok - ok argument for ok.
  */
 export function buildLivenessPayload(ok: boolean): { ok: boolean } {
   return {

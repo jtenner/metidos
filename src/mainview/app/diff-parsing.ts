@@ -39,16 +39,16 @@ export const EMPTY_DIFF_PARSE_RESULT: DiffParseResult = {
   },
 };
 /**
- * Function of shouldWorkerizeDiffParsing.
- * @param diffText - The value of `diffText`.
+ * Should workerize diff parsing.
+ * @param diffText - Diff content to process.
  */
 
 export function shouldWorkerizeDiffParsing(diffText: string): boolean {
   return diffText.length >= LARGE_DIFF_WORKER_TEXT_LENGTH;
 }
 /**
- * Function of classifyDiffLine.
- * @param line - The value of `line`.
+ * Performs classifyDiffLine operation.
+ * @param line - line argument for classifyDiffLine.
  */
 
 function classifyDiffLine(line: string): DiffLineKind {
@@ -70,8 +70,8 @@ function classifyDiffLine(line: string): DiffLineKind {
   return "context";
 }
 /**
- * Function of parseUnifiedDiffText.
- * @param diffText - The value of `diffText`.
+ * Parses unified diff text.
+ * @param diffText - Diff content to process.
  */
 
 export function parseUnifiedDiffText(diffText: string): DiffParseResult {

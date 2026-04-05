@@ -91,8 +91,8 @@ function getNow(): string {
 /**
  * Build a stable `AbortError`-shaped object from either a DOM abort reason
  * or a fallback string, preserving original cause when available.
- * @param reason - The value of `reason`.
- * @param fallbackMessage - The value of `fallbackMessage`.
+ * @param reason - Reason for this operation.
+ * @param fallbackMessage - fallbackMessage argument for fallbackMessage.
  */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
@@ -276,8 +276,8 @@ function removeGitCommandTask(
 
 /**
  * Reject a queued task with a normalized abort error.
- * @param task - The value of `task`.
- * @param reason - The value of `reason`.
+ * @param task - task argument for task.
+ * @param reason - Reason for this operation.
  */
 function abortQueuedGitTask(task: GitCommandQueueTask, reason: string): void {
   task.reject(createAbortError(null, reason));
@@ -286,7 +286,7 @@ function abortQueuedGitTask(task: GitCommandQueueTask, reason: string): void {
 /**
  * Cancel active background work for a repository and clear remaining queue entries.
  * Called when a foreground request arrives and must preempt lower-priority tasks.
- * @param reason - The value of `reason`.
+ * @param reason - Reason for this operation.
  */
 function abortBackgroundGitCommands(reason: string): void {
   for (const [cwd, queue] of gitCommandQueueMap) {
@@ -313,7 +313,7 @@ function abortBackgroundGitCommands(reason: string): void {
 /**
  * Start the next available task for this cwd, honoring foreground-first scheduling.
  * Completed tasks re-trigger scheduling to continue draining queued work.
- * @param cwd - The value of `cwd`.
+ * @param cwd - Current working directory.
  */
 function scheduleGitCommandQueue(cwd: string): void {
   const queue = gitCommandQueueMap.get(cwd);
@@ -367,8 +367,8 @@ function enqueueGitCommand<T>(
       : taskAbortController.signal;
     let settled = false;
     /**
-     * Function of finalize.
-     * @param callback - The value of `callback`.
+     * Finalizes request handling.
+     * @param callback - Callback to invoke.
      */
 
     const finalize = (callback: () => void) => {
@@ -581,8 +581,8 @@ export function normalizeGitPath(worktreePath: string, value: string): string {
 
 /**
  * Return true when a path falls outside a root after path normalization.
- * @param rootPath - The value of `rootPath`.
- * @param candidatePath - The value of `candidatePath`.
+ * @param rootPath - Root directory path.
+ * @param candidatePath - candidatePath path used by candidatePath.
  */
 function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
   const relativePath = relative(rootPath, candidatePath);
@@ -599,7 +599,7 @@ function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
 /**
  * Resolve the nearest existing ancestor so symlink escapes are detected
  * even when the final file path does not exist yet.
- * @param path - The value of `path`.
+ * @param path - Filesystem path.
  */
 function nearestExistingPath(path: string): string | null {
   let current = path;
@@ -664,8 +664,8 @@ function splitLines(value: string): string[] {
 
 /**
  * Build a synthetic add diff for binary/add-only files where `git diff` may be empty.
- * @param path - The value of `path`.
- * @param content - The value of `content`.
+ * @param path - Filesystem path.
+ * @param content - content argument for content.
  */
 function buildSyntheticAddDiff(path: string, content: string): string {
   const lines = splitLines(content);
@@ -682,8 +682,8 @@ function buildSyntheticAddDiff(path: string, content: string): string {
 
 /**
  * Build a synthetic delete diff for deleted files when HEAD content must be rendered.
- * @param path - The value of `path`.
- * @param content - The value of `content`.
+ * @param path - Filesystem path.
+ * @param content - content argument for content.
  */
 function buildSyntheticDeleteDiff(path: string, content: string): string {
   const lines = splitLines(content);
@@ -1099,7 +1099,7 @@ function normalizeWorktreeFileContentCursor(value: unknown): number {
 
 /**
  * Normalize page size with clamp and positive-integer enforcement.
- * @param value - The value of `value`.
+ * @param value - Input value.
  */
 function normalizeWorktreeFileContentPageSize(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -1249,7 +1249,7 @@ function emptyGitHistorySummary(
 
 /**
  * Parse a single non-decorated log record emitted with known field separators.
- * @param record - The value of `record`.
+ * @param record - record argument for record.
  */
 function parseGitHistoryEntryRecord(record: string): RpcGitHistoryEntry | null {
   const [hash, shortHash, subject, authorName, committedAt] = record.split(
@@ -1353,7 +1353,7 @@ function buildGitHistorySignature(
 /** Convert page-limit request to an integer in [1, DEFAULT_GIT_HISTORY_PAGE_SIZE]. */
 /**
  * Convert page-limit request to a bounded positive integer.
- * @param limit - The value of `limit`.
+ * @param limit - limit argument for limit.
  */
 export function normalizeGitHistoryPageLimit(limit?: number): number {
   if (typeof limit !== "number" || !Number.isInteger(limit)) {

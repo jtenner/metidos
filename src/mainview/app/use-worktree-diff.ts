@@ -19,9 +19,9 @@ import { createAbortError, isAbortError } from "./state";
 
 const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
 /**
- * Function of worktreeChangeMetadataMatches.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * Performs worktreeChangeMetadataMatches operation.
+ * @param left - left argument for worktreeChangeMetadataMatches.
+ * @param right - right argument for worktreeChangeMetadataMatches.
  */
 
 function worktreeChangeMetadataMatches(

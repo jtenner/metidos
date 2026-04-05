@@ -142,9 +142,9 @@ import {
 } from "./thread-status-refresh";
 
 /**
- * Function of mergeThreadMessageHistory.
- * @param current - The value of `current`.
- * @param incoming - The value of `incoming`.
+ * Merges thread message history.
+ * @param current - current argument for mergeThreadMessageHistory.
+ * @param incoming - incoming argument for mergeThreadMessageHistory.
  */
 
 function mergeThreadMessageHistory(
@@ -194,11 +194,11 @@ type VisibleMessageCacheEntry = {
 };
 
 /**
- * Function of readCachedVisibleMessage.
- * @param cache - The value of `cache`.
- * @param cacheKey - The value of `cacheKey`.
- * @param signature - The value of `signature`.
- * @param createValue - The value of `createValue`.
+ * Reads cached visible message.
+ * @param cache - cache argument for readCachedVisibleMessage.
+ * @param cacheKey - cacheKey argument for readCachedVisibleMessage.
+ * @param signature - signature argument for readCachedVisibleMessage.
+ * @param createValue - createValue argument for readCachedVisibleMessage.
  */
 
 function readCachedVisibleMessage(
@@ -221,8 +221,8 @@ function readCachedVisibleMessage(
 }
 
 /**
- * Function of threadMessageVisibleSignature.
- * @param message - The value of `message`.
+ * Performs threadMessageVisibleSignature operation.
+ * @param message - Message payload.
  */
 
 function threadMessageVisibleSignature(message: RpcThreadMessage): string {
@@ -245,8 +245,8 @@ function threadMessageVisibleSignature(message: RpcThreadMessage): string {
 }
 
 /**
- * Function of buildThreadVisibleMessage.
- * @param message - The value of `message`.
+ * Builds thread visible message.
+ * @param message - Message payload.
  */
 
 function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
@@ -341,7 +341,7 @@ type MobileNavigationIndicatorState = "none" | "working" | "completed";
 
 /**
  * Stable sort for thread collections by updated timestamp, newest-first.
- * @param items - The value of `items`.
+ * @param items - items argument for items.
  */
 function sortThreadsByUpdatedAt(items: RpcThread[]): RpcThread[] {
   return [...items].sort((left, right) =>
@@ -361,8 +361,8 @@ function useDesktopViewport(): boolean {
   useEffect(() => {
     const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
     /**
-     * Function of handleChange.
-     * @param event - The value of `event`.
+     * Handles change.
+     * @param event - event argument for handleChange.
      */
 
     const handleChange = (event: MediaQueryListEvent): void => {
@@ -382,7 +382,7 @@ function useDesktopViewport(): boolean {
 
 /**
  * Normalizes backend thread errors to a quick classification predicate.
- * @param error - The value of `error`.
+ * @param error - Error value to process.
  */
 function isThreadNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -417,8 +417,8 @@ function areWorktreeChangesEqual(
 
 /**
  * Compares simple string arrays in a deterministic, order-sensitive way.
- * @param left - The value of `left`.
- * @param right - The value of `right`.
+ * @param left - left argument for left.
+ * @param right - right argument for right.
  */
 function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left === right) {
@@ -456,9 +456,9 @@ function areWorktreeSnapshotsEquivalent(
 }
 
 /**
- * Function of buildLoadedProjectWorktreesState.
- * @param worktrees - The value of `worktrees`.
- * @param loadedAtMs - The value of `loadedAtMs`.
+ * Builds loaded project worktrees state.
+ * @param worktrees - worktrees argument for buildLoadedProjectWorktreesState.
+ * @param loadedAtMs - loadedAtMs argument for buildLoadedProjectWorktreesState.
  */
 
 function buildLoadedProjectWorktreesState(
@@ -1162,8 +1162,8 @@ export default function App({
     );
 
     /**
-     * Function of handlePointerDown.
-     * @param event - The value of `event`.
+     * Handles pointer down.
+     * @param event - event argument for handlePointerDown.
      */
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -3442,8 +3442,8 @@ export default function App({
     }
 
     /**
-     * Function of handlePointerDown.
-     * @param event - The value of `event`.
+     * Handles pointer down.
+     * @param event - event argument for handlePointerDown.
      */
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -3456,8 +3456,8 @@ export default function App({
     };
 
     /**
-     * Function of handleKeyDown.
-     * @param event - The value of `event`.
+     * Handles key down.
+     * @param event - event argument for handleKeyDown.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -3486,8 +3486,8 @@ export default function App({
     }
 
     /**
-     * Function of handlePointerDown.
-     * @param event - The value of `event`.
+     * Handles pointer down.
+     * @param event - event argument for handlePointerDown.
      */
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -3500,8 +3500,8 @@ export default function App({
     };
 
     /**
-     * Function of handleKeyDown.
-     * @param event - The value of `event`.
+     * Handles key down.
+     * @param event - event argument for handleKeyDown.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -3867,8 +3867,8 @@ export default function App({
 
   useEffect(() => {
     /**
-     * Function of handleThreadStartRequestCreated.
-     * @param event - The value of `event`.
+     * Handles thread start request created.
+     * @param event - event argument for handleThreadStartRequestCreated.
      */
 
     const handleThreadStartRequestCreated = (
@@ -3932,8 +3932,8 @@ export default function App({
     }
 
     /**
-     * Function of handleKeyDown.
-     * @param event - The value of `event`.
+     * Handles key down.
+     * @param event - event argument for handleKeyDown.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -4553,8 +4553,8 @@ export default function App({
 
   useEffect(() => {
     /**
-     * Function of handleContextFocusChanged.
-     * @param event - The value of `event`.
+     * Handles context focus changed.
+     * @param event - event argument for handleContextFocusChanged.
      */
 
     const handleContextFocusChanged = (

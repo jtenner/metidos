@@ -60,10 +60,10 @@ export type WorktreeGitHistoryCacheState = {
   historySignature: string | null;
 };
 /**
- * Function of applyGitHistoryCachePage.
- * @param worktreeState - The value of `worktreeState`.
- * @param offset - The value of `offset`.
- * @param page - The value of `page`.
+ * Applies git history cache page.
+ * @param worktreeState - worktreeState argument for applyGitHistoryCachePage.
+ * @param offset - offset argument for applyGitHistoryCachePage.
+ * @param page - page argument for applyGitHistoryCachePage.
  */
 
 export function applyGitHistoryCachePage(

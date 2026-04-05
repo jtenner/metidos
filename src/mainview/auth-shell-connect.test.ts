@@ -19,8 +19,8 @@ import {
 import { RpcError } from "./rpc-errors";
 
 /**
- * Function of buildAuthStatus.
- * @param overrides - The value of `overrides`.
+ * Builds auth status.
+ * @param overrides - overrides argument for buildAuthStatus.
  */
 
 function buildAuthStatus(overrides: Partial<AuthStatus> = {}): AuthStatus {

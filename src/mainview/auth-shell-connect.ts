@@ -51,8 +51,8 @@ export type InitialRpcConnectRetryInfo = {
 
 export class AuthShellTimeoutError extends Error {
   /**
-   * Function of constructor.
-   * @param message - The value of `message`.
+   * Creates and initializes a new instance.
+   * @param message - Message payload.
    */
 
   constructor(message: string) {
@@ -77,8 +77,8 @@ type ResolveAuthShellGateOptions = {
   statusTimeoutMs?: number;
 };
 /**
- * Function of defaultRetryWait.
- * @param delayMs - The value of `delayMs`.
+ * Performs defaultRetryWait operation.
+ * @param delayMs - delayMs argument for defaultRetryWait.
  */
 
 function defaultRetryWait(delayMs: number): Promise<void> {
@@ -91,8 +91,8 @@ function defaultRetryWait(delayMs: number): Promise<void> {
   });
 }
 /**
- * Function of shouldRetryInitialRpcConnect.
- * @param error - The value of `error`.
+ * Should retry initial rpc connect.
+ * @param error - Error value to process.
  */
 
 export function shouldRetryInitialRpcConnect(error: unknown): boolean {
@@ -102,8 +102,8 @@ export function shouldRetryInitialRpcConnect(error: unknown): boolean {
   );
 }
 /**
- * Function of withTimeout.
- * @param options - The value of `options`.
+ * Performs withTimeout operation.
+ * @param options - Configuration options used by this operation.
  */
 
 function withTimeout<T>(options: {
@@ -131,8 +131,8 @@ function withTimeout<T>(options: {
   });
 }
 /**
- * Function of connectRpcTransportWithRetry.
- * @param options - The value of `options`.
+ * Connects rpc transport with retry.
+ * @param options - Configuration options used by this operation.
  */
 
 export async function connectRpcTransportWithRetry(options: {

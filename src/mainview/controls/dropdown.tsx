@@ -96,8 +96,8 @@ export function DropdownControl({
     }
 
     /**
-     * Function of handlePointerDown.
-     * @param event - The value of `event`.
+     * Handles pointer down.
+     * @param event - event argument for handlePointerDown.
      */
     const handlePointerDown = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
@@ -106,8 +106,8 @@ export function DropdownControl({
     };
 
     /**
-     * Function of handleKeyDown.
-     * @param event - The value of `event`.
+     * Handles key down.
+     * @param event - event argument for handleKeyDown.
      */
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {

@@ -24,9 +24,9 @@ describe("sidecar thread metadata updates", () => {
       options: Parameters<UpdateThreadMetadataRpc>[1];
     }> = [];
     /**
-     * Function of rpcCall.
-     * @param params - The value of `params`.
-     * @param options - The value of `options`.
+     * Performs rpcCall operation.
+     * @param params - Parameters object.
+     * @param options - Configuration options used by this operation.
      */
     const rpcCall: UpdateThreadMetadataRpc = async (params, options) => {
       calls.push({ options, params });

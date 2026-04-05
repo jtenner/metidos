@@ -16,9 +16,9 @@ type ResolveTlsRuntimeConfigOptions = {
   forceTls?: boolean;
 };
 /**
- * Function of formatLoopbackHttpOrigin.
- * @param port - The value of `port`.
- * @param tlsEnabled - The value of `tlsEnabled`.
+ * Formats loopback http origin.
+ * @param port - port argument for formatLoopbackHttpOrigin.
+ * @param tlsEnabled - tlsEnabled argument for formatLoopbackHttpOrigin.
  */
 
 export function formatLoopbackHttpOrigin(
@@ -28,9 +28,9 @@ export function formatLoopbackHttpOrigin(
   return `${tlsEnabled ? "https" : "http"}://127.0.0.1:${port}`;
 }
 /**
- * Function of formatLoopbackWebSocketUrl.
- * @param port - The value of `port`.
- * @param tlsEnabled - The value of `tlsEnabled`.
+ * Formats loopback web socket url.
+ * @param port - port argument for formatLoopbackWebSocketUrl.
+ * @param tlsEnabled - tlsEnabled argument for formatLoopbackWebSocketUrl.
  */
 
 export function formatLoopbackWebSocketUrl(
@@ -40,9 +40,9 @@ export function formatLoopbackWebSocketUrl(
   return `${tlsEnabled ? "wss" : "ws"}://127.0.0.1:${port}/rpc`;
 }
 /**
- * Function of isPublicTlsEnabled.
- * @param args - The value of `args`.
- * @param env - The value of `env`.
+ * Is public tls enabled.
+ * @param args - Argument list passed to isPublicTlsEnabled.
+ * @param env - env argument for isPublicTlsEnabled.
  */
 
 export function isPublicTlsEnabled(
@@ -55,8 +55,8 @@ export function isPublicTlsEnabled(
   return env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1";
 }
 /**
- * Function of resolveTlsRuntimeConfig.
- * @param options - The value of `options`.
+ * Resolves tls runtime config.
+ * @param options - Configuration options used by this operation.
  */
 
 export function resolveTlsRuntimeConfig(

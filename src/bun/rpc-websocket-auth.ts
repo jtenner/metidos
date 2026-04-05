@@ -39,8 +39,8 @@ export type RpcWebSocketAuthResult =
     };
 
 /**
- * Function of authorizeRpcWebSocketUpgrade.
- * @param options - The value of `options`.
+ * Performs authorizeRpcWebSocketUpgrade operation.
+ * @param options - Configuration options used by this operation.
  */
 export function authorizeRpcWebSocketUpgrade(options: {
   authBypass: boolean;

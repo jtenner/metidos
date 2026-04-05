@@ -32,9 +32,9 @@ type CoalescedWorktreeInvalidationChannel<
   ) => () => void;
 };
 /**
- * Function of createCoalescedWorktreeInvalidationChannel.
- * @param scheduleFlush - The value of `scheduleFlush`.
- * @param cancelFlush - The value of `cancelFlush`.
+ * Creates coalesced worktree invalidation channel.
+ * @param scheduleFlush - scheduleFlush argument for createCoalescedWorktreeInvalidationChannel.
+ * @param cancelFlush - cancelFlush argument for createCoalescedWorktreeInvalidationChannel.
  */
 
 export function createCoalescedWorktreeInvalidationChannel<
@@ -92,8 +92,8 @@ const worktreeTasksChangedChannel =
 const worktreeGitHistoryChangedChannel =
   createCoalescedWorktreeInvalidationChannel<RpcWorktreeGitHistoryChanged>();
 /**
- * Function of publishWorktreeTasksChanged.
- * @param payload - The value of `payload`.
+ * Performs publishWorktreeTasksChanged operation.
+ * @param payload - payload argument for publishWorktreeTasksChanged.
  */
 
 export function publishWorktreeTasksChanged(
@@ -102,8 +102,8 @@ export function publishWorktreeTasksChanged(
   worktreeTasksChangedChannel.publish(payload);
 }
 /**
- * Function of subscribeToWorktreeTasksChanged.
- * @param subscriber - The value of `subscriber`.
+ * Performs subscribeToWorktreeTasksChanged operation.
+ * @param subscriber - subscriber argument for subscribeToWorktreeTasksChanged.
  */
 
 export function subscribeToWorktreeTasksChanged(
@@ -112,8 +112,8 @@ export function subscribeToWorktreeTasksChanged(
   return worktreeTasksChangedChannel.subscribe(subscriber);
 }
 /**
- * Function of publishWorktreeGitHistoryChanged.
- * @param payload - The value of `payload`.
+ * Performs publishWorktreeGitHistoryChanged operation.
+ * @param payload - payload argument for publishWorktreeGitHistoryChanged.
  */
 
 export function publishWorktreeGitHistoryChanged(
@@ -122,8 +122,8 @@ export function publishWorktreeGitHistoryChanged(
   worktreeGitHistoryChangedChannel.publish(payload);
 }
 /**
- * Function of subscribeToWorktreeGitHistoryChanged.
- * @param subscriber - The value of `subscriber`.
+ * Performs subscribeToWorktreeGitHistoryChanged operation.
+ * @param subscriber - subscriber argument for subscribeToWorktreeGitHistoryChanged.
  */
 
 export function subscribeToWorktreeGitHistoryChanged(

@@ -20,9 +20,9 @@ export function createProjectLifecycleRequestTracker(): {
   const requestIds = new Map<number, number>();
 
   /**
-   * Function of buildRequest.
-   * @param projectId - The value of `projectId`.
-   * @param requestId - The value of `requestId`.
+   * Builds request.
+   * @param projectId - Project identifier.
+   * @param requestId - requestId identifier.
    */
   const buildRequest = (
     projectId: number,

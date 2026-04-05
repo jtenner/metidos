@@ -61,11 +61,11 @@ export class DiffParseRequestManager {
   private worker: DiffParseWorkerLike | null = null;
   private workerFailed = false;
   /**
-   * Function of constructor.
-   * @param canUseWorker - The value of `canUseWorker`.
-   * @param createWorker - The value of `createWorker`.
-   * @param maxCacheEntries - The value of `maxCacheEntries`.
-   * @param parseSynchronously - The value of `parseSynchronously`.
+   * Creates and initializes a new instance.
+   * @param canUseWorker - canUseWorker argument for constructor.
+   * @param createWorker - createWorker argument for constructor.
+   * @param maxCacheEntries - maxCacheEntries argument for constructor.
+   * @param parseSynchronously - parseSynchronously argument for constructor.
    */
 
   constructor({
@@ -85,8 +85,8 @@ export class DiffParseRequestManager {
     this.parseSynchronously = parseSynchronously;
   }
   /**
-   * Function of read.
-   * @param diffText - The value of `diffText`.
+   * Reads data as part of processing.
+   * @param diffText - Diff content to process.
    */
 
   read(diffText: string): DiffParseSnapshot {
@@ -148,9 +148,9 @@ export class DiffParseRequestManager {
     return loadingSnapshot;
   }
   /**
-   * Function of subscribe.
-   * @param diffText - The value of `diffText`.
-   * @param listener - The value of `listener`.
+   * Subscribes to async worker events.
+   * @param diffText - Diff content to process.
+   * @param listener - Event listener callback.
    */
 
   subscribe(diffText: string, listener: DiffParseListener): () => void {
@@ -189,8 +189,8 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Function of handleWorkerMessage.
-   * @param data - The value of `data`.
+   * Handles worker message.
+   * @param data - data argument for handleWorkerMessage.
    */
 
   private handleWorkerMessage(data: DiffParsingWorkerResponse): void {
@@ -224,8 +224,8 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Function of resolveSynchronously.
-   * @param diffText - The value of `diffText`.
+   * Resolves synchronously.
+   * @param diffText - Diff content to process.
    */
 
   private resolveSynchronously(diffText: string): void {
@@ -236,9 +236,9 @@ export class DiffParseRequestManager {
     this.finishPendingDiff(diffText, this.parseSynchronously(diffText));
   }
   /**
-   * Function of finishPendingDiff.
-   * @param diffText - The value of `diffText`.
-   * @param result - The value of `result`.
+   * Performs finishPendingDiff operation.
+   * @param diffText - Diff content to process.
+   * @param result - result argument for finishPendingDiff.
    */
 
   private finishPendingDiff(diffText: string, result: DiffParseResult): void {
@@ -254,9 +254,9 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Function of storeReadySnapshot.
-   * @param diffText - The value of `diffText`.
-   * @param result - The value of `result`.
+   * Performs storeReadySnapshot operation.
+   * @param diffText - Diff content to process.
+   * @param result - result argument for storeReadySnapshot.
    */
 
   private storeReadySnapshot(
@@ -287,8 +287,8 @@ export class DiffParseRequestManager {
 
 const sharedDiffParseRequestManager = new DiffParseRequestManager();
 /**
- * Function of useDiffParseResult.
- * @param diffText - The value of `diffText`.
+ * Provides hook behavior for DiffParseResult.
+ * @param diffText - Diff content to process.
  */
 
 export function useDiffParseResult(diffText: string): DiffParseSnapshot {

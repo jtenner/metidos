@@ -24,8 +24,8 @@ type ProjectProceduresModule = typeof import("./project-procedures");
 
 let projectProcedures: ProjectProceduresModule | null = null;
 /**
- * Function of createTempDirectory.
- * @param prefix - The value of `prefix`.
+ * Creates temp directory.
+ * @param prefix - prefix argument for createTempDirectory.
  */
 
 function createTempDirectory(prefix: string): string {
@@ -34,8 +34,8 @@ function createTempDirectory(prefix: string): string {
   return path;
 }
 /**
- * Function of initializeGitRepository.
- * @param path - The value of `path`.
+ * Performs initializeGitRepository operation.
+ * @param path - Filesystem path.
  */
 
 function initializeGitRepository(path: string): void {

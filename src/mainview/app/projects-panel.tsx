@@ -102,12 +102,12 @@ function comparePinnedWorktreeEntries(
 }
 
 /**
- * Function of deriveProjectsPanelWorktreeData.
- * @param filteredProjects - The value of `filteredProjects`.
- * @param getProjectWorktrees - The value of `getProjectWorktrees`.
- * @param normalizedSidebarSearchQuery - The value of `normalizedSidebarSearchQuery`.
- * @param worktreeSearchTextByKey - The value of `worktreeSearchTextByKey`.
- * @param projectById - The value of `projectById`.
+ * Derives projects panel worktree data.
+ * @param filteredProjects - filteredProjects argument for deriveProjectsPanelWorktreeData.
+ * @param getProjectWorktrees - getProjectWorktrees argument for deriveProjectsPanelWorktreeData.
+ * @param normalizedSidebarSearchQuery - normalizedSidebarSearchQuery argument for deriveProjectsPanelWorktreeData.
+ * @param worktreeSearchTextByKey - worktreeSearchTextByKey argument for deriveProjectsPanelWorktreeData.
+ * @param projectById - projectById identifier.
  */
 export function deriveProjectsPanelWorktreeData(
   filteredProjects: RpcProject[],

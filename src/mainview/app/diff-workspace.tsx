@@ -44,8 +44,8 @@ export function emptyDiffFilePatchState(
 }
 
 /**
- * Function of buildDiffFileTree.
- * @param changes - The value of `changes`.
+ * Builds diff file tree.
+ * @param changes - changes argument for buildDiffFileTree.
  */
 export function buildDiffFileTree(
   changes: RpcWorktreeChange[],
@@ -101,8 +101,8 @@ export function buildDiffFileTree(
   // Materialize map-backed tree into deterministic arrays:
   // directories before files, both sorted lexicographically by label.
   /**
-   * Function of materialize.
-   * @param nodes - The value of `nodes`.
+   * Materializes node data into view objects.
+   * @param nodes - Structured nodes.
    */
   const materialize = (nodes: Map<string, MutableNode>): DiffFileTreeNode[] =>
     [...nodes.values()]
@@ -126,10 +126,10 @@ export function buildDiffFileTree(
 }
 
 /**
- * Function of DiffFileTree.
- * @param nodes - The value of `nodes`.
- * @param onSelectedDiffFilePathChange - The value of `onSelectedDiffFilePathChange`.
- * @param selectedDiffFilePath - The value of `selectedDiffFilePath`.
+ * Performs DiffFileTree operation.
+ * @param nodes - Structured nodes.
+ * @param onSelectedDiffFilePathChange - onSelectedDiffFilePathChange path used by DiffFileTree.
+ * @param selectedDiffFilePath - selectedDiffFilePath path used by DiffFileTree.
  */
 function DiffFileTree({
   nodes,
@@ -142,9 +142,9 @@ function DiffFileTree({
 }): JSX.Element {
   // Recursive renderer that increases left padding by depth for visual hierarchy.
   /**
-   * Function of renderNodes.
-   * @param currentNodes - The value of `currentNodes`.
-   * @param depth - The value of `depth`.
+   * Renders nodes.
+   * @param currentNodes - currentNodes argument for renderNodes.
+   * @param depth - depth argument for renderNodes.
    */
   const renderNodes = (
     currentNodes: DiffFileTreeNode[],

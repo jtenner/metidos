@@ -16,8 +16,8 @@ type MergeThreadStatusSummariesOptions = {
   loadedThreadStatuses: RpcThread[];
 };
 /**
- * Function of mergeThreadStatusSummaries.
- * @param options - The value of `options`.
+ * Merges thread status summaries.
+ * @param options - Configuration options used by this operation.
  */
 
 export function mergeThreadStatusSummaries(

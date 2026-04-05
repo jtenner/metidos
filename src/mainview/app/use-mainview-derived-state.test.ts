@@ -10,9 +10,9 @@ import { worktreeKey } from "./state";
 import { deriveWorktreeDisplayPathByKey } from "./use-mainview-derived-state";
 
 /**
- * Function of project.
- * @param id - The value of `id`.
- * @param path - The value of `path`.
+ * Builds a project fixture.
+ * @param id - Identifier value.
+ * @param path - Filesystem path.
  */
 
 function project(id: number, path: string): RpcProject {
@@ -27,9 +27,9 @@ function project(id: number, path: string): RpcProject {
   };
 }
 /**
- * Function of worktree.
- * @param path - The value of `path`.
- * @param branch - The value of `branch`.
+ * Builds a worktree fixture.
+ * @param path - Filesystem path.
+ * @param branch - Target git branch.
  */
 
 function worktree(path: string, branch: string | null = "main"): RpcWorktree {

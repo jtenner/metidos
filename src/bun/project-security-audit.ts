@@ -17,8 +17,8 @@ type CreateThreadParams = AppRPCSchema["requests"]["createThread"]["params"];
 type RunProjectTaskParams =
   AppRPCSchema["requests"]["runProjectTask"]["params"];
 /**
- * Function of stringifyPayload.
- * @param payload - The value of `payload`.
+ * Stringifies payload.
+ * @param payload - payload argument for stringifyPayload.
  */
 
 function stringifyPayload(
@@ -27,16 +27,16 @@ function stringifyPayload(
   return JSON.stringify(payload);
 }
 /**
- * Function of normalizeUnsafeMode.
- * @param value - The value of `value`.
+ * Normalizes unsafe mode.
+ * @param value - Input value.
  */
 
 function normalizeUnsafeMode(value: boolean | number): boolean {
   return value === true || value === 1;
 }
 /**
- * Function of taskLabel.
- * @param task - The value of `task`.
+ * Performs taskLabel operation.
+ * @param task - task argument for taskLabel.
  */
 
 function taskLabel(task: RunProjectTaskParams["task"]): string {
@@ -46,9 +46,9 @@ function taskLabel(task: RunProjectTaskParams["task"]): string {
   return task.path;
 }
 /**
- * Function of recordCrossWorkspaceThreadAuditEvent.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs recordCrossWorkspaceThreadAuditEvent operation.
+ * @param database - database argument for recordCrossWorkspaceThreadAuditEvent.
+ * @param input - input argument for recordCrossWorkspaceThreadAuditEvent.
  */
 
 export function recordCrossWorkspaceThreadAuditEvent(
@@ -80,9 +80,9 @@ export function recordCrossWorkspaceThreadAuditEvent(
   });
 }
 /**
- * Function of recordProjectTaskQueuedAuditEvent.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs recordProjectTaskQueuedAuditEvent operation.
+ * @param database - database argument for recordProjectTaskQueuedAuditEvent.
+ * @param input - input argument for recordProjectTaskQueuedAuditEvent.
  */
 
 export function recordProjectTaskQueuedAuditEvent(
@@ -111,9 +111,9 @@ export function recordProjectTaskQueuedAuditEvent(
   });
 }
 /**
- * Function of recordProjectDeletedAuditEvent.
- * @param database - The value of `database`.
- * @param input - The value of `input`.
+ * Performs recordProjectDeletedAuditEvent operation.
+ * @param database - database argument for recordProjectDeletedAuditEvent.
+ * @param input - input argument for recordProjectDeletedAuditEvent.
  */
 
 export function recordProjectDeletedAuditEvent(

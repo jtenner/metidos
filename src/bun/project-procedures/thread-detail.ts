@@ -69,8 +69,8 @@ function hasUnreadThreadError(thread: ThreadRecord): boolean {
   );
 }
 /**
- * Function of isStoppedThreadMessage.
- * @param message - The value of `message`.
+ * Is stopped thread message.
+ * @param message - Message payload.
  */
 
 export function isStoppedThreadMessage(message: string | null): boolean {

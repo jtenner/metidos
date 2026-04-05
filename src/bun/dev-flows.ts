@@ -36,18 +36,18 @@ export type DevWebSocketTicket = {
   ticket: string;
 };
 /**
- * Function of envFlagEnabled.
- * @param value - The value of `value`.
+ * Performs envFlagEnabled operation.
+ * @param value - Input value.
  */
 
 function envFlagEnabled(value: string | undefined): boolean {
   return value?.trim() === "1";
 }
 /**
- * Function of assertDevOnlyFlag.
- * @param enabled - The value of `enabled`.
- * @param flagName - The value of `flagName`.
- * @param isDevServer - The value of `isDevServer`.
+ * Performs assertDevOnlyFlag operation.
+ * @param enabled - enabled argument for assertDevOnlyFlag.
+ * @param flagName - flagName argument for assertDevOnlyFlag.
+ * @param isDevServer - Boolean flag indicating isDevServer.
  */
 
 function assertDevOnlyFlag(
@@ -60,8 +60,8 @@ function assertDevOnlyFlag(
   }
 }
 /**
- * Function of resolveDevFlowMode.
- * @param options - The value of `options`.
+ * Resolves dev flow mode.
+ * @param options - Configuration options used by this operation.
  */
 
 export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
@@ -78,8 +78,8 @@ export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
   };
 }
 /**
- * Function of issueDevWebSocketTicket.
- * @param nowMs - The value of `nowMs`.
+ * Performs issueDevWebSocketTicket operation.
+ * @param nowMs - nowMs argument for issueDevWebSocketTicket.
  */
 
 export function issueDevWebSocketTicket(
@@ -91,8 +91,8 @@ export function issueDevWebSocketTicket(
   };
 }
 /**
- * Function of resetLocalAppState.
- * @param options - The value of `options`.
+ * Resets local app state.
+ * @param options - Configuration options used by this operation.
  */
 
 export function resetLocalAppState(
