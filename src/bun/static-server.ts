@@ -8,6 +8,7 @@ import {
   type InjectedRuntimeConfig,
   LOOPBACK_HOSTNAME,
 } from "./server-security";
+import { buildBrowserFacingRpcWebSocketUrl } from "./static-server-routing";
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
@@ -278,38 +279,28 @@ function isLoopbackBrowserHost(host: string | null): boolean {
   }
 }
 
-function shouldInjectDirectRpcWebSocketUrlForRequest(
-  request: Request,
-): boolean {
-  if (process.env.JOLT_RPC_URL?.trim()) {
-    return true;
-  }
-
+function buildDirectRpcWebSocketUrlForRequest(request: Request): string | null {
   if (resolveForwardedProto(request) === "https") {
-    return false;
-  }
-
-  return isLoopbackBrowserHost(readBrowserFacingHost(request));
-}
-
-function buildBrowserFacingWebSocketUrl(request: Request): string | null {
-  const browserFacingHost = readBrowserFacingHost(request);
-  if (!browserFacingHost) {
     return null;
   }
 
-  return `${resolveForwardedProto(request) === "https" ? "wss" : "ws"}://${browserFacingHost}/rpc`;
+  const browserFacingHost = readBrowserFacingHost(request);
+  if (!isLoopbackBrowserHost(browserFacingHost)) {
+    return null;
+  }
+
+  return buildBrowserFacingRpcWebSocketUrl({
+    browserFacingHost,
+    forwardedProto: resolveForwardedProto(request),
+    rpcPort: RPC_PORT,
+  });
 }
 
 function buildConnectUrlsForRequest(request: Request): string[] {
   const connectUrls = new Set<string>();
-  if (shouldInjectDirectRpcWebSocketUrlForRequest(request)) {
-    connectUrls.add(RPC_WEBSOCKET_URL);
-  }
-
-  const browserFacingWebSocketUrl = buildBrowserFacingWebSocketUrl(request);
-  if (browserFacingWebSocketUrl) {
-    connectUrls.add(browserFacingWebSocketUrl);
+  const directRpcWebSocketUrl = buildDirectRpcWebSocketUrlForRequest(request);
+  if (directRpcWebSocketUrl) {
+    connectUrls.add(directRpcWebSocketUrl);
   }
 
   return [...connectUrls];
@@ -317,8 +308,7 @@ function buildConnectUrlsForRequest(request: Request): string[] {
 
 function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
   const forwardedProto = resolveForwardedProto(request);
-  const shouldInjectDirectRpcWebSocketUrl =
-    shouldInjectDirectRpcWebSocketUrlForRequest(request);
+  const directRpcWebSocketUrl = buildDirectRpcWebSocketUrlForRequest(request);
 
   return {
     devServer: IS_DEV_SERVER,
@@ -328,9 +318,9 @@ function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
           preferTls: true,
         }
       : {}),
-    ...(shouldInjectDirectRpcWebSocketUrl
+    ...(directRpcWebSocketUrl
       ? {
-          rpcWebSocketUrl: RPC_WEBSOCKET_URL,
+          rpcWebSocketUrl: directRpcWebSocketUrl,
         }
       : {}),
   };

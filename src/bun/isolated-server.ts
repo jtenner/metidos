@@ -176,11 +176,6 @@ const staticServer = spawnRole(
     JOLT_RPC_HEALTH_URL: `${rpcHttpOrigin}/health`,
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_PORT: String(RPC_PORT),
-    ...(PUBLIC_TLS_ENABLED
-      ? {}
-      : {
-          JOLT_RPC_URL: rpcWebSocketUrl,
-        }),
     [TLS_PUBLIC_TRANSPORT_ENV]: PUBLIC_TLS_ENABLED ? "1" : "",
   },
 );
