@@ -4342,7 +4342,10 @@ export default function App({
     ) {
       return;
     }
-    void createThreadForWorktree(selectedProject.id, activeSelectedWorktreePath);
+    void createThreadForWorktree(
+      selectedProject.id,
+      activeSelectedWorktreePath,
+    );
   }, [
     activeSelectedWorktreeOpened,
     activeSelectedWorktreePath,
@@ -5127,12 +5130,17 @@ export default function App({
                   sidebarSearchQuery={sidebarSearchQuery}
                   workspacePanelProps={{
                     acknowledgeThreadErrorSeenInBackground,
-                    canCreateThread:
-                      Boolean(
-                        selectedProject &&
-                          activeSelectedWorktreePath &&
-                          activeSelectedWorktreeOpened,
-                      ),
+                    activeSelectedWorktreeBranch:
+                      activeSelectedWorktree?.branch?.trim() || "Primary",
+                    activeSelectedWorktreeFolder:
+                      activeSelectedWorktreeName ||
+                      activeSelectedWorktreeFolder ||
+                      "Current worktree",
+                    canCreateThread: Boolean(
+                      selectedProject &&
+                        activeSelectedWorktreePath &&
+                        activeSelectedWorktreeOpened,
+                    ),
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     isThreadStatusDismissed,
@@ -5143,6 +5151,8 @@ export default function App({
                     projectById,
                     selectedThreadId,
                     sidebarActionButtonClass,
+                    selectedProjectNameForThread:
+                      selectedProject?.name ?? "Current project",
                     threadPreviewsDisabled: threadActionMenu !== null,
                     threadActivityIndicator,
                     threadsError,
@@ -5284,7 +5294,7 @@ export default function App({
             id="mobile-navigation-drawer"
             ref={mobileSidebarScrollRef}
           >
-                <SidebarContent
+            <SidebarContent
               activeSidebarBranchLabel={activeSidebarBranchLabel}
               collapseControl={null}
               gitHistoryPanelKey={`${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`}
@@ -5338,28 +5348,35 @@ export default function App({
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}
-                  workspacePanelProps={{
-                    acknowledgeThreadErrorSeenInBackground,
-                    canCreateThread:
-                      Boolean(
-                        selectedProject &&
-                          activeSelectedWorktreePath &&
-                          activeSelectedWorktreeOpened,
-                      ),
-                    clearCompletedThreadIndicator,
-                    dismissThreadStatus,
-                    isThreadStatusDismissed,
-                    isCreatingThread,
-                    onCreateThread: handleCreateThreadForActiveWorktree,
-                    onOpenThread: handleOpenThread,
-                    onOpenThreadActionMenu: openThreadActionMenu,
-                    projectById,
-                    selectedThreadId,
-                    sidebarActionButtonClass,
-                    threadPreviewsDisabled: threadActionMenu !== null,
-                    threadActivityIndicator,
-                    threadsError,
-                    worktreeDisplayPathByKey,
+              workspacePanelProps={{
+                acknowledgeThreadErrorSeenInBackground,
+                activeSelectedWorktreeBranch:
+                  activeSelectedWorktree?.branch?.trim() || "Primary",
+                activeSelectedWorktreeFolder:
+                  activeSelectedWorktreeName ||
+                  activeSelectedWorktreeFolder ||
+                  "Current worktree",
+                canCreateThread: Boolean(
+                  selectedProject &&
+                    activeSelectedWorktreePath &&
+                    activeSelectedWorktreeOpened,
+                ),
+                clearCompletedThreadIndicator,
+                dismissThreadStatus,
+                isThreadStatusDismissed,
+                isCreatingThread,
+                onCreateThread: handleCreateThreadForActiveWorktree,
+                onOpenThread: handleOpenThread,
+                onOpenThreadActionMenu: openThreadActionMenu,
+                projectById,
+                selectedThreadId,
+                sidebarActionButtonClass,
+                selectedProjectNameForThread:
+                  selectedProject?.name ?? "Current project",
+                threadPreviewsDisabled: threadActionMenu !== null,
+                threadActivityIndicator,
+                threadsError,
+                worktreeDisplayPathByKey,
                 workspaceActiveThreads: filteredWorkspaceActiveThreads,
                 workspacePinnedThreads: filteredWorkspacePinnedThreads,
                 worktreeByProjectAndPath,
