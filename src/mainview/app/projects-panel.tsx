@@ -237,14 +237,16 @@ function ProjectWorktreeRow({
           >
             {shortName(worktree.path)}
           </div>
-          <div className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]">
-            {showProjectName ? (
-              `${worktree.branch ?? "Primary"} · ${displayPath}`
-            ) : (
-              <>
-                {worktree.branch ?? "Primary"} · {displayPath}
-              </>
-            )}
+          <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]">
+            <span
+              aria-hidden="true"
+              className="text-[12px] leading-none text-[#a7b5be]"
+            >
+              ⎇
+            </span>
+            <span>
+              {worktree.branch ?? "Primary"} · {displayPath}
+            </span>
           </div>
         </div>
         <span

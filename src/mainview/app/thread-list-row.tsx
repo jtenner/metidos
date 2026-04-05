@@ -326,14 +326,28 @@ const ThreadListRow = memo(function ThreadListRow({
             : threadPinned
               ? "Pinned"
               : null;
-  const secondaryLabel = [
-    threadStatusLabel,
-    showLocation
-      ? [threadProject?.name, threadBranchName].filter(Boolean).join(" · ")
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const branchLabel = (
+    <span className="inline-flex items-center gap-1">
+      <span
+        aria-hidden="true"
+        className="text-[12px] leading-none text-[#a7b5be]"
+      >
+        ⎇
+      </span>
+      {threadBranchName}
+    </span>
+  );
+  const secondaryLabel = (
+    <>
+      {threadStatusLabel ? <>{threadStatusLabel} · </> : null}
+      {showLocation ? (
+        <>
+          {threadProject?.name ? <>{threadProject.name} · </> : null}
+          {branchLabel}
+        </>
+      ) : null}
+    </>
+  );
 
   // Compose ARIA label and preview handlers to keep keyboard/screen-reader context consistent.
   return (
@@ -393,7 +407,7 @@ const ThreadListRow = memo(function ThreadListRow({
           <div className="truncate text-[14px] font-medium leading-4">
             {thread.title}
           </div>
-          {secondaryLabel ? (
+          {threadStatusLabel || showLocation ? (
             <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
               {secondaryLabel}
             </div>
