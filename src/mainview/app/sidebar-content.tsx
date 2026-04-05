@@ -68,10 +68,12 @@ export function SidebarContent({
         </div>
       </div>
 
-      <div className="select-none space-y-5">
+      <div className="select-none">
         {/* Main panel stack: workspace context first, then worktrees/projects, then history. */}
         <WorkspacePanel {...workspacePanelProps} />
+        <hr className="w-full border-t border-[#232b30] mt-3 mb-3" />
         <ProjectsPanel {...projectsPanelProps} />
+        <hr className="w-full border-t border-[#232b30] mt-3 mb-3" />
         <GitHistoryPanel key={gitHistoryPanelKey} {...gitHistoryPanelProps} />
       </div>
     </div>
