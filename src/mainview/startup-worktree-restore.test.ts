@@ -15,6 +15,13 @@ import {
   reconcileStartupSelectedWorktreePath,
 } from "./startup-worktree-restore";
 
+/**
+ * Function of project.
+ * @param id - The value of `id`.
+ * @param path - The value of `path`.
+ * @param options - The value of `options`.
+ */
+
 function project(
   id: number,
   path: string,
@@ -30,6 +37,11 @@ function project(
     updatedAt: "2026-04-04T00:00:00.000Z",
   };
 }
+/**
+ * Function of worktree.
+ * @param path - The value of `path`.
+ * @param branch - The value of `branch`.
+ */
 
 function worktree(path: string, branch = "feature"): RpcWorktree {
   return {

@@ -15,6 +15,11 @@ type ResolveTlsRuntimeConfigOptions = {
   env?: NodeJS.ProcessEnv;
   forceTls?: boolean;
 };
+/**
+ * Function of formatLoopbackHttpOrigin.
+ * @param port - The value of `port`.
+ * @param tlsEnabled - The value of `tlsEnabled`.
+ */
 
 export function formatLoopbackHttpOrigin(
   port: number,
@@ -22,6 +27,11 @@ export function formatLoopbackHttpOrigin(
 ): string {
   return `${tlsEnabled ? "https" : "http"}://127.0.0.1:${port}`;
 }
+/**
+ * Function of formatLoopbackWebSocketUrl.
+ * @param port - The value of `port`.
+ * @param tlsEnabled - The value of `tlsEnabled`.
+ */
 
 export function formatLoopbackWebSocketUrl(
   port: number,
@@ -29,6 +39,11 @@ export function formatLoopbackWebSocketUrl(
 ): string {
   return `${tlsEnabled ? "wss" : "ws"}://127.0.0.1:${port}/rpc`;
 }
+/**
+ * Function of isPublicTlsEnabled.
+ * @param args - The value of `args`.
+ * @param env - The value of `env`.
+ */
 
 export function isPublicTlsEnabled(
   args: string[],
@@ -39,6 +54,10 @@ export function isPublicTlsEnabled(
   }
   return env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1";
 }
+/**
+ * Function of resolveTlsRuntimeConfig.
+ * @param options - The value of `options`.
+ */
 
 export function resolveTlsRuntimeConfig(
   options: ResolveTlsRuntimeConfigOptions = {},

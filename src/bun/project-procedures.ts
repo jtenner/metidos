@@ -509,6 +509,10 @@ let worktreeGitHistoryChangeListener:
 function hasForegroundReadPressure(): boolean {
   return foregroundReadCount > 0;
 }
+/**
+ * Function of shouldRefreshWorktreeTaskCache.
+ * @param state - The value of `state`.
+ */
 
 function shouldRefreshWorktreeTaskCache(state: WorktreePollState): boolean {
   return (
@@ -529,6 +533,11 @@ function flushDeferredBackgroundWork(): void {
     callback();
   }
 }
+/**
+ * Function of queueBackgroundWorkWhenIdle.
+ * @param key - The value of `key`.
+ * @param callback - The value of `callback`.
+ */
 
 function queueBackgroundWorkWhenIdle(key: string, callback: () => void): void {
   if (!hasForegroundReadPressure()) {
@@ -545,6 +554,10 @@ function syncAllProjectBackgroundPolling(): void {
     syncProjectRefreshPolling(state);
   }
 }
+/**
+ * Function of withForegroundRead.
+ * @param callback - The value of `callback`.
+ */
 
 async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
   foregroundReadCount += 1;
@@ -558,12 +571,21 @@ async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
     flushDeferredBackgroundWork();
   }
 }
+/**
+ * Function of runTaskCacheRefreshLimited.
+ * @param callback - The value of `callback`.
+ */
 
 function runTaskCacheRefreshLimited<T>(callback: () => Promise<T>): Promise<T> {
   return taskCacheRefreshLimit.run(callback, {
     abortMessage: "Project task refresh was aborted.",
   });
 }
+/**
+ * Function of runWorktreeOpenLimited.
+ * @param callback - The value of `callback`.
+ * @param signal - The value of `signal`.
+ */
 
 function runWorktreeOpenLimited<T>(
   callback: () => Promise<T>,
@@ -574,6 +596,12 @@ function runWorktreeOpenLimited<T>(
     signal: signal ?? null,
   });
 }
+/**
+ * Function of runGitHistoryReadLimited.
+ * @param callback - The value of `callback`.
+ * @param signal - The value of `signal`.
+ * @param abortMessage - The value of `abortMessage`.
+ */
 
 function runGitHistoryReadLimited<T>(
   callback: () => Promise<T>,
@@ -585,6 +613,12 @@ function runGitHistoryReadLimited<T>(
     signal: signal ?? null,
   });
 }
+/**
+ * Function of runDiffLoadLimited.
+ * @param callback - The value of `callback`.
+ * @param signal - The value of `signal`.
+ * @param abortMessage - The value of `abortMessage`.
+ */
 
 function runDiffLoadLimited<T>(
   callback: () => Promise<T>,
@@ -596,6 +630,10 @@ function runDiffLoadLimited<T>(
     signal: signal ?? null,
   });
 }
+/**
+ * Function of recordTaskCacheRefreshDuration.
+ * @param durationMs - The value of `durationMs`.
+ */
 
 function recordTaskCacheRefreshDuration(durationMs: number): void {
   lastTaskCacheRefreshDurationMs = durationMs;
@@ -604,6 +642,10 @@ function recordTaskCacheRefreshDuration(durationMs: number): void {
     durationMs,
   );
 }
+/**
+ * Function of recordThreadActivityPersistenceDuration.
+ * @param durationMs - The value of `durationMs`.
+ */
 
 function recordThreadActivityPersistenceDuration(durationMs: number): void {
   lastThreadActivityPersistenceDurationMs = durationMs;
@@ -678,6 +720,10 @@ function joltRpcUrl(): string {
 
   return JOLT_DEFAULT_RPC_URL;
 }
+/**
+ * Function of createCodexClient.
+ * @param thread - The value of `thread`.
+ */
 
 function createCodexClient(
   thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
@@ -699,12 +745,20 @@ function createCodexClient(
     },
   });
 }
+/**
+ * Function of gitPriorityFromRpcRequest.
+ * @param priority - The value of `priority`.
+ */
 
 function gitPriorityFromRpcRequest(
   priority: RpcRequestPriority,
 ): GitCommandPriority {
   return priority === "background" ? "background" : "foreground";
 }
+/**
+ * Function of gitCommandOptionsFromRequest.
+ * @param context - The value of `context`.
+ */
 
 function gitCommandOptionsFromRequest(
   context?: RpcRequestContext,
@@ -718,10 +772,18 @@ function gitCommandOptionsFromRequest(
     signal: context.signal,
   };
 }
+/**
+ * Function of invalidateThreadDetailCache.
+ * @param threadId - The value of `threadId`.
+ */
 
 function invalidateThreadDetailCache(threadId: number): void {
   threadDetailCache.delete(threadId);
 }
+/**
+ * Function of clearThreadRuntimeState.
+ * @param threadId - The value of `threadId`.
+ */
 
 function clearThreadRuntimeState(threadId: number): void {
   const activeController = threadTurnAbortControllerMap.get(threadId);
@@ -736,6 +798,10 @@ function clearThreadRuntimeState(threadId: number): void {
   threadRunStatusMap.delete(threadId);
   invalidateThreadDetailCache(threadId);
 }
+/**
+ * Function of clearProjectThreadRuntimeState.
+ * @param projectId - The value of `projectId`.
+ */
 
 function clearProjectThreadRuntimeState(projectId: number): void {
   for (const thread of listThreads(db)) {
@@ -745,6 +811,11 @@ function clearProjectThreadRuntimeState(projectId: number): void {
     clearThreadRuntimeState(thread.id);
   }
 }
+/**
+ * Function of setThreadRunStatus.
+ * @param threadId - The value of `threadId`.
+ * @param status - The value of `status`.
+ */
 
 function setThreadRunStatus(
   threadId: number,
@@ -753,14 +824,29 @@ function setThreadRunStatus(
   threadRunStatusMap.set(threadId, status);
   invalidateThreadDetailCache(threadId);
 }
+/**
+ * Function of currentThreadRunStatus.
+ * @param thread - The value of `thread`.
+ */
 
 function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
   return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
+/**
+ * Function of resolveUnsafeMode.
+ * @param unsafeMode - The value of `unsafeMode`.
+ */
 
 function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
   return unsafeMode === true;
 }
+/**
+ * Function of codexThreadOptions.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param model - The value of `model`.
+ * @param reasoningEffort - The value of `reasoningEffort`.
+ * @param unsafeMode - The value of `unsafeMode`.
+ */
 
 function codexThreadOptions(
   worktreePath: string,
@@ -779,6 +865,10 @@ function codexThreadOptions(
     workingDirectory: worktreePath,
   };
 }
+/**
+ * Function of createManagedCodexThread.
+ * @param thread - The value of `thread`.
+ */
 
 function createManagedCodexThread(thread: ThreadRecord): CodexThread {
   const client = createCodexClient(thread);
@@ -806,6 +896,10 @@ function createManagedCodexThread(thread: ThreadRecord): CodexThread {
         ),
       );
 }
+/**
+ * Function of ensureCodexThread.
+ * @param thread - The value of `thread`.
+ */
 
 async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
   const active = codexThreadMap.get(thread.id);
@@ -817,6 +911,10 @@ async function ensureCodexThread(thread: ThreadRecord): Promise<CodexThread> {
   codexThreadMap.set(thread.id, next);
   return next;
 }
+/**
+ * Function of threadById.
+ * @param threadId - The value of `threadId`.
+ */
 
 function threadById(threadId: number): ThreadRecord {
   const thread = getThreadById(db, threadId);
@@ -825,11 +923,20 @@ function threadById(threadId: number): ThreadRecord {
   }
   return thread;
 }
+/**
+ * Function of rpcThreadById.
+ * @param threadId - The value of `threadId`.
+ */
 
 function rpcThreadById(threadId: number): RpcThread {
   const thread = threadById(threadId);
   return toRpcThread(thread, currentThreadRunStatus(thread));
 }
+/**
+ * Function of buildThreadDetail.
+ * @param threadId - The value of `threadId`.
+ * @param options - The value of `options`.
+ */
 
 async function buildThreadDetail(
   threadId: number,
@@ -848,6 +955,10 @@ async function buildThreadDetail(
     nextCursor: page.nextCursor,
   };
 }
+/**
+ * Function of readThreadDetailCached.
+ * @param threadId - The value of `threadId`.
+ */
 
 async function readThreadDetailCached(
   threadId: number,
@@ -866,12 +977,24 @@ async function readThreadDetailCached(
   );
   return detail;
 }
+/**
+ * Function of warmThreadDetailCache.
+ * @param threadId - The value of `threadId`.
+ */
 
 function warmThreadDetailCache(threadId: number): void {
   void readThreadDetailCached(threadId).catch((error) => {
     console.error(`Failed to warm thread detail cache for ${threadId}`, error);
   });
 }
+/**
+ * Function of settleCanceledThreadTurn.
+ * @param threadId - The value of `threadId`.
+ * @param startedAt - The value of `startedAt`.
+ * @param lastAssistantItemId - The value of `lastAssistantItemId`.
+ * @param lastAssistantText - The value of `lastAssistantText`.
+ * @param message - The value of `message`.
+ */
 
 async function settleCanceledThreadTurn(
   threadId: number,
@@ -899,6 +1022,10 @@ async function settleCanceledThreadTurn(
     hasUnreadError: false,
   });
 }
+/**
+ * Function of interruptionMessageFromAbort.
+ * @param reason - The value of `reason`.
+ */
 
 function interruptionMessageFromAbort(reason: unknown): string {
   const message =
@@ -919,10 +1046,22 @@ function interruptionMessageFromAbort(reason: unknown): string {
   }
   return THREAD_INTERRUPTED_MESSAGE;
 }
+/**
+ * Function of buildThreadTurnActivityId.
+ * @param startedAt - The value of `startedAt`.
+ * @param itemId - The value of `itemId`.
+ */
 
 function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
   return `${startedAt}:${itemId}`;
 }
+/**
+ * Function of runThreadMessageInBackground.
+ * @param threadId - The value of `threadId`.
+ * @param input - The value of `input`.
+ * @param startedAt - The value of `startedAt`.
+ * @param controller - The value of `controller`.
+ */
 
 async function runThreadMessageInBackground(
   threadId: number,
@@ -1232,6 +1371,11 @@ async function runThreadMessageInBackground(
     threadTurnCompletionMap.delete(threadId);
   }
 }
+/**
+ * Function of worktreePathFromName.
+ * @param projectPath - The value of `projectPath`.
+ * @param worktreeName - The value of `worktreeName`.
+ */
 
 function worktreePathFromName(
   projectPath: string,
@@ -1248,6 +1392,12 @@ function worktreePathFromName(
 
   return resolve(dirname(projectPath), `${basename(projectPath)}-${token}`);
 }
+/**
+ * Function of readProjectWorktrees.
+ * @param projectPath - The value of `projectPath`.
+ * @param projectId - The value of `projectId`.
+ * @param options - The value of `options`.
+ */
 
 async function readProjectWorktrees(
   projectPath: string,
@@ -1291,6 +1441,10 @@ async function readProjectWorktrees(
   }
   return worktrees;
 }
+/**
+ * Function of listDirectorySuggestionsProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function listDirectorySuggestionsProcedure(
   params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
@@ -1299,6 +1453,10 @@ export async function listDirectorySuggestionsProcedure(
     directories: listDirectorySuggestions(params.query),
   };
 }
+/**
+ * Function of assertProjectDirectory.
+ * @param projectPath - The value of `projectPath`.
+ */
 
 function assertProjectDirectory(projectPath: string): void {
   if (!existsSync(projectPath)) {
@@ -1308,6 +1466,11 @@ function assertProjectDirectory(projectPath: string): void {
     throw new Error(`Project path must be a directory: ${projectPath}`);
   }
 }
+/**
+ * Function of logBackgroundGitFailure.
+ * @param message - The value of `message`.
+ * @param error - The value of `error`.
+ */
 
 function logBackgroundGitFailure(message: string, error: unknown): void {
   if (isAbortError(error)) {
@@ -1345,6 +1508,10 @@ type BufferedThreadActivityWrite = {
   signature: string;
   terminal: boolean;
 };
+/**
+ * Function of stringifyActivityValue.
+ * @param value - The value of `value`.
+ */
 
 function stringifyActivityValue(value: unknown): string {
   if (typeof value === "string") {
@@ -1359,6 +1526,10 @@ function stringifyActivityValue(value: unknown): string {
     return String(value);
   }
 }
+/**
+ * Function of extractToolCallTextContent.
+ * @param content - The value of `content`.
+ */
 
 function extractToolCallTextContent(content: unknown): string {
   if (!Array.isArray(content)) {
@@ -1382,6 +1553,10 @@ function extractToolCallTextContent(content: unknown): string {
     })
     .join("\n\n");
 }
+/**
+ * Function of formatToolCallOutput.
+ * @param item - The value of `item`.
+ */
 
 function formatToolCallOutput(
   item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
@@ -1604,6 +1779,10 @@ function createBufferedThreadActivityWriter(): {
     },
   };
 }
+/**
+ * Function of persistThreadActivityInputs.
+ * @param inputs - The value of `inputs`.
+ */
 
 function persistThreadActivityInputs(
   inputs: readonly ThreadActivityInput[],
@@ -1628,6 +1807,13 @@ function persistThreadActivityInputs(
     invalidateThreadDetailCache(threadId);
   }
 }
+/**
+ * Function of buildReasoningActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param item - The value of `item`.
+ * @param state - The value of `state`.
+ */
 
 function buildReasoningActivityInput(
   threadId: number,
@@ -1643,6 +1829,13 @@ function buildReasoningActivityInput(
     state,
   };
 }
+/**
+ * Function of buildAssistantChatActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param text - The value of `text`.
+ * @param state - The value of `state`.
+ */
 
 function buildAssistantChatActivityInput(
   threadId: number,
@@ -1659,6 +1852,13 @@ function buildAssistantChatActivityInput(
     state,
   };
 }
+/**
+ * Function of upsertAssistantChatActivity.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param text - The value of `text`.
+ * @param state - The value of `state`.
+ */
 
 async function upsertAssistantChatActivity(
   threadId: number,
@@ -1670,6 +1870,12 @@ async function upsertAssistantChatActivity(
     buildAssistantChatActivityInput(threadId, itemId, text, state),
   ]);
 }
+/**
+ * Function of buildCommandActivityInputPayload.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param payload - The value of `payload`.
+ */
 
 function buildCommandActivityInputPayload(
   threadId: number,
@@ -1691,6 +1897,12 @@ function buildCommandActivityInputPayload(
     } satisfies CommandActivityPayload),
   };
 }
+/**
+ * Function of buildCommandActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param item - The value of `item`.
+ */
 
 function buildCommandActivityInput(
   threadId: number,
@@ -1704,6 +1916,13 @@ function buildCommandActivityInput(
     state: item.status,
   });
 }
+/**
+ * Function of buildFileChangeActivityInputs.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param item - The value of `item`.
+ */
 
 async function buildFileChangeActivityInputs(
   threadId: number,
@@ -1733,6 +1952,12 @@ async function buildFileChangeActivityInputs(
     }),
   );
 }
+/**
+ * Function of buildToolCallActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param item - The value of `item`.
+ */
 
 function buildToolCallActivityInput(
   threadId: number,
@@ -1753,6 +1978,13 @@ function buildToolCallActivityInput(
     } satisfies ToolCallActivityPayload),
   };
 }
+/**
+ * Function of buildWebSearchActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param item - The value of `item`.
+ * @param state - The value of `state`.
+ */
 
 function buildWebSearchActivityInput(
   threadId: number,
@@ -1768,6 +2000,13 @@ function buildWebSearchActivityInput(
     state,
   };
 }
+/**
+ * Function of buildErrorActivityInput.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ * @param item - The value of `item`.
+ * @param state - The value of `state`.
+ */
 
 function buildErrorActivityInput(
   threadId: number,
@@ -1783,6 +2022,11 @@ function buildErrorActivityInput(
     state,
   };
 }
+/**
+ * Function of mergeProjectWorktreePins.
+ * @param projectId - The value of `projectId`.
+ * @param worktrees - The value of `worktrees`.
+ */
 
 function mergeProjectWorktreePins(
   projectId: number,
@@ -1800,6 +2044,12 @@ function mergeProjectWorktreePins(
     pinnedAt: pinnedAtByPath.get(worktree.path) ?? null,
   }));
 }
+/**
+ * Function of listFreshProjectWorktrees.
+ * @param projectPath - The value of `projectPath`.
+ * @param projectId - The value of `projectId`.
+ * @param options - The value of `options`.
+ */
 
 async function listFreshProjectWorktrees(
   projectPath: string,
@@ -1812,6 +2062,11 @@ async function listFreshProjectWorktrees(
   }
   return mergeProjectWorktreePins(projectId, worktrees);
 }
+/**
+ * Function of findKnownProjectWorktree.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function findKnownProjectWorktree(
   projectId: number,
@@ -1827,6 +2082,11 @@ function findKnownProjectWorktree(
 function getNow(): string {
   return new Date().toISOString();
 }
+/**
+ * Function of refreshProjectPoll.
+ * @param projectId - The value of `projectId`.
+ * @param options - The value of `options`.
+ */
 
 async function refreshProjectPoll(
   projectId: number,
@@ -1857,6 +2117,10 @@ async function refreshProjectPoll(
   }
   syncProjectRefreshPolling(state);
 }
+/**
+ * Function of startProjectRefreshPolling.
+ * @param state - The value of `state`.
+ */
 
 function startProjectRefreshPolling(state: ProjectPollState): void {
   if (state.projectTimer) {
@@ -1874,6 +2138,10 @@ function startProjectRefreshPolling(state: ProjectPollState): void {
     });
   }, PROJECT_POLL_INTERVAL_MS);
 }
+/**
+ * Function of stopProjectRefreshPolling.
+ * @param state - The value of `state`.
+ */
 
 function stopProjectRefreshPolling(state: ProjectPollState): void {
   if (!state.projectTimer) {
@@ -1883,6 +2151,10 @@ function stopProjectRefreshPolling(state: ProjectPollState): void {
   clearInterval(state.projectTimer);
   state.projectTimer = null;
 }
+/**
+ * Function of syncProjectRefreshPolling.
+ * @param state - The value of `state`.
+ */
 
 function syncProjectRefreshPolling(state: ProjectPollState): void {
   if (hasForegroundReadPressure()) {
@@ -1897,6 +2169,10 @@ function syncProjectRefreshPolling(state: ProjectPollState): void {
 
   stopProjectRefreshPolling(state);
 }
+/**
+ * Function of ensureProjectPoller.
+ * @param project - The value of `project`.
+ */
 
 function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
   let state = projectPollMap.get(project.id);
@@ -1920,6 +2196,11 @@ function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
 
   return state;
 }
+/**
+ * Function of stopWorktreePolling.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function stopWorktreePolling(
   state: ProjectPollState,
@@ -1935,6 +2216,11 @@ function stopWorktreePolling(
   closeTaskWatchers(active);
   state.openWorktrees.delete(worktreePath);
 }
+/**
+ * Function of createWorktreePollState.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function createWorktreePollState(
   projectId: number,
@@ -1969,6 +2255,11 @@ function createWorktreePollState(
     lastUpdatedAt,
   };
 }
+/**
+ * Function of ensureWorktreePollState.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function ensureWorktreePollState(
   state: ProjectPollState,
@@ -1983,6 +2274,10 @@ function ensureWorktreePollState(
   state.openWorktrees.set(worktreePath, worktreeState);
   return worktreeState;
 }
+/**
+ * Function of closeTaskWatchers.
+ * @param worktreeState - The value of `worktreeState`.
+ */
 
 function closeTaskWatchers(worktreeState: WorktreePollState): void {
   for (const watcher of worktreeState.taskWatchers) {
@@ -1994,6 +2289,11 @@ function closeTaskWatchers(worktreeState: WorktreePollState): void {
   }
   worktreeState.taskWatchers = [];
 }
+/**
+ * Function of areTaskWatchTargetsEqual.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 function areTaskWatchTargetsEqual(
   left: TaskWatchTarget[],
@@ -2011,6 +2311,11 @@ function areTaskWatchTargetsEqual(
       target.kind === right[index]?.kind && target.path === right[index]?.path,
   );
 }
+/**
+ * Function of areProjectTasksEqual.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 function areProjectTasksEqual(
   left: RpcProjectTask[],
@@ -2035,6 +2340,11 @@ function areProjectTasksEqual(
     );
   });
 }
+/**
+ * Function of logBackgroundTaskFailure.
+ * @param message - The value of `message`.
+ * @param error - The value of `error`.
+ */
 
 function logBackgroundTaskFailure(message: string, error: unknown): void {
   if (isAbortError(error)) {
@@ -2043,6 +2353,12 @@ function logBackgroundTaskFailure(message: string, error: unknown): void {
 
   console.error(message, error);
 }
+/**
+ * Function of refreshWorktreeTaskCache.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param options - The value of `options`.
+ */
 
 async function refreshWorktreeTaskCache(
   state: ProjectPollState,
@@ -2116,6 +2432,11 @@ async function refreshWorktreeTaskCache(
     }
   }
 }
+/**
+ * Function of stopWorktreeBackgroundPolling.
+ * @param worktreeState - The value of `worktreeState`.
+ * @param reason - The value of `reason`.
+ */
 
 function stopWorktreeBackgroundPolling(
   worktreeState: WorktreePollState,
@@ -2127,6 +2448,11 @@ function stopWorktreeBackgroundPolling(
   }
   abortGitHistoryPrefetch(worktreeState, reason);
 }
+/**
+ * Function of startWorktreeTaskPolling.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function startWorktreeTaskPolling(
   state: ProjectPollState,
@@ -2261,6 +2587,11 @@ function startWorktreeTaskPolling(
 
   return worktreeState;
 }
+/**
+ * Function of startWorktreeGitHistoryPolling.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function startWorktreeGitHistoryPolling(
   state: ProjectPollState,
@@ -2316,6 +2647,10 @@ function startWorktreeGitHistoryPolling(
 
   return worktreeState;
 }
+/**
+ * Function of syncProjectWorktreeBackgroundPolling.
+ * @param state - The value of `state`.
+ */
 
 function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
   if (hasForegroundReadPressure()) {
@@ -2340,6 +2675,10 @@ function syncProjectWorktreeBackgroundPolling(state: ProjectPollState): void {
     );
   }
 }
+/**
+ * Function of stopProjectPoller.
+ * @param projectId - The value of `projectId`.
+ */
 
 function stopProjectPoller(projectId: number): void {
   const state = projectPollMap.get(projectId);
@@ -2352,6 +2691,10 @@ function stopProjectPoller(projectId: number): void {
   }
   projectPollMap.delete(projectId);
 }
+/**
+ * Function of projectByIdForPath.
+ * @param projectId - The value of `projectId`.
+ */
 
 function projectByIdForPath(projectId: number): ProjectRecord {
   const project = getProjectById(db, projectId);
@@ -2360,6 +2703,12 @@ function projectByIdForPath(projectId: number): ProjectRecord {
   }
   return project;
 }
+/**
+ * Function of findProjectWorktree.
+ * @param project - The value of `project`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param options - The value of `options`.
+ */
 
 async function findProjectWorktree(
   project: ProjectRecord,
@@ -2373,6 +2722,12 @@ async function findProjectWorktree(
   );
   return worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
+/**
+ * Function of assertProjectWorktree.
+ * @param project - The value of `project`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param options - The value of `options`.
+ */
 
 async function assertProjectWorktree(
   project: ProjectRecord,
@@ -2387,6 +2742,11 @@ async function assertProjectWorktree(
   }
   return worktree;
 }
+/**
+ * Function of trackedProjectWorktree.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function trackedProjectWorktree(
   state: ProjectPollState,
@@ -2394,6 +2754,13 @@ function trackedProjectWorktree(
 ): RpcWorktree | null {
   return state.worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
+/**
+ * Function of ensureTrackedProjectWorktree.
+ * @param project - The value of `project`.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param options - The value of `options`.
+ */
 
 async function ensureTrackedProjectWorktree(
   project: ProjectRecord,
@@ -2420,6 +2787,15 @@ async function ensureTrackedProjectWorktree(
     `Worktree not found for project ${project.path}: ${worktreePath}`,
   );
 }
+/**
+ * Function of createThreadRecord.
+ * @param project - The value of `project`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param model - The value of `model`.
+ * @param reasoningEffort - The value of `reasoningEffort`.
+ * @param unsafeMode - The value of `unsafeMode`.
+ * @param options - The value of `options`.
+ */
 
 async function createThreadRecord(
   project: ProjectRecord,
@@ -2456,6 +2832,12 @@ async function createThreadRecord(
     throw error;
   }
 }
+/**
+ * Function of recordUnsafeModeAuditEvent.
+ * @param thread - The value of `thread`.
+ * @param unsafeMode - The value of `unsafeMode`.
+ * @param source - The value of `source`.
+ */
 
 function recordUnsafeModeAuditEvent(
   thread: ThreadRecord,
@@ -2476,6 +2858,11 @@ function recordUnsafeModeAuditEvent(
     }),
   });
 }
+/**
+ * Function of openProjectProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function openProjectProcedure(
   params: AppRPCSchema["requests"]["openProject"]["params"],
@@ -2492,6 +2879,11 @@ export async function openProjectProcedure(
     return opened;
   });
 }
+/**
+ * Function of openProjectWithGitOptions.
+ * @param params - The value of `params`.
+ * @param requestGitOptions - The value of `requestGitOptions`.
+ */
 
 async function openProjectWithGitOptions(
   params: AppRPCSchema["requests"]["openProject"]["params"],
@@ -2528,6 +2920,11 @@ async function openProjectWithGitOptions(
     worktrees: state.worktrees,
   };
 }
+/**
+ * Function of openProjectsBatchProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function openProjectsBatchProcedure(
   params: AppRPCSchema["requests"]["openProjectsBatch"]["params"],
@@ -2563,6 +2960,11 @@ export async function openProjectsBatchProcedure(
     return results;
   });
 }
+/**
+ * Function of listProjectWorktreesProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function listProjectWorktreesProcedure(
   params: AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
@@ -2584,6 +2986,11 @@ export async function listProjectWorktreesProcedure(
     };
   });
 }
+/**
+ * Function of listProjectTasksProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function listProjectTasksProcedure(
   params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
@@ -2633,6 +3040,10 @@ export async function listProjectTasksProcedure(
     return tasks;
   });
 }
+/**
+ * Function of createWorktreeProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function createWorktreeProcedure(
   params: AppRPCSchema["requests"]["createWorktree"]["params"],
@@ -2665,6 +3076,10 @@ export async function createWorktreeProcedure(
     worktreePath,
   };
 }
+/**
+ * Function of setWorktreePinnedProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function setWorktreePinnedProcedure(
   params: AppRPCSchema["requests"]["setWorktreePinned"]["params"],
@@ -2687,6 +3102,10 @@ export async function setWorktreePinnedProcedure(
     worktrees,
   };
 }
+/**
+ * Function of createThreadProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function createThreadProcedure(
   params: AppRPCSchema["requests"]["createThread"]["params"],
@@ -2712,6 +3131,10 @@ export async function createThreadProcedure(
   });
   return readThreadDetailCached(thread.id);
 }
+/**
+ * Function of requestThreadStartProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function requestThreadStartProcedure(
   params: AppRPCSchema["requests"]["requestThreadStart"]["params"],
@@ -2747,6 +3170,10 @@ export async function requestThreadStartProcedure(
     createdAt: new Date().toISOString(),
   };
 }
+/**
+ * Function of getThreadProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function getThreadProcedure(
   params: AppRPCSchema["requests"]["getThread"]["params"],
@@ -2759,6 +3186,10 @@ export async function getThreadProcedure(
 
   return readThreadDetailCached(params.threadId);
 }
+/**
+ * Function of markThreadErrorSeenProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function markThreadErrorSeenProcedure(
   params: AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
@@ -2772,6 +3203,10 @@ export async function markThreadErrorSeenProcedure(
   });
   return readThreadDetailCached(thread.id);
 }
+/**
+ * Function of sendThreadMessageProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function sendThreadMessageProcedure(
   params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
@@ -2784,6 +3219,11 @@ export async function sendThreadMessageProcedure(
 
   return queueThreadMessage(thread, input);
 }
+/**
+ * Function of queueThreadMessage.
+ * @param thread - The value of `thread`.
+ * @param input - The value of `input`.
+ */
 
 async function queueThreadMessage(
   thread: ThreadRecord,
@@ -2823,6 +3263,10 @@ async function queueThreadMessage(
 
   return readThreadDetailCached(thread.id);
 }
+/**
+ * Function of packageScriptDisplayCommand.
+ * @param task - The value of `task`.
+ */
 
 function packageScriptDisplayCommand(task: {
   packageDirectory: string;
@@ -2832,6 +3276,12 @@ function packageScriptDisplayCommand(task: {
     ? `bun run ${task.scriptName}`
     : `cd ${task.packageDirectory} && bun run ${task.scriptName}`;
 }
+/**
+ * Function of readProcessOutputStream.
+ * @param stream - The value of `stream`.
+ * @param onChunk - The value of `onChunk`.
+ * @param signal - The value of `signal`.
+ */
 
 async function readProcessOutputStream(
   stream: ReadableStream<Uint8Array> | null | undefined,
@@ -2877,6 +3327,11 @@ async function readProcessOutputStream(
     reader.releaseLock();
   }
 }
+/**
+ * Function of queuePackageScriptTask.
+ * @param thread - The value of `thread`.
+ * @param task - The value of `task`.
+ */
 
 async function queuePackageScriptTask(
   thread: ThreadRecord,
@@ -2916,6 +3371,14 @@ async function queuePackageScriptTask(
 
   return readThreadDetailCached(thread.id);
 }
+/**
+ * Function of runPackageScriptTaskInBackground.
+ * @param threadId - The value of `threadId`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param task - The value of `task`.
+ * @param startedAt - The value of `startedAt`.
+ * @param controller - The value of `controller`.
+ */
 
 async function runPackageScriptTaskInBackground(
   threadId: number,
@@ -3091,6 +3554,12 @@ async function runPackageScriptTaskInBackground(
     threadTurnCompletionMap.delete(threadId);
   }
 }
+/**
+ * Function of readAndStoreWorktreeSnapshot.
+ * @param state - The value of `state`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param options - The value of `options`.
+ */
 
 async function readAndStoreWorktreeSnapshot(
   state: ProjectPollState,
@@ -3109,6 +3578,10 @@ async function readAndStoreWorktreeSnapshot(
     ...snapshot,
   };
 }
+/**
+ * Function of runProjectTaskProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function runProjectTaskProcedure(
   params: AppRPCSchema["requests"]["runProjectTask"]["params"],
@@ -3175,6 +3648,10 @@ export async function runProjectTaskProcedure(
     throw error;
   }
 }
+/**
+ * Function of stopThreadTurnProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function stopThreadTurnProcedure(
   params: AppRPCSchema["requests"]["stopThreadTurn"]["params"],
@@ -3198,6 +3675,10 @@ export async function stopThreadTurnProcedure(
   await threadTurnCompletionMap.get(thread.id);
   return readThreadDetailCached(thread.id);
 }
+/**
+ * Function of renameThreadProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function renameThreadProcedure(
   params: AppRPCSchema["requests"]["renameThread"]["params"],
@@ -3210,6 +3691,10 @@ export async function renameThreadProcedure(
       : { summary: params.summary }),
   });
 }
+/**
+ * Function of updateThreadMetadataProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function updateThreadMetadataProcedure(
   params: AppRPCSchema["requests"]["updateThreadMetadata"]["params"],
@@ -3252,12 +3737,20 @@ export async function updateThreadMetadataProcedure(
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
+/**
+ * Function of setThreadPinnedProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function setThreadPinnedProcedure(
   params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
 ): Promise<RpcThread> {
   return updateThreadMetadataProcedure(params);
 }
+/**
+ * Function of updateThreadModelProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function updateThreadModelProcedure(
   params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
@@ -3273,6 +3766,10 @@ export async function updateThreadModelProcedure(
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
+/**
+ * Function of updateThreadReasoningEffortProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function updateThreadReasoningEffortProcedure(
   params: AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
@@ -3290,6 +3787,10 @@ export async function updateThreadReasoningEffortProcedure(
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
+/**
+ * Function of updateThreadUnsafeModeProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function updateThreadUnsafeModeProcedure(
   params: AppRPCSchema["requests"]["updateThreadUnsafeMode"]["params"],
@@ -3312,6 +3813,10 @@ export async function updateThreadUnsafeModeProcedure(
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
+/**
+ * Function of deleteThreadProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function deleteThreadProcedure(
   params: AppRPCSchema["requests"]["deleteThread"]["params"],
@@ -3329,6 +3834,10 @@ export async function deleteThreadProcedure(
     message: `Deleted thread ${thread.title}`,
   };
 }
+/**
+ * Function of discardEmptyThreadProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function discardEmptyThreadProcedure(
   params: AppRPCSchema["requests"]["discardEmptyThread"]["params"],
@@ -3356,6 +3865,11 @@ export async function discardEmptyThreadProcedure(
     discarded: true,
   };
 }
+/**
+ * Function of openWorktreeProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function openWorktreeProcedure(
   params: AppRPCSchema["requests"]["openWorktree"]["params"],
@@ -3370,6 +3884,12 @@ export async function openWorktreeProcedure(
     );
   });
 }
+/**
+ * Function of openWorktreeWithGitOptions.
+ * @param params - The value of `params`.
+ * @param requestGitOptions - The value of `requestGitOptions`.
+ * @param signal - The value of `signal`.
+ */
 
 async function openWorktreeWithGitOptions(
   params: AppRPCSchema["requests"]["openWorktree"]["params"],
@@ -3452,6 +3972,11 @@ async function openWorktreeWithGitOptions(
     history,
   };
 }
+/**
+ * Function of openWorktreesBatchProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function openWorktreesBatchProcedure(
   params: AppRPCSchema["requests"]["openWorktreesBatch"]["params"],
@@ -3488,6 +4013,11 @@ export async function openWorktreesBatchProcedure(
     return results;
   });
 }
+/**
+ * Function of getWorktreeSnapshotProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function getWorktreeSnapshotProcedure(
   params: AppRPCSchema["requests"]["getWorktreeSnapshot"]["params"],
@@ -3509,6 +4039,11 @@ export async function getWorktreeSnapshotProcedure(
     );
   });
 }
+/**
+ * Function of readWorktreeFileContentPageProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function readWorktreeFileContentPageProcedure(
   params: AppRPCSchema["requests"]["readWorktreeFileContentPage"]["params"],
@@ -3538,6 +4073,11 @@ export async function readWorktreeFileContentPageProcedure(
     };
   });
 }
+/**
+ * Function of readWorktreeFileDiffProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function readWorktreeFileDiffProcedure(
   params: AppRPCSchema["requests"]["readWorktreeFileDiff"]["params"],
@@ -3567,6 +4107,11 @@ export async function readWorktreeFileDiffProcedure(
     };
   });
 }
+/**
+ * Function of listWorktreeGitHistoryProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function listWorktreeGitHistoryProcedure(
   params: AppRPCSchema["requests"]["listWorktreeGitHistory"]["params"],
@@ -3692,6 +4237,11 @@ export async function listWorktreeGitHistoryProcedure(
     return buildGitHistoryResultFromCache(state, limit, offset);
   });
 }
+/**
+ * Function of getWorktreeGitCommitDiffProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function getWorktreeGitCommitDiffProcedure(
   params: AppRPCSchema["requests"]["getWorktreeGitCommitDiff"]["params"],
@@ -3723,6 +4273,11 @@ export async function getWorktreeGitCommitDiffProcedure(
     );
   });
 }
+/**
+ * Function of setActiveWorktreeProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function setActiveWorktreeProcedure(
   params: AppRPCSchema["requests"]["setActiveWorktree"]["params"],
@@ -3798,6 +4353,11 @@ export async function setActiveWorktreeProcedure(
     worktreePath,
   };
 }
+/**
+ * Function of focusContextProcedure.
+ * @param params - The value of `params`.
+ * @param context - The value of `context`.
+ */
 
 export async function focusContextProcedure(
   params: AppRPCSchema["requests"]["focusContext"]["params"],
@@ -3869,6 +4429,10 @@ export async function focusContextProcedure(
     };
   });
 }
+/**
+ * Function of closeWorktreeProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function closeWorktreeProcedure(
   params: AppRPCSchema["requests"]["closeWorktree"]["params"],
@@ -3889,6 +4453,10 @@ export async function closeWorktreeProcedure(
     worktreePath: normalizePath(params.worktreePath),
   };
 }
+/**
+ * Function of closeProjectProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function closeProjectProcedure(
   params: AppRPCSchema["requests"]["closeProject"]["params"],
@@ -3902,6 +4470,10 @@ export async function closeProjectProcedure(
     message: `Closed project ${project.name}`,
   };
 }
+/**
+ * Function of deleteProjectProcedure.
+ * @param params - The value of `params`.
+ */
 
 export async function deleteProjectProcedure(
   params: AppRPCSchema["requests"]["deleteProject"]["params"],
@@ -3932,6 +4504,11 @@ export async function deleteProjectProcedure(
     message: `Removed project ${project.name}`,
   };
 }
+/**
+ * Function of getOpenWorktreeSnapshot.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 export function getOpenWorktreeSnapshot(
   projectId: number,
@@ -3994,12 +4571,20 @@ export function suspendActiveWorktreePolling(): void {
 export function shutdownProcedureCacheMaintenance(): void {
   shutdownDirectorySuggestionCacheMaintenance();
 }
+/**
+ * Function of setWorktreeTaskChangeListener.
+ * @param listener - The value of `listener`.
+ */
 
 export function setWorktreeTaskChangeListener(
   listener: ((projectId: number, worktreePath: string) => void) | null,
 ): void {
   worktreeTaskChangeListener = listener;
 }
+/**
+ * Function of setWorktreeGitHistoryChangeListener.
+ * @param listener - The value of `listener`.
+ */
 
 export function setWorktreeGitHistoryChangeListener(
   listener: ((projectId: number, worktreePath: string) => void) | null,

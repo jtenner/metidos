@@ -25,6 +25,12 @@ export type InjectedRuntimeConfig = {
   preferTls?: boolean;
   rpcWebSocketUrl?: string;
 };
+/**
+ * Function of formatBrowserOrigin.
+ * @param protocol - The value of `protocol`.
+ * @param host - The value of `host`.
+ * @param port - The value of `port`.
+ */
 
 function formatBrowserOrigin(
   protocol: BrowserOriginProtocol,
@@ -128,6 +134,10 @@ export function isWebSocketOriginAllowed(
   }
   return allowed.has(normalizedOrigin);
 }
+/**
+ * Function of normalizeConnectSource.
+ * @param url - The value of `url`.
+ */
 
 function normalizeConnectSource(url: string): string | null {
   const trimmed = url.trim();
@@ -150,6 +160,10 @@ function normalizeConnectSource(url: string): string | null {
     return null;
   }
 }
+/**
+ * Function of buildContentSecurityPolicy.
+ * @param connectUrls - The value of `connectUrls`.
+ */
 
 export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
   const connectSources = new Set<string>(["'self'"]);
@@ -174,6 +188,11 @@ export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
     "style-src 'self' 'unsafe-inline'",
   ].join("; ");
 }
+/**
+ * Function of applySecurityHeaders.
+ * @param headers - The value of `headers`.
+ * @param options - The value of `options`.
+ */
 
 export function applySecurityHeaders(
   headers: Headers,
@@ -191,6 +210,10 @@ export function applySecurityHeaders(
   headers.set("x-frame-options", "DENY");
   return headers;
 }
+/**
+ * Function of buildRuntimeConfigElement.
+ * @param runtimeConfig - The value of `runtimeConfig`.
+ */
 
 export function buildRuntimeConfigElement(
   runtimeConfig: InjectedRuntimeConfig,

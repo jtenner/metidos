@@ -14,6 +14,13 @@ import {
   reconcileStartupProjectRestore,
 } from "./startup-project-restore";
 
+/**
+ * Function of project.
+ * @param id - The value of `id`.
+ * @param path - The value of `path`.
+ * @param options - The value of `options`.
+ */
+
 function project(
   id: number,
   path: string,

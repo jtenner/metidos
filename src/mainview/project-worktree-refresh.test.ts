@@ -12,6 +12,11 @@ import {
   shouldRefreshProjectActionMenuWorktrees,
 } from "./project-worktree-refresh";
 
+/**
+ * Function of worktree.
+ * @param overrides - The value of `overrides`.
+ */
+
 function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
   return {
     path: "/repo",
@@ -22,6 +27,10 @@ function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
     ...overrides,
   };
 }
+/**
+ * Function of projectState.
+ * @param overrides - The value of `overrides`.
+ */
 
 function projectState(overrides?: Partial<ProjectNodeState>): ProjectNodeState {
   return {

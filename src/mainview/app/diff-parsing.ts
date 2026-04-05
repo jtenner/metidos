@@ -38,10 +38,18 @@ export const EMPTY_DIFF_PARSE_RESULT: DiffParseResult = {
     hunks: 0,
   },
 };
+/**
+ * Function of shouldWorkerizeDiffParsing.
+ * @param diffText - The value of `diffText`.
+ */
 
 export function shouldWorkerizeDiffParsing(diffText: string): boolean {
   return diffText.length >= LARGE_DIFF_WORKER_TEXT_LENGTH;
 }
+/**
+ * Function of classifyDiffLine.
+ * @param line - The value of `line`.
+ */
 
 function classifyDiffLine(line: string): DiffLineKind {
   if (line.startsWith("diff --git")) {
@@ -61,6 +69,10 @@ function classifyDiffLine(line: string): DiffLineKind {
   }
   return "context";
 }
+/**
+ * Function of parseUnifiedDiffText.
+ * @param diffText - The value of `diffText`.
+ */
 
 export function parseUnifiedDiffText(diffText: string): DiffParseResult {
   if (!diffText.trim()) {

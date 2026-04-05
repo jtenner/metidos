@@ -68,6 +68,10 @@ function hasUnreadThreadError(thread: ThreadRecord): boolean {
       (!thread.lastErrorSeenAt || thread.lastErrorSeenAt < thread.lastErrorAt),
   );
 }
+/**
+ * Function of isStoppedThreadMessage.
+ * @param message - The value of `message`.
+ */
 
 export function isStoppedThreadMessage(message: string | null): boolean {
   return (

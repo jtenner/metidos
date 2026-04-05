@@ -122,6 +122,10 @@ class RpcHarnessClient {
   private closed = false;
   private nextId = 1;
   private readonly socket: WebSocket;
+  /**
+   * Function of constructor.
+   * @param url - The value of `url`.
+   */
 
   constructor(url: string) {
     this.socket = new WebSocket(url);
@@ -221,6 +225,10 @@ class RpcHarnessClient {
     this.closed = true;
     this.socket.close();
   }
+  /**
+   * Function of handleMessage.
+   * @param raw - The value of `raw`.
+   */
 
   private handleMessage(raw: string): void {
     let parsed: RpcResponseMessage | null = null;
@@ -248,6 +256,10 @@ class RpcHarnessClient {
     pending.reject(new Error(parsed.error || "RPC request failed."));
   }
 }
+/**
+ * Function of parseArgs.
+ * @param argv - The value of `argv`.
+ */
 
 function parseArgs(argv: string[]): HarnessOptions {
   const options: HarnessOptions = {
@@ -512,6 +524,11 @@ async function measureRpc<K extends RpcMethodName>(
     };
   }
 }
+/**
+ * Function of choosePreferredTask.
+ * @param tasks - The value of `tasks`.
+ * @param requestedTaskId - The value of `requestedTaskId`.
+ */
 
 function choosePreferredTask(
   tasks: RpcProjectTask[],

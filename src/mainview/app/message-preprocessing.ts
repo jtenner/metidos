@@ -38,10 +38,18 @@ export type PreparedMessageRenderPlan =
       blocks: PreparedRichMarkdownBlock[];
       kind: "rich";
     };
+/**
+ * Function of shouldWorkerizeMessagePreprocessing.
+ * @param text - The value of `text`.
+ */
 
 export function shouldWorkerizeMessagePreprocessing(text: string): boolean {
   return text.length >= LARGE_MARKDOWN_PREPROCESS_TEXT_LENGTH;
 }
+/**
+ * Function of shouldSkipSyntaxHighlighting.
+ * @param code - The value of `code`.
+ */
 
 export function shouldSkipSyntaxHighlighting(code: string): boolean {
   if (code.length > MAX_HIGHLIGHTED_CODE_BLOCK_CHARACTERS) {
@@ -50,6 +58,10 @@ export function shouldSkipSyntaxHighlighting(code: string): boolean {
 
   return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
 }
+/**
+ * Function of splitMarkdownTextForPreparedRendering.
+ * @param text - The value of `text`.
+ */
 
 function splitMarkdownTextForPreparedRendering(text: string): string[] {
   if (text.length <= MAX_PREPARED_MARKDOWN_BLOCK_CHARACTERS) {
@@ -84,6 +96,12 @@ function splitMarkdownTextForPreparedRendering(text: string): string[] {
 
   return chunks.length > 0 ? chunks : [text];
 }
+/**
+ * Function of pushPreparedMarkdownBlocks.
+ * @param blocks - The value of `blocks`.
+ * @param text - The value of `text`.
+ * @param startIndex - The value of `startIndex`.
+ */
 
 function pushPreparedMarkdownBlocks(
   blocks: PreparedRichMarkdownBlock[],
@@ -107,6 +125,10 @@ function pushPreparedMarkdownBlocks(
 
   return nextIndex;
 }
+/**
+ * Function of prepareRichMarkdownBlocks.
+ * @param text - The value of `text`.
+ */
 
 function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
   const blocks: PreparedRichMarkdownBlock[] = [];
@@ -177,6 +199,10 @@ function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
   flushMarkdown();
   return blocks;
 }
+/**
+ * Function of prepareMessageRenderPlan.
+ * @param text - The value of `text`.
+ */
 
 export function prepareMessageRenderPlan(
   text: string,

@@ -76,6 +76,13 @@ export class MessagePreprocessingRequestManager {
   private nextRequestId = 0;
   private worker: MessagePreprocessingWorkerLike | null = null;
   private workerFailed = false;
+  /**
+   * Function of constructor.
+   * @param canUseWorker - The value of `canUseWorker`.
+   * @param createWorker - The value of `createWorker`.
+   * @param maxCacheEntries - The value of `maxCacheEntries`.
+   * @param prepareSynchronously - The value of `prepareSynchronously`.
+   */
 
   constructor({
     canUseWorker = isBrowserWorkerAvailable,
@@ -93,6 +100,10 @@ export class MessagePreprocessingRequestManager {
     this.maxCacheEntries = maxCacheEntries;
     this.prepareSynchronously = prepareSynchronously;
   }
+  /**
+   * Function of read.
+   * @param text - The value of `text`.
+   */
 
   read(text: string): MessagePreprocessingSnapshot {
     if (!text.trim()) {
@@ -146,6 +157,11 @@ export class MessagePreprocessingRequestManager {
 
     return loadingSnapshot;
   }
+  /**
+   * Function of subscribe.
+   * @param text - The value of `text`.
+   * @param listener - The value of `listener`.
+   */
 
   subscribe(text: string, listener: MessagePreprocessingListener): () => void {
     const pending = this.pendingByText.get(text);
@@ -182,6 +198,10 @@ export class MessagePreprocessingRequestManager {
       return null;
     }
   }
+  /**
+   * Function of handleWorkerMessage.
+   * @param data - The value of `data`.
+   */
 
   private handleWorkerMessage(data: MessagePreprocessingWorkerResponse): void {
     const text = this.requestToText.get(data.id);
@@ -213,6 +233,10 @@ export class MessagePreprocessingRequestManager {
       this.resolveSynchronously(text);
     }
   }
+  /**
+   * Function of resolveSynchronously.
+   * @param text - The value of `text`.
+   */
 
   private resolveSynchronously(text: string): void {
     const pending = this.pendingByText.get(text);
@@ -221,6 +245,11 @@ export class MessagePreprocessingRequestManager {
     }
     this.finishPendingText(text, this.prepareSynchronously(text));
   }
+  /**
+   * Function of finishPendingText.
+   * @param text - The value of `text`.
+   * @param plan - The value of `plan`.
+   */
 
   private finishPendingText(
     text: string,
@@ -237,6 +266,11 @@ export class MessagePreprocessingRequestManager {
       listener(readySnapshot);
     }
   }
+  /**
+   * Function of storeReadySnapshot.
+   * @param text - The value of `text`.
+   * @param plan - The value of `plan`.
+   */
 
   private storeReadySnapshot(
     text: string,
@@ -266,6 +300,10 @@ export class MessagePreprocessingRequestManager {
 
 const sharedMessagePreprocessingRequestManager =
   new MessagePreprocessingRequestManager();
+/**
+ * Function of usePreparedMessageRenderPlan.
+ * @param text - The value of `text`.
+ */
 
 export function usePreparedMessageRenderPlan(
   text: string,

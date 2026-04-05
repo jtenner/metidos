@@ -433,6 +433,11 @@ export function shortName(value: string): string {
   const parts = normalized.split(/[\\/]/).filter(Boolean);
   return parts.at(-1) ?? value;
 }
+/**
+ * Function of worktreeKey.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 export function worktreeKey(projectId: number, worktreePath: string): string {
   return `${projectId}::${worktreePath}`;
@@ -444,6 +449,12 @@ export function worktreeKey(projectId: number, worktreePath: string): string {
 export function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+/**
+ * Function of gitHistoryDiffCacheKey.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param commitHash - The value of `commitHash`.
+ */
 
 export function gitHistoryDiffCacheKey(
   projectId: number,
@@ -477,6 +488,10 @@ export function defaultWorktreeState(): WorktreeNodeState {
     error: "",
   };
 }
+/**
+ * Function of buildProjectWorktreeIndex.
+ * @param worktrees - The value of `worktrees`.
+ */
 
 export function buildProjectWorktreeIndex(
   worktrees: RpcWorktree[],
@@ -494,6 +509,10 @@ export function buildProjectWorktreeIndex(
     worktreePaths,
   };
 }
+/**
+ * Function of projectStateWorktrees.
+ * @param state - The value of `state`.
+ */
 
 export function projectStateWorktrees(
   state: Pick<ProjectNodeState, "worktreeByPath" | "worktreePaths">,
@@ -509,6 +528,10 @@ export function projectStateWorktrees(
 
   return worktrees;
 }
+/**
+ * Function of projectStateWorktreeCount.
+ * @param state - The value of `state`.
+ */
 
 export function projectStateWorktreeCount(
   state: Pick<ProjectNodeState, "worktreePaths">,
@@ -529,6 +552,10 @@ export function emptyThreadStore(): ThreadStore {
     orderedIds: [],
   };
 }
+/**
+ * Function of projectStoreItems.
+ * @param store - The value of `store`.
+ */
 
 export function projectStoreItems(store: ProjectStore): RpcProject[] {
   const items: RpcProject[] = [];
@@ -542,6 +569,10 @@ export function projectStoreItems(store: ProjectStore): RpcProject[] {
 
   return items;
 }
+/**
+ * Function of threadStoreItems.
+ * @param store - The value of `store`.
+ */
 
 export function threadStoreItems(store: ThreadStore): RpcThread[] {
   const items: RpcThread[] = [];
@@ -555,6 +586,11 @@ export function threadStoreItems(store: ThreadStore): RpcThread[] {
 
   return items;
 }
+/**
+ * Function of projectStoreGet.
+ * @param store - The value of `store`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function projectStoreGet(
   store: ProjectStore,
@@ -562,6 +598,11 @@ export function projectStoreGet(
 ): RpcProject | null {
   return store.byId[projectId] ?? null;
 }
+/**
+ * Function of threadStoreGet.
+ * @param store - The value of `store`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function threadStoreGet(
   store: ThreadStore,
@@ -599,6 +640,11 @@ export function mergeResetGitHistory(
       preservedTail.length > 0 ? current.nextOffset : nextPage.nextOffset,
   };
 }
+/**
+ * Function of appendGitHistoryPage.
+ * @param current - The value of `current`.
+ * @param nextPage - The value of `nextPage`.
+ */
 
 export function appendGitHistoryPage(
   current: RpcWorktreeGitHistoryResult,
@@ -620,6 +666,11 @@ export function appendGitHistoryPage(
     nextOffset: nextPage.nextOffset,
   };
 }
+/**
+ * Function of findPrimaryWorktree.
+ * @param project - The value of `project`.
+ * @param worktrees - The value of `worktrees`.
+ */
 
 export function findPrimaryWorktree(
   project: RpcProject,
@@ -637,6 +688,11 @@ export function primaryWorktreePath(
 ): string {
   return findPrimaryWorktree(project, worktrees)?.path ?? project.path;
 }
+/**
+ * Function of orderProjectWorktrees.
+ * @param project - The value of `project`.
+ * @param worktrees - The value of `worktrees`.
+ */
 
 export function orderProjectWorktrees(
   project: RpcProject,
@@ -667,6 +723,10 @@ export function orderProjectWorktrees(
     return 0;
   });
 }
+/**
+ * Function of worktreeDisplayName.
+ * @param worktree - The value of `worktree`.
+ */
 
 export function worktreeDisplayName(worktree: RpcWorktree | null): string {
   return worktree?.branch ?? "Primary";
@@ -721,6 +781,10 @@ function parsePositiveInteger(value: unknown): number | null {
     ? value
     : null;
 }
+/**
+ * Function of isCodexReasoningEffort.
+ * @param value - The value of `value`.
+ */
 
 export function isCodexReasoningEffort(
   value: unknown,
@@ -771,6 +835,10 @@ function normalizePersistedOpenWorktrees(
 
   return next;
 }
+/**
+ * Function of normalizePersistedOpenProjectPaths.
+ * @param value - The value of `value`.
+ */
 
 function normalizePersistedOpenProjectPaths(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -872,6 +940,10 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
     return defaultPersistedTreeViewState();
   }
 }
+/**
+ * Function of serializePersistedMainviewState.
+ * @param state - The value of `state`.
+ */
 
 function serializePersistedMainviewState(
   state: PersistedMainviewState,
@@ -898,6 +970,10 @@ export function writePersistedMainviewState(
     JSON.stringify(serializePersistedMainviewState(state)),
   );
 }
+/**
+ * Function of patchPersistedMainviewState.
+ * @param patch - The value of `patch`.
+ */
 
 export function patchPersistedMainviewState(
   patch: Partial<PersistedMainviewState>,
@@ -912,6 +988,10 @@ export function patchPersistedMainviewState(
     version: MAINVIEW_STATE_STORAGE_VERSION,
   });
 }
+/**
+ * Function of writePersistedTreeViewState.
+ * @param state - The value of `state`.
+ */
 
 export function writePersistedTreeViewState(
   state: PersistedTreeViewState,
@@ -938,6 +1018,10 @@ export function resizeComposerTextarea(
   textarea.style.height = "auto";
   textarea.style.height = `${Math.max(textarea.scrollHeight, minHeight)}px`;
 }
+/**
+ * Function of threadRunStatus.
+ * @param thread - The value of `thread`.
+ */
 
 export function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
   return (
@@ -950,6 +1034,10 @@ export function threadRunStatus(thread: RpcThread | null): RpcThreadRunStatus {
     }
   );
 }
+/**
+ * Function of threadErrorLevel.
+ * @param thread - The value of `thread`.
+ */
 
 export function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
   if (thread.runStatus.hasUnreadError) {
@@ -963,6 +1051,11 @@ export function threadErrorLevel(thread: RpcThread): ThreadErrorLevel {
   }
   return "none";
 }
+/**
+ * Function of mergeThreadErrorLevel.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 export function mergeThreadErrorLevel(
   left: ThreadErrorLevel,
@@ -1006,6 +1099,11 @@ export function threadErrorPreview(
     updatedAt: thread.runStatus.updatedAt ?? thread.updatedAt,
   };
 }
+/**
+ * Function of pickPreferredThreadErrorPreview.
+ * @param current - The value of `current`.
+ * @param next - The value of `next`.
+ */
 
 export function pickPreferredThreadErrorPreview(
   current: ThreadErrorPreview | undefined,
@@ -1040,6 +1138,12 @@ export function ensureTrailingSeparator(value: string): string {
     ? value
     : `${value}${separator}`;
 }
+/**
+ * Function of formatDirectoryPathForInput.
+ * @param value - The value of `value`.
+ * @param homeDirectory - The value of `homeDirectory`.
+ * @param supportsTildePath - The value of `supportsTildePath`.
+ */
 
 export function formatDirectoryPathForInput(
   value: string,
@@ -1107,6 +1211,10 @@ export function formatPathForDisplay(
 
   return formattedPath;
 }
+/**
+ * Function of formatGitHistoryTimestamp.
+ * @param value - The value of `value`.
+ */
 
 export function formatGitHistoryTimestamp(value: string): string {
   const timestamp = Date.parse(value);
@@ -1115,10 +1223,19 @@ export function formatGitHistoryTimestamp(value: string): string {
   }
   return GIT_HISTORY_TIMESTAMP_FORMATTER.format(timestamp);
 }
+/**
+ * Function of sortThreads.
+ * @param items - The value of `items`.
+ */
 
 export function sortThreads(items: RpcThread[]): RpcThread[] {
   return [...items].sort(compareThreadsByRecency);
 }
+/**
+ * Function of findThreadInsertionIndex.
+ * @param items - The value of `items`.
+ * @param thread - The value of `thread`.
+ */
 
 function findThreadInsertionIndex(
   items: RpcThread[],
@@ -1137,6 +1254,12 @@ function findThreadInsertionIndex(
   }
   return low;
 }
+/**
+ * Function of findThreadStoreInsertionIndex.
+ * @param orderedIds - The value of `orderedIds`.
+ * @param byId - The value of `byId`.
+ * @param thread - The value of `thread`.
+ */
 
 function findThreadStoreInsertionIndex(
   orderedIds: number[],
@@ -1180,6 +1303,12 @@ export function compareThreadsByRecency(
   }
   return right.updatedAt.localeCompare(left.updatedAt);
 }
+/**
+ * Function of preferredThreadForWorktree.
+ * @param threads - The value of `threads`.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 export function preferredThreadForWorktree(
   threads: RpcThread[],
@@ -1204,6 +1333,12 @@ export function preferredThreadForWorktree(
 
   return preferredThread;
 }
+/**
+ * Function of latestThreadForWorktree.
+ * @param threads - The value of `threads`.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 export function latestThreadForWorktree(
   threads: RpcThread[],
@@ -1240,6 +1375,10 @@ export function pinnedThreadForWorktree(
     )[0] ?? null
   );
 }
+/**
+ * Function of serializeOpenWorktrees.
+ * @param projectStates - The value of `projectStates`.
+ */
 
 export function serializeOpenWorktrees(
   projectStates: ProjectStateMap,
@@ -1292,6 +1431,11 @@ export function pickInitialThread(
 
   return threads[0] ?? null;
 }
+/**
+ * Function of upsertThreadList.
+ * @param items - The value of `items`.
+ * @param thread - The value of `thread`.
+ */
 
 export function upsertThreadList(
   items: RpcThread[],
@@ -1336,6 +1480,11 @@ export function upsertThreadList(
   next.splice(insertionIndex, 0, thread);
   return next;
 }
+/**
+ * Function of compareProjects.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 function compareProjects(left: RpcProject, right: RpcProject): number {
   return left.name.localeCompare(right.name, undefined, {
@@ -1343,6 +1492,12 @@ function compareProjects(left: RpcProject, right: RpcProject): number {
     sensitivity: "base",
   });
 }
+/**
+ * Function of findProjectInsertionIndex.
+ * @param orderedIds - The value of `orderedIds`.
+ * @param byId - The value of `byId`.
+ * @param project - The value of `project`.
+ */
 
 function findProjectInsertionIndex(
   orderedIds: number[],
@@ -1375,6 +1530,10 @@ export function upsertProjectList(
   next.push(project);
   return next.sort(compareProjects);
 }
+/**
+ * Function of createProjectStore.
+ * @param items - The value of `items`.
+ */
 
 export function createProjectStore(items: RpcProject[]): ProjectStore {
   let nextStore = emptyProjectStore();
@@ -1385,6 +1544,11 @@ export function createProjectStore(items: RpcProject[]): ProjectStore {
 
   return nextStore;
 }
+/**
+ * Function of upsertProjectStore.
+ * @param store - The value of `store`.
+ * @param project - The value of `project`.
+ */
 
 export function upsertProjectStore(
   store: ProjectStore,
@@ -1454,6 +1618,11 @@ export function upsertProjectStore(
     orderedIds,
   };
 }
+/**
+ * Function of removeProjectFromStore.
+ * @param store - The value of `store`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function removeProjectFromStore(
   store: ProjectStore,
@@ -1473,6 +1642,10 @@ export function removeProjectFromStore(
     orderedIds: store.orderedIds.filter((entryId) => entryId !== projectId),
   };
 }
+/**
+ * Function of withAcknowledgedUnreadThread.
+ * @param thread - The value of `thread`.
+ */
 
 export function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
   if (!thread.runStatus.hasUnreadError) {
@@ -1487,6 +1660,10 @@ export function withAcknowledgedUnreadThread(thread: RpcThread): RpcThread {
     },
   };
 }
+/**
+ * Function of withAcknowledgedUnreadThreadDetail.
+ * @param detail - The value of `detail`.
+ */
 
 export function withAcknowledgedUnreadThreadDetail(
   detail: RpcThreadDetail,
@@ -1510,6 +1687,10 @@ export function removeThreadFromList(
 ): RpcThread[] {
   return items.filter((thread) => thread.id !== threadId);
 }
+/**
+ * Function of createThreadStore.
+ * @param items - The value of `items`.
+ */
 
 export function createThreadStore(items: RpcThread[]): ThreadStore {
   let nextStore = emptyThreadStore();
@@ -1520,6 +1701,11 @@ export function createThreadStore(items: RpcThread[]): ThreadStore {
 
   return nextStore;
 }
+/**
+ * Function of upsertThreadStore.
+ * @param store - The value of `store`.
+ * @param thread - The value of `thread`.
+ */
 
 export function upsertThreadStore(
   store: ThreadStore,
@@ -1593,6 +1779,11 @@ export function upsertThreadStore(
     orderedIds,
   };
 }
+/**
+ * Function of removeThreadFromStore.
+ * @param store - The value of `store`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function removeThreadFromStore(
   store: ThreadStore,

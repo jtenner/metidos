@@ -50,6 +50,11 @@ export type InitialRpcConnectRetryInfo = {
 };
 
 export class AuthShellTimeoutError extends Error {
+  /**
+   * Function of constructor.
+   * @param message - The value of `message`.
+   */
+
   constructor(message: string) {
     super(message);
     this.name = "AuthShellTimeoutError";
@@ -71,6 +76,10 @@ type ResolveAuthShellGateOptions = {
   setupTimeoutMs?: number;
   statusTimeoutMs?: number;
 };
+/**
+ * Function of defaultRetryWait.
+ * @param delayMs - The value of `delayMs`.
+ */
 
 function defaultRetryWait(delayMs: number): Promise<void> {
   if (delayMs <= 0) {
@@ -81,6 +90,10 @@ function defaultRetryWait(delayMs: number): Promise<void> {
     globalThis.setTimeout(resolve, delayMs);
   });
 }
+/**
+ * Function of shouldRetryInitialRpcConnect.
+ * @param error - The value of `error`.
+ */
 
 export function shouldRetryInitialRpcConnect(error: unknown): boolean {
   return !(
@@ -88,6 +101,10 @@ export function shouldRetryInitialRpcConnect(error: unknown): boolean {
     isAuthRequiredRpcError(error)
   );
 }
+/**
+ * Function of withTimeout.
+ * @param options - The value of `options`.
+ */
 
 function withTimeout<T>(options: {
   message: string;
@@ -113,6 +130,10 @@ function withTimeout<T>(options: {
     );
   });
 }
+/**
+ * Function of connectRpcTransportWithRetry.
+ * @param options - The value of `options`.
+ */
 
 export async function connectRpcTransportWithRetry(options: {
   baseDelayMs?: number;

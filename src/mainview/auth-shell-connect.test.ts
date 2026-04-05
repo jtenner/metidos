@@ -18,6 +18,11 @@ import {
 } from "./auth-shell-connect";
 import { RpcError } from "./rpc-errors";
 
+/**
+ * Function of buildAuthStatus.
+ * @param overrides - The value of `overrides`.
+ */
+
 function buildAuthStatus(overrides: Partial<AuthStatus> = {}): AuthStatus {
   return {
     authenticated: false,

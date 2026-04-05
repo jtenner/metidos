@@ -34,6 +34,10 @@ export type ResolvedProjectTaskExecution =
         command: string;
       };
     };
+/**
+ * Function of tasksDirectoryPath.
+ * @param worktreePath - The value of `worktreePath`.
+ */
 
 function tasksDirectoryPath(worktreePath: string): string {
   return resolve(worktreePath, ".tasks");
@@ -45,6 +49,11 @@ function tasksDirectoryPath(worktreePath: string): string {
 function normalizeRelativeTaskPath(taskPath: string): string {
   return taskPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
 }
+/**
+ * Function of pathEscapesRoot.
+ * @param rootPath - The value of `rootPath`.
+ * @param candidatePath - The value of `candidatePath`.
+ */
 
 function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
   const relativePath = relative(rootPath, candidatePath);
@@ -58,6 +67,11 @@ function pathEscapesRoot(rootPath: string, candidatePath: string): boolean {
     isAbsolute(relativePath)
   );
 }
+/**
+ * Function of safeRealPathInsideRootAsync.
+ * @param rootRealPath - The value of `rootRealPath`.
+ * @param candidatePath - The value of `candidatePath`.
+ */
 
 async function safeRealPathInsideRootAsync(
   rootRealPath: string,
@@ -70,6 +84,12 @@ async function safeRealPathInsideRootAsync(
     return false;
   }
 }
+/**
+ * Function of assertRealPathInsideRoot.
+ * @param rootPath - The value of `rootPath`.
+ * @param candidatePath - The value of `candidatePath`.
+ * @param errorMessage - The value of `errorMessage`.
+ */
 
 function assertRealPathInsideRoot(
   rootPath: string,
@@ -134,6 +154,10 @@ function isIgnoredPackageDirectory(name: string): boolean {
     name === "build"
   );
 }
+/**
+ * Function of sortDirectoryEntries.
+ * @param values - The value of `values`.
+ */
 
 function sortDirectoryEntries<
   Entry extends {
@@ -150,6 +174,10 @@ function sortDirectoryEntries<
     }),
   );
 }
+/**
+ * Function of safeDirectoryRealPathAsync.
+ * @param path - The value of `path`.
+ */
 
 async function safeDirectoryRealPathAsync(
   path: string,
@@ -193,6 +221,11 @@ async function visitDirectoryOnceAsync(
   visitedRealPaths.add(realPath);
   return true;
 }
+/**
+ * Function of isDirectoryCandidate.
+ * @param entry - The value of `entry`.
+ * @param fullPath - The value of `fullPath`.
+ */
 
 async function isDirectoryCandidate(
   entry: {
@@ -222,6 +255,13 @@ async function isFileCandidate(
 
   return safeIsFileAsync(fullPath);
 }
+/**
+ * Function of listProjectTaskFilesAsync.
+ * @param tasksDirectory - The value of `tasksDirectory`.
+ * @param prefix - The value of `prefix`.
+ * @param rootRealPath - The value of `rootRealPath`.
+ * @param visitedRealPaths - The value of `visitedRealPaths`.
+ */
 
 async function listProjectTaskFilesAsync(
   tasksDirectory: string,
@@ -284,6 +324,13 @@ async function listProjectTaskFilesAsync(
 
   return tasks;
 }
+/**
+ * Function of listPackageJsonTasksAsync.
+ * @param rootDirectory - The value of `rootDirectory`.
+ * @param currentDirectory - The value of `currentDirectory`.
+ * @param rootRealPath - The value of `rootRealPath`.
+ * @param visitedRealPaths - The value of `visitedRealPaths`.
+ */
 
 async function listPackageJsonTasksAsync(
   rootDirectory: string,

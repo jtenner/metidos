@@ -59,6 +59,12 @@ export type WorktreeGitHistoryCacheState = {
   historyPrefetch: PendingGitHistoryPrefetch | null;
   historySignature: string | null;
 };
+/**
+ * Function of applyGitHistoryCachePage.
+ * @param worktreeState - The value of `worktreeState`.
+ * @param offset - The value of `offset`.
+ * @param page - The value of `page`.
+ */
 
 export function applyGitHistoryCachePage(
   worktreeState: WorktreeGitHistoryCacheState,

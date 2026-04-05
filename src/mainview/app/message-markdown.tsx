@@ -74,6 +74,13 @@ function renderPreparedCodeBlock({
 }
 
 const markdownComponents: Components = {
+  /**
+   * Function of a.
+   * @param href - The value of `href`.
+   * @param children - The value of `children`.
+   * @param props - The value of `props`.
+   */
+
   a({ href, children, ...props }) {
     return (
       <a
@@ -86,7 +93,14 @@ const markdownComponents: Components = {
         {children}
       </a>
     );
-  },
+  } /**
+   * Function of code.
+   * @param children - The value of `children`.
+   * @param className - The value of `className`.
+   * @param _node - The value of `_node`.
+   * @param props - The value of `props`.
+   */,
+
   code({ children, className, node: _node, ...props }) {
     const code = String(children).replace(/\n$/, "");
     const languageMatch = /language-([\w-]+)/.exec(className ?? "");
@@ -129,10 +143,18 @@ const markdownComponents: Components = {
         {children}
       </code>
     );
-  },
+  } /**
+   * Function of pre.
+   * @param children - The value of `children`.
+   */,
+
   pre({ children }) {
     return <div className="my-3 overflow-x-auto">{children}</div>;
-  },
+  } /**
+   * Function of table.
+   * @param children - The value of `children`.
+   */,
+
   table({ children }) {
     return (
       <div className="my-3 overflow-x-auto">

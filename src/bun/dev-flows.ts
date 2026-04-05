@@ -35,10 +35,20 @@ export type DevWebSocketTicket = {
   expiresAt: string;
   ticket: string;
 };
+/**
+ * Function of envFlagEnabled.
+ * @param value - The value of `value`.
+ */
 
 function envFlagEnabled(value: string | undefined): boolean {
   return value?.trim() === "1";
 }
+/**
+ * Function of assertDevOnlyFlag.
+ * @param enabled - The value of `enabled`.
+ * @param flagName - The value of `flagName`.
+ * @param isDevServer - The value of `isDevServer`.
+ */
 
 function assertDevOnlyFlag(
   enabled: boolean,
@@ -49,6 +59,10 @@ function assertDevOnlyFlag(
     throw new Error(`${flagName}=1 requires --dev or JOLT_DEV=1.`);
   }
 }
+/**
+ * Function of resolveDevFlowMode.
+ * @param options - The value of `options`.
+ */
 
 export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
   const env = options.env ?? process.env;
@@ -63,6 +77,10 @@ export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
     resetOnStartup,
   };
 }
+/**
+ * Function of issueDevWebSocketTicket.
+ * @param nowMs - The value of `nowMs`.
+ */
 
 export function issueDevWebSocketTicket(
   nowMs = Date.now(),
@@ -72,6 +90,10 @@ export function issueDevWebSocketTicket(
     ticket: `dev-${crypto.randomUUID()}`,
   };
 }
+/**
+ * Function of resetLocalAppState.
+ * @param options - The value of `options`.
+ */
 
 export function resetLocalAppState(
   options: ResetLocalAppStateOptions = {},

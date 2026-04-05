@@ -320,6 +320,10 @@ function isWritableDirectory(path: string): boolean {
     return false;
   }
 }
+/**
+ * Function of applyOwnerOnlyFilePermissions.
+ * @param path - The value of `path`.
+ */
 
 function applyOwnerOnlyFilePermissions(path: string): void {
   try {
@@ -328,6 +332,10 @@ function applyOwnerOnlyFilePermissions(path: string): void {
     // Windows does not reliably support POSIX chmod semantics; ignore there.
   }
 }
+/**
+ * Function of selectWritableAppDataDirectory.
+ * @param options - The value of `options`.
+ */
 
 export function selectWritableAppDataDirectory(options: {
   configuredAppDataDir?: string | null | undefined;
@@ -375,10 +383,18 @@ function resolveAppDataDirectory(): string {
   });
   return resolvedAppDataDir;
 }
+/**
+ * Function of getAppDataDirectoryPath.
+ * @param options - The value of `options`.
+ */
 
 export function getAppDataDirectoryPath(options?: AppDataPathOptions): string {
   return options?.appDataDir ?? resolveAppDataDirectory();
 }
+/**
+ * Function of applyAppDatabasePermissions.
+ * @param dbPath - The value of `dbPath`.
+ */
 
 function applyAppDatabasePermissions(dbPath: string): void {
   if (existsSync(dbPath)) {
@@ -392,6 +408,12 @@ function applyAppDatabasePermissions(dbPath: string): void {
     applyOwnerOnlyFilePermissions(sidecarPath);
   }
 }
+/**
+ * Function of tableHasColumn.
+ * @param db - The value of `db`.
+ * @param tableName - The value of `tableName`.
+ * @param columnName - The value of `columnName`.
+ */
 
 function tableHasColumn(
   db: Database,
@@ -747,6 +769,10 @@ export function migrateDatabase(db: Database): void {
 		`,
   );
 }
+/**
+ * Function of getAppDatabasePath.
+ * @param options - The value of `options`.
+ */
 
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
   /** Full path to the SQLite file in the resolved application data directory. */
@@ -789,6 +815,10 @@ export function initAppDatabase(): Database {
   appDatabase = db;
   return db;
 }
+/**
+ * Function of getAuthSettings.
+ * @param database - The value of `database`.
+ */
 
 export function getAuthSettings(database: Database): AuthSettingsRecord | null {
   /** Read the singleton auth-settings row if setup has been completed. */
@@ -811,6 +841,11 @@ export function getAuthSettings(database: Database): AuthSettingsRecord | null {
     )
     .get();
 }
+/**
+ * Function of upsertAuthSettings.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function upsertAuthSettings(
   database: Database,
@@ -860,6 +895,12 @@ export function upsertAuthSettings(
   }
   return settings;
 }
+/**
+ * Function of setAuthFailureState.
+ * @param database - The value of `database`.
+ * @param failedPrimaryFactorAttempts - The value of `failedPrimaryFactorAttempts`.
+ * @param lockedUntil - The value of `lockedUntil`.
+ */
 
 export function setAuthFailureState(
   database: Database,
@@ -881,12 +922,20 @@ export function setAuthFailureState(
     lockedUntil,
   );
 }
+/**
+ * Function of resetAuthFailureState.
+ * @param database - The value of `database`.
+ */
 
 export function resetAuthFailureState(database: Database): void {
   /** Clear any stored failed-attempt counters and lockout state. */
 
   setAuthFailureState(database, 0, null);
 }
+/**
+ * Function of listAuthRecoveryCodes.
+ * @param database - The value of `database`.
+ */
 
 export function listAuthRecoveryCodes(
   database: Database,
@@ -906,6 +955,11 @@ export function listAuthRecoveryCodes(
     )
     .all();
 }
+/**
+ * Function of replaceAuthRecoveryCodeHashes.
+ * @param database - The value of `database`.
+ * @param codeHashes - The value of `codeHashes`.
+ */
 
 export function replaceAuthRecoveryCodeHashes(
   database: Database,
@@ -932,6 +986,12 @@ export function replaceAuthRecoveryCodeHashes(
     return listAuthRecoveryCodes(database);
   });
 }
+/**
+ * Function of markAuthRecoveryCodeUsed.
+ * @param database - The value of `database`.
+ * @param codeHash - The value of `codeHash`.
+ * @param usedAt - The value of `usedAt`.
+ */
 
 export function markAuthRecoveryCodeUsed(
   database: Database,
@@ -952,6 +1012,11 @@ export function markAuthRecoveryCodeUsed(
   );
   return Number(result.changes) > 0;
 }
+/**
+ * Function of createAuthSession.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function createAuthSession(
   database: Database,
@@ -984,6 +1049,11 @@ export function createAuthSession(
   }
   return session;
 }
+/**
+ * Function of getAuthSession.
+ * @param database - The value of `database`.
+ * @param sessionId - The value of `sessionId`.
+ */
 
 export function getAuthSession(
   database: Database,
@@ -1005,6 +1075,13 @@ export function getAuthSession(
     )
     .get(sessionId);
 }
+/**
+ * Function of touchAuthSession.
+ * @param database - The value of `database`.
+ * @param sessionId - The value of `sessionId`.
+ * @param lastUsedAt - The value of `lastUsedAt`.
+ * @param expiresAt - The value of `expiresAt`.
+ */
 
 export function touchAuthSession(
   database: Database,
@@ -1042,6 +1119,12 @@ export function touchAuthSession(
     sessionId,
   );
 }
+/**
+ * Function of setAuthSessionStepUpValidUntil.
+ * @param database - The value of `database`.
+ * @param sessionId - The value of `sessionId`.
+ * @param stepUpValidUntil - The value of `stepUpValidUntil`.
+ */
 
 export function setAuthSessionStepUpValidUntil(
   database: Database,
@@ -1060,18 +1143,32 @@ export function setAuthSessionStepUpValidUntil(
     sessionId,
   );
 }
+/**
+ * Function of deleteAuthSession.
+ * @param database - The value of `database`.
+ * @param sessionId - The value of `sessionId`.
+ */
 
 export function deleteAuthSession(database: Database, sessionId: string): void {
   /** Remove one session and cascade any dependent websocket tickets. */
 
   runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
 }
+/**
+ * Function of deleteAllAuthSessions.
+ * @param database - The value of `database`.
+ */
 
 export function deleteAllAuthSessions(database: Database): number {
   /** Revoke every authenticated session and cascade dependent websocket tickets. */
   const result = runStatement(database, "DELETE FROM auth_sessions");
   return Number(result.changes);
 }
+/**
+ * Function of deleteExpiredAuthSessions.
+ * @param database - The value of `database`.
+ * @param now - The value of `now`.
+ */
 
 export function deleteExpiredAuthSessions(
   database: Database,
@@ -1089,6 +1186,11 @@ export function deleteExpiredAuthSessions(
   );
   return Number(result.changes);
 }
+/**
+ * Function of createAuthWebSocketTicket.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function createAuthWebSocketTicket(
   database: Database,
@@ -1119,6 +1221,11 @@ export function createAuthWebSocketTicket(
   }
   return ticket;
 }
+/**
+ * Function of getAuthWebSocketTicket.
+ * @param database - The value of `database`.
+ * @param ticketId - The value of `ticketId`.
+ */
 
 export function getAuthWebSocketTicket(
   database: Database,
@@ -1141,6 +1248,12 @@ export function getAuthWebSocketTicket(
     )
     .get(ticketId);
 }
+/**
+ * Function of consumeAuthWebSocketTicket.
+ * @param database - The value of `database`.
+ * @param ticketId - The value of `ticketId`.
+ * @param consumedAt - The value of `consumedAt`.
+ */
 
 export function consumeAuthWebSocketTicket(
   database: Database,
@@ -1164,6 +1277,11 @@ export function consumeAuthWebSocketTicket(
   }
   return getAuthWebSocketTicket(database, ticketId);
 }
+/**
+ * Function of deleteExpiredAuthWebSocketTickets.
+ * @param database - The value of `database`.
+ * @param now - The value of `now`.
+ */
 
 export function deleteExpiredAuthWebSocketTickets(
   database: Database,
@@ -1182,6 +1300,11 @@ export function deleteExpiredAuthWebSocketTickets(
   );
   return Number(result.changes);
 }
+/**
+ * Function of createSecurityAuditEvent.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function createSecurityAuditEvent(
   database: Database,
@@ -1231,6 +1354,11 @@ export function createSecurityAuditEvent(
   }
   return event;
 }
+/**
+ * Function of listSecurityAuditEvents.
+ * @param database - The value of `database`.
+ * @param options - The value of `options`.
+ */
 
 export function listSecurityAuditEvents(
   database: Database,
@@ -1373,6 +1501,11 @@ export function listSecurityAuditEvents(
     )
     .all();
 }
+/**
+ * Function of getProject.
+ * @param database - The value of `database`.
+ * @param projectPath - The value of `projectPath`.
+ */
 
 export function getProject(
   database: Database,
@@ -1397,6 +1530,11 @@ export function getProject(
     )
     .get(projectPath);
 }
+/**
+ * Function of getProjectById.
+ * @param database - The value of `database`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function getProjectById(
   database: Database,
@@ -1422,6 +1560,10 @@ export function getProjectById(
     )
     .get(projectId);
 }
+/**
+ * Function of listProjects.
+ * @param database - The value of `database`.
+ */
 
 export function listProjects(database: Database): ProjectRecord[] {
   /** Read all projects ordered by recent activity and then name. */
@@ -1443,6 +1585,11 @@ export function listProjects(database: Database): ProjectRecord[] {
     )
     .all();
 }
+/**
+ * Function of upsertProject.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function upsertProject(
   database: Database,
@@ -1473,6 +1620,10 @@ export function upsertProject(
 
   return project;
 }
+/**
+ * Function of listOpenProjects.
+ * @param database - The value of `database`.
+ */
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
   /** Return only open projects for current workspaces. */
@@ -1495,6 +1646,11 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
     )
     .all();
 }
+/**
+ * Function of setProjectClosed.
+ * @param database - The value of `database`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function setProjectClosed(database: Database, projectId: number): void {
   /** Soft-close a project by unsetting its open flag. */
@@ -1505,11 +1661,21 @@ export function setProjectClosed(database: Database, projectId: number): void {
     projectId,
   );
 }
+/**
+ * Function of deleteProject.
+ * @param database - The value of `database`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function deleteProject(database: Database, projectId: number): void {
   /** Delete a project and cascade dependent rows via FK constraints. */
   runStatement(database, "DELETE FROM projects WHERE id = ?", projectId);
 }
+/**
+ * Function of listProjectWorktreePins.
+ * @param database - The value of `database`.
+ * @param projectId - The value of `projectId`.
+ */
 
 export function listProjectWorktreePins(
   database: Database,
@@ -1530,6 +1696,13 @@ export function listProjectWorktreePins(
     )
     .all(projectId);
 }
+/**
+ * Function of setProjectWorktreePinned.
+ * @param database - The value of `database`.
+ * @param projectId - The value of `projectId`.
+ * @param worktreePath - The value of `worktreePath`.
+ * @param pinned - The value of `pinned`.
+ */
 
 export function setProjectWorktreePinned(
   database: Database,
@@ -1575,6 +1748,10 @@ export function setProjectWorktreePinned(
     worktreePath,
   );
 }
+/**
+ * Function of listThreads.
+ * @param database - The value of `database`.
+ */
 
 export function listThreads(database: Database): ThreadRecord[] {
   /** Fetch all threads, prioritized by pin state and recency. */
@@ -1619,6 +1796,11 @@ export function listThreads(database: Database): ThreadRecord[] {
     )
     .all();
 }
+/**
+ * Function of getThreadById.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function getThreadById(
   database: Database,
@@ -1662,6 +1844,11 @@ export function getThreadById(
     )
     .get(threadId);
 }
+/**
+ * Function of createThread.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function createThread(
   database: Database,
@@ -1711,6 +1898,12 @@ export function createThread(
   }
   return thread;
 }
+/**
+ * Function of updateThreadCodexId.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param codexThreadId - The value of `codexThreadId`.
+ */
 
 export function updateThreadCodexId(
   database: Database,
@@ -1731,6 +1924,13 @@ export function updateThreadCodexId(
     threadId,
   );
 }
+/**
+ * Function of renameThread.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param title - The value of `title`.
+ * @param summary - The value of `summary`.
+ */
 
 export function renameThread(
   database: Database,
@@ -1768,6 +1968,12 @@ export function renameThread(
     threadId,
   );
 }
+/**
+ * Function of setThreadModel.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param model - The value of `model`.
+ */
 
 export function setThreadModel(
   database: Database,
@@ -1788,6 +1994,12 @@ export function setThreadModel(
     threadId,
   );
 }
+/**
+ * Function of setThreadReasoningEffort.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param reasoningEffort - The value of `reasoningEffort`.
+ */
 
 export function setThreadReasoningEffort(
   database: Database,
@@ -1809,6 +2021,12 @@ export function setThreadReasoningEffort(
     threadId,
   );
 }
+/**
+ * Function of setThreadUnsafeMode.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param unsafeMode - The value of `unsafeMode`.
+ */
 
 export function setThreadUnsafeMode(
   database: Database,
@@ -1829,6 +2047,12 @@ export function setThreadUnsafeMode(
     threadId,
   );
 }
+/**
+ * Function of setThreadPinned.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param pinned - The value of `pinned`.
+ */
 
 export function setThreadPinned(
   database: Database,
@@ -1854,11 +2078,21 @@ export function setThreadPinned(
     threadId,
   );
 }
+/**
+ * Function of deleteThread.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function deleteThread(database: Database, threadId: number): void {
   /** Remove a thread and all its messages via foreign key cascade. */
   runStatement(database, "DELETE FROM threads WHERE id = ?", threadId);
 }
+/**
+ * Function of markThreadRan.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function markThreadRan(database: Database, threadId: number): void {
   /** Mark a thread successfully executed and clear transient error state. */
@@ -1879,6 +2113,12 @@ export function markThreadRan(database: Database, threadId: number): void {
     threadId,
   );
 }
+/**
+ * Function of markThreadRunStarted.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param startedAt - The value of `startedAt`.
+ */
 
 export function markThreadRunStarted(
   database: Database,
@@ -1904,6 +2144,12 @@ export function markThreadRunStarted(
     threadId,
   );
 }
+/**
+ * Function of markThreadStopped.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param message - The value of `message`.
+ */
 
 export function markThreadStopped(
   database: Database,
@@ -1928,6 +2174,13 @@ export function markThreadStopped(
     threadId,
   );
 }
+/**
+ * Function of setThreadUsage.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param usage - The value of `usage`.
+ * @param compactionStats - The value of `compactionStats`.
+ */
 
 export function setThreadUsage(
   database: Database,
@@ -1966,6 +2219,12 @@ export function setThreadUsage(
     threadId,
   );
 }
+/**
+ * Function of markThreadFailed.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param errorMessage - The value of `errorMessage`.
+ */
 
 export function markThreadFailed(
   database: Database,
@@ -1989,6 +2248,11 @@ export function markThreadFailed(
     threadId,
   );
 }
+/**
+ * Function of markThreadErrorSeen.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function markThreadErrorSeen(
   database: Database,
@@ -2013,6 +2277,10 @@ export function markThreadErrorSeen(
     threadId,
   );
 }
+/**
+ * Function of listThreadsWithInProgressMessages.
+ * @param database - The value of `database`.
+ */
 
 export function listThreadsWithInProgressMessages(
   database: Database,
@@ -2031,6 +2299,11 @@ export function listThreadsWithInProgressMessages(
     )
     .all();
 }
+/**
+ * Function of listThreadMessages.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function listThreadMessages(
   database: Database,
@@ -2059,6 +2332,12 @@ export function listThreadMessages(
     )
     .all(threadId);
 }
+/**
+ * Function of listThreadMessagesPage.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param options - The value of `options`.
+ */
 
 export function listThreadMessagesPage(
   database: Database,
@@ -2127,6 +2406,11 @@ export function listThreadMessagesPage(
       hasMore && pageRows.length > 0 ? (pageRows[0]?.id ?? null) : null,
   };
 }
+/**
+ * Function of createThreadMessage.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function createThreadMessage(
   database: Database,
@@ -2179,6 +2463,11 @@ export function createThreadMessage(
   }
   return message;
 }
+/**
+ * Function of upsertThreadActivity.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function upsertThreadActivity(
   database: Database,
@@ -2191,6 +2480,12 @@ export function upsertThreadActivity(
 
   upsertThreadActivities(database, [input]);
 }
+/**
+ * Function of findThreadActivityMessageId.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ * @param itemId - The value of `itemId`.
+ */
 
 function findThreadActivityMessageId(
   database: Database,
@@ -2211,6 +2506,12 @@ function findThreadActivityMessageId(
     .get(threadId, itemId);
   return existing ? existing.id : null;
 }
+/**
+ * Function of updateThreadActivityById.
+ * @param database - The value of `database`.
+ * @param messageId - The value of `messageId`.
+ * @param input - The value of `input`.
+ */
 
 function updateThreadActivityById(
   database: Database,
@@ -2244,6 +2545,11 @@ function updateThreadActivityById(
   );
   return Number(result.changes) > 0;
 }
+/**
+ * Function of insertThreadActivity.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 function insertThreadActivity(
   database: Database,
@@ -2275,6 +2581,11 @@ function insertThreadActivity(
   );
   return Number(result.lastInsertRowid);
 }
+/**
+ * Function of upsertThreadActivities.
+ * @param database - The value of `database`.
+ * @param inputs - The value of `inputs`.
+ */
 
 export function upsertThreadActivities(
   database: Database,
@@ -2327,6 +2638,11 @@ export function upsertThreadActivities(
     return resolvedMessageIds;
   });
 }
+/**
+ * Function of stopInProgressThreadMessages.
+ * @param database - The value of `database`.
+ * @param threadId - The value of `threadId`.
+ */
 
 export function stopInProgressThreadMessages(
   database: Database,

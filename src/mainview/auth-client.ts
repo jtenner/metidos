@@ -24,6 +24,14 @@ export type TotpEnrollment = {
 };
 
 export class AuthApiError extends Error {
+  /**
+   * Function of constructor.
+   * @param code - The value of `code`.
+   * @param message - The value of `message`.
+   * @param status - The value of `status`.
+   * @param details - The value of `details`.
+   */
+
   constructor(
     readonly code: string,
     message: string,
@@ -50,10 +58,18 @@ declare global {
     }>;
   }
 }
+/**
+ * Function of isRecord.
+ * @param value - The value of `value`.
+ */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+/**
+ * Function of normalizeAuthErrorDetails.
+ * @param value - The value of `value`.
+ */
 
 function normalizeAuthErrorDetails(value: unknown): AuthErrorDetails | null {
   if (!isRecord(value)) {
@@ -66,6 +82,10 @@ function normalizeAuthErrorDetails(value: unknown): AuthErrorDetails | null {
   }
   return next;
 }
+/**
+ * Function of readJsonBody.
+ * @param response - The value of `response`.
+ */
 
 async function readJsonBody(response: Response): Promise<unknown> {
   const text = await response.text();
@@ -79,6 +99,11 @@ async function readJsonBody(response: Response): Promise<unknown> {
     throw new Error("Auth endpoint returned invalid JSON.");
   }
 }
+/**
+ * Function of toAuthApiError.
+ * @param response - The value of `response`.
+ * @param payload - The value of `payload`.
+ */
 
 function toAuthApiError(response: Response, payload: unknown): AuthApiError {
   const body = payload as AuthErrorResponse;
@@ -95,6 +120,11 @@ function toAuthApiError(response: Response, payload: unknown): AuthApiError {
     normalizeAuthErrorDetails(body.error?.details),
   );
 }
+/**
+ * Function of requestAuthJson.
+ * @param path - The value of `path`.
+ * @param init - The value of `init`.
+ */
 
 async function requestAuthJson<T>(
   path: string,
@@ -117,6 +147,10 @@ async function requestAuthJson<T>(
   }
   return payload as T;
 }
+/**
+ * Function of dispatchAuthRequired.
+ * @param reason - The value of `reason`.
+ */
 
 export function dispatchAuthRequired(reason: string): void {
   if (typeof window === "undefined") {
@@ -130,6 +164,10 @@ export function dispatchAuthRequired(reason: string): void {
     }),
   );
 }
+/**
+ * Function of isAuthRequiredError.
+ * @param error - The value of `error`.
+ */
 
 export function isAuthRequiredError(error: unknown): boolean {
   return (
@@ -158,6 +196,10 @@ export async function prepareSetupEnrollment(): Promise<TotpEnrollment> {
   });
   return payload.enrollment;
 }
+/**
+ * Function of completeAuthSetup.
+ * @param input - The value of `input`.
+ */
 
 export async function completeAuthSetup(input: {
   primaryFactor: string;
@@ -178,6 +220,10 @@ export async function completeAuthSetup(input: {
     method: "POST",
   });
 }
+/**
+ * Function of loginAuth.
+ * @param input - The value of `input`.
+ */
 
 export async function loginAuth(input: {
   primaryFactor: string;
@@ -193,6 +239,10 @@ export async function loginAuth(input: {
     method: "POST",
   });
 }
+/**
+ * Function of loginWithRecoveryCodeAuth.
+ * @param input - The value of `input`.
+ */
 
 export async function loginWithRecoveryCodeAuth(input: {
   primaryFactor: string;
@@ -219,6 +269,10 @@ export async function logoutAuth(): Promise<AuthStatus> {
   });
   return payload.status;
 }
+/**
+ * Function of stepUpAuth.
+ * @param input - The value of `input`.
+ */
 
 export async function stepUpAuth(input: {
   primaryFactor: string;

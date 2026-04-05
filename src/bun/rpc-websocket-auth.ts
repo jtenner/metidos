@@ -38,6 +38,10 @@ export type RpcWebSocketAuthResult =
       ok: false;
     };
 
+/**
+ * Function of authorizeRpcWebSocketUpgrade.
+ * @param options - The value of `options`.
+ */
 export function authorizeRpcWebSocketUpgrade(options: {
   authBypass: boolean;
   cookieHeader: string | null;

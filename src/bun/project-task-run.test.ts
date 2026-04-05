@@ -23,12 +23,20 @@ const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
 type ProjectProceduresModule = typeof import("./project-procedures");
 
 let projectProcedures: ProjectProceduresModule | null = null;
+/**
+ * Function of createTempDirectory.
+ * @param prefix - The value of `prefix`.
+ */
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
   tempDirectories.add(path);
   return path;
 }
+/**
+ * Function of initializeGitRepository.
+ * @param path - The value of `path`.
+ */
 
 function initializeGitRepository(path: string): void {
   execFileSync("git", ["init"], {

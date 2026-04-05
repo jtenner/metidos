@@ -60,6 +60,13 @@ export class DiffParseRequestManager {
   private nextRequestId = 0;
   private worker: DiffParseWorkerLike | null = null;
   private workerFailed = false;
+  /**
+   * Function of constructor.
+   * @param canUseWorker - The value of `canUseWorker`.
+   * @param createWorker - The value of `createWorker`.
+   * @param maxCacheEntries - The value of `maxCacheEntries`.
+   * @param parseSynchronously - The value of `parseSynchronously`.
+   */
 
   constructor({
     canUseWorker = isBrowserWorkerAvailable,
@@ -77,6 +84,10 @@ export class DiffParseRequestManager {
     this.maxCacheEntries = maxCacheEntries;
     this.parseSynchronously = parseSynchronously;
   }
+  /**
+   * Function of read.
+   * @param diffText - The value of `diffText`.
+   */
 
   read(diffText: string): DiffParseSnapshot {
     if (!diffText.trim()) {
@@ -136,6 +147,11 @@ export class DiffParseRequestManager {
 
     return loadingSnapshot;
   }
+  /**
+   * Function of subscribe.
+   * @param diffText - The value of `diffText`.
+   * @param listener - The value of `listener`.
+   */
 
   subscribe(diffText: string, listener: DiffParseListener): () => void {
     const pending = this.pendingByDiffText.get(diffText);
@@ -172,6 +188,10 @@ export class DiffParseRequestManager {
       return null;
     }
   }
+  /**
+   * Function of handleWorkerMessage.
+   * @param data - The value of `data`.
+   */
 
   private handleWorkerMessage(data: DiffParsingWorkerResponse): void {
     const diffText = this.requestToDiffText.get(data.id);
@@ -203,6 +223,10 @@ export class DiffParseRequestManager {
       this.resolveSynchronously(diffText);
     }
   }
+  /**
+   * Function of resolveSynchronously.
+   * @param diffText - The value of `diffText`.
+   */
 
   private resolveSynchronously(diffText: string): void {
     const pending = this.pendingByDiffText.get(diffText);
@@ -211,6 +235,11 @@ export class DiffParseRequestManager {
     }
     this.finishPendingDiff(diffText, this.parseSynchronously(diffText));
   }
+  /**
+   * Function of finishPendingDiff.
+   * @param diffText - The value of `diffText`.
+   * @param result - The value of `result`.
+   */
 
   private finishPendingDiff(diffText: string, result: DiffParseResult): void {
     const pending = this.pendingByDiffText.get(diffText);
@@ -224,6 +253,11 @@ export class DiffParseRequestManager {
       listener(readySnapshot);
     }
   }
+  /**
+   * Function of storeReadySnapshot.
+   * @param diffText - The value of `diffText`.
+   * @param result - The value of `result`.
+   */
 
   private storeReadySnapshot(
     diffText: string,
@@ -252,6 +286,10 @@ export class DiffParseRequestManager {
 }
 
 const sharedDiffParseRequestManager = new DiffParseRequestManager();
+/**
+ * Function of useDiffParseResult.
+ * @param diffText - The value of `diffText`.
+ */
 
 export function useDiffParseResult(diffText: string): DiffParseSnapshot {
   const [snapshot, setSnapshot] = useState<DiffParseSnapshot>(() =>

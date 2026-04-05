@@ -9,6 +9,12 @@ import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { worktreeKey } from "./state";
 import { deriveWorktreeDisplayPathByKey } from "./use-mainview-derived-state";
 
+/**
+ * Function of project.
+ * @param id - The value of `id`.
+ * @param path - The value of `path`.
+ */
+
 function project(id: number, path: string): RpcProject {
   return {
     createdAt: "2026-04-04T00:00:00.000Z",
@@ -20,6 +26,11 @@ function project(id: number, path: string): RpcProject {
     updatedAt: "2026-04-04T00:00:00.000Z",
   };
 }
+/**
+ * Function of worktree.
+ * @param path - The value of `path`.
+ * @param branch - The value of `branch`.
+ */
 
 function worktree(path: string, branch: string | null = "main"): RpcWorktree {
   return {

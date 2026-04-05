@@ -18,6 +18,11 @@ import type { WorktreeNodeState } from "./state";
 import { createAbortError, isAbortError } from "./state";
 
 const WORKTREE_DIFF_POLL_INTERVAL_MS = 2_500;
+/**
+ * Function of worktreeChangeMetadataMatches.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 function worktreeChangeMetadataMatches(
   left: RpcWorktreeChange | null,

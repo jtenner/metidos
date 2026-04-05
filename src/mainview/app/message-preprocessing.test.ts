@@ -26,6 +26,10 @@ class FakeMessagePreprocessingWorker {
     | null = null;
   requests: MessagePreprocessingWorkerRequest[] = [];
   terminated = false;
+  /**
+   * Function of postMessage.
+   * @param message - The value of `message`.
+   */
 
   postMessage(message: MessagePreprocessingWorkerRequest): void {
     this.requests.push(message);
@@ -34,6 +38,10 @@ class FakeMessagePreprocessingWorker {
   terminate(): void {
     this.terminated = true;
   }
+  /**
+   * Function of resolveLastRequest.
+   * @param response - The value of `response`.
+   */
 
   resolveLastRequest(response: MessagePreprocessingWorkerResponse): void {
     this.onmessage?.({

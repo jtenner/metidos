@@ -11,6 +11,12 @@ import {
 } from "./chat-workspace";
 import type { VisibleMessage } from "./state";
 
+/**
+ * Function of assistantChatMessage.
+ * @param key - The value of `key`.
+ * @param text - The value of `text`.
+ */
+
 function assistantChatMessage(key: string, text: string): VisibleMessage {
   return {
     key,
@@ -20,6 +26,11 @@ function assistantChatMessage(key: string, text: string): VisibleMessage {
     tone: "normal",
   };
 }
+/**
+ * Function of userChatMessage.
+ * @param key - The value of `key`.
+ * @param text - The value of `text`.
+ */
 
 function userChatMessage(key: string, text: string): VisibleMessage {
   return {
@@ -29,6 +40,11 @@ function userChatMessage(key: string, text: string): VisibleMessage {
     text,
   };
 }
+/**
+ * Function of reasoningMessage.
+ * @param key - The value of `key`.
+ * @param text - The value of `text`.
+ */
 
 function reasoningMessage(key: string, text: string): VisibleMessage {
   return {

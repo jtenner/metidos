@@ -22,14 +22,26 @@ const AES_GCM_IV_LENGTH = 12;
 type AuthSecretOptions = {
   appDataDir?: string;
 };
+/**
+ * Function of authSecretDirectory.
+ * @param options - The value of `options`.
+ */
 
 function authSecretDirectory(options?: AuthSecretOptions): string {
   return options?.appDataDir ?? dirname(getAppDatabasePath());
 }
+/**
+ * Function of getAuthSecretKeyPath.
+ * @param options - The value of `options`.
+ */
 
 export function getAuthSecretKeyPath(options?: AuthSecretOptions): string {
   return resolve(authSecretDirectory(options), AUTH_SECRET_KEY_FILE_NAME);
 }
+/**
+ * Function of applyOwnerOnlyDirectoryPermissions.
+ * @param path - The value of `path`.
+ */
 
 function applyOwnerOnlyDirectoryPermissions(path: string): void {
   try {
@@ -38,6 +50,10 @@ function applyOwnerOnlyDirectoryPermissions(path: string): void {
     // Windows does not reliably support POSIX chmod semantics; ignore there.
   }
 }
+/**
+ * Function of ensureDirectory.
+ * @param path - The value of `path`.
+ */
 
 function ensureDirectory(path: string): void {
   if (!existsSync(path)) {
@@ -48,6 +64,10 @@ function ensureDirectory(path: string): void {
   }
   applyOwnerOnlyDirectoryPermissions(path);
 }
+/**
+ * Function of applyOwnerOnlyFilePermissions.
+ * @param path - The value of `path`.
+ */
 
 function applyOwnerOnlyFilePermissions(path: string): void {
   try {
@@ -56,24 +76,44 @@ function applyOwnerOnlyFilePermissions(path: string): void {
     // Windows does not reliably support POSIX chmod semantics; ignore there.
   }
 }
+/**
+ * Function of base64UrlEncode.
+ * @param bytes - The value of `bytes`.
+ */
 
 function base64UrlEncode(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
+/**
+ * Function of base64UrlDecode.
+ * @param value - The value of `value`.
+ */
 
 function base64UrlDecode(value: string): Uint8Array {
   return new Uint8Array(Buffer.from(value, "base64url"));
 }
+/**
+ * Function of randomBytes.
+ * @param length - The value of `length`.
+ */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
+/**
+ * Function of toArrayBuffer.
+ * @param bytes - The value of `bytes`.
+ */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy.buffer;
 }
+/**
+ * Function of loadOrCreateRawKey.
+ * @param options - The value of `options`.
+ */
 
 function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   const directory = authSecretDirectory(options);
@@ -97,6 +137,11 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   applyOwnerOnlyFilePermissions(path);
   return created;
 }
+/**
+ * Function of importSecretKey.
+ * @param usages - The value of `usages`.
+ * @param options - The value of `options`.
+ */
 
 async function importSecretKey(
   usages: KeyUsage[],
@@ -113,6 +158,10 @@ async function importSecretKey(
     usages,
   );
 }
+/**
+ * Function of deleteAuthSecretKey.
+ * @param options - The value of `options`.
+ */
 
 export function deleteAuthSecretKey(options?: AuthSecretOptions): boolean {
   /** Remove the persisted auth-secret key so a full local reset can reseed TOTP encryption cleanly. */

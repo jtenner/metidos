@@ -240,6 +240,10 @@ const RPC_WEBSOCKET_URL =
   formatLoopbackWebSocketUrl(RPC_PORT, false);
 const BACKEND_HEALTH_URL =
   process.env.JOLT_RPC_HEALTH_URL?.trim() || `${RPC_HTTP_ORIGIN}/health`;
+/**
+ * Function of resolveForwardedProto.
+ * @param request - The value of `request`.
+ */
 
 function resolveForwardedProto(request: Request): "http" | "https" {
   const forwardedProto = request.headers
@@ -258,6 +262,10 @@ function resolveForwardedProto(request: Request): "http" | "https" {
   }
   return new URL(request.url).protocol === "https:" ? "https" : "http";
 }
+/**
+ * Function of readBrowserFacingHost.
+ * @param request - The value of `request`.
+ */
 
 function readBrowserFacingHost(request: Request): string | null {
   const forwardedHost = request.headers
@@ -279,6 +287,10 @@ function readBrowserFacingHost(request: Request): string | null {
     return null;
   }
 }
+/**
+ * Function of isLoopbackBrowserHost.
+ * @param host - The value of `host`.
+ */
 
 function isLoopbackBrowserHost(host: string | null): boolean {
   if (!host) {
@@ -292,6 +304,10 @@ function isLoopbackBrowserHost(host: string | null): boolean {
     return false;
   }
 }
+/**
+ * Function of buildDirectRpcWebSocketUrlForRequest.
+ * @param request - The value of `request`.
+ */
 
 function buildDirectRpcWebSocketUrlForRequest(request: Request): string | null {
   if (resolveForwardedProto(request) === "https") {
@@ -309,6 +325,10 @@ function buildDirectRpcWebSocketUrlForRequest(request: Request): string | null {
     rpcPort: RPC_PORT,
   });
 }
+/**
+ * Function of buildConnectUrlsForRequest.
+ * @param request - The value of `request`.
+ */
 
 function buildConnectUrlsForRequest(request: Request): string[] {
   const connectUrls = new Set<string>();
@@ -319,6 +339,10 @@ function buildConnectUrlsForRequest(request: Request): string[] {
 
   return [...connectUrls];
 }
+/**
+ * Function of buildRuntimeConfigForRequest.
+ * @param request - The value of `request`.
+ */
 
 function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
   const forwardedProto = resolveForwardedProto(request);
@@ -339,6 +363,11 @@ function buildRuntimeConfigForRequest(request: Request): RuntimeConfig {
       : {}),
   };
 }
+/**
+ * Function of proxyBackendAuthRequest.
+ * @param request - The value of `request`.
+ * @param connectUrls - The value of `connectUrls`.
+ */
 
 async function proxyBackendAuthRequest(
   request: Request,
@@ -380,7 +409,11 @@ let server: ReturnType<typeof Bun.serve>;
 server = Bun.serve({
   hostname: LOOPBACK_HOSTNAME,
   idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-  port: PUBLIC_PORT,
+  port: PUBLIC_PORT /**
+   * Function of fetch.
+   * @param request - The value of `request`.
+   */,
+
   async fetch(request): Promise<Response> {
     // Route only what the frontend requires and leave unknown paths as 404.
     const { pathname } = new URL(request.url);

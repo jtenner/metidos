@@ -11,6 +11,11 @@ import {
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
 
+/**
+ * Function of threadDetail.
+ * @param threadId - The value of `threadId`.
+ */
+
 function threadDetail(threadId: number): RpcThreadDetail {
   return {
     thread: {

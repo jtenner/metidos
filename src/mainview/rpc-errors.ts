@@ -6,6 +6,13 @@
 type RpcErrorDetails = Record<string, string | null>;
 
 export class RpcError extends Error {
+  /**
+   * Function of constructor.
+   * @param message - The value of `message`.
+   * @param code - The value of `code`.
+   * @param details - The value of `details`.
+   */
+
   constructor(
     message: string,
     readonly code: string,
@@ -15,10 +22,18 @@ export class RpcError extends Error {
     this.name = "RpcError";
   }
 }
+/**
+ * Function of isRecord.
+ * @param value - The value of `value`.
+ */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+/**
+ * Function of normalizeRpcErrorDetails.
+ * @param value - The value of `value`.
+ */
 
 export function normalizeRpcErrorDetails(
   value: unknown,
@@ -33,10 +48,18 @@ export function normalizeRpcErrorDetails(
   }
   return next;
 }
+/**
+ * Function of isStepUpRequiredError.
+ * @param error - The value of `error`.
+ */
 
 export function isStepUpRequiredError(error: unknown): boolean {
   return error instanceof RpcError && error.code === "step_up_required";
 }
+/**
+ * Function of isAuthRequiredRpcError.
+ * @param error - The value of `error`.
+ */
 
 export function isAuthRequiredRpcError(error: unknown): boolean {
   return (

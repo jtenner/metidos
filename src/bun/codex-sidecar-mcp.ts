@@ -320,6 +320,10 @@ function normalizeRpcRequestPriority(
       return "foreground";
   }
 }
+/**
+ * Function of canonicalPath.
+ * @param value - The value of `value`.
+ */
 
 function canonicalPath(value: string): string {
   return canonicalizeSidecarPath(value, {
@@ -595,6 +599,10 @@ type ListThreadsRow = {
   runState: RpcThread["runStatus"]["state"];
   updatedAt: string;
 };
+/**
+ * Function of buildThreadListRows.
+ * @param options - The value of `options`.
+ */
 
 async function buildThreadListRows(options: {
   projectName: string;
@@ -809,6 +817,10 @@ async function resolveWorktreeTarget(params?: {
 
   throw new Error("worktreePath required with no active worktree.");
 }
+/**
+ * Function of requireThreadId.
+ * @param threadId - The value of `threadId`.
+ */
 
 function requireThreadId(threadId?: number | null): number {
   if (typeof threadId === "number") {

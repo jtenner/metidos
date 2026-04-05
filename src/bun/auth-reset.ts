@@ -61,6 +61,12 @@ Commands:
 
 class MutedOutput extends Writable {
   muted = false;
+  /**
+   * Function of _write.
+   * @param chunk - The value of `chunk`.
+   * @param encoding - The value of `encoding`.
+   * @param callback - The value of `callback`.
+   */
 
   override _write(
     chunk: Buffer | string,
@@ -73,18 +79,30 @@ class MutedOutput extends Writable {
     callback();
   }
 }
+/**
+ * Function of isAuthPrimaryFactorType.
+ * @param value - The value of `value`.
+ */
 
 function isAuthPrimaryFactorType(
   value: string,
 ): value is AuthPrimaryFactorType {
   return value === "pin" || value === "password";
 }
+/**
+ * Function of formatPrimaryFactorLabel.
+ * @param primaryFactorType - The value of `primaryFactorType`.
+ */
 
 function formatPrimaryFactorLabel(
   primaryFactorType: AuthPrimaryFactorType,
 ): string {
   return primaryFactorType === "pin" ? "PIN" : "password";
 }
+/**
+ * Function of toCliErrorMessage.
+ * @param error - The value of `error`.
+ */
 
 function toCliErrorMessage(error: unknown): string {
   if (error instanceof AuthServiceError) {
@@ -101,6 +119,10 @@ function toCliErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+/**
+ * Function of parseArgs.
+ * @param args - The value of `args`.
+ */
 
 function parseArgs(args: string[]): ParsedArgs {
   if (args.includes("--help") || args.includes("-h")) {
@@ -153,6 +175,10 @@ function parseArgs(args: string[]): ParsedArgs {
     ...(newPrimaryFactorType ? { newPrimaryFactorType } : {}),
   };
 }
+/**
+ * Function of buildCliAuthProofInput.
+ * @param input - The value of `input`.
+ */
 
 function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
   return {
@@ -170,6 +196,11 @@ function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
       : {}),
   };
 }
+/**
+ * Function of resetPrimaryFactorFromCli.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export async function resetPrimaryFactorFromCli(
   database: Database,
@@ -208,6 +239,11 @@ export async function resetPrimaryFactorFromCli(
     revokedSessionCount,
   };
 }
+/**
+ * Function of regenerateRecoveryCodesFromCli.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export async function regenerateRecoveryCodesFromCli(
   database: Database,
@@ -229,6 +265,11 @@ export async function regenerateRecoveryCodesFromCli(
   });
   return recoveryCodes;
 }
+/**
+ * Function of promptVisible.
+ * @param readlineInterface - The value of `readlineInterface`.
+ * @param question - The value of `question`.
+ */
 
 async function promptVisible(
   readlineInterface: ReturnType<typeof createInterface>,
@@ -236,6 +277,12 @@ async function promptVisible(
 ): Promise<string> {
   return (await readlineInterface.question(question)).trim();
 }
+/**
+ * Function of promptSecret.
+ * @param readlineInterface - The value of `readlineInterface`.
+ * @param output - The value of `output`.
+ * @param question - The value of `question`.
+ */
 
 async function promptSecret(
   readlineInterface: ReturnType<typeof createInterface>,
@@ -252,6 +299,10 @@ async function promptSecret(
     process.stdout.write("\n");
   }
 }
+/**
+ * Function of promptPrimaryFactorType.
+ * @param readlineInterface - The value of `readlineInterface`.
+ */
 
 async function promptPrimaryFactorType(
   readlineInterface: ReturnType<typeof createInterface>,
@@ -269,6 +320,10 @@ async function promptPrimaryFactorType(
     console.error('Please enter either "pin" or "password".');
   }
 }
+/**
+ * Function of runInteractiveCli.
+ * @param args - The value of `args`.
+ */
 
 async function runInteractiveCli(args: string[]): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {

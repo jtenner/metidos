@@ -16,16 +16,28 @@ import type { AppRPCSchema } from "./rpc-schema";
 type CreateThreadParams = AppRPCSchema["requests"]["createThread"]["params"];
 type RunProjectTaskParams =
   AppRPCSchema["requests"]["runProjectTask"]["params"];
+/**
+ * Function of stringifyPayload.
+ * @param payload - The value of `payload`.
+ */
 
 function stringifyPayload(
   payload: Record<string, string | number | boolean | null>,
 ): string {
   return JSON.stringify(payload);
 }
+/**
+ * Function of normalizeUnsafeMode.
+ * @param value - The value of `value`.
+ */
 
 function normalizeUnsafeMode(value: boolean | number): boolean {
   return value === true || value === 1;
 }
+/**
+ * Function of taskLabel.
+ * @param task - The value of `task`.
+ */
 
 function taskLabel(task: RunProjectTaskParams["task"]): string {
   if (task.kind === "script") {
@@ -33,6 +45,11 @@ function taskLabel(task: RunProjectTaskParams["task"]): string {
   }
   return task.path;
 }
+/**
+ * Function of recordCrossWorkspaceThreadAuditEvent.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function recordCrossWorkspaceThreadAuditEvent(
   database: Database,
@@ -62,6 +79,11 @@ export function recordCrossWorkspaceThreadAuditEvent(
     worktreePath: input.thread.worktreePath,
   });
 }
+/**
+ * Function of recordProjectTaskQueuedAuditEvent.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function recordProjectTaskQueuedAuditEvent(
   database: Database,
@@ -88,6 +110,11 @@ export function recordProjectTaskQueuedAuditEvent(
     worktreePath: input.thread.worktreePath,
   });
 }
+/**
+ * Function of recordProjectDeletedAuditEvent.
+ * @param database - The value of `database`.
+ * @param input - The value of `input`.
+ */
 
 export function recordProjectDeletedAuditEvent(
   database: Database,

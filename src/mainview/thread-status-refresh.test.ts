@@ -16,9 +16,20 @@ import {
   resolveThreadStatusRefreshOutcome,
 } from "./thread-status-refresh";
 
+/**
+ * Function of thread.
+ * @param threadId - The value of `threadId`.
+ */
+
 function thread(threadId: number): RpcThread {
   return sortableThread(threadId, "2026-04-04T12:00:00.000Z");
 }
+/**
+ * Function of sortableThread.
+ * @param threadId - The value of `threadId`.
+ * @param updatedAt - The value of `updatedAt`.
+ * @param pinnedAt - The value of `pinnedAt`.
+ */
 
 function sortableThread(
   threadId: number,
@@ -31,6 +42,10 @@ function sortableThread(
     updatedAt,
   } as unknown as RpcThread;
 }
+/**
+ * Function of threadDetail.
+ * @param threadId - The value of `threadId`.
+ */
 
 function threadDetail(threadId: number): RpcThreadDetail {
   return {

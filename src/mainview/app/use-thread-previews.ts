@@ -15,6 +15,11 @@ import {
   type ThreadSummaryPopoverState,
 } from "./state";
 
+/**
+ * Function of anchorStillActive.
+ * @param anchorId - The value of `anchorId`.
+ */
+
 function anchorStillActive(anchorId: string): boolean {
   // Treat anchor as active when hovered or focus is on it/inside it; otherwise hide popovers.
   if (typeof document === "undefined") {

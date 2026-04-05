@@ -31,6 +31,11 @@ type CoalescedWorktreeInvalidationChannel<
     subscriber: WorktreeInvalidationSubscriber<TPayload>,
   ) => () => void;
 };
+/**
+ * Function of createCoalescedWorktreeInvalidationChannel.
+ * @param scheduleFlush - The value of `scheduleFlush`.
+ * @param cancelFlush - The value of `cancelFlush`.
+ */
 
 export function createCoalescedWorktreeInvalidationChannel<
   TPayload extends WorktreeInvalidationPayload,
@@ -86,24 +91,40 @@ const worktreeTasksChangedChannel =
   createCoalescedWorktreeInvalidationChannel<RpcWorktreeTasksChanged>();
 const worktreeGitHistoryChangedChannel =
   createCoalescedWorktreeInvalidationChannel<RpcWorktreeGitHistoryChanged>();
+/**
+ * Function of publishWorktreeTasksChanged.
+ * @param payload - The value of `payload`.
+ */
 
 export function publishWorktreeTasksChanged(
   payload: RpcWorktreeTasksChanged,
 ): void {
   worktreeTasksChangedChannel.publish(payload);
 }
+/**
+ * Function of subscribeToWorktreeTasksChanged.
+ * @param subscriber - The value of `subscriber`.
+ */
 
 export function subscribeToWorktreeTasksChanged(
   subscriber: WorktreeInvalidationSubscriber<RpcWorktreeTasksChanged>,
 ): () => void {
   return worktreeTasksChangedChannel.subscribe(subscriber);
 }
+/**
+ * Function of publishWorktreeGitHistoryChanged.
+ * @param payload - The value of `payload`.
+ */
 
 export function publishWorktreeGitHistoryChanged(
   payload: RpcWorktreeGitHistoryChanged,
 ): void {
   worktreeGitHistoryChangedChannel.publish(payload);
 }
+/**
+ * Function of subscribeToWorktreeGitHistoryChanged.
+ * @param subscriber - The value of `subscriber`.
+ */
 
 export function subscribeToWorktreeGitHistoryChanged(
   subscriber: WorktreeInvalidationSubscriber<RpcWorktreeGitHistoryChanged>,

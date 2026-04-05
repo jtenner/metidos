@@ -14,10 +14,18 @@ const MAX_SECURITY_AUDIT_LIMIT = 200;
 type RpcSecurityAuditPayloadValue = NonNullable<
   RpcSecurityAuditEvent["payload"]
 >[string];
+/**
+ * Function of isRecord.
+ * @param value - The value of `value`.
+ */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+/**
+ * Function of isRpcSecurityAuditPayloadValue.
+ * @param value - The value of `value`.
+ */
 
 function isRpcSecurityAuditPayloadValue(
   value: unknown,
@@ -29,6 +37,10 @@ function isRpcSecurityAuditPayloadValue(
     value === null
   );
 }
+/**
+ * Function of normalizeSecurityAuditLimit.
+ * @param limit - The value of `limit`.
+ */
 
 function normalizeSecurityAuditLimit(limit?: number): number {
   if (typeof limit !== "number" || !Number.isInteger(limit)) {
@@ -36,6 +48,10 @@ function normalizeSecurityAuditLimit(limit?: number): number {
   }
   return Math.max(1, Math.min(MAX_SECURITY_AUDIT_LIMIT, limit));
 }
+/**
+ * Function of normalizeThreadId.
+ * @param threadId - The value of `threadId`.
+ */
 
 function normalizeThreadId(threadId?: number | null): number | undefined {
   return typeof threadId === "number" &&
@@ -44,6 +60,10 @@ function normalizeThreadId(threadId?: number | null): number | undefined {
     ? threadId
     : undefined;
 }
+/**
+ * Function of normalizeProjectId.
+ * @param projectId - The value of `projectId`.
+ */
 
 function normalizeProjectId(projectId?: number | null): number | undefined {
   return typeof projectId === "number" &&
@@ -52,6 +72,10 @@ function normalizeProjectId(projectId?: number | null): number | undefined {
     ? projectId
     : undefined;
 }
+/**
+ * Function of parseSecurityAuditPayload.
+ * @param payloadJson - The value of `payloadJson`.
+ */
 
 function parseSecurityAuditPayload(
   payloadJson: string | null,
@@ -78,6 +102,11 @@ function parseSecurityAuditPayload(
     return null;
   }
 }
+/**
+ * Function of listSecurityAuditEventsFromDatabase.
+ * @param database - The value of `database`.
+ * @param params - The value of `params`.
+ */
 
 export function listSecurityAuditEventsFromDatabase(
   database: Database,

@@ -17,6 +17,12 @@ import {
   upsertThreadStore,
 } from "./state";
 
+/**
+ * Function of project.
+ * @param id - The value of `id`.
+ * @param name - The value of `name`.
+ */
+
 function project(id: number, name: string): RpcProject {
   return {
     createdAt: "2026-04-04T00:00:00.000Z",
@@ -28,6 +34,12 @@ function project(id: number, name: string): RpcProject {
     updatedAt: "2026-04-04T00:00:00.000Z",
   };
 }
+/**
+ * Function of thread.
+ * @param id - The value of `id`.
+ * @param updatedAt - The value of `updatedAt`.
+ * @param pinnedAt - The value of `pinnedAt`.
+ */
 
 function thread(
   id: number,
@@ -40,6 +52,10 @@ function thread(
     updatedAt,
   } as unknown as RpcThread;
 }
+/**
+ * Function of worktree.
+ * @param path - The value of `path`.
+ */
 
 function worktree(path: string): RpcWorktree {
   return {

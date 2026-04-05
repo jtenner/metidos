@@ -40,6 +40,10 @@ export type AuthSetupMaterial = {
   totpSecret: string;
   totpUri: string;
 };
+/**
+ * Function of encodeBase32.
+ * @param bytes - The value of `bytes`.
+ */
 
 function encodeBase32(bytes: Uint8Array): string {
   let output = "";
@@ -61,6 +65,10 @@ function encodeBase32(bytes: Uint8Array): string {
 
   return output;
 }
+/**
+ * Function of decodeBase32.
+ * @param secret - The value of `secret`.
+ */
 
 function decodeBase32(secret: string): Uint8Array {
   const normalized = secret.toUpperCase().replace(/[\s=-]/g, "");
@@ -87,6 +95,11 @@ function decodeBase32(secret: string): Uint8Array {
 
   return Uint8Array.from(bytes);
 }
+/**
+ * Function of timingSafeTextEqual.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ */
 
 function timingSafeTextEqual(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left);
@@ -96,20 +109,36 @@ function timingSafeTextEqual(left: string, right: string): boolean {
   }
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
+/**
+ * Function of normalizeRecoveryCode.
+ * @param code - The value of `code`.
+ */
 
 function normalizeRecoveryCode(code: string): string {
   return code.toUpperCase().replace(/[\s-]/g, "");
 }
+/**
+ * Function of randomBytes.
+ * @param length - The value of `length`.
+ */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
+/**
+ * Function of toArrayBuffer.
+ * @param bytes - The value of `bytes`.
+ */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy.buffer;
 }
+/**
+ * Function of generateRandomToken.
+ * @param length - The value of `length`.
+ */
 
 function generateRandomToken(length = 32): string {
   return Buffer.from(randomBytes(length)).toString("base64url");
@@ -123,12 +152,20 @@ function generateRecoveryCode(): string {
   }
   return `${raw.slice(0, 5)}-${raw.slice(5, 10)}`;
 }
+/**
+ * Function of validateTotpDigits.
+ * @param digits - The value of `digits`.
+ */
 
 function validateTotpDigits(digits: number): void {
   if (!Number.isInteger(digits) || digits < 6 || digits > 8) {
     throw new Error("TOTP digits must be an integer between 6 and 8.");
   }
 }
+/**
+ * Function of validateTotpPeriodSeconds.
+ * @param periodSeconds - The value of `periodSeconds`.
+ */
 
 function validateTotpPeriodSeconds(periodSeconds: number): void {
   if (!Number.isInteger(periodSeconds) || periodSeconds <= 0) {
@@ -211,6 +248,12 @@ export function buildTotpUri({
   const encodedSecret = encodeURIComponent(secret);
   return `otpauth://totp/${label}?secret=${encodedSecret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=${DEFAULT_TOTP_DIGITS}&period=${DEFAULT_TOTP_PERIOD_SECONDS}`;
 }
+/**
+ * Function of hotp.
+ * @param secret - The value of `secret`.
+ * @param counter - The value of `counter`.
+ * @param digits - The value of `digits`.
+ */
 
 async function hotp(
   secret: string,

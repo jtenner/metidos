@@ -124,6 +124,10 @@ declare global {
     __joltRuntime?: RuntimeConfig;
   }
 }
+/**
+ * Function of isRecord.
+ * @param value - The value of `value`.
+ */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -287,12 +291,20 @@ function clearRpcReconnectTimer(): void {
     rpcReconnectTimer = null;
   }
 }
+/**
+ * Function of buildSocketUrlWithTicket.
+ * @param ticket - The value of `ticket`.
+ */
 
 function buildSocketUrlWithTicket(ticket: string): string {
   const url = new URL(socketBaseUrl, window.location.href);
   url.searchParams.set("ticket", ticket);
   return url.toString();
 }
+/**
+ * Function of reloadWindow.
+ * @param reason - The value of `reason`.
+ */
 
 function reloadWindow(reason: string): void {
   // In dev mode only, reload after backend reports readiness.
@@ -330,6 +342,10 @@ async function waitForDevServer(): Promise<void> {
     void waitForDevServer();
   }, 250);
 }
+/**
+ * Function of scheduleDevRecovery.
+ * @param reason - The value of `reason`.
+ */
 
 function scheduleDevRecovery(reason: string): void {
   // Avoid launching parallel recovery checks when one is already scheduled.
@@ -351,6 +367,10 @@ window.addEventListener("beforeunload", () => {
   clearDevRecoveryTimer();
   clearRpcReconnectTimer();
 });
+/**
+ * Function of rejectPendingRequests.
+ * @param reason - The value of `reason`.
+ */
 
 function rejectPendingRequests(reason: unknown): void {
   // Fail and clear every in-flight request when transport is dropped.
@@ -359,6 +379,10 @@ function rejectPendingRequests(reason: unknown): void {
   }
   pendingRequests.clear();
 }
+/**
+ * Function of scheduleRpcReconnect.
+ * @param reason - The value of `reason`.
+ */
 
 function scheduleRpcReconnect(reason: string): void {
   // Exponential backoff reconnect for non-dev environments.
@@ -412,12 +436,20 @@ async function enableRpcTransport(): Promise<void> {
   connectRpcSocket("initial");
   await connectionReady;
 }
+/**
+ * Function of handleRpcAuthFailure.
+ * @param error - The value of `error`.
+ */
 
 function handleRpcAuthFailure(error: { message: string }): void {
   rejectConnection(error);
   disableRpcTransport();
   dispatchAuthRequired(error.message);
 }
+/**
+ * Function of connectRpcSocket.
+ * @param reason - The value of `reason`.
+ */
 
 function connectRpcSocket(reason: "initial" | "reconnect"): void {
   if (isPageUnloading || !rpcTransportEnabled || rpcSocketConnectPromise) {
@@ -588,6 +620,11 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
     rpcSocketConnectPromise = null;
   });
 }
+/**
+ * Function of createAbortError.
+ * @param reason - The value of `reason`.
+ * @param fallbackMessage - The value of `fallbackMessage`.
+ */
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   // Normalize arbitrary abort signals into a reusable Error with cause metadata.
@@ -605,6 +642,10 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
   }
   return error;
 }
+/**
+ * Function of normalizeTimeoutMs.
+ * @param timeoutMs - The value of `timeoutMs`.
+ */
 
 function normalizeTimeoutMs(timeoutMs?: number): number | null {
   // Guard against invalid timeouts before forwarding as transport-level constraints.
@@ -617,6 +658,10 @@ function normalizeTimeoutMs(timeoutMs?: number): number | null {
   }
   return Math.max(1, Math.floor(timeoutMs));
 }
+/**
+ * Function of buildRequestSignal.
+ * @param options - The value of `options`.
+ */
 
 function buildRequestSignal(
   options?: RpcProcedureCallOptions,
@@ -639,6 +684,10 @@ function buildRequestSignal(
   }
   return AbortSignal.any(signals);
 }
+/**
+ * Function of waitForConnection.
+ * @param signal - The value of `signal`.
+ */
 
 async function waitForConnection(signal: AbortSignal | null): Promise<void> {
   // Block until the websocket handshake is ready unless caller aborts first.
@@ -666,6 +715,10 @@ async function waitForConnection(signal: AbortSignal | null): Promise<void> {
     }),
   ]);
 }
+/**
+ * Function of waitForOpenSocket.
+ * @param signal - The value of `signal`.
+ */
 
 async function waitForOpenSocket(
   signal: AbortSignal | null,
@@ -679,6 +732,11 @@ async function waitForOpenSocket(
     }
   }
 }
+/**
+ * Function of sendSocketMessage.
+ * @param targetSocket - The value of `targetSocket`.
+ * @param message - The value of `message`.
+ */
 
 function sendSocketMessage(
   targetSocket: WebSocket,
@@ -687,6 +745,12 @@ function sendSocketMessage(
   // Send typed payload to the active websocket.
   targetSocket.send(JSON.stringify(message));
 }
+/**
+ * Function of sendRequest.
+ * @param method - The value of `method`.
+ * @param params - The value of `params`.
+ * @param options - The value of `options`.
+ */
 
 async function sendRequest<K extends RpcMethodName>(
   method: K,
@@ -785,6 +849,10 @@ async function sendRequest<K extends RpcMethodName>(
 
   return response;
 }
+/**
+ * Function of createProcedure.
+ * @param method - The value of `method`.
+ */
 
 function createProcedure<K extends RpcMethodName>(
   method: K,

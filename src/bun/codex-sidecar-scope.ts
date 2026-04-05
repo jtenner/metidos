@@ -16,6 +16,11 @@ type SidecarScopeOptions = CanonicalizePathOptions & {
   targetWorktreePath: string;
   worktreePathContext?: string | null;
 };
+/**
+ * Function of canonicalizeSidecarPath.
+ * @param value - The value of `value`.
+ * @param options - The value of `options`.
+ */
 
 export function canonicalizeSidecarPath(
   value: string,
@@ -34,6 +39,12 @@ export function canonicalizeSidecarPath(
   const platform = options.platform ?? process.platform;
   return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
+/**
+ * Function of sidecarPathsEqual.
+ * @param left - The value of `left`.
+ * @param right - The value of `right`.
+ * @param options - The value of `options`.
+ */
 
 export function sidecarPathsEqual(
   left: string,
@@ -45,6 +56,11 @@ export function sidecarPathsEqual(
     canonicalizeSidecarPath(right, options)
   );
 }
+/**
+ * Function of enforceBoundThreadScope.
+ * @param threadId - The value of `threadId`.
+ * @param boundThreadId - The value of `boundThreadId`.
+ */
 
 export function enforceBoundThreadScope(
   threadId: number,
@@ -56,6 +72,10 @@ export function enforceBoundThreadScope(
     );
   }
 }
+/**
+ * Function of enforceTargetScope.
+ * @param options - The value of `options`.
+ */
 
 export function enforceTargetScope(options: SidecarScopeOptions): void {
   if (

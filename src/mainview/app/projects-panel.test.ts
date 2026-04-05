@@ -10,6 +10,13 @@ import { buildNormalizedSearchText } from "../controls/search-utils";
 import { deriveProjectsPanelWorktreeData } from "./projects-panel";
 import { worktreeKey } from "./state";
 
+/**
+ * Function of createProject.
+ * @param id - The value of `id`.
+ * @param name - The value of `name`.
+ * @param path - The value of `path`.
+ */
+
 function createProject(id: number, name: string, path: string): RpcProject {
   return {
     id,
@@ -21,6 +28,12 @@ function createProject(id: number, name: string, path: string): RpcProject {
     lastOpenedAt: "2026-04-04T00:00:00.000Z",
   };
 }
+/**
+ * Function of createWorktree.
+ * @param path - The value of `path`.
+ * @param branch - The value of `branch`.
+ * @param pinnedAt - The value of `pinnedAt`.
+ */
 
 function createWorktree(
   path: string,
@@ -35,6 +48,11 @@ function createWorktree(
     pinnedAt,
   };
 }
+/**
+ * Function of buildWorktreeSearchText.
+ * @param projects - The value of `projects`.
+ * @param worktreesByProjectId - The value of `worktreesByProjectId`.
+ */
 
 function buildWorktreeSearchText(
   projects: RpcProject[],

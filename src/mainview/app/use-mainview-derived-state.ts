@@ -121,6 +121,41 @@ export function deriveWorktreeDisplayPathByKey(
 
   return next;
 }
+/**
+ * Function of useMainviewDerivedState.
+ * @param chatError - The value of `chatError`.
+ * @param codexModels - The value of `codexModels`.
+ * @param defaultCodexModel - The value of `defaultCodexModel`.
+ * @param defaultCodexReasoningEffort - The value of `defaultCodexReasoningEffort`.
+ * @param getProjectState - The value of `getProjectState`.
+ * @param getWorktreeState - The value of `getWorktreeState`.
+ * @param gitHistory - The value of `gitHistory`.
+ * @param homeDirectory - The value of `homeDirectory`.
+ * @param isCreatingThread - The value of `isCreatingThread`.
+ * @param isDocumentVisible - The value of `isDocumentVisible`.
+ * @param isLoadingProjectTasks - The value of `isLoadingProjectTasks`.
+ * @param isRunningProjectTask - The value of `isRunningProjectTask`.
+ * @param isSending - The value of `isSending`.
+ * @param isStoppingThread - The value of `isStoppingThread`.
+ * @param isThreadLoading - The value of `isThreadLoading`.
+ * @param isUpdatingThreadModel - The value of `isUpdatingThreadModel`.
+ * @param isUpdatingThreadReasoningEffort - The value of `isUpdatingThreadReasoningEffort`.
+ * @param isUpdatingThreadUnsafeMode - The value of `isUpdatingThreadUnsafeMode`.
+ * @param pendingThreadModel - The value of `pendingThreadModel`.
+ * @param pendingThreadReasoningEffort - The value of `pendingThreadReasoningEffort`.
+ * @param pendingThreadUnsafeMode - The value of `pendingThreadUnsafeMode`.
+ * @param projectActionMenu - The value of `projectActionMenu`.
+ * @param projects - The value of `projects`.
+ * @param reasoningEfforts - The value of `reasoningEfforts`.
+ * @param selectedDiffFilePath - The value of `selectedDiffFilePath`.
+ * @param selectedProjectId - The value of `selectedProjectId`.
+ * @param selectedThreadId - The value of `selectedThreadId`.
+ * @param selectedWorktreePath - The value of `selectedWorktreePath`.
+ * @param sidebarSearchQuery - The value of `sidebarSearchQuery`.
+ * @param supportsTildePath - The value of `supportsTildePath`.
+ * @param threadActionMenu - The value of `threadActionMenu`.
+ * @param threads - The value of `threads`.
+ */
 
 export function useMainviewDerivedState({
   chatError,

@@ -305,6 +305,11 @@ process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
 const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
 );
+/**
+ * Function of requireFreshStepUpForRpcAction.
+ * @param context - The value of `context`.
+ * @param actionDescription - The value of `actionDescription`.
+ */
 
 function requireFreshStepUpForRpcAction(
   context: RpcRequestContext,
@@ -420,6 +425,11 @@ let peakPendingRpcRequestCount = 0;
 let lastEventLoopLagMs = 0;
 let peakEventLoopLagMs = 0;
 let lastOverloadLogAt = 0;
+/**
+ * Function of buildResponseHeaders.
+ * @param contentType - The value of `contentType`.
+ * @param headers - The value of `headers`.
+ */
 
 function buildResponseHeaders(
   contentType: string,
@@ -430,6 +440,13 @@ function buildResponseHeaders(
   responseHeaders.set("content-type", contentType);
   return applySecurityHeaders(responseHeaders);
 }
+/**
+ * Function of stringResponse.
+ * @param body - The value of `body`.
+ * @param contentType - The value of `contentType`.
+ * @param status - The value of `status`.
+ * @param headers - The value of `headers`.
+ */
 
 function stringResponse(
   body: string,
@@ -442,6 +459,12 @@ function stringResponse(
     status,
   });
 }
+/**
+ * Function of jsonResponse.
+ * @param value - The value of `value`.
+ * @param status - The value of `status`.
+ * @param headers - The value of `headers`.
+ */
 
 function jsonResponse(
   value: unknown,
@@ -472,6 +495,11 @@ function currentNowMs(): number {
 class RequestValidationError extends Error {
   readonly code: string;
   readonly status: number;
+  /**
+   * Function of constructor.
+   * @param message - The value of `message`.
+   * @param options - The value of `options`.
+   */
 
   constructor(
     message: string,
@@ -486,6 +514,10 @@ class RequestValidationError extends Error {
     this.status = options?.status ?? 400;
   }
 }
+/**
+ * Function of isSecureRequest.
+ * @param request - The value of `request`.
+ */
 
 function isSecureRequest(request: Request): boolean {
   const forwardedProto = request.headers
@@ -504,6 +536,10 @@ function isSecureRequest(request: Request): boolean {
   }
   return new URL(request.url).protocol === "https:";
 }
+/**
+ * Function of normalizeBrowserOrigin.
+ * @param origin - The value of `origin`.
+ */
 
 function normalizeBrowserOrigin(origin: string): string | null {
   try {
@@ -522,6 +558,10 @@ function normalizeBrowserOrigin(origin: string): string | null {
     return null;
   }
 }
+/**
+ * Function of resolveRpcClientOriginFromRequest.
+ * @param request - The value of `request`.
+ */
 
 function resolveRpcClientOriginFromRequest(request: Request): string | null {
   const forwardedHost = request.headers
@@ -550,6 +590,10 @@ function resolveRpcClientOriginFromRequest(request: Request): string | null {
   }
   return normalizeBrowserOrigin(`${protocol}://${host}`);
 }
+/**
+ * Function of normalizeAuthRouteOrigin.
+ * @param origin - The value of `origin`.
+ */
 
 function normalizeAuthRouteOrigin(origin: string): string | null {
   try {
@@ -568,6 +612,10 @@ function normalizeAuthRouteOrigin(origin: string): string | null {
     return null;
   }
 }
+/**
+ * Function of resolveExpectedAuthRouteOrigin.
+ * @param request - The value of `request`.
+ */
 
 function resolveExpectedAuthRouteOrigin(request: Request): string | null {
   const forwardedHost = request.headers
@@ -588,6 +636,10 @@ function resolveExpectedAuthRouteOrigin(request: Request): string | null {
 
   return normalizeAuthRouteOrigin(new URL(request.url).origin);
 }
+/**
+ * Function of requireJsonAuthRequest.
+ * @param request - The value of `request`.
+ */
 
 function requireJsonAuthRequest(request: Request): void {
   const contentType = request.headers
@@ -605,6 +657,10 @@ function requireJsonAuthRequest(request: Request): void {
     );
   }
 }
+/**
+ * Function of enforceAuthMutationRequestSecurity.
+ * @param request - The value of `request`.
+ */
 
 function enforceAuthMutationRequestSecurity(request: Request): void {
   requireJsonAuthRequest(request);
@@ -638,10 +694,19 @@ function enforceAuthMutationRequestSecurity(request: Request): void {
     });
   }
 }
+/**
+ * Function of sessionCookieMaxAgeSeconds.
+ * @param expiresAt - The value of `expiresAt`.
+ * @param nowMs - The value of `nowMs`.
+ */
 
 function sessionCookieMaxAgeSeconds(expiresAt: string, nowMs: number): number {
   return Math.max(0, Math.floor((Date.parse(expiresAt) - nowMs) / 1000));
 }
+/**
+ * Function of readJsonBody.
+ * @param request - The value of `request`.
+ */
 
 async function readJsonBody(
   request: Request,
@@ -667,6 +732,11 @@ async function readJsonBody(
     );
   }
 }
+/**
+ * Function of readRequiredString.
+ * @param body - The value of `body`.
+ * @param fieldName - The value of `fieldName`.
+ */
 
 function readRequiredString(
   body: Record<string, unknown>,
@@ -680,6 +750,11 @@ function readRequiredString(
   }
   return value;
 }
+/**
+ * Function of readOptionalString.
+ * @param body - The value of `body`.
+ * @param fieldName - The value of `fieldName`.
+ */
 
 function readOptionalString(
   body: Record<string, unknown>,
@@ -694,6 +769,11 @@ function readOptionalString(
   }
   return value;
 }
+/**
+ * Function of readOptionalInteger.
+ * @param body - The value of `body`.
+ * @param fieldName - The value of `fieldName`.
+ */
 
 function readOptionalInteger(
   body: Record<string, unknown>,
@@ -710,6 +790,10 @@ function readOptionalInteger(
   }
   return value as number;
 }
+/**
+ * Function of readOptionalSessionLifetimeDays.
+ * @param body - The value of `body`.
+ */
 
 function readOptionalSessionLifetimeDays(
   body: Record<string, unknown>,
@@ -725,6 +809,10 @@ function readOptionalSessionLifetimeDays(
   }
   return value;
 }
+/**
+ * Function of readPrimaryFactorType.
+ * @param body - The value of `body`.
+ */
 
 function readPrimaryFactorType(
   body: Record<string, unknown>,
@@ -737,6 +825,12 @@ function readPrimaryFactorType(
   }
   return value;
 }
+/**
+ * Function of authErrorResponse.
+ * @param request - The value of `request`.
+ * @param error - The value of `error`.
+ * @param options - The value of `options`.
+ */
 
 function authErrorResponse(
   request: Request,
@@ -799,6 +893,10 @@ function authErrorResponse(
     headers,
   );
 }
+/**
+ * Function of handleAuthRequest.
+ * @param request - The value of `request`.
+ */
 
 async function handleAuthRequest(request: Request): Promise<Response | null> {
   const { pathname } = new URL(request.url);
@@ -1255,6 +1353,10 @@ function toErrorMessage(error: unknown): string {
   }
   return String(error);
 }
+/**
+ * Function of buildRpcErrorPayload.
+ * @param error - The value of `error`.
+ */
 
 function buildRpcErrorPayload(
   error: unknown,
@@ -1636,6 +1738,10 @@ function broadcastThreadStartRequestCreated(
     }
   }
 }
+/**
+ * Function of normalizeWatchFilename.
+ * @param filename - The value of `filename`.
+ */
 
 function normalizeWatchFilename(filename?: string | Buffer | null): string {
   if (typeof filename === "string") {
@@ -1844,7 +1950,12 @@ async function bootstrap(): Promise<void> {
   startOverloadMonitoring(() => activeServerPort);
   const serverOptions = {
     hostname: LOOPBACK_HOSTNAME,
-    idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
+    idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS /**
+     * Function of fetch.
+     * @param request - The value of `request`.
+     * @param serverInstance - The value of `serverInstance`.
+     */,
+
     async fetch(request, serverInstance) {
       const { pathname } = new URL(request.url);
 
@@ -1959,17 +2070,31 @@ async function bootstrap(): Promise<void> {
       return stringResponse("Not found", "text/plain; charset=utf-8", 404);
     },
     websocket: {
+      /**
+       * Function of open.
+       * @param ws - The value of `ws`.
+       */
+
       open(ws) {
         rpcClients.add(ws);
         getPendingRpcRequests(ws);
-      },
+      } /**
+       * Function of close.
+       * @param ws - The value of `ws`.
+       */,
+
       close(ws) {
         rpcClients.delete(ws);
         abortAllPendingRpcRequests(ws, "RPC connection closed.");
         if (rpcClients.size === 0) {
           suspendActiveWorktreePolling();
         }
-      },
+      } /**
+       * Function of message.
+       * @param ws - The value of `ws`.
+       * @param rawMessage - The value of `rawMessage`.
+       */,
+
       message(ws, rawMessage) {
         void (async () => {
           const payload = parseRawSocketMessage(rawMessage);

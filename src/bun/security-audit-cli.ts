@@ -26,6 +26,11 @@ Options:
   --thread-id <id>    Restrict results to a single thread id.
   --help, -h          Show this help text.
 `;
+/**
+ * Function of parsePositiveIntegerFlag.
+ * @param value - The value of `value`.
+ * @param flagName - The value of `flagName`.
+ */
 
 function parsePositiveIntegerFlag(value: string, flagName: string): number {
   const parsed = Number.parseInt(value, 10);
@@ -34,6 +39,10 @@ function parsePositiveIntegerFlag(value: string, flagName: string): number {
   }
   return parsed;
 }
+/**
+ * Function of parseSecurityAuditCliArgs.
+ * @param args - The value of `args`.
+ */
 
 export function parseSecurityAuditCliArgs(
   args: string[],
@@ -129,6 +138,10 @@ export function parseSecurityAuditCliArgs(
       : {}),
   };
 }
+/**
+ * Function of formatSecurityAuditEventsForCli.
+ * @param events - The value of `events`.
+ */
 
 export function formatSecurityAuditEventsForCli(
   events: ReturnType<typeof listSecurityAuditEventsFromDatabase>,
@@ -160,6 +173,10 @@ export function formatSecurityAuditEventsForCli(
     })
     .join("\n\n");
 }
+/**
+ * Function of runSecurityAuditCli.
+ * @param args - The value of `args`.
+ */
 
 export async function runSecurityAuditCli(args: string[]): Promise<void> {
   const options = parseSecurityAuditCliArgs(args);
