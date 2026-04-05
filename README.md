@@ -27,7 +27,7 @@ flowchart TD
     APP["App.tsx\n- shell + route-like workspace composition\n- orchestrates selected project/worktree/thread state"]
     DER["app/* hooks + derived state\n- maps RPC data into panels\n- memoized selectors + thread/workspace views"]
     CTRL["controls/* UI controls\n- composer, menus, selectors, search\n- model/effort toggles and actions"]
-    ROUT["window event bridge\n- custom events for async server pushes"]
+    ROUT["frontend event bridge\n- coalesced invalidation subscriptions + targeted custom events"]
   end
 
   %% transport boundary
@@ -152,7 +152,7 @@ Threads and worktrees are coordinated through procedures in `src/bun/project-pro
 - `src/bun` is the server/process layer.
   - `index.ts` is the main WebSocket + HTTP host and RPC dispatcher.
   - `project-procedures.ts` is the orchestration layer for everything that mutates user-visible state.
-  - `project-procedures/*` splits logic by domain (catalog, tasks, history, Git diff, and thread detail).
+  - `project-procedures/*` splits logic by domain (catalog, directory suggestions, tasks, history, shared helpers, and thread detail).
   - `db.ts`, `git.ts`, `rpc-schema.ts`, and `build-mainview.ts` provide persistence, VCS actions, API contracts, and build-time support.
 
 ## Developer commands
@@ -216,7 +216,7 @@ The script replaces the full site config so `/` points to the static server and 
 - `AGENTS.md`
   - Repository instructions and canonical tree snapshot.
 - `agent-todo.md`
-  - Task tracking for documentation/housekeeping workflows.
+  - Main frontend performance work tracker and slice status log.
 - `biome.json`
   - Linting/formatting rules.
 - `bun-plugin-react-compiler.ts`
@@ -237,4 +237,4 @@ The script replaces the full site config so `/` points to the static server and 
 - Keep frontend and backend RPC contracts aligned in `src/bun/rpc-schema.ts`.
 - Prefer clear comments for edge-case behavior (cancellations, open/close sequencing, stale-response handling).
 - Run docs + format/style checks according to `bun run validate` before non-doc code changes.
-- Use `agent-todo.md` for short-lived documentation/process work; leave it intentionally empty when there are no active housekeeping tasks.
+- Keep `agent-todo.md` aligned with the current frontend performance slice status when that tracker changes.
