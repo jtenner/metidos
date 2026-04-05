@@ -160,6 +160,7 @@
 │     │  ├─ message-ui.tsx
 │     │  ├─ projects-panel.tsx
 │     │  ├─ projects-panel.test.ts
+│     │  ├─ security-audit-panel.test.ts
 │     │  ├─ security-audit-panel.tsx
 │     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts

@@ -492,7 +492,7 @@ Done when:
 
 ### Slice P4.3: Virtualize security-audit rows if the list grows
 
-Status: `todo`
+Status: `done`
 
 Problem:
 - Security audit currently renders the full visible list into one scroll container.

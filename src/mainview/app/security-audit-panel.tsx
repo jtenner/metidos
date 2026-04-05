@@ -1,4 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  measureElement as defaultMeasureElement,
+  useVirtualizer,
+  type Virtualizer,
+} from "@tanstack/react-virtual";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { RpcProject, RpcSecurityAuditEvent } from "../../bun/rpc-schema";
 import { type AppIconName, materialSymbol } from "../controls/icons";
@@ -23,11 +28,19 @@ type SecurityAuditPanelProps = {
 };
 
 const SECURITY_AUDIT_REFRESH_INTERVAL_MS = 15_000;
+const SECURITY_AUDIT_VIRTUALIZATION_THRESHOLD = 40;
+const SECURITY_AUDIT_ROW_ESTIMATE_PX = 112;
+const SECURITY_AUDIT_VIRTUALIZATION_OVERSCAN = 8;
 type AuditFilterScope = "all" | "project" | "thread";
 const AUDIT_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   dateStyle: "short",
   timeStyle: "medium",
 });
+
+type SecurityAuditDisplayRow = {
+  event: RpcSecurityAuditEvent;
+  projectLabel: string | null;
+};
 
 function eventIconName(eventType: string): AppIconName {
   if (
@@ -68,16 +81,40 @@ function readPayloadProjectName(event: RpcSecurityAuditEvent): string | null {
     : null;
 }
 
+export function shouldVirtualizeSecurityAuditRows(
+  rowCount: number,
+  threshold: number = SECURITY_AUDIT_VIRTUALIZATION_THRESHOLD,
+): boolean {
+  return rowCount >= threshold;
+}
+
+export function deriveSecurityAuditDisplayRows(
+  events: RpcSecurityAuditEvent[],
+  projectNames: ReadonlyMap<number, string>,
+): SecurityAuditDisplayRow[] {
+  return events.map((event) => ({
+    event,
+    projectLabel:
+      readPayloadProjectName(event) ??
+      (event.projectId !== null
+        ? (projectNames.get(event.projectId) ?? `Project #${event.projectId}`)
+        : null),
+  }));
+}
+
 const SecurityAuditEventRow = memo(function SecurityAuditEventRow({
+  detailsOpen,
   event,
+  onToggleDetails,
   projectLabel,
   selectedThreadId,
 }: {
+  detailsOpen: boolean;
   event: RpcSecurityAuditEvent;
+  onToggleDetails: (open: boolean) => void;
   projectLabel: string | null;
   selectedThreadId: number | null;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const payloadText = useMemo(() => {
     if (!detailsOpen || event.payload === null) {
       return null;
@@ -134,8 +171,9 @@ const SecurityAuditEventRow = memo(function SecurityAuditEventRow({
           {event.payload !== null ? (
             <details
               className="mt-2"
+              open={detailsOpen}
               onToggle={(event) => {
-                setDetailsOpen(event.currentTarget.open);
+                onToggleDetails(event.currentTarget.open);
               }}
             >
               <summary className="cursor-pointer text-[10px] uppercase tracking-[0.16em] text-[#8ca6b9]">
@@ -166,7 +204,12 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
 }: SecurityAuditPanelProps) {
   const securityAuditOpen = useSecurityAuditPanelOpen();
   const [scope, setScope] = useState<AuditFilterScope>("all");
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const lastRefreshKeyRef = useRef<string | null>(null);
+  const eventListScrollRef = useRef<HTMLDivElement | null>(null);
+  const eventRowHeightCacheRef = useRef<Map<number, number>>(new Map());
   const projectNames = useMemo(
     () =>
       new Map(
@@ -205,6 +248,13 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
     threadFilterAvailable,
   ]);
   const refreshKey = `${scope}:${selectedProjectId ?? "none"}:${selectedThreadId ?? "none"}`;
+  const displayRows = useMemo(
+    () => deriveSecurityAuditDisplayRows(events, projectNames),
+    [events, projectNames],
+  );
+  const useVirtualizedRows = shouldVirtualizeSecurityAuditRows(
+    displayRows.length,
+  );
 
   useEffect(() => {
     if (scope === "thread" && !threadFilterAvailable) {
@@ -255,6 +305,73 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
       window.clearInterval(intervalId);
     };
   }, [onRefresh, refreshOptions, securityAuditOpen]);
+
+  useEffect(() => {
+    const visibleEventIds = new Set(events.map((event) => event.id));
+    setExpandedEventIds((current) => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const eventId of current) {
+        if (visibleEventIds.has(eventId)) {
+          next.add(eventId);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [events]);
+
+  const toggleDetailsOpen = useCallback((eventId: number, open: boolean) => {
+    setExpandedEventIds((current) => {
+      const next = new Set(current);
+      if (open) {
+        next.add(eventId);
+      } else {
+        next.delete(eventId);
+      }
+      return next;
+    });
+  }, []);
+
+  const measureAuditRowElement = useCallback(
+    (
+      element: HTMLDivElement,
+      entry: ResizeObserverEntry | undefined,
+      instance: Virtualizer<HTMLDivElement, HTMLDivElement>,
+    ): number => {
+      const eventId = Number(element.dataset.eventId ?? "-1");
+      const size = defaultMeasureElement(element, entry, instance);
+
+      if (eventId >= 0) {
+        eventRowHeightCacheRef.current.set(eventId, size);
+      }
+
+      return size;
+    },
+    [],
+  );
+
+  const auditVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: displayRows.length,
+    estimateSize: (index) => {
+      const eventId = displayRows[index]?.event.id;
+      return eventId === undefined
+        ? SECURITY_AUDIT_ROW_ESTIMATE_PX
+        : (eventRowHeightCacheRef.current.get(eventId) ??
+            SECURITY_AUDIT_ROW_ESTIMATE_PX);
+    },
+    gap: 8,
+    getItemKey: (index) => displayRows[index]?.event.id ?? index,
+    getScrollElement: () =>
+      useVirtualizedRows ? eventListScrollRef.current : null,
+    measureElement: measureAuditRowElement,
+    overscan: SECURITY_AUDIT_VIRTUALIZATION_OVERSCAN,
+    useAnimationFrameWithResizeObserver: true,
+    useFlushSync: false,
+  });
+  const virtualRows = auditVirtualizer.getVirtualItems();
+  const totalVirtualSize = auditVirtualizer.getTotalSize();
 
   return (
     <section className="select-none">
@@ -317,25 +434,63 @@ export const SecurityAuditPanel = memo(function SecurityAuditPanel({
             <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
               Loading security audit log...
             </div>
-          ) : events.length > 0 ? (
-            <div className="max-h-80 space-y-2 overflow-y-auto pr-1 hide-scrollbar">
-              {events.map((event) => {
-                const projectLabel =
-                  readPayloadProjectName(event) ??
-                  (event.projectId !== null
-                    ? (projectNames.get(event.projectId) ??
-                      `Project #${event.projectId}`)
-                    : null);
+          ) : displayRows.length > 0 ? (
+            <div
+              className="max-h-80 overflow-y-auto pr-1 hide-scrollbar"
+              ref={eventListScrollRef}
+            >
+              {useVirtualizedRows ? (
+                <div
+                  className="relative w-full"
+                  style={{
+                    height: `${totalVirtualSize}px`,
+                  }}
+                >
+                  {virtualRows.map((virtualRow) => {
+                    const row = displayRows[virtualRow.index];
+                    if (!row) {
+                      return null;
+                    }
 
-                return (
-                  <SecurityAuditEventRow
-                    key={event.id}
-                    event={event}
-                    projectLabel={projectLabel}
-                    selectedThreadId={selectedThreadId}
-                  />
-                );
-              })}
+                    return (
+                      <div
+                        className="absolute left-0 top-0 w-full"
+                        data-event-id={row.event.id}
+                        key={virtualRow.key}
+                        ref={auditVirtualizer.measureElement}
+                        style={{
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <SecurityAuditEventRow
+                          detailsOpen={expandedEventIds.has(row.event.id)}
+                          event={row.event}
+                          onToggleDetails={(open) => {
+                            toggleDetailsOpen(row.event.id, open);
+                          }}
+                          projectLabel={row.projectLabel}
+                          selectedThreadId={selectedThreadId}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {displayRows.map((row) => (
+                    <SecurityAuditEventRow
+                      detailsOpen={expandedEventIds.has(row.event.id)}
+                      event={row.event}
+                      key={row.event.id}
+                      onToggleDetails={(open) => {
+                        toggleDetailsOpen(row.event.id, open);
+                      }}
+                      projectLabel={row.projectLabel}
+                      selectedThreadId={selectedThreadId}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ) : hasLoaded ? (
             <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
