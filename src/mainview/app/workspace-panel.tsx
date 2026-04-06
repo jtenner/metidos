@@ -213,7 +213,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
                 {selectedProjectNameForThread}{" "}
                 <span className="inline-flex items-center gap-1 text-[#8ca6b9]">
                   <span className="material-symbols-outlined text-[12px] leading-none text-[#8ca6b9]">
-                    call_split
+                    ⎇
                   </span>
                   <span className="truncate">
                     {activeSelectedWorktreeBranch}
