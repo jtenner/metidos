@@ -40,6 +40,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](../research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 - [Responsive Shell and Sidebar Collapse](../research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
+- [Page Header Orientation and Breadcrumbs](../research/2026-04-06-page-header-orientation-and-breadcrumbs.md)
 - [Accessible Forms, Controls, and Affordances](../research/2026-04-06-accessible-forms-controls-and-affordances.md)
 
 ## Related Principles

@@ -2,7 +2,7 @@
 
 Date: 2026-04-06
 
-This research pass focused on how dense web UIs communicate structure before users read every line. The goal was to find implementation-friendly rules for headings, spacing, grouping, and component-level layout that keep workspace pages scannable at desktop and small-screen sizes. The responsive type and container-aware implementation details that support this hierarchy are tracked in a dedicated note. Current design-system guidance also points toward page headers that can carry breadcrumbs, search, and filters when those controls help orientation.
+This research pass focused on how dense web UIs communicate structure before users read every line. The goal was to find implementation-friendly rules for headings, spacing, grouping, and component-level layout that keep workspace pages scannable at desktop and small-screen sizes. The responsive type and container-aware implementation details that support this hierarchy are tracked in a dedicated note. Page-header composition and breadcrumb conventions are tracked separately in [Page Header Orientation and Breadcrumbs](./2026-04-06-page-header-orientation-and-breadcrumbs.md).
 
 ## Summary
 
@@ -70,7 +70,7 @@ Strong hierarchy comes from semantic structure plus consistent visual rhythm. Us
 ## Practical Implications
 
 - Use one dominant `h1` for the page title and make subordinate sections follow a clear rank order.
-- Treat the page header as part of the hierarchy system: title first, then breadcrumbs or search/filter controls only when they improve orientation.
+- Treat the page header as part of the hierarchy system: title first, then breadcrumbs or search/filter controls only when they improve orientation. See the page-header orientation note for placement details.
 - Keep sidebar headings stable across views instead of reshaping them to match the content pane.
 - Prefer labels, spacing, and proximity over decorative separators to show relationships.
 - Use the grid or column system to divide major regions before adding extra visual ornament.
@@ -84,6 +84,7 @@ Strong hierarchy comes from semantic structure plus consistent visual rhythm. Us
 ## Follow-Up
 
 - Compare the repo's actual page headers, breadcrumbs, search, and filter affordances against this hierarchy model.
+- Use the page-header orientation note to decide whether breadcrumbs belong on a given page at all.
 - Check whether any dense-tool pages need a stricter maximum number of emphasis levels or a clearer split between productive and expressive typography.
 - Decide whether this guidance should eventually become a principle about scannability and layout rhythm.
 - See the responsive typography and container-aware layout note for the CSS primitives that support this hierarchy.

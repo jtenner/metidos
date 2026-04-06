@@ -42,8 +42,8 @@ Read this file before any web research, then update it after each sweep so the b
 - Which breakpoint and collapse behavior best fits the repo's desktop-first shell?
 - Should the shell use a temporary drawer, a rail, or both when the left nav collapses?
 - How should focus restoration work after the collapsed navigation closes?
-- When should breadcrumbs or page titles carry orientation at smaller widths?
-- Which surfaces should use a page-header pattern with breadcrumbs, search, or filters, and which should keep those controls in the body?
+- Which dense pages still need breadcrumbs once shell navigation and visible titles are in place?
+- Which page-header controls belong in the header versus a local toolbar or body region?
 - Which panes, cards, or dense content blocks should adopt container queries before viewport breakpoints?
 - Where should `text-wrap: balance` stay limited to short headings, and where should it stay off?
 - Which repeated regions should use `aria-labelledby` versus `aria-label` when labels are already visible?
@@ -65,7 +65,7 @@ Read this file before any web research, then update it after each sweep so the b
 - Accessible labels, grouping, and affordance rules for custom controls
 - Target-size defaults and spacing exceptions for dense toolbars and icon actions
 - Feedback-state defaults for loading, empty, success, and error surfaces
-- Page-header composition for dense workspace views
+- Page-header composition and breadcrumb conventions for dense workspace views
 - Mobile adaptation strategies for desktop-first interfaces
 - Strong defaults for spacing, typography, and color systems in productivity UIs
 - Empty-state and onboarding patterns for technical tools
@@ -81,6 +81,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 - [Responsive Typography and Container-Aware Layout](./research/2026-04-06-responsive-typography-and-container-aware-layout.md)
 - [Validation Timing and `:user-invalid` Styling](./research/2026-04-06-validation-timing-and-user-invalid-styling.md)
+- [Page Header Orientation and Breadcrumbs](./research/2026-04-06-page-header-orientation-and-breadcrumbs.md)
 - [Information Hierarchy and Visual Structure](./research/2026-04-06-information-hierarchy-and-visual-structure.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
 - [Accessible Forms, Controls, and Affordances](./research/2026-04-06-accessible-forms-controls-and-affordances.md)

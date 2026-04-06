@@ -46,4 +46,4 @@ The strongest current guidance is to keep the shell responsive by content, not b
 - Verify the repo's actual collapse breakpoint against these content-driven rules.
 - Decide whether the shell should offer a drawer-only collapse, a rail, or a hybrid.
 - Research the best focus-restoration behavior after the navigation closes.
-- Compare whether breadcrumbs or title/subtitle metadata should carry primary orientation at smaller widths.
+- Compare whether breadcrumbs or title/subtitle metadata should carry primary orientation at smaller widths. See [Page Header Orientation and Breadcrumbs](./2026-04-06-page-header-orientation-and-breadcrumbs.md) for the header-specific guidance.

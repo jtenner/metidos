@@ -44,6 +44,7 @@
 │  │     ├─ 2026-04-06-accessible-forms-controls-and-affordances.md
 │  │     ├─ 2026-04-06-form-error-summary-focus-management.md
 │  │     ├─ 2026-04-06-information-hierarchy-and-visual-structure.md
+│  │     ├─ 2026-04-06-page-header-orientation-and-breadcrumbs.md
 │  │     ├─ 2026-04-06-motion-and-reduced-motion.md
 │  │     ├─ 2026-04-06-loading-empty-error-feedback-states.md
 │  │     ├─ 2026-04-06-responsive-typography-and-container-aware-layout.md
