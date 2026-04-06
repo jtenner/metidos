@@ -64,6 +64,7 @@ import {
   emptyProjectStore,
   emptyThreadStore,
   formatDirectoryPathForInput,
+  formatPathForDisplay,
   GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
   GIT_HISTORY_PAGE_SIZE,
   GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
@@ -5133,9 +5134,13 @@ export default function App({
                     activeSelectedWorktreeBranch:
                       activeSelectedWorktree?.branch?.trim() || "Primary",
                     activeSelectedWorktreeFolder:
-                      activeSelectedWorktreePath ||
-                      activeSelectedWorktreeFolder ||
-                      "Current worktree",
+                      activeSelectedWorktreePath
+                        ? formatPathForDisplay(
+                            activeSelectedWorktreePath,
+                            homeDirectory,
+                            true,
+                          )
+                        : activeSelectedWorktreeFolder || "Current worktree",
                     canCreateThread: Boolean(
                       selectedProject &&
                         activeSelectedWorktreePath &&
@@ -5353,9 +5358,13 @@ export default function App({
                 activeSelectedWorktreeBranch:
                   activeSelectedWorktree?.branch?.trim() || "Primary",
                 activeSelectedWorktreeFolder:
-                  activeSelectedWorktreePath ||
-                  activeSelectedWorktreeFolder ||
-                  "Current worktree",
+                  activeSelectedWorktreePath
+                    ? formatPathForDisplay(
+                        activeSelectedWorktreePath,
+                        homeDirectory,
+                        true,
+                      )
+                    : activeSelectedWorktreeFolder || "Current worktree",
                 canCreateThread: Boolean(
                   selectedProject &&
                     activeSelectedWorktreePath &&
