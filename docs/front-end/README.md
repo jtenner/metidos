@@ -39,6 +39,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Responsive Shell and Sidebar Collapse](./research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
+- [Responsive Shell Navigation Principle](./principles/responsive-shell-navigation-principle.md)
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](./research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 - [Dense Workspace Shell Pattern](./patterns/dense-workspace-shell-pattern.md)
 - [Front-end Tree Sweep](./audits/2026-04-06-front-end-tree-sweep.md)

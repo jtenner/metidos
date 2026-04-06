@@ -29,8 +29,10 @@
 │  │  │  ├─ dense-workspace-shell-pattern.md
 │  │  │  └─ README.md
 │  │  ├─ principles/
-│  │  │  └─ README.md
+│  │  │  ├─ README.md
+│  │  │  └─ responsive-shell-navigation-principle.md
 │  │  └─ research/
+│  │     ├─ 2026-04-06-responsive-shell-and-sidebar-collapse.md
 │  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md
 │  │     └─ README.md
 │  ├─ 2026-04-04-frontend-feedback-inventory.md
