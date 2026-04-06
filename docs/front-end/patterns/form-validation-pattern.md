@@ -15,20 +15,23 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 - Associate labels explicitly with `for` and `id` unless there is a strong reason not to.
 - Group radios and checkboxes in `<fieldset>` with a `<legend>`.
 - Keep helper text and error text adjacent to the field they describe.
-- Use `aria-describedby` for helper text and `aria-errormessage` for error text when both are needed.
+- Use `aria-describedby` for helper text and `aria-errormessage` for visible error text when both are needed.
 - Mark invalid fields with `aria-invalid="true"` only after validation fails.
+- If the form uses custom validation UI, add `novalidate` so browser bubbles do not compete with your error summary.
 - Keep a live region container in the DOM before it is needed when errors or status updates must be announced.
 
 ## Validation Behavior
 
-- Validate when the field can be meaningfully checked.
-- Prefer blur-time validation for fields with local rules.
+- Validate on submission by default.
+- Prefer blur-time validation only for fields with simple local rules that benefit from early feedback.
 - For submit-time validation, keep the user's entered values in place.
-- Show inline error text next to the field and a summary when the form has multiple problems.
-- Move focus to the summary or the first invalid field after a failed submit.
+- Show inline error text next to the field and an error summary when there are multiple problems or the first error may be offscreen.
+- Keep the summary copy identical to the inline field copy and link each summary item to its field.
+- Move focus to the summary after a failed submit when one is present; otherwise move focus to the first invalid field.
 - Keep the error message specific about what is wrong and what to do next.
 - Use `role="alert"` for urgent validation failures that need immediate attention.
 - Use `role="status"` for non-urgent confirmations or progress updates.
+- When custom validation is in charge, prefer a single announcement path instead of mixing native browser messages with custom summaries.
 - Do not mark empty required fields invalid before the user tries to submit the form.
 
 ## Controls
@@ -46,6 +49,8 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 - Wrapping unrelated inputs in one generic group label.
 - Replacing native controls with custom `div`-based widgets unless the native element cannot express the interaction.
 - Reusing one helper string for both instructions and errors.
+- Clearing the user's entered values when validation fails.
+- Mixing native browser error bubbles with a custom summary and inline error pattern.
 
 ## Related Research
 

@@ -38,6 +38,7 @@
 │  │  │  └─ responsive-shell-navigation-principle.md
 │  │  └─ research/
 │  │     ├─ 2026-04-06-accessible-forms-controls-and-affordances.md
+│  │     ├─ 2026-04-06-information-hierarchy-and-visual-structure.md
 │  │     ├─ 2026-04-06-motion-and-reduced-motion.md
 │  │     ├─ 2026-04-06-loading-empty-error-feedback-states.md
 │  │     ├─ 2026-04-06-search-filtering-and-progressive-disclosure.md

@@ -25,16 +25,17 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Current Research Priorities
 
+- Information hierarchy and visual structure in dense workspace pages
 - Loading, empty, and error feedback states
-- Accessible forms, validation contracts, and interaction affordances
+- Accessible forms, error summaries, and validation timing
 - Motion and transitions that clarify state without adding noise
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
 
 ## Open Questions
 
-- Which form validation contract should be standard across dialogs, side panels, and inline editors?
-- Should the repo standardize `aria-describedby` plus `aria-errormessage` for custom validation states, with `aria-invalid` only after validation?
+- When should dialogs, side panels, and inline editors use a top-of-surface error summary versus only a focused first-invalid field?
+- Should the repo standardize `novalidate` anywhere custom validation UI is used?
 - Where do the 24 by 24 CSS pixel target-size rules need spacing exceptions or equivalent controls in dense toolbars?
 - Where should the app adopt the feedback-states pattern first: tables, panels, or detail views?
 - When should feedback use `role="status"`, `role="alert"`, or `aria-busy`?
@@ -48,10 +49,14 @@ Read this file before any web research, then update it after each sweep so the b
 - Which search and filter controls should stay visible versus collapse into disclosure?
 - How should selected filters and counts stay visible when the filter UI is collapsed?
 - How should this repo distinguish between design principles, pattern notes, and implementation-ready guidance?
+- How many distinct heading or emphasis levels are useful before a dense page starts to feel noisy?
+- Should breadcrumb, page title, and section caption conventions be standardized across detail panes and mobile breakpoints?
+- When should visual structure rely on spacing and proximity instead of additional separators or ornament?
 
 ## Follow-Up Topics
 
-- Form validation patterns for dialogs, panels, and inline editors
+- Error summary focus management for dialogs, panels, and inline editors
+- Blur-time versus submit-time validation timing
 - Accessible labels, grouping, and affordance rules for custom controls
 - Target-size defaults and spacing exceptions for dense toolbars and icon actions
 - Feedback-state defaults for loading, empty, success, and error surfaces
@@ -65,6 +70,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Research
 
+- [Information Hierarchy and Visual Structure](./research/2026-04-06-information-hierarchy-and-visual-structure.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
 - [Accessible Forms, Controls, and Affordances](./research/2026-04-06-accessible-forms-controls-and-affordances.md)
 - [Search, Filtering, and Progressive Disclosure](./research/2026-04-06-search-filtering-and-progressive-disclosure.md)

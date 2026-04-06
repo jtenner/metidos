@@ -7,6 +7,7 @@ This research pass focused on practical patterns for dense developer tools: how 
 ## Summary
 
 The strongest current guidance is to keep the workspace shell shallow and predictable, use progressive disclosure instead of deep nested navigation, and match the feedback pattern to the scope of the wait or error. For large content areas, skeletons are better than spinners for initial load; for single async actions, inline loading works better; for missing data, replace the absent content with an empty state rather than layering a message on top of it.
+Page-level hierarchy and visual structure are tracked separately in [Information Hierarchy and Visual Structure](./2026-04-06-information-hierarchy-and-visual-structure.md).
 
 ## Source Notes
 
@@ -81,3 +82,4 @@ The strongest current guidance is to keep the workspace shell shallow and predic
 - Compare responsive collapse behavior for the shell against the repo's actual mobile breakpoints.
 - Collect more examples of dense multi-pane workspaces that use tabs, split panels, or contextual sidebars well.
 - Decide which of these findings should be promoted into a durable principle vs. a reusable pattern.
+- Use the visual-structure note for heading, spacing, and layout-rhythm questions so this note stays focused on shell navigation and feedback states.

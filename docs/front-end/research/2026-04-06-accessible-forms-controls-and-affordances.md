@@ -2,7 +2,7 @@
 
 Date: 2026-04-06
 
-This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive.
+This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive. The current validation guidance is to validate on submission by default, keep native labels and descriptions visible, and surface a top-of-surface error summary plus inline field messages when a submission fails.
 
 ## Summary
 
@@ -24,9 +24,23 @@ The current best practice is still to rely on native HTML controls first, becaus
 - [MDN form structure guide](https://developer.mozilla.org/ms/docs/Learn/Forms/How_to_structure_a_web_form)
   - Related widgets should be grouped with `<fieldset>` and `<legend>`.
   - The legend becomes part of the effective label for controls in the group.
+- [W3C Design System: Forms: validation](https://design-system.w3.org/styles/form-validation.html)
+  - The default recommendation is to validate on submission.
+  - The design system recommends turning off native HTML5 validation when custom validation messaging is used.
+- [W3C Design System: Forms: errors](https://design-system.w3.org/styles/form-errors.html)
+  - Error handling should include a title prefix, an error summary at the top of the page, and per-field error messages.
+  - Summary items should point at the field they belong to.
+- [GOV.UK Design System: Error summary](https://design-system.service.gov.uk/components/error-summary/)
+  - Show an error summary when there is a validation error.
+  - Keep the summary messages identical to the inline field messages.
+  - Move focus to the summary after a failed submission.
+- [GOV.UK Design System: Error message](https://design-system.service.gov.uk/components/error-message/)
+  - Show the error message next to the relevant field and in the summary.
+  - Keep the user’s entered values in place so they can fix the issue without re-entering data.
+  - Use wording from the question or fieldset label so the message still makes sense out of context.
 - [MDN `aria-invalid`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-invalid)
   - Mark invalid controls with `aria-invalid="true"` when custom validation is in play.
-  - Pair invalid state with styling and a message that explains what to fix.
+  - Do not set it on empty required fields until after the user tries to submit.
 - [MDN `aria-describedby`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-describedby)
   - Use `aria-describedby` for helper text and other plain-text descriptions that add context.
   - Keep descriptions concise; use `aria-details` when the content is more structured.
@@ -53,17 +67,20 @@ The current best practice is still to rely on native HTML controls first, becaus
 - Prefer native `<input>`, `<select>`, `<textarea>`, `<button>`, `<a>`, `<fieldset>`, and `<legend>` before reaching for ARIA.
 - Use explicit `<label for>` associations for all visible form fields.
 - Group radios and checkboxes with `<fieldset>` and `<legend>` instead of visually faking a heading.
-- Keep help text and error text adjacent to the field they describe and wire it with `aria-describedby` or `aria-errormessage` when needed.
-- Mark invalid controls clearly with `aria-invalid`, but do not hide the actual error copy.
-- Use an error summary or other top-of-form entry point when a form has multiple failures or the first error may be offscreen.
+- Keep help text and error text adjacent to the field they describe; use `aria-describedby` for helper text and `aria-errormessage` for the visible error text when the field is invalid.
+- Mark invalid controls clearly with `aria-invalid`, but only after validation has failed.
+- Validate on submission by default. Use blur-time validation only for local, deterministic rules that do not interrupt the user too early.
+- If the form uses custom validation UI, add `novalidate` so the browser’s native bubbles do not compete with the summary and inline messages.
+- Show an error summary at the top of the surface when a submission fails, especially when there is more than one error or the first error may be offscreen.
+- Keep the summary copy identical to the inline error copy, and link each summary item to its field.
+- Move focus to the error summary after a failed submit, or to the first invalid field if the surface does not have a summary.
 - Use `<button>` for actions and `<a>` for navigation so the browser can preserve correct keyboard and context-menu behavior.
 - Make touch targets large enough to avoid accidental activation, especially for adjacent icon buttons and destructive controls.
 - Avoid icon-only controls unless the name is obvious in text or an accessible name is supplied.
 - Prefer a 24 by 24 CSS pixel minimum for pointer targets, or enough spacing around smaller targets to satisfy WCAG 2.2 target-size guidance.
-- Treat the native validation UI as the default unless the design needs custom messaging, custom timing, or a richer error summary.
 
 ## Follow-Up
 
-- Decide whether error summaries should be standardized across dialogs, side panels, and full-page forms.
-- Verify whether the repo should treat `aria-describedby` and `aria-errormessage` as the default pairing for custom validation states.
+- Decide when dialogs, side panels, and inline editors need a top-of-surface error summary versus only a focused first-invalid field.
+- Verify whether the repo should standardize `novalidate` anywhere custom validation UI is implemented.
 - Compare the recommended target sizes here with the repo's current spacing and density goals.
