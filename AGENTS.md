@@ -23,12 +23,15 @@
 │  │  ├─ GOALS.md
 │  │  ├─ README.md
 │  │  ├─ audits/
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
+│  │  │  ├─ dense-workspace-shell-pattern.md
 │  │  │  └─ README.md
 │  │  ├─ principles/
 │  │  │  └─ README.md
 │  │  └─ research/
+│  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md
 │  │     └─ README.md
 │  ├─ 2026-04-04-frontend-feedback-inventory.md
 │  ├─ 2026-04-04-frontend-performance-inventory.md
