@@ -30,10 +30,12 @@ When a form fails validation, the current guidance favors a top-of-surface error
 - [MDN `alert` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alert_role)
   - `alert` is for important, usually time-sensitive information.
   - It is meant for dynamic updates, not static page content.
-- [MDN `status` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/status_role)
+- [MDN `status` role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/status_role)
   - `status` is for advisory information that does not warrant interruption.
 - [MDN `aria-busy`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-busy)
   - Use `aria-busy` when a related section is still being updated so assistive technology waits for the batch to finish.
+- [MDN `noValidate`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/noValidate)
+  - `noValidate` disables the browser's built-in constraint validation on submit.
 
 ## Practical Implications
 
@@ -46,6 +48,11 @@ When a form fails validation, the current guidance favors a top-of-surface error
 - Use `role="alert"` for dynamically inserted, urgent error content, and keep routine progress or confirmation messages in `status` regions instead.
 - Keep `aria-busy` limited to areas that are genuinely still changing.
 - Use `:user-invalid` as a style-only progressive enhancement for post-interaction invalid states where browser support is sufficient, but do not rely on CSS alone for semantics.
+
+## Related Patterns
+
+- [Form Validation Pattern](../patterns/form-validation-pattern.md)
+- [Feedback States Pattern](../patterns/feedback-states-pattern.md)
 
 ## Follow-Up
 
