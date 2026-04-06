@@ -106,6 +106,7 @@ async function executeCronJob(
       reasoningEffort: normalizeStoredCodexReasoningEffort(
         cronJob.reasoningEffort,
       ),
+      unsafeMode: cronJob.unsafeMode === 1,
     });
     const threadId = threadResult.thread.id;
     const run = createCronJobRun(database, {

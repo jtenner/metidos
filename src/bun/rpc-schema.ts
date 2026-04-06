@@ -354,6 +354,7 @@ export type RpcCronJob = {
   description: string;
   model: string;
   reasoningEffort: RpcCodexReasoningEffort;
+  unsafeMode: boolean;
   lastRunDate: number | null;
   lastRunStatus: RpcCronJobRunStatus | null;
   enabled: 0 | 1;
@@ -645,6 +646,7 @@ export type AppRPCSchema = {
         worktreePath: string;
         schedule: string;
         prompt: string;
+        unsafeMode?: boolean;
         model?: string;
         reasoningEffort?: RpcCodexReasoningEffort;
         title?: string;
@@ -658,6 +660,7 @@ export type AppRPCSchema = {
         cronJobId: number;
         model?: string;
         reasoningEffort?: RpcCodexReasoningEffort;
+        unsafeMode?: boolean;
         schedule?: string;
         prompt?: string;
         title?: string;

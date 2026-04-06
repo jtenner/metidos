@@ -3289,6 +3289,7 @@ function buildCronJobDefaultDescription(
 function normalizeCronJobReasoningEffort(cronJob: CronJobRecord): RpcCronJob {
   return {
     ...cronJob,
+    unsafeMode: cronJob.unsafeMode === 1,
     reasoningEffort: normalizeStoredCodexReasoningEffort(
       cronJob.reasoningEffort,
     ),
@@ -3312,6 +3313,7 @@ export async function newCronProcedure(
   const schedule = params.schedule.trim();
   const model = resolveCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
+  const unsafeMode = resolveUnsafeMode(params.unsafeMode);
   if (!schedule) {
     throw new Error("Cron schedule is required.");
   }
@@ -3339,6 +3341,7 @@ export async function newCronProcedure(
       worktreePath,
       schedule,
       prompt,
+      unsafeMode,
       title,
       description,
       model,
@@ -3387,6 +3390,7 @@ export async function updateCronProcedure(
     model?: string;
     reasoningEffort?: string;
     enabled?: boolean;
+    unsafeMode?: boolean;
   } = {};
 
   if (typeof params.model !== "undefined") {
@@ -3435,6 +3439,10 @@ export async function updateCronProcedure(
     updates.enabled = params.enabled;
   }
 
+  if (typeof params.unsafeMode === "boolean") {
+    updates.unsafeMode = params.unsafeMode;
+  }
+
   if (
     typeof updates.schedule === "undefined" &&
     typeof updates.prompt === "undefined" &&
@@ -3442,6 +3450,7 @@ export async function updateCronProcedure(
     typeof updates.description === "undefined" &&
     typeof updates.model === "undefined" &&
     typeof updates.reasoningEffort === "undefined" &&
+    typeof updates.unsafeMode === "undefined" &&
     typeof updates.enabled === "undefined"
   ) {
     throw new Error("At least one update field is required.");

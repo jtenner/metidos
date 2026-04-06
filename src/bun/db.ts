@@ -251,6 +251,7 @@ export type CronJobRecord = {
   description: string;
   model: string;
   reasoningEffort: string;
+  unsafeMode: 0 | 1;
   lastRunDate: number | null;
   lastRunStatus: CronJobRunStatus | null;
   enabled: 0 | 1;
@@ -277,6 +278,7 @@ type CronJobInput = {
   description: string;
   model: string;
   reasoningEffort: string;
+  unsafeMode?: boolean | null;
   enabled?: boolean | null;
 };
 
@@ -287,6 +289,7 @@ type CronJobUpdateInput = {
   description?: string;
   model?: string;
   reasoningEffort?: string;
+  unsafeMode?: boolean;
   enabled?: boolean;
 };
 
@@ -929,6 +932,7 @@ export function migrateDatabase(db: Database): void {
 				description TEXT NOT NULL,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				last_run_date INTEGER,
 				last_run_status TEXT CHECK(last_run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
 				enabled INTEGER NOT NULL DEFAULT 1,
@@ -963,6 +967,11 @@ export function migrateDatabase(db: Database): void {
     db,
     "reasoning_effort",
     "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+  );
+  ensureCronJobColumn(
+    db,
+    "unsafe_mode",
+    "unsafe_mode INTEGER NOT NULL DEFAULT 0",
   );
   runStatement(
     db,
@@ -1004,6 +1013,15 @@ export function migrateDatabase(db: Database): void {
 			WHERE reasoning_effort IS NULL OR TRIM(reasoning_effort) = ''
 		`,
     DEFAULT_THREAD_REASONING_EFFORT,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				unsafe_mode = 0
+			WHERE unsafe_mode IS NULL
+		`,
   );
   dedupeActiveCronJobTitles(db);
   runStatement(
@@ -2950,9 +2968,11 @@ export function createCronJob(
 				description,
 				model,
 				reasoning_effort,
+				unsafe_mode,
 				enabled
 			)
 			VALUES (
+				?,
 				?,
 				?,
 				?,
@@ -2972,6 +2992,7 @@ export function createCronJob(
     input.description,
     input.model,
     input.reasoningEffort,
+    input.unsafeMode === true ? 1 : 0,
     input.enabled === false ? 0 : 1,
   );
   const cronJob = getCronJobById(database, Number(result.lastInsertRowid));
@@ -3002,6 +3023,7 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3041,6 +3063,7 @@ export function getCronJobById(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3099,6 +3122,11 @@ export function updateCronJob(
     bindings.push(input.reasoningEffort);
   }
 
+  if (typeof input.unsafeMode === "boolean") {
+    updates.push("unsafe_mode = ?");
+    bindings.push(input.unsafeMode ? 1 : 0);
+  }
+
   if (typeof input.enabled === "boolean") {
     updates.push("enabled = ?");
     bindings.push(input.enabled ? 1 : 0);
@@ -3143,6 +3171,7 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3276,6 +3305,7 @@ export function claimCronJobsForScheduledRun(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3321,6 +3351,7 @@ export function claimCronJobForScheduledRunById(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,

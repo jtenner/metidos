@@ -598,6 +598,7 @@ export default function App({
   const [cronEditSchedule, setCronEditSchedule] = useState("");
   const [cronEditPrompt, setCronEditPrompt] = useState("");
   const [cronEditEnabled, setCronEditEnabled] = useState(true);
+  const [cronEditUnsafeMode, setCronEditUnsafeMode] = useState(false);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
   const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
@@ -5086,6 +5087,7 @@ export default function App({
     setCronEditSchedule("");
     setCronEditPrompt("");
     setCronEditEnabled(true);
+    setCronEditUnsafeMode(activeUnsafeMode);
     setCronCreatorModel(activeCodexModel || defaultCodexModel || "");
     setCronCreatorReasoningEffort(
       activeReasoningEffort || defaultCodexReasoningEffort,
@@ -5094,6 +5096,7 @@ export default function App({
   }, [
     activeCodexModel,
     activeReasoningEffort,
+    activeUnsafeMode,
     defaultCodexModel,
     defaultCodexReasoningEffort,
   ]);
@@ -5162,7 +5165,7 @@ export default function App({
         }
 
         const threadId = createdDetail.thread.id;
-        const threadMessage = `Use the new_cron tool to create this cron job for the current workspace.\n\n${describePrompt}`;
+        const threadMessage = `Use the new_cron tool to create this cron job for the current workspace.\nSet unsafeMode to ${cronEditUnsafeMode ? "true" : "false"}.\n\n${describePrompt}`;
         const sentDetail = await executeWithStepUp(
           "create a cron job from a natural-language description",
           () =>
@@ -5207,6 +5210,7 @@ export default function App({
     defaultCodexModel,
     activeCodexModel,
     cronCreatorModel,
+    cronEditUnsafeMode,
     activeUnsafeMode,
     defaultCodexReasoningEffort,
     cronCreatorReasoningEffort,
@@ -5260,6 +5264,7 @@ export default function App({
           ...(cronEditDescription.trim()
             ? { description: cronEditDescription.trim() }
             : {}),
+          unsafeMode: cronEditUnsafeMode,
           enabled: cronEditEnabled,
         });
         await loadCronJobs();
@@ -5283,6 +5288,7 @@ export default function App({
     cronEditPrompt,
     cronEditSchedule,
     cronEditTitle,
+    cronEditUnsafeMode,
     defaultCodexModel,
     defaultCodexReasoningEffort,
     loadCronJobs,
@@ -5689,6 +5695,17 @@ export default function App({
                           }}
                         />
                         {renderCronCreatorModelControls("desktop")}
+                        <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                          <input
+                            checked={cronEditUnsafeMode}
+                            className="h-4 w-4"
+                            type="checkbox"
+                            onChange={(event) => {
+                              setCronEditUnsafeMode(event.target.checked);
+                            }}
+                          />
+                          Unsafe mode
+                        </label>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -5763,6 +5780,17 @@ export default function App({
                           />
                         </div>
                         {renderCronCreatorModelControls("desktop")}
+                        <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                          <input
+                            checked={cronEditUnsafeMode}
+                            className="h-4 w-4"
+                            type="checkbox"
+                            onChange={(event) => {
+                              setCronEditUnsafeMode(event.target.checked);
+                            }}
+                          />
+                          Unsafe mode
+                        </label>
                         <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                           <input
                             checked={cronEditEnabled}
@@ -6102,6 +6130,17 @@ export default function App({
                         }}
                       />
                       {renderCronCreatorModelControls("mobile")}
+                      <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                        <input
+                          checked={cronEditUnsafeMode}
+                          className="h-4 w-4"
+                          type="checkbox"
+                          onChange={(event) => {
+                            setCronEditUnsafeMode(event.target.checked);
+                          }}
+                        />
+                        Unsafe mode
+                      </label>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -6176,6 +6215,17 @@ export default function App({
                         />
                       </div>
                       {renderCronCreatorModelControls("mobile")}
+                      <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                        <input
+                          checked={cronEditUnsafeMode}
+                          className="h-4 w-4"
+                          type="checkbox"
+                          onChange={(event) => {
+                            setCronEditUnsafeMode(event.target.checked);
+                          }}
+                        />
+                        Unsafe mode
+                      </label>
                       <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                         <input
                           checked={cronEditEnabled}

@@ -1128,6 +1128,7 @@ function cronJobPayload(cronJob: RpcCronJob) {
     cronJobId: cronJob.id,
     projectId: cronJob.projectId,
     worktreePath: cronJob.worktreePath,
+    unsafeMode: cronJob.unsafeMode,
     title: cronJob.title,
     description: cronJob.description,
     schedule: cronJob.schedule,
@@ -1534,6 +1535,12 @@ server.registerTool(
         .describe(
           "Optional full description for the cron job. Defaults to a prompt-derived summary.",
         ),
+      unsafeMode: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, cron-run threads start in danger-full-access mode.",
+        ),
       enabled: z
         .boolean()
         .optional()
@@ -1573,6 +1580,9 @@ server.registerTool(
         : {}),
       ...(typeof params.description === "string"
         ? { description: params.description.trim() }
+        : {}),
+      ...(typeof params.unsafeMode === "boolean"
+        ? { unsafeMode: params.unsafeMode }
         : {}),
       ...(typeof params.enabled === "boolean"
         ? { enabled: params.enabled }
@@ -1631,6 +1641,12 @@ server.registerTool(
         .describe(
           "Optional replacement description. Omit to keep the current description.",
         ),
+      unsafeMode: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, cron-run threads start in danger-full-access mode.",
+        ),
       reasoningEffort: z
         .enum(["minimal", "low", "medium", "high", "xhigh"])
         .optional()
@@ -1652,6 +1668,7 @@ server.registerTool(
       params.model === undefined &&
       params.title === undefined &&
       params.description === undefined &&
+      params.unsafeMode === undefined &&
       params.reasoningEffort === undefined &&
       params.enabled === undefined
     ) {
@@ -1676,6 +1693,9 @@ server.registerTool(
         : {}),
       ...(typeof params.reasoningEffort === "string"
         ? { reasoningEffort: params.reasoningEffort }
+        : {}),
+      ...(typeof params.unsafeMode === "boolean"
+        ? { unsafeMode: params.unsafeMode }
         : {}),
       ...(typeof params.enabled === "boolean"
         ? { enabled: params.enabled }
