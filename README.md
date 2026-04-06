@@ -160,6 +160,7 @@ bun run harness:starvation    # run starvation harness utility
   - Tooling + dependency + compiler + Bun execution config.
 - `docs/`
   - Repository design notes, audits, and migration references.
+  - `docs/front-end/` is the living research index for web UI and UX techniques, with `GOALS.md` as the first stop for new research passes.
 - `src/`
   - Source of truth for backend and frontend architecture.
 

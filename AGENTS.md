@@ -19,6 +19,17 @@
 ├─ bun.lock
 ├─ bunfig.toml
 ├─ docs/
+│  ├─ front-end/
+│  │  ├─ GOALS.md
+│  │  ├─ README.md
+│  │  ├─ audits/
+│  │  │  └─ README.md
+│  │  ├─ patterns/
+│  │  │  └─ README.md
+│  │  ├─ principles/
+│  │  │  └─ README.md
+│  │  └─ research/
+│  │     └─ README.md
 │  ├─ 2026-04-04-frontend-feedback-inventory.md
 │  ├─ 2026-04-04-frontend-performance-inventory.md
 │  └─ archive/
