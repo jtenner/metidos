@@ -39,6 +39,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Accessible Forms, Controls, and Affordances](./research/2026-04-06-accessible-forms-controls-and-affordances.md)
+- [Form Validation Pattern](./patterns/form-validation-pattern.md)
 - [Search, Filtering, and Progressive Disclosure](./research/2026-04-06-search-filtering-and-progressive-disclosure.md)
 - [Motion and Reduced Motion Guardrails](./research/2026-04-06-motion-and-reduced-motion.md)
 - [Front-end Tree Sweep Follow-up](./audits/2026-04-06-front-end-tree-sweep-followup.md)

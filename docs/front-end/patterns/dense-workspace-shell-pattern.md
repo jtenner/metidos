@@ -32,13 +32,6 @@ Use this pattern for developer tools and other data-dense products that need a p
 - Replace an empty region with an empty state instead of leaving surrounding chrome in place.
 - Keep error and empty-state copy local to the affected area.
 
-## Forms and Validation
-
-- Validate as early as the field can be meaningfully checked, usually on blur.
-- Place error text directly near the field.
-- Make the message specific about what is wrong and how to fix it.
-- Disable submit only when the resulting feedback remains visible and the form is short enough that the user can recover easily.
-
 ## Avoid
 
 - A three-tier navigation stack in the shell.
@@ -53,6 +46,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](../research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 - [Responsive Shell and Sidebar Collapse](../research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
+- [Accessible Forms, Controls, and Affordances](../research/2026-04-06-accessible-forms-controls-and-affordances.md)
 
 ## Related Principles
 
