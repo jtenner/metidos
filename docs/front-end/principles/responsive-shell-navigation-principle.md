@@ -8,6 +8,7 @@ Responsive shells should preserve orientation before they preserve chrome.
 - Collapse secondary navigation before it starts to compete with the page.
 - Use temporary navigation surfaces on narrow viewports instead of squeezing a permanent sidebar into an unusable shape.
 - Keep repeated shell regions reachable through landmarks and skip links.
+- Label repeated navigation regions clearly so shell nav stays distinct from page-scoped navigation.
 - Make interaction state explicit with selected styling plus `aria-current` and `aria-expanded`.
 - Prefer content-driven breakpoints over device-specific widths.
 
@@ -19,4 +20,5 @@ Responsive shells should preserve orientation before they preserve chrome.
 
 ## Related Research
 
+- [Navigation Landmarks and Sidebar Patterns](../research/2026-04-06-navigation-landmarks-and-sidebar-patterns.md)
 - [Responsive Shell and Sidebar Collapse](../research/2026-04-06-responsive-shell-and-sidebar-collapse.md)

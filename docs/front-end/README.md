@@ -39,6 +39,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Navigation Landmarks and Sidebar Patterns](./research/2026-04-06-navigation-landmarks-and-sidebar-patterns.md)
+- [Front-end Tree Sweep: Navigation Landmarks and Sidebar Patterns](./audits/2026-04-06-front-end-tree-sweep-navigation-landmarks.md)
 - [Page Header Orientation and Breadcrumbs](./research/2026-04-06-page-header-orientation-and-breadcrumbs.md)
 - [Front-end Tree Sweep: Information Hierarchy and Layout Rhythm](./audits/2026-04-06-front-end-tree-sweep-information-hierarchy.md)
 - [Responsive Typography and Container-Aware Layout](./research/2026-04-06-responsive-typography-and-container-aware-layout.md)

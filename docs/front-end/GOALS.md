@@ -29,7 +29,7 @@ Read this file before any web research, then update it after each sweep so the b
 - Responsive typography, container-aware layout primitives, and page-header composition for dense panes and cards
 - Loading, empty, and error feedback states
 - Search, filtering, and progressive disclosure patterns
-- Distinguishing shell navigation from in-page navigation in multi-panel workspaces
+- Distinguishing shell navigation, breadcrumbs, and in-page navigation in multi-panel workspaces
 - Motion and transitions that clarify state without adding noise
 - Accessible forms affordances and post-interaction styling that remain clear at dense sizes
 
@@ -40,8 +40,9 @@ Read this file before any web research, then update it after each sweep so the b
 - When should feedback use `role="status"`, `role="alert"`, or `aria-busy`?
 - How should no-results search states relate to the feedback-states pattern versus the search pattern?
 - Which breakpoint and collapse behavior best fits the repo's desktop-first shell?
-- Should the shell use a temporary drawer, a rail, or both when the left nav collapses?
+- Should the shell use a temporary drawer, a rail, or both when the left nav collapses at different widths?
 - How should focus restoration work after the collapsed navigation closes?
+- Which shell and page-scoped navigation regions need distinct labels, and where should breadcrumbs replace deeper shell nav?
 - Which dense pages still need breadcrumbs once shell navigation and visible titles are in place?
 - Which page-header controls belong in the header versus a local toolbar or body region?
 - Which panes, cards, or dense content blocks should adopt container queries before viewport breakpoints?
@@ -75,6 +76,7 @@ Read this file before any web research, then update it after each sweep so the b
 - Documentation structure patterns for keeping research notes tidy over time
 - `:user-invalid` fallback styling and support checks for post-interaction invalid states
 - Responsive typography and container-aware layout primitives
+- Navigation landmarks, sidebar collapse, and shell-vs-page navigation boundaries
 - Short-heading balancing rules for scanable titles and captions
 
 ## Recent Research
@@ -89,6 +91,7 @@ Read this file before any web research, then update it after each sweep so the b
 - [Search, Filtering, and Progressive Disclosure](./research/2026-04-06-search-filtering-and-progressive-disclosure.md)
 - [Motion and Reduced Motion Guardrails](./research/2026-04-06-motion-and-reduced-motion.md)
 - [Responsive Shell and Sidebar Collapse](./research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
+- [Navigation Landmarks and Sidebar Patterns](./research/2026-04-06-navigation-landmarks-and-sidebar-patterns.md)
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](./research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 
 ## Recent Principles
@@ -103,6 +106,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Audits
 
+- [Front-end Tree Sweep: Navigation Landmarks and Sidebar Patterns](./audits/2026-04-06-front-end-tree-sweep-navigation-landmarks.md)
 - [Front-end Tree Sweep: Information Hierarchy and Layout Rhythm](./audits/2026-04-06-front-end-tree-sweep-information-hierarchy.md)
 - [Front-end Tree Sweep: Responsive Layout Primitives Split](./audits/2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md)
 - [Front-end Tree Sweep: Validation Timing and `:user-invalid`](./audits/2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md)

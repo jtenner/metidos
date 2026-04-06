@@ -12,6 +12,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 
 - Keep the shell shallow.
 - Use the header for global actions and the left panel for primary workspace navigation.
+- Keep shell navigation distinct from page-scoped navigation, and use short labels for repeated `nav` regions.
 - Use the page header for the page title and any local orientation controls such as breadcrumbs, search, or filters when they help the current task.
 - Keep navigation to two levels, and move deeper detail into page tabs or in-content controls.
 - Use sentence case for menu labels.
@@ -38,6 +39,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 
 ## Related Research
 
+- [Navigation Landmarks and Sidebar Patterns](../research/2026-04-06-navigation-landmarks-and-sidebar-patterns.md)
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](../research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 - [Responsive Shell and Sidebar Collapse](../research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
 - [Page Header Orientation and Breadcrumbs](../research/2026-04-06-page-header-orientation-and-breadcrumbs.md)
