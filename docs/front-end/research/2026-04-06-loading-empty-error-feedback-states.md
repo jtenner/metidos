@@ -63,3 +63,4 @@ The current guidance is to match the feedback pattern to the scope of the wait o
 
 - Verify whether the app uses loading, empty, and error feedback consistently across tables, panels, and detail views.
 - Compare the app’s current live-region behavior against the `status`, `alert`, and `aria-busy` guidance here.
+- Compare validation-summary handling against [Form Error Summary Focus Management](./2026-04-06-form-error-summary-focus-management.md) so the alert and focus behavior stay consistent.

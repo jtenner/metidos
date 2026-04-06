@@ -26,6 +26,7 @@
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-form-error-summary-focus.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-target-size.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
@@ -38,6 +39,7 @@
 │  │  │  └─ responsive-shell-navigation-principle.md
 │  │  └─ research/
 │  │     ├─ 2026-04-06-accessible-forms-controls-and-affordances.md
+│  │     ├─ 2026-04-06-form-error-summary-focus-management.md
 │  │     ├─ 2026-04-06-information-hierarchy-and-visual-structure.md
 │  │     ├─ 2026-04-06-motion-and-reduced-motion.md
 │  │     ├─ 2026-04-06-loading-empty-error-feedback-states.md

@@ -41,4 +41,5 @@ Use this pattern for tables, panels, result sets, and detail surfaces that need 
 ## Related Research
 
 - [Loading, Empty, and Error Feedback States](../research/2026-04-06-loading-empty-error-feedback-states.md)
+- [Form Error Summary Focus Management](../research/2026-04-06-form-error-summary-focus-management.md)
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](../research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)

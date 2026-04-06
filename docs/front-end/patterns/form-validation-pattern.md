@@ -55,4 +55,5 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 ## Related Research
 
 - [Accessible Forms, Controls, and Affordances](../research/2026-04-06-accessible-forms-controls-and-affordances.md)
+- [Form Error Summary Focus Management](../research/2026-04-06-form-error-summary-focus-management.md)
 - [Loading, Empty, and Error Feedback States](../research/2026-04-06-loading-empty-error-feedback-states.md)

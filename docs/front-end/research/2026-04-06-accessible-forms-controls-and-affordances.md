@@ -2,7 +2,7 @@
 
 Date: 2026-04-06
 
-This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive. The current validation guidance is to validate on submission by default, keep native labels and descriptions visible, and surface a top-of-surface error summary plus inline field messages when a submission fails.
+This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive. The current validation guidance is to validate on submission by default, keep native labels and descriptions visible, and pair inline field messages with the dedicated form-error-summary guidance when a submission fails.
 
 ## Summary
 
@@ -73,7 +73,7 @@ The current best practice is still to rely on native HTML controls first, becaus
 - If the form uses custom validation UI, add `novalidate` so the browser’s native bubbles do not compete with the summary and inline messages.
 - Show an error summary at the top of the surface when a submission fails, especially when there is more than one error or the first error may be offscreen.
 - Keep the summary copy identical to the inline error copy, and link each summary item to its field.
-- Move focus to the error summary after a failed submit, or to the first invalid field if the surface does not have a summary.
+- See the dedicated form-error-summary note for the focus-order and announcement details.
 - Use `<button>` for actions and `<a>` for navigation so the browser can preserve correct keyboard and context-menu behavior.
 - Make touch targets large enough to avoid accidental activation, especially for adjacent icon buttons and destructive controls.
 - Avoid icon-only controls unless the name is obvious in text or an accessible name is supplied.
@@ -81,6 +81,4 @@ The current best practice is still to rely on native HTML controls first, becaus
 
 ## Follow-Up
 
-- Decide when dialogs, side panels, and inline editors need a top-of-surface error summary versus only a focused first-invalid field.
-- Verify whether the repo should standardize `novalidate` anywhere custom validation UI is implemented.
 - Compare the recommended target sizes here with the repo's current spacing and density goals.

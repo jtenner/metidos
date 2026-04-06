@@ -39,6 +39,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Form Error Summary Focus Management](./research/2026-04-06-form-error-summary-focus-management.md)
+- [Front-end Tree Sweep: Form Error Summary Focus](./audits/2026-04-06-front-end-tree-sweep-form-error-summary-focus.md)
 - [Information Hierarchy and Visual Structure](./research/2026-04-06-information-hierarchy-and-visual-structure.md)
 - [Front-end Tree Sweep: Validation and Target Size](./audits/2026-04-06-front-end-tree-sweep-validation-target-size.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
