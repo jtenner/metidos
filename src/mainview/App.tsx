@@ -334,6 +334,7 @@ const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
 const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
 const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
 type PrimaryView = "chat" | "diff" | "cronjobs";
+type CronCreatorMode = "describe" | "edit";
 type WorktreeThreadPopoverState = {
   maxHeight: number;
   width: number;
@@ -580,6 +581,18 @@ export default function App({
   const [cronJobs, setCronJobs] = useState<RpcCronJob[]>([]);
   const [cronJobsError, setCronJobsError] = useState("");
   const [isLoadingCronJobs, setIsLoadingCronJobs] = useState(false);
+  const [isCreatingCronJob, setIsCreatingCronJob] = useState(false);
+  const [cronCreatorMode, setCronCreatorMode] = useState<CronCreatorMode>(
+    "describe",
+  );
+  const [cronCreatorOpen, setCronCreatorOpen] = useState(false);
+  const [cronCreatorError, setCronCreatorError] = useState("");
+  const [cronDescribePrompt, setCronDescribePrompt] = useState("");
+  const [cronEditTitle, setCronEditTitle] = useState("");
+  const [cronEditDescription, setCronEditDescription] = useState("");
+  const [cronEditSchedule, setCronEditSchedule] = useState("");
+  const [cronEditPrompt, setCronEditPrompt] = useState("");
+  const [cronEditEnabled, setCronEditEnabled] = useState(true);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
   const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
@@ -5013,6 +5026,183 @@ export default function App({
     primeCronJobs();
   }, [primeCronJobs]);
 
+  const resetCronCreatorFields = useCallback(() => {
+    setCronDescribePrompt("");
+    setCronEditTitle("");
+    setCronEditDescription("");
+    setCronEditSchedule("");
+    setCronEditPrompt("");
+    setCronEditEnabled(true);
+    setCronCreatorError("");
+  }, []);
+
+  const openCronCreator = useCallback(
+    (mode: CronCreatorMode = "describe") => {
+      setCronCreatorMode(mode);
+      resetCronCreatorFields();
+      setCronCreatorOpen(true);
+    },
+    [resetCronCreatorFields],
+  );
+
+  const closeCronCreator = useCallback(() => {
+    setCronCreatorOpen(false);
+    setCronCreatorError("");
+  }, []);
+
+  const handleDescribeCronSubmit = useCallback(() => {
+    if (!selectedProject || !activeSelectedWorktreePath) {
+      setCronCreatorError("Select a workspace before creating a cron job.");
+      return;
+    }
+
+    const describePrompt = cronDescribePrompt.trim();
+    if (!describePrompt) {
+      setCronCreatorError("Describe the cron you want to create.");
+      return;
+    }
+
+    setIsCreatingCronJob(true);
+    setCronCreatorError("");
+
+    void (async () => {
+      let createdDetail: RpcThreadDetail | null = null;
+      try {
+        createdDetail = await executeWithStepUp(
+          "create a thread outside the current workspace",
+          () =>
+            procedures.createThread({
+              projectId: selectedProject.id,
+              worktreePath: activeSelectedWorktreePath,
+              currentProjectId: selectedProjectIdRef.current,
+              currentWorktreePath: selectedWorktreePathRef.current,
+              model: activeCodexModel || defaultCodexModel || null,
+              reasoningEffort:
+                activeReasoningEffort || defaultCodexReasoningEffort || null,
+              unsafeMode: activeUnsafeMode,
+            }),
+        );
+        if (!createdDetail) {
+          return;
+        }
+
+        const threadMessage = `Use the new_cron tool to create this cron job for the current workspace.\n\n${describePrompt}`;
+        const sentDetail = await executeWithStepUp(
+          "create a cron job from a natural-language description",
+          () =>
+            procedures.sendThreadMessage({
+              threadId: createdDetail.thread.id,
+              input: threadMessage,
+            }),
+        );
+        if (!sentDetail) {
+          return;
+        }
+
+        upsertThread(sentDetail.thread);
+        if (
+          shouldApplySentThreadDetailToSelection({
+            detail: sentDetail,
+            requestedThreadId: createdDetail.thread.id,
+            selectedThreadId: selectedThreadIdRef.current,
+          })
+        ) {
+          selectedThreadRunStateRef.current = sentDetail.thread.runStatus.state;
+          mergeSelectedThreadMessageHistory(sentDetail);
+        }
+
+        closeCronCreator();
+        setCronDescribePrompt("");
+      } catch (error) {
+        if (createdDetail) {
+          upsertThread(createdDetail.thread);
+        }
+        setCronCreatorError(
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        setIsCreatingCronJob(false);
+      }
+    })();
+  }, [
+    activeSelectedWorktreePath,
+    closeCronCreator,
+    defaultCodexModel,
+    activeCodexModel,
+    activeReasoningEffort,
+    activeUnsafeMode,
+    defaultCodexReasoningEffort,
+    cronDescribePrompt,
+    executeWithStepUp,
+    mergeSelectedThreadMessageHistory,
+    procedures,
+    shouldApplySentThreadDetailToSelection,
+    selectedProject,
+    upsertThread,
+  ]);
+
+  const handleEditCronSubmit = useCallback(() => {
+    if (!selectedProject || !activeSelectedWorktreePath) {
+      setCronCreatorError("Select a workspace before creating a cron job.");
+      return;
+    }
+
+    const schedule = cronEditSchedule.trim();
+    const prompt = cronEditPrompt.trim();
+
+    if (!schedule) {
+      setCronCreatorError("Cron schedule is required.");
+      return;
+    }
+
+    if (!prompt) {
+      setCronCreatorError("Cron prompt is required.");
+      return;
+    }
+
+    setIsCreatingCronJob(true);
+    setCronCreatorError("");
+
+    void (async () => {
+      try {
+        await procedures.newCron({
+          projectId: selectedProject.id,
+          worktreePath: activeSelectedWorktreePath,
+          schedule,
+          prompt,
+          ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
+          ...(cronEditDescription.trim()
+            ? { description: cronEditDescription.trim() }
+            : {}),
+          enabled: cronEditEnabled,
+        });
+        await loadCronJobs();
+        closeCronCreator();
+      } catch (error) {
+        setCronCreatorError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setIsCreatingCronJob(false);
+      }
+    })();
+  }, [
+    activeSelectedWorktreePath,
+    closeCronCreator,
+    cronEditDescription,
+    cronEditEnabled,
+    cronEditPrompt,
+    cronEditSchedule,
+    cronEditTitle,
+    loadCronJobs,
+    procedures,
+    selectedProject,
+  ]);
+
+  useEffect(() => {
+    if (primaryView !== "cronjobs") {
+      closeCronCreator();
+    }
+  }, [closeCronCreator, primaryView]);
+
   const handleNewWorktreeNameChange = useCallback((value: string) => {
     setProjectActionMenuError("");
     setNewWorktreeName(value);
@@ -5295,7 +5485,190 @@ export default function App({
                 />
               ) : null
             ) : primaryView === "cronjobs" ? (
-              <div className="flex min-h-0 flex-1 flex-col px-6 py-6">
+              <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-6">
+                <div className="flex items-center justify-between">
+                  <div className="font-label text-xs uppercase tracking-[0.14em] text-[#9db9cb]">
+                    Cron jobs
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                      openCronCreator("describe");
+                    }}
+                  >
+                    New Cron
+                  </button>
+                </div>
+                {cronCreatorOpen ? (
+                  <div className="rounded-lg border border-[#2b3a45] bg-[#161a1d] p-4">
+                    <div className="mb-4 flex gap-2 border-b border-[#27333a] pb-3">
+                      <button
+                        type="button"
+                        className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                          cronCreatorMode === "describe"
+                            ? "bg-[#2f3b43] text-[#f2f0ef]"
+                            : "text-[#9db9cb] hover:text-[#f2f0ef]"
+                        }`}
+                        onClick={() => {
+                          setCronCreatorError("");
+                          setCronCreatorMode("describe");
+                        }}
+                      >
+                        Describe Cron
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                          cronCreatorMode === "edit"
+                            ? "bg-[#2f3b43] text-[#f2f0ef]"
+                            : "text-[#9db9cb] hover:text-[#f2f0ef]"
+                        }`}
+                        onClick={() => {
+                          setCronCreatorError("");
+                          setCronCreatorMode("edit");
+                        }}
+                      >
+                        Edit Cron
+                      </button>
+                    </div>
+
+                    {cronCreatorMode === "describe" ? (
+                      <div className="space-y-3">
+                        <label
+                          htmlFor="cron-describe-input"
+                          className="font-label text-[11px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                        >
+                          Cron description
+                        </label>
+                        <textarea
+                          id="cron-describe-input"
+                          className="min-h-28 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          placeholder="Describe cron schedule and work to perform."
+                          rows={6}
+                          value={cronDescribePrompt}
+                          onChange={(event) => {
+                            setCronDescribePrompt(event.target.value);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label
+                            htmlFor="cron-edit-title"
+                            className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                          >
+                            Title
+                          </label>
+                          <input
+                            id="cron-edit-title"
+                            className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            placeholder="Optional title"
+                            value={cronEditTitle}
+                            onChange={(event) => {
+                              setCronEditTitle(event.target.value);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label
+                            htmlFor="cron-edit-description"
+                            className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                          >
+                            Description
+                          </label>
+                          <textarea
+                            id="cron-edit-description"
+                            className="min-h-16 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            placeholder="Optional description"
+                            rows={3}
+                            value={cronEditDescription}
+                            onChange={(event) => {
+                              setCronEditDescription(event.target.value);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label
+                            htmlFor="cron-edit-schedule"
+                            className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                          >
+                            Schedule
+                          </label>
+                          <input
+                            id="cron-edit-schedule"
+                            className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            placeholder="cron expression, e.g. */5 * * * *"
+                            value={cronEditSchedule}
+                            onChange={(event) => {
+                              setCronEditSchedule(event.target.value);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label
+                            htmlFor="cron-edit-prompt"
+                            className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                          >
+                            Prompt
+                          </label>
+                          <textarea
+                            id="cron-edit-prompt"
+                            className="min-h-20 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            placeholder="What the cron run thread should do"
+                            rows={4}
+                            value={cronEditPrompt}
+                            onChange={(event) => {
+                              setCronEditPrompt(event.target.value);
+                            }}
+                          />
+                        </div>
+                        <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                          <input
+                            checked={cronEditEnabled}
+                            className="h-4 w-4"
+                            type="checkbox"
+                            onChange={(event) => {
+                              setCronEditEnabled(event.target.checked);
+                            }}
+                          />
+                          Enable immediately
+                        </label>
+                      </div>
+                    )}
+
+                    {cronCreatorError ? (
+                      <div className="mt-4 rounded border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
+                        {cronCreatorError}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
+                        onClick={closeCronCreator}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isCreatingCronJob}
+                        onClick={() => {
+                          if (cronCreatorMode === "describe") {
+                            handleDescribeCronSubmit();
+                            return;
+                          }
+                          handleEditCronSubmit();
+                        }}
+                      >
+                        {isCreatingCronJob ? "Creating…" : "OK"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <CronjobWorkspace
                   cronJobs={cronJobs}
                   cronJobsError={cronJobsError}
@@ -5520,8 +5893,191 @@ export default function App({
                 unsafeModeToggleDisabled={unsafeModeToggleDisabled}
               />
             ) : null
-          ) : primaryView === "cronjobs" ? (
+            ) : primaryView === "cronjobs" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pt-6">
+              <div className="flex items-center justify-between">
+                <div className="font-label text-xs uppercase tracking-[0.14em] text-[#9db9cb]">
+                  Cron jobs
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3]"
+                  onClick={() => {
+                    openCronCreator("describe");
+                  }}
+                >
+                  New Cron
+                </button>
+              </div>
+              {cronCreatorOpen ? (
+                <div className="rounded-lg border border-[#2b3a45] bg-[#161a1d] p-4">
+                  <div className="mb-4 flex gap-2 border-b border-[#27333a] pb-3">
+                    <button
+                      type="button"
+                      className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                        cronCreatorMode === "describe"
+                          ? "bg-[#2f3b43] text-[#f2f0ef]"
+                          : "text-[#9db9cb] hover:text-[#f2f0ef]"
+                      }`}
+                      onClick={() => {
+                        setCronCreatorError("");
+                        setCronCreatorMode("describe");
+                      }}
+                    >
+                      Describe Cron
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                        cronCreatorMode === "edit"
+                          ? "bg-[#2f3b43] text-[#f2f0ef]"
+                          : "text-[#9db9cb] hover:text-[#f2f0ef]"
+                      }`}
+                      onClick={() => {
+                        setCronCreatorError("");
+                        setCronCreatorMode("edit");
+                      }}
+                    >
+                      Edit Cron
+                    </button>
+                  </div>
+
+                  {cronCreatorMode === "describe" ? (
+                    <div className="space-y-3">
+                      <label
+                        htmlFor="cron-describe-input-mobile"
+                        className="font-label text-[11px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                      >
+                        Cron description
+                      </label>
+                      <textarea
+                        id="cron-describe-input-mobile"
+                        className="min-h-28 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                        placeholder="Describe cron schedule and work to perform."
+                        rows={6}
+                        value={cronDescribePrompt}
+                        onChange={(event) => {
+                          setCronDescribePrompt(event.target.value);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="cron-edit-title-mobile"
+                          className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                        >
+                          Title
+                        </label>
+                        <input
+                          id="cron-edit-title-mobile"
+                          className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          placeholder="Optional title"
+                          value={cronEditTitle}
+                          onChange={(event) => {
+                            setCronEditTitle(event.target.value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="cron-edit-description-mobile"
+                          className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                        >
+                          Description
+                        </label>
+                        <textarea
+                          id="cron-edit-description-mobile"
+                          className="min-h-16 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          placeholder="Optional description"
+                          rows={3}
+                          value={cronEditDescription}
+                          onChange={(event) => {
+                            setCronEditDescription(event.target.value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="cron-edit-schedule-mobile"
+                          className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                        >
+                          Schedule
+                        </label>
+                        <input
+                          id="cron-edit-schedule-mobile"
+                          className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          placeholder="cron expression, e.g. */5 * * * *"
+                          value={cronEditSchedule}
+                          onChange={(event) => {
+                            setCronEditSchedule(event.target.value);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="cron-edit-prompt-mobile"
+                          className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]"
+                        >
+                          Prompt
+                        </label>
+                        <textarea
+                          id="cron-edit-prompt-mobile"
+                          className="min-h-20 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          placeholder="What the cron run thread should do"
+                          rows={4}
+                          value={cronEditPrompt}
+                          onChange={(event) => {
+                            setCronEditPrompt(event.target.value);
+                          }}
+                        />
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
+                        <input
+                          checked={cronEditEnabled}
+                          className="h-4 w-4"
+                          type="checkbox"
+                          onChange={(event) => {
+                            setCronEditEnabled(event.target.checked);
+                          }}
+                        />
+                        Enable immediately
+                      </label>
+                    </div>
+                  )}
+
+                  {cronCreatorError ? (
+                    <div className="mt-4 rounded border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
+                      {cronCreatorError}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
+                      onClick={closeCronCreator}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isCreatingCronJob}
+                      onClick={() => {
+                        if (cronCreatorMode === "describe") {
+                          handleDescribeCronSubmit();
+                          return;
+                        }
+                        handleEditCronSubmit();
+                      }}
+                    >
+                      {isCreatingCronJob ? "Creating…" : "OK"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <CronjobWorkspace
                 cronJobs={cronJobs}
                 cronJobsError={cronJobsError}

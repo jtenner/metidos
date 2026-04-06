@@ -22,7 +22,16 @@ type CronSchedulerThreadStart = {
   runnerPath: string;
 };
 
-type CronSchedulerThreadMessage = CronSchedulerThreadStart | { type: "stop" };
+type CronSchedulerThreadSync = {
+  type: "sync";
+  cronJobId: number;
+};
+
+type CronSchedulerThreadStop = { type: "stop" };
+type CronSchedulerThreadMessage =
+  | CronSchedulerThreadStart
+  | CronSchedulerThreadStop
+  | CronSchedulerThreadSync;
 
 type CronSchedulerThreadStatusMessage =
   | { type: "stopped" }
@@ -33,6 +42,9 @@ let schedulerWorker: Worker | null = null;
 let stopResolve: (() => void) | null = null;
 let stopTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * Resolve any pending stop waiter when the worker has shut down.
+ */
 function resolveSchedulerStop(): void {
   if (!stopResolve) {
     return;
@@ -45,6 +57,9 @@ function resolveSchedulerStop(): void {
   }
 }
 
+/**
+ * Send a control message to the scheduler worker if it is currently active.
+ */
 function notifySchedulerWorker(message: CronSchedulerThreadMessage): void {
   if (!schedulerWorker) {
     return;
@@ -52,6 +67,9 @@ function notifySchedulerWorker(message: CronSchedulerThreadMessage): void {
   schedulerWorker.postMessage(message);
 }
 
+/**
+ * Ask the worker to stop, terminate it, and clean up local state.
+ */
 function shutdownWorker(): void {
   if (!schedulerWorker) {
     return;
@@ -62,6 +80,9 @@ function shutdownWorker(): void {
   resolveSchedulerStop();
 }
 
+/**
+ * Handle lifecycle messages from the worker thread.
+ */
 function onWorkerMessage(
   event: MessageEvent<CronSchedulerThreadStatusMessage>,
 ): void {
@@ -130,5 +151,15 @@ export async function stopCronScheduler(): Promise<void> {
     }, 2_000);
 
     notifySchedulerWorker({ type: "stop" });
+  });
+}
+
+/**
+ * Ask the scheduler worker to sync a single cron job after DB changes.
+ */
+export function syncCronSchedulerCron(cronJobId: number): void {
+  notifySchedulerWorker({
+    type: "sync",
+    cronJobId,
   });
 }

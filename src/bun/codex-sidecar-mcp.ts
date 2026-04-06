@@ -1111,6 +1111,9 @@ function threadStartRequestPayload(request: RpcThreadStartRequest) {
   };
 }
 
+/**
+ * Build a stable MCP response shape for cron job records.
+ */
 function cronJobPayload(cronJob: RpcCronJob) {
   return {
     cronJobId: cronJob.id,
@@ -1127,6 +1130,20 @@ function cronJobPayload(cronJob: RpcCronJob) {
     createdAt: cronJob.createdAt,
     updatedAt: cronJob.updatedAt,
   };
+}
+
+/**
+ * Return MCP-friendly error metadata for structured logging.
+ */
+function normalizeToolError(error: unknown): unknown {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null,
+    };
+  }
+  return String(error);
 }
 
 /**
@@ -1150,17 +1167,9 @@ function safeMetadataAnnotations() {
   };
 }
 
-function normalizeToolError(error: unknown): unknown {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack ?? null,
-    };
-  }
-  return String(error);
-}
-
+/**
+ * Wrap tool handlers with start/finish/error tracing and duration capture.
+ */
 function withToolLogging<TArgs, TResult>(
   toolName: string,
   handler: (args: TArgs) => Promise<TResult> | TResult,

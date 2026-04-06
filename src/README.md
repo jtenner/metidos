@@ -18,6 +18,14 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Git-facing utilities used for worktree listing, history, and diff operations.
 - `index.ts`
   - Bun-side entrypoint that wires RPC and process-level handlers.
+- `sidecar-cron-scheduler.ts`
+  - Launches and controls the cron worker process that keeps Bun.cron registrations in sync.
+- `sidecar-cron-thread.ts`
+  - Worker-side cron scheduler loop for loading active jobs and handling command messages.
+- `sidecar-cron-runner.ts`
+  - Cron execution callback invoked by scheduled Bun.cron registrations.
+- `sidecar-cron-scheduler.ts` + `sidecar-cron-thread.ts`
+  - New cron and updated cron changes are propagated via targeted sync updates (no full scheduler restart).
 - `isolated-server.ts`
   - Isolated execution/server runner for sidecar workflows.
 - `tls-config.ts`

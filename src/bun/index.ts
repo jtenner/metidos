@@ -116,6 +116,7 @@ import {
 import {
   startCronScheduler,
   stopCronScheduler,
+  syncCronSchedulerCron,
 } from "./sidecar-cron-scheduler";
 import {
   formatLoopbackHttpOrigin,
@@ -390,8 +391,16 @@ const rpcHandlers: RpcRequestHandlerMap = {
     broadcastThreadStartRequestCreated(request);
     return request;
   },
-  newCron: (params) => newCronProcedure(params),
-  updateCron: (params) => updateCronProcedure(params),
+  newCron: async (params) => {
+    const cron = await newCronProcedure(params);
+    syncCronSchedulerCron(cron.id);
+    return cron;
+  },
+  updateCron: async (params) => {
+    const cron = await updateCronProcedure(params);
+    syncCronSchedulerCron(cron.id);
+    return cron;
+  },
   listCrons: (params) => listCronsProcedure(params),
   getThread: (params) => getThreadProcedure(params),
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),

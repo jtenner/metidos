@@ -5,7 +5,8 @@
 
 import { Database } from "bun:sqlite";
 
-import { listActiveCronJobs } from "./db";
+import { getCronJobById, listActiveCronJobs } from "./db";
+import type { CronJobRecord } from "./db";
 
 type StartCronSchedulerThread = {
   type: "start";
@@ -17,9 +18,15 @@ type StopCronSchedulerThread = {
   type: "stop";
 };
 
+type SyncCronSchedulerThread = {
+  type: "sync";
+  cronJobId: number;
+};
+
 type CronSchedulerThreadMessage =
   | StartCronSchedulerThread
-  | StopCronSchedulerThread;
+  | StopCronSchedulerThread
+  | SyncCronSchedulerThread;
 
 type CronSchedulerThreadStatusMessage =
   | { type: "stopped" }
@@ -33,8 +40,14 @@ type CronSchedulerWorkerScope = {
 const workerScope = globalThis as unknown as CronSchedulerWorkerScope;
 
 let database: Database | null = null;
+let queue: Promise<void> = Promise.resolve();
+let cronRunnerPath: string | null = null;
 const cronJobTitles = new Set<string>();
+const CRON_JOB_TITLE_PREFIX = "jolt-cron-";
 
+/**
+ * Convert a cron title into a stable, filesystem-safe token for Bun.cron labels.
+ */
 function slugifyCronTitle(value: string): string {
   return (
     value
@@ -46,11 +59,24 @@ function slugifyCronTitle(value: string): string {
   ).slice(0, 64);
 }
 
+/**
+ * Build the deterministic Bun.cron label used for a single cron row.
+ */
 function buildCronJobTitle(job: { id: number; title: string }): string {
   const safeTitle = slugifyCronTitle(job.title);
-  return `jolt-cron-${job.id}-${safeTitle}`;
+  return `${CRON_JOB_TITLE_PREFIX}${job.id}-${safeTitle}`;
 }
 
+/**
+ * Build the shared prefix that identifies all job labels for one cron id.
+ */
+function buildCronJobTitlePrefix(cronJobId: number): string {
+  return `${CRON_JOB_TITLE_PREFIX}${cronJobId}-`;
+}
+
+/**
+ * Report an async scheduler error to the main worker process.
+ */
 function postError(error: unknown): void {
   workerScope.postMessage({
     type: "error",
@@ -58,6 +84,9 @@ function postError(error: unknown): void {
   });
 }
 
+/**
+ * Unregister every job registered for this worker instance.
+ */
 async function unregisterAllCronJobs(): Promise<void> {
   for (const title of cronJobTitles) {
     try {
@@ -69,6 +98,75 @@ async function unregisterAllCronJobs(): Promise<void> {
   cronJobTitles.clear();
 }
 
+/**
+ * Remove all registrations for a single cron id while keeping other jobs intact.
+ */
+async function unregisterCronJobsForCronId(cronJobId: number): Promise<void> {
+  const prefix = buildCronJobTitlePrefix(cronJobId);
+  const titleSnapshot = Array.from(cronJobTitles);
+  for (const title of titleSnapshot) {
+    if (!title.startsWith(prefix)) {
+      continue;
+    }
+    try {
+      await Bun.cron.remove(title);
+    } catch {
+      // Ignore when registration is already gone.
+    }
+    cronJobTitles.delete(title);
+  }
+}
+
+/**
+ * Register a cron job with Bun.cron and track its title for later cleanup.
+ */
+async function registerCronJob(
+  runnerPath: string,
+  cronJob: Pick<CronJobRecord, "id" | "title" | "schedule">,
+): Promise<void> {
+  const title = buildCronJobTitle(cronJob);
+  cronJobTitles.add(title);
+  try {
+    await Bun.cron.remove(title).catch(() => undefined);
+    await Bun.cron(runnerPath, cronJob.schedule, title);
+  } catch (error) {
+    cronJobTitles.delete(title);
+    throw error;
+  }
+}
+
+/**
+ * Reconcile one cron id from the database into active worker registration.
+ */
+async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
+  const databaseHandle = database;
+  if (!databaseHandle) {
+    return;
+  }
+  if (!cronRunnerPath) {
+    return;
+  }
+
+  await unregisterCronJobsForCronId(cronJobId);
+  const cronJob = getCronJobById(databaseHandle, cronJobId);
+  if (
+    !cronJob ||
+    cronJob.enabled !== 1 ||
+    cronJob.deletedAt !== null
+  ) {
+    return;
+  }
+
+  try {
+    await registerCronJob(cronRunnerPath, cronJob);
+  } catch (error) {
+    postError(error);
+  }
+}
+
+/**
+ * Register all active cron jobs during scheduler startup.
+ */
 async function registerCronJobs(runnerPath: string): Promise<void> {
   const databaseHandle = database;
   if (!databaseHandle) {
@@ -76,30 +174,32 @@ async function registerCronJobs(runnerPath: string): Promise<void> {
   }
 
   const jobs = listActiveCronJobs(databaseHandle);
-  const scheduleByTitle = new Map<string, string>();
-
   for (const job of jobs) {
-    scheduleByTitle.set(buildCronJobTitle(job), job.schedule);
-  }
-
-  const titles = Array.from(scheduleByTitle.keys());
-  for (const title of titles) {
-    const schedule = scheduleByTitle.get(title);
-    if (!schedule) {
+    if (job.enabled !== 1 || job.deletedAt !== null) {
       continue;
     }
-    cronJobTitles.add(title);
-    await Bun.cron.remove(title).catch(() => undefined);
     try {
-      await Bun.cron(runnerPath, schedule, title);
+      await registerCronJob(runnerPath, job);
     } catch (error) {
-      cronJobTitles.delete(title);
       postError(error);
     }
   }
 }
 
+/**
+ * Queue async worker commands to ensure deterministic start/stop/sync sequencing.
+ */
+function queueSchedulerCommand(command: () => Promise<void>): void {
+  queue = queue.then(() => command()).catch((error) => {
+    postError(error);
+  });
+}
+
+/**
+ * Initialize state, open the app DB, and register all currently active cron jobs.
+ */
 async function start(message: StartCronSchedulerThread): Promise<void> {
+  cronRunnerPath = message.runnerPath;
   await unregisterAllCronJobs();
   await closeDatabase();
   database = new Database(message.dbPath);
@@ -107,12 +207,19 @@ async function start(message: StartCronSchedulerThread): Promise<void> {
   await registerCronJobs(message.runnerPath);
 }
 
+/**
+ * Remove all registered cron jobs and close db access before signaling shutdown.
+ */
 async function stop(): Promise<void> {
   await unregisterAllCronJobs();
   await closeDatabase();
+  cronRunnerPath = null;
   workerScope.postMessage({ type: "stopped" });
 }
 
+/**
+ * Close database handles and reset the local cache.
+ */
 async function closeDatabase(): Promise<void> {
   if (!database) {
     return;
@@ -121,6 +228,9 @@ async function closeDatabase(): Promise<void> {
   database = null;
 }
 
+/**
+ * Handle control messages sent from the scheduler orchestrator thread.
+ */
 workerScope.onmessage = (event) => {
   const message = event.data as CronSchedulerThreadMessage;
   if (!message || typeof message.type !== "string") {
@@ -128,15 +238,16 @@ workerScope.onmessage = (event) => {
   }
 
   if (message.type === "start") {
-    void start(message).catch((error) => {
-      postError(error);
-    });
+    queueSchedulerCommand(() => start(message));
     return;
   }
 
   if (message.type === "stop") {
-    void stop().catch((error) => {
-      postError(error);
-    });
+    queueSchedulerCommand(stop);
+    return;
+  }
+
+  if (message.type === "sync") {
+    queueSchedulerCommand(() => syncCronJobFromDatabase(message.cronJobId));
   }
 };

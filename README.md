@@ -16,6 +16,7 @@ The goal is to keep coding sessions, project state, and tool outputs tightly cou
 - Run and track project-defined tasks.
 - View and diff worktree file content without leaving the app.
 - Preserve responsive interactions with cancellation, background updates, and resilient reconnects.
+- Create and manage cron jobs from the Cronjobs workspace.
 
 ## Big-picture architecture
 
@@ -70,6 +71,17 @@ flowchart TD
    - Invalidation logic clears in-flight requests and reconnect state.
    - Backend has configurable monitoring/maintenance hooks to recover stale polling and procedure caches.
 
+## Cronjobs workspace
+
+- The cron view now includes a **New Cron** button in the workspace header.
+- **Describe Cron** opens a text input and sends a message through the normal thread/message path, using `new_cron` tooling to create the job from natural language.
+- **Edit Cron** opens explicit cron fields (`title`, `description`, `schedule`, `prompt`, `enabled`) and creates the job directly.
+- `newCron`/`updateCron` operations are written through existing DB-backed procedures and then notify the scheduler worker with the changed cron id.
+- The scheduler uses targeted sync instead of full worker restarts:
+  - `sidecar-cron-scheduler.ts` sends `sync` messages for one cron id.
+  - `sidecar-cron-thread.ts` applies updates in a serialized queue, unregisters previous registrations for that id, and re-registers when enabled.
+  - Full restart remains only for process startup/shutdown.
+
 ## Project/Worktree model
 
 The main data model is centered on three layers:
@@ -95,6 +107,9 @@ Threads and worktrees are coordinated through procedures in `src/bun/project-pro
   - `src/mainview/controls/*` contains reusable controls (selects, composer, icons, search, dropdown primitives).
 - `src/bun` is the server/process layer.
   - `index.ts` is the main WebSocket + HTTP host and RPC dispatcher.
+  - `sidecar-cron-scheduler.ts` controls the cron scheduler worker lifecycle.
+  - `sidecar-cron-thread.ts` receives scheduler commands (`start`, `sync`, `stop`) and manages Bun.cron registrations.
+  - `sidecar-cron-runner.ts` executes cron jobs by creating and running thread turns.
   - `project-procedures.ts` is the orchestration layer for everything that mutates user-visible state.
   - `project-procedures/*` splits logic by domain (catalog, directory suggestions, tasks, history, shared helpers, and thread detail).
   - `db.ts`, `git.ts`, `rpc-schema.ts`, and `build-mainview.ts` provide persistence, VCS actions, API contracts, and build-time support.

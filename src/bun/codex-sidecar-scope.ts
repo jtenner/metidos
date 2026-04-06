@@ -16,12 +16,10 @@ type SidecarScopeOptions = CanonicalizePathOptions & {
   targetWorktreePath: string;
   worktreePathContext?: string | null;
 };
-/**
- * Performs canonicalizeSidecarPath operation.
- * @param value - Input value.
- * @param options - Configuration options used by this operation.
- */
 
+/**
+ * Resolve and normalize a path to a canonical, cross-platform string.
+ */
 export function canonicalizeSidecarPath(
   value: string,
   options: CanonicalizePathOptions = {},
@@ -39,29 +37,24 @@ export function canonicalizeSidecarPath(
   const platform = options.platform ?? process.platform;
   return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
-/**
- * Performs sidecarPathsEqual operation.
- * @param left - left argument for sidecarPathsEqual.
- * @param right - right argument for sidecarPathsEqual.
- * @param options - Configuration options used by this operation.
- */
 
+/**
+ * Compare two user-provided paths for equality after canonicalization.
+ */
 export function sidecarPathsEqual(
   left: string,
   right: string,
   options: CanonicalizePathOptions = {},
 ): boolean {
   return (
-    canonicalizeSidecarPath(left, options) ===
+  canonicalizeSidecarPath(left, options) ===
     canonicalizeSidecarPath(right, options)
   );
 }
-/**
- * Performs enforceBoundThreadScope operation.
- * @param threadId - Thread identifier.
- * @param boundThreadId - boundThreadId identifier.
- */
 
+/**
+ * Enforce optional thread binding from sidecar environment context.
+ */
 export function enforceBoundThreadScope(
   threadId: number,
   boundThreadId?: number | null,
@@ -72,11 +65,10 @@ export function enforceBoundThreadScope(
     );
   }
 }
-/**
- * Performs enforceTargetScope operation.
- * @param options - Configuration options used by this operation.
- */
 
+/**
+ * Enforce optional project/worktree scoping restrictions from sidecar environment.
+ */
 export function enforceTargetScope(options: SidecarScopeOptions): void {
   if (
     typeof options.projectIdContext === "number" &&

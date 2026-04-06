@@ -20,7 +20,9 @@ import {
 } from "./project-procedures";
 import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 
+/** Poll interval used while waiting for the cron-spawned thread to finish. */
 const THREAD_POLL_INTERVAL_MS = 500;
+/** Maximum elapsed time allowed for one cron invocation before marking it errored. */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
 type CronExecutionController = {
@@ -28,6 +30,9 @@ type CronExecutionController = {
   scheduledTime: number;
 };
 
+/**
+ * Parse thread timestamp strings returned by DB columns.
+ */
 function parseThreadDate(value: string | null): number | null {
   if (!value) {
     return null;
@@ -36,6 +41,12 @@ function parseThreadDate(value: string | null): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/**
+ * Wait for a thread run to exit active work, or timeout.
+ *
+ * Uses `runStartedAt` as the cut-off to disambiguate stale thread status from an
+ * unrelated previous run.
+ */
 async function waitForThreadRunCompletion(
   threadId: number,
   database: ReturnType<typeof initAppDatabase>,
@@ -79,6 +90,9 @@ async function waitForThreadRunCompletion(
   return "Errored";
 }
 
+/**
+ * Create the cron job run record and execute the cron prompt in a child thread.
+ */
 async function executeCronJob(
   database: ReturnType<typeof initAppDatabase>,
   cronJob: CronJobRecord,
@@ -127,6 +141,9 @@ async function executeCronJob(
   }
 }
 
+/**
+ * Claim due cron rows for this fire and execute them sequentially.
+ */
 async function runDueCronJobs(
   schedule: string,
   scheduledTime: number,
@@ -143,6 +160,9 @@ async function runDueCronJobs(
 }
 
 export default {
+  /**
+   * Bun Cron entrypoint: claim and run jobs for the provided schedule payload.
+   */
   async scheduled(controller: CronExecutionController): Promise<void> {
     try {
       await runDueCronJobs(controller.cron, controller.scheduledTime);
