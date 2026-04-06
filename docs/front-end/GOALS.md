@@ -12,10 +12,10 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Current Research Priorities
 
-- Motion and transitions that clarify state without adding noise
-- Search, filtering, and progressive disclosure patterns
 - Accessible forms, controls, and interaction affordances
 - Microcopy and state messaging for empty, loading, and error states
+- Motion and transitions that clarify state without adding noise
+- Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
 
 ## Open Questions
@@ -28,6 +28,9 @@ Read this file before any web research, then update it after each sweep so the b
 - How should empty states and inline notifications interact when several panels are empty or failing at once?
 - Which form validation rules should be standardized across dialogs, side panels, and inline editors?
 - Which micro-interactions improve confidence without slowing expert users down?
+- Which motion effects are essential, and which should disappear under reduced motion?
+- Which search and filter controls should stay visible versus collapse into disclosure?
+- How should selected filters and counts stay visible when the filter UI is collapsed?
 - How should this repo distinguish between design principles, pattern notes, and implementation-ready guidance?
 
 ## Follow-Up Topics
@@ -37,10 +40,14 @@ Read this file before any web research, then update it after each sweep so the b
 - Empty-state and onboarding patterns for technical tools
 - Discoverable but unobtrusive advanced controls
 - Form validation and error-copy patterns for technical tools
+- Search and filtering patterns for dense workspaces
+- Reduced-motion defaults for state transitions and loading surfaces
 - Documentation structure patterns for keeping research notes tidy over time
 
 ## Recent Research
 
+- [Search, Filtering, and Progressive Disclosure](./research/2026-04-06-search-filtering-and-progressive-disclosure.md)
+- [Motion and Reduced Motion Guardrails](./research/2026-04-06-motion-and-reduced-motion.md)
 - [Responsive Shell and Sidebar Collapse](./research/2026-04-06-responsive-shell-and-sidebar-collapse.md)
 - [Dense Workspace Hierarchy, Navigation, and Feedback States](./research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
 

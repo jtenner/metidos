@@ -24,6 +24,7 @@
 │  │  ├─ README.md
 │  │  ├─ audits/
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
 │  │  │  ├─ dense-workspace-shell-pattern.md
@@ -32,6 +33,8 @@
 │  │  │  ├─ README.md
 │  │  │  └─ responsive-shell-navigation-principle.md
 │  │  └─ research/
+│  │     ├─ 2026-04-06-motion-and-reduced-motion.md
+│  │     ├─ 2026-04-06-search-filtering-and-progressive-disclosure.md
 │  │     ├─ 2026-04-06-responsive-shell-and-sidebar-collapse.md
 │  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md
 │  │     └─ README.md
