@@ -25,6 +25,7 @@
 │  │  ├─ audits/
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-information-hierarchy.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-form-error-summary-focus.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md

@@ -6,10 +6,13 @@ This research pass focused on how dense web UIs communicate structure before use
 
 ## Summary
 
-Strong hierarchy comes from semantic structure plus consistent visual rhythm. Use heading ranks to mirror page sections, label page regions when landmarks repeat, and keep line length and type scale under control so the page stays readable when resized or magnified. Within dense layouts, related controls should stay close to the content they affect, and the layout should not depend on tiny visual distinctions to communicate grouping.
+Strong hierarchy comes from semantic structure plus consistent visual rhythm. Use heading ranks to mirror page sections, label page regions when landmarks repeat, and keep line length and type scale under control so the page stays readable when resized or magnified. Within dense layouts, related controls should stay close to the content they affect, and the layout should not depend on tiny visual distinctions to communicate grouping. For short headings and captions, `text-wrap: balance` can improve the visual shape of wrapped text without changing the underlying hierarchy.
 
 ## Source Notes
 
+- [WAI Page Structure Tutorial](https://www.w3.org/WAI/tutorials/page-structure/)
+  - Headings should be nested logically so the page structure is understandable before the content is fully read.
+  - Labels and headings work together to make repeated regions easier to scan and navigate.
 - [WAI Headings](https://www.w3.org/WAI/tutorials/page-structure/headings/)
   - Headings communicate page organization and support in-page navigation.
   - Nest heading ranks in order; avoid skipping levels where possible.
@@ -18,15 +21,9 @@ Strong hierarchy comes from semantic structure plus consistent visual rhythm. Us
 - [WAI Labeling Regions](https://www.w3.org/WAI/tutorials/page-structure/labels/)
   - Distinguish repeated regions of the same type with `aria-labelledby` or `aria-label`.
   - Unique landmarks like `main` do not need extra labels.
-- [WAI ARIA11 Landmarks](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA11)
-  - Landmarks help keyboard and assistive-technology users skip repeated chrome.
-  - Landmarks supplement headings and should cover the whole page structure.
-  - Multiple landmarks of the same role need clear labels.
-- [GOV.UK Headings](https://design-system.service.gov.uk/styles/headings/)
-  - Style headings consistently to create a clear content structure.
-  - The updated type scale improves legibility on small screens.
-  - Sentence case is the default.
-  - Long-form pages should use larger heading steps at the top and smaller steps below.
+- [WAI Landmark Regions APG](https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/)
+  - Give each landmark a meaningful role and label so assistive-technology users can understand the page structure quickly.
+  - If a page has more than one landmark of the same type, each should get a unique label.
 - [GOV.UK Type Scale](https://design-system.service.gov.uk/styles/type-scale/)
   - The type scale creates a consistent vertical rhythm that makes pages easier to scan and read.
   - Relative units help type resize better when zoomed or magnified.
@@ -35,14 +32,16 @@ Strong hierarchy comes from semantic structure plus consistent visual rhythm. Us
   - Start with a single-column layout on small screens.
   - Two-thirds layouts help keep line length readable on desktop.
   - Avoid assuming devices; design for screen sizes.
-- [Material Design Accessibility](https://m1.material.io/usability/accessibility.html)
-  - Related items should stay in proximity so users can understand grouping.
-  - Scalable text and spacious layouts help magnification and assistive technologies.
-  - Visual icons can be small when the touch target is larger.
+- [MDN `text-wrap`](https://developer.mozilla.org/en-US/docs/Web/CSS/text-wrap)
+  - `text-wrap: balance` is intended for short blocks such as headings, captions, and blockquotes.
+  - The goal is better line balance and legibility, not wholesale changes to content hierarchy.
+- [MDN Container Queries](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_container_queries)
+  - Component-level layout can respond to the width of a container rather than the viewport.
+  - Container queries are a better fit than viewport breakpoints when hierarchy changes at the card, pane, or sidebar level.
 - [Nielsen Norman Group Visual Design Principles](https://media.nngroup.com/media/articles/attachments/Principles_Visual_Design-Letter.pdf)
   - Visual hierarchy guides the eye in order of importance.
-  - Scale and contrast do most of the work; use no more than a few type sizes.
-  - Balance and Gestalt grouping matter more than decorative ornament.
+  - Scale, contrast, balance, and Gestalt grouping do most of the work.
+  - Use a small number of size steps so the page stays scannable.
 - [MDN CSS Grid Layout](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Grid_layout)
   - Grid is a good fit for dividing a page into major regions.
   - It keeps the relationship between parts of a control explicit.
@@ -54,6 +53,8 @@ Strong hierarchy comes from semantic structure plus consistent visual rhythm. Us
 - Prefer labels, spacing, and proximity over decorative separators to show relationships.
 - Constrain long-form content to readable measures instead of letting wide columns carry the entire page.
 - Make repeated shell regions and sidebars identifiable with landmarks plus visible labels.
+- Reserve `text-wrap: balance` for short headings and other short blocks where line shape matters more than exact wrapping.
+- Use container queries when a pane, card, or sidebar needs its own hierarchy breakpoints.
 - Design dense control rows with enough hit area and spacing that grouping stays clear at 200% zoom.
 
 ## Follow-Up

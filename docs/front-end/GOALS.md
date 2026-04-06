@@ -25,7 +25,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Current Research Priorities
 
-- Information hierarchy and visual structure in dense workspace pages
+- Information hierarchy, region labels, and visual structure in dense workspace pages
 - Responsive typography and container-aware layout primitives for dense panes and cards
 - Loading, empty, and error feedback states
 - Search, filtering, and progressive disclosure patterns
@@ -45,6 +45,7 @@ Read this file before any web research, then update it after each sweep so the b
 - When should breadcrumbs or page titles carry orientation at smaller widths?
 - Which panes, cards, or dense content blocks should adopt container queries before viewport breakpoints?
 - Where should `text-wrap: balance` stay limited to short headings, and where should it stay off?
+- Which repeated regions should use `aria-labelledby` versus `aria-label` when labels are already visible?
 - Which micro-interactions improve confidence without slowing expert users down?
 - Which motion effects are essential, and which should disappear under reduced motion?
 - Which search and filter controls should stay visible versus collapse into disclosure?
@@ -98,6 +99,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Audits
 
+- [Front-end Tree Sweep: Information Hierarchy and Layout Rhythm](./audits/2026-04-06-front-end-tree-sweep-information-hierarchy.md)
 - [Front-end Tree Sweep: Responsive Layout Primitives Split](./audits/2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md)
 - [Front-end Tree Sweep: Validation Timing and `:user-invalid`](./audits/2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md)
 - [Front-end Tree Sweep: Feedback States Split](./audits/2026-04-06-front-end-tree-sweep-feedback-states.md)
