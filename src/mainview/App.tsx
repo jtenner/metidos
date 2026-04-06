@@ -5133,9 +5133,7 @@ export default function App({
                     activeSelectedWorktreeBranch:
                       activeSelectedWorktree?.branch?.trim() || "Primary",
                     activeSelectedWorktreeFolder:
-                      activeSelectedWorktreeName ||
-                      activeSelectedWorktreeFolder ||
-                      "Current worktree",
+                      activeSelectedWorktreeFolder || "Current worktree",
                     canCreateThread: Boolean(
                       selectedProject &&
                         activeSelectedWorktreePath &&
@@ -5353,9 +5351,7 @@ export default function App({
                 activeSelectedWorktreeBranch:
                   activeSelectedWorktree?.branch?.trim() || "Primary",
                 activeSelectedWorktreeFolder:
-                  activeSelectedWorktreeName ||
-                  activeSelectedWorktreeFolder ||
-                  "Current worktree",
+                  activeSelectedWorktreeFolder || "Current worktree",
                 canCreateThread: Boolean(
                   selectedProject &&
                     activeSelectedWorktreePath &&
