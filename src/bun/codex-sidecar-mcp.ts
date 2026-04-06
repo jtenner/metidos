@@ -1138,6 +1138,7 @@ function cronJobPayload(cronJob: RpcCronJob) {
     deletedAt: cronJob.deletedAt,
     createdAt: cronJob.createdAt,
     updatedAt: cronJob.updatedAt,
+    nextRunDate: cronJob.nextRunDate,
   };
 }
 

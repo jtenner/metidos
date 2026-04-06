@@ -24,6 +24,17 @@ function formatLastRunDate(lastRunDate: number | null): string {
   return parsedDate.toLocaleString();
 }
 
+function formatNextRunDate(nextRunDate: number | null): string {
+  if (nextRunDate === null) {
+    return "Unavailable";
+  }
+  const parsedDate = new Date(nextRunDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Unknown";
+  }
+  return parsedDate.toLocaleString();
+}
+
 function describeCronSchedule(schedule: string): string {
   try {
     return cronstrue.toString(schedule);
@@ -135,6 +146,10 @@ export function CronjobWorkspace({
             <div className="flex items-center justify-between text-[11px] text-[#7f8d97]">
               <span>Last run</span>
               <span>{formatLastRunDate(cronJob.lastRunDate)}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-[#7f8d97]">
+              <span>Next run</span>
+              <span>{formatNextRunDate(cronJob.nextRunDate)}</span>
             </div>
             {cronJob.lastRunStatus ? (
               <div className="flex items-center justify-between text-[11px] text-[#7f8d97]">

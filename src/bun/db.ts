@@ -257,6 +257,7 @@ export type CronJobRecord = {
   deletedAt: number | null;
   createdAt: string;
   updatedAt: string;
+  nextRunDate: number | null;
 };
 
 export type CronJobRunRecord = {
@@ -296,6 +297,8 @@ type CronJobRunInput = {
   runStatus: CronJobRunStatus;
 };
 
+type CronJobSqlRecord = Omit<CronJobRecord, "nextRunDate">;
+
 const DEFAULT_APP_DATA_DIR =
   process.platform === "darwin"
     ? join(homedir(), "Library", "Application Support", APP_NAME)
@@ -311,6 +314,42 @@ const DEFAULT_APP_DATA_DIR =
 /** Cached app-data directory path resolved for this process. */
 
 let resolvedAppDataDir: string | null = null;
+
+/** Compute next run timestamp from a cron schedule expression, if parseable. */
+function computeCronJobNextRunDate(schedule: string): number | null {
+  if (
+    typeof Bun === "undefined" ||
+    !Bun.cron ||
+    typeof Bun.cron.parse !== "function" ||
+    typeof schedule !== "string" ||
+    schedule.trim().length === 0
+  ) {
+    return null;
+  }
+  try {
+    const nextRunDate = Bun.cron.parse(schedule);
+    if (!(nextRunDate instanceof Date)) {
+      return null;
+    }
+    const nextRunDateMs = nextRunDate.getTime();
+    return Number.isNaN(nextRunDateMs) ? null : nextRunDateMs;
+  } catch {
+    return null;
+  }
+}
+
+/** Attach computed `nextRunDate` to a cron record coming out of SQL. */
+function hydrateCronJobFromSqlRow(
+  cronJob: CronJobSqlRecord,
+  includeNextRunDate: boolean,
+): CronJobRecord {
+  return {
+    ...cronJob,
+    nextRunDate: includeNextRunDate
+      ? computeCronJobNextRunDate(cronJob.schedule)
+      : null,
+  };
+}
 
 export type AppDataPathOptions = {
   appDataDir?: string;
@@ -2950,8 +2989,8 @@ export function createCronJob(
  */
 export function listCronJobs(database: Database): CronJobRecord[] {
   /** Load all cron jobs with latest settings. */
-  return database
-    .query<CronJobRecord, []>(
+  const rows = database
+    .query<CronJobSqlRecord, []>(
       `
 			SELECT
 				id,
@@ -2974,6 +3013,7 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 		`,
     )
     .all();
+  return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, true));
 }
 
 /**
@@ -2984,10 +3024,12 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 export function getCronJobById(
   database: Database,
   cronJobId: number,
+  options: { includeNextRunDate?: boolean } = {},
 ): CronJobRecord | null {
+  const { includeNextRunDate = true } = options;
   /** Read a cron job row by its id. */
-  return database
-    .query<CronJobRecord, [number]>(
+  const cronJob = database
+    .query<CronJobSqlRecord, [number]>(
       `
 			SELECT
 				id,
@@ -3010,6 +3052,7 @@ export function getCronJobById(
 		`,
     )
     .get(cronJobId);
+  return cronJob ? hydrateCronJobFromSqlRow(cronJob, includeNextRunDate) : null;
 }
 
 /**
@@ -3087,8 +3130,8 @@ export function updateCronJob(
  */
 export function listActiveCronJobs(database: Database): CronJobRecord[] {
   /** Read cron jobs that are enabled and not soft-deleted. */
-  return database
-    .query<CronJobRecord, []>(
+  const rows = database
+    .query<CronJobSqlRecord, []>(
       `
 			SELECT
 				id,
@@ -3112,6 +3155,7 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 		`,
     )
     .all();
+  return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, false));
 }
 
 /**
@@ -3203,8 +3247,8 @@ export function claimCronJobsForScheduledRun(
   runDate: number,
 ): CronJobRecord[] {
   /** Claim due jobs atomically by matching schedule and stale last-run timestamp. */
-  return database
-    .query<CronJobRecord, [number, string, number]>(
+  const rows = database
+    .query<CronJobSqlRecord, [number, string, number]>(
       `
 			UPDATE cron_jobs
 			SET
@@ -3241,6 +3285,7 @@ export function claimCronJobsForScheduledRun(
 		`,
     )
     .all(runDate, schedule, runDate);
+  return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, false));
 }
 
 /**

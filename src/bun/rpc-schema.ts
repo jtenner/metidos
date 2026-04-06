@@ -360,6 +360,7 @@ export type RpcCronJob = {
   deletedAt: number | null;
   createdAt: string;
   updatedAt: string;
+  nextRunDate: number | null;
 };
 
 export type RpcChatThreadMessage = {

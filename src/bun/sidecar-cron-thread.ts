@@ -157,7 +157,9 @@ async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
   }
 
   await unregisterCronJobsForCronId(cronJobId);
-  const cronJob = getCronJobById(databaseHandle, cronJobId);
+  const cronJob = getCronJobById(databaseHandle, cronJobId, {
+    includeNextRunDate: false,
+  });
   if (!cronJob || cronJob.enabled !== 1 || cronJob.deletedAt !== null) {
     return;
   }
