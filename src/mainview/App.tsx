@@ -122,7 +122,9 @@ import {
   readChatComposerDraft,
   setChatComposerDraft,
 } from "./controls/chat-composer-control";
+import { CodexModelSelector } from "./controls/codex-model-selector";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
+import { ReasoningEffortSelector } from "./controls/reasoning-effort-selector";
 import { runRollbackSafeProjectClose } from "./project-close";
 import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
 import { shouldRefreshProjectActionMenuWorktrees } from "./project-worktree-refresh";
@@ -586,6 +588,9 @@ export default function App({
     useState<CronCreatorMode>("describe");
   const [cronCreatorOpen, setCronCreatorOpen] = useState(false);
   const [cronCreatorError, setCronCreatorError] = useState("");
+  const [cronCreatorModel, setCronCreatorModel] = useState("");
+  const [cronCreatorReasoningEffort, setCronCreatorReasoningEffort] =
+    useState<RpcCodexReasoningEffort>(defaultCodexReasoningEffort);
   const [cronDescribePrompt, setCronDescribePrompt] = useState("");
   const [cronEditTitle, setCronEditTitle] = useState("");
   const [cronEditDescription, setCronEditDescription] = useState("");
@@ -5045,8 +5050,17 @@ export default function App({
     setCronEditSchedule("");
     setCronEditPrompt("");
     setCronEditEnabled(true);
+    setCronCreatorModel(activeCodexModel || defaultCodexModel || "");
+    setCronCreatorReasoningEffort(
+      activeReasoningEffort || defaultCodexReasoningEffort,
+    );
     setCronCreatorError("");
-  }, []);
+  }, [
+    activeCodexModel,
+    activeReasoningEffort,
+    defaultCodexModel,
+    defaultCodexReasoningEffort,
+  ]);
 
   const openCronCreator = useCallback(
     (mode: CronCreatorMode = "describe") => {
@@ -5074,6 +5088,12 @@ export default function App({
       return;
     }
 
+    const model = cronCreatorModel.trim()
+      ? cronCreatorModel.trim()
+      : activeCodexModel || defaultCodexModel || null;
+    const reasoningEffort =
+      cronCreatorReasoningEffort || defaultCodexReasoningEffort;
+
     setIsCreatingCronJob(true);
     setCronCreatorError("");
 
@@ -5088,9 +5108,9 @@ export default function App({
               worktreePath: activeSelectedWorktreePath,
               currentProjectId: selectedProjectIdRef.current,
               currentWorktreePath: selectedWorktreePathRef.current,
-              model: activeCodexModel || defaultCodexModel || null,
+              model,
               reasoningEffort:
-                activeReasoningEffort || defaultCodexReasoningEffort || null,
+                reasoningEffort || defaultCodexReasoningEffort || null,
               unsafeMode: activeUnsafeMode,
             }),
         );
@@ -5142,9 +5162,11 @@ export default function App({
     closeCronCreator,
     defaultCodexModel,
     activeCodexModel,
+    cronCreatorModel,
     activeReasoningEffort,
     activeUnsafeMode,
     defaultCodexReasoningEffort,
+    cronCreatorReasoningEffort,
     cronDescribePrompt,
     executeWithStepUp,
     mergeSelectedThreadMessageHistory,
@@ -5175,6 +5197,12 @@ export default function App({
       return;
     }
 
+    const model = cronCreatorModel.trim()
+      ? cronCreatorModel.trim()
+      : activeCodexModel || defaultCodexModel || null;
+    const reasoningEffort =
+      cronCreatorReasoningEffort || defaultCodexReasoningEffort;
+
     setIsCreatingCronJob(true);
     setCronCreatorError("");
 
@@ -5185,6 +5213,8 @@ export default function App({
           worktreePath: activeSelectedWorktreePath,
           schedule,
           prompt,
+          model,
+          reasoningEffort,
           ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
           ...(cronEditDescription.trim()
             ? { description: cronEditDescription.trim() }
@@ -5205,6 +5235,8 @@ export default function App({
     activeSelectedWorktreePath,
     closeCronCreator,
     cronEditDescription,
+    cronCreatorModel,
+    cronCreatorReasoningEffort,
     cronEditEnabled,
     cronEditPrompt,
     cronEditSchedule,
@@ -5247,6 +5279,52 @@ export default function App({
     window.__joltAppMountedAt = Date.now();
     console.log("App.tsx mounted", window.__joltAppMountedAt);
   }, []);
+
+  const cronCreatorModelValue = cronCreatorModel.trim()
+    ? cronCreatorModel
+    : activeCodexModel || defaultCodexModel || "";
+  const renderCronCreatorModelControls = (
+    variant: "desktop" | "mobile",
+  ): JSX.Element => (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="space-y-1">
+        <label
+          className={`font-label text-[10px] uppercase tracking-[0.16em] ${
+            variant === "desktop" ? "text-[#7ea2b8]" : "text-[#7ea2b8]"
+          }`}
+        >
+          Model
+        </label>
+        <CodexModelSelector
+          appTitle="Cron"
+          disabled={isCreatingCronJob}
+          models={codexModels}
+          onChange={setCronCreatorModel}
+          reasoningOptions={reasoningEfforts}
+          onChangeReasoningEffort={
+            variant === "desktop" ? setCronCreatorReasoningEffort : undefined
+          }
+          reasoningValue={cronCreatorReasoningEffort}
+          value={cronCreatorModelValue}
+          variant={variant}
+        />
+      </div>
+      {variant === "desktop" ? (
+        <div className="space-y-1">
+          <label className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+            Reasoning effort
+          </label>
+          <ReasoningEffortSelector
+            disabled={isCreatingCronJob}
+            onChange={setCronCreatorReasoningEffort}
+            options={reasoningEfforts}
+            value={cronCreatorReasoningEffort}
+            variant={variant}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="h-screen overflow-hidden bg-[#0e0e0e] text-[#ffffff]">
@@ -5568,6 +5646,7 @@ export default function App({
                             setCronDescribePrompt(event.target.value);
                           }}
                         />
+                        {renderCronCreatorModelControls("desktop")}
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -5641,6 +5720,7 @@ export default function App({
                             }}
                           />
                         </div>
+                        {renderCronCreatorModelControls("desktop")}
                         <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                           <input
                             checked={cronEditEnabled}
@@ -5977,6 +6057,7 @@ export default function App({
                           setCronDescribePrompt(event.target.value);
                         }}
                       />
+                      {renderCronCreatorModelControls("mobile")}
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -6050,6 +6131,7 @@ export default function App({
                           }}
                         />
                       </div>
+                      {renderCronCreatorModelControls("mobile")}
                       <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                         <input
                           checked={cronEditEnabled}

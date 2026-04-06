@@ -3295,6 +3295,8 @@ export async function newCronProcedure(
   });
   const prompt = params.prompt.trim();
   const schedule = params.schedule.trim();
+  const model = resolveCodexModel(params.model);
+  const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   if (!schedule) {
     throw new Error("Cron schedule is required.");
   }
@@ -3323,6 +3325,8 @@ export async function newCronProcedure(
     prompt,
     title,
     description,
+    model,
+    reasoningEffort,
     enabled: params.enabled ?? null,
   });
 }
@@ -3361,8 +3365,20 @@ export async function updateCronProcedure(
     prompt?: string;
     title?: string;
     description?: string;
+    model?: string;
+    reasoningEffort?: string;
     enabled?: boolean;
   } = {};
+
+  if (typeof params.model !== "undefined") {
+    updates.model = resolveCodexModel(params.model);
+  }
+
+  if (typeof params.reasoningEffort !== "undefined") {
+    updates.reasoningEffort = resolveCodexReasoningEffort(
+      params.reasoningEffort,
+    );
+  }
 
   if (typeof params.schedule !== "undefined") {
     const schedule = params.schedule.trim();
@@ -3405,6 +3421,8 @@ export async function updateCronProcedure(
     typeof updates.prompt === "undefined" &&
     typeof updates.title === "undefined" &&
     typeof updates.description === "undefined" &&
+    typeof updates.model === "undefined" &&
+    typeof updates.reasoningEffort === "undefined" &&
     typeof updates.enabled === "undefined"
   ) {
     throw new Error("At least one update field is required.");

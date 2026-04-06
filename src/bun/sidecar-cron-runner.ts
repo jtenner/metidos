@@ -105,6 +105,8 @@ async function executeCronJob(
     const threadResult = await createThreadProcedure({
       projectId: cronJob.projectId,
       worktreePath: cronJob.worktreePath,
+      model: cronJob.model ?? null,
+      reasoningEffort: cronJob.reasoningEffort ?? null,
     });
     const threadId = threadResult.thread.id;
     const run = createCronJobRun(database, {

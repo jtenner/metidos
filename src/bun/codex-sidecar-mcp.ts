@@ -1468,6 +1468,12 @@ server.registerTool(
         .trim()
         .min(1)
         .describe("Prompt sent to the cron run thread."),
+      model: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Model override for cron-run threads."),
       title: z
         .string()
         .trim()
@@ -1490,6 +1496,10 @@ server.registerTool(
         .describe(
           "Whether the cron schedule starts immediately. Omit for null metadata.",
         ),
+      reasoningEffort: z
+        .enum(["minimal", "low", "medium", "high", "xhigh"])
+        .optional()
+        .describe("Reasoning effort override for cron-run threads."),
     },
     annotations: {
       idempotentHint: false,
@@ -1508,6 +1518,12 @@ server.registerTool(
       worktreePath: target.worktreePath,
       schedule: params.schedule.trim(),
       prompt: params.prompt.trim(),
+      ...(typeof params.model === "string"
+        ? { model: params.model.trim() }
+        : {}),
+      ...(typeof params.reasoningEffort === "string"
+        ? { reasoningEffort: params.reasoningEffort }
+        : {}),
       ...(typeof params.title === "string"
         ? { title: params.title.trim() }
         : {}),
@@ -1543,6 +1559,12 @@ server.registerTool(
         .min(1)
         .optional()
         .describe("Optional replacement cron schedule."),
+      model: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Optional model override for cron run threads."),
       prompt: z
         .string()
         .trim()
@@ -1565,6 +1587,10 @@ server.registerTool(
         .describe(
           "Optional replacement description. Omit to keep the current description.",
         ),
+      reasoningEffort: z
+        .enum(["minimal", "low", "medium", "high", "xhigh"])
+        .optional()
+        .describe("Reasoning effort override for cron run threads."),
       enabled: z.boolean().optional().describe("Optional new enabled state."),
       deleted: z.boolean().optional().describe("Optional soft-delete flag."),
     },
@@ -1579,8 +1605,10 @@ server.registerTool(
       params.deleted === undefined &&
       params.schedule === undefined &&
       params.prompt === undefined &&
+      params.model === undefined &&
       params.title === undefined &&
       params.description === undefined &&
+      params.reasoningEffort === undefined &&
       params.enabled === undefined
     ) {
       throw new Error("At least one update field is required.");
@@ -1590,6 +1618,9 @@ server.registerTool(
       ...(typeof params.schedule === "undefined"
         ? {}
         : { schedule: params.schedule.trim() }),
+      ...(typeof params.model === "undefined"
+        ? {}
+        : { model: params.model.trim() }),
       ...(typeof params.prompt === "undefined"
         ? {}
         : { prompt: params.prompt.trim() }),
@@ -1598,6 +1629,9 @@ server.registerTool(
         : {}),
       ...(typeof params.description === "string"
         ? { description: params.description.trim() }
+        : {}),
+      ...(typeof params.reasoningEffort === "string"
+        ? { reasoningEffort: params.reasoningEffort }
         : {}),
       ...(typeof params.enabled === "boolean"
         ? { enabled: params.enabled }

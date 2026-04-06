@@ -249,6 +249,8 @@ export type CronJobRecord = {
   prompt: string;
   title: string;
   description: string;
+  model: string;
+  reasoningEffort: string;
   lastRunDate: number | null;
   lastRunStatus: CronJobRunStatus | null;
   enabled: 0 | 1;
@@ -272,6 +274,8 @@ type CronJobInput = {
   prompt: string;
   title: string;
   description: string;
+  model: string;
+  reasoningEffort: string;
   enabled?: boolean | null;
 };
 
@@ -280,6 +284,8 @@ type CronJobUpdateInput = {
   prompt?: string;
   title?: string;
   description?: string;
+  model?: string;
+  reasoningEffort?: string;
   enabled?: boolean;
 };
 
@@ -882,6 +888,8 @@ export function migrateDatabase(db: Database): void {
 				prompt TEXT NOT NULL,
 				title TEXT NOT NULL,
 				description TEXT NOT NULL,
+				model TEXT NOT NULL DEFAULT 'gpt-5.4',
+				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
 				last_run_date INTEGER,
 				last_run_status TEXT CHECK(last_run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
 				enabled INTEGER NOT NULL DEFAULT 1,
@@ -911,6 +919,12 @@ export function migrateDatabase(db: Database): void {
     "description",
     "description TEXT NOT NULL DEFAULT ''",
   );
+  ensureCronJobColumn(db, "model", "model TEXT NOT NULL DEFAULT 'gpt-5.4'");
+  ensureCronJobColumn(
+    db,
+    "reasoning_effort",
+    "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+  );
   runStatement(
     db,
     `
@@ -931,6 +945,26 @@ export function migrateDatabase(db: Database): void {
 				description = COALESCE(NULLIF(TRIM(prompt), ''), schedule)
 			WHERE description IS NULL OR TRIM(description) = ''
 		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				model = ?
+			WHERE model IS NULL OR TRIM(model) = ''
+		`,
+    DEFAULT_THREAD_MODEL,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				reasoning_effort = ?
+			WHERE reasoning_effort IS NULL OR TRIM(reasoning_effort) = ''
+		`,
+    DEFAULT_THREAD_REASONING_EFFORT,
   );
   dedupeActiveCronJobTitles(db);
   runStatement(
@@ -2875,9 +2909,13 @@ export function createCronJob(
 				prompt,
 				title,
 				description,
+				model,
+				reasoning_effort,
 				enabled
 			)
 			VALUES (
+				?,
+				?,
 				?,
 				?,
 				?,
@@ -2893,6 +2931,8 @@ export function createCronJob(
     input.prompt,
     input.title,
     input.description,
+    input.model,
+    input.reasoningEffort,
     input.enabled === false ? 0 : 1,
   );
   const cronJob = getCronJobById(database, Number(result.lastInsertRowid));
@@ -2921,6 +2961,8 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 				prompt,
 				title,
 				description,
+				model,
+				reasoning_effort AS reasoningEffort,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -2955,6 +2997,8 @@ export function getCronJobById(
 				prompt,
 				title,
 				description,
+				model,
+				reasoning_effort AS reasoningEffort,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3002,6 +3046,16 @@ export function updateCronJob(
     bindings.push(input.description);
   }
 
+  if (typeof input.model === "string") {
+    updates.push("model = ?");
+    bindings.push(input.model);
+  }
+
+  if (typeof input.reasoningEffort === "string") {
+    updates.push("reasoning_effort = ?");
+    bindings.push(input.reasoningEffort);
+  }
+
   if (typeof input.enabled === "boolean") {
     updates.push("enabled = ?");
     bindings.push(input.enabled ? 1 : 0);
@@ -3044,6 +3098,8 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 				prompt,
 				title,
 				description,
+				model,
+				reasoning_effort AS reasoningEffort,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
@@ -3174,6 +3230,8 @@ export function claimCronJobsForScheduledRun(
 				prompt,
 				title,
 				description,
+				model,
+				reasoning_effort AS reasoningEffort,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
 				enabled,
