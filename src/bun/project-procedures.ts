@@ -76,6 +76,7 @@ import {
   resolveCodexModel,
   resolveCodexReasoningEffort,
 } from "./project-procedures/codex-catalog";
+import { normalizeCommandDisplayText } from "./project-procedures/command-normalization";
 import {
   listDirectorySuggestions,
   shutdownDirectorySuggestionCacheMaintenance,
@@ -1980,13 +1981,15 @@ function buildCommandActivityInput(
   itemId: string,
   item: Extract<ThreadItem, { type: "command_execution" }>,
 ): ThreadActivityInput {
+  const command = normalizeCommandDisplayText(item.command);
   return buildCommandActivityInputPayload(threadId, itemId, {
-    command: item.command,
+    command,
     exitCode: item.exit_code ?? null,
     output: item.aggregated_output,
     state: item.status,
   });
 }
+
 /**
  * Builds file change activity inputs.
  * @param threadId - Thread identifier.

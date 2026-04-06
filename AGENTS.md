@@ -92,6 +92,8 @@
 │  │  ├─ isolated-server.ts
 │  │  ├─ project-procedures/
 │  │  │  ├─ README.md
+│  │  │  ├─ command-normalization.test.ts
+│  │  │  ├─ command-normalization.ts
 │  │  │  ├─ codex-catalog.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts

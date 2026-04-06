@@ -17,6 +17,7 @@ import {
   normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
 } from "./codex-catalog";
+import { normalizeCommandDisplayText } from "./command-normalization";
 import { shortName } from "./shared";
 
 const LEGACY_THREAD_STOPPED_MESSAGE = "Codex turn was stopped by the user.";
@@ -301,7 +302,7 @@ function toRpcThreadMessage(message: ThreadMessageRecord): RpcThreadMessage {
         message.state === "stopped"
           ? message.state
           : "in_progress",
-      command: payload?.command ?? message.text,
+      command: normalizeCommandDisplayText(payload?.command ?? message.text),
       output: payload?.output ?? "",
       exitCode: typeof payload?.exitCode === "number" ? payload.exitCode : null,
       createdAt: message.createdAt,
