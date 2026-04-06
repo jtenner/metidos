@@ -26,7 +26,7 @@ Read this file before any web research, then update it after each sweep so the b
 ## Current Research Priorities
 
 - Information hierarchy and visual structure in dense workspace pages
-- Responsive typographic hierarchy and component-level layout adaptation
+- Responsive typography and container-aware layout primitives for dense panes and cards
 - Loading, empty, and error feedback states
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
@@ -43,6 +43,8 @@ Read this file before any web research, then update it after each sweep so the b
 - Should the shell use a temporary drawer, a rail, or both when the left nav collapses?
 - How should focus restoration work after the collapsed navigation closes?
 - When should breadcrumbs or page titles carry orientation at smaller widths?
+- Which panes, cards, or dense content blocks should adopt container queries before viewport breakpoints?
+- Where should `text-wrap: balance` stay limited to short headings, and where should it stay off?
 - Which micro-interactions improve confidence without slowing expert users down?
 - Which motion effects are essential, and which should disappear under reduced motion?
 - Which search and filter controls should stay visible versus collapse into disclosure?
@@ -52,10 +54,7 @@ Read this file before any web research, then update it after each sweep so the b
 - How many distinct heading or emphasis levels are useful before a dense page starts to feel noisy?
 - Should breadcrumb, page title, and section caption conventions be standardized across detail panes and mobile breakpoints?
 - When should visual structure rely on spacing and proximity instead of additional separators or ornament?
-- When should `text-wrap: balance` be the default for page titles, card headings, or both?
-- Which panes should use container queries instead of viewport breakpoints?
-- Where is `subgrid` worth the complexity for nested cards, tables, or form sections?
-- Which type and spacing tokens should use `clamp()` so they stay fluid but bounded?
+- Which hierarchy conventions belong in semantic guidance versus layout-implementation guidance?
 
 ## Follow-Up Topics
 
@@ -71,12 +70,12 @@ Read this file before any web research, then update it after each sweep so the b
 - Reduced-motion defaults for state transitions and loading surfaces
 - Documentation structure patterns for keeping research notes tidy over time
 - `:user-invalid` fallback styling and support checks for post-interaction invalid states
-- Responsive typography and bounded scale systems for dense workspace pages
-- Container-aware layout and alignment patterns for panes, cards, and tables
+- Responsive typography and container-aware layout primitives
 - Short-heading balancing rules for scanable titles and captions
 
 ## Recent Research
 
+- [Responsive Typography and Container-Aware Layout](./research/2026-04-06-responsive-typography-and-container-aware-layout.md)
 - [Validation Timing and `:user-invalid` Styling](./research/2026-04-06-validation-timing-and-user-invalid-styling.md)
 - [Information Hierarchy and Visual Structure](./research/2026-04-06-information-hierarchy-and-visual-structure.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
@@ -99,6 +98,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Audits
 
+- [Front-end Tree Sweep: Responsive Layout Primitives Split](./audits/2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md)
 - [Front-end Tree Sweep: Validation Timing and `:user-invalid`](./audits/2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md)
 - [Front-end Tree Sweep: Feedback States Split](./audits/2026-04-06-front-end-tree-sweep-feedback-states.md)
 - [Front-end Tree Sweep Follow-up](./audits/2026-04-06-front-end-tree-sweep-followup.md)

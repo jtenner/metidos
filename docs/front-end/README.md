@@ -39,6 +39,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Responsive Typography and Container-Aware Layout](./research/2026-04-06-responsive-typography-and-container-aware-layout.md)
+- [Front-end Tree Sweep: Responsive Layout Primitives Split](./audits/2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md)
 - [Validation Timing and `:user-invalid` Styling](./research/2026-04-06-validation-timing-and-user-invalid-styling.md)
 - [Front-end Tree Sweep: Validation Timing and `:user-invalid`](./audits/2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md)
 - [Form Error Summary Focus Management](./research/2026-04-06-form-error-summary-focus-management.md)

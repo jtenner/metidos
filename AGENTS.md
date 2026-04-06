@@ -27,6 +27,7 @@
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-form-error-summary-focus.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-responsive-layout-primitives.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-target-size.md
 │  │  │  └─ README.md
@@ -44,6 +45,7 @@
 │  │     ├─ 2026-04-06-information-hierarchy-and-visual-structure.md
 │  │     ├─ 2026-04-06-motion-and-reduced-motion.md
 │  │     ├─ 2026-04-06-loading-empty-error-feedback-states.md
+│  │     ├─ 2026-04-06-responsive-typography-and-container-aware-layout.md
 │  │     ├─ 2026-04-06-search-filtering-and-progressive-disclosure.md
 │  │     ├─ 2026-04-06-responsive-shell-and-sidebar-collapse.md
 │  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md
