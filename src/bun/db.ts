@@ -25,6 +25,8 @@ export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
 /** Lazily-initialized singleton db handle for the process lifetime. */
 
 let appDatabase: Database | null = null;
+/** Default SQLite lock-retry timeout for write contention handling. */
+const SQL_BUSY_TIMEOUT_MS = 2500;
 
 type ProjectInput = {
   projectPath: string;
@@ -1094,6 +1096,7 @@ export function initAppDatabase(): Database {
 
   const db = new Database(dbPath);
   runStatement(db, "PRAGMA foreign_keys = ON");
+  runStatement(db, `PRAGMA busy_timeout = ${SQL_BUSY_TIMEOUT_MS}`);
   migrateDatabase(db);
   applyAppDatabasePermissions(dbPath);
   appDatabase = db;

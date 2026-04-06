@@ -431,6 +431,8 @@ const TASK_CACHE_REFRESH_CONCURRENCY = 1;
 const DIFF_LOAD_CONCURRENCY = 2;
 const WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS = 30_000;
 const TASK_WATCH_RETRY_DELAY_MS = 60_000;
+const JOLT_THREAD_START_METADATA_INSTRUCTION =
+  "Before you do anything, please update the jolt thread metadata by calling 'modify_thread'.";
 
 /**
  * Per-worktree command options, including an explicit refresh override.
@@ -2162,6 +2164,87 @@ function findKnownProjectWorktree(
 function getNow(): string {
   return new Date().toISOString();
 }
+
+const SQLITE_LOCK_RETRY_ATTEMPTS = 6;
+const SQLITE_LOCK_RETRY_BASE_DELAY_MS = 40;
+const SQLITE_LOCK_RETRY_MAX_DELAY_MS = 500;
+const SQLITE_LOCK_RETRY_JITTER_MS = 25;
+
+function isSqliteLockError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  const typedError = error as { code?: string | number };
+  if (typeof typedError.code === "string") {
+    if (
+      typedError.code === "SQLITE_BUSY" ||
+      typedError.code === "SQLITE_LOCKED"
+    ) {
+      return true;
+    }
+  }
+  if (typeof typedError.code === "number") {
+    if (typedError.code === 5 || typedError.code === 6) {
+      return true;
+    }
+  }
+
+  return (
+    message.includes("database is locked") ||
+    message.includes("database is busy")
+  );
+}
+
+function computeSqliteRetryDelayMs(attempt: number): number {
+  const cappedAttempt = Math.max(1, attempt);
+  const exponentialDelay = Math.min(
+    SQLITE_LOCK_RETRY_MAX_DELAY_MS,
+    SQLITE_LOCK_RETRY_BASE_DELAY_MS * 2 ** (cappedAttempt - 1),
+  );
+  const jitter = Math.floor(Math.random() * SQLITE_LOCK_RETRY_JITTER_MS);
+  return exponentialDelay + jitter;
+}
+
+async function waitForNextRetryDelay(delayMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, delayMs);
+  });
+}
+
+async function withSqliteRetry<T>(action: () => T | Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= SQLITE_LOCK_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      if (!isSqliteLockError(error) || attempt === SQLITE_LOCK_RETRY_ATTEMPTS) {
+        throw error;
+      }
+      await waitForNextRetryDelay(computeSqliteRetryDelayMs(attempt));
+    }
+  }
+
+  throw new Error("SQLite retry loop exhausted.");
+}
+
+function runImmediateSqliteTransaction<T>(action: () => T): T {
+  db.run("BEGIN IMMEDIATE");
+  try {
+    const result = action();
+    db.run("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      db.run("ROLLBACK");
+    } catch {
+      // Ignore rollback failures after transactional contention.
+    }
+    throw error;
+  }
+}
 /**
  * Performs refreshProjectPoll operation.
  * @param projectId - Project identifier.
@@ -2890,15 +2973,17 @@ async function createThreadRecord(
     forceRefresh: true,
   });
 
-  const thread = createThread(db, {
-    projectId: project.id,
-    worktreePath,
-    title: buildThreadTitle(worktree, worktreePath),
-    model,
-    reasoningEffort,
-    unsafeMode,
-    codexThreadId: null,
-  });
+  const thread = await withSqliteRetry(() =>
+    createThread(db, {
+      projectId: project.id,
+      worktreePath,
+      title: buildThreadTitle(worktree, worktreePath),
+      model,
+      reasoningEffort,
+      unsafeMode,
+      codexThreadId: null,
+    }),
+  );
   try {
     const codexThread = createManagedCodexThread(
       thread,
@@ -3480,14 +3565,15 @@ export async function runCronNowProcedure(
     throw new Error("Cannot run a disabled cron job.");
   }
 
-  const didQueue = runCronNowInScheduler(cronJob.id);
-  if (!didQueue) {
-    throw new Error("Cron scheduler is not available.");
+  const threadId = await runCronNowInScheduler(cronJob.id);
+  if (threadId === null) {
+    throw new Error("Cron job could not be started at this time.");
   }
 
   return {
     success: true,
     cronJobId: cronJob.id,
+    threadId,
   };
 }
 
@@ -3566,16 +3652,27 @@ async function queueThreadMessage(
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error("Thread is already processing a message.");
   }
+  const startedAt = getNow();
+  let threadedPrompt = input;
+  await withSqliteRetry(() => {
+    return runImmediateSqliteTransaction(() => {
+      const isFirstTurn =
+        listThreadMessagesPage(db, thread.id, { limit: 1 }).messages.length ===
+        0;
+      threadedPrompt = isFirstTurn
+        ? `${JOLT_THREAD_START_METADATA_INSTRUCTION}\n\n${input}`
+        : input;
 
-  markThreadErrorSeen(db, thread.id);
-  createThreadMessage(db, {
-    threadId: thread.id,
-    role: "user",
-    text: input,
+      markThreadErrorSeen(db, thread.id);
+      createThreadMessage(db, {
+        threadId: thread.id,
+        role: "user",
+        text: input,
+      });
+      markThreadRunStarted(db, thread.id, startedAt);
+    });
   });
 
-  const startedAt = getNow();
-  markThreadRunStarted(db, thread.id, startedAt);
   const controller = new AbortController();
   threadTurnAbortControllerMap.set(thread.id, controller);
   setThreadRunStatus(thread.id, {
@@ -3588,7 +3685,7 @@ async function queueThreadMessage(
 
   const completion = runThreadMessageInBackground(
     thread.id,
-    input,
+    threadedPrompt,
     startedAt,
     controller,
     sessionId,
@@ -3680,10 +3777,14 @@ async function queuePackageScriptTask(
     throw new Error("Thread is already processing a message.");
   }
 
-  markThreadErrorSeen(db, thread.id);
-
   const startedAt = getNow();
-  markThreadRunStarted(db, thread.id, startedAt);
+  await withSqliteRetry(() => {
+    return runImmediateSqliteTransaction(() => {
+      markThreadErrorSeen(db, thread.id);
+      markThreadRunStarted(db, thread.id, startedAt);
+    });
+  });
+
   const controller = new AbortController();
   threadTurnAbortControllerMap.set(thread.id, controller);
   setThreadRunStatus(thread.id, {

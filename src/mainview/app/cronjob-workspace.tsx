@@ -169,7 +169,7 @@ export function CronjobWorkspace({
                   onRunCron(cronJob.id);
                 }}
               >
-                {runningCronJobs.has(cronJob.id) ? "Running…" : "Run"}
+                {runningCronJobs.has(cronJob.id) ? "Running…" : "Run now"}
               </button>
             </div>
           </div>

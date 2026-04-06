@@ -681,6 +681,7 @@ export type AppRPCSchema = {
       response: {
         success: boolean;
         cronJobId: number;
+        threadId: number;
       };
     };
     getThread: {

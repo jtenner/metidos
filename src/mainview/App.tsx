@@ -5046,7 +5046,12 @@ export default function App({
         setCronJobsError("");
 
         try {
-          await procedures.runCronNow({ cronJobId });
+          const result = await procedures.runCronNow({ cronJobId });
+          if (!result.success) {
+            throw new Error(`Cron job ${cronJobId} did not start.`);
+          }
+          setPrimaryView("chat");
+          await openThread(result.threadId);
           await loadCronJobs();
         } catch (error) {
           setCronJobsError(
@@ -5064,7 +5069,7 @@ export default function App({
         }
       })();
     },
-    [loadCronJobs, procedures],
+    [loadCronJobs, openThread, procedures],
   );
 
   const refreshCronJobsForDescribeCron = useCallback(async () => {

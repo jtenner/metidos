@@ -3,15 +3,15 @@
  * @description Cron job execution logic used by in-process Bun.cron callbacks.
  */
 
+import { Database } from "bun:sqlite";
 import {
   type CronJobRecord,
   type CronJobRunStatus,
   claimCronJobForScheduledRunById,
   claimCronJobsForScheduledRun,
-  closeAppDatabase,
   createCronJobRun,
+  getAppDatabasePath,
   getThreadById,
-  initAppDatabase,
   updateCronJobLastRun,
   updateCronJobRunStatus,
 } from "./db";
@@ -26,6 +26,14 @@ import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 const THREAD_POLL_INTERVAL_MS = 500;
 /** Maximum elapsed time allowed for one cron invocation before marking it errored. */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
+const SQL_BUSY_TIMEOUT_MS = 2500;
+
+function openCronDatabase(): Database {
+  const database = new Database(getAppDatabasePath());
+  database.run("PRAGMA foreign_keys = ON");
+  database.run(`PRAGMA busy_timeout = ${SQL_BUSY_TIMEOUT_MS}`);
+  return database;
+}
 
 /**
  * Parse thread timestamp strings returned by DB columns.
@@ -46,7 +54,7 @@ function parseThreadDate(value: string | null): number | null {
  */
 async function waitForThreadRunCompletion(
   threadId: number,
-  database: ReturnType<typeof initAppDatabase>,
+  database: Database,
   runStartedAt: string | null,
   deadlineMs: number,
 ): Promise<CronJobRunStatus> {
@@ -88,13 +96,51 @@ async function waitForThreadRunCompletion(
 }
 
 /**
+ * Launches background completion tracking for a single cron run row.
+ */
+async function monitorCronJobRun(
+  cronJobId: number,
+  runId: number,
+  threadId: number,
+  runStartedAt: string | null,
+  scheduledTime: number,
+): Promise<void> {
+  const database = openCronDatabase();
+  try {
+    const status = await waitForThreadRunCompletion(
+      threadId,
+      database,
+      runStartedAt,
+      Date.now() + RUN_TIMEOUT_MS,
+    );
+    updateCronJobRunStatus(database, runId, status);
+    updateCronJobLastRun(database, cronJobId, scheduledTime, status);
+  } catch (error) {
+    const status = "Errored" as const;
+    updateCronJobRunStatus(database, runId, status);
+    updateCronJobLastRun(database, cronJobId, scheduledTime, status);
+    console.error(
+      `Cron job ${cronJobId} failed while waiting for thread ${threadId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  } finally {
+    database.close(false);
+  }
+}
+
+type CronJobExecution = {
+  runId: number;
+  threadId: number;
+  runStartedAt: string | null;
+};
+
+/**
  * Create the cron job run record and execute the cron prompt in a child thread.
  */
 async function executeCronJob(
-  database: ReturnType<typeof initAppDatabase>,
+  database: Database,
   cronJob: CronJobRecord,
   scheduledTime: number,
-): Promise<CronJobRunStatus> {
+): Promise<CronJobExecution | null> {
   const cronJobId = cronJob.id;
   let runId: number | null = null;
 
@@ -121,15 +167,18 @@ async function executeCronJob(
       threadId,
       input: cronJob.prompt,
     });
-    const status = await waitForThreadRunCompletion(
+    void monitorCronJobRun(
+      cronJobId,
+      run.id,
       threadId,
-      database,
       execution.thread.runStatus.startedAt,
-      Date.now() + RUN_TIMEOUT_MS,
+      scheduledTime,
     );
-    updateCronJobRunStatus(database, run.id, status);
-    updateCronJobLastRun(database, cronJobId, scheduledTime, status);
-    return status;
+    return {
+      runId,
+      threadId,
+      runStartedAt: execution.thread.runStatus.startedAt,
+    };
   } catch (error) {
     const status = "Errored" as const;
     if (runId) {
@@ -139,7 +188,7 @@ async function executeCronJob(
     console.error(
       `Cron job ${cronJobId} failed with error: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return status;
+    return null;
   }
 }
 
@@ -150,7 +199,7 @@ export async function runDueCronJobs(
   schedule: string,
   scheduledTime: number,
 ): Promise<void> {
-  const database = initAppDatabase();
+  const database = openCronDatabase();
   try {
     const jobs = claimCronJobsForScheduledRun(
       database,
@@ -165,7 +214,7 @@ export async function runDueCronJobs(
       await executeCronJob(database, job, scheduledTime);
     }
   } finally {
-    closeAppDatabase();
+    database.close(false);
   }
 }
 
@@ -175,8 +224,8 @@ export async function runDueCronJobs(
 export async function runCronJobById(
   cronJobId: number,
   scheduledTime: number,
-): Promise<void> {
-  const database = initAppDatabase();
+): Promise<number | null> {
+  const database = openCronDatabase();
   try {
     const jobs = claimCronJobForScheduledRunById(
       database,
@@ -184,13 +233,18 @@ export async function runCronJobById(
       scheduledTime,
     );
     if (!jobs.length) {
-      return;
+      return null;
     }
+    let runThreadId: number | null = null;
 
     for (const job of jobs) {
-      await executeCronJob(database, job, scheduledTime);
+      const execution = await executeCronJob(database, job, scheduledTime);
+      if (runThreadId === null && execution !== null) {
+        runThreadId = execution.threadId;
+      }
     }
+    return runThreadId;
   } finally {
-    closeAppDatabase();
+    database.close(false);
   }
 }

@@ -23,6 +23,39 @@ import {
 
 const DEFAULT_PUBLIC_PORT = "7599";
 const isolatedServerLogger = createSubsystemLogger("Web Server");
+const TASK_EXIT_CODE_OFFSET = 128;
+const EXIT_SIGNAL_CODES: Record<number, string> = {
+  1: "SIGHUP",
+  2: "SIGINT",
+  3: "SIGQUIT",
+  4: "SIGILL",
+  5: "SIGTRAP",
+  6: "SIGABRT",
+  7: "SIGBUS",
+  8: "SIGFPE",
+  9: "SIGKILL",
+  10: "SIGUSR1",
+  11: "SIGSEGV",
+  12: "SIGUSR2",
+  13: "SIGPIPE",
+  14: "SIGALRM",
+  15: "SIGTERM",
+  16: "SIGCHLD",
+  17: "SIGCONT",
+  18: "SIGSTOP",
+  19: "SIGTSTP",
+  20: "SIGTTIN",
+  21: "SIGTTOU",
+  22: "SIGURG",
+  23: "SIGXCPU",
+  24: "SIGXFSZ",
+  25: "SIGVTALRM",
+  26: "SIGPROF",
+  27: "SIGWINCH",
+  28: "SIGIO",
+  29: "SIGPWR",
+  30: "SIGSYS",
+};
 
 /**
  * Process role names that this launcher can start.
@@ -92,25 +125,99 @@ function resolvePort(
 }
 
 /**
- * Spawn one side of the isolated server with inherited stdio and merged env.
+ * Spawn one side of the isolated server with captured stdio streams and merged env.
  * Environment from this process is inherited, then role-specific settings override.
  */
+
+function signalNameFromExitCode(exitCode: number): string | null {
+  return exitCode >= TASK_EXIT_CODE_OFFSET && exitCode <= 255
+    ? (EXIT_SIGNAL_CODES[exitCode - TASK_EXIT_CODE_OFFSET] ?? null)
+    : null;
+}
+
+function logChildOutputLine(
+  role: ChildRole,
+  source: "stdout" | "stderr",
+  line: string,
+): void {
+  if (!line.trim()) {
+    return;
+  }
+  const message = `[${role}] ${source}: ${line}`;
+  if (source === "stderr") {
+    isolatedServerLogger.error(message);
+  } else {
+    isolatedServerLogger.info(message);
+  }
+}
+
+async function pipeStreamToLogger(
+  role: ChildRole,
+  source: "stdout" | "stderr",
+  stream: ReadableStream<Uint8Array> | null,
+): Promise<void> {
+  if (stream === null) {
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  const reader = stream.getReader();
+  let buffered = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value || value.byteLength === 0) {
+        continue;
+      }
+
+      buffered += decoder.decode(value, { stream: true });
+      const lines = buffered.split("\n");
+      buffered = lines.pop() ?? "";
+      for (const line of lines) {
+        logChildOutputLine(role, source, line);
+      }
+    }
+
+    buffered += decoder.decode();
+    if (buffered.trim()) {
+      logChildOutputLine(role, source, buffered);
+    }
+  } catch (error) {
+    isolatedServerLogger.error(
+      error instanceof Error
+        ? `Failed reading ${role} ${source}: ${error.message}`
+        : `Failed reading ${role} ${source}`,
+    );
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 function spawnRole(
   _role: ChildRole,
   args: string[],
   env: Record<string, string>,
-): Bun.Subprocess<"inherit", "inherit", "inherit"> {
-  return Bun.spawn({
+): Bun.Subprocess<"pipe", "pipe", "pipe"> {
+  const child = Bun.spawn({
     cmd: [process.execPath, "run", ...args],
     env: {
       ...process.env,
       ...env,
     },
-    stderr: "inherit",
+    stderr: "pipe",
     stdin: "inherit",
-    stdout: "inherit",
+    stdout: "pipe",
   });
+
+  void pipeStreamToLogger(_role, "stdout", child.stdout);
+  void pipeStreamToLogger(_role, "stderr", child.stderr);
+  isolatedServerLogger.info(
+    `Launched ${_role} child ${child.pid} (${args[0]}).`,
+  );
+  return child;
 }
 
 /**
@@ -209,7 +316,9 @@ let shuttingDown = false;
  */
 
 function stopChild(
-  child: Bun.Subprocess<"inherit", "inherit", "inherit">,
+  child:
+    | Bun.Subprocess<"inherit", "inherit", "inherit">
+    | Bun.Subprocess<"pipe", "pipe", "pipe">,
 ): void {
   try {
     child.kill();
@@ -278,8 +387,12 @@ const exitedProcess = await Promise.race([
 ]);
 
 if (!shuttingDown) {
+  const signalName = signalNameFromExitCode(exitedProcess.code);
+  const exitDescription = signalName
+    ? `code ${exitedProcess.code} (${signalName})`
+    : `code ${exitedProcess.code}`;
   isolatedServerLogger.error(
-    `Jolt isolated server child "${exitedProcess.role}" exited with code ${exitedProcess.code}.`,
+    `Jolt isolated server child "${exitedProcess.role}" exited with ${exitDescription}.`,
   );
   await shutdownAndExit(exitedProcess.code === 0 ? 1 : exitedProcess.code);
 }

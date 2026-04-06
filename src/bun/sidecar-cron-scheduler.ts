@@ -165,19 +165,9 @@ export function syncCronSchedulerCron(cronJobId: number): void {
 }
 
 /**
- * Ask the scheduler worker to execute a specific cron job now.
+ * Start a specific cron job immediately and return the created thread identifier.
  */
-export function runCronNow(cronJobId: number): boolean {
-  if (!schedulerWorker) {
-    logger.warning(
-      "Cron scheduler worker unavailable; cannot run cron job now.",
-    );
-    return false;
-  }
-
-  notifySchedulerWorker({
-    type: "run",
-    cronJobId,
-  });
-  return true;
+export async function runCronNow(cronJobId: number): Promise<number | null> {
+  const { runCronJobById } = await import("./sidecar-cron-runner");
+  return runCronJobById(cronJobId, Date.now());
 }
