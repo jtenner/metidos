@@ -21,6 +21,7 @@ export type AppIconName =
   | "code"
   | "delete"
   | "difference"
+  | "description"
   | "expand_less"
   | "expand_more"
   | "folder"
@@ -124,6 +125,16 @@ function renderIconGlyph(
         <>
           <rect x="5" y="5" width="8" height="8" rx="1.5" />
           <rect x="11" y="11" width="8" height="8" rx="1.5" />
+        </>
+      );
+    case "description":
+      return (
+        <>
+          <path d="M6.5 4.5h7l4 4V19.5a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z" />
+          <path d="M13.5 4.5V9h4.5" />
+          <path d="M8 12h8" />
+          <path d="M8 15h8" />
+          <path d="M8 18h5" />
         </>
       );
     case "expand_less":

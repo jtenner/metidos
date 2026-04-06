@@ -624,8 +624,15 @@ const DesktopTranscriptGroupRow = memo(function DesktopTranscriptGroupRow({
                     }`}
                     key={message.key}
                   >
-                    <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
-                      {renderAssistantMessageContent(message)}
+                    <div className="space-y-2">
+                      <div className="min-w-0 max-w-full text-sm leading-relaxed text-[#ffffff]">
+                        {renderAssistantMessageContent(message)}
+                      </div>
+                      {isPlainAssistantTextMessage(message) ? (
+                        <AssistantMessageCopyButton
+                          text={message.kind === "chat" ? message.text : ""}
+                        />
+                      ) : null}
                     </div>
                   </div>
                 ) : null,
@@ -691,8 +698,13 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
                     className="w-full bg-[#262a2d] px-[10px] py-[10px]"
                     key={message.key}
                   >
-                    <div className="text-sm leading-relaxed text-[#ffffff]">
-                      {renderAssistantMessageContent(message)}
+                    <div className="space-y-2">
+                      <div className="text-sm leading-relaxed text-[#ffffff]">
+                        {renderAssistantMessageContent(message)}
+                      </div>
+                      <AssistantMessageCopyButton
+                        text={message.kind === "chat" ? message.text : ""}
+                      />
                     </div>
                   </div>
                 );
@@ -724,6 +736,116 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
     </div>
   );
 }, areGroupRowPropsEqual);
+
+function AssistantMessageCopyButton({ text }: { text: string }): JSX.Element {
+  const [showCopied, setShowCopied] = useState(false);
+  const [isCopyPopoverFading, setIsCopyPopoverFading] = useState(false);
+  const hideCopiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const fadeCopiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const clearCopyStateTimeouts = useCallback((): void => {
+    if (hideCopiedTimeoutRef.current !== null) {
+      clearTimeout(hideCopiedTimeoutRef.current);
+      hideCopiedTimeoutRef.current = null;
+    }
+    if (fadeCopiedTimeoutRef.current !== null) {
+      clearTimeout(fadeCopiedTimeoutRef.current);
+      fadeCopiedTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearCopyStateTimeouts();
+    };
+  }, [clearCopyStateTimeouts]);
+
+  const payload = text.trim();
+
+  const onCopy = (): void => {
+    if (!payload) {
+      return;
+    }
+    copyTextToClipboard(payload);
+    clearCopyStateTimeouts();
+    setIsCopyPopoverFading(false);
+    setShowCopied(true);
+    hideCopiedTimeoutRef.current = setTimeout(() => {
+      setIsCopyPopoverFading(true);
+    }, 1400);
+    fadeCopiedTimeoutRef.current = setTimeout(() => {
+      setShowCopied(false);
+      setIsCopyPopoverFading(false);
+    }, 1845);
+  };
+
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        aria-label="Copy assistant message"
+        className="inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]"
+        onClick={onCopy}
+        title="Copy this message"
+        type="button"
+      >
+        {materialSymbol("description", "text-[12px] leading-none")}
+        <span>Copy</span>
+      </button>
+      {showCopied ? (
+        <span
+          className={`pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] whitespace-nowrap text-[#9fd0f2] transition-opacity duration-450 ${
+            isCopyPopoverFading ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          Message copied.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function copyTextToClipboard(text: string): void {
+  const payload = text.trim();
+  if (!payload) {
+    return;
+  }
+
+  const fallbackCopy = (): boolean => {
+    if (typeof document === "undefined") {
+      return false;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = payload;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "-9999px";
+    textarea.style.width = "1px";
+    textarea.style.height = "1px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return copied;
+  };
+
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    navigator.clipboard.writeText
+  ) {
+    void navigator.clipboard.writeText(payload).catch(() => {
+      fallbackCopy();
+    });
+    return;
+  }
+
+  fallbackCopy();
+}
 
 const ChatTranscript = memo(function ChatTranscript({
   activeThreadId,
