@@ -14,6 +14,24 @@ import {
 } from "./state";
 import { useThreadPreviews } from "./use-thread-previews";
 
+const THREAD_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+/**
+ * Formats a thread timestamp for row subtitles and accessibility labels.
+ * @param value - Timestamp string from the thread record.
+ */
+function formatThreadTimestamp(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return "Unknown";
+  }
+
+  return THREAD_TIMESTAMP_FORMATTER.format(timestamp);
+}
+
 export type SharedThreadListProps = {
   /** Ack callback for clearing "unread error" thread state when opened in background. */
   acknowledgeThreadErrorSeenInBackground: (threadId: number) => void;
@@ -280,6 +298,7 @@ const ThreadListRow = memo(function ThreadListRow({
     hasUnreadError || hasRunError || hasRunStopped
       ? (thread.runStatus.error ?? "")
       : "";
+  const threadTimestampLabel = formatThreadTimestamp(thread.updatedAt);
   const threadAriaLabel = [
     thread.title,
     threadPinned ? "Pinned." : null,
@@ -294,6 +313,7 @@ const ThreadListRow = memo(function ThreadListRow({
             : hasCompletedActivity
               ? "Completed."
               : null,
+    `Updated ${threadTimestampLabel}.`,
     `Branch ${threadBranchName}.`,
     `Worktree ${threadWorktreeDisplayPath}.`,
   ]
@@ -339,11 +359,22 @@ const ThreadListRow = memo(function ThreadListRow({
   );
   const secondaryLabel = (
     <>
-      {threadStatusLabel ? <>{threadStatusLabel} · </> : null}
-      {showLocation ? (
+      <span className="text-[#7d8992]">{threadTimestampLabel}</span>
+      {threadStatusLabel || showLocation ? (
         <>
-          {threadProject?.name ? <>{threadProject.name} · </> : null}
-          {branchLabel}
+          <span className="text-[#66737c]"> · </span>
+          <span className="text-[#88939b]">
+            {threadStatusLabel}
+            {threadStatusLabel && showLocation ? (
+              <span className="text-[#66737c]"> · </span>
+            ) : null}
+            {showLocation ? (
+              <>
+                {threadProject?.name ? <>{threadProject.name} · </> : null}
+                {branchLabel}
+              </>
+            ) : null}
+          </span>
         </>
       ) : null}
     </>
@@ -407,11 +438,9 @@ const ThreadListRow = memo(function ThreadListRow({
           <div className="truncate text-[14px] font-medium leading-4">
             {thread.title}
           </div>
-          {threadStatusLabel || showLocation ? (
-            <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
-              {secondaryLabel}
-            </div>
-          ) : null}
+          <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
+            {secondaryLabel}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 pl-2">
           {threadPinned ? (
