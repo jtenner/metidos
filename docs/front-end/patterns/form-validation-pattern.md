@@ -23,7 +23,7 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 ## Validation Behavior
 
 - Validate on submission by default.
-- Prefer blur-time validation only for fields with simple local rules that benefit from early feedback.
+- Prefer blur-time validation only for fields with simple local rules that benefit from early feedback; see [Validation Timing and `:user-invalid` Styling](../research/2026-04-06-validation-timing-and-user-invalid-styling.md).
 - For submit-time validation, keep the user's entered values in place.
 - Show inline error text next to the field and an error summary when there are multiple problems or the first error may be offscreen.
 - Keep the summary copy identical to the inline field copy and link each summary item to its field.
@@ -33,6 +33,7 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 - Use `role="status"` for non-urgent confirmations or progress updates.
 - When custom validation is in charge, prefer a single announcement path instead of mixing native browser messages with custom summaries.
 - Do not mark empty required fields invalid before the user tries to submit the form.
+- Use `:user-invalid` as a style-only progressive enhancement after interaction, and keep a fallback class if the styling must be consistent across browsers.
 
 ## Controls
 
@@ -56,4 +57,5 @@ Use this pattern for dialogs, side panels, inline editors, and full-page forms t
 
 - [Accessible Forms, Controls, and Affordances](../research/2026-04-06-accessible-forms-controls-and-affordances.md)
 - [Form Error Summary Focus Management](../research/2026-04-06-form-error-summary-focus-management.md)
+- [Validation Timing and `:user-invalid` Styling](../research/2026-04-06-validation-timing-and-user-invalid-styling.md)
 - [Loading, Empty, and Error Feedback States](../research/2026-04-06-loading-empty-error-feedback-states.md)

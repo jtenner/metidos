@@ -47,7 +47,7 @@ When a form fails validation, the current guidance favors a top-of-surface error
 - Use custom validation UI consistently if the form owns its own messaging; do not mix browser bubbles with a custom summary.
 - Use `role="alert"` for dynamically inserted, urgent error content, and keep routine progress or confirmation messages in `status` regions instead.
 - Keep `aria-busy` limited to areas that are genuinely still changing.
-- Use `:user-invalid` as a style-only progressive enhancement for post-interaction invalid states where browser support is sufficient, but do not rely on CSS alone for semantics.
+- Use `:user-invalid` as a style-only progressive enhancement for post-interaction invalid states where browser support is sufficient, but do not rely on CSS alone for semantics. See the dedicated validation-timing note for the submit-first default and blur-time exceptions.
 
 ## Related Patterns
 
@@ -58,4 +58,4 @@ When a form fails validation, the current guidance favors a top-of-surface error
 
 - Compare the app’s current failed-submit behavior against the summary-or-first-field rule here.
 - Check whether any custom validation surface still depends on native browser bubbles instead of a single summary-and-inline pattern.
-- Decide whether `:user-invalid` should become a standard styling hook for this repo.
+- Confirm that any `:user-invalid` styling has a fallback for browsers or component surfaces that need broader support.

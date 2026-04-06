@@ -27,6 +27,7 @@
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-form-error-summary-focus.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-target-size.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
@@ -46,6 +47,7 @@
 │  │     ├─ 2026-04-06-search-filtering-and-progressive-disclosure.md
 │  │     ├─ 2026-04-06-responsive-shell-and-sidebar-collapse.md
 │  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md
+│  │     ├─ 2026-04-06-validation-timing-and-user-invalid-styling.md
 │  │     └─ README.md
 │  ├─ 2026-04-04-frontend-feedback-inventory.md
 │  ├─ 2026-04-04-frontend-performance-inventory.md

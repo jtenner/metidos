@@ -47,11 +47,11 @@ Read this file before any web research, then update it after each sweep so the b
 - Which motion effects are essential, and which should disappear under reduced motion?
 - Which search and filter controls should stay visible versus collapse into disclosure?
 - How should selected filters and counts stay visible when the filter UI is collapsed?
+- Which shared form controls need a fallback class alongside `:user-invalid`?
 - How should this repo distinguish between design principles, pattern notes, and implementation-ready guidance?
 - How many distinct heading or emphasis levels are useful before a dense page starts to feel noisy?
 - Should breadcrumb, page title, and section caption conventions be standardized across detail panes and mobile breakpoints?
 - When should visual structure rely on spacing and proximity instead of additional separators or ornament?
-- Should `:user-invalid` become a standard styling hook for post-interaction invalid states?
 - When should `text-wrap: balance` be the default for page titles, card headings, or both?
 - Which panes should use container queries instead of viewport breakpoints?
 - Where is `subgrid` worth the complexity for nested cards, tables, or form sections?
@@ -59,7 +59,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Follow-Up Topics
 
-- Blur-time versus submit-time validation timing
+- Validation timing exceptions for deterministic field-level checks
 - Accessible labels, grouping, and affordance rules for custom controls
 - Target-size defaults and spacing exceptions for dense toolbars and icon actions
 - Feedback-state defaults for loading, empty, success, and error surfaces
@@ -70,13 +70,14 @@ Read this file before any web research, then update it after each sweep so the b
 - Search and filtering patterns for dense workspaces
 - Reduced-motion defaults for state transitions and loading surfaces
 - Documentation structure patterns for keeping research notes tidy over time
-- `:user-invalid` styling hooks for post-interaction invalid states
+- `:user-invalid` fallback styling and support checks for post-interaction invalid states
 - Responsive typography and bounded scale systems for dense workspace pages
 - Container-aware layout and alignment patterns for panes, cards, and tables
 - Short-heading balancing rules for scanable titles and captions
 
 ## Recent Research
 
+- [Validation Timing and `:user-invalid` Styling](./research/2026-04-06-validation-timing-and-user-invalid-styling.md)
 - [Information Hierarchy and Visual Structure](./research/2026-04-06-information-hierarchy-and-visual-structure.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
 - [Accessible Forms, Controls, and Affordances](./research/2026-04-06-accessible-forms-controls-and-affordances.md)
@@ -98,6 +99,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Audits
 
+- [Front-end Tree Sweep: Validation Timing and `:user-invalid`](./audits/2026-04-06-front-end-tree-sweep-validation-timing-user-invalid.md)
 - [Front-end Tree Sweep: Feedback States Split](./audits/2026-04-06-front-end-tree-sweep-feedback-states.md)
 - [Front-end Tree Sweep Follow-up](./audits/2026-04-06-front-end-tree-sweep-followup.md)
 - [Front-end Tree Sweep: Form Error Summary Focus](./audits/2026-04-06-front-end-tree-sweep-form-error-summary-focus.md)

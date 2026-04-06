@@ -2,7 +2,7 @@
 
 Date: 2026-04-06
 
-This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive. The current validation guidance is to validate on submission by default, keep native labels and descriptions visible, and pair inline field messages with the dedicated form-error-summary guidance when a submission fails.
+This research pass focused on practical form design and control affordances for web apps: how to label fields clearly, group related inputs, report errors accessibly, and keep action controls obviously interactive. The current validation guidance is to validate on submission by default, keep native labels and descriptions visible, and pair inline field messages with the dedicated form-error-summary guidance when a submission fails. Validation timing and `:user-invalid` styling are covered in the dedicated validation note.
 
 ## Summary
 
@@ -69,7 +69,7 @@ The current best practice is still to rely on native HTML controls first, becaus
 - Group radios and checkboxes with `<fieldset>` and `<legend>` instead of visually faking a heading.
 - Keep help text and error text adjacent to the field they describe; use `aria-describedby` for helper text and `aria-errormessage` for the visible error text when the field is invalid.
 - Mark invalid controls clearly with `aria-invalid`, but only after validation has failed.
-- Validate on submission by default. Use blur-time validation only for local, deterministic rules that do not interrupt the user too early.
+- Validate on submission by default and see the dedicated validation note for blur-time exceptions and `:user-invalid` styling.
 - If the form uses custom validation UI, add `novalidate` so the browser’s native bubbles do not compete with the summary and inline messages.
 - Show an error summary at the top of the surface when a submission fails, especially when there is more than one error or the first error may be offscreen.
 - Keep the summary copy identical to the inline error copy, and link each summary item to its field.
