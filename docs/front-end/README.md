@@ -37,3 +37,8 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 - [Frontend Feedback Inventory](/home/jtenner/Projects/jt-ide/docs/2026-04-04-frontend-feedback-inventory.md)
 - [Frontend Performance Inventory](/home/jtenner/Projects/jt-ide/docs/2026-04-04-frontend-performance-inventory.md)
 
+## Recent Front-end Notes
+
+- [Dense Workspace Hierarchy, Navigation, and Feedback States](./research/2026-04-06-dense-workspace-hierarchy-navigation-feedback.md)
+- [Dense Workspace Shell Pattern](./patterns/dense-workspace-shell-pattern.md)
+- [Front-end Tree Sweep](./audits/2026-04-06-front-end-tree-sweep.md)
