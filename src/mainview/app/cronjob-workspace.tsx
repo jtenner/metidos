@@ -12,6 +12,7 @@ type CronjobWorkspaceProps = {
   cronJobs: RpcCronJob[];
   cronJobsError: string;
   isLoadingCronJobs: boolean;
+  onEditCron: (cronJob: RpcCronJob) => void;
   onRunCron: (cronJobId: number) => void;
   runningCronJobs: Set<number>;
 };
@@ -86,6 +87,7 @@ export function CronjobWorkspace({
   cronJobs,
   cronJobsError,
   isLoadingCronJobs,
+  onEditCron,
   onRunCron,
   runningCronJobs,
 }: CronjobWorkspaceProps): JSX.Element {
@@ -186,10 +188,19 @@ export function CronjobWorkspace({
                 <span>{cronJob.lastRunStatus}</span>
               </div>
             ) : null}
-            <div className="pt-1">
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
-                className="rounded border border-[#2c8e47] bg-[#1d6f35] px-3 py-1.5 text-[11px] font-label uppercase tracking-[0.14em] text-[#ebffee] transition-colors hover:bg-[#247b3f] hover:border-[#37a657] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded border border-[#39464f] bg-[#1a242b] px-3 py-1.5 text-[11px] font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
+                onClick={() => {
+                  onEditCron(cronJob);
+                }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="rounded border border-[#2c8e47] bg-[#1d6f35] px-3 py-1.5 text-[11px] font-label uppercase tracking-[0.14em] text-[#ebffee] transition-colors hover:border-[#37a657] hover:bg-[#247b3f] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={
                   runningCronJobs.has(cronJob.id) || cronJob.enabled !== 1
                 }

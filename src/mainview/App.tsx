@@ -599,6 +599,9 @@ export default function App({
   const [cronEditPrompt, setCronEditPrompt] = useState("");
   const [cronEditEnabled, setCronEditEnabled] = useState(true);
   const [cronEditUnsafeMode, setCronEditUnsafeMode] = useState(false);
+  const [cronEditingCronJobId, setCronEditingCronJobId] = useState<
+    number | null
+  >(null);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
   const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
@@ -5086,6 +5089,7 @@ export default function App({
   }, [loadCronJobs]);
 
   const resetCronCreatorFields = useCallback(() => {
+    setCronEditingCronJobId(null);
     setCronDescribePrompt("");
     setCronEditTitle("");
     setCronEditDescription("");
@@ -5115,9 +5119,26 @@ export default function App({
     [resetCronCreatorFields],
   );
 
+  const openCronEditor = useCallback((cronJob: RpcCronJob) => {
+    setCronCreatorMode("edit");
+    setCronEditingCronJobId(cronJob.id);
+    setCronDescribePrompt("");
+    setCronEditTitle(cronJob.title);
+    setCronEditDescription(cronJob.description);
+    setCronEditSchedule(cronJob.schedule);
+    setCronEditPrompt(cronJob.prompt);
+    setCronEditEnabled(cronJob.enabled === 1);
+    setCronEditUnsafeMode(cronJob.unsafeMode);
+    setCronCreatorModel(cronJob.model);
+    setCronCreatorReasoningEffort(cronJob.reasoningEffort);
+    setCronCreatorError("");
+    setCronCreatorOpen(true);
+  }, []);
+
   const closeCronCreator = useCallback(() => {
     setCronCreatorOpen(false);
     setCronCreatorError("");
+    setCronEditingCronJobId(null);
   }, []);
 
   const setCronCreatorReasoningEffortValue = useCallback(
@@ -5229,10 +5250,8 @@ export default function App({
   ]);
 
   const handleEditCronSubmit = useCallback(() => {
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      setCronCreatorError("Select a workspace before creating a cron job.");
-      return;
-    }
+    const updatingExistingCron =
+      cronCreatorMode === "edit" && cronEditingCronJobId !== null;
 
     const schedule = cronEditSchedule.trim();
     const prompt = cronEditPrompt.trim();
@@ -5258,20 +5277,39 @@ export default function App({
 
     void (async () => {
       try {
-        await procedures.newCron({
-          projectId: selectedProject.id,
-          worktreePath: activeSelectedWorktreePath,
-          schedule,
-          prompt,
-          ...(model ? { model } : {}),
-          reasoningEffort,
-          ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
-          ...(cronEditDescription.trim()
-            ? { description: cronEditDescription.trim() }
-            : {}),
-          unsafeMode: cronEditUnsafeMode,
-          enabled: cronEditEnabled,
-        });
+        if (updatingExistingCron) {
+          await procedures.updateCron({
+            cronJobId: cronEditingCronJobId,
+            schedule,
+            prompt,
+            ...(model ? { model } : {}),
+            reasoningEffort,
+            ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
+            ...(cronEditDescription.trim()
+              ? { description: cronEditDescription.trim() }
+              : {}),
+            unsafeMode: cronEditUnsafeMode,
+            enabled: cronEditEnabled,
+          });
+        } else {
+          if (!selectedProject || !activeSelectedWorktreePath) {
+            throw new Error("Select a workspace before creating a cron job.");
+          }
+          await procedures.newCron({
+            projectId: selectedProject.id,
+            worktreePath: activeSelectedWorktreePath,
+            schedule,
+            prompt,
+            ...(model ? { model } : {}),
+            reasoningEffort,
+            ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
+            ...(cronEditDescription.trim()
+              ? { description: cronEditDescription.trim() }
+              : {}),
+            unsafeMode: cronEditUnsafeMode,
+            enabled: cronEditEnabled,
+          });
+        }
         await loadCronJobs();
         closeCronCreator();
       } catch (error) {
@@ -5294,6 +5332,8 @@ export default function App({
     cronEditSchedule,
     cronEditTitle,
     cronEditUnsafeMode,
+    cronCreatorMode,
+    cronEditingCronJobId,
     defaultCodexModel,
     defaultCodexReasoningEffort,
     loadCronJobs,
@@ -5338,6 +5378,15 @@ export default function App({
   const cronCreatorModelValue = cronCreatorModel.trim()
     ? cronCreatorModel
     : activeCodexModel || defaultCodexModel || "";
+  const isEditingExistingCron =
+    cronCreatorMode === "edit" && cronEditingCronJobId !== null;
+  const cronCreatorSubmitLabel = isCreatingCronJob
+    ? isEditingExistingCron
+      ? "Updating…"
+      : "Creating…"
+    : isEditingExistingCron
+      ? "Update Cron"
+      : "Create Cron";
   const renderCronCreatorModelControls = (
     variant: "desktop" | "mobile",
   ): JSX.Element => (
@@ -5681,6 +5730,12 @@ export default function App({
                       </button>
                     </div>
 
+                    {isEditingExistingCron ? (
+                      <div className="mb-4 rounded border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
+                        Editing cron job #{cronEditingCronJobId}
+                      </div>
+                    ) : null}
+
                     {cronCreatorMode === "describe" ? (
                       <div className="space-y-3">
                         <label
@@ -5836,7 +5891,7 @@ export default function App({
                           handleEditCronSubmit();
                         }}
                       >
-                        {isCreatingCronJob ? "Creating…" : "OK"}
+                        {cronCreatorSubmitLabel}
                       </button>
                     </div>
                   </div>
@@ -5845,6 +5900,7 @@ export default function App({
                   cronJobs={cronJobs}
                   cronJobsError={cronJobsError}
                   isLoadingCronJobs={isLoadingCronJobs}
+                  onEditCron={openCronEditor}
                   onRunCron={handleRunCronNow}
                   runningCronJobs={runningCronJobs}
                 />
@@ -6116,6 +6172,12 @@ export default function App({
                     </button>
                   </div>
 
+                  {isEditingExistingCron ? (
+                    <div className="mb-4 rounded border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
+                      Editing cron job #{cronEditingCronJobId}
+                    </div>
+                  ) : null}
+
                   {cronCreatorMode === "describe" ? (
                     <div className="space-y-3">
                       <label
@@ -6271,7 +6333,7 @@ export default function App({
                         handleEditCronSubmit();
                       }}
                     >
-                      {isCreatingCronJob ? "Creating…" : "OK"}
+                      {cronCreatorSubmitLabel}
                     </button>
                   </div>
                 </div>
@@ -6280,6 +6342,7 @@ export default function App({
                 cronJobs={cronJobs}
                 cronJobsError={cronJobsError}
                 isLoadingCronJobs={isLoadingCronJobs}
+                onEditCron={openCronEditor}
                 onRunCron={handleRunCronNow}
                 runningCronJobs={runningCronJobs}
               />
