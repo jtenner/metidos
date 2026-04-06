@@ -184,7 +184,7 @@ export const WorkspacePanel = memo(function WorkspacePanel({
               aria-label={
                 canCreateThread
                   ? "Create thread for selected worktree"
-                  : "Select an open worktree first"
+                  : "Select a project and worktree first"
               }
               onMouseEnter={showCreateThreadPopover}
               onMouseLeave={deferHideCreateThreadPopover}

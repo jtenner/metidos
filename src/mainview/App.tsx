@@ -4338,8 +4338,7 @@ export default function App({
   const handleCreateThreadForActiveWorktree = useCallback(() => {
     if (
       !selectedProject ||
-      !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened
+      !activeSelectedWorktreePath
     ) {
       return;
     }
@@ -4348,7 +4347,6 @@ export default function App({
       activeSelectedWorktreePath,
     );
   }, [
-    activeSelectedWorktreeOpened,
     activeSelectedWorktreePath,
     createThreadForWorktree,
     selectedProject,
@@ -5141,11 +5139,8 @@ export default function App({
                             true,
                           )
                         : activeSelectedWorktreeFolder || "Current worktree",
-                    canCreateThread: Boolean(
-                      selectedProject &&
-                        activeSelectedWorktreePath &&
-                        activeSelectedWorktreeOpened,
-                    ),
+                    canCreateThread:
+                      selectedProject !== null && activeSelectedWorktreePath !== null,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     isThreadStatusDismissed,
@@ -5365,11 +5360,8 @@ export default function App({
                         true,
                       )
                     : activeSelectedWorktreeFolder || "Current worktree",
-                canCreateThread: Boolean(
-                  selectedProject &&
-                    activeSelectedWorktreePath &&
-                    activeSelectedWorktreeOpened,
-                ),
+                canCreateThread:
+                  selectedProject !== null && activeSelectedWorktreePath !== null,
                 clearCompletedThreadIndicator,
                 dismissThreadStatus,
                 isThreadStatusDismissed,
