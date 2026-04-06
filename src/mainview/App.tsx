@@ -21,6 +21,7 @@ import type {
   RpcCodexReasoningEffortOption,
   RpcContextFocusChanged,
   RpcGitHistoryEntry,
+  RpcCronJob,
   RpcProject,
   RpcProjectTask,
   RpcRequestPriority,
@@ -39,6 +40,7 @@ import { AuthStepUpDialog } from "./app/auth-step-up-dialog";
 import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
 import { DiffWorkspace } from "./app/diff-workspace";
+import { CronjobWorkspace } from "./app/cronjob-workspace";
 import {
   subscribeToWorktreeGitHistoryChanged,
   subscribeToWorktreeTasksChanged,
@@ -331,7 +333,7 @@ const WORKTREE_THREAD_POPOVER_DESKTOP_WIDTH_PX = 360;
 const WORKTREE_THREAD_POPOVER_MOBILE_WIDTH_PX = 320;
 const WORKTREE_THREAD_POPOVER_ESTIMATED_HEIGHT_PX = 420;
 const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
-type PrimaryView = "chat" | "diff";
+type PrimaryView = "chat" | "diff" | "cronjobs";
 type WorktreeThreadPopoverState = {
   maxHeight: number;
   width: number;
@@ -575,6 +577,9 @@ export default function App({
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [isApprovingThreadStartRequest, setIsApprovingThreadStartRequest] =
     useState(false);
+  const [cronJobs, setCronJobs] = useState<RpcCronJob[]>([]);
+  const [cronJobsError, setCronJobsError] = useState("");
+  const [isLoadingCronJobs, setIsLoadingCronJobs] = useState(false);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
   const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
@@ -764,6 +769,8 @@ export default function App({
   const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
     null,
   );
+  const cronJobsRequestIdRef = useRef(0);
+  const cronJobsAbortControllerRef = useRef<AbortController | null>(null);
   // Request/caching refs below track in-flight RPCs by key so refreshes can be
   // shared, cancelled, or ignored without extra state transitions.
   const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
@@ -1853,6 +1860,60 @@ export default function App({
       loadMoreController.abort(createAbortError(null, reason));
     }
   }, []);
+
+  const abortCronJobsRequest = useCallback((reason: string) => {
+    const controller = cronJobsAbortControllerRef.current;
+    if (!controller) {
+      return;
+    }
+
+    cronJobsAbortControllerRef.current = null;
+    controller.abort(createAbortError(null, reason));
+  }, []);
+
+  const loadCronJobs = useCallback(async (): Promise<void> => {
+    if (isLoadingCronJobs) {
+      return;
+    }
+
+    const requestId = ++cronJobsRequestIdRef.current;
+    abortCronJobsRequest("Cron job request was superseded.");
+    const controller = new AbortController();
+    cronJobsAbortControllerRef.current = controller;
+    setIsLoadingCronJobs(true);
+    setCronJobsError("");
+
+    try {
+      const result = await procedures.listCrons(undefined, {
+        priority: "foreground",
+        signal: controller.signal,
+      });
+      if (cronJobsRequestIdRef.current !== requestId) {
+        return;
+      }
+      setCronJobs(result);
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+      if (cronJobsRequestIdRef.current !== requestId) {
+        return;
+      }
+      setCronJobs([]);
+      setCronJobsError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (cronJobsAbortControllerRef.current === controller) {
+        cronJobsAbortControllerRef.current = null;
+      }
+      if (cronJobsRequestIdRef.current === requestId) {
+        setIsLoadingCronJobs(false);
+      }
+    }
+  }, [abortCronJobsRequest, isLoadingCronJobs, procedures]);
+
+  const primeCronJobs = useCallback(() => {
+    void loadCronJobs();
+  }, [loadCronJobs]);
 
   const abortThreadOpenRequest = useCallback((reason: string) => {
     const controller = threadOpenAbortControllerRef.current;
@@ -4134,8 +4195,9 @@ export default function App({
     return () => {
       abortProjectTasksRequest("Project task request was canceled.");
       abortGitHistoryRequests("Git history request was canceled.");
+      abortCronJobsRequest("Cron job request was canceled.");
     };
-  }, [abortGitHistoryRequests, abortProjectTasksRequest]);
+  }, [abortCronJobsRequest, abortGitHistoryRequests, abortProjectTasksRequest]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
@@ -4946,6 +5008,11 @@ export default function App({
     void refreshActiveWorktreeSnapshot();
   }, [refreshActiveWorktreeSnapshot]);
 
+  const handleShowCronjobs = useCallback(() => {
+    setPrimaryView("cronjobs");
+    primeCronJobs();
+  }, [primeCronJobs]);
+
   const handleNewWorktreeNameChange = useCallback((value: string) => {
     setProjectActionMenuError("");
     setNewWorktreeName(value);
@@ -5008,6 +5075,20 @@ export default function App({
                 }}
               >
                 Diff
+              </button>
+              <button
+                type="button"
+                className={`font-label text-xs uppercase tracking-wider pb-1 transition-colors duration-200 ${
+                  primaryView === "cronjobs"
+                    ? "border-b-2 border-[#7eadce] text-[#bdd5e6]"
+                    : "text-[#adabaa] hover:text-[#f2f0ef]"
+                }`}
+                onMouseEnter={() => {
+                  primeCronJobs();
+                }}
+                onClick={handleShowCronjobs}
+              >
+                Cronjobs
               </button>
             </nav>
           </div>
@@ -5213,6 +5294,14 @@ export default function App({
                   unsafeModeToggleDisabled={unsafeModeToggleDisabled}
                 />
               ) : null
+            ) : primaryView === "cronjobs" ? (
+              <div className="flex min-h-0 flex-1 flex-col px-6 py-6">
+                <CronjobWorkspace
+                  cronJobs={cronJobs}
+                  cronJobsError={cronJobsError}
+                  isLoadingCronJobs={isLoadingCronJobs}
+                />
+              </div>
             ) : (
               <div className="flex min-h-0 flex-1 px-6 py-6">
                 <DiffWorkspace
@@ -5431,6 +5520,14 @@ export default function App({
                 unsafeModeToggleDisabled={unsafeModeToggleDisabled}
               />
             ) : null
+          ) : primaryView === "cronjobs" ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pt-6">
+              <CronjobWorkspace
+                cronJobs={cronJobs}
+                cronJobsError={cronJobsError}
+                isLoadingCronJobs={isLoadingCronJobs}
+              />
+            </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-4 pt-6">
               <DiffWorkspace
@@ -5468,7 +5565,7 @@ export default function App({
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             </div>
           </div>
-          <nav className="grid h-16 grid-cols-2 items-center bg-[#0e0e0e]">
+          <nav className="grid h-16 grid-cols-3 items-center bg-[#0e0e0e]">
             <button
               type="button"
               className={`flex h-full flex-col items-center justify-center pt-2 transition-colors ${
@@ -5483,6 +5580,23 @@ export default function App({
               {materialSymbol("difference")}
               <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
                 Diff
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`flex h-full flex-col items-center justify-center pt-2 transition-colors ${
+                primaryView === "cronjobs"
+                  ? "text-[#bdd5e6] font-bold border-t-2 border-[#bdd5e6]"
+                  : "text-[#adabaa] hover:text-[#f2f0ef]"
+              }`}
+              onMouseEnter={() => {
+                primeCronJobs();
+              }}
+              onClick={handleShowCronjobs}
+            >
+              {materialSymbol("task_alt")}
+              <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
+                Cronjobs
               </span>
             </button>
             <button
