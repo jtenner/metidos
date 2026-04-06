@@ -26,6 +26,7 @@ Read this file before any web research, then update it after each sweep so the b
 ## Current Research Priorities
 
 - Information hierarchy and visual structure in dense workspace pages
+- Responsive typographic hierarchy and component-level layout adaptation
 - Loading, empty, and error feedback states
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
@@ -51,6 +52,10 @@ Read this file before any web research, then update it after each sweep so the b
 - Should breadcrumb, page title, and section caption conventions be standardized across detail panes and mobile breakpoints?
 - When should visual structure rely on spacing and proximity instead of additional separators or ornament?
 - Should `:user-invalid` become a standard styling hook for post-interaction invalid states?
+- When should `text-wrap: balance` be the default for page titles, card headings, or both?
+- Which panes should use container queries instead of viewport breakpoints?
+- Where is `subgrid` worth the complexity for nested cards, tables, or form sections?
+- Which type and spacing tokens should use `clamp()` so they stay fluid but bounded?
 
 ## Follow-Up Topics
 
@@ -66,6 +71,9 @@ Read this file before any web research, then update it after each sweep so the b
 - Reduced-motion defaults for state transitions and loading surfaces
 - Documentation structure patterns for keeping research notes tidy over time
 - `:user-invalid` styling hooks for post-interaction invalid states
+- Responsive typography and bounded scale systems for dense workspace pages
+- Container-aware layout and alignment patterns for panes, cards, and tables
+- Short-heading balancing rules for scanable titles and captions
 
 ## Recent Research
 
