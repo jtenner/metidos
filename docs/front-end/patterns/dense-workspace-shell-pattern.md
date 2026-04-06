@@ -24,23 +24,15 @@ Use this pattern for developer tools and other data-dense products that need a p
 - Place skip-to-main and landmark semantics in the shell before adding more elaborate motion.
 - Use content-driven breakpoints and relative units so the collapse happens when the layout needs it, not when a device class says it should.
 
-## Feedback States
-
-- Use skeletons for initial loads of tables, cards, panels, and other container-based content.
-- Use inline loading for a single action that is in progress.
-- Use progressive loading when a large page can reveal useful structure before all content is ready.
-- Replace an empty region with an empty state instead of leaving surrounding chrome in place.
-- Keep error and empty-state copy local to the affected area.
-
 ## Avoid
 
 - A three-tier navigation stack in the shell.
-- Multiple primary buttons in adjacent empty states.
-- Skeletons for controls that the user must interact with, such as buttons, dropdowns, or dialogs.
-- Full-page spinners for content that could be revealed progressively.
-- Generic error text that does not explain the next step.
 - Forcing a permanent expanded sidebar on narrow screens.
 - Hiding repeated shell navigation without providing landmarks or a clear route to the main content.
+
+## Related Patterns
+
+- [Feedback States Pattern](../patterns/feedback-states-pattern.md)
 
 ## Related Research
 

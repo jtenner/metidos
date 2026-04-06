@@ -25,9 +25,11 @@
 │  │  ├─ audits/
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
 │  │  │  ├─ dense-workspace-shell-pattern.md
+│  │  │  ├─ feedback-states-pattern.md
 │  │  │  ├─ form-validation-pattern.md
 │  │  │  └─ README.md
 │  │  ├─ principles/
@@ -36,6 +38,7 @@
 │  │  └─ research/
 │  │     ├─ 2026-04-06-accessible-forms-controls-and-affordances.md
 │  │     ├─ 2026-04-06-motion-and-reduced-motion.md
+│  │     ├─ 2026-04-06-loading-empty-error-feedback-states.md
 │  │     ├─ 2026-04-06-search-filtering-and-progressive-disclosure.md
 │  │     ├─ 2026-04-06-responsive-shell-and-sidebar-collapse.md
 │  │     ├─ 2026-04-06-dense-workspace-hierarchy-navigation-feedback.md

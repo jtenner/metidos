@@ -72,6 +72,10 @@ The strongest current guidance is to keep the workspace shell shallow and predic
 - Keep one primary next step per empty state whenever possible.
 - Use inline field validation and nearby error copy for forms and dialogs.
 
+## Related Patterns
+
+- [Feedback States Pattern](../patterns/feedback-states-pattern.md)
+
 ## Follow-Up
 
 - Compare responsive collapse behavior for the shell against the repo's actual mobile breakpoints.

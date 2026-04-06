@@ -5,10 +5,9 @@ Use this folder for reusable interface patterns, interaction recipes, and layout
 Examples:
 
 - Sidebar organization patterns
-- Feedback and loading state patterns
+- Feedback, loading, empty, and error state patterns
 - Search and filtering patterns
 - Form layout and validation patterns
 - Empty state and onboarding patterns
 
 Each pattern note should explain when to use it, why it works, and what to avoid.
-

@@ -13,8 +13,8 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Current Research Priorities
 
+- Loading, empty, and error feedback states
 - Accessible forms, controls, and interaction affordances
-- Microcopy and state messaging for empty, loading, and error states
 - Motion and transitions that clarify state without adding noise
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
@@ -24,12 +24,13 @@ Read this file before any web research, then update it after each sweep so the b
 - Which form validation contract should be standard across dialogs, side panels, and inline editors?
 - Should the repo standardize `aria-describedby` plus `aria-errormessage` for custom validation states?
 - What target-size minimum should the UI treat as the default for buttons, icon actions, and adjacent controls?
+- Where should the app adopt the feedback-states pattern first: tables, panels, or detail views?
+- When should feedback use `role="status"`, `role="alert"`, or `aria-busy`?
+- How should no-results search states relate to the feedback-states pattern versus the search pattern?
 - Which breakpoint and collapse behavior best fits the repo's desktop-first shell?
 - Should the shell use a temporary drawer, a rail, or both when the left nav collapses?
 - How should focus restoration work after the collapsed navigation closes?
 - When should breadcrumbs or page titles carry orientation at smaller widths?
-- Which loading pattern should be the default for tables, side panels, and detail views?
-- How should empty states and inline notifications interact when several panels are empty or failing at once?
 - Which micro-interactions improve confidence without slowing expert users down?
 - Which motion effects are essential, and which should disappear under reduced motion?
 - Which search and filter controls should stay visible versus collapse into disclosure?
@@ -40,7 +41,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 - Form validation patterns for dialogs, panels, and inline editors
 - Accessible labels, grouping, and affordance rules for custom controls
-- Form validation and error-copy defaults for technical tools
+- Feedback-state defaults for loading, empty, success, and error surfaces
 - Mobile adaptation strategies for desktop-first interfaces
 - Strong defaults for spacing, typography, and color systems in productivity UIs
 - Empty-state and onboarding patterns for technical tools
@@ -51,6 +52,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Recent Research
 
+- [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
 - [Accessible Forms, Controls, and Affordances](./research/2026-04-06-accessible-forms-controls-and-affordances.md)
 - [Search, Filtering, and Progressive Disclosure](./research/2026-04-06-search-filtering-and-progressive-disclosure.md)
 - [Motion and Reduced Motion Guardrails](./research/2026-04-06-motion-and-reduced-motion.md)
@@ -60,8 +62,17 @@ Read this file before any web research, then update it after each sweep so the b
 ## Recent Principles
 
 - [Responsive Shell Navigation Principle](./principles/responsive-shell-navigation-principle.md)
+
+## Recent Patterns
+
+- [Feedback States Pattern](./patterns/feedback-states-pattern.md)
 - [Dense Workspace Shell Pattern](./patterns/dense-workspace-shell-pattern.md)
 - [Form Validation Pattern](./patterns/form-validation-pattern.md)
+
+## Recent Audits
+
+- [Front-end Tree Sweep: Feedback States Split](./audits/2026-04-06-front-end-tree-sweep-feedback-states.md)
+- [Front-end Tree Sweep Follow-up](./audits/2026-04-06-front-end-tree-sweep-followup.md)
 
 ## Sweep Checklist
 
