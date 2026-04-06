@@ -39,10 +39,9 @@ flowchart TD
 ## Runtime flow (how it works day-to-day)
 
 1. **Startup**
-   - `bun run src/bun/index.ts` (or `bun run start:monolith`) boots the server.
-   - `bun run start:tls` starts the isolated server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
-     By default that means public HTTP on `127.0.0.1:7599` and the RPC backend on `127.0.0.1:7600`, so a reverse proxy must send `/rpc` to the backend port instead of reusing the static-server upstream.
-     If you want one upstream for both `/` and `/rpc`, run the monolith entrypoint with `--tls` instead.
+   - `bun run src/bun/index.ts` (or `bun run start`) boots the server.
+   - `bun run start:tls` starts the same single-port server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
+     Point both `/` and `/rpc` at the same backend upstream, and preserve `X-Forwarded-Host` plus `X-Forwarded-Proto` so websocket origin checks see the browser origin.
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets (`index.html`, css, fonts)
      - `ws://.../rpc` on loopback, with `wss://.../rpc` expected only through a TLS-terminating reverse proxy
@@ -119,9 +118,8 @@ Threads and worktrees are coordinated through procedures in `src/bun/project-pro
 Useful scripts from `package.json`:
 
 ```bash
-bun run start                 # build CSS + run isolated server
-bun run start:tls             # build CSS + run isolated server in reverse-proxy TLS mode
-bun run start:monolith        # build CSS + run full monolith backend
+bun run start                 # build CSS + run server
+bun run start:tls             # build CSS + run server in reverse-proxy TLS mode
 bun run dev                   # build CSS + run main dev server with CSS watch
 bun run build:dev             # install + build mainview bundle
 bun run validate              # biome format check + typecheck
@@ -136,6 +134,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--backend-only` or `JOLT_BACKEND_ONLY=1` to restrict backend mode.
 - `--dev` or `JOLT_DEV=1` for development reconnect behavior and refresh hooks.
 - `--tls` or `JOLT_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
+- `JOLT_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 
 ## Data and performance characteristics
 
