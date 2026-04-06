@@ -53,6 +53,14 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     deprecated: false,
     contextWindowTokens: 400_000,
   },
+  {
+    id: "gpt-5.3-codex-spark",
+    label: "GPT-5.3-Codex-Spark",
+    group: "Coding",
+    summary: "Lower-latency Codex-focused variant for faster coding tasks.",
+    deprecated: false,
+    contextWindowTokens: 400_000,
+  },
 ];
 
 const codexModelOptionMap = new Map(
