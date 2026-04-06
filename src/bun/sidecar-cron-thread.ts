@@ -7,11 +7,11 @@ import { Database } from "bun:sqlite";
 
 import { getCronJobById, listActiveCronJobs } from "./db";
 import type { CronJobRecord } from "./db";
+import { runDueCronJobs } from "./sidecar-cron-runner";
 
 type StartCronSchedulerThread = {
   type: "start";
   dbPath: string;
-  runnerPath: string;
 };
 
 type StopCronSchedulerThread = {
@@ -41,9 +41,16 @@ const workerScope = globalThis as unknown as CronSchedulerWorkerScope;
 
 let database: Database | null = null;
 let queue: Promise<void> = Promise.resolve();
-let cronRunnerPath: string | null = null;
 const cronJobTitles = new Set<string>();
 const CRON_JOB_TITLE_PREFIX = "jolt-cron-";
+
+type BunCronRegister = (
+  schedule: string,
+  handler: () => Promise<void> | void,
+  title: string,
+) => Promise<void>;
+
+const registerCron = Bun.cron as unknown as BunCronRegister;
 
 /**
  * Convert a cron title into a stable, filesystem-safe token for Bun.cron labels.
@@ -121,14 +128,19 @@ async function unregisterCronJobsForCronId(cronJobId: number): Promise<void> {
  * Register a cron job with Bun.cron and track its title for later cleanup.
  */
 async function registerCronJob(
-  runnerPath: string,
   cronJob: Pick<CronJobRecord, "id" | "title" | "schedule">,
 ): Promise<void> {
   const title = buildCronJobTitle(cronJob);
   cronJobTitles.add(title);
   try {
     await Bun.cron.remove(title).catch(() => undefined);
-    await Bun.cron(runnerPath, cronJob.schedule, title);
+    await registerCron(
+      cronJob.schedule,
+      async () => {
+        await runDueCronJobs(cronJob.schedule, Date.now());
+      },
+      title,
+    );
   } catch (error) {
     cronJobTitles.delete(title);
     throw error;
@@ -143,9 +155,6 @@ async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
   if (!databaseHandle) {
     return;
   }
-  if (!cronRunnerPath) {
-    return;
-  }
 
   await unregisterCronJobsForCronId(cronJobId);
   const cronJob = getCronJobById(databaseHandle, cronJobId);
@@ -154,7 +163,7 @@ async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
   }
 
   try {
-    await registerCronJob(cronRunnerPath, cronJob);
+    await registerCronJob(cronJob);
   } catch (error) {
     postError(error);
   }
@@ -163,7 +172,7 @@ async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
 /**
  * Register all active cron jobs during scheduler startup.
  */
-async function registerCronJobs(runnerPath: string): Promise<void> {
+async function registerCronJobs(): Promise<void> {
   const databaseHandle = database;
   if (!databaseHandle) {
     return;
@@ -175,7 +184,7 @@ async function registerCronJobs(runnerPath: string): Promise<void> {
       continue;
     }
     try {
-      await registerCronJob(runnerPath, job);
+      await registerCronJob(job);
     } catch (error) {
       postError(error);
     }
@@ -197,12 +206,11 @@ function queueSchedulerCommand(command: () => Promise<void>): void {
  * Initialize state, open the app DB, and register all currently active cron jobs.
  */
 async function start(message: StartCronSchedulerThread): Promise<void> {
-  cronRunnerPath = message.runnerPath;
   await unregisterAllCronJobs();
   await closeDatabase();
   database = new Database(message.dbPath);
   database.run("PRAGMA foreign_keys = ON");
-  await registerCronJobs(message.runnerPath);
+  await registerCronJobs();
 }
 
 /**
@@ -211,7 +219,6 @@ async function start(message: StartCronSchedulerThread): Promise<void> {
 async function stop(): Promise<void> {
   await unregisterAllCronJobs();
   await closeDatabase();
-  cronRunnerPath = null;
   workerScope.postMessage({ type: "stopped" });
 }
 

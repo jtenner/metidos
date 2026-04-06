@@ -1,6 +1,6 @@
 /**
  * @file src/bun/sidecar-cron-runner.ts
- * @description Cron job runner entrypoint used by Bun.cron registrations.
+ * @description Cron job execution logic used by in-process Bun.cron callbacks.
  */
 
 import {
@@ -24,11 +24,6 @@ import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 const THREAD_POLL_INTERVAL_MS = 500;
 /** Maximum elapsed time allowed for one cron invocation before marking it errored. */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
-
-type CronExecutionController = {
-  cron: string;
-  scheduledTime: number;
-};
 
 /**
  * Parse thread timestamp strings returned by DB columns.
@@ -146,30 +141,25 @@ async function executeCronJob(
 /**
  * Claim due cron rows for this fire and execute them sequentially.
  */
-async function runDueCronJobs(
+export async function runDueCronJobs(
   schedule: string,
   scheduledTime: number,
 ): Promise<void> {
   const database = initAppDatabase();
-  const jobs = claimCronJobsForScheduledRun(database, schedule, scheduledTime);
-  if (!jobs.length) {
-    return;
-  }
+  try {
+    const jobs = claimCronJobsForScheduledRun(
+      database,
+      schedule,
+      scheduledTime,
+    );
+    if (!jobs.length) {
+      return;
+    }
 
-  for (const job of jobs) {
-    await executeCronJob(database, job, scheduledTime);
+    for (const job of jobs) {
+      await executeCronJob(database, job, scheduledTime);
+    }
+  } finally {
+    closeAppDatabase();
   }
 }
-
-export default {
-  /**
-   * Bun Cron entrypoint: claim and run jobs for the provided schedule payload.
-   */
-  async scheduled(controller: CronExecutionController): Promise<void> {
-    try {
-      await runDueCronJobs(controller.cron, controller.scheduledTime);
-    } finally {
-      closeAppDatabase();
-    }
-  },
-};

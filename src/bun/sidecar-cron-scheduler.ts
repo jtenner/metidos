@@ -3,7 +3,6 @@
  * @description Main-process handle for the cron scheduler worker thread.
  */
 
-import { fileURLToPath } from "node:url";
 import { getAppDatabasePath } from "./db";
 import { createSubsystemLogger } from "./logging";
 
@@ -12,14 +11,10 @@ const CRON_SCHEDULER_THREAD_URL = new URL(
   "./sidecar-cron-thread.ts",
   import.meta.url,
 );
-const CRON_RUNNER_PATH = fileURLToPath(
-  new URL("./sidecar-cron-runner.ts", import.meta.url),
-);
 
 type CronSchedulerThreadStart = {
   type: "start";
   dbPath: string;
-  runnerPath: string;
 };
 
 type CronSchedulerThreadSync = {
@@ -129,7 +124,6 @@ export function startCronScheduler(): void {
   const startPayload: CronSchedulerThreadStart = {
     type: "start",
     dbPath,
-    runnerPath: CRON_RUNNER_PATH,
   };
   notifySchedulerWorker(startPayload);
   logger.info("Cron scheduler worker started.");
