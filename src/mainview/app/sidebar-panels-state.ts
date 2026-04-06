@@ -161,6 +161,22 @@ export function toggleWorkspacePanelOpen(): void {
 }
 
 /**
+ * Set workspace panel open/closed state explicitly.
+ */
+export function setWorkspacePanelOpen(open: boolean): void {
+  updateSidebarPanelsSnapshot((current) => {
+    if (current.workspaceOpen === open) {
+      return current;
+    }
+
+    return {
+      ...current,
+      workspaceOpen: open,
+    };
+  });
+}
+
+/**
  * Toggle workspace active section open/closed state.
  */
 export function toggleWorkspaceActiveSectionOpen(): void {
@@ -168,6 +184,22 @@ export function toggleWorkspaceActiveSectionOpen(): void {
     ...current,
     workspaceActiveOpen: !current.workspaceActiveOpen,
   }));
+}
+
+/**
+ * Set workspace active section open/closed state explicitly.
+ */
+export function setWorkspaceActiveSectionOpen(open: boolean): void {
+  updateSidebarPanelsSnapshot((current) => {
+    if (current.workspaceActiveOpen === open) {
+      return current;
+    }
+
+    return {
+      ...current,
+      workspaceActiveOpen: open,
+    };
+  });
 }
 
 /**

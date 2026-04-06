@@ -50,6 +50,8 @@ import { SidebarContent } from "./app/sidebar-content";
 import {
   readSidebarPanelsSnapshot,
   setProjectTreeOpen,
+  setWorkspaceActiveSectionOpen,
+  setWorkspacePanelOpen,
 } from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
@@ -657,6 +659,11 @@ export default function App({
     [projectStore],
   );
   const threads = useMemo(() => threadStoreItems(threadStore), [threadStore]);
+  const threadStoreRef = useRef(threadStore);
+
+  useEffect(() => {
+    threadStoreRef.current = threadStore;
+  }, [threadStore]);
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
@@ -1536,15 +1543,27 @@ export default function App({
   }, []);
 
   const replaceThreads = useCallback((items: RpcThread[]): void => {
-    setThreadStore(createThreadStore(items));
+    setThreadStore((_current) => {
+      const next = createThreadStore(items);
+      threadStoreRef.current = next;
+      return next;
+    });
   }, []);
 
   const upsertThread = useCallback((thread: RpcThread): void => {
-    setThreadStore((prev) => upsertThreadStore(prev, thread));
+    setThreadStore((prev) => {
+      const next = upsertThreadStore(prev, thread);
+      threadStoreRef.current = next;
+      return next;
+    });
   }, []);
 
   const removeThread = useCallback((threadId: number): void => {
-    setThreadStore((prev) => removeThreadFromStore(prev, threadId));
+    setThreadStore((prev) => {
+      const next = removeThreadFromStore(prev, threadId);
+      threadStoreRef.current = next;
+      return next;
+    });
   }, []);
 
   const {
@@ -2730,7 +2749,7 @@ export default function App({
   const openThread = useCallback(
     async (threadId: number, options?: OpenThreadOptions) => {
       const requestId = ++threadOpenRequestIdRef.current;
-      const optimisticThread = threadStore.byId[threadId] ?? null;
+      const optimisticThread = threadStoreRef.current.byId[threadId] ?? null;
       abortThreadOpenRequest("Thread open request was superseded.");
       abortThreadHistoryBackfill("Thread open request was superseded.");
       const controller = new AbortController();
@@ -2789,7 +2808,6 @@ export default function App({
       loadThreadDetailForOpen,
       prepareOpenedThreadDetail,
       syncThreadContext,
-      threadStore,
       upsertThread,
     ],
   );
@@ -4036,7 +4054,8 @@ export default function App({
     if (
       !selectedProjectId ||
       !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened
+      !activeSelectedWorktreeOpened ||
+      isThreadLoading
     ) {
       return;
     }
@@ -4067,6 +4086,7 @@ export default function App({
     activeSelectedWorktreePath,
     activeSelectedWorktreeOpened,
     clearThreadSelection,
+    isThreadLoading,
     selectedProjectId,
     selectedThread,
     selectedThreadId,
@@ -4075,7 +4095,7 @@ export default function App({
   ]);
 
   useEffect(() => {
-    if (!selectedThreadId || selectedThread) {
+    if (!selectedThreadId || selectedThread || isThreadLoading) {
       return;
     }
     if (threads[0]) {
@@ -4086,6 +4106,7 @@ export default function App({
   }, [
     clearThreadSelection,
     openThread,
+    isThreadLoading,
     selectedThread,
     selectedThreadId,
     threads,
@@ -5035,6 +5056,37 @@ export default function App({
     primeCronJobs();
   }, [primeCronJobs]);
 
+  const openCronThreadInRecent = useCallback(
+    async (threadId: number): Promise<void> => {
+      setWorkspacePanelOpen(true);
+      setWorkspaceActiveSectionOpen(true);
+
+      const detailPromise = procedures.getThread(
+        { threadId },
+        {
+          priority: "foreground",
+        },
+      );
+      const loadedThreads = await procedures.listThreads();
+      replaceThreads(loadedThreads);
+
+      await new Promise<void>((resolve) => {
+        if (typeof window === "undefined") {
+          resolve();
+          return;
+        }
+
+        window.requestAnimationFrame(() => resolve());
+      });
+
+      setPrimaryView("chat");
+      await openThread(threadId, {
+        detailPromise,
+      });
+    },
+    [openThread, procedures, replaceThreads],
+  );
+
   const handleRunCronNow = useCallback(
     (cronJobId: number) => {
       void (async () => {
@@ -5053,8 +5105,7 @@ export default function App({
           if (!result.success) {
             throw new Error(`Cron job ${cronJobId} did not start.`);
           }
-          setPrimaryView("chat");
-          await openThread(result.threadId);
+          await openCronThreadInRecent(result.threadId);
           await loadCronJobs();
         } catch (error) {
           setCronJobsError(
@@ -5072,7 +5123,7 @@ export default function App({
         }
       })();
     },
-    [loadCronJobs, openThread, procedures],
+    [loadCronJobs, openCronThreadInRecent, procedures],
   );
 
   const refreshCronJobsForDescribeCron = useCallback(async () => {
