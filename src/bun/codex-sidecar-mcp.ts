@@ -1344,6 +1344,49 @@ server.registerTool(
   }),
 );
 
+/**
+ * Tool: list available models and model catalog details for cron creation.
+ */
+server.registerTool(
+  "list_models",
+  {
+    title: "List Models",
+    description:
+      "List all supported codex models and their associated default reasoning effort.",
+    inputSchema: {},
+    annotations: {
+      idempotentHint: true,
+      openWorldHint: false,
+      readOnlyHint: true,
+    },
+  },
+  withToolLogging("list_models", async () => {
+    const catalog = await rpcClient.call("getCodexModelCatalog", undefined);
+    const lines = catalog.models.map(
+      (model) =>
+        `- ${model.id}: ${model.label} (${model.group}${
+          model.deprecated ? ", deprecated" : ""
+        })`,
+    );
+    return textResult(
+      lines.length > 0
+        ? [
+            `Default model: ${catalog.defaultModel}`,
+            `Default reasoning effort: ${catalog.defaultReasoningEffort}`,
+            "",
+            ...lines,
+          ].join("\n")
+        : "No models are currently configured.",
+      {
+        defaultModel: catalog.defaultModel,
+        defaultReasoningEffort: catalog.defaultReasoningEffort,
+        models: catalog.models,
+        reasoningEfforts: catalog.reasoningEfforts,
+      },
+    );
+  }),
+);
+
 /** Tool: focus the UI on a project/workspace/thread context. */
 
 server.registerTool(
