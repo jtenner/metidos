@@ -116,6 +116,7 @@
 │  │  ├─ codex-sidecar-scope.ts
 │  │  ├─ codex-sidecar-mcp.test.ts
 │  │  ├─ codex-sidecar-mcp.ts
+│  │  ├─ logging.test.ts
 │  │  ├─ logging-thread.ts
 │  │  ├─ logging.ts
 │  │  ├─ db.ts

@@ -879,7 +879,7 @@ export function FileChangeMessage({
       <div className="min-w-0">
         <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
           File Change -{" "}
-          <span className="truncate font-mono text-[9px] text-[#f2f0ef]">
+          <span className="truncate font-mono text-[10px] text-[#f2f0ef]">
             {path}
           </span>
         </div>

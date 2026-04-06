@@ -8,6 +8,8 @@ type LoggingThreadMessage = {
   payload: LogMessage;
 };
 
+export const TRACE_LOGGING_ENV = "JOLT_TRACE_LOGS";
+
 export type LogLevel = "INFO" | "WARNING" | "ERROR" | "TRACE";
 
 export type LogDescription = string | Record<string, unknown>;
@@ -23,6 +25,19 @@ const LOG_THREAD_URL = new URL("./logging-thread.ts", import.meta.url);
 
 let loggingThread: Worker | null = null;
 let loggingThreadSupported = true;
+
+export function isTraceLoggingEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env[TRACE_LOGGING_ENV]?.trim() === "1";
+}
+
+export function shouldEmitLogLevel(
+  level: LogLevel,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return level !== "TRACE" || isTraceLoggingEnabled(env);
+}
 
 function normalizeDescription(description: LogDescription): unknown {
   if (typeof description === "string") {
@@ -118,6 +133,10 @@ function log(
   source: string,
   description: LogDescription,
 ): void {
+  if (!shouldEmitLogLevel(level)) {
+    return;
+  }
+
   postToThreadOrFallback({
     description,
     level,

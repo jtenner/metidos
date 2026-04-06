@@ -21,6 +21,13 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Invokes `Bun.build` with the React compiler plugin and writes output to `.jolt-build/index.js`.
   - Provides deterministic bundling and surfaceable build errors used by dev/runtime flows.
 
+- `logging.ts`
+  - Centralizes Bun-side subsystem logging and the worker-backed stderr dispatch used by runtime components.
+  - Suppresses `TRACE` output by default; set `JOLT_TRACE_LOGS=1` when you need verbose transport diagnostics.
+
+- `logging-thread.ts`
+  - Worker thread that serializes structured log entries onto stderr without blocking the main runtime loop.
+
 - `project-procedures.ts`
   - Exposes all RPC procedure implementations consumed by the frontend.
   - Coordinates projects, worktrees, threads, tasks, file content reads/diffs, git history, and thread lifecycle operations.
