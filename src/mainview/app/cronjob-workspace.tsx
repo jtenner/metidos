@@ -4,8 +4,9 @@
  */
 
 import * as cronstrue from "cronstrue";
-import type { JSX } from "react";
+import { type JSX, Suspense } from "react";
 import type { RpcCronJob } from "../../bun/rpc-schema";
+import { LazyRichMarkdownMessage } from "./message-markdown-loader";
 
 type CronjobWorkspaceProps = {
   cronJobs: RpcCronJob[];
@@ -58,8 +59,28 @@ function CronjobStatus({
   );
 }
 
+function CronjobPromptMarkdown({ prompt }: { prompt: string }): JSX.Element {
+  if (!prompt.trim()) {
+    return (
+      <div className="text-sm leading-6 text-[#9aa3ae]">No prompt text.</div>
+    );
+  }
+
+  return (
+    <Suspense
+      fallback={
+        <div className="whitespace-pre-wrap break-words text-sm leading-6 text-[#dce7ee]">
+          {prompt}
+        </div>
+      }
+    >
+      <LazyRichMarkdownMessage text={prompt} />
+    </Suspense>
+  );
+}
+
 /**
- * Renders a simple grid listing for available cron jobs.
+ * Renders a grid listing for available cron jobs with prominent cron text.
  */
 export function CronjobWorkspace({
   cronJobs,
@@ -96,16 +117,43 @@ export function CronjobWorkspace({
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {cronJobs.map((cronJob) => (
         <article
-          className="rounded-md border border-[#2b3a45] bg-[#161a1d] p-3"
+          className="rounded-md border border-[#2b3a45] bg-[#161a1d] p-4"
           key={cronJob.id}
         >
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-[#f2f0ef]">
-              {cronJob.title || "Untitled cron job"}
-            </h3>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <h3 className="truncate text-sm font-semibold text-[#f2f0ef]">
+                {cronJob.title || "Untitled cron job"}
+              </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7b8893]">
+                  Schedule
+                </span>
+                <span className="group relative inline-flex max-w-full">
+                  <span className="cursor-help rounded-full border border-[#3f5765] bg-[#10171c] px-2.5 py-1 font-mono text-[11px] leading-5 text-[#d7e5ee] transition-colors group-hover:border-[#4d687a] group-hover:text-[#f4f8fb] group-focus-within:border-[#5d7e93] group-focus-within:text-[#f4f8fb]">
+                    {cronJob.schedule}
+                  </span>
+                  <span
+                    className="pointer-events-none absolute left-0 top-full z-50 mt-1 w-[16rem] max-w-[min(90vw,16rem)] rounded border border-[#3c5462] bg-[#141b20] px-2.5 py-2 text-left text-[11px] leading-5 text-[#e2eef7] opacity-0 shadow-[0_18px_38px_rgba(0,0,0,0.42)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                    role="tooltip"
+                    aria-hidden="true"
+                  >
+                    {describeCronSchedule(cronJob.schedule)}
+                  </span>
+                </span>
+              </div>
+            </div>
             <CronjobStatus enabled={cronJob.enabled} />
           </div>
-          <div className="space-y-2 text-xs">
+          <div className="mt-3 rounded-md border border-[#283742] bg-[#0f1418] p-3 text-sm leading-6 text-[#dce7ee]">
+            <div className="mb-2 font-label text-[10px] uppercase tracking-[0.16em] text-[#8aa4b6]">
+              Cron text
+            </div>
+            <div className="max-h-40 overflow-y-auto pr-1">
+              <CronjobPromptMarkdown prompt={cronJob.prompt} />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2 text-[11px] text-[#7f8d97]">
             <div className="text-[#9aa6b1]">
               <span className="mr-1 font-label uppercase tracking-widest text-[#7b8893]">
                 ID:
@@ -123,26 +171,6 @@ export function CronjobWorkspace({
                 Worktree:
               </span>
               {cronJob.worktreePath}
-            </div>
-            <div className="text-[#9aa6b1]">
-              <span className="mr-1 font-label uppercase tracking-widest text-[#7b8893]">
-                Schedule:
-              </span>
-              <span className="group relative inline-flex">
-                <span className="cursor-help rounded border-b border-[#3f5765] border-dotted text-[#d7e5ee] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#7aa5c4] focus-visible:ring-offset-1 focus-visible:ring-offset-[#0e0e0e] group-hover:text-[#f4f8fb] group-focus-within:text-[#f4f8fb]">
-                  {cronJob.schedule}
-                </span>
-                <span
-                  className="pointer-events-none absolute left-0 top-full z-50 mt-1 w-[16rem] max-w-[min(90vw,16rem)] rounded border border-[#3c5462] bg-[#141b20] px-2.5 py-2 text-left text-[11px] leading-5 text-[#e2eef7] opacity-0 shadow-[0_18px_38px_rgba(0,0,0,0.42)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-                  role="tooltip"
-                  aria-hidden="true"
-                >
-                  {describeCronSchedule(cronJob.schedule)}
-                </span>
-              </span>
-            </div>
-            <div className="text-[#99a3ae] h-14 overflow-y-auto break-all">
-              {cronJob.prompt}
             </div>
             <div className="flex items-center justify-between text-[11px] text-[#7f8d97]">
               <span>Last run</span>
