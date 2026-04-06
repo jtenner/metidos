@@ -584,6 +584,7 @@ export default function App({
   const [cronJobsError, setCronJobsError] = useState("");
   const [isLoadingCronJobs, setIsLoadingCronJobs] = useState(false);
   const [isCreatingCronJob, setIsCreatingCronJob] = useState(false);
+  const [runningCronJobs, setRunningCronJobs] = useState(new Set<number>());
   const [cronCreatorMode, setCronCreatorMode] =
     useState<CronCreatorMode>("describe");
   const [cronCreatorOpen, setCronCreatorOpen] = useState(false);
@@ -5030,6 +5031,41 @@ export default function App({
     primeCronJobs();
   }, [primeCronJobs]);
 
+  const handleRunCronNow = useCallback(
+    (cronJobId: number) => {
+      void (async () => {
+        setRunningCronJobs((current) => {
+          if (current.has(cronJobId)) {
+            return current;
+          }
+          const next = new Set(current);
+          next.add(cronJobId);
+          return next;
+        });
+        setCronJobsError("");
+
+        try {
+          await procedures.runCronNow({ cronJobId });
+          await loadCronJobs();
+        } catch (error) {
+          setCronJobsError(
+            error instanceof Error ? error.message : String(error),
+          );
+        } finally {
+          setRunningCronJobs((current) => {
+            if (!current.has(cronJobId)) {
+              return current;
+            }
+            const next = new Set(current);
+            next.delete(cronJobId);
+            return next;
+          });
+        }
+      })();
+    },
+    [loadCronJobs, procedures],
+  );
+
   const refreshCronJobsForDescribeCron = useCallback(async () => {
     await loadCronJobs();
 
@@ -5770,6 +5806,8 @@ export default function App({
                   cronJobs={cronJobs}
                   cronJobsError={cronJobsError}
                   isLoadingCronJobs={isLoadingCronJobs}
+                  onRunCron={handleRunCronNow}
+                  runningCronJobs={runningCronJobs}
                 />
               </div>
             ) : (
@@ -6181,6 +6219,8 @@ export default function App({
                 cronJobs={cronJobs}
                 cronJobsError={cronJobsError}
                 isLoadingCronJobs={isLoadingCronJobs}
+                onRunCron={handleRunCronNow}
+                runningCronJobs={runningCronJobs}
               />
             </div>
           ) : (

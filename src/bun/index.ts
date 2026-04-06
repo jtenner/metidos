@@ -69,6 +69,7 @@ import {
   recoverInterruptedThreadTurnsOnStartup,
   renameThreadProcedure,
   requestThreadStartProcedure,
+  runCronNowProcedure,
   runProjectTaskProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
@@ -116,6 +117,7 @@ import {
 import {
   startCronScheduler,
   stopCronScheduler,
+  runCronNow,
   syncCronSchedulerCron,
 } from "./sidecar-cron-scheduler";
 import {
@@ -402,6 +404,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
     return cron;
   },
   listCrons: (params) => listCronsProcedure(params),
+  runCronNow: (params) => runCronNowProcedure(params),
   getThread: (params) => getThreadProcedure(params),
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
   sendThreadMessage: (params, context) =>

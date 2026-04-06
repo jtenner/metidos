@@ -11,6 +11,8 @@ type CronjobWorkspaceProps = {
   cronJobs: RpcCronJob[];
   cronJobsError: string;
   isLoadingCronJobs: boolean;
+  onRunCron: (cronJobId: number) => void;
+  runningCronJobs: Set<number>;
 };
 
 function formatLastRunDate(lastRunDate: number | null): string {
@@ -63,6 +65,8 @@ export function CronjobWorkspace({
   cronJobs,
   cronJobsError,
   isLoadingCronJobs,
+  onRunCron,
+  runningCronJobs,
 }: CronjobWorkspaceProps): JSX.Element {
   if (isLoadingCronJobs) {
     return (
@@ -157,6 +161,20 @@ export function CronjobWorkspace({
                 <span>{cronJob.lastRunStatus}</span>
               </div>
             ) : null}
+            <div className="pt-1">
+              <button
+                type="button"
+                className="rounded border border-[#2c8e47] bg-[#1d6f35] px-3 py-1.5 text-[11px] font-label uppercase tracking-[0.14em] text-[#ebffee] transition-colors hover:bg-[#247b3f] hover:border-[#37a657] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  runningCronJobs.has(cronJob.id) || cronJob.enabled !== 1
+                }
+                onClick={() => {
+                  onRunCron(cronJob.id);
+                }}
+              >
+                {runningCronJobs.has(cronJob.id) ? "Running…" : "Run"}
+              </button>
+            </div>
           </div>
         </article>
       ))}

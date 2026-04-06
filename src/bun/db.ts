@@ -3289,6 +3289,55 @@ export function claimCronJobsForScheduledRun(
 }
 
 /**
+ * Claims a specific cron job for execution and marks it in progress.
+ */
+export function claimCronJobForScheduledRunById(
+  database: Database,
+  cronJobId: number,
+  runDate: number,
+): CronJobRecord[] {
+  const rows = database
+    .query<CronJobSqlRecord, [number, number, number]>(
+      `
+			UPDATE cron_jobs
+			SET
+				last_run_date = ?,
+				last_run_status = 'InProgress',
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+				AND enabled = 1
+				AND deleted_at IS NULL
+				AND (
+					last_run_date IS NULL
+					OR last_run_date < ?
+				)
+			RETURNING
+				id,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				schedule,
+				prompt,
+				title,
+				description,
+				model,
+				reasoning_effort AS reasoningEffort,
+				last_run_date AS lastRunDate,
+				last_run_status AS lastRunStatus,
+				enabled,
+				deleted_at AS deletedAt,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+		`,
+      runDate,
+      cronJobId,
+      runDate,
+    )
+    .all();
+
+  return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, false));
+}
+
+/**
  * Creates a cron job run row.
  * @param database - database argument for createCronJobRun.
  * @param input - Input row.

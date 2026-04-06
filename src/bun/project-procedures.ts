@@ -52,6 +52,7 @@ import {
   upsertProject,
   upsertThreadActivities,
 } from "./db";
+import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
 import {
   DEFAULT_GIT_HISTORY_PAGE_SIZE,
   type GitCommandOptions,
@@ -3429,6 +3430,36 @@ export async function updateCronProcedure(
   }
 
   return updateCronJob(db, current.id, updates);
+}
+
+/**
+ * Triggers a cron job to run immediately.
+ */
+export async function runCronNowProcedure(
+  params: AppRPCSchema["requests"]["runCronNow"]["params"],
+): Promise<AppRPCSchema["requests"]["runCronNow"]["response"]> {
+  const cronJob = getCronJobById(db, params.cronJobId);
+  if (!cronJob) {
+    throw new Error(`Cron job not found: ${params.cronJobId}`);
+  }
+
+  if (cronJob.deletedAt !== null) {
+    throw new Error("Cannot run a deleted cron job.");
+  }
+
+  if (cronJob.enabled !== 1) {
+    throw new Error("Cannot run a disabled cron job.");
+  }
+
+  const didQueue = runCronNowInScheduler(cronJob.id);
+  if (!didQueue) {
+    throw new Error("Cron scheduler is not available.");
+  }
+
+  return {
+    success: true,
+    cronJobId: cronJob.id,
+  };
 }
 
 /**

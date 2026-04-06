@@ -901,6 +901,7 @@ const procedures: ProjectProcedures = {
   newCron: createProcedure("newCron"),
   updateCron: createProcedure("updateCron"),
   listCrons: createProcedure("listCrons"),
+  runCronNow: createProcedure("runCronNow"),
   updateThreadMetadata: createProcedure("updateThreadMetadata"),
   renameThread: createProcedure("renameThread"),
   setThreadPinned: createProcedure("setThreadPinned"),

@@ -22,11 +22,17 @@ type CronSchedulerThreadSync = {
   cronJobId: number;
 };
 
+type CronSchedulerThreadRun = {
+  type: "run";
+  cronJobId: number;
+};
+
 type CronSchedulerThreadStop = { type: "stop" };
 type CronSchedulerThreadMessage =
   | CronSchedulerThreadStart
   | CronSchedulerThreadStop
-  | CronSchedulerThreadSync;
+  | CronSchedulerThreadSync
+  | CronSchedulerThreadRun;
 
 type CronSchedulerThreadStatusMessage =
   | { type: "stopped" }
@@ -156,4 +162,22 @@ export function syncCronSchedulerCron(cronJobId: number): void {
     type: "sync",
     cronJobId,
   });
+}
+
+/**
+ * Ask the scheduler worker to execute a specific cron job now.
+ */
+export function runCronNow(cronJobId: number): boolean {
+  if (!schedulerWorker) {
+    logger.warning(
+      "Cron scheduler worker unavailable; cannot run cron job now.",
+    );
+    return false;
+  }
+
+  notifySchedulerWorker({
+    type: "run",
+    cronJobId,
+  });
+  return true;
 }

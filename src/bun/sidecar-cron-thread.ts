@@ -7,7 +7,7 @@ import { Database } from "bun:sqlite";
 
 import { getCronJobById, listActiveCronJobs } from "./db";
 import type { CronJobRecord } from "./db";
-import { runDueCronJobs } from "./sidecar-cron-runner";
+import { runCronJobById, runDueCronJobs } from "./sidecar-cron-runner";
 
 type StartCronSchedulerThread = {
   type: "start";
@@ -23,10 +23,16 @@ type SyncCronSchedulerThread = {
   cronJobId: number;
 };
 
+type RunCronSchedulerThread = {
+  type: "run";
+  cronJobId: number;
+};
+
 type CronSchedulerThreadMessage =
   | StartCronSchedulerThread
   | StopCronSchedulerThread
-  | SyncCronSchedulerThread;
+  | SyncCronSchedulerThread
+  | RunCronSchedulerThread;
 
 type CronSchedulerThreadStatusMessage =
   | { type: "stopped" }
@@ -256,5 +262,10 @@ workerScope.onmessage = (event) => {
 
   if (message.type === "sync") {
     queueSchedulerCommand(() => syncCronJobFromDatabase(message.cronJobId));
+    return;
+  }
+
+  if (message.type === "run") {
+    queueSchedulerCommand(() => runCronJobById(message.cronJobId, Date.now()));
   }
 };

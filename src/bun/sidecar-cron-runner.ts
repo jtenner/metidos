@@ -6,6 +6,7 @@
 import {
   type CronJobRecord,
   type CronJobRunStatus,
+  claimCronJobForScheduledRunById,
   claimCronJobsForScheduledRun,
   closeAppDatabase,
   createCronJobRun,
@@ -150,6 +151,32 @@ export async function runDueCronJobs(
     const jobs = claimCronJobsForScheduledRun(
       database,
       schedule,
+      scheduledTime,
+    );
+    if (!jobs.length) {
+      return;
+    }
+
+    for (const job of jobs) {
+      await executeCronJob(database, job, scheduledTime);
+    }
+  } finally {
+    closeAppDatabase();
+  }
+}
+
+/**
+ * Claim a single cron row and execute it once on demand.
+ */
+export async function runCronJobById(
+  cronJobId: number,
+  scheduledTime: number,
+): Promise<void> {
+  const database = initAppDatabase();
+  try {
+    const jobs = claimCronJobForScheduledRunById(
+      database,
+      cronJobId,
       scheduledTime,
     );
     if (!jobs.length) {

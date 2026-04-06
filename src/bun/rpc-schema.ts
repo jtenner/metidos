@@ -671,6 +671,15 @@ export type AppRPCSchema = {
       params: undefined;
       response: RpcCronJob[];
     };
+    runCronNow: {
+      params: {
+        cronJobId: number;
+      };
+      response: {
+        success: boolean;
+        cronJobId: number;
+      };
+    };
     getThread: {
       params: { threadId: number; cursor?: number | null };
       response: RpcThreadDetail;
@@ -895,6 +904,10 @@ export interface ProjectProcedures {
   listCrons: RpcProcedureCall<
     AppRPCSchema["requests"]["listCrons"]["params"],
     AppRPCSchema["requests"]["listCrons"]["response"]
+  >;
+  runCronNow: RpcProcedureCall<
+    AppRPCSchema["requests"]["runCronNow"]["params"],
+    AppRPCSchema["requests"]["runCronNow"]["response"]
   >;
   updateThreadMetadata: RpcProcedureCall<
     AppRPCSchema["requests"]["updateThreadMetadata"]["params"],
