@@ -8,6 +8,12 @@ Read this file before any web research, then update it after each sweep so the b
 - https://atomicdesign.bradfrost.com/table-of-contents/
 - https://www.merixstudio.com/blog/best-frontend-development-blogs
 - https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md
+- https://www.nngroup.com/articles/homepage-design-principles/
+- https://graphicdesign.stackexchange.com/questions/36884/what-are-the-steps-in-designing-a-website
+- https://larryludwig.com/website-layout-best-practices/
+- https://www.commoninja.com/blog/guide-to-website-layouts
+- https://selfmadedesigner.com/website-layouts/
+
 
 ## Top-Level Aims
 
