@@ -5,8 +5,8 @@
 
 import { Database } from "bun:sqlite";
 
-import { getCronJobById, listActiveCronJobs } from "./db";
 import type { CronJobRecord } from "./db";
+import { getCronJobById, listActiveCronJobs } from "./db";
 import { runCronJobById, runDueCronJobs } from "./sidecar-cron-runner";
 
 type StartCronSchedulerThread = {

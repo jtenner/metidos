@@ -20,8 +20,8 @@ import type {
   RpcCodexReasoningEffort,
   RpcCodexReasoningEffortOption,
   RpcContextFocusChanged,
-  RpcGitHistoryEntry,
   RpcCronJob,
+  RpcGitHistoryEntry,
   RpcProject,
   RpcProjectTask,
   RpcRequestPriority,
@@ -38,9 +38,9 @@ import type {
 import { ProjectActionMenu, ThreadActionMenu } from "./app/action-menus";
 import { AuthStepUpDialog } from "./app/auth-step-up-dialog";
 import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
+import { CronjobWorkspace } from "./app/cronjob-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
 import { DiffWorkspace } from "./app/diff-workspace";
-import { CronjobWorkspace } from "./app/cronjob-workspace";
 import {
   subscribeToWorktreeGitHistoryChanged,
   subscribeToWorktreeTasksChanged,
@@ -5112,6 +5112,13 @@ export default function App({
     setCronCreatorError("");
   }, []);
 
+  const setCronCreatorReasoningEffortValue = useCallback(
+    (nextReasoningEffort: RpcCodexReasoningEffort) => {
+      setCronCreatorReasoningEffort(nextReasoningEffort);
+    },
+    [],
+  );
+
   const handleDescribeCronSubmit = useCallback(() => {
     if (!selectedProject || !activeSelectedWorktreePath) {
       setCronCreatorError("Select a workspace before creating a cron job.");
@@ -5154,12 +5161,13 @@ export default function App({
           return;
         }
 
+        const threadId = createdDetail.thread.id;
         const threadMessage = `Use the new_cron tool to create this cron job for the current workspace.\n\n${describePrompt}`;
         const sentDetail = await executeWithStepUp(
           "create a cron job from a natural-language description",
           () =>
             procedures.sendThreadMessage({
-              threadId: createdDetail.thread.id,
+              threadId,
               input: `${threadMessage}\n\nUse projectId ${selectedProject.id} and worktree ${activeSelectedWorktreePath}.`,
             }),
         );
@@ -5199,7 +5207,6 @@ export default function App({
     defaultCodexModel,
     activeCodexModel,
     cronCreatorModel,
-    activeReasoningEffort,
     activeUnsafeMode,
     defaultCodexReasoningEffort,
     cronCreatorReasoningEffort,
@@ -5207,10 +5214,8 @@ export default function App({
     executeWithStepUp,
     mergeSelectedThreadMessageHistory,
     procedures,
-    shouldApplySentThreadDetailToSelection,
     selectedProject,
     refreshCronJobsForDescribeCron,
-    selectedWorktreePathRef,
     upsertThread,
   ]);
 
@@ -5235,7 +5240,7 @@ export default function App({
 
     const model = cronCreatorModel.trim()
       ? cronCreatorModel.trim()
-      : activeCodexModel || defaultCodexModel || null;
+      : activeCodexModel || defaultCodexModel;
     const reasoningEffort =
       cronCreatorReasoningEffort || defaultCodexReasoningEffort;
 
@@ -5249,7 +5254,7 @@ export default function App({
           worktreePath: activeSelectedWorktreePath,
           schedule,
           prompt,
-          model,
+          ...(model ? { model } : {}),
           reasoningEffort,
           ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
           ...(cronEditDescription.trim()
@@ -5271,12 +5276,15 @@ export default function App({
     activeSelectedWorktreePath,
     closeCronCreator,
     cronEditDescription,
+    activeCodexModel,
     cronCreatorModel,
     cronCreatorReasoningEffort,
     cronEditEnabled,
     cronEditPrompt,
     cronEditSchedule,
     cronEditTitle,
+    defaultCodexModel,
+    defaultCodexReasoningEffort,
     loadCronJobs,
     procedures,
     selectedProject,
@@ -5324,22 +5332,20 @@ export default function App({
   ): JSX.Element => (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <div className="space-y-1">
-        <label
+        <div
           className={`font-label text-[10px] uppercase tracking-[0.16em] ${
             variant === "desktop" ? "text-[#7ea2b8]" : "text-[#7ea2b8]"
           }`}
         >
           Model
-        </label>
+        </div>
         <CodexModelSelector
           appTitle="Cron"
           disabled={isCreatingCronJob}
           models={codexModels}
           onChange={setCronCreatorModel}
           reasoningOptions={reasoningEfforts}
-          onChangeReasoningEffort={
-            variant === "desktop" ? setCronCreatorReasoningEffort : undefined
-          }
+          onChangeReasoningEffort={setCronCreatorReasoningEffortValue}
           reasoningValue={cronCreatorReasoningEffort}
           value={cronCreatorModelValue}
           variant={variant}
@@ -5347,9 +5353,9 @@ export default function App({
       </div>
       {variant === "desktop" ? (
         <div className="space-y-1">
-          <label className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+          <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
             Reasoning effort
-          </label>
+          </div>
           <ReasoningEffortSelector
             disabled={isCreatingCronJob}
             onChange={setCronCreatorReasoningEffort}

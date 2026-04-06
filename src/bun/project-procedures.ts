@@ -12,7 +12,12 @@ import {
   type ThreadItem,
 } from "@openai/codex-sdk";
 
-import type { ProjectRecord, ThreadActivityInput, ThreadRecord } from "./db";
+import type {
+  CronJobRecord,
+  ProjectRecord,
+  ThreadActivityInput,
+  ThreadRecord,
+} from "./db";
 import {
   createCronJob,
   createSecurityAuditEvent,
@@ -52,7 +57,6 @@ import {
   upsertProject,
   upsertThreadActivities,
 } from "./db";
-import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
 import {
   DEFAULT_GIT_HISTORY_PAGE_SIZE,
   type GitCommandOptions,
@@ -157,6 +161,7 @@ import type {
   RpcWorktreeGitHistorySummary,
   RpcWorktreeSnapshot,
 } from "./rpc-schema";
+import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
 
 /**
  * Shared DB handle for all RPC procedures in this process.
@@ -3281,6 +3286,15 @@ function buildCronJobDefaultDescription(
     : `${withSchedule.slice(0, MAX_CRON_DESCRIPTION_LENGTH - 3)}...`;
 }
 
+function normalizeCronJobReasoningEffort(cronJob: CronJobRecord): RpcCronJob {
+  return {
+    ...cronJob,
+    reasoningEffort: normalizeStoredCodexReasoningEffort(
+      cronJob.reasoningEffort,
+    ),
+  };
+}
+
 /**
  * Creates a cron job row tied to a workspace.
  * @param params - Parameters object.
@@ -3319,17 +3333,19 @@ export async function newCronProcedure(
     throw new Error("Cron description is required.");
   }
 
-  return createCronJob(db, {
-    projectId: project.id,
-    worktreePath,
-    schedule,
-    prompt,
-    title,
-    description,
-    model,
-    reasoningEffort,
-    enabled: params.enabled ?? null,
-  });
+  return normalizeCronJobReasoningEffort(
+    createCronJob(db, {
+      projectId: project.id,
+      worktreePath,
+      schedule,
+      prompt,
+      title,
+      description,
+      model,
+      reasoningEffort,
+      enabled: params.enabled ?? null,
+    }),
+  );
 }
 
 /**
@@ -3348,9 +3364,11 @@ export async function updateCronProcedure(
   if (typeof params.deleted === "boolean" && params.deleted) {
     if (current.deletedAt === null) {
       softDeleteCronJob(db, current.id);
-      return getCronJobById(db, current.id) ?? current;
+      return normalizeCronJobReasoningEffort(
+        getCronJobById(db, current.id) ?? current,
+      );
     }
-    return current;
+    return normalizeCronJobReasoningEffort(current);
   }
 
   if (current.deletedAt !== null) {
@@ -3429,7 +3447,9 @@ export async function updateCronProcedure(
     throw new Error("At least one update field is required.");
   }
 
-  return updateCronJob(db, current.id, updates);
+  return normalizeCronJobReasoningEffort(
+    updateCronJob(db, current.id, updates),
+  );
 }
 
 /**
@@ -3469,7 +3489,9 @@ export async function runCronNowProcedure(
 export async function listCronsProcedure(
   _params: AppRPCSchema["requests"]["listCrons"]["params"],
 ): Promise<RpcCronJob[]> {
-  return listCronJobs(db).filter((cronJob) => cronJob.deletedAt === null);
+  return listCronJobs(db)
+    .filter((cronJob) => cronJob.deletedAt === null)
+    .map(normalizeCronJobReasoningEffort);
 }
 /**
  * Gets thread procedure.

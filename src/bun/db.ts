@@ -3328,11 +3328,8 @@ export function claimCronJobForScheduledRunById(
 				created_at AS createdAt,
 				updated_at AS updatedAt
 		`,
-      runDate,
-      cronJobId,
-      runDate,
     )
-    .all();
+    .all(runDate, cronJobId, runDate);
 
   return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, false));
 }

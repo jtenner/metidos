@@ -3,9 +3,9 @@
  * @description Module for cronjob workspace.
  */
 
+import * as cronstrue from "cronstrue";
 import type { JSX } from "react";
 import type { RpcCronJob } from "../../bun/rpc-schema";
-import * as cronstrue from "cronstrue";
 
 type CronjobWorkspaceProps = {
   cronJobs: RpcCronJob[];
@@ -129,10 +129,7 @@ export function CronjobWorkspace({
                 Schedule:
               </span>
               <span className="group relative inline-flex">
-                <span
-                  className="cursor-help rounded border-b border-[#3f5765] border-dotted text-[#d7e5ee] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#7aa5c4] focus-visible:ring-offset-1 focus-visible:ring-offset-[#0e0e0e] group-hover:text-[#f4f8fb] group-focus-within:text-[#f4f8fb]"
-                  tabIndex={0}
-                >
+                <span className="cursor-help rounded border-b border-[#3f5765] border-dotted text-[#d7e5ee] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#7aa5c4] focus-visible:ring-offset-1 focus-visible:ring-offset-[#0e0e0e] group-hover:text-[#f4f8fb] group-focus-within:text-[#f4f8fb]">
                   {cronJob.schedule}
                 </span>
                 <span

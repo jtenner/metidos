@@ -19,6 +19,7 @@ import {
   createThreadProcedure,
   sendThreadMessageProcedure,
 } from "./project-procedures";
+import { normalizeStoredCodexReasoningEffort } from "./project-procedures/codex-catalog";
 import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 
 /** Poll interval used while waiting for the cron-spawned thread to finish. */
@@ -102,7 +103,9 @@ async function executeCronJob(
       projectId: cronJob.projectId,
       worktreePath: cronJob.worktreePath,
       model: cronJob.model ?? null,
-      reasoningEffort: cronJob.reasoningEffort ?? null,
+      reasoningEffort: normalizeStoredCodexReasoningEffort(
+        cronJob.reasoningEffort,
+      ),
     });
     const threadId = threadResult.thread.id;
     const run = createCronJobRun(database, {

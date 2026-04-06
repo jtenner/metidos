@@ -117,7 +117,6 @@ import {
 import {
   startCronScheduler,
   stopCronScheduler,
-  runCronNow,
   syncCronSchedulerCron,
 } from "./sidecar-cron-scheduler";
 import {
