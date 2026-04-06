@@ -26,7 +26,7 @@
 
 This audit focused on the code that defines the app's trust boundaries:
 
-- HTTP and websocket entrypoints in `src/bun/index.ts` and `src/bun/static-server.ts`
+- HTTP and websocket entrypoints in `src/bun/index.ts` and the historical split-launcher static server
 - RPC procedures and Codex orchestration in `src/bun/project-procedures.ts`
 - filesystem and git helpers in `src/bun/git.ts`
 - persistence in `src/bun/db.ts`
@@ -370,7 +370,7 @@ On its own this is mainly information disclosure, but in combination with the un
 Responses are served with only `content-type` and `cache-control` in the common helpers:
 
 - `src/bun/index.ts:301-321`
-- `src/bun/static-server.ts:83-106`
+- the historical split-launcher response helper
 
 There is no evidence of:
 

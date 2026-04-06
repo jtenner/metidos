@@ -18,6 +18,7 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Git-facing utilities used for worktree listing, history, and diff operations.
 - `index.ts`
   - Bun-side entrypoint that wires RPC and process-level handlers.
+  - Default local server entrypoint used by `bun start`, `bun start:tls`, and `bun run src/bun/index.ts`.
 - `sidecar-cron-scheduler.ts`
   - Launches and controls the cron worker process that keeps Bun.cron registrations in sync.
 - `sidecar-cron-thread.ts`
@@ -26,8 +27,6 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Cron execution callback invoked by scheduled Bun.cron registrations.
 - `sidecar-cron-scheduler.ts` + `sidecar-cron-thread.ts`
   - New cron and updated cron changes are propagated via targeted sync updates (no full scheduler restart).
-- `isolated-server.ts`
-  - Isolated execution/server runner for sidecar workflows.
 - `tls-config.ts`
   - Shared reverse-proxy TLS policy helper used by the Bun entrypoints.
 - `project-procedures.ts`
@@ -36,8 +35,6 @@ Holds backend orchestration and server entry logic that powers local project/tas
   - Shared websocket-upgrade auth gate used to verify session/ticket requirements before `/rpc` upgrades.
 - `rpc-schema.ts`
   - Shared RPC typings/contracts used across Bun/browser boundaries.
-- `static-server.ts`
-  - Static asset serving layer for mainview/browser UI resources.
 - `starvation-harness.ts`
   - Guard/utility for starvation/retry scenarios in background loops or polling.
 

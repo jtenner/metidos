@@ -123,7 +123,6 @@
 │  │  ├─ git.ts
 │  │  ├─ git.test.ts
 │  │  ├─ index.ts
-│  │  ├─ isolated-server.ts
 │  │  ├─ project-procedures/
 │  │  │  ├─ README.md
 │  │  │  ├─ command-normalization.test.ts
@@ -151,9 +150,6 @@
 │  │  ├─ security-audit.ts
 │  │  ├─ server-security.test.ts
 │  │  ├─ server-security.ts
-│  │  ├─ static-server.ts
-│  │  ├─ static-server-routing.test.ts
-│  │  ├─ static-server-routing.ts
 │  │  ├─ starvation-harness.ts
 │  │  ├─ thread-metadata.test.ts
 │  │  ├─ tls-config.test.ts

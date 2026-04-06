@@ -10,21 +10,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Exposes loopback HTTP routes for mainview assets and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
-
-- `static-server.ts`
-  - Runs the static/public HTTP server for the frontend app when not using the unified mode.
-  - Serves bundled frontend assets (`index.html`, `index.js`, `index.css`, fonts) and injects runtime config via an inert JSON bootstrap element in the HTML shell.
-  - Proxies `/auth/*` requests to the backend so browser auth flows stay same-origin even when the UI and RPC server are split across ports.
-  - Includes a minimal `/health` endpoint that reports only liveness and proxies backend readiness without exposing backend internals.
-  - Resolves and validates CLI args/env values for public/RPC ports and reverse-proxy TLS mode.
-
-- `isolated-server.ts`
-  - Launches two child processes (backend and static server) as separate roles with isolated env and ports.
-  - Handles cross-process lifecycle and coordinated shutdown when either child exits unexpectedly.
-  - Useful for local developer workflows where frontend and backend separation is desired.
+  - Backing entrypoint for the default `bun start` and `bun start:tls` scripts.
 
 - `tls-config.ts`
-  - Resolves the reverse-proxy TLS policy shared across monolith and isolated entrypoints.
+  - Resolves the reverse-proxy TLS policy shared across the Bun entrypoints.
   - Supports `--tls` / `JOLT_TLS=1` for deployments where nginx or another reverse proxy terminates TLS and the browser transport should be treated as HTTPS/WSS.
 
 - `build-mainview.ts`
