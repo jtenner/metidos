@@ -54,24 +54,14 @@ function fallbackConsoleLog(message: LogMessage): void {
     source: message.source,
     description: normalizeDescription(message.description),
   };
-
-  switch (message.level) {
-    case "ERROR": {
-      const prefix = `[${getDescriptionPrefix(message.level)}]`;
-      console.error(`${prefix} ${output.source}`, output);
-      break;
-    }
-    case "WARNING": {
-      const prefix = `[${getDescriptionPrefix(message.level)}]`;
-      console.warn(`${prefix} ${output.source}`, output);
-      break;
-    }
-    default: {
-      const prefix = `[${getDescriptionPrefix(message.level)}]`;
-      console.log(`${prefix} ${output.source}`, output);
-      break;
-    }
+  const payload = JSON.stringify(output);
+  if (!payload) {
+    process.stderr.write(`${getDescriptionPrefix(message.level)} ${output.source}\n`);
+    return;
   }
+
+  const prefix = `[${getDescriptionPrefix(message.level)}]`;
+  process.stderr.write(`${prefix} ${output.source} ${payload}\n`);
 }
 
 function resolveLoggingThread(): Worker | null {

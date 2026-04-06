@@ -582,9 +582,8 @@ export default function App({
   const [cronJobsError, setCronJobsError] = useState("");
   const [isLoadingCronJobs, setIsLoadingCronJobs] = useState(false);
   const [isCreatingCronJob, setIsCreatingCronJob] = useState(false);
-  const [cronCreatorMode, setCronCreatorMode] = useState<CronCreatorMode>(
-    "describe",
-  );
+  const [cronCreatorMode, setCronCreatorMode] =
+    useState<CronCreatorMode>("describe");
   const [cronCreatorOpen, setCronCreatorOpen] = useState(false);
   const [cronCreatorError, setCronCreatorError] = useState("");
   const [cronDescribePrompt, setCronDescribePrompt] = useState("");
@@ -5026,6 +5025,19 @@ export default function App({
     primeCronJobs();
   }, [primeCronJobs]);
 
+  const refreshCronJobsForDescribeCron = useCallback(async () => {
+    await loadCronJobs();
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(() => {
+          resolve();
+        }, 1_200);
+      });
+      await loadCronJobs();
+    }
+  }, [loadCronJobs]);
+
   const resetCronCreatorFields = useCallback(() => {
     setCronDescribePrompt("");
     setCronEditTitle("");
@@ -5092,7 +5104,7 @@ export default function App({
           () =>
             procedures.sendThreadMessage({
               threadId: createdDetail.thread.id,
-              input: threadMessage,
+              input: `${threadMessage}\n\nUse projectId ${selectedProject.id} and worktree ${activeSelectedWorktreePath}.`,
             }),
         );
         if (!sentDetail) {
@@ -5111,6 +5123,7 @@ export default function App({
           mergeSelectedThreadMessageHistory(sentDetail);
         }
 
+        await refreshCronJobsForDescribeCron();
         closeCronCreator();
         setCronDescribePrompt("");
       } catch (error) {
@@ -5138,6 +5151,8 @@ export default function App({
     procedures,
     shouldApplySentThreadDetailToSelection,
     selectedProject,
+    refreshCronJobsForDescribeCron,
+    selectedWorktreePathRef,
     upsertThread,
   ]);
 
@@ -5179,7 +5194,9 @@ export default function App({
         await loadCronJobs();
         closeCronCreator();
       } catch (error) {
-        setCronCreatorError(error instanceof Error ? error.message : String(error));
+        setCronCreatorError(
+          error instanceof Error ? error.message : String(error),
+        );
       } finally {
         setIsCreatingCronJob(false);
       }
@@ -5893,7 +5910,7 @@ export default function App({
                 unsafeModeToggleDisabled={unsafeModeToggleDisabled}
               />
             ) : null
-            ) : primaryView === "cronjobs" ? (
+          ) : primaryView === "cronjobs" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pt-6">
               <div className="flex items-center justify-between">
                 <div className="font-label text-xs uppercase tracking-[0.14em] text-[#9db9cb]">

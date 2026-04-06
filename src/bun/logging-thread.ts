@@ -50,17 +50,10 @@ function formatLogEntry(message: LogMessage): {
 
 function handleLogMessage(message: LogMessage): void {
   const payload = formatLogEntry(message);
-  switch (message.level) {
-    case "ERROR":
-      console.error(payload);
-      return;
-    case "WARNING":
-      console.warn(payload);
-      return;
-    default:
-      console.log(payload);
-      return;
-  }
+  const serialized =
+    JSON.stringify(payload) ??
+    `{"level":"${payload.level}","source":"${payload.source}","description":"${payload.description}"}`;
+  process.stderr.write(`${serialized}\n`);
 }
 
 workerScope.onmessage = (event) => {

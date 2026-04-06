@@ -212,7 +212,9 @@ async function requestWebSocketTicket(options: {
     cache: "no-store",
     headers: {
       Cookie: buildSessionCookieHeader(options.sessionId),
+      "Content-Type": "application/json",
     },
+    body: "{}",
     method: "POST",
   });
   const rawText = await response.text();
@@ -425,10 +427,13 @@ class JoltRpcClient {
 
           nextSocket.addEventListener("message", (event) => {
             // Ignore non-response frames; this socket may carry unrelated payload types.
-            const message = JSON.parse(
-              String(event.data),
-            ) as RpcResponseMessage;
-            if (message.type !== "response") {
+            let message: RpcResponseMessage;
+            try {
+              message = JSON.parse(String(event.data)) as RpcResponseMessage;
+            } catch {
+              return;
+            }
+            if (!message || typeof message !== "object" || message.type !== "response") {
               return;
             }
             const pending = this.clearPendingRequest(message.id);
