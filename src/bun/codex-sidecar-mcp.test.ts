@@ -6,6 +6,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import {
   buildRpcSocketConnectionDetails,
+  buildRpcSocketCookieHeader,
   buildSessionCookieHeader,
   deriveRpcHttpOrigin,
 } from "./codex-sidecar-mcp";
@@ -28,12 +29,13 @@ describe("codex sidecar websocket auth handoff", () => {
             ok: true,
             ticket: {
               expiresAt: "2026-04-05T00:01:00.000Z",
-              ticket: "ticket-456",
             },
           }),
           {
             headers: {
               "content-type": "application/json; charset=utf-8",
+              "set-cookie":
+                "jolt_ws_ticket=ticket-456; Path=/rpc; HttpOnly; SameSite=Strict; Max-Age=60",
             },
             status: 200,
           },
@@ -49,9 +51,9 @@ describe("codex sidecar websocket auth handoff", () => {
 
     expect(details).toEqual({
       headers: {
-        Cookie: buildSessionCookieHeader("session-123"),
+        Cookie: buildRpcSocketCookieHeader("session-123", "ticket-456"),
       },
-      url: "ws://127.0.0.1:7599/rpc?ticket=ticket-456",
+      url: "ws://127.0.0.1:7599/rpc",
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(String(fetchImpl.mock.calls[0]?.[0])).toBe(

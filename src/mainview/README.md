@@ -10,7 +10,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
 
-`auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and websocket ticket acquisition.
+`auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and step-up verification.
 
 `auth-shell-connect.ts` isolates the shared authenticated-bootstrap logic used when the UI opens an existing session or transitions into a newly authenticated session and the first RPC transport connect needs transient recovery.
 

@@ -27,12 +27,7 @@ import {
 } from "./app/invalidation-events";
 import { loadRichMarkdownModule } from "./app/message-markdown-loader";
 import { CONTEXT_FOCUS_CHANGED_EVENT_NAME } from "./app/state";
-import {
-  AuthApiError,
-  dispatchAuthRequired,
-  isAuthRequiredError,
-  issueWebSocketTicket,
-} from "./auth-client";
+import { dispatchAuthRequired } from "./auth-client";
 import AuthShell from "./auth-shell";
 import {
   isAuthRequiredRpcError,
@@ -292,19 +287,6 @@ function clearRpcReconnectTimer(): void {
   }
 }
 /**
- * Builds socket url with ticket.
- *
- * The ticket is appended as a query param and is paired with the authenticated browser
- * session via cookies during websocket upgrade.
- * @param ticket - ticket argument for buildSocketUrlWithTicket.
- */
-
-function buildSocketUrlWithTicket(ticket: string): string {
-  const url = new URL(socketBaseUrl, window.location.href);
-  url.searchParams.set("ticket", ticket);
-  return url.toString();
-}
-/**
  * Performs reloadWindow operation.
  * @param reason - Reason for this operation.
  */
@@ -452,8 +434,7 @@ function handleRpcAuthFailure(error: { message: string }): void {
 /**
  * Connects rpc socket.
  *
- * Before opening the websocket, the client acquires a short-lived ticket from
- * `issueWebSocketTicket()` and attaches it via `buildSocketUrlWithTicket`.
+ * Browser RPC upgrades authenticate via the existing same-origin session cookie.
  * @param reason - Reason for this operation.
  */
 
@@ -471,31 +452,9 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
 
   clearRpcReconnectTimer();
   rpcSocketConnectPromise = (async () => {
-    let nextSocketUrl: string;
-    try {
-      const ticket = await issueWebSocketTicket();
-      nextSocketUrl = buildSocketUrlWithTicket(ticket.ticket);
-    } catch (error) {
-      if (error instanceof AuthApiError && isAuthRequiredError(error)) {
-        handleRpcAuthFailure(error);
-        return;
-      }
-
-      if (reason === "initial") {
-        rejectConnection(error);
-      } else {
-        console.error("Failed to acquire websocket auth ticket", error);
-        scheduleRpcReconnect("ws-ticket");
-      }
-      return;
-    }
-    if (isPageUnloading || !rpcTransportEnabled) {
-      return;
-    }
-
     let nextSocket: WebSocket;
     try {
-      nextSocket = new WebSocket(nextSocketUrl);
+      nextSocket = new WebSocket(socketBaseUrl);
     } catch (error) {
       if (reason === "initial") {
         rejectConnection(error);

@@ -266,6 +266,8 @@ workerScope.onmessage = (event) => {
   }
 
   if (message.type === "run") {
-    queueSchedulerCommand(() => runCronJobById(message.cronJobId, Date.now()));
+    queueSchedulerCommand(async () => {
+      await runCronJobById(message.cronJobId, Date.now());
+    });
   }
 };

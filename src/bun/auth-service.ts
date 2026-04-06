@@ -46,6 +46,8 @@ import {
 
 const SESSION_COOKIE_NAME = "jolt_session";
 const SESSION_COOKIE_PATH = "/";
+const WEBSOCKET_TICKET_COOKIE_NAME = "jolt_ws_ticket";
+const WEBSOCKET_TICKET_COOKIE_PATH = "/rpc";
 const DEFAULT_TOTP_ISSUER = "Jolt";
 const LOGIN_LOCKOUT_AFTER_FAILURES = 3;
 const LOGIN_LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
@@ -121,6 +123,11 @@ type AuthStatus = {
 
 type SessionCookieOptions = {
   maxAgeSeconds: number;
+  secure: boolean;
+};
+
+type WebSocketTicketCookieOptions = {
+  maxAgeSeconds?: number;
   secure: boolean;
 };
 
@@ -463,6 +470,19 @@ export function readSessionCookie(cookieHeader: string | null): string | null {
 }
 
 /**
+ * Parse the websocket ticket cookie from an incoming Cookie header.
+ * @param cookieHeader - cookieHeader argument for cookieHeader.
+ */
+export function readWebSocketTicketCookie(
+  cookieHeader: string | null,
+): string | null {
+  if (!cookieHeader) {
+    return null;
+  }
+  return parseCookieHeaderValue(cookieHeader, WEBSOCKET_TICKET_COOKIE_NAME);
+}
+
+/**
  * Serialize the authenticated session cookie.
  */
 
@@ -484,6 +504,26 @@ export function buildSessionCookieHeader(
 }
 
 /**
+ * Serialize the short-lived websocket ticket cookie used during RPC upgrades.
+ */
+export function buildWebSocketTicketCookieHeader(
+  ticketId: string,
+  options: WebSocketTicketCookieOptions,
+): string {
+  const parts = [
+    `${WEBSOCKET_TICKET_COOKIE_NAME}=${ticketId}`,
+    `Path=${WEBSOCKET_TICKET_COOKIE_PATH}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${options.maxAgeSeconds ?? Math.ceil(WEBSOCKET_TICKET_LIFETIME_MS / 1000)}`,
+  ];
+  if (options.secure) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+
+/**
  * Serialize an expired session cookie so browsers remove it immediately.
  * @param secure - secure argument for secure.
  */
@@ -491,6 +531,27 @@ export function buildClearedSessionCookieHeader(secure: boolean): string {
   const parts = [
     `${SESSION_COOKIE_NAME}=`,
     `Path=${SESSION_COOKIE_PATH}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    "Max-Age=0",
+    `Expires=${formatHttpDate(new Date(0))}`,
+  ];
+  if (secure) {
+    parts.push("Secure");
+  }
+  return parts.join("; ");
+}
+
+/**
+ * Serialize an expired websocket ticket cookie so browsers remove it immediately.
+ * @param secure - secure argument for secure.
+ */
+export function buildClearedWebSocketTicketCookieHeader(
+  secure: boolean,
+): string {
+  const parts = [
+    `${WEBSOCKET_TICKET_COOKIE_NAME}=`,
+    `Path=${WEBSOCKET_TICKET_COOKIE_PATH}`,
     "HttpOnly",
     "SameSite=Strict",
     "Max-Age=0",

@@ -17,7 +17,6 @@ describe("rpc websocket auth helper", () => {
         authBypass: true,
         cookieHeader: null,
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
-        requestUrl: "https://localhost:7599/rpc",
         validateTicket,
       }),
     ).toEqual({
@@ -30,23 +29,42 @@ describe("rpc websocket auth helper", () => {
     expect(validateTicket).not.toHaveBeenCalled();
   });
 
-  it("rejects websocket upgrades that do not provide both session cookie and ticket", () => {
+  it("rejects websocket upgrades that do not provide a session cookie", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
         cookieHeader: null,
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
-        requestUrl: "https://localhost:7599/rpc",
         validateTicket: () => {},
       }),
     ).toEqual({
       failure: {
-        body: "Authenticated websocket ticket required",
+        body: "Authenticated session required",
         kind: "response",
         status: 401,
       },
       ok: false,
     });
+  });
+
+  it("allows websocket upgrades with only the session cookie", () => {
+    const validateTicket = mock(() => {});
+
+    expect(
+      authorizeRpcWebSocketUpgrade({
+        authBypass: false,
+        cookieHeader: "jolt_session=session-123",
+        nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
+        validateTicket,
+      }),
+    ).toEqual({
+      ok: true,
+      socketData: {
+        authBypass: false,
+        sessionId: "session-123",
+      },
+    });
+    expect(validateTicket).not.toHaveBeenCalled();
   });
 
   it("validates the websocket ticket against the current session", () => {
@@ -55,9 +73,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123",
+        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
-        requestUrl: "https://localhost:7599/rpc?ticket=ticket-456",
         validateTicket,
       }),
     ).toEqual({
@@ -74,6 +91,31 @@ describe("rpc websocket auth helper", () => {
     });
   });
 
+  it("ignores stale websocket ticket cookies when the session is still valid", () => {
+    const error = new AuthServiceError(
+      "invalid_websocket_ticket",
+      "The websocket ticket is invalid or expired.",
+      401,
+    );
+
+    expect(
+      authorizeRpcWebSocketUpgrade({
+        authBypass: false,
+        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
+        nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
+        validateTicket: () => {
+          throw error;
+        },
+      }),
+    ).toEqual({
+      ok: true,
+      socketData: {
+        authBypass: false,
+        sessionId: "session-123",
+      },
+    });
+  });
+
   it("marks session-required failures so the caller can clear the cookie", () => {
     const error = new AuthServiceError(
       "session_required",
@@ -84,9 +126,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123",
+        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
-        requestUrl: "https://localhost:7599/rpc?ticket=ticket-456",
         validateTicket: () => {
           throw error;
         },
@@ -94,6 +135,7 @@ describe("rpc websocket auth helper", () => {
     ).toEqual({
       failure: {
         clearSessionCookie: true,
+        clearWebSocketTicketCookie: true,
         error,
         kind: "auth_error",
       },
@@ -101,19 +143,18 @@ describe("rpc websocket auth helper", () => {
     });
   });
 
-  it("preserves ticket failures without forcing a cookie clear", () => {
+  it("preserves non-session websocket auth failures without forcing a session cookie clear", () => {
     const error = new AuthServiceError(
-      "invalid_websocket_ticket",
-      "The websocket ticket is invalid or expired.",
-      401,
+      "auth_already_configured",
+      "unexpected auth state",
+      409,
     );
 
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123",
+        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
-        requestUrl: "https://localhost:7599/rpc?ticket=ticket-456",
         validateTicket: () => {
           throw error;
         },
@@ -121,6 +162,7 @@ describe("rpc websocket auth helper", () => {
     ).toEqual({
       failure: {
         clearSessionCookie: false,
+        clearWebSocketTicketCookie: true,
         error,
         kind: "auth_error",
       },

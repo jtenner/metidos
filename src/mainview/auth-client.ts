@@ -290,20 +290,3 @@ export async function stepUpAuth(input: {
     method: "POST",
   });
 }
-
-export async function issueWebSocketTicket(): Promise<{
-  expiresAt: string;
-  ticket: string;
-}> {
-  const payload = await requestAuthJson<{
-    ok: true;
-    ticket: {
-      expiresAt: string;
-      ticket: string;
-    };
-  }>("/auth/ws-ticket", {
-    body: JSON.stringify({}),
-    method: "POST",
-  });
-  return payload.ticket;
-}

@@ -137,6 +137,26 @@ export function buildSessionCookieHeader(sessionId: string): string {
   return `jolt_session=${sessionId}`;
 }
 
+/**
+ * Builds the websocket ticket cookie pair used during authenticated RPC upgrades.
+ * @param ticketId - Ticket identifier.
+ */
+export function buildWebSocketTicketCookieHeader(ticketId: string): string {
+  return `jolt_ws_ticket=${ticketId}`;
+}
+
+/**
+ * Builds the combined Cookie header used for authenticated RPC upgrades.
+ * @param sessionId - Session identifier.
+ * @param ticketId - Ticket identifier.
+ */
+export function buildRpcSocketCookieHeader(
+  sessionId: string,
+  ticketId: string,
+): string {
+  return `${buildSessionCookieHeader(sessionId)}; ${buildWebSocketTicketCookieHeader(ticketId)}`;
+}
+
 type RpcSocketConnectionDetails = {
   headers?: Record<string, string>;
   url: string;
@@ -147,11 +167,17 @@ type WebSocketTicket = {
   ticket: string;
 };
 
+type WebSocketTicketMetadata = {
+  expiresAt: string;
+};
+
 /**
  * Parses a websocket-ticket response payload.
  * @param value - Response payload.
  */
-function readWebSocketTicket(value: unknown): WebSocketTicket | null {
+function readWebSocketTicketMetadata(
+  value: unknown,
+): WebSocketTicketMetadata | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
   }
@@ -160,16 +186,33 @@ function readWebSocketTicket(value: unknown): WebSocketTicket | null {
     return null;
   }
   const ticket = payload.ticket as Record<string, unknown>;
-  if (
-    typeof ticket.ticket !== "string" ||
-    typeof ticket.expiresAt !== "string"
-  ) {
+  if (typeof ticket.expiresAt !== "string") {
     return null;
   }
   return {
     expiresAt: ticket.expiresAt,
-    ticket: ticket.ticket,
   };
+}
+
+/**
+ * Extract the websocket ticket cookie value from a Set-Cookie header.
+ * @param value - Set-Cookie header value.
+ */
+function readTicketIdFromSetCookie(value: string | null): string | null {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const [cookiePair] = value.split(";");
+  if (!cookiePair) {
+    return null;
+  }
+
+  const [name, ...valueParts] = cookiePair.trim().split("=");
+  if (name !== "jolt_ws_ticket") {
+    return null;
+  }
+  return valueParts.join("=") || null;
 }
 
 /**
@@ -227,8 +270,11 @@ async function requestWebSocketTicket(options: {
     }
   }
 
-  const ticket = readWebSocketTicket(payload);
-  if (!response.ok || !ticket) {
+  const ticketMetadata = readWebSocketTicketMetadata(payload);
+  const ticketId = readTicketIdFromSetCookie(
+    response.headers.get("set-cookie"),
+  );
+  if (!response.ok || !ticketMetadata || !ticketId) {
     const message =
       readWebSocketTicketErrorMessage(payload) ??
       rawText.trim() ??
@@ -239,15 +285,18 @@ async function requestWebSocketTicket(options: {
     );
   }
 
-  return ticket;
+  return {
+    expiresAt: ticketMetadata.expiresAt,
+    ticket: ticketId,
+  };
 }
 
 /**
  * Build websocket connection details for the RPC client.
  *
  * If a `sessionId` is available, the client first exchanges it for a short-lived ticket
- * and attaches both the ticket and session cookie. Without a session id, it falls back to
- * a direct websocket URL.
+ * and attaches both the ticket and session cookie via the websocket Cookie header.
+ * Without a session id, it falls back to a direct websocket URL.
  * @param options - Configuration options used by this operation.
  */
 export async function buildRpcSocketConnectionDetails(options: {
@@ -267,14 +316,12 @@ export async function buildRpcSocketConnectionDetails(options: {
     httpOrigin: options.httpOrigin,
     sessionId: options.sessionId,
   });
-  const url = new URL(options.rpcUrl);
-  url.searchParams.set("ticket", ticket.ticket);
 
   return {
     headers: {
-      Cookie: buildSessionCookieHeader(options.sessionId),
+      Cookie: buildRpcSocketCookieHeader(options.sessionId, ticket.ticket),
     },
-    url: url.toString(),
+    url: options.rpcUrl,
   };
 }
 

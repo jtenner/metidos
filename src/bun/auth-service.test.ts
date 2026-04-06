@@ -13,7 +13,9 @@ import { generateTotpCode } from "./auth";
 import type { AuthServiceError } from "./auth-service";
 import {
   buildClearedSessionCookieHeader,
+  buildClearedWebSocketTicketCookieHeader,
   buildSessionCookieHeader,
+  buildWebSocketTicketCookieHeader,
   DEFAULT_SESSION_IDLE_TIMEOUT_MS,
   DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
@@ -23,6 +25,7 @@ import {
   logout,
   prepareTotpEnrollment,
   readSessionCookie,
+  readWebSocketTicketCookie,
   requireFreshStepUp,
   resolveSession,
   setupAuth,
@@ -638,14 +641,26 @@ describe("auth service", () => {
     );
   });
 
-  it("serializes and clears session cookies", () => {
-    const cookie = buildSessionCookieHeader("session-1", {
+  it("serializes and clears session and websocket ticket cookies", () => {
+    const sessionCookie = buildSessionCookieHeader("session-1", {
       maxAgeSeconds: 60,
       secure: false,
     });
+    const ticketCookie = buildWebSocketTicketCookieHeader("ticket-1", {
+      secure: false,
+    });
 
-    expect(readSessionCookie(cookie)).toBe("session-1");
+    expect(readSessionCookie(sessionCookie)).toBe("session-1");
+    expect(
+      readWebSocketTicketCookie(
+        "jolt_session=session-1; jolt_ws_ticket=ticket-1",
+      ),
+    ).toBe("ticket-1");
+    expect(ticketCookie).toContain("Path=/rpc");
     expect(buildClearedSessionCookieHeader(false)).toContain("Max-Age=0");
+    expect(buildClearedWebSocketTicketCookieHeader(false)).toContain(
+      "Max-Age=0",
+    );
   });
 
   it("removes sessions on logout", async () => {

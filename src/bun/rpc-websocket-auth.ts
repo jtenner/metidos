@@ -2,11 +2,15 @@
  * @file src/bun/rpc-websocket-auth.ts
  * @description Module for rpc websocket auth.
  *
- * Upgrades are only accepted when both a valid session cookie (`jolt_session`) and
- * short-lived websocket ticket are present, unless auth bypass is explicitly enabled.
+ * Upgrades are accepted when a valid session cookie (`jolt_session`) is present.
+ * A short-lived websocket ticket cookie is optional compatibility hardening.
  */
 
-import { AuthServiceError, readSessionCookie } from "./auth-service";
+import {
+  AuthServiceError,
+  readSessionCookie,
+  readWebSocketTicketCookie,
+} from "./auth-service";
 
 export type RpcWebSocketSocketData = {
   authBypass: boolean;
@@ -27,6 +31,7 @@ type RpcWebSocketAuthFailure =
     }
   | {
       clearSessionCookie: boolean;
+      clearWebSocketTicketCookie: boolean;
       error: unknown;
       kind: "auth_error";
     };
@@ -44,14 +49,14 @@ export type RpcWebSocketAuthResult =
 /**
  * Performs websocket-auth upgrade authorization.
  *
- * In normal mode, the request must include a valid session cookie and ticket pair.
+ * In normal mode, the request must include a valid session cookie. If a websocket
+ * ticket cookie is also present, it is validated opportunistically.
  * @param options - Configuration options used by this operation.
  */
 export function authorizeRpcWebSocketUpgrade(options: {
   authBypass: boolean;
   cookieHeader: string | null;
   nowMs: number;
-  requestUrl: string;
   validateTicket: (input: ValidateTicketInput) => void;
 }): RpcWebSocketAuthResult {
   if (options.authBypass) {
@@ -65,11 +70,11 @@ export function authorizeRpcWebSocketUpgrade(options: {
   }
 
   const sessionId = readSessionCookie(options.cookieHeader);
-  const ticketId = new URL(options.requestUrl).searchParams.get("ticket");
-  if (!sessionId || !ticketId) {
+  const ticketId = readWebSocketTicketCookie(options.cookieHeader);
+  if (!sessionId) {
     return {
       failure: {
-        body: "Authenticated websocket ticket required",
+        body: "Authenticated session required",
         kind: "response",
         status: 401,
       },
@@ -77,23 +82,39 @@ export function authorizeRpcWebSocketUpgrade(options: {
     };
   }
 
-  try {
-    options.validateTicket({
-      nowMs: options.nowMs,
-      sessionId,
-      ticketId,
-    });
-  } catch (error) {
-    return {
-      failure: {
-        clearSessionCookie:
-          error instanceof AuthServiceError &&
-          error.code === "session_required",
-        error,
-        kind: "auth_error",
-      },
-      ok: false,
-    };
+  if (ticketId) {
+    try {
+      options.validateTicket({
+        nowMs: options.nowMs,
+        sessionId,
+        ticketId,
+      });
+    } catch (error) {
+      if (
+        error instanceof AuthServiceError &&
+        error.code === "invalid_websocket_ticket"
+      ) {
+        return {
+          ok: true,
+          socketData: {
+            authBypass: false,
+            sessionId,
+          },
+        };
+      }
+
+      return {
+        failure: {
+          clearSessionCookie:
+            error instanceof AuthServiceError &&
+            error.code === "session_required",
+          clearWebSocketTicketCookie: true,
+          error,
+          kind: "auth_error",
+        },
+        ok: false,
+      };
+    }
   }
 
   return {

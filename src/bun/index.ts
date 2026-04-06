@@ -10,7 +10,9 @@ import type { ServerWebSocket } from "bun";
 import {
   AuthServiceError,
   buildClearedSessionCookieHeader,
+  buildClearedWebSocketTicketCookieHeader,
   buildSessionCookieHeader,
+  buildWebSocketTicketCookieHeader,
   DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
   issueWebSocketTicket,
@@ -874,13 +876,20 @@ function authErrorResponse(
   error: unknown,
   options?: {
     clearSessionCookie?: boolean;
+    clearWebSocketTicketCookie?: boolean;
   },
 ): Response {
   const headers = new Headers();
   if (options?.clearSessionCookie) {
-    headers.set(
+    headers.append(
       "set-cookie",
       buildClearedSessionCookieHeader(isSecureRequest(request)),
+    );
+  }
+  if (options?.clearWebSocketTicketCookie) {
+    headers.append(
+      "set-cookie",
+      buildClearedWebSocketTicketCookieHeader(isSecureRequest(request)),
     );
   }
 
@@ -1184,42 +1193,59 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/logout" && request.method === "POST") {
       logout(database, sessionId);
+      const headers = new Headers();
+      headers.append(
+        "set-cookie",
+        buildClearedSessionCookieHeader(secureCookie),
+      );
+      headers.append(
+        "set-cookie",
+        buildClearedWebSocketTicketCookieHeader(secureCookie),
+      );
       return respondAuthJson(
         {
           ok: true,
           status: getCurrentAuthStatus(),
         },
         200,
-        {
-          "set-cookie": buildClearedSessionCookieHeader(secureCookie),
-        },
+        headers,
       );
     }
 
     if (pathname === "/auth/ws-ticket" && request.method === "POST") {
-      if (DEV_FLOW_MODE.authBypass) {
-        return respondAuthJson({
+      const ticket = DEV_FLOW_MODE.authBypass
+        ? issueDevWebSocketTicket(nowMs)
+        : (() => {
+            if (!sessionId) {
+              throw new AuthServiceError(
+                "session_required",
+                "A valid authenticated session is required.",
+                401,
+              );
+            }
+
+            return issueWebSocketTicket(database, {
+              nowMs,
+              sessionId,
+            });
+          })();
+      const headers = new Headers();
+      headers.append(
+        "set-cookie",
+        buildWebSocketTicketCookieHeader(ticket.ticket, {
+          secure: secureCookie,
+        }),
+      );
+      return respondAuthJson(
+        {
           ok: true,
-          ticket: issueDevWebSocketTicket(nowMs),
-        });
-      }
-
-      if (!sessionId) {
-        throw new AuthServiceError(
-          "session_required",
-          "A valid authenticated session is required.",
-          401,
-        );
-      }
-
-      const ticket = issueWebSocketTicket(database, {
-        nowMs,
-        sessionId,
-      });
-      return respondAuthJson({
-        ok: true,
-        ticket,
-      });
+          ticket: {
+            expiresAt: ticket.expiresAt,
+          },
+        },
+        200,
+        headers,
+      );
     }
 
     return respondAuthJson(
@@ -1248,6 +1274,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         error.code === "invalid_credentials");
     return authErrorResponse(request, error, {
       clearSessionCookie,
+      clearWebSocketTicketCookie: clearSessionCookie,
     });
   }
 }
@@ -2189,7 +2216,6 @@ async function bootstrap(): Promise<void> {
           authBypass: DEV_FLOW_MODE.authBypass,
           cookieHeader: request.headers.get("cookie"),
           nowMs: currentNowMs(),
-          requestUrl: request.url,
           validateTicket: (input) => {
             validateAndConsumeWebSocketTicket(initAppDatabase(), input);
           },
@@ -2207,6 +2233,8 @@ async function bootstrap(): Promise<void> {
             });
             return authErrorResponse(request, websocketAuth.failure.error, {
               clearSessionCookie: websocketAuth.failure.clearSessionCookie,
+              clearWebSocketTicketCookie:
+                websocketAuth.failure.clearWebSocketTicketCookie,
             });
           }
           webServerLogger.warning({

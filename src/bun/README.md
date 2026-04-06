@@ -90,7 +90,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `rpc-websocket-auth.ts`
   - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
-  - Encapsulates the session-cookie and websocket-ticket requirements so those checks are regression-tested independently from the full server bootstrap.
+  - Encapsulates the authenticated-session requirement plus optional websocket-ticket compatibility checks so those rules stay regression-tested independently from the full server bootstrap.
 
 - `codex-sidecar-mcp.ts`
   - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.

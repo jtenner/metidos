@@ -211,16 +211,18 @@ function authConsoleShell(props: {
   children: JSX.Element;
   error: string;
   footer?: JSX.Element | null;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   subtitle?: string;
   title: string;
 }): JSX.Element {
   const maxWidth =
-    props.size === "lg"
-      ? "max-w-lg"
-      : props.size === "sm"
-        ? "max-w-sm"
-        : "max-w-md";
+    props.size === "xl"
+      ? "max-w-4xl"
+      : props.size === "lg"
+        ? "max-w-lg"
+        : props.size === "sm"
+          ? "max-w-sm"
+          : "max-w-md";
 
   return (
     <main className="relative flex min-h-full flex-col items-center justify-center overflow-auto bg-[#040b11] px-4 py-12 text-[#e8eef5]">
@@ -976,6 +978,7 @@ export default function AuthShell({
       </div>
     ),
     error,
+    size: "xl",
     footer: lockedUntilLabel ? (
       <div className="border border-[#503526] bg-[#281a13] px-4 py-3 text-sm leading-7 text-[#efc092]">
         Too many failed attempts. Login is locked until {lockedUntilLabel}.
