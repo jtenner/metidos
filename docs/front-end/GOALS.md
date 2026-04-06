@@ -3,6 +3,12 @@
 This file tracks what the front-end research cron should keep learning next.
 Read this file before any web research, then update it after each sweep so the backlog stays current.
 
+## User Supplied Research Sources
+
+- https://atomicdesign.bradfrost.com/table-of-contents/
+- https://www.merixstudio.com/blog/best-frontend-development-blogs
+- https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md
+
 ## Top-Level Aims
 
 - Keep the front-end docs tree organized, source-backed, and easy to navigate.
@@ -14,7 +20,7 @@ Read this file before any web research, then update it after each sweep so the b
 ## Current Research Priorities
 
 - Loading, empty, and error feedback states
-- Accessible forms, controls, and interaction affordances
+- Accessible forms, validation contracts, and interaction affordances
 - Motion and transitions that clarify state without adding noise
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
@@ -22,8 +28,8 @@ Read this file before any web research, then update it after each sweep so the b
 ## Open Questions
 
 - Which form validation contract should be standard across dialogs, side panels, and inline editors?
-- Should the repo standardize `aria-describedby` plus `aria-errormessage` for custom validation states?
-- What target-size minimum should the UI treat as the default for buttons, icon actions, and adjacent controls?
+- Should the repo standardize `aria-describedby` plus `aria-errormessage` for custom validation states, with `aria-invalid` only after validation?
+- Where do the 24 by 24 CSS pixel target-size rules need spacing exceptions or equivalent controls in dense toolbars?
 - Where should the app adopt the feedback-states pattern first: tables, panels, or detail views?
 - When should feedback use `role="status"`, `role="alert"`, or `aria-busy`?
 - How should no-results search states relate to the feedback-states pattern versus the search pattern?
@@ -41,6 +47,7 @@ Read this file before any web research, then update it after each sweep so the b
 
 - Form validation patterns for dialogs, panels, and inline editors
 - Accessible labels, grouping, and affordance rules for custom controls
+- Target-size defaults and spacing exceptions for dense toolbars and icon actions
 - Feedback-state defaults for loading, empty, success, and error surfaces
 - Mobile adaptation strategies for desktop-first interfaces
 - Strong defaults for spacing, typography, and color systems in productivity UIs

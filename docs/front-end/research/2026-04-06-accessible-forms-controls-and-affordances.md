@@ -6,7 +6,7 @@ This research pass focused on practical form design and control affordances for 
 
 ## Summary
 
-The current best practice is still to rely on native HTML controls first, because they bring accessible names, keyboard behavior, and platform affordances for free. Explicit labels, field groups, visible error text, and sensible touch target sizes matter more than custom widget styling. When validation fails, the user should see the error near the field and, for larger forms, also get a summary or other clear entry point to the errors.
+The current best practice is still to rely on native HTML controls first, because they bring accessible names, keyboard behavior, and platform affordances for free. Explicit labels, field groups, visible help text, visible error text, and sensible touch target sizes matter more than custom widget styling. For custom validation, `aria-invalid` should be set only after validation, helper text should stay separate from error text, and the error message should be wired to the field with `aria-errormessage` when the failure is explicit enough to need a direct announcement.
 
 ## Source Notes
 
@@ -27,11 +27,15 @@ The current best practice is still to rely on native HTML controls first, becaus
 - [MDN `aria-invalid`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-invalid)
   - Mark invalid controls with `aria-invalid="true"` when custom validation is in play.
   - Pair invalid state with styling and a message that explains what to fix.
+- [MDN `aria-describedby`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-describedby)
+  - Use `aria-describedby` for helper text and other plain-text descriptions that add context.
+  - Keep descriptions concise; use `aria-details` when the content is more structured.
 - [MDN `aria-errormessage`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-errormessage)
-  - Use `aria-errormessage` to point at the visible error text.
-  - The error text should be visible, not only announced.
+  - Use `aria-errormessage` to point at the visible error text when the control is invalid.
+  - Keep the error text visible and specific about what is wrong and how to fix it.
 - [MDN live regions](https://developer.mozilla.org/docs/Web/Accessibility/ARIA/Guides/Live_regions)
-  - `role="alert"` is appropriate for error or warning messages that need immediate announcement.
+  - Use `role="alert"` for urgent, dynamically displayed validation errors.
+  - Use `role="status"` for non-urgent progress or confirmation.
   - Avoid combining live-region mechanisms in a way that causes duplicate announcements.
 - [WCAG 2.2 Understanding SC 2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)
   - Pointer targets should be at least 24 by 24 CSS pixels unless one of the WCAG exceptions applies.
@@ -55,6 +59,8 @@ The current best practice is still to rely on native HTML controls first, becaus
 - Use `<button>` for actions and `<a>` for navigation so the browser can preserve correct keyboard and context-menu behavior.
 - Make touch targets large enough to avoid accidental activation, especially for adjacent icon buttons and destructive controls.
 - Avoid icon-only controls unless the name is obvious in text or an accessible name is supplied.
+- Prefer a 24 by 24 CSS pixel minimum for pointer targets, or enough spacing around smaller targets to satisfy WCAG 2.2 target-size guidance.
+- Treat the native validation UI as the default unless the design needs custom messaging, custom timing, or a richer error summary.
 
 ## Follow-Up
 

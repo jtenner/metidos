@@ -39,6 +39,7 @@ The cron job that maintains it should always read `GOALS.md` first, then decide 
 
 ## Recent Front-end Notes
 
+- [Front-end Tree Sweep: Validation and Target Size](./audits/2026-04-06-front-end-tree-sweep-validation-target-size.md)
 - [Loading, Empty, and Error Feedback States](./research/2026-04-06-loading-empty-error-feedback-states.md)
 - [Feedback States Pattern](./patterns/feedback-states-pattern.md)
 - [Front-end Tree Sweep: Feedback States Split](./audits/2026-04-06-front-end-tree-sweep-feedback-states.md)

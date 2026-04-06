@@ -26,6 +26,7 @@
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-followup.md
 │  │  │  ├─ 2026-04-06-front-end-tree-sweep-feedback-states.md
+│  │  │  ├─ 2026-04-06-front-end-tree-sweep-validation-target-size.md
 │  │  │  └─ README.md
 │  │  ├─ patterns/
 │  │  │  ├─ dense-workspace-shell-pattern.md
