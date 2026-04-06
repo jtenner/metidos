@@ -47,7 +47,7 @@ export function sidecarPathsEqual(
   options: CanonicalizePathOptions = {},
 ): boolean {
   return (
-  canonicalizeSidecarPath(left, options) ===
+    canonicalizeSidecarPath(left, options) ===
     canonicalizeSidecarPath(right, options)
   );
 }

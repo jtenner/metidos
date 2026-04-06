@@ -149,11 +149,7 @@ async function syncCronJobFromDatabase(cronJobId: number): Promise<void> {
 
   await unregisterCronJobsForCronId(cronJobId);
   const cronJob = getCronJobById(databaseHandle, cronJobId);
-  if (
-    !cronJob ||
-    cronJob.enabled !== 1 ||
-    cronJob.deletedAt !== null
-  ) {
+  if (!cronJob || cronJob.enabled !== 1 || cronJob.deletedAt !== null) {
     return;
   }
 
@@ -190,9 +186,11 @@ async function registerCronJobs(runnerPath: string): Promise<void> {
  * Queue async worker commands to ensure deterministic start/stop/sync sequencing.
  */
 function queueSchedulerCommand(command: () => Promise<void>): void {
-  queue = queue.then(() => command()).catch((error) => {
-    postError(error);
-  });
+  queue = queue
+    .then(() => command())
+    .catch((error) => {
+      postError(error);
+    });
 }
 
 /**

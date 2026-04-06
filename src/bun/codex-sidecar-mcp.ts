@@ -433,7 +433,11 @@ class JoltRpcClient {
             } catch {
               return;
             }
-            if (!message || typeof message !== "object" || message.type !== "response") {
+            if (
+              !message ||
+              typeof message !== "object" ||
+              message.type !== "response"
+            ) {
               return;
             }
             const pending = this.clearPendingRequest(message.id);

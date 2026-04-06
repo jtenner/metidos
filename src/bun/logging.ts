@@ -56,7 +56,9 @@ function fallbackConsoleLog(message: LogMessage): void {
   };
   const payload = JSON.stringify(output);
   if (!payload) {
-    process.stderr.write(`${getDescriptionPrefix(message.level)} ${output.source}\n`);
+    process.stderr.write(
+      `${getDescriptionPrefix(message.level)} ${output.source}\n`,
+    );
     return;
   }
 
