@@ -50,6 +50,7 @@ import {
   getThreadProcedure,
   getWorktreeGitCommitDiffProcedure,
   getWorktreeSnapshotProcedure,
+  listCronsProcedure,
   listDirectorySuggestionsProcedure,
   listProjectsProcedure,
   listProjectTasksProcedure,
@@ -58,6 +59,7 @@ import {
   listThreadsProcedure,
   listWorktreeGitHistoryProcedure,
   markThreadErrorSeenProcedure,
+  newCronProcedure,
   openProjectProcedure,
   openProjectsBatchProcedure,
   openWorktreeProcedure,
@@ -80,6 +82,7 @@ import {
   startProcedureCacheMaintenance,
   stopThreadTurnProcedure,
   suspendActiveWorktreePolling,
+  updateCronProcedure,
   updateThreadMetadataProcedure,
   updateThreadModelProcedure,
   updateThreadReasoningEffortProcedure,
@@ -110,6 +113,10 @@ import {
   LOOPBACK_HOSTNAME,
   parseAllowedBrowserOrigins,
 } from "./server-security";
+import {
+  startCronScheduler,
+  stopCronScheduler,
+} from "./sidecar-cron-scheduler";
 import {
   formatLoopbackHttpOrigin,
   formatLoopbackWebSocketUrl,
@@ -383,6 +390,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
     broadcastThreadStartRequestCreated(request);
     return request;
   },
+  newCron: (params) => newCronProcedure(params),
+  updateCron: (params) => updateCronProcedure(params),
+  listCrons: (params) => listCronsProcedure(params),
   getThread: (params) => getThreadProcedure(params),
   markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
   sendThreadMessage: (params, context) =>
@@ -2076,6 +2086,7 @@ async function bootstrap(): Promise<void> {
 
   initAppDatabase();
   recoverInterruptedThreadTurnsOnStartup();
+  startCronScheduler();
   if (!BACKEND_ONLY) {
     await queueMainviewBundleBuild();
     startDevMainviewWatcher();
@@ -2626,6 +2637,7 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
     setWorktreeTaskChangeListener(null);
     shutdownProcedureCacheMaintenance();
     shutdownProjectPolling();
+    await stopCronScheduler();
     await shutdownActiveThreadTurns();
   })()
     .catch((error) => {

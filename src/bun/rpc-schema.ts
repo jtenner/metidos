@@ -338,6 +338,28 @@ export type RpcThread = {
   runStatus: RpcThreadRunStatus;
 };
 
+export type RpcCronJobRunStatus =
+  | "InProgress"
+  | "Stopped"
+  | "Errored"
+  | "Completed";
+
+export type RpcCronJob = {
+  id: number;
+  projectId: number;
+  worktreePath: string;
+  schedule: string;
+  prompt: string;
+  title: string;
+  description: string;
+  lastRunDate: number | null;
+  lastRunStatus: RpcCronJobRunStatus | null;
+  enabled: 0 | 1;
+  deletedAt: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RpcChatThreadMessage = {
   id: number;
   threadId: number;
@@ -614,6 +636,34 @@ export type AppRPCSchema = {
       };
       response: RpcThreadStartRequest;
     };
+    newCron: {
+      params: {
+        projectId: number;
+        worktreePath: string;
+        schedule: string;
+        prompt: string;
+        title?: string;
+        description?: string;
+        enabled?: boolean;
+      };
+      response: RpcCronJob;
+    };
+    updateCron: {
+      params: {
+        cronJobId: number;
+        schedule?: string;
+        prompt?: string;
+        title?: string;
+        description?: string;
+        enabled?: boolean;
+        deleted?: boolean;
+      };
+      response: RpcCronJob;
+    };
+    listCrons: {
+      params: undefined;
+      response: RpcCronJob[];
+    };
     getThread: {
       params: { threadId: number; cursor?: number | null };
       response: RpcThreadDetail;
@@ -826,6 +876,18 @@ export interface ProjectProcedures {
   runProjectTask: RpcProcedureCall<
     AppRPCSchema["requests"]["runProjectTask"]["params"],
     AppRPCSchema["requests"]["runProjectTask"]["response"]
+  >;
+  newCron: RpcProcedureCall<
+    AppRPCSchema["requests"]["newCron"]["params"],
+    AppRPCSchema["requests"]["newCron"]["response"]
+  >;
+  updateCron: RpcProcedureCall<
+    AppRPCSchema["requests"]["updateCron"]["params"],
+    AppRPCSchema["requests"]["updateCron"]["response"]
+  >;
+  listCrons: RpcProcedureCall<
+    AppRPCSchema["requests"]["listCrons"]["params"],
+    AppRPCSchema["requests"]["listCrons"]["response"]
   >;
   updateThreadMetadata: RpcProcedureCall<
     AppRPCSchema["requests"]["updateThreadMetadata"]["params"],

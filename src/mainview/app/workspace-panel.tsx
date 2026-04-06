@@ -3,12 +3,12 @@
  * @description Module for workspace panel.
  */
 
-import { memo, useCallback, useState } from "react";
-import type { JSX } from "react";
 import type {
+  JSX,
   FocusEvent as ReactFocusEvent,
   MouseEvent as ReactMouseEvent,
 } from "react";
+import { memo, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RpcThread } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";

@@ -14,15 +14,18 @@ import {
 
 import type { ProjectRecord, ThreadActivityInput, ThreadRecord } from "./db";
 import {
+  createCronJob,
   createSecurityAuditEvent,
   createThread,
   createThreadMessage,
   deleteProject,
   deleteThread,
+  getCronJobById,
   getProject,
   getProjectById,
   getThreadById,
   initAppDatabase,
+  listCronJobs,
   listProjects,
   listProjectWorktreePins,
   listThreadMessages,
@@ -42,7 +45,9 @@ import {
   setThreadReasoningEffort,
   setThreadUnsafeMode,
   setThreadUsage,
+  softDeleteCronJob,
   stopInProgressThreadMessages,
+  updateCronJob,
   updateThreadCodexId,
   upsertProject,
   upsertThreadActivities,
@@ -125,6 +130,7 @@ import type {
   RpcCodexReasoningEffort,
   RpcContextFocusChanged,
   RpcCreateWorktreeResult,
+  RpcCronJob,
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
@@ -3239,6 +3245,179 @@ export async function requestThreadStartProcedure(
     pinnedAt: null,
     createdAt: new Date().toISOString(),
   };
+}
+
+const MAX_CRON_TITLE_LENGTH = 72;
+const MAX_CRON_DESCRIPTION_LENGTH = 240;
+
+function buildCronJobDefaultTitle(
+  schedule: string,
+  prompt: string | null | undefined,
+): string {
+  const trimmedPrompt = (prompt ?? "").trim();
+  const firstLine = trimmedPrompt.split("\n", 1)[0] ?? "";
+  const firstLineTrimmed = firstLine.trim();
+  const titleBase = firstLineTrimmed
+    ? firstLineTrimmed
+    : `Cron schedule ${schedule}`;
+  const cleaned = titleBase.replace(/\s+/g, " ").trim();
+  return cleaned.length <= MAX_CRON_TITLE_LENGTH
+    ? cleaned
+    : `${cleaned.slice(0, MAX_CRON_TITLE_LENGTH - 3)}...`;
+}
+
+function buildCronJobDefaultDescription(
+  schedule: string,
+  prompt: string | null | undefined,
+): string {
+  const descriptionBase = (prompt ?? "").replace(/\s+/g, " ").trim();
+  const withSchedule = `Schedule ${schedule}: ${descriptionBase}`;
+  return withSchedule.length <= MAX_CRON_DESCRIPTION_LENGTH
+    ? withSchedule
+    : `${withSchedule.slice(0, MAX_CRON_DESCRIPTION_LENGTH - 3)}...`;
+}
+
+/**
+ * Creates a cron job row tied to a workspace.
+ * @param params - Parameters object.
+ */
+
+export async function newCronProcedure(
+  params: AppRPCSchema["requests"]["newCron"]["params"],
+): Promise<RpcCronJob> {
+  const project = projectByIdForPath(params.projectId);
+  const worktreePath = normalizePath(params.worktreePath);
+  await assertProjectWorktree(project, worktreePath, {
+    forceRefresh: true,
+  });
+  const prompt = params.prompt.trim();
+  const schedule = params.schedule.trim();
+  if (!schedule) {
+    throw new Error("Cron schedule is required.");
+  }
+  if (!prompt) {
+    throw new Error("Cron prompt is required.");
+  }
+  const title =
+    typeof params.title === "string"
+      ? params.title.trim()
+      : buildCronJobDefaultTitle(schedule, prompt);
+  const description =
+    typeof params.description === "string"
+      ? params.description.trim()
+      : buildCronJobDefaultDescription(schedule, prompt);
+  if (typeof params.title === "string" && !title) {
+    throw new Error("Cron title is required.");
+  }
+  if (typeof params.description === "string" && !description) {
+    throw new Error("Cron description is required.");
+  }
+
+  return createCronJob(db, {
+    projectId: project.id,
+    worktreePath,
+    schedule,
+    prompt,
+    title,
+    description,
+    enabled: params.enabled ?? null,
+  });
+}
+
+/**
+ * Updates an existing cron job.
+ * @param params - Parameters object.
+ */
+
+export async function updateCronProcedure(
+  params: AppRPCSchema["requests"]["updateCron"]["params"],
+): Promise<RpcCronJob> {
+  const current = getCronJobById(db, params.cronJobId);
+  if (!current) {
+    throw new Error(`Cron job not found: ${params.cronJobId}`);
+  }
+
+  if (typeof params.deleted === "boolean" && params.deleted) {
+    if (current.deletedAt === null) {
+      softDeleteCronJob(db, current.id);
+      return getCronJobById(db, current.id) ?? current;
+    }
+    return current;
+  }
+
+  if (current.deletedAt !== null) {
+    throw new Error("Deleted cron jobs cannot be modified.");
+  }
+
+  if (params.deleted === false) {
+    throw new Error("Cannot undelete cron jobs.");
+  }
+
+  const updates: {
+    schedule?: string;
+    prompt?: string;
+    title?: string;
+    description?: string;
+    enabled?: boolean;
+  } = {};
+
+  if (typeof params.schedule !== "undefined") {
+    const schedule = params.schedule.trim();
+    if (!schedule) {
+      throw new Error("Cron schedule is required.");
+    }
+    updates.schedule = schedule;
+  }
+
+  if (typeof params.prompt !== "undefined") {
+    const prompt = params.prompt.trim();
+    if (!prompt) {
+      throw new Error("Cron prompt is required.");
+    }
+    updates.prompt = prompt;
+  }
+
+  if (typeof params.title !== "undefined") {
+    const title = params.title.trim();
+    if (!title) {
+      throw new Error("Cron title is required.");
+    }
+    updates.title = title;
+  }
+
+  if (typeof params.description !== "undefined") {
+    const description = params.description.trim();
+    if (!description) {
+      throw new Error("Cron description is required.");
+    }
+    updates.description = description;
+  }
+
+  if (typeof params.enabled === "boolean") {
+    updates.enabled = params.enabled;
+  }
+
+  if (
+    typeof updates.schedule === "undefined" &&
+    typeof updates.prompt === "undefined" &&
+    typeof updates.title === "undefined" &&
+    typeof updates.description === "undefined" &&
+    typeof updates.enabled === "undefined"
+  ) {
+    throw new Error("At least one update field is required.");
+  }
+
+  return updateCronJob(db, current.id, updates);
+}
+
+/**
+ * Lists non-deleted cron jobs.
+ * @returns List of all cron jobs where deletedAt is null.
+ */
+export async function listCronsProcedure(
+  _params: AppRPCSchema["requests"]["listCrons"]["params"],
+): Promise<RpcCronJob[]> {
+  return listCronJobs(db).filter((cronJob) => cronJob.deletedAt === null);
 }
 /**
  * Gets thread procedure.

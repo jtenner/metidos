@@ -121,7 +121,10 @@
 │  │  ├─ starvation-harness.ts
 │  │  ├─ thread-metadata.test.ts
 │  │  ├─ tls-config.test.ts
-│  │  └─ tls-config.ts
+│  │  ├─ tls-config.ts
+│  │  ├─ sidecar-cron-runner.ts
+│  │  ├─ sidecar-cron-scheduler.ts
+│  │  └─ sidecar-cron-thread.ts
 │  └─ mainview/
 │     ├─ README.md
 │     ├─ App.tsx

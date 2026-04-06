@@ -4336,21 +4336,14 @@ export default function App({
   );
 
   const handleCreateThreadForActiveWorktree = useCallback(() => {
-    if (
-      !selectedProject ||
-      !activeSelectedWorktreePath
-    ) {
+    if (!selectedProject || !activeSelectedWorktreePath) {
       return;
     }
     void createThreadForWorktree(
       selectedProject.id,
       activeSelectedWorktreePath,
     );
-  }, [
-    activeSelectedWorktreePath,
-    createThreadForWorktree,
-    selectedProject,
-  ]);
+  }, [activeSelectedWorktreePath, createThreadForWorktree, selectedProject]);
 
   const handleToggleWorktreePinned = useCallback(
     (projectId: number, worktreePath: string, pinned: boolean) => {
@@ -5131,16 +5124,16 @@ export default function App({
                     acknowledgeThreadErrorSeenInBackground,
                     activeSelectedWorktreeBranch:
                       activeSelectedWorktree?.branch?.trim() || "Primary",
-                    activeSelectedWorktreeFolder:
-                      activeSelectedWorktreePath
-                        ? formatPathForDisplay(
-                            activeSelectedWorktreePath,
-                            homeDirectory,
-                            true,
-                          )
-                        : activeSelectedWorktreeFolder || "Current worktree",
+                    activeSelectedWorktreeFolder: activeSelectedWorktreePath
+                      ? formatPathForDisplay(
+                          activeSelectedWorktreePath,
+                          homeDirectory,
+                          true,
+                        )
+                      : activeSelectedWorktreeFolder || "Current worktree",
                     canCreateThread:
-                      selectedProject !== null && activeSelectedWorktreePath !== null,
+                      selectedProject !== null &&
+                      activeSelectedWorktreePath !== null,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     isThreadStatusDismissed,
@@ -5352,16 +5345,16 @@ export default function App({
                 acknowledgeThreadErrorSeenInBackground,
                 activeSelectedWorktreeBranch:
                   activeSelectedWorktree?.branch?.trim() || "Primary",
-                activeSelectedWorktreeFolder:
-                  activeSelectedWorktreePath
-                    ? formatPathForDisplay(
-                        activeSelectedWorktreePath,
-                        homeDirectory,
-                        true,
-                      )
-                    : activeSelectedWorktreeFolder || "Current worktree",
+                activeSelectedWorktreeFolder: activeSelectedWorktreePath
+                  ? formatPathForDisplay(
+                      activeSelectedWorktreePath,
+                      homeDirectory,
+                      true,
+                    )
+                  : activeSelectedWorktreeFolder || "Current worktree",
                 canCreateThread:
-                  selectedProject !== null && activeSelectedWorktreePath !== null,
+                  selectedProject !== null &&
+                  activeSelectedWorktreePath !== null,
                 clearCompletedThreadIndicator,
                 dismissThreadStatus,
                 isThreadStatusDismissed,

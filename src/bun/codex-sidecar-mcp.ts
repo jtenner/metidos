@@ -15,6 +15,7 @@ import {
 import { createSubsystemLogger } from "./logging";
 import type {
   AppRPCSchema,
+  RpcCronJob,
   RpcProcedureCallOptions,
   RpcProject,
   RpcRequestPriority,
@@ -1110,6 +1111,24 @@ function threadStartRequestPayload(request: RpcThreadStartRequest) {
   };
 }
 
+function cronJobPayload(cronJob: RpcCronJob) {
+  return {
+    cronJobId: cronJob.id,
+    projectId: cronJob.projectId,
+    worktreePath: cronJob.worktreePath,
+    title: cronJob.title,
+    description: cronJob.description,
+    schedule: cronJob.schedule,
+    prompt: cronJob.prompt,
+    lastRunDate: cronJob.lastRunDate,
+    lastRunStatus: cronJob.lastRunStatus,
+    enabled: cronJob.enabled,
+    deletedAt: cronJob.deletedAt,
+    createdAt: cronJob.createdAt,
+    updatedAt: cronJob.updatedAt,
+  };
+}
+
 /**
  * Build MCP text output with optional structured payload for downstream clients.
  * @param text - Input text content.
@@ -1364,6 +1383,214 @@ server.registerTool(
         worktreePath: result.worktreePath,
         threadId: result.threadId,
       },
+    );
+  }),
+);
+
+/**
+ * Tool: list non-deleted cron jobs.
+ */
+
+server.registerTool(
+  "list_crons",
+  {
+    title: "List Cron Jobs",
+    description: "List all non-deleted cron jobs with latest run metadata.",
+    inputSchema: {},
+    annotations: {
+      idempotentHint: true,
+      openWorldHint: false,
+      readOnlyHint: true,
+    },
+  },
+  withToolLogging("list_crons", async () => {
+    const crons = await rpcClient.call("listCrons", undefined);
+    return textResult(`Found ${crons.length} cron job(s).`, {
+      cronJobs: crons.map(cronJobPayload),
+    });
+  }),
+);
+
+/**
+ * Tool: create a cron job for periodic work execution.
+ */
+
+server.registerTool(
+  "new_cron",
+  {
+    title: "New Cron Job",
+    description:
+      "Create a new cron job bound to a project workspace. The run prompt is reused for each fire time.",
+    inputSchema: {
+      projectId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
+      projectPath: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Project path if projectId is unknown. Omit for null metadata.",
+        ),
+      worktreePath: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          `${defaultWorktreePathDescription()} Omit for null metadata.`,
+        ),
+      schedule: z.string().trim().min(1).describe("Cron schedule expression."),
+      prompt: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("Prompt sent to the cron run thread."),
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional short name for the cron job. Defaults to a label derived from the prompt.",
+        ),
+      description: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional full description for the cron job. Defaults to a prompt-derived summary.",
+        ),
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          "Whether the cron schedule starts immediately. Omit for null metadata.",
+        ),
+    },
+    annotations: {
+      idempotentHint: false,
+      openWorldHint: false,
+      readOnlyHint: false,
+    },
+  },
+  withToolLogging("new_cron", async (params) => {
+    const target = await resolveWorktreeTarget({
+      projectId: params.projectId,
+      projectPath: params.projectPath,
+      worktreePath: params.worktreePath,
+    });
+    const created = await rpcClient.call("newCron", {
+      projectId: target.projectId,
+      worktreePath: target.worktreePath,
+      schedule: params.schedule.trim(),
+      prompt: params.prompt.trim(),
+      ...(typeof params.title === "string"
+        ? { title: params.title.trim() }
+        : {}),
+      ...(typeof params.description === "string"
+        ? { description: params.description.trim() }
+        : {}),
+      ...(typeof params.enabled === "boolean"
+        ? { enabled: params.enabled }
+        : {}),
+    });
+    return textResult(
+      `Created cron job ${created.id} in ${target.worktreePath}.`,
+      cronJobPayload(created),
+    );
+  }),
+);
+
+/**
+ * Tool: update a cron job definition or toggle enabled/deletion.
+ */
+
+server.registerTool(
+  "update_cron",
+  {
+    title: "Update Cron Job",
+    description:
+      "Update schedule, prompt, enabled state, or soft-delete a cron job.",
+    inputSchema: {
+      cronJobId: z.number().int().positive().describe("Cron job identifier."),
+      schedule: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Optional replacement cron schedule."),
+      prompt: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Optional replacement prompt."),
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional replacement title. Omit to keep the current title.",
+        ),
+      description: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          "Optional replacement description. Omit to keep the current description.",
+        ),
+      enabled: z.boolean().optional().describe("Optional new enabled state."),
+      deleted: z.boolean().optional().describe("Optional soft-delete flag."),
+    },
+    annotations: {
+      idempotentHint: false,
+      openWorldHint: false,
+      readOnlyHint: false,
+    },
+  },
+  withToolLogging("update_cron", async (params) => {
+    if (
+      params.deleted === undefined &&
+      params.schedule === undefined &&
+      params.prompt === undefined &&
+      params.title === undefined &&
+      params.description === undefined &&
+      params.enabled === undefined
+    ) {
+      throw new Error("At least one update field is required.");
+    }
+    const updated = await rpcClient.call("updateCron", {
+      cronJobId: params.cronJobId,
+      ...(typeof params.schedule === "undefined"
+        ? {}
+        : { schedule: params.schedule.trim() }),
+      ...(typeof params.prompt === "undefined"
+        ? {}
+        : { prompt: params.prompt.trim() }),
+      ...(typeof params.title === "string"
+        ? { title: params.title.trim() }
+        : {}),
+      ...(typeof params.description === "string"
+        ? { description: params.description.trim() }
+        : {}),
+      ...(typeof params.enabled === "boolean"
+        ? { enabled: params.enabled }
+        : {}),
+      ...(typeof params.deleted === "boolean"
+        ? { deleted: params.deleted }
+        : {}),
+    });
+    return textResult(
+      `Updated cron job ${updated.id}.`,
+      cronJobPayload(updated),
     );
   }),
 );

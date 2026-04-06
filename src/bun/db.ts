@@ -235,6 +235,61 @@ export type SecurityAuditEventRecord = {
   createdAt: string;
 };
 
+export type CronJobRunStatus =
+  | "InProgress"
+  | "Stopped"
+  | "Errored"
+  | "Completed";
+
+export type CronJobRecord = {
+  id: number;
+  projectId: number;
+  worktreePath: string;
+  schedule: string;
+  prompt: string;
+  title: string;
+  description: string;
+  lastRunDate: number | null;
+  lastRunStatus: CronJobRunStatus | null;
+  enabled: 0 | 1;
+  deletedAt: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CronJobRunRecord = {
+  id: number;
+  cronJobId: number;
+  threadId: number;
+  runDate: number;
+  runStatus: CronJobRunStatus;
+};
+
+type CronJobInput = {
+  projectId: number;
+  worktreePath: string;
+  schedule: string;
+  prompt: string;
+  title: string;
+  description: string;
+  enabled?: boolean | null;
+};
+
+type CronJobUpdateInput = {
+  schedule?: string;
+  prompt?: string;
+  title?: string;
+  description?: string;
+  enabled?: boolean;
+};
+
+type CronJobRunInput = {
+  cronJobId: number;
+  threadId: number;
+  runDate: number;
+  runStatus: CronJobRunStatus;
+};
+
 const DEFAULT_APP_DATA_DIR =
   process.platform === "darwin"
     ? join(homedir(), "Library", "Application Support", APP_NAME)
@@ -459,6 +514,54 @@ function ensureThreadMessageColumn(
       db,
       `ALTER TABLE thread_messages ADD COLUMN ${columnDefinition}`,
     );
+  }
+}
+
+/**
+ * Ensure `cron_jobs` has a column for evolving schema versions.
+ * This keeps older databases compatible with new cron metadata fields.
+ */
+function ensureCronJobColumn(
+  db: Database,
+  columnName: string,
+  columnDefinition: string,
+): void {
+  // Column addition is additive and preserves existing row data.
+  if (!tableHasColumn(db, "cron_jobs", columnName)) {
+    runStatement(db, `ALTER TABLE cron_jobs ADD COLUMN ${columnDefinition}`);
+  }
+}
+
+/**
+ * Make existing active cron titles unique so the unique index can be added safely.
+ */
+function dedupeActiveCronJobTitles(database: Database): void {
+  const activeJobRows = database
+    .query<{ id: number; title: string }, []>(
+      `
+			SELECT
+				id,
+				title
+			FROM cron_jobs
+			WHERE deleted_at IS NULL
+			ORDER BY LOWER(TRIM(title)) ASC, created_at ASC, id ASC
+		`,
+    )
+    .all();
+
+  const titleCounts = new Map<string, number>();
+  for (const row of activeJobRows) {
+    const title = row.title.trim().toLowerCase();
+    const currentCount = titleCounts.get(title) ?? 0;
+    titleCounts.set(title, currentCount + 1);
+    if (currentCount > 0) {
+      runStatement(
+        database,
+        `UPDATE cron_jobs SET title = ? WHERE id = ?`,
+        `${row.title}-${currentCount}`,
+        row.id,
+      );
+    }
   }
 }
 
@@ -766,6 +869,96 @@ export function migrateDatabase(db: Database): void {
     `
 			CREATE INDEX IF NOT EXISTS idx_security_audit_events_thread_id
 			ON security_audit_events(thread_id, created_at DESC, id DESC);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS cron_jobs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				schedule TEXT NOT NULL,
+				prompt TEXT NOT NULL,
+				title TEXT NOT NULL,
+				description TEXT NOT NULL,
+				last_run_date INTEGER,
+				last_run_status TEXT CHECK(last_run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
+				enabled INTEGER NOT NULL DEFAULT 1,
+				deleted_at INTEGER,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_cron_jobs_enabled
+			ON cron_jobs(project_id, enabled, deleted_at, id);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_cron_jobs_schedule
+			ON cron_jobs(schedule, enabled, deleted_at, last_run_date);
+		`,
+  );
+  ensureCronJobColumn(db, "title", "title TEXT NOT NULL DEFAULT 'Cron job'");
+  ensureCronJobColumn(
+    db,
+    "description",
+    "description TEXT NOT NULL DEFAULT ''",
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				title = COALESCE(
+					NULLIF(TRIM(substr(prompt, 1, 72)), ''),
+					'Cron job ' || id
+				)
+			WHERE title IS NULL OR TRIM(title) = ''
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				description = COALESCE(NULLIF(TRIM(prompt), ''), schedule)
+			WHERE description IS NULL OR TRIM(description) = ''
+		`,
+  );
+  dedupeActiveCronJobTitles(db);
+  runStatement(
+    db,
+    `
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_cron_jobs_title_unique
+			ON cron_jobs(title COLLATE NOCASE)
+			WHERE deleted_at IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS cron_job_runs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				cron_job_id INTEGER NOT NULL REFERENCES cron_jobs(id) ON DELETE CASCADE,
+				thread_id INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+				run_date INTEGER NOT NULL,
+				run_status TEXT NOT NULL CHECK(run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_cron_job_runs_job
+			ON cron_job_runs(cron_job_id, run_date DESC, id DESC);
 		`,
   );
 }
@@ -2661,4 +2854,445 @@ export function stopInProgressThreadMessages(
 		`,
     threadId,
   );
+}
+
+/**
+ * Creates a cron job row.
+ * @param database - database argument for createCronJob.
+ * @param input - Input row.
+ */
+export function createCronJob(
+  database: Database,
+  input: CronJobInput,
+): CronJobRecord {
+  const result = runStatement(
+    database,
+    `
+			INSERT INTO cron_jobs (
+				project_id,
+				worktree_path,
+				schedule,
+				prompt,
+				title,
+				description,
+				enabled
+			)
+			VALUES (
+				?,
+				?,
+				?,
+				?,
+				?,
+				?,
+				?
+			)
+		`,
+    input.projectId,
+    input.worktreePath,
+    input.schedule,
+    input.prompt,
+    input.title,
+    input.description,
+    input.enabled === false ? 0 : 1,
+  );
+  const cronJob = getCronJobById(database, Number(result.lastInsertRowid));
+  if (!cronJob) {
+    throw new Error(
+      `Failed to create cron job for project ${input.projectId} and workspace ${input.worktreePath}`,
+    );
+  }
+  return cronJob;
+}
+
+/**
+ * Lists cron jobs.
+ * @param database - database argument for listCronJobs.
+ */
+export function listCronJobs(database: Database): CronJobRecord[] {
+  /** Load all cron jobs with latest settings. */
+  return database
+    .query<CronJobRecord, []>(
+      `
+			SELECT
+				id,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				schedule,
+				prompt,
+				title,
+				description,
+				last_run_date AS lastRunDate,
+				last_run_status AS lastRunStatus,
+				enabled,
+				deleted_at AS deletedAt,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM cron_jobs
+			ORDER BY id DESC
+		`,
+    )
+    .all();
+}
+
+/**
+ * Gets a single cron job by id.
+ * @param database - database argument for getCronJobById.
+ * @param cronJobId - Cron job identifier.
+ */
+export function getCronJobById(
+  database: Database,
+  cronJobId: number,
+): CronJobRecord | null {
+  /** Read a cron job row by its id. */
+  return database
+    .query<CronJobRecord, [number]>(
+      `
+			SELECT
+				id,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				schedule,
+				prompt,
+				title,
+				description,
+				last_run_date AS lastRunDate,
+				last_run_status AS lastRunStatus,
+				enabled,
+				deleted_at AS deletedAt,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM cron_jobs
+			WHERE id = ?
+		`,
+    )
+    .get(cronJobId);
+}
+
+/**
+ * Updates a cron job row.
+ * @param database - database argument for updateCronJob.
+ * @param cronJobId - Cron job identifier.
+ * @param input - patch input.
+ */
+export function updateCronJob(
+  database: Database,
+  cronJobId: number,
+  input: CronJobUpdateInput,
+): CronJobRecord {
+  const updates: string[] = [];
+  const bindings: SQLQueryBindings[] = [];
+
+  if (typeof input.schedule === "string") {
+    updates.push("schedule = ?");
+    bindings.push(input.schedule);
+  }
+
+  if (typeof input.prompt === "string") {
+    updates.push("prompt = ?");
+    bindings.push(input.prompt);
+  }
+
+  if (typeof input.title === "string") {
+    updates.push("title = ?");
+    bindings.push(input.title);
+  }
+
+  if (typeof input.description === "string") {
+    updates.push("description = ?");
+    bindings.push(input.description);
+  }
+
+  if (typeof input.enabled === "boolean") {
+    updates.push("enabled = ?");
+    bindings.push(input.enabled ? 1 : 0);
+  }
+
+  if (!updates.length) {
+    throw new Error("No cron job fields to update.");
+  }
+
+  const sql = `
+			UPDATE cron_jobs
+			SET
+				${updates.join(", ")},
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`;
+
+  runStatement(database, sql, ...bindings, cronJobId);
+  const cronJob = getCronJobById(database, cronJobId);
+  if (!cronJob) {
+    throw new Error(`Cron job not found: ${cronJobId}`);
+  }
+  return cronJob;
+}
+
+/**
+ * Lists enabled, non-deleted cron jobs.
+ * @param database - database argument for listActiveCronJobs.
+ */
+export function listActiveCronJobs(database: Database): CronJobRecord[] {
+  /** Read cron jobs that are enabled and not soft-deleted. */
+  return database
+    .query<CronJobRecord, []>(
+      `
+			SELECT
+				id,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				schedule,
+				prompt,
+				title,
+				description,
+				last_run_date AS lastRunDate,
+				last_run_status AS lastRunStatus,
+				enabled,
+				deleted_at AS deletedAt,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM cron_jobs
+			WHERE enabled = 1 AND deleted_at IS NULL
+			ORDER BY id ASC
+		`,
+    )
+    .all();
+}
+
+/**
+ * Sets cron job enabled state.
+ * @param database - database argument for setCronJobEnabled.
+ * @param cronJobId - Cron job identifier.
+ * @param enabled - enabled state.
+ */
+export function setCronJobEnabled(
+  database: Database,
+  cronJobId: number,
+  enabled: boolean,
+): void {
+  /** Toggle cron job scheduling state. */
+  runStatement(
+    database,
+    `
+			UPDATE cron_jobs
+			SET
+				enabled = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    enabled ? 1 : 0,
+    cronJobId,
+  );
+}
+
+/**
+ * Soft deletes a cron job by setting deletedAt.
+ * @param database - database argument for softDeleteCronJob.
+ * @param cronJobId - Cron job identifier.
+ */
+export function softDeleteCronJob(database: Database, cronJobId: number): void {
+  /** Disable and soft-delete a cron job so historical run rows remain. */
+  runStatement(
+    database,
+    `
+			UPDATE cron_jobs
+			SET
+				deleted_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+				enabled = 0,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    cronJobId,
+  );
+}
+
+/**
+ * Updates cron job last-run metadata.
+ * @param database - database argument for updateCronJobLastRun.
+ * @param cronJobId - Cron job identifier.
+ * @param inputRunDate - Last run date (ms since epoch).
+ * @param status - Last run status.
+ */
+export function updateCronJobLastRun(
+  database: Database,
+  cronJobId: number,
+  inputRunDate: number,
+  status: CronJobRunStatus,
+): void {
+  /** Persist runtime execution metadata for scheduler visibility. */
+  runStatement(
+    database,
+    `
+			UPDATE cron_jobs
+			SET
+				last_run_date = ?,
+				last_run_status = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    inputRunDate,
+    status,
+    cronJobId,
+  );
+}
+
+/**
+ * Claims due cron jobs and marks them as in progress.
+ * @param database - database argument for claimCronJobsForScheduledRun.
+ * @param schedule - Cron schedule expression that triggered.
+ * @param runDate - Run time in ms since epoch.
+ */
+export function claimCronJobsForScheduledRun(
+  database: Database,
+  schedule: string,
+  runDate: number,
+): CronJobRecord[] {
+  /** Claim due jobs atomically by matching schedule and stale last-run timestamp. */
+  return database
+    .query<CronJobRecord, [number, string, number]>(
+      `
+			UPDATE cron_jobs
+			SET
+				last_run_date = ?,
+				last_run_status = 'InProgress',
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id IN (
+				SELECT id
+				FROM cron_jobs
+				WHERE schedule = ?
+					AND enabled = 1
+					AND deleted_at IS NULL
+					AND (
+						last_run_date IS NULL
+						OR last_run_date < ?
+					)
+			)
+			RETURNING
+				id,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				schedule,
+				prompt,
+				title,
+				description,
+				last_run_date AS lastRunDate,
+				last_run_status AS lastRunStatus,
+				enabled,
+				deleted_at AS deletedAt,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+		`,
+    )
+    .all(runDate, schedule, runDate);
+}
+
+/**
+ * Creates a cron job run row.
+ * @param database - database argument for createCronJobRun.
+ * @param input - Input row.
+ */
+export function createCronJobRun(
+  database: Database,
+  input: CronJobRunInput,
+): CronJobRunRecord {
+  const result = runStatement(
+    database,
+    `
+			INSERT INTO cron_job_runs (
+				cron_job_id,
+				thread_id,
+				run_date,
+				run_status
+			)
+			VALUES (?, ?, ?, ?)
+		`,
+    input.cronJobId,
+    input.threadId,
+    input.runDate,
+    input.runStatus,
+  );
+  const runId = Number(result.lastInsertRowid);
+  const runRow = getCronJobRunById(database, runId);
+  if (!runRow) {
+    throw new Error(
+      `Failed to create cron job run for cronJobId ${input.cronJobId}`,
+    );
+  }
+  return runRow;
+}
+
+/**
+ * Reads a cron job run by id.
+ * @param database - database argument for getCronJobRunById.
+ * @param runId - Run identifier.
+ */
+export function getCronJobRunById(
+  database: Database,
+  runId: number,
+): CronJobRunRecord | null {
+  /** Read a single run row by primary key. */
+  return database
+    .query<CronJobRunRecord, [number]>(
+      `
+			SELECT
+				id,
+				cron_job_id AS cronJobId,
+				thread_id AS threadId,
+				run_date AS runDate,
+				run_status AS runStatus
+			FROM cron_job_runs
+			WHERE id = ?
+		`,
+    )
+    .get(runId);
+}
+
+/**
+ * Updates cron job run status.
+ * @param database - database argument for updateCronJobRunStatus.
+ * @param runId - Run identifier.
+ * @param status - New status.
+ */
+export function updateCronJobRunStatus(
+  database: Database,
+  runId: number,
+  status: CronJobRunStatus,
+): void {
+  /** Persist terminal run status for scheduler history. */
+  runStatement(
+    database,
+    `
+			UPDATE cron_job_runs
+			SET run_status = ?
+			WHERE id = ?
+		`,
+    status,
+    runId,
+  );
+}
+
+/**
+ * Lists run rows for a specific cron job.
+ * @param database - database argument for listCronJobRuns.
+ * @param cronJobId - Cron job identifier.
+ */
+export function listCronJobRuns(
+  database: Database,
+  cronJobId: number,
+): CronJobRunRecord[] {
+  /** Return run history newest-first for inspection and analytics. */
+  return database
+    .query<CronJobRunRecord, [number]>(
+      `
+			SELECT
+				id,
+				cron_job_id AS cronJobId,
+				thread_id AS threadId,
+				run_date AS runDate,
+				run_status AS runStatus
+			FROM cron_job_runs
+			WHERE cron_job_id = ?
+			ORDER BY run_date DESC, id DESC
+		`,
+    )
+    .all(cronJobId);
 }
