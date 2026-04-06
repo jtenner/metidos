@@ -25,8 +25,8 @@ Read this file before any web research, then update it after each sweep so the b
 
 ## Current Research Priorities
 
-- Information hierarchy, region labels, and visual structure in dense workspace pages
-- Responsive typography and container-aware layout primitives for dense panes and cards
+- Information hierarchy, region labels, page headers, and visual structure in dense workspace pages
+- Responsive typography, container-aware layout primitives, and page-header composition for dense panes and cards
 - Loading, empty, and error feedback states
 - Search, filtering, and progressive disclosure patterns
 - Distinguishing shell navigation from in-page navigation in multi-panel workspaces
@@ -43,9 +43,11 @@ Read this file before any web research, then update it after each sweep so the b
 - Should the shell use a temporary drawer, a rail, or both when the left nav collapses?
 - How should focus restoration work after the collapsed navigation closes?
 - When should breadcrumbs or page titles carry orientation at smaller widths?
+- Which surfaces should use a page-header pattern with breadcrumbs, search, or filters, and which should keep those controls in the body?
 - Which panes, cards, or dense content blocks should adopt container queries before viewport breakpoints?
 - Where should `text-wrap: balance` stay limited to short headings, and where should it stay off?
 - Which repeated regions should use `aria-labelledby` versus `aria-label` when labels are already visible?
+- Where should productive type styles stay the default, and where is expressive typography actually warranted?
 - Which micro-interactions improve confidence without slowing expert users down?
 - Which motion effects are essential, and which should disappear under reduced motion?
 - Which search and filter controls should stay visible versus collapse into disclosure?
@@ -63,6 +65,7 @@ Read this file before any web research, then update it after each sweep so the b
 - Accessible labels, grouping, and affordance rules for custom controls
 - Target-size defaults and spacing exceptions for dense toolbars and icon actions
 - Feedback-state defaults for loading, empty, success, and error surfaces
+- Page-header composition for dense workspace views
 - Mobile adaptation strategies for desktop-first interfaces
 - Strong defaults for spacing, typography, and color systems in productivity UIs
 - Empty-state and onboarding patterns for technical tools

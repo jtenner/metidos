@@ -12,6 +12,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 
 - Keep the shell shallow.
 - Use the header for global actions and the left panel for primary workspace navigation.
+- Use the page header for the page title and any local orientation controls such as breadcrumbs, search, or filters when they help the current task.
 - Keep navigation to two levels, and move deeper detail into page tabs or in-content controls.
 - Use sentence case for menu labels.
 - Keep the active location obvious with a selected state and `aria-current="page"` on the active link.
@@ -29,6 +30,7 @@ Use this pattern for developer tools and other data-dense products that need a p
 - A three-tier navigation stack in the shell.
 - Forcing a permanent expanded sidebar on narrow screens.
 - Hiding repeated shell navigation without providing landmarks or a clear route to the main content.
+- Putting page-scoped orientation controls in the shell header when they belong with the page content.
 
 ## Related Patterns
 
