@@ -57,6 +57,7 @@
 │  │     └─ README.md
 │  ├─ 2026-04-04-frontend-feedback-inventory.md
 │  ├─ 2026-04-04-frontend-performance-inventory.md
+│  ├─ 2026-04-07-thread-tool-access-controls.md
 │  └─ archive/
 │     ├─ README.md
 │     ├─ 2026-03-31-correctness-issues.md

@@ -153,7 +153,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#7ce38d]"
               checked={value.agentsAccess}
-              description="Allow thread and agent tools."
+              description="Allow planning and sub-agent tools."
               disabled={disabled}
               label="Agents"
               onChange={(checked) => {
@@ -167,7 +167,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#8ed0ff]"
               checked={value.joltAccess}
-              description="Allow Jolt MCP tools such as cron helpers."
+              description="Allow Jolt MCP tools such as thread, cron, and workspace helpers."
               disabled={disabled}
               label="Jolt"
               onChange={(checked) => {

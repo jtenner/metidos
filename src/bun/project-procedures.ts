@@ -757,10 +757,118 @@ function joltRpcHttpOrigin(rpcUrl: string): string {
   return url.origin;
 }
 
+type CodexClientThreadContext = Pick<
+  ThreadRecord,
+  | "agentsAccess"
+  | "githubAccess"
+  | "id"
+  | "joltAccess"
+  | "projectId"
+  | "worktreePath"
+>;
+
+type CodexClientConfig = NonNullable<
+  NonNullable<ConstructorParameters<typeof Codex>[0]>["config"]
+>;
+
+type CodexAccessFlag = boolean | 0 | 1 | null | undefined;
+
+function normalizeCodexAccessFlag(value: CodexAccessFlag): boolean {
+  return value === true || value === 1;
+}
+
+/**
+ * Builds per-thread developer instructions that keep access reporting aligned with thread flags.
+ */
+function buildThreadAccessDeveloperInstructions(
+  thread: {
+    agentsAccess: CodexAccessFlag;
+    githubAccess: CodexAccessFlag;
+    joltAccess: CodexAccessFlag;
+  },
+): string | null {
+  const lines: string[] = [];
+  const agentsAccess = normalizeCodexAccessFlag(thread.agentsAccess);
+  const githubAccess = normalizeCodexAccessFlag(thread.githubAccess);
+  const joltAccess = normalizeCodexAccessFlag(thread.joltAccess);
+
+  if (!agentsAccess) {
+    lines.push(
+      "Agent access is disabled for this thread. Treat `update_plan`, `request_user_input`, `spawn_agent`, `send_input`, `resume_agent`, `wait_agent`, and `close_agent` as unavailable. Do not use them and do not mention them when listing available tools.",
+    );
+  }
+
+  if (!githubAccess) {
+    lines.push(
+      "GitHub access is disabled for this thread. Treat all `mcp__codex_apps__github_*` tools as unavailable. Do not use them and do not mention them when listing available tools.",
+    );
+  }
+
+  if (!joltAccess) {
+    lines.push(
+      "Jolt access is disabled for this thread. Treat all `mcp__jolt__*` tools as unavailable. Do not use them and do not mention them when listing available tools.",
+    );
+  }
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return [
+    "Thread access controls override any broader default tool surface.",
+    ...lines,
+    "When the user asks which tools are available, list only tools that are enabled for this thread and callable in the current mode.",
+  ].join("\n");
+}
+
 /**
  * Creates codex client.
  * @param thread - thread argument for createCodexClient.
  */
+
+export function buildCodexClientConfig(
+  thread: CodexClientThreadContext,
+  options?: {
+    sessionId?: string | null;
+  },
+): CodexClientConfig {
+  const githubAccess = normalizeCodexAccessFlag(thread.githubAccess);
+  const agentsAccess = normalizeCodexAccessFlag(thread.agentsAccess);
+  const joltAccess = normalizeCodexAccessFlag(thread.joltAccess);
+  const developerInstructions = buildThreadAccessDeveloperInstructions(thread);
+
+  return {
+    apps: {
+      github: {
+        enabled: githubAccess,
+      },
+    },
+    ...(developerInstructions
+      ? {
+          developer_instructions: developerInstructions,
+        }
+      : {}),
+    features: {
+      default_mode_request_user_input: agentsAccess,
+      enable_fanout: agentsAccess,
+      multi_agent: agentsAccess,
+      multi_agent_v2: agentsAccess,
+    },
+    ...(joltAccess
+      ? {
+          mcp_servers: {
+            [JOLT_MCP_SERVER_NAME]: {
+              command: process.execPath,
+              args: [JOLT_SIDECAR_SERVER_PATH],
+              env: buildCodexSidecarEnv(thread, {
+                sessionId: options?.sessionId ?? null,
+              }),
+            },
+          },
+        }
+      : {}),
+  };
+}
 
 function createCodexClient(
   thread: ThreadRecord,
@@ -768,24 +876,10 @@ function createCodexClient(
     sessionId?: string | null;
   },
 ): Codex {
-  const accessEnabled =
-    thread.githubAccess || thread.agentsAccess || thread.joltAccess;
-  const config = accessEnabled
-    ? {
-        mcp_servers: {
-          [JOLT_MCP_SERVER_NAME]: {
-            command: process.execPath,
-            args: [JOLT_SIDECAR_SERVER_PATH],
-            env: buildCodexSidecarEnv(thread, {
-              sessionId: options?.sessionId ?? null,
-            }),
-          },
-        },
-      }
-    : {};
-
   return new Codex({
-    config,
+    config: buildCodexClientConfig(thread, {
+      sessionId: options?.sessionId ?? null,
+    }),
   });
 }
 /**

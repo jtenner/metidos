@@ -1305,7 +1305,7 @@ const server = new McpServer({
 
 /** Tool: update existing thread metadata and access controls. */
 
-if (agentsAccessContext) {
+if (joltAccessContext) {
   server.registerTool(
     "update_thread",
     {
@@ -1451,7 +1451,7 @@ if (agentsAccessContext) {
   );
 }
 
-if (agentsAccessContext) {
+if (joltAccessContext) {
   /** Tool: list project threads with optional workspace filtering. */
   server.registerTool(
     "list_threads",
@@ -1943,7 +1943,7 @@ if (joltAccessContext) {
  * Tool: create threads with optional start/request workflow for deferred approval.
  */
 
-if (agentsAccessContext) {
+if (joltAccessContext) {
   server.registerTool(
     "new_thread",
     {

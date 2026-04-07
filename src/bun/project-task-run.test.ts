@@ -110,6 +110,55 @@ afterAll(async () => {
 });
 
 describe("project task execution", () => {
+  it("builds a codex config that enforces thread-scoped access controls", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexClientConfig(
+        {
+          id: 17,
+          githubAccess: false,
+          agentsAccess: false,
+          joltAccess: true,
+          projectId: 9,
+          worktreePath: "/repo/worktree",
+        },
+        {
+          sessionId: "session-123",
+        },
+      ),
+    ).toMatchObject({
+      apps: {
+        github: {
+          enabled: false,
+        },
+      },
+      developer_instructions: expect.stringContaining(
+        "Treat `update_plan`, `request_user_input`, `spawn_agent`, `send_input`, `resume_agent`, `wait_agent`, and `close_agent` as unavailable.",
+      ),
+      features: {
+        default_mode_request_user_input: false,
+        enable_fanout: false,
+        multi_agent: false,
+        multi_agent_v2: false,
+      },
+      mcp_servers: {
+        jolt: {
+          command: process.execPath,
+          env: {
+            JOLT_AGENTS_ACCESS: "0",
+            JOLT_GITHUB_ACCESS: "0",
+            JOLT_JOLT_ACCESS: "1",
+            JOLT_PROJECT_ID: "9",
+            JOLT_SESSION_ID: "session-123",
+            JOLT_THREAD_ID: "17",
+            JOLT_WORKTREE_PATH: "/repo/worktree",
+          },
+        },
+      },
+    });
+  });
+
   it("builds a sidecar environment with the active session id", async () => {
     const procedures = await loadProjectProcedures();
 
@@ -139,6 +188,66 @@ describe("project task execution", () => {
       JOLT_SESSION_ID: "session-123",
       JOLT_THREAD_ID: "17",
       JOLT_WORKTREE_PATH: "/repo/worktree",
+    });
+  });
+
+  it("omits the Jolt sidecar server when Jolt access is disabled", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexClientConfig({
+        id: 23,
+        githubAccess: true,
+        agentsAccess: true,
+        joltAccess: false,
+        projectId: 11,
+        worktreePath: "/repo/other-worktree",
+      }),
+    ).toEqual({
+      apps: {
+        github: {
+          enabled: true,
+        },
+      },
+      developer_instructions: expect.stringContaining(
+        "Treat all `mcp__jolt__*` tools as unavailable.",
+      ),
+      features: {
+        default_mode_request_user_input: true,
+        enable_fanout: true,
+        multi_agent: true,
+        multi_agent_v2: true,
+      },
+    });
+  });
+
+  it("normalizes numeric SQLite-style access flags before building Codex config", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexClientConfig({
+        id: 31,
+        githubAccess: 0 as unknown as boolean,
+        agentsAccess: 1 as unknown as boolean,
+        joltAccess: 0 as unknown as boolean,
+        projectId: 12,
+        worktreePath: "/repo/sqlite-flags",
+      }),
+    ).toEqual({
+      apps: {
+        github: {
+          enabled: false,
+        },
+      },
+      developer_instructions: expect.stringContaining(
+        "Treat all `mcp__jolt__*` tools as unavailable.",
+      ),
+      features: {
+        default_mode_request_user_input: true,
+        enable_fanout: true,
+        multi_agent: true,
+        multi_agent_v2: true,
+      },
     });
   });
 
