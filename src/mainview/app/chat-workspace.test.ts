@@ -8,6 +8,7 @@ import { describe, expect, it } from "bun:test";
 import {
   deriveGroupedVisibleMessages,
   deriveTranscriptMeasurementRows,
+  isChatTranscriptAtBottom,
   shouldRenderUnsafeModePopover,
 } from "./chat-workspace";
 import type { VisibleMessage } from "./state";
@@ -265,5 +266,34 @@ describe("shouldRenderUnsafeModePopover", () => {
         isAnchorHovered: false,
       }),
     ).toBeTrue();
+  });
+});
+
+describe("isChatTranscriptAtBottom", () => {
+  it("treats the viewport as pinned when the remaining gap is within the bottom threshold", () => {
+    expect(
+      isChatTranscriptAtBottom({
+        clientHeight: 600,
+        scrollHeight: 1200,
+        scrollTop: 600,
+      }),
+    ).toBeTrue();
+    expect(
+      isChatTranscriptAtBottom({
+        clientHeight: 600,
+        scrollHeight: 1200,
+        scrollTop: 584,
+      }),
+    ).toBeTrue();
+  });
+
+  it("treats the viewport as unpinned when the gap exceeds the threshold", () => {
+    expect(
+      isChatTranscriptAtBottom({
+        clientHeight: 600,
+        scrollHeight: 1200,
+        scrollTop: 560,
+      }),
+    ).toBeFalse();
   });
 });

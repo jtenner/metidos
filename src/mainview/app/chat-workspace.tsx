@@ -17,6 +17,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -183,6 +184,24 @@ export function shouldRenderUnsafeModePopover({
   isAnchorHovered,
 }: UnsafeModePopoverVisibilityOptions): boolean {
   return checked && (isAnchorFocused || isAnchorHovered);
+}
+
+/**
+ * Checks whether the transcript viewport is effectively pinned to the bottom.
+ * @param container - Scroll container for the chat transcript.
+ */
+export function isChatTranscriptAtBottom(
+  container: Pick<
+    HTMLDivElement,
+    "clientHeight" | "scrollHeight" | "scrollTop"
+  >,
+): boolean {
+  return (
+    Math.max(
+      container.scrollHeight - container.scrollTop - container.clientHeight,
+      0,
+    ) <= CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX
+  );
 }
 
 /**
@@ -905,7 +924,8 @@ const ChatTranscript = memo(function ChatTranscript({
   const groupedMessagesCacheRef = useRef<GroupedVisibleMessagesCache | null>(
     null,
   );
-  const autoscrollRafRef = useRef<number | null>(null);
+  const autoScrollResetRafRef = useRef<number | null>(null);
+  const isAutoScrollingRef = useRef(false);
   const groupedMessagesCache = deriveGroupedVisibleMessages(
     activeThreadId,
     messages,
@@ -1089,26 +1109,45 @@ const ChatTranscript = memo(function ChatTranscript({
 
   const updatePinnedToBottom = useCallback(
     (container: HTMLDivElement): void => {
+      if (isAutoScrollingRef.current) {
+        return;
+      }
+
       // Update auto-scroll state only when transcript is near bottom; avoids fighting
       // manual user scrolling while new messages stream in.
-      pinnedToBottomRef.current =
-        container.scrollHeight - container.scrollTop - container.clientHeight <=
-        CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
+      pinnedToBottomRef.current = isChatTranscriptAtBottom(container);
     },
     [],
   );
 
   const scrollToBottom = useCallback((): void => {
-    if (rowCount <= 0) {
+    const container = scrollRef.current;
+    if (!container || rowCount <= 0) {
       return;
     }
-    virtualizer.scrollToIndex(rowCount - 1, {
-      align: "end",
-      behavior: "auto",
+    if (autoScrollResetRafRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollResetRafRef.current);
+    }
+
+    isAutoScrollingRef.current = true;
+    container.scrollTop = container.scrollHeight;
+    autoScrollResetRafRef.current = window.requestAnimationFrame(() => {
+      isAutoScrollingRef.current = false;
+      autoScrollResetRafRef.current = null;
     });
-  }, [rowCount, virtualizer]);
+  }, [rowCount]);
 
   useEffect(() => {
+    return () => {
+      if (autoScrollResetRafRef.current !== null) {
+        window.cancelAnimationFrame(autoScrollResetRafRef.current);
+        autoScrollResetRafRef.current = null;
+      }
+      isAutoScrollingRef.current = false;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
     // On thread change, force pin-to-bottom behavior so new thread opens scrolled to latest.
     const threadChanged = previousThreadIdRef.current !== activeThreadId;
     if (threadChanged) {
@@ -1116,20 +1155,8 @@ const ChatTranscript = memo(function ChatTranscript({
       previousThreadIdRef.current = activeThreadId;
     }
     if (pinnedToBottomRef.current) {
-      if (autoscrollRafRef.current !== null) {
-        window.cancelAnimationFrame(autoscrollRafRef.current);
-      }
-      autoscrollRafRef.current = window.requestAnimationFrame(() => {
-        scrollToBottom();
-        autoscrollRafRef.current = null;
-      });
+      scrollToBottom();
     }
-    return () => {
-      if (autoscrollRafRef.current !== null) {
-        window.cancelAnimationFrame(autoscrollRafRef.current);
-        autoscrollRafRef.current = null;
-      }
-    };
   }, [activeThreadId, scrollToBottom]);
 
   return (
