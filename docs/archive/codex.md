@@ -34,7 +34,7 @@ If no session id is available, the sidecar falls back to a direct websocket conn
 
 The sidecar exposes these Jolt control tools:
 
-- `modify_thread`
+- `update_thread`
 - `new_thread`
 - `run_untrusted_js`
   - Executes untrusted JavaScript or TypeScript in a vm2 NodeVM sandbox.
@@ -43,12 +43,12 @@ The sidecar exposes these Jolt control tools:
 
 Guidance:
 
-- treat `modify_thread` as a safe metadata update
+- treat `update_thread` as a safe metadata update
 - use `new_thread` sparingly
 - use `new_thread.autoStart` to ask the UI for permission before creating a separate thread; when `unsafeMode` is true, the thread starts immediately instead of waiting for the popup
-- let `modify_thread` run liberally whenever a better title, a short summary, or pinning and unpinning would improve scanability
-- use the optional `summary` field on `modify_thread` for a short desktop hover description when it adds useful context
-- use the optional `pinned` field on `modify_thread` to pin important threads and unpin them when that organization no longer helps
+- let `update_thread` run liberally whenever a better title, a short summary, or pinning and unpinning would improve scanability
+- use the optional `summary` field on `update_thread` for a short desktop hover description when it adds useful context
+- use the optional `pinned` field on `update_thread` to pin important threads and unpin them when that organization no longer helps
 - pass `threadId` explicitly for thread-scoped tools; the bound thread id is exposed in tool metadata
 - attach the sidecar at client construction so every thread from that `Codex` instance can reach it
 

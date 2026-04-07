@@ -432,7 +432,7 @@ const DIFF_LOAD_CONCURRENCY = 2;
 const WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS = 30_000;
 const TASK_WATCH_RETRY_DELAY_MS = 60_000;
 const JOLT_THREAD_START_METADATA_INSTRUCTION =
-  "Before you do anything, please update the jolt thread metadata by calling 'modify_thread'.";
+  "Before you do anything, please update the jolt thread metadata by calling 'update_thread'.";
 
 /**
  * Per-worktree command options, including an explicit refresh override.

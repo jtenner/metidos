@@ -1277,9 +1277,9 @@ const server = new McpServer({
 /** Tool: update existing thread metadata (title, summary, pinned). */
 
 server.registerTool(
-  "modify_thread",
+  "update_thread",
   {
-    title: "Modify Thread",
+    title: "Update Thread",
     description: `Update Jolt thread metadata. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning and unpinning would make the thread easier to scan.${boundThreadSentence()}`,
     inputSchema: {
       title: z
@@ -1312,7 +1312,7 @@ server.registerTool(
     annotations: safeMetadataAnnotations(),
   },
   withToolLogging(
-    "modify_thread",
+    "update_thread",
     async ({ pinned, summary, threadId, title }) => {
       const resolvedThreadId = requireThreadId(threadId);
       const thread = await updateThreadMetadataFromSidecar(
