@@ -25,7 +25,10 @@ import type {
   RpcThreadStartRequest,
   RpcWorktree,
 } from "./rpc-schema";
-import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
+import {
+  updateThreadAccessFromSidecar,
+  updateThreadMetadataFromSidecar,
+} from "./sidecar-thread-metadata";
 import {
   formatVm2ExecutionReportText,
   runUntrustedJavaScriptInVm2,
@@ -80,11 +83,20 @@ type ThreadLifecycleStatus = "Turning" | "Errored" | "Stopped" | "Created";
 const threadIdContext = readIntegerEnv("JOLT_THREAD_ID");
 const projectIdContext = readIntegerEnv("JOLT_PROJECT_ID");
 const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
+const githubAccessContext = readBooleanEnv("JOLT_GITHUB_ACCESS");
+const agentsAccessContext = readBooleanEnv("JOLT_AGENTS_ACCESS");
+const joltAccessContext = readBooleanEnv("JOLT_JOLT_ACCESS", true);
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
 const rpcHttpOrigin =
   readStringEnv("JOLT_RPC_HTTP_ORIGIN") ?? deriveRpcHttpOrigin(rpcUrl);
 const sessionIdContext = readStringEnv("JOLT_SESSION_ID");
 const sidecarLogger = createSubsystemLogger("MCP Sidecar");
+sidecarLogger.trace({
+  message: "MCP access flags loaded",
+  githubAccess: githubAccessContext,
+  agentsAccess: agentsAccessContext,
+  joltAccess: joltAccessContext,
+});
 const supportedCodexModels = buildCodexModelCatalog()
   .models.map((model) => model.id)
   .join(", ");
@@ -562,6 +574,25 @@ function readIntegerEnv(name: string): number | null {
 function readStringEnv(name: string): string | null {
   const raw = process.env[name]?.trim();
   return raw ? raw : null;
+}
+
+/**
+ * Read and parse an environment variable as a boolean flag.
+ * @param name - Environment variable name.
+ * @param defaultValue - Value used when the variable is unset or malformed.
+ */
+function readBooleanEnv(name: string, defaultValue = false): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) {
+    return defaultValue;
+  }
+  if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") {
+    return true;
+  }
+  if (raw === "0" || raw === "false" || raw === "no" || raw === "off") {
+    return false;
+  }
+  return defaultValue;
 }
 
 /**
@@ -1122,6 +1153,10 @@ function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
     threadId: thread.id,
     projectId: thread.projectId,
     worktreePath: thread.worktreePath,
+    githubAccess: thread.githubAccess,
+    agentsAccess: thread.agentsAccess,
+    joltAccess: thread.joltAccess,
+    unsafeMode: thread.unsafeMode,
     title: thread.title,
     summary: thread.summary,
     pinned: thread.pinnedAt !== null,
@@ -1184,6 +1219,9 @@ function cronJobPayload(cronJob: RpcCronJob) {
     cronJobId: cronJob.id,
     projectId: cronJob.projectId,
     worktreePath: cronJob.worktreePath,
+    githubAccess: cronJob.githubAccess,
+    agentsAccess: cronJob.agentsAccess,
+    joltAccess: cronJob.joltAccess,
     unsafeMode: cronJob.unsafeMode,
     title: cronJob.title,
     description: cronJob.description,
@@ -1222,15 +1260,6 @@ function textResult(text: string, structuredContent?: Record<string, unknown>) {
   return {
     content: [{ type: "text" as const, text }],
     ...(typeof structuredContent === "undefined" ? {} : { structuredContent }),
-  };
-}
-
-/** Shared MCP annotations used by read-modify metadata operations. */
-function safeMetadataAnnotations() {
-  return {
-    idempotentHint: true,
-    openWorldHint: false,
-    readOnlyHint: true,
   };
 }
 
@@ -1274,623 +1303,802 @@ const server = new McpServer({
   version: "0.0.1",
 });
 
-/** Tool: update existing thread metadata (title, summary, pinned). */
+/** Tool: update existing thread metadata and access controls. */
 
-server.registerTool(
-  "update_thread",
-  {
-    title: "Update Thread",
-    description: `Update Jolt thread metadata. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning and unpinning would make the thread easier to scan.${boundThreadSentence()}`,
-    inputSchema: {
-      title: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Short title. Supply one for every thread, including quick one-off tasks. Omit only when updating other metadata without changing the title.",
-        ),
-      summary: z
-        .string()
-        .optional()
-        .describe(
-          "Optional thread summary. Empty clears it. Omit to leave unchanged.",
-        ),
-      pinned: z
-        .boolean()
-        .optional()
-        .describe(
-          "Optional pinned state. Set true to pin, false to unpin, or omit to leave the pinned state unchanged.",
-        ),
-      threadId: z
-        .number()
-        .int()
-        .positive()
-        .describe(explicitThreadIdDescription()),
-    },
-    // Treat metadata updates as safe UI changes so Codex can run them freely.
-    annotations: safeMetadataAnnotations(),
-  },
-  withToolLogging(
+if (agentsAccessContext) {
+  server.registerTool(
     "update_thread",
-    async ({ pinned, summary, threadId, title }) => {
-      const resolvedThreadId = requireThreadId(threadId);
-      const thread = await updateThreadMetadataFromSidecar(
-        (params, options) =>
-          rpcClient.call("updateThreadMetadata", params, options),
+    {
+      title: "Update Thread",
+      description: `Update Jolt thread metadata and access controls. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, pinning, or access changes would make the thread easier to scan.${boundThreadSentence()}`,
+      inputSchema: {
+        title: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Short title. Supply one for every thread, including quick one-off tasks. Omit only when updating other fields without changing the title.",
+          ),
+        summary: z
+          .string()
+          .optional()
+          .describe(
+            "Optional thread summary. Empty clears it. Omit to leave unchanged.",
+          ),
+        pinned: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional pinned state. Set true to pin, false to unpin, or omit to leave the pinned state unchanged.",
+          ),
+        githubAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional GitHub access flag. Omit to keep the current value.",
+          ),
+        agentsAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional agent-tool access flag. Omit to keep the current value.",
+          ),
+        joltAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional Jolt-tool access flag. Omit to keep the current value.",
+          ),
+        unsafeMode: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional danger-full-access flag. Omit to keep the current value.",
+          ),
+        threadId: z
+          .number()
+          .int()
+          .positive()
+          .describe(explicitThreadIdDescription()),
+      },
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
+      },
+    },
+    withToolLogging(
+      "update_thread",
+      async ({
+        agentsAccess,
+        githubAccess,
+        joltAccess,
+        pinned,
+        summary,
+        threadId,
+        title,
+        unsafeMode,
+      }) => {
+        const resolvedThreadId = requireThreadId(threadId);
+        const hasMetadataUpdate =
+          typeof title !== "undefined" ||
+          typeof summary !== "undefined" ||
+          typeof pinned !== "undefined";
+        const hasAccessUpdate =
+          typeof githubAccess !== "undefined" ||
+          typeof agentsAccess !== "undefined" ||
+          typeof joltAccess !== "undefined" ||
+          typeof unsafeMode !== "undefined";
+        if (!hasMetadataUpdate && !hasAccessUpdate) {
+          throw new Error(
+            "At least one of title, summary, pinned, githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+          );
+        }
+
+        let thread: RpcThread | null = null;
+
+        if (hasMetadataUpdate) {
+          thread = await updateThreadMetadataFromSidecar(
+            (params, options) =>
+              rpcClient.call("updateThreadMetadata", params, options),
+            {
+              threadId: resolvedThreadId,
+              ...(typeof title === "undefined" ? {} : { title }),
+              ...(typeof summary === "undefined" ? {} : { summary }),
+              ...(typeof pinned === "undefined" ? {} : { pinned }),
+            },
+            {
+              priority: "foreground",
+            },
+          );
+        }
+
+        if (hasAccessUpdate) {
+          thread = await updateThreadAccessFromSidecar(
+            (params, options) =>
+              rpcClient.call("updateThreadAccess", params, options),
+            {
+              threadId: resolvedThreadId,
+              ...(typeof githubAccess === "undefined" ? {} : { githubAccess }),
+              ...(typeof agentsAccess === "undefined" ? {} : { agentsAccess }),
+              ...(typeof joltAccess === "undefined" ? {} : { joltAccess }),
+              ...(typeof unsafeMode === "undefined" ? {} : { unsafeMode }),
+            },
+            {
+              priority: "foreground",
+            },
+          );
+        }
+
+        if (!thread) {
+          throw new Error("Thread update did not return a result.");
+        }
+
+        return textResult(`Updated thread ${thread.id}.`, {
+          threadId: thread.id,
+          title: thread.title,
+          summary: thread.summary,
+          pinned: thread.pinnedAt !== null,
+          pinnedAt: thread.pinnedAt,
+          githubAccess: thread.githubAccess,
+          agentsAccess: thread.agentsAccess,
+          joltAccess: thread.joltAccess,
+          unsafeMode: thread.unsafeMode,
+        });
+      },
+    ),
+  );
+}
+
+if (agentsAccessContext) {
+  /** Tool: list project threads with optional workspace filtering. */
+  server.registerTool(
+    "list_threads",
+    {
+      title: "List Threads",
+      description:
+        "List Jolt threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
+      inputSchema: {
+        projectName: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Project name or path to inspect."),
+        workspaceName: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("Optional git worktree name or path."),
+      },
+      annotations: {
+        idempotentHint: true,
+        openWorldHint: false,
+        readOnlyHint: true,
+      },
+    },
+    withToolLogging("list_threads", async ({ projectName, workspaceName }) => {
+      const { project, rows, workspace } = await buildThreadListRows({
+        projectName,
+        workspaceName,
+      });
+      const textLines = rows.length
+        ? rows.map(
+            (row) =>
+              `- [${row.threadId}] ${row.title} (${row.workspaceName} · ${row.workspacePath})${row.pinned ? " [pinned]" : ""}${row.summary ? ` - ${row.summary}` : ""}`,
+          )
+        : [
+            workspace
+              ? `No threads found in ${project.name} / ${workspace.branch?.trim() || shortName(workspace.path)}.`
+              : `No threads found in ${project.name}.`,
+          ];
+      return textResult(
+        [
+          `Threads for ${project.name}${workspace ? ` / ${workspace.branch?.trim() || shortName(workspace.path)}` : ""}:`,
+          ...textLines,
+        ].join("\n"),
         {
-          threadId: resolvedThreadId,
-          ...(typeof title === "undefined" ? {} : { title }),
-          ...(typeof summary === "undefined" ? {} : { summary }),
-          ...(typeof pinned === "undefined" ? {} : { pinned }),
+          projectId: project.id,
+          projectName: project.name,
+          projectPath: project.path,
+          workspacePath: workspace?.path ?? null,
+          workspaceName: workspace
+            ? workspace.branch?.trim() ||
+              (samePath(workspace.path, project.path)
+                ? "Primary"
+                : shortName(workspace.path))
+            : null,
+          threads: rows,
+        },
+      );
+    }),
+  );
+}
+
+if (joltAccessContext) {
+  /**
+   * Tool: run untrusted JavaScript or TypeScript in a vm2 sandbox.
+   */
+  server.registerTool(
+    "run_untrusted_js",
+    {
+      title: "Run Untrusted JS",
+      description:
+        "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Supports redirected console output, a configurable timeout, and a frozen sandbox with fetch plus Bun.Glob, Bun.file, Bun.SQLite, Bun.sleep, Bun.nanoseconds, Bun.gzipSync, Bun.gunzipSync, Bun.deflateSync, Bun.inflateSync, Bun.zstdCompress, Bun.zstdDecompress, Bun.zstdCompressSync, Bun.zstdDecompressSync, Bun.semver, Bun.TOML, Bun.markdown, and Bun.color. The sandboxed fs mock is read-only outside the current worktree and writable only inside it.",
+      inputSchema: {
+        code: z
+          .string()
+          .min(1)
+          .describe("TypeScript or JavaScript source to execute."),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Sandbox timeout in milliseconds. Defaults to 60000."),
+      },
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
+      },
+    },
+    withToolLogging("run_untrusted_js", async ({ code, timeoutMs }) => {
+      const report = await runUntrustedJavaScriptInVm2({
+        code,
+        ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+        worktreePath: worktreePathContext ?? process.cwd(),
+      });
+      return textResult(formatVm2ExecutionReportText(report), report);
+    }),
+  );
+
+  /** Tool: focus the UI on a project/workspace/thread context. */
+  server.registerTool(
+    "set_context",
+    {
+      title: "Set Context",
+      description:
+        "Focus the UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
+      inputSchema: {
+        project: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Project name or path to focus."),
+        workspace: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("Optional git worktree name or path."),
+        threadId: z
+          .union([z.number().int().positive(), z.string().trim().min(1)])
+          .optional()
+          .describe("Optional thread id to focus."),
+      },
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
+      },
+    },
+    withToolLogging("set_context", async ({ project, threadId, workspace }) => {
+      const target = await resolveFocusContextTarget({
+        project,
+        threadId,
+        workspace,
+      });
+      const result = await rpcClient.call(
+        "focusContext",
+        {
+          projectId: target.project.id,
+          worktreePath: target.worktree.path,
+          ...(target.threadId === null ? {} : { threadId: target.threadId }),
         },
         {
           priority: "foreground",
         },
       );
-      return textResult(`Updated thread ${thread.id}.`, {
-        threadId: thread.id,
-        title: thread.title,
-        summary: thread.summary,
-        pinned: thread.pinnedAt !== null,
-        pinnedAt: thread.pinnedAt,
+      return textResult(
+        `Focused ${result.projectName} / ${shortName(result.worktreePath)}${result.threadId ? ` / thread ${result.threadId}` : ""}.`,
+        {
+          projectId: result.projectId,
+          projectName: result.projectName,
+          projectPath: result.projectPath,
+          worktreePath: result.worktreePath,
+          threadId: result.threadId,
+        },
+      );
+    }),
+  );
+
+  /**
+   * Tool: list non-deleted cron jobs.
+   */
+
+  server.registerTool(
+    "list_crons",
+    {
+      title: "List Cron Jobs",
+      description: "List all non-deleted cron jobs with latest run metadata.",
+      inputSchema: {},
+      annotations: {
+        idempotentHint: true,
+        openWorldHint: false,
+        readOnlyHint: true,
+      },
+    },
+    withToolLogging("list_crons", async () => {
+      const crons = await rpcClient.call("listCrons", undefined);
+      return textResult(`Found ${crons.length} cron job(s).`, {
+        cronJobs: crons.map(cronJobPayload),
       });
-    },
-  ),
-);
+    }),
+  );
 
-/** Tool: list project threads with optional workspace filtering. */
-server.registerTool(
-  "list_threads",
-  {
-    title: "List Threads",
-    description:
-      "List Jolt threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
-    inputSchema: {
-      projectName: z
-        .string()
-        .trim()
-        .min(1)
-        .describe("Project name or path to inspect."),
-      workspaceName: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Optional git worktree name or path."),
-    },
-    annotations: {
-      idempotentHint: true,
-      openWorldHint: false,
-      readOnlyHint: true,
-    },
-  },
-  withToolLogging("list_threads", async ({ projectName, workspaceName }) => {
-    const { project, rows, workspace } = await buildThreadListRows({
-      projectName,
-      workspaceName,
-    });
-    const textLines = rows.length
-      ? rows.map(
-          (row) =>
-            `- [${row.threadId}] ${row.title} (${row.workspaceName} · ${row.workspacePath})${row.pinned ? " [pinned]" : ""}${row.summary ? ` - ${row.summary}` : ""}`,
-        )
-      : [
-          workspace
-            ? `No threads found in ${project.name} / ${workspace.branch?.trim() || shortName(workspace.path)}.`
-            : `No threads found in ${project.name}.`,
-        ];
-    return textResult(
-      [
-        `Threads for ${project.name}${workspace ? ` / ${workspace.branch?.trim() || shortName(workspace.path)}` : ""}:`,
-        ...textLines,
-      ].join("\n"),
-      {
-        projectId: project.id,
-        projectName: project.name,
-        projectPath: project.path,
-        workspacePath: workspace?.path ?? null,
-        workspaceName: workspace
-          ? workspace.branch?.trim() ||
-            (samePath(workspace.path, project.path)
-              ? "Primary"
-              : shortName(workspace.path))
-          : null,
-        threads: rows,
+  /**
+   * Tool: create a cron job for periodic work execution.
+   */
+
+  server.registerTool(
+    "new_cron",
+    {
+      title: "New Cron Job",
+      description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. ${supportedCodexModelsSentence}`,
+      inputSchema: {
+        projectId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
+        projectPath: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Project path if projectId is unknown. Omit for null metadata.",
+          ),
+        worktreePath: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            `${defaultWorktreePathDescription()} Omit for null metadata.`,
+          ),
+        schedule: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Cron schedule expression."),
+        prompt: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("Prompt sent to the cron run thread."),
+        model: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            `Model override for cron-run threads. ${supportedCodexModelsSentence}`,
+          ),
+        githubAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow GitHub tools for cron-run threads. Omit for null metadata.",
+          ),
+        agentsAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow agent tools for cron-run threads. Omit for null metadata.",
+          ),
+        joltAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow Jolt MCP tools for cron-run threads. Omit for null metadata.",
+          ),
+        title: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional short name for the cron job. Defaults to a label derived from the prompt.",
+          ),
+        description: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional full description for the cron job. Defaults to a prompt-derived summary.",
+          ),
+        unsafeMode: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, cron-run threads start in danger-full-access mode.",
+          ),
+        enabled: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether the cron schedule starts immediately. Omit for null metadata.",
+          ),
+        reasoningEffort: z
+          .enum(["minimal", "low", "medium", "high", "xhigh"])
+          .optional()
+          .describe("Reasoning effort override for cron-run threads."),
       },
-    );
-  }),
-);
-
-/**
- * Tool: run untrusted JavaScript or TypeScript in a vm2 sandbox.
- */
-server.registerTool(
-  "run_untrusted_js",
-  {
-    title: "Run Untrusted JS",
-    description:
-      "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Supports redirected console output, a configurable timeout, and a frozen sandbox with fetch plus Bun.Glob, Bun.file, Bun.SQLite, Bun.sleep, Bun.nanoseconds, Bun.gzipSync, Bun.gunzipSync, Bun.deflateSync, Bun.inflateSync, Bun.zstdCompress, Bun.zstdDecompress, Bun.zstdCompressSync, Bun.zstdDecompressSync, Bun.semver, Bun.TOML, Bun.markdown, and Bun.color. The sandboxed fs mock is read-only outside the current worktree and writable only inside it.",
-    inputSchema: {
-      code: z
-        .string()
-        .min(1)
-        .describe("TypeScript or JavaScript source to execute."),
-      timeoutMs: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("Sandbox timeout in milliseconds. Defaults to 60000."),
-    },
-    annotations: {
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  withToolLogging("run_untrusted_js", async ({ code, timeoutMs }) => {
-    const report = await runUntrustedJavaScriptInVm2({
-      code,
-      ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
-      worktreePath: worktreePathContext ?? process.cwd(),
-    });
-    return textResult(formatVm2ExecutionReportText(report), report);
-  }),
-);
-
-/** Tool: focus the UI on a project/workspace/thread context. */
-
-server.registerTool(
-  "set_context",
-  {
-    title: "Set Context",
-    description:
-      "Focus the UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
-    inputSchema: {
-      project: z
-        .string()
-        .trim()
-        .min(1)
-        .describe("Project name or path to focus."),
-      workspace: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Optional git worktree name or path."),
-      threadId: z
-        .union([z.number().int().positive(), z.string().trim().min(1)])
-        .optional()
-        .describe("Optional thread id to focus."),
-    },
-    annotations: {
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  withToolLogging("set_context", async ({ project, threadId, workspace }) => {
-    const target = await resolveFocusContextTarget({
-      project,
-      threadId,
-      workspace,
-    });
-    const result = await rpcClient.call(
-      "focusContext",
-      {
-        projectId: target.project.id,
-        worktreePath: target.worktree.path,
-        ...(target.threadId === null ? {} : { threadId: target.threadId }),
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
       },
-      {
-        priority: "foreground",
+    },
+    withToolLogging("new_cron", async (params) => {
+      const target = await resolveWorktreeTarget({
+        projectId: params.projectId,
+        projectPath: params.projectPath,
+        worktreePath: params.worktreePath,
+      });
+      const created = await rpcClient.call("newCron", {
+        projectId: target.projectId,
+        worktreePath: target.worktreePath,
+        schedule: params.schedule.trim(),
+        prompt: params.prompt.trim(),
+        ...(typeof params.model === "string"
+          ? { model: params.model.trim() }
+          : {}),
+        ...(typeof params.reasoningEffort === "string"
+          ? { reasoningEffort: params.reasoningEffort }
+          : {}),
+        ...(typeof params.githubAccess === "boolean"
+          ? { githubAccess: params.githubAccess }
+          : {}),
+        ...(typeof params.agentsAccess === "boolean"
+          ? { agentsAccess: params.agentsAccess }
+          : {}),
+        ...(typeof params.joltAccess === "boolean"
+          ? { joltAccess: params.joltAccess }
+          : {}),
+        ...(typeof params.title === "string"
+          ? { title: params.title.trim() }
+          : {}),
+        ...(typeof params.description === "string"
+          ? { description: params.description.trim() }
+          : {}),
+        ...(typeof params.unsafeMode === "boolean"
+          ? { unsafeMode: params.unsafeMode }
+          : {}),
+        ...(typeof params.enabled === "boolean"
+          ? { enabled: params.enabled }
+          : {}),
+      });
+      return textResult(
+        `Created cron job ${created.id} in ${target.worktreePath}.`,
+        cronJobPayload(created),
+      );
+    }),
+  );
+
+  /**
+   * Tool: update a cron job definition or toggle enabled/deletion.
+   */
+
+  server.registerTool(
+    "update_cron",
+    {
+      title: "Update Cron Job",
+      description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. ${supportedCodexModelsSentence}`,
+      inputSchema: {
+        cronJobId: z.number().int().positive().describe("Cron job identifier."),
+        schedule: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("Optional replacement cron schedule."),
+        model: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            `Optional model override for cron run threads. ${supportedCodexModelsSentence}`,
+          ),
+        githubAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional GitHub access flag for cron-run threads. Omit to keep the current value.",
+          ),
+        agentsAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional agent access flag for cron-run threads. Omit to keep the current value.",
+          ),
+        joltAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Optional Jolt access flag for cron-run threads. Omit to keep the current value.",
+          ),
+        prompt: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("Optional replacement prompt."),
+        title: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional replacement title. Omit to keep the current title.",
+          ),
+        description: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional replacement description. Omit to keep the current description.",
+          ),
+        unsafeMode: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, cron-run threads start in danger-full-access mode.",
+          ),
+        reasoningEffort: z
+          .enum(["minimal", "low", "medium", "high", "xhigh"])
+          .optional()
+          .describe("Reasoning effort override for cron run threads."),
+        enabled: z.boolean().optional().describe("Optional new enabled state."),
+        deleted: z.boolean().optional().describe("Optional soft-delete flag."),
       },
-    );
-    return textResult(
-      `Focused ${result.projectName} / ${shortName(result.worktreePath)}${result.threadId ? ` / thread ${result.threadId}` : ""}.`,
-      {
-        projectId: result.projectId,
-        projectName: result.projectName,
-        projectPath: result.projectPath,
-        worktreePath: result.worktreePath,
-        threadId: result.threadId,
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
       },
-    );
-  }),
-);
-
-/**
- * Tool: list non-deleted cron jobs.
- */
-
-server.registerTool(
-  "list_crons",
-  {
-    title: "List Cron Jobs",
-    description: "List all non-deleted cron jobs with latest run metadata.",
-    inputSchema: {},
-    annotations: {
-      idempotentHint: true,
-      openWorldHint: false,
-      readOnlyHint: true,
     },
-  },
-  withToolLogging("list_crons", async () => {
-    const crons = await rpcClient.call("listCrons", undefined);
-    return textResult(`Found ${crons.length} cron job(s).`, {
-      cronJobs: crons.map(cronJobPayload),
-    });
-  }),
-);
-
-/**
- * Tool: create a cron job for periodic work execution.
- */
-
-server.registerTool(
-  "new_cron",
-  {
-    title: "New Cron Job",
-    description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. ${supportedCodexModelsSentence}`,
-    inputSchema: {
-      projectId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
-      projectPath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Project path if projectId is unknown. Omit for null metadata.",
-        ),
-      worktreePath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          `${defaultWorktreePathDescription()} Omit for null metadata.`,
-        ),
-      schedule: z.string().trim().min(1).describe("Cron schedule expression."),
-      prompt: z
-        .string()
-        .trim()
-        .min(1)
-        .describe("Prompt sent to the cron run thread."),
-      model: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          `Model override for cron-run threads. ${supportedCodexModelsSentence}`,
-        ),
-      title: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Optional short name for the cron job. Defaults to a label derived from the prompt.",
-        ),
-      description: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Optional full description for the cron job. Defaults to a prompt-derived summary.",
-        ),
-      unsafeMode: z
-        .boolean()
-        .optional()
-        .describe(
-          "When true, cron-run threads start in danger-full-access mode.",
-        ),
-      enabled: z
-        .boolean()
-        .optional()
-        .describe(
-          "Whether the cron schedule starts immediately. Omit for null metadata.",
-        ),
-      reasoningEffort: z
-        .enum(["minimal", "low", "medium", "high", "xhigh"])
-        .optional()
-        .describe("Reasoning effort override for cron-run threads."),
-    },
-    annotations: {
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  withToolLogging("new_cron", async (params) => {
-    const target = await resolveWorktreeTarget({
-      projectId: params.projectId,
-      projectPath: params.projectPath,
-      worktreePath: params.worktreePath,
-    });
-    const created = await rpcClient.call("newCron", {
-      projectId: target.projectId,
-      worktreePath: target.worktreePath,
-      schedule: params.schedule.trim(),
-      prompt: params.prompt.trim(),
-      ...(typeof params.model === "string"
-        ? { model: params.model.trim() }
-        : {}),
-      ...(typeof params.reasoningEffort === "string"
-        ? { reasoningEffort: params.reasoningEffort }
-        : {}),
-      ...(typeof params.title === "string"
-        ? { title: params.title.trim() }
-        : {}),
-      ...(typeof params.description === "string"
-        ? { description: params.description.trim() }
-        : {}),
-      ...(typeof params.unsafeMode === "boolean"
-        ? { unsafeMode: params.unsafeMode }
-        : {}),
-      ...(typeof params.enabled === "boolean"
-        ? { enabled: params.enabled }
-        : {}),
-    });
-    return textResult(
-      `Created cron job ${created.id} in ${target.worktreePath}.`,
-      cronJobPayload(created),
-    );
-  }),
-);
-
-/**
- * Tool: update a cron job definition or toggle enabled/deletion.
- */
-
-server.registerTool(
-  "update_cron",
-  {
-    title: "Update Cron Job",
-    description: `Update schedule, prompt, enabled state, or soft-delete a cron job. ${supportedCodexModelsSentence}`,
-    inputSchema: {
-      cronJobId: z.number().int().positive().describe("Cron job identifier."),
-      schedule: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Optional replacement cron schedule."),
-      model: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          `Optional model override for cron run threads. ${supportedCodexModelsSentence}`,
-        ),
-      prompt: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe("Optional replacement prompt."),
-      title: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Optional replacement title. Omit to keep the current title.",
-        ),
-      description: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Optional replacement description. Omit to keep the current description.",
-        ),
-      unsafeMode: z
-        .boolean()
-        .optional()
-        .describe(
-          "When true, cron-run threads start in danger-full-access mode.",
-        ),
-      reasoningEffort: z
-        .enum(["minimal", "low", "medium", "high", "xhigh"])
-        .optional()
-        .describe("Reasoning effort override for cron run threads."),
-      enabled: z.boolean().optional().describe("Optional new enabled state."),
-      deleted: z.boolean().optional().describe("Optional soft-delete flag."),
-    },
-    annotations: {
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  withToolLogging("update_cron", async (params) => {
-    if (
-      params.deleted === undefined &&
-      params.schedule === undefined &&
-      params.prompt === undefined &&
-      params.model === undefined &&
-      params.title === undefined &&
-      params.description === undefined &&
-      params.unsafeMode === undefined &&
-      params.reasoningEffort === undefined &&
-      params.enabled === undefined
-    ) {
-      throw new Error("At least one update field is required.");
-    }
-    const updated = await rpcClient.call("updateCron", {
-      cronJobId: params.cronJobId,
-      ...(typeof params.schedule === "undefined"
-        ? {}
-        : { schedule: params.schedule.trim() }),
-      ...(typeof params.model === "undefined"
-        ? {}
-        : { model: params.model.trim() }),
-      ...(typeof params.prompt === "undefined"
-        ? {}
-        : { prompt: params.prompt.trim() }),
-      ...(typeof params.title === "string"
-        ? { title: params.title.trim() }
-        : {}),
-      ...(typeof params.description === "string"
-        ? { description: params.description.trim() }
-        : {}),
-      ...(typeof params.reasoningEffort === "string"
-        ? { reasoningEffort: params.reasoningEffort }
-        : {}),
-      ...(typeof params.unsafeMode === "boolean"
-        ? { unsafeMode: params.unsafeMode }
-        : {}),
-      ...(typeof params.enabled === "boolean"
-        ? { enabled: params.enabled }
-        : {}),
-      ...(typeof params.deleted === "boolean"
-        ? { deleted: params.deleted }
-        : {}),
-    });
-    return textResult(
-      `Updated cron job ${updated.id}.`,
-      cronJobPayload(updated),
-    );
-  }),
-);
+    withToolLogging("update_cron", async (params) => {
+      if (
+        params.deleted === undefined &&
+        params.schedule === undefined &&
+        params.prompt === undefined &&
+        params.model === undefined &&
+        params.githubAccess === undefined &&
+        params.agentsAccess === undefined &&
+        params.joltAccess === undefined &&
+        params.title === undefined &&
+        params.description === undefined &&
+        params.unsafeMode === undefined &&
+        params.reasoningEffort === undefined &&
+        params.enabled === undefined
+      ) {
+        throw new Error("At least one update field is required.");
+      }
+      const updated = await rpcClient.call("updateCron", {
+        cronJobId: params.cronJobId,
+        ...(typeof params.schedule === "undefined"
+          ? {}
+          : { schedule: params.schedule.trim() }),
+        ...(typeof params.model === "undefined"
+          ? {}
+          : { model: params.model.trim() }),
+        ...(typeof params.githubAccess === "boolean"
+          ? { githubAccess: params.githubAccess }
+          : {}),
+        ...(typeof params.agentsAccess === "boolean"
+          ? { agentsAccess: params.agentsAccess }
+          : {}),
+        ...(typeof params.joltAccess === "boolean"
+          ? { joltAccess: params.joltAccess }
+          : {}),
+        ...(typeof params.prompt === "undefined"
+          ? {}
+          : { prompt: params.prompt.trim() }),
+        ...(typeof params.title === "string"
+          ? { title: params.title.trim() }
+          : {}),
+        ...(typeof params.description === "string"
+          ? { description: params.description.trim() }
+          : {}),
+        ...(typeof params.reasoningEffort === "string"
+          ? { reasoningEffort: params.reasoningEffort }
+          : {}),
+        ...(typeof params.unsafeMode === "boolean"
+          ? { unsafeMode: params.unsafeMode }
+          : {}),
+        ...(typeof params.enabled === "boolean"
+          ? { enabled: params.enabled }
+          : {}),
+        ...(typeof params.deleted === "boolean"
+          ? { deleted: params.deleted }
+          : {}),
+      });
+      return textResult(
+        `Updated cron job ${updated.id}.`,
+        cronJobPayload(updated),
+      );
+    }),
+  );
+}
 
 /**
  * Tool: create threads with optional start/request workflow for deferred approval.
  */
 
-server.registerTool(
-  "new_thread",
-  {
-    title: "New Thread",
-    description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sidecar sessions cannot escape their current project/worktree. Set autoStart=true to ask the UI first; unsafeMode skips the popup. ${supportedCodexModelsSentence}`,
-    inputSchema: {
-      input: z.string().trim().min(1).describe("Initial prompt."),
-      projectId: z
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
-      projectPath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          "Project path if projectId is unknown. Omit for null metadata.",
-        ),
-      worktreePath: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          `${defaultWorktreePathDescription()} Omit for null metadata.`,
-        ),
-      model: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe(
-          `Model override. ${supportedCodexModelsSentence} Omit for null metadata.`,
-        ),
-      reasoningEffort: z
-        .enum(["minimal", "low", "medium", "high", "xhigh"])
-        .optional()
-        .describe("Reasoning override. Omit for null metadata."),
-      unsafeMode: z
-        .boolean()
-        .optional()
-        .describe(
-          "Use the danger-full-access sandbox for the new thread. Omit for null metadata.",
-        ),
-      autoStart: z
-        .boolean()
-        .optional()
-        .describe(
-          "When true, request permission in the UI before creating the thread. If unsafeMode is true, the thread starts immediately. Omit for null metadata.",
-        ),
-    },
-    annotations: {
-      idempotentHint: false,
-      openWorldHint: false,
-      readOnlyHint: false,
-    },
-  },
-  withToolLogging(
+if (agentsAccessContext) {
+  server.registerTool(
     "new_thread",
-    async ({
-      autoStart,
-      input,
-      model,
-      projectId,
-      projectPath,
-      reasoningEffort,
-      unsafeMode,
-      worktreePath,
-    }) => {
-      const target = await resolveWorktreeTarget({
+    {
+      title: "New Thread",
+      description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sidecar sessions cannot escape their current project/worktree. Set autoStart=true to ask the UI first; unsafeMode skips the popup. Access flags mirror thread controls and default to the live thread values. ${supportedCodexModelsSentence}`,
+      inputSchema: {
+        input: z.string().trim().min(1).describe("Initial prompt."),
+        projectId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(`${defaultProjectIdDescription()} Omit for null metadata.`),
+        projectPath: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            "Project path if projectId is unknown. Omit for null metadata.",
+          ),
+        worktreePath: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            `${defaultWorktreePathDescription()} Omit for null metadata.`,
+          ),
+        model: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe(
+            `Model override. ${supportedCodexModelsSentence} Omit for null metadata.`,
+          ),
+        reasoningEffort: z
+          .enum(["minimal", "low", "medium", "high", "xhigh"])
+          .optional()
+          .describe("Reasoning override. Omit for null metadata."),
+        githubAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow GitHub tools for the new thread. Omit for null metadata.",
+          ),
+        agentsAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow agent tools for the new thread. Omit for null metadata.",
+          ),
+        joltAccess: z
+          .boolean()
+          .optional()
+          .describe(
+            "Allow Jolt MCP tools for the new thread. Omit for null metadata.",
+          ),
+        unsafeMode: z
+          .boolean()
+          .optional()
+          .describe(
+            "Use the danger-full-access sandbox for the new thread. Omit for null metadata.",
+          ),
+        autoStart: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, request permission in the UI before creating the thread. If unsafeMode is true, the thread starts immediately. Omit for null metadata.",
+          ),
+      },
+      annotations: {
+        idempotentHint: false,
+        openWorldHint: false,
+        readOnlyHint: false,
+      },
+    },
+    withToolLogging(
+      "new_thread",
+      async ({
+        autoStart,
+        agentsAccess,
+        githubAccess,
+        joltAccess,
+        input,
+        model,
         projectId,
         projectPath,
+        reasoningEffort,
+        unsafeMode,
         worktreePath,
-      });
-      const metadata = {
-        input,
-        model: model ?? null,
-        reasoningEffort: reasoningEffort ?? null,
-        unsafeMode: unsafeMode ?? null,
-        autoStart: autoStart ?? null,
-        projectPath: target.projectPath,
-      };
+      }) => {
+        const target = await resolveWorktreeTarget({
+          projectId,
+          projectPath,
+          worktreePath,
+        });
+        const metadata = {
+          input,
+          model: model ?? null,
+          reasoningEffort: reasoningEffort ?? null,
+          githubAccess: githubAccess ?? null,
+          agentsAccess: agentsAccess ?? null,
+          joltAccess: joltAccess ?? null,
+          unsafeMode: unsafeMode ?? null,
+          autoStart: autoStart ?? null,
+          projectPath: target.projectPath,
+        };
 
-      if (autoStart === true && unsafeMode !== true) {
-        // For approved flow, request permission first instead of creating immediately.
-        const request = await rpcClient.call("requestThreadStart", {
+        if (autoStart === true && unsafeMode !== true) {
+          // For approved flow, request permission first instead of creating immediately.
+          const request = await rpcClient.call("requestThreadStart", {
+            projectId: target.projectId,
+            worktreePath: target.worktreePath,
+            input,
+            model: metadata.model,
+            reasoningEffort: metadata.reasoningEffort,
+            githubAccess: metadata.githubAccess,
+            agentsAccess: metadata.agentsAccess,
+            joltAccess: metadata.joltAccess,
+            unsafeMode: metadata.unsafeMode,
+            autoStart: metadata.autoStart,
+          });
+          const payload = threadStartRequestPayload(request);
+          return textResult(
+            `Requested permission to start a thread for ${target.worktreePath}.`,
+            payload,
+          );
+        }
+
+        // Default path: create thread and send first message in one end-to-end operation.
+        const created = await rpcClient.call("createThread", {
           projectId: target.projectId,
           worktreePath: target.worktreePath,
-          input,
           model: metadata.model,
           reasoningEffort: metadata.reasoningEffort,
+          githubAccess: metadata.githubAccess,
+          agentsAccess: metadata.agentsAccess,
+          joltAccess: metadata.joltAccess,
           unsafeMode: metadata.unsafeMode,
-          autoStart: metadata.autoStart,
         });
-        const payload = threadStartRequestPayload(request);
+        const started = await rpcClient.call("sendThreadMessage", {
+          threadId: created.thread.id,
+          input,
+        });
+        const payload = threadStatusPayload(started, metadata);
         return textResult(
-          `Requested permission to start a thread for ${target.worktreePath}.`,
+          `Started thread ${payload.threadId} (${payload.status}).`,
           payload,
         );
-      }
-
-      // Default path: create thread and send first message in one end-to-end operation.
-      const created = await rpcClient.call("createThread", {
-        projectId: target.projectId,
-        worktreePath: target.worktreePath,
-        model: metadata.model,
-        reasoningEffort: metadata.reasoningEffort,
-        unsafeMode: metadata.unsafeMode,
-      });
-      const started = await rpcClient.call("sendThreadMessage", {
-        threadId: created.thread.id,
-        input,
-      });
-      const payload = threadStatusPayload(started, metadata);
-      return textResult(
-        `Started thread ${payload.threadId} (${payload.status}).`,
-        payload,
-      );
-    },
-  ),
-);
+      },
+    ),
+  );
+}
 
 /** Start MCP stdio server and begin listening for tool invocations. */
 async function main(): Promise<void> {

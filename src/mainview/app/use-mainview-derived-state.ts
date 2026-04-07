@@ -82,7 +82,10 @@ type UseMainviewDerivedStateParams = {
   isThreadLoading: boolean;
   isUpdatingThreadModel: boolean;
   isUpdatingThreadReasoningEffort: boolean;
-  isUpdatingThreadUnsafeMode: boolean;
+  isUpdatingThreadAccess: boolean;
+  pendingThreadGithubAccess: boolean;
+  pendingThreadAgentsAccess: boolean;
+  pendingThreadJoltAccess: boolean;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: RpcCodexReasoningEffort;
   pendingThreadUnsafeMode: boolean;
@@ -140,7 +143,10 @@ export function deriveWorktreeDisplayPathByKey(
  * @param isThreadLoading - Boolean flag indicating isThreadLoading.
  * @param isUpdatingThreadModel - Boolean flag indicating isUpdatingThreadModel.
  * @param isUpdatingThreadReasoningEffort - Boolean flag indicating isUpdatingThreadReasoningEffort.
- * @param isUpdatingThreadUnsafeMode - Boolean flag indicating isUpdatingThreadUnsafeMode.
+ * @param isUpdatingThreadAccess - Boolean flag indicating isUpdatingThreadAccess.
+ * @param pendingThreadGithubAccess - pendingThreadGithubAccess argument for useMainviewDerivedState.
+ * @param pendingThreadAgentsAccess - pendingThreadAgentsAccess argument for useMainviewDerivedState.
+ * @param pendingThreadJoltAccess - pendingThreadJoltAccess argument for useMainviewDerivedState.
  * @param pendingThreadModel - pendingThreadModel argument for useMainviewDerivedState.
  * @param pendingThreadReasoningEffort - pendingThreadReasoningEffort argument for useMainviewDerivedState.
  * @param pendingThreadUnsafeMode - pendingThreadUnsafeMode argument for useMainviewDerivedState.
@@ -175,7 +181,10 @@ export function useMainviewDerivedState({
   isThreadLoading,
   isUpdatingThreadModel,
   isUpdatingThreadReasoningEffort,
-  isUpdatingThreadUnsafeMode,
+  isUpdatingThreadAccess,
+  pendingThreadGithubAccess,
+  pendingThreadAgentsAccess,
+  pendingThreadJoltAccess,
   pendingThreadModel,
   pendingThreadReasoningEffort,
   pendingThreadUnsafeMode,
@@ -310,6 +319,27 @@ export function useMainviewDerivedState({
     selectedThread,
   ]);
 
+  const activeGithubAccess = useMemo(() => {
+    if (selectedThread) {
+      return selectedThread.githubAccess;
+    }
+    return pendingThreadGithubAccess;
+  }, [pendingThreadGithubAccess, selectedThread]);
+
+  const activeAgentsAccess = useMemo(() => {
+    if (selectedThread) {
+      return selectedThread.agentsAccess;
+    }
+    return pendingThreadAgentsAccess;
+  }, [pendingThreadAgentsAccess, selectedThread]);
+
+  const activeJoltAccess = useMemo(() => {
+    if (selectedThread) {
+      return selectedThread.joltAccess;
+    }
+    return pendingThreadJoltAccess;
+  }, [pendingThreadJoltAccess, selectedThread]);
+
   const activeUnsafeMode = useMemo(() => {
     if (selectedThread) {
       return selectedThread.unsafeMode;
@@ -422,11 +452,11 @@ export function useMainviewDerivedState({
     isSending ||
     isUpdatingThreadReasoningEffort ||
     selectedThreadIsWorking;
-  const unsafeModeToggleDisabled =
+  const threadAccessControlDisabled =
     isCreatingThread ||
     isThreadLoading ||
     isSending ||
-    isUpdatingThreadUnsafeMode ||
+    isUpdatingThreadAccess ||
     selectedThreadIsWorking;
 
   const selectedThreadRunError =
@@ -714,6 +744,9 @@ export function useMainviewDerivedState({
     activeCodexModel,
     activeContextInputTokens,
     activeContextWindowTokens,
+    activeGithubAccess,
+    activeAgentsAccess,
+    activeJoltAccess,
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,
@@ -755,7 +788,7 @@ export function useMainviewDerivedState({
     selectedThreadRunStatus,
     taskSelectorDisabled,
     threadActionMenuThread,
-    unsafeModeToggleDisabled,
+    threadAccessControlDisabled,
     worktreeByProjectAndPath,
     worktreeDisplayPathByKey,
     worktreeSearchTextByKey,

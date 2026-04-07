@@ -33,6 +33,7 @@ export type AppIconName =
   | "radio_button_unchecked"
   | "search"
   | "settings"
+  | "shield"
   | "stop"
   | "task_alt"
   | "terminal";
@@ -213,6 +214,13 @@ function renderIconGlyph(
           <path d="m15.9 15.9 1.4 1.4" />
           <path d="m17.3 6.7-1.4 1.4" />
           <path d="m8.1 15.9-1.4 1.4" />
+        </>
+      );
+    case "shield":
+      return (
+        <>
+          <path d="M12 3.5 19 6.5v5.2c0 4.85-3.15 8.95-7 10-3.85-1.05-7-5.15-7-10V6.5z" />
+          <path d="M12 7.25v8.5" />
         </>
       );
     case "stop":

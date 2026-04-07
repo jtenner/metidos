@@ -242,7 +242,8 @@
 │     │  ├─ reasoning-effort-selector.tsx
 │     │  ├─ search-utils.ts
 │     │  ├─ sidebar-search-control.tsx
-│     │  └─ sidebar-section-header.tsx
+│     │  ├─ sidebar-section-header.tsx
+│     │  └─ thread-access-control.tsx
 │     ├─ index.css
 │     ├─ index.html
 │     ├─ index.ts

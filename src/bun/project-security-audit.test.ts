@@ -43,10 +43,13 @@ describe("project security audit helpers", () => {
     });
     const thread = createThread(database, {
       codexThreadId: null,
+      agentsAccess: false,
+      githubAccess: false,
       model: "gpt-5",
       projectId: project.id,
       reasoningEffort: "medium",
       title: "Feature thread",
+      joltAccess: true,
       unsafeMode: false,
       worktreePath: "/repo/feature-b",
     });
@@ -87,10 +90,13 @@ describe("project security audit helpers", () => {
     });
     const thread = createThread(database, {
       codexThreadId: null,
+      agentsAccess: false,
+      githubAccess: false,
       model: "gpt-5",
       projectId: project.id,
       reasoningEffort: "medium",
       title: "Task thread",
+      joltAccess: true,
       unsafeMode: true,
       worktreePath: "/repo",
     });

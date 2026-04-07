@@ -45,6 +45,7 @@ import {
   renameThread,
   setProjectClosed,
   setProjectWorktreePinned,
+  setThreadAccess,
   setThreadModel,
   setThreadPinned,
   setThreadReasoningEffort,
@@ -757,63 +758,34 @@ function joltRpcHttpOrigin(rpcUrl: string): string {
 }
 
 /**
- * Builds the environment passed to the Codex MCP sidecar for a thread.
- *
- * The sidecar receives identifiers for thread/project/worktree context and, when present,
- * the active `JOLT_SESSION_ID` used to request a websocket ticket before connecting.
- * @param thread - Thread metadata needed to scope MCP sidecar access.
- * @param options - Optional overrides used by tests and callers. `sessionId` is injected as
- * `JOLT_SESSION_ID` only when present.
- */
-export function buildCodexSidecarEnv(
-  thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
-  options?: {
-    rpcHttpOrigin?: string | null;
-    rpcUrl?: string | null;
-    sessionId?: string | null;
-  },
-): Record<string, string> {
-  const rpcUrl = options?.rpcUrl?.trim() || joltRpcUrl();
-  const rpcHttpOrigin =
-    options?.rpcHttpOrigin?.trim() || joltRpcHttpOrigin(rpcUrl);
-  const sessionId = options?.sessionId?.trim() || null;
-
-  return {
-    JOLT_PROJECT_ID: String(thread.projectId),
-    JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
-    JOLT_RPC_URL: rpcUrl,
-    JOLT_THREAD_ID: String(thread.id),
-    JOLT_WORKTREE_PATH: thread.worktreePath,
-    ...(sessionId
-      ? {
-          JOLT_SESSION_ID: sessionId,
-        }
-      : {}),
-  };
-}
-/**
  * Creates codex client.
  * @param thread - thread argument for createCodexClient.
  */
 
 function createCodexClient(
-  thread: Pick<ThreadRecord, "id" | "projectId" | "worktreePath">,
+  thread: ThreadRecord,
   options?: {
     sessionId?: string | null;
   },
 ): Codex {
-  return new Codex({
-    config: {
-      mcp_servers: {
-        [JOLT_MCP_SERVER_NAME]: {
-          command: process.execPath,
-          args: [JOLT_SIDECAR_SERVER_PATH],
-          env: buildCodexSidecarEnv(thread, {
-            sessionId: options?.sessionId ?? null,
-          }),
+  const accessEnabled =
+    thread.githubAccess || thread.agentsAccess || thread.joltAccess;
+  const config = accessEnabled
+    ? {
+        mcp_servers: {
+          [JOLT_MCP_SERVER_NAME]: {
+            command: process.execPath,
+            args: [JOLT_SIDECAR_SERVER_PATH],
+            env: buildCodexSidecarEnv(thread, {
+              sessionId: options?.sessionId ?? null,
+            }),
+          },
         },
-      },
-    },
+      }
+    : {};
+
+  return new Codex({
+    config,
   });
 }
 /**
@@ -904,12 +876,42 @@ function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
   return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
 /**
+ * Thread access flags used for thread and cron creation.
+ */
+
+type ThreadAccessControls = {
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
+  unsafeMode: boolean;
+};
+
+/**
  * Resolves unsafe mode.
  * @param unsafeMode - unsafeMode argument for resolveUnsafeMode.
  */
 
 function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
   return unsafeMode === true;
+}
+/**
+ * Resolves thread access controls with defaults.
+ */
+
+function resolveThreadAccessControls(
+  input: {
+    githubAccess?: boolean | null;
+    agentsAccess?: boolean | null;
+    joltAccess?: boolean | null;
+    unsafeMode?: boolean | null;
+  } = {},
+): ThreadAccessControls {
+  return {
+    githubAccess: input.githubAccess === true,
+    agentsAccess: input.agentsAccess === true,
+    joltAccess: input.joltAccess !== false,
+    unsafeMode: resolveUnsafeMode(input.unsafeMode ?? null),
+  };
 }
 /**
  * Performs codexThreadOptions operation.
@@ -934,6 +936,53 @@ function codexThreadOptions(
       ? ("danger-full-access" as const)
       : ("workspace-write" as const),
     workingDirectory: worktreePath,
+  };
+}
+/**
+ * Builds the environment passed to the Codex MCP sidecar for a thread.
+ *
+ * The sidecar receives identifiers for thread/project/worktree context and the
+ * current access flags so it can gate tool registration.
+ * @param thread - Thread metadata needed to scope MCP sidecar access.
+ * @param options - Optional overrides used by tests and callers. `sessionId` is injected as
+ * `JOLT_SESSION_ID` only when present.
+ */
+
+export function buildCodexSidecarEnv(
+  thread: Pick<
+    ThreadRecord,
+    | "agentsAccess"
+    | "githubAccess"
+    | "id"
+    | "joltAccess"
+    | "projectId"
+    | "worktreePath"
+  >,
+  options?: {
+    rpcHttpOrigin?: string | null;
+    rpcUrl?: string | null;
+    sessionId?: string | null;
+  },
+): Record<string, string> {
+  const rpcUrl = options?.rpcUrl?.trim() || joltRpcUrl();
+  const rpcHttpOrigin =
+    options?.rpcHttpOrigin?.trim() || joltRpcHttpOrigin(rpcUrl);
+  const sessionId = options?.sessionId?.trim() || null;
+
+  return {
+    JOLT_AGENTS_ACCESS: thread.agentsAccess ? "1" : "0",
+    JOLT_GITHUB_ACCESS: thread.githubAccess ? "1" : "0",
+    JOLT_JOLT_ACCESS: thread.joltAccess ? "1" : "0",
+    JOLT_PROJECT_ID: String(thread.projectId),
+    JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
+    JOLT_RPC_URL: rpcUrl,
+    JOLT_THREAD_ID: String(thread.id),
+    JOLT_WORKTREE_PATH: thread.worktreePath,
+    ...(sessionId
+      ? {
+          JOLT_SESSION_ID: sessionId,
+        }
+      : {}),
   };
 }
 /**
@@ -2956,7 +3005,7 @@ async function ensureTrackedProjectWorktree(
  * @param worktreePath - Worktree path.
  * @param model - model argument for createThreadRecord.
  * @param reasoningEffort - reasoningEffort argument for createThreadRecord.
- * @param unsafeMode - unsafeMode argument for createThreadRecord.
+ * @param access - access argument for createThreadRecord.
  * @param options - Configuration options used by this operation.
  */
 
@@ -2965,7 +3014,7 @@ async function createThreadRecord(
   worktreePath: string,
   model: string,
   reasoningEffort: RpcCodexReasoningEffort,
-  unsafeMode: boolean,
+  access: ThreadAccessControls,
   options?: CreateThreadRecordOptions,
 ): Promise<ThreadRecord> {
   const worktree = await assertProjectWorktree(project, worktreePath, {
@@ -2980,7 +3029,10 @@ async function createThreadRecord(
       title: buildThreadTitle(worktree, worktreePath),
       model,
       reasoningEffort,
-      unsafeMode,
+      githubAccess: access.githubAccess,
+      agentsAccess: access.agentsAccess,
+      joltAccess: access.joltAccess,
+      unsafeMode: access.unsafeMode,
       codexThreadId: null,
     }),
   );
@@ -2990,7 +3042,7 @@ async function createThreadRecord(
       options?.sessionId ?? null,
     );
     codexThreadMap.set(thread.id, codexThread);
-    if (unsafeMode) {
+    if (access.unsafeMode) {
       recordUnsafeModeAuditEvent(thread, true, "thread_create");
     }
     return thread;
@@ -3283,13 +3335,13 @@ export async function createThreadProcedure(
   const worktreePath = normalizePath(params.worktreePath);
   const model = resolveCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
-  const unsafeMode = resolveUnsafeMode(params.unsafeMode);
+  const access = resolveThreadAccessControls(params);
   const thread = await createThreadRecord(
     project,
     worktreePath,
     model,
     reasoningEffort,
-    unsafeMode,
+    access,
     {
       forceRefresh: true,
       sessionId: context?.auth.sessionId ?? null,
@@ -3319,6 +3371,7 @@ export async function requestThreadStartProcedure(
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
   });
+  const access = resolveThreadAccessControls(params);
 
   return {
     requestId: crypto.randomUUID(),
@@ -3330,7 +3383,10 @@ export async function requestThreadStartProcedure(
     reasoningEffort: params.reasoningEffort?.trim()
       ? resolveCodexReasoningEffort(params.reasoningEffort)
       : null,
-    unsafeMode: params.unsafeMode ?? null,
+    githubAccess: access.githubAccess,
+    agentsAccess: access.agentsAccess,
+    joltAccess: access.joltAccess,
+    unsafeMode: access.unsafeMode,
     autoStart: params.autoStart ?? null,
     threadId: null,
     title: null,
@@ -3398,7 +3454,7 @@ export async function newCronProcedure(
   const schedule = params.schedule.trim();
   const model = resolveCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
-  const unsafeMode = resolveUnsafeMode(params.unsafeMode);
+  const access = resolveThreadAccessControls(params);
   if (!schedule) {
     throw new Error("Cron schedule is required.");
   }
@@ -3426,7 +3482,10 @@ export async function newCronProcedure(
       worktreePath,
       schedule,
       prompt,
-      unsafeMode,
+      githubAccess: access.githubAccess,
+      agentsAccess: access.agentsAccess,
+      joltAccess: access.joltAccess,
+      unsafeMode: access.unsafeMode,
       title,
       description,
       model,
@@ -3474,6 +3533,9 @@ export async function updateCronProcedure(
     description?: string;
     model?: string;
     reasoningEffort?: string;
+    githubAccess?: boolean;
+    agentsAccess?: boolean;
+    joltAccess?: boolean;
     enabled?: boolean;
     unsafeMode?: boolean;
   } = {};
@@ -3486,6 +3548,18 @@ export async function updateCronProcedure(
     updates.reasoningEffort = resolveCodexReasoningEffort(
       params.reasoningEffort,
     );
+  }
+
+  if (typeof params.githubAccess === "boolean") {
+    updates.githubAccess = params.githubAccess;
+  }
+
+  if (typeof params.agentsAccess === "boolean") {
+    updates.agentsAccess = params.agentsAccess;
+  }
+
+  if (typeof params.joltAccess === "boolean") {
+    updates.joltAccess = params.joltAccess;
   }
 
   if (typeof params.schedule !== "undefined") {
@@ -3535,6 +3609,9 @@ export async function updateCronProcedure(
     typeof updates.description === "undefined" &&
     typeof updates.model === "undefined" &&
     typeof updates.reasoningEffort === "undefined" &&
+    typeof updates.githubAccess === "undefined" &&
+    typeof updates.agentsAccess === "undefined" &&
+    typeof updates.joltAccess === "undefined" &&
     typeof updates.unsafeMode === "undefined" &&
     typeof updates.enabled === "undefined"
   ) {
@@ -4032,6 +4109,7 @@ export async function runProjectTaskProcedure(
     worktreePath,
     params.task,
   );
+  const access = resolveThreadAccessControls(params);
 
   let thread = params.threadId ? threadById(params.threadId) : null;
   const createdThread = thread === null;
@@ -4048,7 +4126,7 @@ export async function runProjectTaskProcedure(
       worktreePath,
       resolveCodexModel(params.model),
       resolveCodexReasoningEffort(params.reasoningEffort),
-      resolveUnsafeMode(params.unsafeMode),
+      access,
       {
         forceRefresh: true,
         sessionId: context?.auth.sessionId ?? null,
@@ -4225,6 +4303,57 @@ export async function updateThreadReasoningEffortProcedure(
 
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   setThreadReasoningEffort(db, thread.id, reasoningEffort);
+  codexThreadMap.delete(thread.id);
+  invalidateThreadDetailCache(thread.id);
+  return rpcThreadById(thread.id);
+}
+/**
+ * Updates thread access controls procedure.
+ * @param params - Parameters object.
+ */
+
+export async function updateThreadAccessProcedure(
+  params: AppRPCSchema["requests"]["updateThreadAccess"]["params"],
+): Promise<RpcThread> {
+  const thread = threadById(params.threadId);
+  if (currentThreadRunStatus(thread).state === "working") {
+    throw new Error(
+      "Thread access controls cannot change while Codex is processing.",
+    );
+  }
+
+  const next = {
+    githubAccess:
+      typeof params.githubAccess === "boolean"
+        ? params.githubAccess
+        : thread.githubAccess,
+    agentsAccess:
+      typeof params.agentsAccess === "boolean"
+        ? params.agentsAccess
+        : thread.agentsAccess,
+    joltAccess:
+      typeof params.joltAccess === "boolean"
+        ? params.joltAccess
+        : thread.joltAccess,
+    unsafeMode:
+      typeof params.unsafeMode === "boolean"
+        ? params.unsafeMode
+        : thread.unsafeMode === 1,
+  };
+
+  if (
+    next.githubAccess === thread.githubAccess &&
+    next.agentsAccess === thread.agentsAccess &&
+    next.joltAccess === thread.joltAccess &&
+    next.unsafeMode === (thread.unsafeMode === 1)
+  ) {
+    return rpcThreadById(thread.id);
+  }
+
+  setThreadAccess(db, thread.id, next);
+  if (next.unsafeMode !== (thread.unsafeMode === 1)) {
+    recordUnsafeModeAuditEvent(thread, next.unsafeMode, "toggle");
+  }
   codexThreadMap.delete(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);

@@ -36,6 +36,8 @@ The sidecar exposes these Jolt control tools:
 
 - `update_thread`
 - `new_thread`
+- `new_cron`
+- `update_cron`
 - `run_untrusted_js`
   - Executes untrusted JavaScript or TypeScript in a vm2 NodeVM sandbox.
   - Redirects console output into the MCP result, exposes a frozen Bun sandbox, and limits fs writes to the current worktree.
@@ -43,9 +45,10 @@ The sidecar exposes these Jolt control tools:
 
 Guidance:
 
-- treat `update_thread` as a safe metadata update
+- treat `update_thread` as a safe metadata and access update
 - use `new_thread` sparingly
 - use `new_thread.autoStart` to ask the UI for permission before creating a separate thread; when `unsafeMode` is true, the thread starts immediately instead of waiting for the popup
+- use `update_thread` or the cron editors to toggle `githubAccess`, `agentsAccess`, `joltAccess`, and `unsafeMode` rather than reaching into the database directly
 - let `update_thread` run liberally whenever a better title, a short summary, or pinning and unpinning would improve scanability
 - use the optional `summary` field on `update_thread` for a short desktop hover description when it adds useful context
 - use the optional `pinned` field on `update_thread` to pin important threads and unpin them when that organization no longer helps

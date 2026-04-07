@@ -86,6 +86,7 @@ import {
   stopThreadTurnProcedure,
   suspendActiveWorktreePolling,
   updateCronProcedure,
+  updateThreadAccessProcedure,
   updateThreadMetadataProcedure,
   updateThreadModelProcedure,
   updateThreadReasoningEffortProcedure,
@@ -416,6 +417,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
     return runProjectTaskProcedure(params, context);
   },
   updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
+  updateThreadAccess: (params) => updateThreadAccessProcedure(params),
   renameThread: (params) => renameThreadProcedure(params),
   setThreadPinned: (params) => setThreadPinnedProcedure(params),
   updateThreadModel: (params) => updateThreadModelProcedure(params),

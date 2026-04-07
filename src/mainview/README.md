@@ -124,6 +124,8 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/sidebar-section-header.tsx` draws consistent section headers and controls in sidebar cards.
 
+`controls/thread-access-control.tsx` renders the reusable upward-opening dropdown for thread and cron access flags, including GitHub, Agents, Jolt, and Unsafe toggles.
+
 ## Why this folder exists
 
 `src/mainview` is the boundary between data/services and user-facing UI logic for Codex’ primary screen. The folder ensures:

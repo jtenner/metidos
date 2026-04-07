@@ -210,6 +210,9 @@ export type PersistedMainviewState = {
   selectedThreadId: number | null;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: string;
+  pendingThreadGithubAccess: boolean;
+  pendingThreadAgentsAccess: boolean;
+  pendingThreadJoltAccess: boolean;
   pendingThreadUnsafeMode: boolean;
   chatInput: string;
   sidebarCollapsed: boolean;
@@ -219,7 +222,11 @@ export type PersistedMainviewState = {
 
 type PersistedMainviewStorageRecord = Omit<
   PersistedMainviewState,
-  "chatInput" | "pendingThreadUnsafeMode"
+  | "chatInput"
+  | "pendingThreadAgentsAccess"
+  | "pendingThreadGithubAccess"
+  | "pendingThreadJoltAccess"
+  | "pendingThreadUnsafeMode"
 >;
 
 /**
@@ -750,6 +757,9 @@ export function defaultPersistedMainviewState(): PersistedMainviewState {
     selectedThreadId: null,
     pendingThreadModel: "",
     pendingThreadReasoningEffort: "",
+    pendingThreadGithubAccess: false,
+    pendingThreadAgentsAccess: false,
+    pendingThreadJoltAccess: true,
     pendingThreadUnsafeMode: false,
     chatInput: "",
     sidebarCollapsed: false,
@@ -896,6 +906,9 @@ export function readPersistedMainviewState(): PersistedMainviewState {
         typeof parsed.pendingThreadReasoningEffort === "string"
           ? parsed.pendingThreadReasoningEffort
           : "",
+      pendingThreadGithubAccess: false,
+      pendingThreadAgentsAccess: false,
+      pendingThreadJoltAccess: true,
       // Sensitive local inputs stay memory-only and are intentionally never restored.
       pendingThreadUnsafeMode: false,
       chatInput: "",
@@ -950,6 +963,9 @@ function serializePersistedMainviewState(
 ): PersistedMainviewStorageRecord {
   const {
     chatInput: _chatInput,
+    pendingThreadAgentsAccess: _pendingThreadAgentsAccess,
+    pendingThreadGithubAccess: _pendingThreadGithubAccess,
+    pendingThreadJoltAccess: _pendingThreadJoltAccess,
     pendingThreadUnsafeMode: _pendingThreadUnsafeMode,
     ...persistedState
   } = state;

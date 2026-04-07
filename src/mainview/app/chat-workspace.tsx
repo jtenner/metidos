@@ -16,7 +16,6 @@ import {
   memo,
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -33,6 +32,10 @@ import { CodexModelSelector } from "../controls/codex-model-selector";
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
 import { ProjectTaskSelector } from "../controls/project-task-selector";
 import { ReasoningEffortSelector } from "../controls/reasoning-effort-selector";
+import {
+  ThreadAccessControl,
+  type ThreadAccessValue,
+} from "../controls/thread-access-control";
 import {
   ChatErrorMessage,
   ChatNoticeMessage,
@@ -53,7 +56,6 @@ import { APP_TITLE, type VisibleMessage } from "./state";
 type SharedChatControlsProps = {
   activeCodexModel: string;
   activeReasoningEffort: RpcCodexReasoningEffort;
-  activeUnsafeMode: boolean;
   composerActionDisabled: boolean;
   composerActionLabel: string;
   composerDisabled: boolean;
@@ -65,7 +67,7 @@ type SharedChatControlsProps = {
   modelSelectorDisabled: boolean;
   onChangeModel: (value: string) => void;
   onChangeReasoningEffort: (value: RpcCodexReasoningEffort) => void;
-  onChangeUnsafeMode: (value: boolean) => void;
+  onChangeThreadAccess: (value: ThreadAccessValue) => void;
   onSelectTask: (task: RpcProjectTask) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmitMessage: () => void;
@@ -75,8 +77,9 @@ type SharedChatControlsProps = {
   reasoningEfforts: RpcCodexReasoningEffortOption[];
   taskControlError: string;
   taskSelectorDisabled: boolean;
-  unsafeModeControlError: string;
-  unsafeModeToggleDisabled: boolean;
+  threadAccessControlError: string;
+  threadAccessControlDisabled: boolean;
+  threadAccessValue: ThreadAccessValue;
   codexModels: RpcCodexModelOption[];
 };
 
@@ -152,16 +155,6 @@ type GroupRowProps = {
   renderAssistantMessageContent: AssistantMessageRenderer;
 };
 
-/**
- * Props for the unsafe mode toggle control.
- */
-type UnsafeModeToggleProps = {
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-  variant: "desktop" | "mobile";
-};
-
 type UnsafeModePopoverVisibilityOptions = {
   checked: boolean;
   isAnchorFocused: boolean;
@@ -175,8 +168,6 @@ const DESKTOP_CHAT_TRANSCRIPT_GAP_PX = 40;
 const DESKTOP_CHAT_TRANSCRIPT_OVERSCAN = 6;
 const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
 const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
-const UNSAFE_MODE_DESCRIPTION =
-  "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
 
 export function shouldRenderUnsafeModePopover({
   checked,
@@ -504,88 +495,6 @@ function readUserGroupText(
 ): string {
   const message = messages[group.messageIndex];
   return message?.kind === "chat" ? message.text : "";
-}
-
-/**
- * Performs UnsafeModeToggle operation.
- * @param checked - checked argument for UnsafeModeToggle.
- * @param disabled - disabled argument for UnsafeModeToggle.
- * @param onChange - onChange argument for UnsafeModeToggle.
- * @param variant - variant argument for UnsafeModeToggle.
- */
-function UnsafeModeToggle({
-  checked,
-  disabled,
-  onChange,
-  variant,
-}: UnsafeModeToggleProps): JSX.Element {
-  // Compact mode reduces horizontal space on narrow viewports and keeps controls readable.
-  const compact = variant === "mobile";
-  const popoverId = useId();
-  const [isAnchorHovered, setIsAnchorHovered] = useState(false);
-  const [isAnchorFocused, setIsAnchorFocused] = useState(false);
-  const shouldRenderPopover = shouldRenderUnsafeModePopover({
-    checked,
-    isAnchorFocused,
-    isAnchorHovered,
-  });
-
-  return (
-    <div className="relative inline-flex overflow-visible">
-      <label
-        className={[
-          "inline-flex items-center gap-2 rounded-full border transition-colors",
-          compact ? "px-2.5 py-1.5" : "px-3 py-1.5",
-          checked
-            ? "border-[#d89256] bg-[#2d1d12] text-[#ffd3a6]"
-            : "border-[#3d3d3d] bg-[#171717] text-[#b3afad]",
-          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-        ].join(" ")}
-      >
-        <span className="relative inline-flex overflow-visible">
-          <input
-            aria-describedby={shouldRenderPopover ? popoverId : undefined}
-            checked={checked}
-            className="h-3.5 w-3.5 accent-[#d89256]"
-            disabled={disabled}
-            onBlur={() => {
-              setIsAnchorFocused(false);
-            }}
-            onChange={(event) => onChange(event.currentTarget.checked)}
-            onFocus={() => {
-              setIsAnchorFocused(true);
-            }}
-            onMouseEnter={() => {
-              setIsAnchorHovered(true);
-            }}
-            onMouseLeave={() => {
-              setIsAnchorHovered(false);
-            }}
-            type="checkbox"
-          />
-          {shouldRenderPopover ? (
-            <div
-              className={[
-                "pointer-events-none absolute z-50",
-                compact
-                  ? "bottom-[calc(100%+0.5rem)] right-0 w-[18rem] max-w-[calc(100vw-2rem)]"
-                  : "bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 w-[28rem] max-w-[calc(100vw-4rem)]",
-              ].join(" ")}
-              id={popoverId}
-              role="tooltip"
-            >
-              <div className="border border-[#6d5930] bg-[#261f12] px-3 py-2 text-xs leading-5 text-[#f2d79b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-                {UNSAFE_MODE_DESCRIPTION}
-              </div>
-            </div>
-          ) : null}
-        </span>
-        <span className="font-body text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
-          Unsafe
-        </span>
-      </label>
-    </div>
-  );
 }
 
 /**
@@ -1255,7 +1164,6 @@ export function DesktopChatView({
   activeScreenSubtitleSecondary,
   activeScreenTitle,
   activeThreadId,
-  activeUnsafeMode,
   codexModels,
   composerActionDisabled,
   composerActionLabel,
@@ -1271,7 +1179,7 @@ export function DesktopChatView({
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
-  onChangeUnsafeMode,
+  onChangeThreadAccess,
   onSelectTask,
   onSubmit,
   onSubmitMessage,
@@ -1283,8 +1191,9 @@ export function DesktopChatView({
   selectedThreadIsWorking,
   taskControlError,
   taskSelectorDisabled,
-  unsafeModeControlError,
-  unsafeModeToggleDisabled,
+  threadAccessControlError,
+  threadAccessControlDisabled,
+  threadAccessValue,
 }: DesktopChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
   // Header is passed as topContent into virtualized transcript for stable positioning.
   const headerContent = (
@@ -1347,10 +1256,10 @@ export function DesktopChatView({
               onSelect={onSelectTask}
               variant="desktop"
             />
-            <UnsafeModeToggle
-              checked={activeUnsafeMode}
-              disabled={unsafeModeToggleDisabled}
-              onChange={onChangeUnsafeMode}
+            <ThreadAccessControl
+              disabled={threadAccessControlDisabled}
+              onChange={onChangeThreadAccess}
+              value={threadAccessValue}
               variant="desktop"
             />
             <div className="flex-1" />
@@ -1374,9 +1283,9 @@ export function DesktopChatView({
               {taskControlError}
             </div>
           ) : null}
-          {unsafeModeControlError ? (
+          {threadAccessControlError ? (
             <div className="mt-2 text-xs text-[#ff6e84]">
-              {unsafeModeControlError}
+              {threadAccessControlError}
             </div>
           ) : null}
           <ChatComposerControl
@@ -1431,7 +1340,6 @@ export function MobileChatView({
   activeScreenSubtitleSecondary,
   activeScreenTitle,
   activeThreadId,
-  activeUnsafeMode,
   codexModels,
   composerActionDisabled,
   composerActionLabel,
@@ -1447,7 +1355,7 @@ export function MobileChatView({
   modelSelectorDisabled,
   onChangeModel,
   onChangeReasoningEffort,
-  onChangeUnsafeMode,
+  onChangeThreadAccess,
   onSelectTask,
   onSubmit,
   onSubmitMessage,
@@ -1459,8 +1367,9 @@ export function MobileChatView({
   selectedThreadIsWorking,
   taskControlError,
   taskSelectorDisabled,
-  unsafeModeControlError,
-  unsafeModeToggleDisabled,
+  threadAccessControlError,
+  threadAccessControlDisabled,
+  threadAccessValue,
 }: MobileChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
   const footerRef = useRef<HTMLElement | null>(null);
   const [composerInsetPx, setComposerInsetPx] = useState(
@@ -1568,10 +1477,10 @@ export function MobileChatView({
                       variant="mobile"
                     />
                   </div>
-                  <UnsafeModeToggle
-                    checked={activeUnsafeMode}
-                    disabled={unsafeModeToggleDisabled}
-                    onChange={onChangeUnsafeMode}
+                  <ThreadAccessControl
+                    disabled={threadAccessControlDisabled}
+                    onChange={onChangeThreadAccess}
+                    value={threadAccessValue}
                     variant="mobile"
                   />
                 </div>
@@ -1599,9 +1508,9 @@ export function MobileChatView({
           {taskControlError ? (
             <div className="text-xs text-[#ff6e84]">{taskControlError}</div>
           ) : null}
-          {unsafeModeControlError ? (
+          {threadAccessControlError ? (
             <div className="text-xs text-[#ff6e84]">
-              {unsafeModeControlError}
+              {threadAccessControlError}
             </div>
           ) : null}
         </form>

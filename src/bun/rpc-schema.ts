@@ -165,6 +165,9 @@ export type RpcThreadStartRequest = {
   input: string;
   model: string | null;
   reasoningEffort: RpcCodexReasoningEffort | null;
+  githubAccess: boolean | null;
+  agentsAccess: boolean | null;
+  joltAccess: boolean | null;
   unsafeMode: boolean | null;
   autoStart: boolean | null;
   threadId: number | null;
@@ -327,6 +330,9 @@ export type RpcThread = {
   summary: string | null;
   model: string;
   reasoningEffort: RpcCodexReasoningEffort;
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
   unsafeMode: boolean;
   codexThreadId: string | null;
   pinnedAt: string | null;
@@ -354,6 +360,9 @@ export type RpcCronJob = {
   description: string;
   model: string;
   reasoningEffort: RpcCodexReasoningEffort;
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
   unsafeMode: boolean;
   lastRunDate: number | null;
   lastRunStatus: RpcCronJobRunStatus | null;
@@ -624,6 +633,9 @@ export type AppRPCSchema = {
         currentWorktreePath?: string | null;
         model?: string | null;
         reasoningEffort?: RpcCodexReasoningEffort | null;
+        githubAccess?: boolean | null;
+        agentsAccess?: boolean | null;
+        joltAccess?: boolean | null;
         unsafeMode?: boolean | null;
       };
       response: RpcThreadDetail;
@@ -635,6 +647,9 @@ export type AppRPCSchema = {
         input: string;
         model: string | null;
         reasoningEffort: RpcCodexReasoningEffort | null;
+        githubAccess: boolean | null;
+        agentsAccess: boolean | null;
+        joltAccess: boolean | null;
         unsafeMode: boolean | null;
         autoStart: boolean | null;
       };
@@ -646,6 +661,9 @@ export type AppRPCSchema = {
         worktreePath: string;
         schedule: string;
         prompt: string;
+        githubAccess?: boolean;
+        agentsAccess?: boolean;
+        joltAccess?: boolean;
         unsafeMode?: boolean;
         model?: string;
         reasoningEffort?: RpcCodexReasoningEffort;
@@ -660,6 +678,9 @@ export type AppRPCSchema = {
         cronJobId: number;
         model?: string;
         reasoningEffort?: RpcCodexReasoningEffort;
+        githubAccess?: boolean;
+        agentsAccess?: boolean;
+        joltAccess?: boolean;
         unsafeMode?: boolean;
         schedule?: string;
         prompt?: string;
@@ -708,9 +729,22 @@ export type AppRPCSchema = {
         threadId?: number | null;
         model?: string | null;
         reasoningEffort?: RpcCodexReasoningEffort | null;
+        githubAccess?: boolean | null;
+        agentsAccess?: boolean | null;
+        joltAccess?: boolean | null;
         unsafeMode?: boolean | null;
       };
       response: RpcThreadDetail;
+    };
+    updateThreadAccess: {
+      params: {
+        threadId: number;
+        githubAccess?: boolean;
+        agentsAccess?: boolean;
+        joltAccess?: boolean;
+        unsafeMode?: boolean;
+      };
+      response: RpcThread;
     };
     updateThreadMetadata: {
       params: {
@@ -932,6 +966,10 @@ export interface ProjectProcedures {
   updateThreadReasoningEffort: RpcProcedureCall<
     AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
     AppRPCSchema["requests"]["updateThreadReasoningEffort"]["response"]
+  >;
+  updateThreadAccess: RpcProcedureCall<
+    AppRPCSchema["requests"]["updateThreadAccess"]["params"],
+    AppRPCSchema["requests"]["updateThreadAccess"]["response"]
   >;
   updateThreadUnsafeMode: RpcProcedureCall<
     AppRPCSchema["requests"]["updateThreadUnsafeMode"]["params"],

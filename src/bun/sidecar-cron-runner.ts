@@ -152,6 +152,9 @@ async function executeCronJob(
       reasoningEffort: normalizeStoredCodexReasoningEffort(
         cronJob.reasoningEffort,
       ),
+      githubAccess: cronJob.githubAccess,
+      agentsAccess: cronJob.agentsAccess,
+      joltAccess: cronJob.joltAccess,
       unsafeMode: cronJob.unsafeMode === 1,
     });
     const threadId = threadResult.thread.id;

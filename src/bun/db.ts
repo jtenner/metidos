@@ -40,6 +40,9 @@ type ThreadInput = {
   title: string;
   model: string;
   reasoningEffort: string;
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
   unsafeMode: boolean;
   codexThreadId?: string | null;
 };
@@ -145,6 +148,9 @@ export type ThreadRecord = {
   summary: string | null;
   model: string;
   reasoningEffort: string;
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
   unsafeMode: 0 | 1;
   codexThreadId: string | null;
   pinnedAt: string | null;
@@ -253,6 +259,9 @@ export type CronJobRecord = {
   description: string;
   model: string;
   reasoningEffort: string;
+  githubAccess: boolean;
+  agentsAccess: boolean;
+  joltAccess: boolean;
   unsafeMode: 0 | 1;
   lastRunDate: number | null;
   lastRunStatus: CronJobRunStatus | null;
@@ -280,6 +289,9 @@ type CronJobInput = {
   description: string;
   model: string;
   reasoningEffort: string;
+  githubAccess?: boolean | null;
+  agentsAccess?: boolean | null;
+  joltAccess?: boolean | null;
   unsafeMode?: boolean | null;
   enabled?: boolean | null;
 };
@@ -291,6 +303,9 @@ type CronJobUpdateInput = {
   description?: string;
   model?: string;
   reasoningEffort?: string;
+  githubAccess?: boolean;
+  agentsAccess?: boolean;
+  joltAccess?: boolean;
   unsafeMode?: boolean;
   enabled?: boolean;
 };
@@ -658,6 +673,9 @@ export function migrateDatabase(db: Database): void {
 				summary TEXT,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				github_access INTEGER NOT NULL DEFAULT 0,
+				agents_access INTEGER NOT NULL DEFAULT 0,
+				jolt_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				codex_thread_id TEXT,
 				pinned_at TEXT,
@@ -727,6 +745,21 @@ export function migrateDatabase(db: Database): void {
   );
   ensureThreadColumn(
     db,
+    "github_access",
+    "github_access INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureThreadColumn(
+    db,
+    "agents_access",
+    "agents_access INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureThreadColumn(
+    db,
+    "jolt_access",
+    "jolt_access INTEGER NOT NULL DEFAULT 1",
+  );
+  ensureThreadColumn(
+    db,
     "unsafe_mode",
     "unsafe_mode INTEGER NOT NULL DEFAULT 0",
   );
@@ -754,6 +787,30 @@ export function migrateDatabase(db: Database): void {
 			UPDATE threads
 			SET unsafe_mode = 0
 			WHERE unsafe_mode IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE threads
+			SET github_access = 0
+			WHERE github_access IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE threads
+			SET agents_access = 0
+			WHERE agents_access IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE threads
+			SET jolt_access = 1
+			WHERE jolt_access IS NULL
 		`,
   );
   runStatement(
@@ -934,6 +991,9 @@ export function migrateDatabase(db: Database): void {
 				description TEXT NOT NULL,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				github_access INTEGER NOT NULL DEFAULT 0,
+				agents_access INTEGER NOT NULL DEFAULT 0,
+				jolt_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				last_run_date INTEGER,
 				last_run_status TEXT CHECK(last_run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
@@ -969,6 +1029,21 @@ export function migrateDatabase(db: Database): void {
     db,
     "reasoning_effort",
     "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+  );
+  ensureCronJobColumn(
+    db,
+    "github_access",
+    "github_access INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureCronJobColumn(
+    db,
+    "agents_access",
+    "agents_access INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureCronJobColumn(
+    db,
+    "jolt_access",
+    "jolt_access INTEGER NOT NULL DEFAULT 1",
   );
   ensureCronJobColumn(
     db,
@@ -1023,6 +1098,33 @@ export function migrateDatabase(db: Database): void {
 			SET
 				unsafe_mode = 0
 			WHERE unsafe_mode IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				github_access = 0
+			WHERE github_access IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				agents_access = 0
+			WHERE agents_access IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				jolt_access = 1
+			WHERE jolt_access IS NULL
 		`,
   );
   dedupeActiveCronJobTitles(db);
@@ -2049,12 +2151,15 @@ export function listThreads(database: Database): ThreadRecord[] {
 					id,
 					project_id AS projectId,
 					worktree_path AS worktreePath,
-					title,
-					summary,
-					model,
-					reasoning_effort AS reasoningEffort,
-					unsafe_mode AS unsafeMode,
-					codex_thread_id AS codexThreadId,
+				title,
+				summary,
+				model,
+				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
+				unsafe_mode AS unsafeMode,
+				codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
 						updated_at AS updatedAt,
@@ -2102,12 +2207,15 @@ export function getThreadById(
 					id,
 					project_id AS projectId,
 					worktree_path AS worktreePath,
-					title,
-					summary,
-					model,
-					reasoning_effort AS reasoningEffort,
-					unsafe_mode AS unsafeMode,
-					codex_thread_id AS codexThreadId,
+				title,
+				summary,
+				model,
+				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
+				unsafe_mode AS unsafeMode,
+				codex_thread_id AS codexThreadId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
 						updated_at AS updatedAt,
@@ -2155,26 +2263,35 @@ export function createThread(
 				title,
 				model,
 				reasoning_effort,
+				github_access,
+				agents_access,
+				jolt_access,
 				unsafe_mode,
 				codex_thread_id,
 				updated_at
 			)
-			VALUES (
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			)
+				VALUES (
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+				)
 		`,
     input.projectId,
     input.worktreePath,
     input.title,
     input.model,
     input.reasoningEffort,
+    input.githubAccess ? 1 : 0,
+    input.agentsAccess ? 1 : 0,
+    input.joltAccess ? 1 : 0,
     input.unsafeMode ? 1 : 0,
     input.codexThreadId ?? null,
   );
@@ -2305,6 +2422,43 @@ export function setThreadReasoningEffort(
 			WHERE id = ?
 		`,
     reasoningEffort,
+    threadId,
+  );
+}
+/**
+ * Sets thread access controls.
+ * @param database - database argument for setThreadAccess.
+ * @param threadId - Thread identifier.
+ * @param input - Access flag input.
+ */
+
+export function setThreadAccess(
+  database: Database,
+  threadId: number,
+  input: {
+    githubAccess: boolean;
+    agentsAccess: boolean;
+    joltAccess: boolean;
+    unsafeMode: boolean;
+  },
+): void {
+  /** Persist access controls and refresh the thread's modified timestamp. */
+  runStatement(
+    database,
+    `
+			UPDATE threads
+			SET
+				github_access = ?,
+				agents_access = ?,
+				jolt_access = ?,
+				unsafe_mode = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    input.githubAccess ? 1 : 0,
+    input.agentsAccess ? 1 : 0,
+    input.joltAccess ? 1 : 0,
+    input.unsafeMode ? 1 : 0,
     threadId,
   );
 }
@@ -2971,21 +3125,26 @@ export function createCronJob(
 				description,
 				model,
 				reasoning_effort,
+				github_access,
+				agents_access,
+				jolt_access,
 				unsafe_mode,
 				enabled
 			)
-			VALUES (
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?,
-				?
-			)
+				VALUES (
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?
+				)
 		`,
     input.projectId,
     input.worktreePath,
@@ -2995,6 +3154,9 @@ export function createCronJob(
     input.description,
     input.model,
     input.reasoningEffort,
+    input.githubAccess === true ? 1 : 0,
+    input.agentsAccess === true ? 1 : 0,
+    input.joltAccess === false ? 0 : 1,
     input.unsafeMode === true ? 1 : 0,
     input.enabled === false ? 0 : 1,
   );
@@ -3026,6 +3188,9 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3066,6 +3231,9 @@ export function getCronJobById(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3125,6 +3293,21 @@ export function updateCronJob(
     bindings.push(input.reasoningEffort);
   }
 
+  if (typeof input.githubAccess === "boolean") {
+    updates.push("github_access = ?");
+    bindings.push(input.githubAccess ? 1 : 0);
+  }
+
+  if (typeof input.agentsAccess === "boolean") {
+    updates.push("agents_access = ?");
+    bindings.push(input.agentsAccess ? 1 : 0);
+  }
+
+  if (typeof input.joltAccess === "boolean") {
+    updates.push("jolt_access = ?");
+    bindings.push(input.joltAccess ? 1 : 0);
+  }
+
   if (typeof input.unsafeMode === "boolean") {
     updates.push("unsafe_mode = ?");
     bindings.push(input.unsafeMode ? 1 : 0);
@@ -3174,6 +3357,9 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3308,6 +3494,9 @@ export function claimCronJobsForScheduledRun(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3354,6 +3543,9 @@ export function claimCronJobForScheduledRunById(
 				description,
 				model,
 				reasoning_effort AS reasoningEffort,
+				github_access AS githubAccess,
+				agents_access AS agentsAccess,
+				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,

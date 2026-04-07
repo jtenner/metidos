@@ -11,9 +11,16 @@ import type {
 
 type UpdateThreadMetadataParams =
   AppRPCSchema["requests"]["updateThreadMetadata"]["params"];
+type UpdateThreadAccessParams =
+  AppRPCSchema["requests"]["updateThreadAccess"]["params"];
 
 export type UpdateThreadMetadataRpc = (
   params: UpdateThreadMetadataParams,
+  options?: RpcProcedureCallOptions,
+) => Promise<RpcThread>;
+
+export type UpdateThreadAccessRpc = (
+  params: UpdateThreadAccessParams,
   options?: RpcProcedureCallOptions,
 ) => Promise<RpcThread>;
 
@@ -77,6 +84,60 @@ export async function updateThreadMetadataFromSidecar(
   } catch (error) {
     throw new Error(
       `Thread metadata update did not reach the live app: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        cause: error,
+      },
+    );
+  }
+}
+
+/**
+ * Route sidecar thread access mutations through the authoritative RPC path.
+ */
+export async function updateThreadAccessFromSidecar(
+  rpcCall: UpdateThreadAccessRpc,
+  params: {
+    agentsAccess?: boolean;
+    githubAccess?: boolean;
+    joltAccess?: boolean;
+    threadId: number;
+    unsafeMode?: boolean;
+  },
+  options?: RpcProcedureCallOptions,
+): Promise<RpcThread> {
+  if (
+    typeof params.githubAccess === "undefined" &&
+    typeof params.agentsAccess === "undefined" &&
+    typeof params.joltAccess === "undefined" &&
+    typeof params.unsafeMode === "undefined"
+  ) {
+    throw new Error(
+      "At least one of githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+    );
+  }
+
+  try {
+    return await rpcCall(
+      {
+        threadId: params.threadId,
+        ...(typeof params.githubAccess === "boolean"
+          ? { githubAccess: params.githubAccess }
+          : {}),
+        ...(typeof params.agentsAccess === "boolean"
+          ? { agentsAccess: params.agentsAccess }
+          : {}),
+        ...(typeof params.joltAccess === "boolean"
+          ? { joltAccess: params.joltAccess }
+          : {}),
+        ...(typeof params.unsafeMode === "boolean"
+          ? { unsafeMode: params.unsafeMode }
+          : {}),
+      },
+      options,
+    );
+  } catch (error) {
+    throw new Error(
+      `Thread access update did not reach the live app: ${error instanceof Error ? error.message : String(error)}`,
       {
         cause: error,
       },

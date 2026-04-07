@@ -37,3 +37,6 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
 - `sidebar-section-header.tsx`
   - Reusable collapsible section header component for sidebar regions.
   - Renders title text, expand/collapse icon state, and optional action slots.
+- `thread-access-control.tsx`
+  - Reusable upward-opening dropdown for thread and cron access flags.
+  - Exposes GitHub, Agents, Jolt, and Unsafe toggles with the same defaults used by thread and cron state.

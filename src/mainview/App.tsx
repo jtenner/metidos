@@ -131,6 +131,10 @@ import {
 import { CodexModelSelector } from "./controls/codex-model-selector";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { ReasoningEffortSelector } from "./controls/reasoning-effort-selector";
+import {
+  ThreadAccessControl,
+  type ThreadAccessValue,
+} from "./controls/thread-access-control";
 import { runRollbackSafeProjectClose } from "./project-close";
 import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
 import { shouldRefreshProjectActionMenuWorktrees } from "./project-worktree-refresh";
@@ -549,6 +553,15 @@ export default function App({
         ? initialMainviewState.pendingThreadReasoningEffort
         : defaultCodexReasoningEffort,
     );
+  const [pendingThreadGithubAccess, setPendingThreadGithubAccess] = useState(
+    initialMainviewState.pendingThreadGithubAccess,
+  );
+  const [pendingThreadAgentsAccess, setPendingThreadAgentsAccess] = useState(
+    initialMainviewState.pendingThreadAgentsAccess,
+  );
+  const [pendingThreadJoltAccess, setPendingThreadJoltAccess] = useState(
+    initialMainviewState.pendingThreadJoltAccess,
+  );
   const [pendingThreadUnsafeMode, setPendingThreadUnsafeMode] = useState(
     initialMainviewState.pendingThreadUnsafeMode === true,
   );
@@ -589,6 +602,9 @@ export default function App({
   const [cronEditSchedule, setCronEditSchedule] = useState("");
   const [cronEditPrompt, setCronEditPrompt] = useState("");
   const [cronEditEnabled, setCronEditEnabled] = useState(true);
+  const [cronEditGithubAccess, setCronEditGithubAccess] = useState(false);
+  const [cronEditAgentsAccess, setCronEditAgentsAccess] = useState(false);
+  const [cronEditJoltAccess, setCronEditJoltAccess] = useState(true);
   const [cronEditUnsafeMode, setCronEditUnsafeMode] = useState(false);
   const [cronEditingCronJobId, setCronEditingCronJobId] = useState<
     number | null
@@ -598,8 +614,7 @@ export default function App({
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
   const [isUpdatingThreadReasoningEffort, setIsUpdatingThreadReasoningEffort] =
     useState(false);
-  const [isUpdatingThreadUnsafeMode, setIsUpdatingThreadUnsafeMode] =
-    useState(false);
+  const [isUpdatingThreadAccess, setIsUpdatingThreadAccess] = useState(false);
   const [threadActionBusy, setThreadActionBusy] = useState<
     "rename" | "pin" | "delete" | null
   >(null);
@@ -622,7 +637,7 @@ export default function App({
   const [isStoppingThread, setIsStoppingThread] = useState(false);
   const [reasoningEffortControlError, setReasoningEffortControlError] =
     useState("");
-  const [unsafeModeControlError, setUnsafeModeControlError] = useState("");
+  const [threadAccessControlError, setThreadAccessControlError] = useState("");
   const [sessionStateReady, setSessionStateReady] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(
     () => document.visibilityState === "visible",
@@ -890,6 +905,9 @@ export default function App({
     activeCodexModel,
     activeContextInputTokens,
     activeContextWindowTokens,
+    activeGithubAccess,
+    activeAgentsAccess,
+    activeJoltAccess,
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,
@@ -928,7 +946,7 @@ export default function App({
     selectedThreadIsWorking,
     taskSelectorDisabled,
     threadActionMenuThread,
-    unsafeModeToggleDisabled,
+    threadAccessControlDisabled,
     worktreeByProjectAndPath,
     worktreeDisplayPathByKey,
     worktreeSearchTextByKey,
@@ -951,7 +969,10 @@ export default function App({
     isThreadLoading,
     isUpdatingThreadModel,
     isUpdatingThreadReasoningEffort,
-    isUpdatingThreadUnsafeMode,
+    isUpdatingThreadAccess,
+    pendingThreadGithubAccess,
+    pendingThreadAgentsAccess,
+    pendingThreadJoltAccess,
     pendingThreadModel,
     pendingThreadReasoningEffort,
     pendingThreadUnsafeMode,
@@ -967,6 +988,13 @@ export default function App({
     threadActionMenu,
     threads,
   });
+
+  const activeThreadAccessValue: ThreadAccessValue = {
+    githubAccess: activeGithubAccess,
+    agentsAccess: activeAgentsAccess,
+    joltAccess: activeJoltAccess,
+    unsafeMode: activeUnsafeMode,
+  };
 
   // Request queue handling: show and resolve the oldest pending thread-start request
   // first so users always act on the oldest queued action.
@@ -1680,7 +1708,7 @@ export default function App({
       setThreadsError("");
       setModelControlError("");
       setReasoningEffortControlError("");
-      setUnsafeModeControlError("");
+      setThreadAccessControlError("");
       setChatError("");
       try {
         const detail = await executeWithStepUp(
@@ -1694,6 +1722,9 @@ export default function App({
               model: activeCodexModel || defaultCodexModel || null,
               reasoningEffort:
                 activeReasoningEffort || defaultCodexReasoningEffort || null,
+              githubAccess: activeGithubAccess,
+              agentsAccess: activeAgentsAccess,
+              joltAccess: activeJoltAccess,
               unsafeMode: activeUnsafeMode,
             }),
         );
@@ -1752,6 +1783,9 @@ export default function App({
     [
       activeCodexModel,
       activeReasoningEffort,
+      activeAgentsAccess,
+      activeGithubAccess,
+      activeJoltAccess,
       activeUnsafeMode,
       defaultCodexModel,
       defaultCodexReasoningEffort,
@@ -2572,7 +2606,7 @@ export default function App({
       setThreadsError("");
       setModelControlError("");
       setReasoningEffortControlError("");
-      setUnsafeModeControlError("");
+      setThreadAccessControlError("");
       setChatError("");
 
       let createdDetail: RpcThreadDetail | null = null;
@@ -2587,6 +2621,9 @@ export default function App({
               currentWorktreePath: selectedWorktreePathRef.current,
               model: request.model,
               reasoningEffort: request.reasoningEffort,
+              githubAccess: request.githubAccess,
+              agentsAccess: request.agentsAccess,
+              joltAccess: request.joltAccess,
               unsafeMode: request.unsafeMode,
             }),
         );
@@ -3649,7 +3686,10 @@ export default function App({
       selectedThreadId,
       pendingThreadModel,
       pendingThreadReasoningEffort,
-      pendingThreadUnsafeMode: false,
+      pendingThreadGithubAccess,
+      pendingThreadAgentsAccess,
+      pendingThreadJoltAccess,
+      pendingThreadUnsafeMode,
       chatInput: "",
       sidebarCollapsed,
       sidebarSearchQuery,
@@ -3658,6 +3698,10 @@ export default function App({
   }, [
     pendingThreadModel,
     pendingThreadReasoningEffort,
+    pendingThreadGithubAccess,
+    pendingThreadAgentsAccess,
+    pendingThreadJoltAccess,
+    pendingThreadUnsafeMode,
     projectStates,
     selectedProjectId,
     selectedThreadId,
@@ -3727,8 +3771,11 @@ export default function App({
     if (!selectedThread) {
       return;
     }
+    setPendingThreadGithubAccess(selectedThread.githubAccess);
+    setPendingThreadAgentsAccess(selectedThread.agentsAccess);
+    setPendingThreadJoltAccess(selectedThread.joltAccess);
     setPendingThreadUnsafeMode(selectedThread.unsafeMode);
-    setUnsafeModeControlError("");
+    setThreadAccessControlError("");
   }, [selectedThread]);
 
   useEffect(() => {
@@ -4226,39 +4273,51 @@ export default function App({
     [isUpdatingThreadReasoningEffort, procedures, selectedThread, upsertThread],
   );
 
-  const updateActiveUnsafeMode = useCallback(
-    async (unsafeMode: boolean) => {
-      setUnsafeModeControlError("");
+  const updateActiveThreadAccess = useCallback(
+    async (access: ThreadAccessValue) => {
+      setThreadAccessControlError("");
 
       if (!selectedThread) {
-        setPendingThreadUnsafeMode(unsafeMode);
+        setPendingThreadGithubAccess(access.githubAccess);
+        setPendingThreadAgentsAccess(access.agentsAccess);
+        setPendingThreadJoltAccess(access.joltAccess);
+        setPendingThreadUnsafeMode(access.unsafeMode);
         return;
       }
 
       if (
-        selectedThread.unsafeMode === unsafeMode ||
-        isUpdatingThreadUnsafeMode
+        (selectedThread.githubAccess === access.githubAccess &&
+          selectedThread.agentsAccess === access.agentsAccess &&
+          selectedThread.joltAccess === access.joltAccess &&
+          selectedThread.unsafeMode === access.unsafeMode) ||
+        isUpdatingThreadAccess
       ) {
         return;
       }
 
-      setIsUpdatingThreadUnsafeMode(true);
+      setIsUpdatingThreadAccess(true);
       try {
-        const updatedThread = await procedures.updateThreadUnsafeMode({
+        const updatedThread = await procedures.updateThreadAccess({
           threadId: selectedThread.id,
-          unsafeMode,
+          githubAccess: access.githubAccess,
+          agentsAccess: access.agentsAccess,
+          joltAccess: access.joltAccess,
+          unsafeMode: access.unsafeMode,
         });
         upsertThread(updatedThread);
+        setPendingThreadGithubAccess(updatedThread.githubAccess);
+        setPendingThreadAgentsAccess(updatedThread.agentsAccess);
+        setPendingThreadJoltAccess(updatedThread.joltAccess);
         setPendingThreadUnsafeMode(updatedThread.unsafeMode);
       } catch (error) {
-        setUnsafeModeControlError(
+        setThreadAccessControlError(
           error instanceof Error ? error.message : String(error),
         );
       } finally {
-        setIsUpdatingThreadUnsafeMode(false);
+        setIsUpdatingThreadAccess(false);
       }
     },
-    [isUpdatingThreadUnsafeMode, procedures, selectedThread, upsertThread],
+    [isUpdatingThreadAccess, procedures, selectedThread, upsertThread],
   );
 
   const runSelectedTask = useCallback(
@@ -4275,7 +4334,7 @@ export default function App({
       setThreadsError("");
       setChatError("");
       setReasoningEffortControlError("");
-      setUnsafeModeControlError("");
+      setThreadAccessControlError("");
       try {
         const detail = await executeWithStepUp("run this project task", () =>
           procedures.runProjectTask({
@@ -4289,6 +4348,9 @@ export default function App({
             reasoningEffort: selectedThread
               ? null
               : activeReasoningEffort || defaultCodexReasoningEffort || null,
+            githubAccess: selectedThread ? null : activeGithubAccess,
+            agentsAccess: selectedThread ? null : activeAgentsAccess,
+            joltAccess: selectedThread ? null : activeJoltAccess,
             unsafeMode: selectedThread ? null : activeUnsafeMode,
           }),
         );
@@ -4328,6 +4390,9 @@ export default function App({
     [
       activeCodexModel,
       activeReasoningEffort,
+      activeGithubAccess,
+      activeAgentsAccess,
+      activeJoltAccess,
       activeUnsafeMode,
       activeSelectedWorktreePath,
       defaultCodexModel,
@@ -5062,6 +5127,9 @@ export default function App({
     setCronEditSchedule("");
     setCronEditPrompt("");
     setCronEditEnabled(true);
+    setCronEditGithubAccess(activeGithubAccess);
+    setCronEditAgentsAccess(activeAgentsAccess);
+    setCronEditJoltAccess(activeJoltAccess);
     setCronEditUnsafeMode(activeUnsafeMode);
     setCronCreatorModel(activeCodexModel || defaultCodexModel || "");
     setCronCreatorReasoningEffort(
@@ -5069,7 +5137,10 @@ export default function App({
     );
     setCronCreatorError("");
   }, [
+    activeAgentsAccess,
     activeCodexModel,
+    activeGithubAccess,
+    activeJoltAccess,
     activeReasoningEffort,
     activeUnsafeMode,
     defaultCodexModel,
@@ -5094,6 +5165,9 @@ export default function App({
     setCronEditSchedule(cronJob.schedule);
     setCronEditPrompt(cronJob.prompt);
     setCronEditEnabled(cronJob.enabled === 1);
+    setCronEditGithubAccess(cronJob.githubAccess);
+    setCronEditAgentsAccess(cronJob.agentsAccess);
+    setCronEditJoltAccess(cronJob.joltAccess);
     setCronEditUnsafeMode(cronJob.unsafeMode);
     setCronCreatorModel(cronJob.model);
     setCronCreatorReasoningEffort(cronJob.reasoningEffort);
@@ -5149,7 +5223,10 @@ export default function App({
               model,
               reasoningEffort:
                 reasoningEffort || defaultCodexReasoningEffort || null,
-              unsafeMode: activeUnsafeMode,
+              githubAccess: cronEditGithubAccess,
+              agentsAccess: cronEditAgentsAccess,
+              joltAccess: cronEditJoltAccess,
+              unsafeMode: cronEditUnsafeMode,
             }),
         );
         if (!createdDetail) {
@@ -5157,7 +5234,15 @@ export default function App({
         }
 
         const threadId = createdDetail.thread.id;
-        const threadMessage = `Use the new_cron tool to create this cron job for the current workspace.\nSet unsafeMode to ${cronEditUnsafeMode ? "true" : "false"}.\n\n${describePrompt}`;
+        const threadMessage = [
+          "Use the new_cron tool to create this cron job for the current workspace.",
+          `Set githubAccess to ${cronEditGithubAccess ? "true" : "false"}.`,
+          `Set agentsAccess to ${cronEditAgentsAccess ? "true" : "false"}.`,
+          `Set joltAccess to ${cronEditJoltAccess ? "true" : "false"}.`,
+          `Set unsafeMode to ${cronEditUnsafeMode ? "true" : "false"}.`,
+          "",
+          describePrompt,
+        ].join("\n");
         const sentDetail = await executeWithStepUp(
           "create a cron job from a natural-language description",
           () =>
@@ -5202,8 +5287,10 @@ export default function App({
     defaultCodexModel,
     activeCodexModel,
     cronCreatorModel,
+    cronEditAgentsAccess,
+    cronEditGithubAccess,
+    cronEditJoltAccess,
     cronEditUnsafeMode,
-    activeUnsafeMode,
     defaultCodexReasoningEffort,
     cronCreatorReasoningEffort,
     cronDescribePrompt,
@@ -5254,6 +5341,9 @@ export default function App({
             ...(cronEditDescription.trim()
               ? { description: cronEditDescription.trim() }
               : {}),
+            githubAccess: cronEditGithubAccess,
+            agentsAccess: cronEditAgentsAccess,
+            joltAccess: cronEditJoltAccess,
             unsafeMode: cronEditUnsafeMode,
             enabled: cronEditEnabled,
           });
@@ -5272,6 +5362,9 @@ export default function App({
             ...(cronEditDescription.trim()
               ? { description: cronEditDescription.trim() }
               : {}),
+            githubAccess: cronEditGithubAccess,
+            agentsAccess: cronEditAgentsAccess,
+            joltAccess: cronEditJoltAccess,
             unsafeMode: cronEditUnsafeMode,
             enabled: cronEditEnabled,
           });
@@ -5294,6 +5387,9 @@ export default function App({
     cronCreatorModel,
     cronCreatorReasoningEffort,
     cronEditEnabled,
+    cronEditAgentsAccess,
+    cronEditGithubAccess,
+    cronEditJoltAccess,
     cronEditPrompt,
     cronEditSchedule,
     cronEditTitle,
@@ -5341,6 +5437,21 @@ export default function App({
     console.log("App.tsx mounted", window.__joltAppMountedAt);
   }, []);
 
+  const cronEditorAccessValue: ThreadAccessValue = {
+    githubAccess: cronEditGithubAccess,
+    agentsAccess: cronEditAgentsAccess,
+    joltAccess: cronEditJoltAccess,
+    unsafeMode: cronEditUnsafeMode,
+  };
+  const handleCronEditorAccessChange = useCallback(
+    (value: ThreadAccessValue) => {
+      setCronEditGithubAccess(value.githubAccess);
+      setCronEditAgentsAccess(value.agentsAccess);
+      setCronEditJoltAccess(value.joltAccess);
+      setCronEditUnsafeMode(value.unsafeMode);
+    },
+    [],
+  );
   const cronCreatorModelValue = cronCreatorModel.trim()
     ? cronCreatorModel
     : activeCodexModel || defaultCodexModel || "";
@@ -5584,7 +5695,6 @@ export default function App({
                   activeContextInputTokens={activeContextInputTokens}
                   activeContextWindowTokens={activeContextWindowTokens}
                   activeReasoningEffort={activeReasoningEffort}
-                  activeUnsafeMode={activeUnsafeMode}
                   activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
                   activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
                   activeScreenTitle={activeScreenTitle}
@@ -5608,8 +5718,8 @@ export default function App({
                   onChangeReasoningEffort={(value) => {
                     void updateActiveReasoningEffort(value);
                   }}
-                  onChangeUnsafeMode={(value) => {
-                    void updateActiveUnsafeMode(value);
+                  onChangeThreadAccess={(value) => {
+                    void updateActiveThreadAccess(value);
                   }}
                   onSelectTask={(task) => {
                     void runSelectedTask(task);
@@ -5626,8 +5736,9 @@ export default function App({
                   selectedThreadIsWorking={selectedThreadIsWorking}
                   taskControlError={taskControlError}
                   taskSelectorDisabled={taskSelectorDisabled}
-                  unsafeModeControlError={unsafeModeControlError}
-                  unsafeModeToggleDisabled={unsafeModeToggleDisabled}
+                  threadAccessControlError={threadAccessControlError}
+                  threadAccessControlDisabled={threadAccessControlDisabled}
+                  threadAccessValue={activeThreadAccessValue}
                 />
               ) : null
             ) : primaryView === "cronjobs" ? (
@@ -5704,17 +5815,18 @@ export default function App({
                           }}
                         />
                         {renderCronCreatorModelControls("desktop")}
-                        <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
-                          <input
-                            checked={cronEditUnsafeMode}
-                            className="h-4 w-4"
-                            type="checkbox"
-                            onChange={(event) => {
-                              setCronEditUnsafeMode(event.target.checked);
-                            }}
+                        <div className="space-y-1">
+                          <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                            Access controls
+                          </div>
+                          <ThreadAccessControl
+                            disabled={isCreatingCronJob}
+                            onChange={handleCronEditorAccessChange}
+                            title="Access controls for this cron job."
+                            value={cronEditorAccessValue}
+                            variant="desktop"
                           />
-                          Unsafe mode
-                        </label>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -5789,17 +5901,18 @@ export default function App({
                           />
                         </div>
                         {renderCronCreatorModelControls("desktop")}
-                        <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
-                          <input
-                            checked={cronEditUnsafeMode}
-                            className="h-4 w-4"
-                            type="checkbox"
-                            onChange={(event) => {
-                              setCronEditUnsafeMode(event.target.checked);
-                            }}
+                        <div className="space-y-1">
+                          <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                            Access controls
+                          </div>
+                          <ThreadAccessControl
+                            disabled={isCreatingCronJob}
+                            onChange={handleCronEditorAccessChange}
+                            title="Access controls for this cron job."
+                            value={cronEditorAccessValue}
+                            variant="desktop"
                           />
-                          Unsafe mode
-                        </label>
+                        </div>
                         <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                           <input
                             checked={cronEditEnabled}
@@ -6029,7 +6142,6 @@ export default function App({
               <MobileChatView
                 activeCodexModel={activeCodexModel}
                 activeReasoningEffort={activeReasoningEffort}
-                activeUnsafeMode={activeUnsafeMode}
                 activeScreenSubtitlePrimary={activeScreenSubtitlePrimary}
                 activeScreenSubtitleSecondary={activeScreenSubtitleSecondary}
                 activeScreenTitle={activeScreenTitle}
@@ -6053,8 +6165,8 @@ export default function App({
                 onChangeReasoningEffort={(value) => {
                   void updateActiveReasoningEffort(value);
                 }}
-                onChangeUnsafeMode={(value) => {
-                  void updateActiveUnsafeMode(value);
+                onChangeThreadAccess={(value) => {
+                  void updateActiveThreadAccess(value);
                 }}
                 onSelectTask={(task) => {
                   void runSelectedTask(task);
@@ -6071,8 +6183,9 @@ export default function App({
                 selectedThreadIsWorking={selectedThreadIsWorking}
                 taskControlError={taskControlError}
                 taskSelectorDisabled={taskSelectorDisabled}
-                unsafeModeControlError={unsafeModeControlError}
-                unsafeModeToggleDisabled={unsafeModeToggleDisabled}
+                threadAccessControlError={threadAccessControlError}
+                threadAccessControlDisabled={threadAccessControlDisabled}
+                threadAccessValue={activeThreadAccessValue}
               />
             ) : null
           ) : primaryView === "cronjobs" ? (
@@ -6149,17 +6262,18 @@ export default function App({
                         }}
                       />
                       {renderCronCreatorModelControls("mobile")}
-                      <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
-                        <input
-                          checked={cronEditUnsafeMode}
-                          className="h-4 w-4"
-                          type="checkbox"
-                          onChange={(event) => {
-                            setCronEditUnsafeMode(event.target.checked);
-                          }}
+                      <div className="space-y-1">
+                        <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                          Access controls
+                        </div>
+                        <ThreadAccessControl
+                          disabled={isCreatingCronJob}
+                          onChange={handleCronEditorAccessChange}
+                          title="Access controls for this cron job."
+                          value={cronEditorAccessValue}
+                          variant="mobile"
                         />
-                        Unsafe mode
-                      </label>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -6234,17 +6348,18 @@ export default function App({
                         />
                       </div>
                       {renderCronCreatorModelControls("mobile")}
-                      <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
-                        <input
-                          checked={cronEditUnsafeMode}
-                          className="h-4 w-4"
-                          type="checkbox"
-                          onChange={(event) => {
-                            setCronEditUnsafeMode(event.target.checked);
-                          }}
+                      <div className="space-y-1">
+                        <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
+                          Access controls
+                        </div>
+                        <ThreadAccessControl
+                          disabled={isCreatingCronJob}
+                          onChange={handleCronEditorAccessChange}
+                          title="Access controls for this cron job."
+                          value={cronEditorAccessValue}
+                          variant="mobile"
                         />
-                        Unsafe mode
-                      </label>
+                      </div>
                       <label className="inline-flex items-center gap-2 text-xs text-[#bfd1dc]">
                         <input
                           checked={cronEditEnabled}
@@ -6487,6 +6602,30 @@ export default function App({
                 {currentThreadStartRequest.reasoningEffort ?? "default"}
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                GitHub:{" "}
+                {currentThreadStartRequest.githubAccess === null
+                  ? "default"
+                  : currentThreadStartRequest.githubAccess
+                    ? "on"
+                    : "off"}
+              </span>
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Agents:{" "}
+                {currentThreadStartRequest.agentsAccess === null
+                  ? "default"
+                  : currentThreadStartRequest.agentsAccess
+                    ? "on"
+                    : "off"}
+              </span>
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Jolt:{" "}
+                {currentThreadStartRequest.joltAccess === null
+                  ? "default"
+                  : currentThreadStartRequest.joltAccess
+                    ? "on"
+                    : "off"}
+              </span>
+              <span className="rounded-full border border-[#8a6b2f] bg-[#231d11] px-3 py-1 text-[#f2d79b]">
                 Unsafe:{" "}
                 {currentThreadStartRequest.unsafeMode === null
                   ? "default"

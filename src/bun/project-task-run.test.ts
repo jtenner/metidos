@@ -117,6 +117,9 @@ describe("project task execution", () => {
       procedures.buildCodexSidecarEnv(
         {
           id: 17,
+          githubAccess: false,
+          agentsAccess: false,
+          joltAccess: true,
           projectId: 9,
           worktreePath: "/repo/worktree",
         },
@@ -127,6 +130,9 @@ describe("project task execution", () => {
         },
       ),
     ).toEqual({
+      JOLT_AGENTS_ACCESS: "0",
+      JOLT_GITHUB_ACCESS: "0",
+      JOLT_JOLT_ACCESS: "1",
       JOLT_PROJECT_ID: "9",
       JOLT_RPC_HTTP_ORIGIN: "http://127.0.0.1:7599",
       JOLT_RPC_URL: "ws://127.0.0.1:7599/rpc",
