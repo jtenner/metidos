@@ -25,6 +25,10 @@ import type {
   RpcWorktree,
 } from "./rpc-schema";
 import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
+import {
+  formatVm2ExecutionReportText,
+  runUntrustedJavaScriptInVm2,
+} from "./vm2-runner";
 
 const DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
 /** Default request timeout in milliseconds when no timeout override is supplied. */
@@ -1433,6 +1437,43 @@ server.registerTool(
         reasoningEfforts: catalog.reasoningEfforts,
       },
     );
+  }),
+);
+
+/**
+ * Tool: run untrusted JavaScript or TypeScript in a vm2 sandbox.
+ */
+server.registerTool(
+  "run_untrusted_js",
+  {
+    title: "Run Untrusted JS",
+    description:
+      "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Console output is redirected back to the MCP tool result, Bun APIs are exposed through a frozen sandbox object, and fs writes are limited to the current worktree.",
+    inputSchema: {
+      code: z
+        .string()
+        .min(1)
+        .describe("TypeScript or JavaScript source to execute."),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Sandbox timeout in milliseconds. Defaults to 60000."),
+    },
+    annotations: {
+      idempotentHint: false,
+      openWorldHint: false,
+      readOnlyHint: false,
+    },
+  },
+  withToolLogging("run_untrusted_js", async ({ code, timeoutMs }) => {
+    const report = await runUntrustedJavaScriptInVm2({
+      code,
+      ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+      worktreePath: worktreePathContext ?? process.cwd(),
+    });
+    return textResult(formatVm2ExecutionReportText(report), report);
   }),
 );
 

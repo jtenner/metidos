@@ -33,6 +33,7 @@
     "react-spinners": "^0.17.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
+    "vm2": "^3.10.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

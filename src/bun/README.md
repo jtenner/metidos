@@ -105,11 +105,27 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Routes thread metadata writes through authoritative RPC updates so tool success matches visible app state.
   - Reuses the active authenticated session id (`JOLT_SESSION_ID`) to fetch a fresh websocket ticket, then opens `/rpc` with both the ticket and the `jolt_session` cookie header.
   - Reads `JOLT_RPC_URL` plus derived `JOLT_RPC_HTTP_ORIGIN` from the thread environment so the sidecar can locate `/auth/ws-ticket`.
+  - Exposes `run_untrusted_js`, which executes untrusted JS/TS through the vm2 runner with redirected console output and worktree-limited writes.
   - Handles websocket protocol, request correlation, and resilient startup/path resolution.
 
 - `codex-sidecar-scope.ts`
   - Provides the scope-enforcement helpers used by the MCP sidecar.
   - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes.
+
+- `vm2-runner.ts`
+  - Shared vm2-backed sandbox helpers for the sidecar's untrusted JS tool.
+  - Builds the frozen Bun sandbox, the worktree-restricted fs mock, and the MCP-facing execution report formatter.
+  - Spawns the worker-backed runner used to enforce the external timeout and collect console events.
+
+- `vm2-runner-worker.ts`
+  - Worker entrypoint for the vm2 sandbox.
+  - Constructs the NodeVM, wires redirected console events, and executes the untrusted script with the requested timeout.
+
+- `vm2-runner-*.test.ts`
+  - Coverage for redirected console output, exposed Bun APIs, worktree write enforcement, and timeout behavior.
+
+- `vm2-runner-test-utils.ts`
+  - Shared temp-directory helper for the vm2 runner tests.
 
 - `sidecar-thread-metadata.ts`
   - Shared helper for sidecar thread metadata mutations.

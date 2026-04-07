@@ -36,6 +36,10 @@ The sidecar exposes these Jolt control tools:
 
 - `modify_thread`
 - `new_thread`
+- `run_untrusted_js`
+  - Executes untrusted JavaScript or TypeScript in a vm2 NodeVM sandbox.
+  - Redirects console output into the MCP result, exposes a frozen Bun sandbox, and limits fs writes to the current worktree.
+  - Accepts a `timeoutMs` override in milliseconds and defaults to 60 seconds when omitted.
 
 Guidance:
 
