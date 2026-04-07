@@ -8,6 +8,7 @@ import { describe, expect, it } from "bun:test";
 import {
   deriveGroupedVisibleMessages,
   deriveTranscriptMeasurementRows,
+  shouldRenderUnsafeModePopover,
 } from "./chat-workspace";
 import type { VisibleMessage } from "./state";
 
@@ -228,5 +229,41 @@ describe("deriveTranscriptMeasurementRows", () => {
 
     expect(collapsedRows[0]?.cacheKey).toBe(expandedRows[0]?.cacheKey);
     expect(collapsedRows[0]?.contentKey).not.toBe(expandedRows[0]?.contentKey);
+  });
+});
+
+describe("shouldRenderUnsafeModePopover", () => {
+  it("requires unsafe mode to be enabled before mounting the tooltip", () => {
+    expect(
+      shouldRenderUnsafeModePopover({
+        checked: false,
+        isAnchorFocused: true,
+        isAnchorHovered: true,
+      }),
+    ).toBeFalse();
+  });
+
+  it("mounts the tooltip only while the checkbox anchor is hovered or focused", () => {
+    expect(
+      shouldRenderUnsafeModePopover({
+        checked: true,
+        isAnchorFocused: false,
+        isAnchorHovered: false,
+      }),
+    ).toBeFalse();
+    expect(
+      shouldRenderUnsafeModePopover({
+        checked: true,
+        isAnchorFocused: false,
+        isAnchorHovered: true,
+      }),
+    ).toBeTrue();
+    expect(
+      shouldRenderUnsafeModePopover({
+        checked: true,
+        isAnchorFocused: true,
+        isAnchorHovered: false,
+      }),
+    ).toBeTrue();
   });
 });

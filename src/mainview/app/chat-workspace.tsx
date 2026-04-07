@@ -161,6 +161,12 @@ type UnsafeModeToggleProps = {
   variant: "desktop" | "mobile";
 };
 
+type UnsafeModePopoverVisibilityOptions = {
+  checked: boolean;
+  isAnchorFocused: boolean;
+  isAnchorHovered: boolean;
+};
+
 const CHAT_AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 24;
 const DESKTOP_CHAT_PADDING_PX = 32;
 const DESKTOP_CHAT_TRANSCRIPT_ESTIMATE_PX = 168;
@@ -170,6 +176,14 @@ const MOBILE_CHAT_TRANSCRIPT_ESTIMATE_PX = 128;
 const MOBILE_CHAT_TRANSCRIPT_OVERSCAN = 5;
 const UNSAFE_MODE_DESCRIPTION =
   "Unsafe mode is enabled for this thread. Codex can use the danger-full-access sandbox, and unsafe-mode changes are recorded in the local security audit log.";
+
+export function shouldRenderUnsafeModePopover({
+  checked,
+  isAnchorFocused,
+  isAnchorHovered,
+}: UnsafeModePopoverVisibilityOptions): boolean {
+  return checked && (isAnchorFocused || isAnchorHovered);
+}
 
 /**
  * Performs hashMeasurementText operation.
@@ -489,8 +503,16 @@ function UnsafeModeToggle({
   // Compact mode reduces horizontal space on narrow viewports and keeps controls readable.
   const compact = variant === "mobile";
   const popoverId = useId();
+  const [isAnchorHovered, setIsAnchorHovered] = useState(false);
+  const [isAnchorFocused, setIsAnchorFocused] = useState(false);
+  const shouldRenderPopover = shouldRenderUnsafeModePopover({
+    checked,
+    isAnchorFocused,
+    isAnchorHovered,
+  });
+
   return (
-    <div className="group relative inline-flex overflow-visible">
+    <div className="relative inline-flex overflow-visible">
       <label
         className={[
           "inline-flex items-center gap-2 rounded-full border transition-colors",
@@ -503,17 +525,29 @@ function UnsafeModeToggle({
       >
         <span className="relative inline-flex overflow-visible">
           <input
-            aria-describedby={checked ? popoverId : undefined}
+            aria-describedby={shouldRenderPopover ? popoverId : undefined}
             checked={checked}
             className="h-3.5 w-3.5 accent-[#d89256]"
             disabled={disabled}
+            onBlur={() => {
+              setIsAnchorFocused(false);
+            }}
             onChange={(event) => onChange(event.currentTarget.checked)}
+            onFocus={() => {
+              setIsAnchorFocused(true);
+            }}
+            onMouseEnter={() => {
+              setIsAnchorHovered(true);
+            }}
+            onMouseLeave={() => {
+              setIsAnchorHovered(false);
+            }}
             type="checkbox"
           />
-          {checked ? (
+          {shouldRenderPopover ? (
             <div
               className={[
-                "absolute z-50 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+                "pointer-events-none absolute z-50",
                 compact
                   ? "bottom-[calc(100%+0.5rem)] right-0 w-[18rem] max-w-[calc(100vw-2rem)]"
                   : "bottom-[calc(100%+0.5rem)] left-1/2 -translate-x-1/2 w-[28rem] max-w-[calc(100vw-4rem)]",
