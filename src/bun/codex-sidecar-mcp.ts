@@ -1448,7 +1448,7 @@ server.registerTool(
   {
     title: "Run Untrusted JS",
     description:
-      "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Console output is redirected back to the MCP tool result, Bun APIs are exposed through a frozen sandbox object, and fs writes are limited to the current worktree.",
+      "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Supports redirected console output, a configurable timeout, and a frozen sandbox with fetch plus Bun.Glob, Bun.file, Bun.SQLite, Bun.sleep, Bun.nanoseconds, Bun.gzipSync, Bun.gunzipSync, Bun.deflateSync, Bun.inflateSync, Bun.zstdCompress, Bun.zstdDecompress, Bun.zstdCompressSync, Bun.zstdDecompressSync, Bun.semver, Bun.TOML, Bun.markdown, and Bun.color. The sandboxed fs mock is read-only outside the current worktree and writable only inside it.",
     inputSchema: {
       code: z
         .string()
