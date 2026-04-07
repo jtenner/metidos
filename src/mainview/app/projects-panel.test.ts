@@ -55,33 +55,25 @@ function buildWorktreeSearchText(
 }
 
 describe("deriveProjectsPanelWorktreeData", () => {
-  it("sorts once per project and keeps pinned worktrees scoped to their own project tree", () => {
-    const betaProject = createProject(2, "Beta", "/repos/beta");
-    const alphaProject = createProject(1, "Alpha", "/repos/alpha");
-    const filteredProjects = [betaProject, alphaProject];
+  it("orders pinned worktrees first and then alphabetically by workspace name", () => {
+    const project = createProject(1, "Alpha", "/repos/alpha");
+    const filteredProjects = [project];
     const worktreesByProjectId = new Map<number, RpcWorktree[]>([
       [
-        betaProject.id,
+        project.id,
         [
+          createWorktree("/repos/alpha/delta", "delta", null),
           createWorktree(
-            "/repos/beta/feature",
-            "feature",
-            "2026-04-04T09:00:00.000Z",
-          ),
-          createWorktree("/repos/beta", "main", null),
-          createWorktree("/repos/beta/release", "release", null),
-        ],
-      ],
-      [
-        alphaProject.id,
-        [
-          createWorktree(
-            "/repos/alpha/feature",
-            "feature",
+            "/repos/alpha/zeta",
+            "zeta",
             "2026-04-04T10:00:00.000Z",
           ),
-          createWorktree("/repos/alpha/release", "release", null),
-          createWorktree("/repos/alpha", "main", null),
+          createWorktree("/repos/alpha/alpha", "alpha", null),
+          createWorktree(
+            "/repos/alpha/beta",
+            "beta",
+            "2026-04-04T09:00:00.000Z",
+          ),
         ],
       ],
     ]);
@@ -104,40 +96,20 @@ describe("deriveProjectsPanelWorktreeData", () => {
       worktreeSearchTextByKey,
     );
 
-    expect(callsByProjectId).toEqual(
-      new Map([
-        [betaProject.id, 1],
-        [alphaProject.id, 1],
-      ]),
+    expect(callsByProjectId).toEqual(new Map([[project.id, 1]]));
+
+    const sections = data.get(project.id);
+    expect(sections?.visibleWorktrees.map((worktree) => worktree.path)).toEqual(
+      [
+        "/repos/alpha/beta",
+        "/repos/alpha/zeta",
+        "/repos/alpha/alpha",
+        "/repos/alpha/delta",
+      ],
     );
-
-    const betaSections = data.get(betaProject.id);
-    const alphaSections = data.get(alphaProject.id);
-
-    expect(betaSections?.hasPinnedWorktrees).toBeTrue();
-    expect(
-      betaSections?.orderedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/beta/feature", "/repos/beta", "/repos/beta/release"]);
-    expect(
-      betaSections?.visiblePinnedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/beta/feature"]);
-    expect(
-      betaSections?.visibleUnpinnedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/beta", "/repos/beta/release"]);
-
-    expect(alphaSections?.hasPinnedWorktrees).toBeTrue();
-    expect(
-      alphaSections?.orderedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/alpha/feature", "/repos/alpha", "/repos/alpha/release"]);
-    expect(
-      alphaSections?.visiblePinnedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/alpha/feature"]);
-    expect(
-      alphaSections?.visibleUnpinnedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/alpha", "/repos/alpha/release"]);
   });
 
-  it("keeps nonmatching pinned worktrees out of the visible pinned subsection while preserving pinned presence per project", () => {
+  it("filters out nonmatching worktrees without changing the selector order", () => {
     const project = createProject(7, "Gamma", "/repos/gamma");
     const filteredProjects = [project];
     const worktreesByProjectId = new Map<number, RpcWorktree[]>([
@@ -167,10 +139,8 @@ describe("deriveProjectsPanelWorktreeData", () => {
     );
 
     const sections = data.get(project.id);
-    expect(sections?.hasPinnedWorktrees).toBeTrue();
-    expect(sections?.visiblePinnedWorktrees).toEqual([]);
-    expect(
-      sections?.visibleUnpinnedWorktrees.map((worktree) => worktree.path),
-    ).toEqual(["/repos/gamma/release"]);
+    expect(sections?.visibleWorktrees.map((worktree) => worktree.path)).toEqual(
+      ["/repos/gamma/release"],
+    );
   });
 });

@@ -780,13 +780,11 @@ function normalizeCodexAccessFlag(value: CodexAccessFlag): boolean {
 /**
  * Builds per-thread developer instructions that keep access reporting aligned with thread flags.
  */
-function buildThreadAccessDeveloperInstructions(
-  thread: {
-    agentsAccess: CodexAccessFlag;
-    githubAccess: CodexAccessFlag;
-    joltAccess: CodexAccessFlag;
-  },
-): string | null {
+function buildThreadAccessDeveloperInstructions(thread: {
+  agentsAccess: CodexAccessFlag;
+  githubAccess: CodexAccessFlag;
+  joltAccess: CodexAccessFlag;
+}): string | null {
   const lines: string[] = [];
   const agentsAccess = normalizeCodexAccessFlag(thread.agentsAccess);
   const githubAccess = normalizeCodexAccessFlag(thread.githubAccess);

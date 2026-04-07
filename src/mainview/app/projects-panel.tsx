@@ -3,7 +3,11 @@
  * @description Module for projects panel.
  */
 
-import { type FormEvent, memo, useMemo } from "react";
+import {
+  measureElement as defaultMeasureElement,
+  useVirtualizer,
+} from "@tanstack/react-virtual";
+import { type FormEvent, memo, useMemo, useRef } from "react";
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import { matchesNormalizedSearchText } from "../controls/search-utils";
@@ -26,15 +30,15 @@ import {
   worktreeThreadPopoverAnchorId,
 } from "./state";
 
-type ProjectWorktreeSections = {
-  hasPinnedWorktrees: boolean;
-  orderedWorktrees: RpcWorktree[];
-  visiblePinnedWorktrees: RpcWorktree[];
-  visibleUnpinnedWorktrees: RpcWorktree[];
+type ProjectWorktreeListData = {
+  visibleWorktrees: RpcWorktree[];
 };
 
+const PROJECT_WORKTREE_ROW_ESTIMATE_PX = 56;
+const PROJECT_WORKTREE_LIST_OVERSCAN = 6;
+
 /**
- * Row props for one worktree entry in either pinned or expanded project section.
+ * Row props for one worktree entry in the project selector list.
  */
 type ProjectWorktreeRowProps = {
   activeWorktree: boolean;
@@ -81,27 +85,17 @@ export function deriveProjectsPanelWorktreeData(
   getProjectWorktrees: (projectId: number) => RpcWorktree[],
   normalizedSidebarSearchQuery: string,
   worktreeSearchTextByKey: ReadonlyMap<string, string>,
-): ReadonlyMap<number, ProjectWorktreeSections> {
-  const projectWorktreeSectionsById = new Map<
-    number,
-    ProjectWorktreeSections
-  >();
+): ReadonlyMap<number, ProjectWorktreeListData> {
+  const projectWorktreeDataById = new Map<number, ProjectWorktreeListData>();
 
   for (const project of filteredProjects) {
     const orderedWorktrees = orderProjectWorktrees(
       project,
       getProjectWorktrees(project.id),
     );
-    const visiblePinnedWorktrees: RpcWorktree[] = [];
-    const visibleUnpinnedWorktrees: RpcWorktree[] = [];
-    let hasPinnedWorktrees = false;
+    const visibleWorktrees: RpcWorktree[] = [];
 
     for (const worktree of orderedWorktrees) {
-      const worktreePinned = worktree.pinnedAt !== null;
-      if (worktreePinned) {
-        hasPinnedWorktrees = true;
-      }
-
       if (
         !worktreeMatchesProjectsSearch(
           normalizedSidebarSearchQuery,
@@ -113,23 +107,15 @@ export function deriveProjectsPanelWorktreeData(
         continue;
       }
 
-      if (worktreePinned) {
-        visiblePinnedWorktrees.push(worktree);
-        continue;
-      }
-
-      visibleUnpinnedWorktrees.push(worktree);
+      visibleWorktrees.push(worktree);
     }
 
-    projectWorktreeSectionsById.set(project.id, {
-      hasPinnedWorktrees,
-      orderedWorktrees,
-      visiblePinnedWorktrees,
-      visibleUnpinnedWorktrees,
+    projectWorktreeDataById.set(project.id, {
+      visibleWorktrees,
     });
   }
 
-  return projectWorktreeSectionsById;
+  return projectWorktreeDataById;
 }
 
 /**
@@ -263,6 +249,128 @@ function ProjectWorktreeRow({
   );
 }
 
+type ProjectWorktreeListProps = {
+  getWorktreeState: (
+    projectId: number,
+    worktreePath: string,
+  ) => WorktreeNodeState;
+  isActiveWorktree: (projectId: number, worktreePath: string) => boolean;
+  onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
+  onToggleWorktreePinned: (
+    projectId: number,
+    worktreePath: string,
+    pinned: boolean,
+  ) => void;
+  onToggleWorktreeThreadSwitcher: (
+    projectId: number,
+    worktreePath: string,
+  ) => void;
+  project: RpcProject;
+  threadSwitcherEnabled: boolean;
+  threadSwitcherOpen: boolean;
+  worktrees: RpcWorktree[];
+  worktreeDisplayPathByKey: ReadonlyMap<string, string>;
+  worktreePinBusyPath: string | null;
+  worktreeThreadErrorLevel: (
+    projectId: number,
+    worktreePath: string,
+  ) => ThreadErrorLevel;
+};
+
+/**
+ * Virtualized list for a project's worktree selector rows.
+ */
+function ProjectWorktreeList({
+  getWorktreeState,
+  isActiveWorktree,
+  onProjectWorktreeClick,
+  onToggleWorktreePinned,
+  onToggleWorktreeThreadSwitcher,
+  project,
+  threadSwitcherEnabled,
+  threadSwitcherOpen,
+  worktrees,
+  worktreeDisplayPathByKey,
+  worktreePinBusyPath,
+  worktreeThreadErrorLevel,
+}: ProjectWorktreeListProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: worktrees.length,
+    estimateSize: () => PROJECT_WORKTREE_ROW_ESTIMATE_PX,
+    getItemKey: (index) => {
+      const worktree = worktrees[index];
+      return worktree ? worktreeKey(project.id, worktree.path) : index;
+    },
+    getScrollElement: () => scrollRef.current,
+    measureElement: defaultMeasureElement,
+    overscan: PROJECT_WORKTREE_LIST_OVERSCAN,
+    useAnimationFrameWithResizeObserver: true,
+  });
+  const virtualRows = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
+  return (
+    <div
+      ref={scrollRef}
+      className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1"
+    >
+      <div
+        className="relative w-full"
+        style={{
+          height: `${totalSize}px`,
+        }}
+      >
+        {virtualRows.map((virtualRow) => {
+          const worktree = worktrees[virtualRow.index];
+          if (!worktree) {
+            return null;
+          }
+
+          const worktreePath = worktree.path;
+
+          return (
+            <div
+              className="absolute left-0 top-0 w-full"
+              data-index={virtualRow.index}
+              key={virtualRow.key}
+              ref={virtualizer.measureElement}
+              style={{
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <ProjectWorktreeRow
+                activeWorktree={isActiveWorktree(project.id, worktreePath)}
+                displayPath={
+                  worktreeDisplayPathByKey.get(
+                    worktreeKey(project.id, worktreePath),
+                  ) ?? worktreePath
+                }
+                onProjectWorktreeClick={onProjectWorktreeClick}
+                onToggleWorktreePinned={onToggleWorktreePinned}
+                onToggleWorktreeThreadSwitcher={onToggleWorktreeThreadSwitcher}
+                project={project}
+                threadSwitcherEnabled={threadSwitcherEnabled}
+                threadSwitcherOpen={
+                  threadSwitcherOpen &&
+                  isActiveWorktree(project.id, worktreePath)
+                }
+                worktree={worktree}
+                worktreeErrorLevel={worktreeThreadErrorLevel(
+                  project.id,
+                  worktreePath,
+                )}
+                worktreePinBusyPath={worktreePinBusyPath}
+                worktreeState={getWorktreeState(project.id, worktreePath)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Full prop contract for the sidebar ProjectsPanel.
  */
@@ -322,7 +430,7 @@ type ProjectsPanelProps = {
 /**
  * Sidebar section for project/worktree management:
  * - add-project form + directory autocomplete
- * - expandable project trees with pinned worktrees grouped inside each project
+ * - expandable project trees with a single virtualized worktree list per project
  * - project-local worktree rows with thread-switch affordances
  */
 export const ProjectsPanel = memo(function ProjectsPanel({
@@ -366,7 +474,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
 }: ProjectsPanelProps) {
   const projectsOpen = useProjectsPanelOpen();
   const openProjectPaths = useOpenProjectPaths();
-  const projectWorktreeSectionsById = useMemo(() => {
+  const projectWorktreeDataById = useMemo(() => {
     return deriveProjectsPanelWorktreeData(
       filteredProjects,
       (projectId) => projectStateWorktrees(getProjectState(projectId)),
@@ -540,15 +648,9 @@ export const ProjectsPanel = memo(function ProjectsPanel({
             ) : (
               filteredProjects.map((project) => {
                 const state = getProjectState(project.id);
-                const worktreeSections = projectWorktreeSectionsById.get(
-                  project.id,
-                );
-                const hasPinnedWorktrees =
-                  worktreeSections?.hasPinnedWorktrees ?? false;
-                const visiblePinnedWorktrees =
-                  worktreeSections?.visiblePinnedWorktrees ?? [];
                 const visibleWorktrees =
-                  worktreeSections?.visibleUnpinnedWorktrees ?? [];
+                  projectWorktreeDataById.get(project.id)?.visibleWorktrees ??
+                  [];
                 const projectTreeOpen = openProjectPaths.has(project.path);
                 const isActive = selectedProjectId === project.id;
                 const projectErrorLevel = projectThreadErrorLevel(project.id);
@@ -654,118 +756,34 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                               {state.error}
                             </div>
                           ) : null}
-                          {visiblePinnedWorktrees.length === 0 &&
-                          visibleWorktrees.length === 0 ? (
+                          {visibleWorktrees.length === 0 ? (
                             <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
                               {normalizedSidebarSearchQuery
                                 ? "No matching worktrees."
-                                : hasPinnedWorktrees
-                                  ? "No unpinned worktrees found."
-                                  : "No worktrees found."}
-                            </div>
-                          ) : null}
-                          {visiblePinnedWorktrees.length > 0 ? (
-                            <div className="space-y-1">
-                              <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
-                                Pinned
-                              </div>
-                              <div className="space-y-1">
-                                {visiblePinnedWorktrees.map((worktree) => (
-                                  <ProjectWorktreeRow
-                                    key={`pinned:${worktree.path}`}
-                                    activeWorktree={isActiveWorktree(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                    displayPath={
-                                      worktreeDisplayPathByKey.get(
-                                        worktreeKey(project.id, worktree.path),
-                                      ) ?? worktree.path
-                                    }
-                                    onProjectWorktreeClick={
-                                      onProjectWorktreeClick
-                                    }
-                                    onToggleWorktreePinned={
-                                      onToggleWorktreePinned
-                                    }
-                                    onToggleWorktreeThreadSwitcher={
-                                      onToggleWorktreeThreadSwitcher
-                                    }
-                                    project={project}
-                                    threadSwitcherEnabled={
-                                      threadSwitcherEnabled
-                                    }
-                                    threadSwitcherOpen={
-                                      threadSwitcherOpen &&
-                                      isActiveWorktree(
-                                        project.id,
-                                        worktree.path,
-                                      )
-                                    }
-                                    worktree={worktree}
-                                    worktreeErrorLevel={worktreeThreadErrorLevel(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                    worktreePinBusyPath={worktreePinBusyPath}
-                                    worktreeState={getWorktreeState(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                  />
-                                ))}
-                              </div>
+                                : "No worktrees found."}
                             </div>
                           ) : null}
                           {visibleWorktrees.length > 0 ? (
-                            <div className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1">
-                              <div className="space-y-1">
-                                {visibleWorktrees.map((worktree) => (
-                                  <ProjectWorktreeRow
-                                    key={worktree.path}
-                                    activeWorktree={isActiveWorktree(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                    displayPath={
-                                      worktreeDisplayPathByKey.get(
-                                        worktreeKey(project.id, worktree.path),
-                                      ) ?? worktree.path
-                                    }
-                                    onProjectWorktreeClick={
-                                      onProjectWorktreeClick
-                                    }
-                                    onToggleWorktreePinned={
-                                      onToggleWorktreePinned
-                                    }
-                                    onToggleWorktreeThreadSwitcher={
-                                      onToggleWorktreeThreadSwitcher
-                                    }
-                                    project={project}
-                                    threadSwitcherEnabled={
-                                      threadSwitcherEnabled
-                                    }
-                                    threadSwitcherOpen={
-                                      threadSwitcherOpen &&
-                                      isActiveWorktree(
-                                        project.id,
-                                        worktree.path,
-                                      )
-                                    }
-                                    worktree={worktree}
-                                    worktreeErrorLevel={worktreeThreadErrorLevel(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                    worktreePinBusyPath={worktreePinBusyPath}
-                                    worktreeState={getWorktreeState(
-                                      project.id,
-                                      worktree.path,
-                                    )}
-                                  />
-                                ))}
-                              </div>
-                            </div>
+                            <ProjectWorktreeList
+                              getWorktreeState={getWorktreeState}
+                              isActiveWorktree={isActiveWorktree}
+                              onProjectWorktreeClick={onProjectWorktreeClick}
+                              onToggleWorktreePinned={onToggleWorktreePinned}
+                              onToggleWorktreeThreadSwitcher={
+                                onToggleWorktreeThreadSwitcher
+                              }
+                              project={project}
+                              threadSwitcherEnabled={threadSwitcherEnabled}
+                              threadSwitcherOpen={threadSwitcherOpen}
+                              worktrees={visibleWorktrees}
+                              worktreeDisplayPathByKey={
+                                worktreeDisplayPathByKey
+                              }
+                              worktreePinBusyPath={worktreePinBusyPath}
+                              worktreeThreadErrorLevel={
+                                worktreeThreadErrorLevel
+                              }
+                            />
                           ) : null}
                         </div>
                       </div>

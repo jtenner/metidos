@@ -25,7 +25,7 @@ Renders the explicit desktop worktree-thread switcher popover and exposes the pu
 Composes the shared mobile/sidebar-drawer sections, including project search, thread lists, and git history.
 
 `projects-panel.tsx`
-Renders project listings and project-focused interactions, including selection, per-project pinned worktree grouping, and the active-worktree thread-switcher trigger.
+Renders project listings and project-focused interactions, including selection, a single virtualized worktree list ordered by pinned state and workspace name, and the active-worktree thread-switcher trigger.
 
 `pinned-threads-panel.tsx`
 Renders the global pinned-thread shortcuts used in the desktop navigation rail.

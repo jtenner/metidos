@@ -696,38 +696,32 @@ export function primaryWorktreePath(
   return findPrimaryWorktree(project, worktrees)?.path ?? project.path;
 }
 /**
- * Performs orderProjectWorktrees operation.
+ * Orders worktrees for sidebar/workspace selection.
+ * Pinned worktrees appear first, then the remainder is sorted by workspace
+ * display name and full path for stability.
  * @param project - project argument for orderProjectWorktrees.
  * @param worktrees - worktrees argument for orderProjectWorktrees.
  */
 
 export function orderProjectWorktrees(
-  project: RpcProject,
+  _project: RpcProject,
   worktrees: RpcWorktree[],
 ): RpcWorktree[] {
-  const primaryPath = primaryWorktreePath(project, worktrees);
   return [...worktrees].sort((left, right) => {
-    const leftPinnedAt = left.pinnedAt ?? "";
-    const rightPinnedAt = right.pinnedAt ?? "";
-    if (leftPinnedAt || rightPinnedAt) {
-      if (!leftPinnedAt) {
-        return 1;
-      }
-      if (!rightPinnedAt) {
-        return -1;
-      }
-      if (leftPinnedAt !== rightPinnedAt) {
-        return rightPinnedAt.localeCompare(leftPinnedAt);
-      }
+    const leftPinned = left.pinnedAt !== null;
+    const rightPinned = right.pinnedAt !== null;
+    if (leftPinned !== rightPinned) {
+      return leftPinned ? -1 : 1;
     }
-    // Ensure primary path is sorted ahead of secondary clones when pinned state is equal.
-    if (left.path === primaryPath && right.path !== primaryPath) {
-      return -1;
+
+    const leftName = shortName(left.path);
+    const rightName = shortName(right.path);
+    const nameCompare = leftName.localeCompare(rightName);
+    if (nameCompare !== 0) {
+      return nameCompare;
     }
-    if (right.path === primaryPath && left.path !== primaryPath) {
-      return 1;
-    }
-    return 0;
+
+    return left.path.localeCompare(right.path);
   });
 }
 /**
