@@ -23,15 +23,6 @@ type ThreadAccessControlProps = {
   variant: "desktop" | "mobile";
 };
 
-function describeThreadAccessValue(value: ThreadAccessValue): string {
-  return [
-    `GitHub ${value.githubAccess ? "enabled" : "disabled"}`,
-    `Agents ${value.agentsAccess ? "enabled" : "disabled"}`,
-    `Jolt ${value.joltAccess ? "enabled" : "disabled"}`,
-    `Unsafe ${value.unsafeMode ? "enabled" : "disabled"}`,
-  ].join(", ");
-}
-
 function AccessRow({
   accentClassName,
   checked,
@@ -52,7 +43,7 @@ function AccessRow({
   return (
     <label
       className={[
-        "flex items-start gap-3 rounded-md border px-3 py-2 transition-colors",
+        "flex items-start gap-2 border px-1 py-1 transition-colors",
         checked
           ? "border-[#4c6070] bg-[#171d21]"
           : "border-[#303840] bg-[#11161a]",
@@ -96,15 +87,16 @@ export function ThreadAccessControl({
   return (
     <DropdownControl
       canOpen={!disabled}
+      closeOnDisable={false}
       disabled={disabled}
       rootClassName="relative inline-flex overflow-visible"
-      title={`${title} ${describeThreadAccessValue(value)}`}
+      title={`${title}`}
       renderButton={({ open, toggle }) => (
         <button
           aria-expanded={open}
           aria-haspopup="dialog"
           className={[
-            "inline-flex h-10 items-center gap-2 rounded-md border px-3 text-left text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors",
+            "inline-flex h-7 items-center gap-2 border px-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors",
             disabled
               ? "cursor-not-allowed border-[#39444b] bg-[#15191c] text-[#8797a2] opacity-70"
               : open
@@ -120,20 +112,6 @@ export function ThreadAccessControl({
             <span>Access</span>
           </span>
           <span className="ml-1 flex min-w-0 items-center gap-1 text-[10px] font-medium tracking-[0.12em] text-[#8ea0ad]">
-            <span
-              className={[
-                "truncate",
-                value.githubAccess || value.agentsAccess || value.unsafeMode
-                  ? "text-[#dbe7ef]"
-                  : "text-[#8ea0ad]",
-              ].join(" ")}
-            >
-              {value.githubAccess || value.agentsAccess || value.unsafeMode
-                ? "Custom"
-                : value.joltAccess
-                  ? "Default"
-                  : "Restricted"}
-            </span>
             <span aria-hidden="true" className="text-[#6f818d]">
               {materialSymbol(
                 open ? "expand_less" : "expand_more",
@@ -143,10 +121,10 @@ export function ThreadAccessControl({
           </span>
         </button>
       )}
-      renderPanel={({ close }) => (
+      renderPanel={() => (
         <div
           className={[
-            "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 overflow-hidden rounded-xl border border-[#3a4751] bg-[#12171b] shadow-[0_24px_60px_rgba(0,0,0,0.52)]",
+            "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 overflow-hidden border border-[#3a4751] bg-[#12171b] shadow-[0_24px_60px_rgba(0,0,0,0.52)]",
             compact
               ? "w-[18rem] max-w-[calc(100vw-1rem)]"
               : "w-[20rem] max-w-[calc(100vw-2rem)]",
@@ -155,9 +133,6 @@ export function ThreadAccessControl({
           <div className="border-b border-[#27323a] px-4 py-3">
             <div className="font-label text-[10px] uppercase tracking-[0.18em] text-[#8fb5cd]">
               Access controls
-            </div>
-            <div className="mt-1 text-xs leading-5 text-[#9fb0bb]">
-              Choose which tool groups are visible to the thread or cron job.
             </div>
           </div>
           <div className="space-y-2 p-3">
@@ -221,15 +196,6 @@ export function ThreadAccessControl({
                 "text-[#f2d79b]",
               ].join(" ")}
             />
-          </div>
-          <div className="flex items-center justify-end border-t border-[#27323a] px-4 py-3">
-            <button
-              className="rounded-full border border-[#46535c] px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] text-[#d4dee5] transition hover:border-[#6d7b85] hover:text-white"
-              onClick={close}
-              type="button"
-            >
-              Done
-            </button>
           </div>
         </div>
       )}

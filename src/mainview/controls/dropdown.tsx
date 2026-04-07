@@ -34,6 +34,8 @@ type DropdownControlProps = {
   canOpen?: boolean;
   /** Disables toggle/rendered interactions without unmounting the control. */
   disabled?: boolean;
+  /** Set to false to keep an open dropdown visible while disabled changes. */
+  closeOnDisable?: boolean;
   /** Optional observer hook for externally tracking open/closed state changes. */
   onOpenChange?: (open: boolean) => void;
   /** Render function for the toggle/button region. */
@@ -54,6 +56,7 @@ type DropdownControlProps = {
  */
 export function DropdownControl({
   canOpen = true,
+  closeOnDisable = true,
   disabled = false,
   onOpenChange,
   renderButton,
@@ -82,12 +85,13 @@ export function DropdownControl({
     onOpenChange?.(open);
   }, [onOpenChange, open]);
 
-  // If parent disables opening while open, force close to avoid stale UI state.
+  // If parent disables opening while open, force close to avoid stale UI state unless
+  // the caller explicitly wants the panel to remain visible during transient disablement.
   useEffect(() => {
-    if (!canOpen && open) {
+    if (closeOnDisable && !canOpen && open) {
       setOpen(false);
     }
-  }, [canOpen, open]);
+  }, [canOpen, closeOnDisable, open]);
 
   // Bind global listeners while open so outside clicks and Escape collapse the dropdown.
   useEffect(() => {
