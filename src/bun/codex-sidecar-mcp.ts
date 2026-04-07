@@ -13,6 +13,7 @@ import {
   enforceTargetScope,
 } from "./codex-sidecar-scope";
 import { createSubsystemLogger } from "./logging";
+import { buildCodexModelCatalog } from "./project-procedures/codex-catalog";
 import type {
   AppRPCSchema,
   RpcCronJob,
@@ -84,6 +85,10 @@ const rpcHttpOrigin =
   readStringEnv("JOLT_RPC_HTTP_ORIGIN") ?? deriveRpcHttpOrigin(rpcUrl);
 const sessionIdContext = readStringEnv("JOLT_SESSION_ID");
 const sidecarLogger = createSubsystemLogger("MCP Sidecar");
+const supportedCodexModels = buildCodexModelCatalog()
+  .models.map((model) => model.id)
+  .join(", ");
+const supportedCodexModelsSentence = `Supported models: ${supportedCodexModels}.`;
 
 /** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {
@@ -1398,49 +1403,6 @@ server.registerTool(
 );
 
 /**
- * Tool: list available models and model catalog details for cron creation.
- */
-server.registerTool(
-  "list_models",
-  {
-    title: "List Models",
-    description:
-      "List all supported codex models and their associated default reasoning effort.",
-    inputSchema: {},
-    annotations: {
-      idempotentHint: true,
-      openWorldHint: false,
-      readOnlyHint: true,
-    },
-  },
-  withToolLogging("list_models", async () => {
-    const catalog = await rpcClient.call("getCodexModelCatalog", undefined);
-    const lines = catalog.models.map(
-      (model) =>
-        `- ${model.id}: ${model.label} (${model.group}${
-          model.deprecated ? ", deprecated" : ""
-        })`,
-    );
-    return textResult(
-      lines.length > 0
-        ? [
-            `Default model: ${catalog.defaultModel}`,
-            `Default reasoning effort: ${catalog.defaultReasoningEffort}`,
-            "",
-            ...lines,
-          ].join("\n")
-        : "No models are currently configured.",
-      {
-        defaultModel: catalog.defaultModel,
-        defaultReasoningEffort: catalog.defaultReasoningEffort,
-        models: catalog.models,
-        reasoningEfforts: catalog.reasoningEfforts,
-      },
-    );
-  }),
-);
-
-/**
  * Tool: run untrusted JavaScript or TypeScript in a vm2 sandbox.
  */
 server.registerTool(
@@ -1570,8 +1532,7 @@ server.registerTool(
   "new_cron",
   {
     title: "New Cron Job",
-    description:
-      "Create a new cron job bound to a project workspace. The run prompt is reused for each fire time.",
+    description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. ${supportedCodexModelsSentence}`,
     inputSchema: {
       projectId: z
         .number()
@@ -1606,7 +1567,9 @@ server.registerTool(
         .trim()
         .min(1)
         .optional()
-        .describe("Model override for cron-run threads."),
+        .describe(
+          `Model override for cron-run threads. ${supportedCodexModelsSentence}`,
+        ),
       title: z
         .string()
         .trim()
@@ -1691,8 +1654,7 @@ server.registerTool(
   "update_cron",
   {
     title: "Update Cron Job",
-    description:
-      "Update schedule, prompt, enabled state, or soft-delete a cron job.",
+    description: `Update schedule, prompt, enabled state, or soft-delete a cron job. ${supportedCodexModelsSentence}`,
     inputSchema: {
       cronJobId: z.number().int().positive().describe("Cron job identifier."),
       schedule: z
@@ -1706,7 +1668,9 @@ server.registerTool(
         .trim()
         .min(1)
         .optional()
-        .describe("Optional model override for cron run threads."),
+        .describe(
+          `Optional model override for cron run threads. ${supportedCodexModelsSentence}`,
+        ),
       prompt: z
         .string()
         .trim()
@@ -1807,8 +1771,7 @@ server.registerTool(
   "new_thread",
   {
     title: "New Thread",
-    description:
-      "Start a separate Jolt thread for distinct work or another git worktree. Bound sidecar sessions cannot escape their current project/worktree. Set autoStart=true to ask the UI first; unsafeMode skips the popup.",
+    description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sidecar sessions cannot escape their current project/worktree. Set autoStart=true to ask the UI first; unsafeMode skips the popup. ${supportedCodexModelsSentence}`,
     inputSchema: {
       input: z.string().trim().min(1).describe("Initial prompt."),
       projectId: z
@@ -1838,7 +1801,9 @@ server.registerTool(
         .trim()
         .min(1)
         .optional()
-        .describe("Model override. Omit for null metadata."),
+        .describe(
+          `Model override. ${supportedCodexModelsSentence} Omit for null metadata.`,
+        ),
       reasoningEffort: z
         .enum(["minimal", "low", "medium", "high", "xhigh"])
         .optional()
