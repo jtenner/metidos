@@ -733,7 +733,7 @@ export function worktreeDisplayName(worktree: RpcWorktree | null): string {
 }
 
 /**
- * Stable anchor id to place error summary popovers per worktree row.
+ * Stable anchor id for the active worktree row thread-switcher trigger.
  */
 export function worktreeThreadPopoverAnchorId(
   projectId: number,

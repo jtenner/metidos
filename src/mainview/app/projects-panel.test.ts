@@ -10,13 +10,6 @@ import { buildNormalizedSearchText } from "../controls/search-utils";
 import { deriveProjectsPanelWorktreeData } from "./projects-panel";
 import { worktreeKey } from "./state";
 
-/**
- * Creates project.
- * @param id - Identifier value.
- * @param name - Display or identifier name.
- * @param path - Filesystem path.
- */
-
 function createProject(id: number, name: string, path: string): RpcProject {
   return {
     id,
@@ -28,12 +21,6 @@ function createProject(id: number, name: string, path: string): RpcProject {
     lastOpenedAt: "2026-04-04T00:00:00.000Z",
   };
 }
-/**
- * Creates worktree.
- * @param path - Filesystem path.
- * @param branch - Target git branch.
- * @param pinnedAt - pinnedAt argument for createWorktree.
- */
 
 function createWorktree(
   path: string,
@@ -48,11 +35,6 @@ function createWorktree(
     pinnedAt,
   };
 }
-/**
- * Builds worktree search text.
- * @param projects - projects argument for buildWorktreeSearchText.
- * @param worktreesByProjectId - worktreesByProjectId identifier.
- */
 
 function buildWorktreeSearchText(
   projects: RpcProject[],
@@ -73,7 +55,7 @@ function buildWorktreeSearchText(
 }
 
 describe("deriveProjectsPanelWorktreeData", () => {
-  it("sorts once per project and reuses the partitioned results across pinned and unpinned lists", () => {
+  it("sorts once per project and keeps pinned worktrees scoped to their own project tree", () => {
     const betaProject = createProject(2, "Beta", "/repos/beta");
     const alphaProject = createProject(1, "Alpha", "/repos/alpha");
     const filteredProjects = [betaProject, alphaProject];
@@ -103,9 +85,6 @@ describe("deriveProjectsPanelWorktreeData", () => {
         ],
       ],
     ]);
-    const projectById = new Map(
-      filteredProjects.map((project) => [project.id, project] as const),
-    );
     const worktreeSearchTextByKey = buildWorktreeSearchText(
       filteredProjects,
       worktreesByProjectId,
@@ -123,7 +102,6 @@ describe("deriveProjectsPanelWorktreeData", () => {
       },
       "",
       worktreeSearchTextByKey,
-      projectById,
     );
 
     expect(callsByProjectId).toEqual(
@@ -132,14 +110,9 @@ describe("deriveProjectsPanelWorktreeData", () => {
         [alphaProject.id, 1],
       ]),
     );
-    expect(
-      data.pinnedWorktreeEntries.map(
-        ({ projectId, worktree }) => `${projectId}:${worktree.path}`,
-      ),
-    ).toEqual(["1:/repos/alpha/feature", "2:/repos/beta/feature"]);
 
-    const betaSections = data.projectWorktreeSectionsById.get(betaProject.id);
-    const alphaSections = data.projectWorktreeSectionsById.get(alphaProject.id);
+    const betaSections = data.get(betaProject.id);
+    const alphaSections = data.get(alphaProject.id);
 
     expect(betaSections?.hasPinnedWorktrees).toBeTrue();
     expect(
@@ -152,15 +125,19 @@ describe("deriveProjectsPanelWorktreeData", () => {
       betaSections?.visibleUnpinnedWorktrees.map((worktree) => worktree.path),
     ).toEqual(["/repos/beta", "/repos/beta/release"]);
 
+    expect(alphaSections?.hasPinnedWorktrees).toBeTrue();
     expect(
       alphaSections?.orderedWorktrees.map((worktree) => worktree.path),
     ).toEqual(["/repos/alpha/feature", "/repos/alpha", "/repos/alpha/release"]);
+    expect(
+      alphaSections?.visiblePinnedWorktrees.map((worktree) => worktree.path),
+    ).toEqual(["/repos/alpha/feature"]);
     expect(
       alphaSections?.visibleUnpinnedWorktrees.map((worktree) => worktree.path),
     ).toEqual(["/repos/alpha", "/repos/alpha/release"]);
   });
 
-  it("keeps nonmatching pinned worktrees out of the pinned section while preserving pinned presence per project", () => {
+  it("keeps nonmatching pinned worktrees out of the visible pinned subsection while preserving pinned presence per project", () => {
     const project = createProject(7, "Gamma", "/repos/gamma");
     const filteredProjects = [project];
     const worktreesByProjectId = new Map<number, RpcWorktree[]>([
@@ -177,7 +154,6 @@ describe("deriveProjectsPanelWorktreeData", () => {
         ],
       ],
     ]);
-    const projectById = new Map([[project.id, project] as const]);
     const worktreeSearchTextByKey = buildWorktreeSearchText(
       filteredProjects,
       worktreesByProjectId,
@@ -188,12 +164,9 @@ describe("deriveProjectsPanelWorktreeData", () => {
       (projectId) => worktreesByProjectId.get(projectId) ?? [],
       "release",
       worktreeSearchTextByKey,
-      projectById,
     );
 
-    expect(data.pinnedWorktreeEntries).toEqual([]);
-
-    const sections = data.projectWorktreeSectionsById.get(project.id);
+    const sections = data.get(project.id);
     expect(sections?.hasPinnedWorktrees).toBeTrue();
     expect(sections?.visiblePinnedWorktrees).toEqual([]);
     expect(

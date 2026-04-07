@@ -15,11 +15,20 @@ Renders the step-up confirmation dialog used when a privileged action requires a
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.
 
+`desktop-sidebar-content.tsx`
+Composes the desktop-only navigation sidebar content: pinned threads, project/worktree navigation, and git history.
+
+`desktop-thread-switcher.tsx`
+Renders the explicit desktop worktree-thread switcher popover and exposes the pure filtering/partitioning helper used by tests.
+
 `sidebar-content.tsx`
-Composes reusable sidebar sections (projects, threads) and controls their layout composition.
+Composes the shared mobile/sidebar-drawer sections, including project search, thread lists, and git history.
 
 `projects-panel.tsx`
-Renders project listings and project-focused interactions, including selection and project status actions.
+Renders project listings and project-focused interactions, including selection, per-project pinned worktree grouping, and the active-worktree thread-switcher trigger.
+
+`pinned-threads-panel.tsx`
+Renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
 `threads-panel.tsx`
 Renders thread lists and thread row interactions as the canonical thread-navigation surface.

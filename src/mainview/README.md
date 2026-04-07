@@ -44,6 +44,10 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/desktop-sidebar.tsx` defines the desktop layout shell and sidebar affordances for wide screens.
 
+`app/desktop-sidebar-content.tsx` composes the desktop-only navigation sidebar content, including pinned threads, project/worktree navigation, and git history.
+
+`app/desktop-thread-switcher.tsx` renders the explicit desktop worktree thread-switcher popover and owns the pure search/partition helper used by tests.
+
 `app/diff-workspace.tsx` renders file patches and supports diff tree construction and state for patch inspection, including worker-backed preparation for very large diffs.
 
 `app/diff-parsing.ts` contains the shared diff parse/summarize helpers and the threshold used to decide when to move large diff preparation off the main thread.
@@ -72,7 +76,9 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
 
-`app/sidebar-content.tsx` composes shared sidebar sections and controls how project, thread, and task data are organized.
+`app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
+
+`app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 
 `app/sidebar-panels-state.ts` owns persisted sidebar panel open/closed state and cross-panel toggle synchronization.
 
