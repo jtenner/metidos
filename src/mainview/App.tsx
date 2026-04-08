@@ -155,6 +155,7 @@ import {
   mergeThreadStatusSummaries,
   resolveThreadStatusRefreshOutcome,
 } from "./thread-status-refresh";
+import { deriveSelectedThreadWorkspaceTarget } from "./thread-workspace-selection";
 
 /**
  * Merges thread message history.
@@ -4741,39 +4742,73 @@ export default function App({
   );
 
   useEffect(() => {
-    if (!sessionStateReady) {
-      return;
-    }
-    if (
-      !selectedThread ||
-      !selectedProject ||
-      selectedProject.id !== selectedThread.projectId ||
-      selectedProject.isOpen !== 1 ||
-      !activeSelectedWorktreePath ||
-      activeSelectedWorktreePath !== selectedThread.worktreePath
-    ) {
+    const targetWorkspace = deriveSelectedThreadWorkspaceTarget({
+      activeSelectedWorktreePath,
+      selectedProject,
+      selectedThread,
+      sessionStateReady,
+    });
+    if (!targetWorkspace) {
       return;
     }
 
     const target = getWorktreeState(
-      selectedThread.projectId,
-      selectedThread.worktreePath,
+      targetWorkspace.projectId,
+      targetWorkspace.worktreePath,
     );
     if (target.loading || target.opened) {
       return;
     }
 
-    void ensureWorktreeOpen(
-      selectedThread.projectId,
-      selectedThread.worktreePath,
-    );
+    void (async () => {
+      if (!targetWorkspace.projectOpen) {
+        try {
+          const openedProject = await procedures.openProject(
+            {
+              projectPath: targetWorkspace.projectPath,
+              name: targetWorkspace.projectName,
+            },
+            {
+              priority: "foreground",
+            },
+          );
+          if (selectedThreadIdRef.current !== targetWorkspace.threadId) {
+            return;
+          }
+          upsertProject(openedProject.project);
+          setProjectState(
+            openedProject.project.id,
+            buildLoadedProjectWorktreesState(openedProject.worktrees),
+          );
+        } catch (error) {
+          if (selectedThreadIdRef.current === targetWorkspace.threadId) {
+            setThreadsError(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+          return;
+        }
+      }
+
+      if (selectedThreadIdRef.current !== targetWorkspace.threadId) {
+        return;
+      }
+
+      await ensureWorktreeOpen(
+        targetWorkspace.projectId,
+        targetWorkspace.worktreePath,
+      );
+    })();
   }, [
     activeSelectedWorktreePath,
     ensureWorktreeOpen,
     getWorktreeState,
+    procedures,
     sessionStateReady,
     selectedProject,
     selectedThread,
+    setProjectState,
+    upsertProject,
   ]);
 
   const postMessage = useCallback(() => {

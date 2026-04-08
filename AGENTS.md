@@ -107,6 +107,8 @@
 │     ├─ startup-project-restore.ts
 │     ├─ startup-worktree-restore.test.ts
 │     ├─ startup-worktree-restore.ts
+│     ├─ thread-workspace-selection.test.ts
+│     ├─ thread-workspace-selection.ts
 │     ├─ thread-send.test.ts
 │     ├─ thread-send.ts
 │     ├─ thread-status-refresh.test.ts

@@ -24,6 +24,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `startup-worktree-restore.ts` isolates startup worktree-restore filtering and selection fallback so stale persisted worktree paths are pruned before the rest of the UI starts reading git history, tasks, or active-worktree state from them.
 
+`thread-workspace-selection.ts` isolates the thread-driven workspace-target derivation used when a selected thread needs to reopen its project and worktree context before diff or history panels can load live worktree data.
+
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 
 `index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.
