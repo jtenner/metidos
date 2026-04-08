@@ -5017,6 +5017,11 @@ export default function App({
 
   const sidebarActionButtonClass =
     "flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";
+  const selectedThreadContextBranchLabel =
+    activeSelectedWorktree?.branch?.trim() || "Primary";
+  const selectedThreadContextPathLabel = activeSelectedWorktreePath
+    ? activeScreenSubtitleSecondary
+    : activeSelectedWorktreeFolder || "No worktree selected";
   const activeSidebarBranchLabel =
     activeSelectedWorktree?.branch?.trim() ||
     (selectedProject
@@ -5579,10 +5584,10 @@ export default function App({
             <>
               <span className="text-[#545d64] text-xs shrink-0">|</span>
               <span className="font-label text-xs text-[#f2f0ef] truncate">
-                {activeSelectedWorktreeFolder}
+                {selectedThreadContextBranchLabel}
               </span>
               <span className="font-label text-xs text-[#8f8d8b] truncate">
-                {activeSelectedWorktreeName}
+                {selectedThreadContextPathLabel}
               </span>
             </>
           ) : null}
