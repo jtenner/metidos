@@ -120,6 +120,23 @@ describe("normalizeCommandDisplayText", () => {
       `/bin/bash -lc 'rg -n "''^@@|''^[-+]" .tmp/post-code-pushing-simplify-callfed/simplify.diff | sed -n '"'1,220p'"''`,
       `rg -n "^@@|^[-+]" .tmp/post-code-pushing-simplify-callfed/simplify.diff | sed -n '1,220p'`,
     ],
+    [
+      "decodes mixed double-quoted and single-quoted POSIX wrapper segments",
+      String.raw`/bin/bash -lc "moon fmt && moon test src/passes/simplify_locals_test.mbt -F '*live multi-root storeback extraction frontier*' && git add CHANGELOG.md agent-todo.md docs/0073-2026-04-02-code-pushing-binaryen-plan.md src/passes/simplify_locals_test.mbt && git diff --cached --stat && msg="'$(mktemp) && printf '"'%s
+
+%s
+%s
+%s
+%s
+' 'Pin simplify-locals multi-root artifact frontier' 'Add an in-tree reducer for the remaining multi-root simplify-locals frontier.' '' 'Why:' '- The first direct hunk is still unresolved and this captures the current behavior precisely.' > \""'$msg" && git commit -F "$msg"'`,
+      `moon fmt && moon test src/passes/simplify_locals_test.mbt -F '*live multi-root storeback extraction frontier*' && git add CHANGELOG.md agent-todo.md docs/0073-2026-04-02-code-pushing-binaryen-plan.md src/passes/simplify_locals_test.mbt && git diff --cached --stat && msg=$(mktemp) && printf '%s
+
+%s
+%s
+%s
+%s
+' 'Pin simplify-locals multi-root artifact frontier' 'Add an in-tree reducer for the remaining multi-root simplify-locals frontier.' '' 'Why:' '- The first direct hunk is still unresolved and this captures the current behavior precisely.' > "$msg" && git commit -F "$msg"`,
+    ],
     ["unwraps unquoted bash command bodies", "/bin/bash -lc pwd", "pwd"],
     ["unwraps cmd.exe wrappers", 'cmd.exe /d /s /c "dir"', "dir"],
     ["unwraps unquoted cmd.exe commands", "cmd.exe /c dir", "dir"],

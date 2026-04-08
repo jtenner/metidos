@@ -101,11 +101,9 @@ function parseCommandWrapper(command: string): ParsedCommandWrapper | null {
  */
 function decodeWrappedCommand(wrapper: ParsedCommandWrapper): string | null {
   if (wrapper.kind === "posix") {
-    const decodedSingleQuotedText = decodePosixSingleQuotedShellText(
-      wrapper.body,
-    );
-    if (typeof decodedSingleQuotedText === "string") {
-      return decodedSingleQuotedText;
+    const decodedShellWordText = decodePosixQuotedShellWordText(wrapper.body);
+    if (typeof decodedShellWordText === "string") {
+      return decodedShellWordText;
     }
   }
 
@@ -133,11 +131,11 @@ function decodeWrappedCommand(wrapper: ParsedCommandWrapper): string | null {
 }
 
 /**
- * Decode a POSIX single shell word that may splice quote segments to embed literal single quotes.
+ * Decode a POSIX shell word that may splice together single-quoted and double-quoted segments.
  */
-function decodePosixSingleQuotedShellText(text: string): string | null {
+function decodePosixQuotedShellWordText(text: string): string | null {
   const trimmed = text.trim();
-  if (!trimmed.startsWith("'")) {
+  if (!(trimmed.startsWith("'") || trimmed.startsWith('"'))) {
     return null;
   }
 
@@ -163,10 +161,13 @@ function decodePosixSingleQuotedShellText(text: string): string | null {
         continue;
       }
       if (character === "\\" && nextCharacter) {
-        if (['"', "$", "\\", "`", "\n"].includes(nextCharacter)) {
-          if (nextCharacter !== "\n") {
-            result += nextCharacter;
-          }
+        if (nextCharacter === "\n") {
+          index += 1;
+          continue;
+        }
+        const decoded = POSIX_DOUBLE_QUOTED_ESCAPES[nextCharacter];
+        if (typeof decoded === "string") {
+          result += decoded;
           index += 1;
           continue;
         }
@@ -205,6 +206,16 @@ function decodePosixSingleQuotedShellText(text: string): string | null {
 
   return mode === "unquoted" ? result : null;
 }
+
+const POSIX_DOUBLE_QUOTED_ESCAPES: Record<string, string> = {
+  '"': '"',
+  "\\": "\\",
+  $: "$",
+  "`": "`",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+};
 
 /**
  * Split wrapper options text into whitespace-delimited tokens.
