@@ -24,7 +24,6 @@ import {
   type ProjectNodeState,
   projectStateWorktrees,
   shortName,
-  type ThreadErrorLevel,
   type WorktreeNodeState,
   worktreeKey,
   worktreeThreadPopoverAnchorId,
@@ -57,7 +56,6 @@ type ProjectWorktreeRowProps = {
   threadSwitcherEnabled: boolean;
   threadSwitcherOpen: boolean;
   worktree: RpcWorktree;
-  worktreeErrorLevel: ThreadErrorLevel;
   worktreePinBusyPath: string | null;
   worktreeState: WorktreeNodeState;
 };
@@ -119,7 +117,7 @@ export function deriveProjectsPanelWorktreeData(
 }
 
 /**
- * Render a selectable worktree row with pin/unpin affordance and status cue.
+ * Render a selectable worktree row with pin/unpin affordance.
  */
 function ProjectWorktreeRow({
   activeWorktree,
@@ -131,7 +129,6 @@ function ProjectWorktreeRow({
   threadSwitcherEnabled,
   threadSwitcherOpen,
   worktree,
-  worktreeErrorLevel,
   worktreePinBusyPath,
   worktreeState,
 }: ProjectWorktreeRowProps) {
@@ -183,19 +180,6 @@ function ProjectWorktreeRow({
             </span>
           </div>
         </div>
-        <span
-          className={`absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
-            showThreadSwitcherButton ? "right-16" : "right-10"
-          } ${
-            worktreeErrorLevel === "unread"
-              ? "bg-[#ff304f]"
-              : worktreeErrorLevel === "failed"
-                ? "bg-[#8f4956]"
-                : worktreeErrorLevel === "stopped"
-                  ? "bg-[#b98a3a]"
-                  : "bg-transparent"
-          }`}
-        />
       </button>
       {showThreadSwitcherButton ? (
         <button
@@ -271,10 +255,6 @@ type ProjectWorktreeListProps = {
   worktrees: RpcWorktree[];
   worktreeDisplayPathByKey: ReadonlyMap<string, string>;
   worktreePinBusyPath: string | null;
-  worktreeThreadErrorLevel: (
-    projectId: number,
-    worktreePath: string,
-  ) => ThreadErrorLevel;
 };
 
 /**
@@ -292,7 +272,6 @@ function ProjectWorktreeList({
   worktrees,
   worktreeDisplayPathByKey,
   worktreePinBusyPath,
-  worktreeThreadErrorLevel,
 }: ProjectWorktreeListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
@@ -356,10 +335,6 @@ function ProjectWorktreeList({
                   isActiveWorktree(project.id, worktreePath)
                 }
                 worktree={worktree}
-                worktreeErrorLevel={worktreeThreadErrorLevel(
-                  project.id,
-                  worktreePath,
-                )}
                 worktreePinBusyPath={worktreePinBusyPath}
                 worktreeState={getWorktreeState(project.id, worktreePath)}
               />
@@ -412,7 +387,6 @@ type ProjectsPanelProps = {
     projectId: number,
     worktreePath: string,
   ) => void;
-  projectThreadErrorLevel: (projectId: number) => ThreadErrorLevel;
   selectedProjectId: number | null;
   supportsTildePath: boolean;
   sidebarActionButtonClass: string;
@@ -421,10 +395,6 @@ type ProjectsPanelProps = {
   worktreePinBusyPath: string | null;
   worktreeDisplayPathByKey: ReadonlyMap<string, string>;
   worktreeSearchTextByKey: ReadonlyMap<string, string>;
-  worktreeThreadErrorLevel: (
-    projectId: number,
-    worktreePath: string,
-  ) => ThreadErrorLevel;
 };
 
 /**
@@ -461,7 +431,6 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   onToggleAddProjectForm,
   onToggleWorktreePinned,
   onToggleWorktreeThreadSwitcher,
-  projectThreadErrorLevel,
   selectedProjectId,
   sidebarActionButtonClass,
   supportsTildePath,
@@ -470,7 +439,6 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   worktreePinBusyPath,
   worktreeDisplayPathByKey,
   worktreeSearchTextByKey,
-  worktreeThreadErrorLevel,
 }: ProjectsPanelProps) {
   const projectsOpen = useProjectsPanelOpen();
   const openProjectPaths = useOpenProjectPaths();
@@ -653,18 +621,8 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                   [];
                 const projectTreeOpen = openProjectPaths.has(project.path);
                 const isActive = selectedProjectId === project.id;
-                const projectErrorLevel = projectThreadErrorLevel(project.id);
                 const showWorktrees =
                   projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
-                const projectIndicatorClass = isActive
-                  ? "bg-[#7aa5c4]"
-                  : projectErrorLevel === "unread"
-                    ? "bg-[#ff304f]"
-                    : projectErrorLevel === "failed"
-                      ? "bg-[#8f4956]"
-                      : projectErrorLevel === "stopped"
-                        ? "bg-[#b98a3a]"
-                        : "bg-[#5f5f5f]";
 
                 return (
                   <div className="space-y-1" key={project.id}>
@@ -705,10 +663,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                           <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
                             {project.name}
                           </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <span
-                              className={`h-1.5 w-1.5 ${projectIndicatorClass}`}
-                            />
+                          <div className="flex shrink-0 items-center">
                             <span className="text-[#62737e]">
                               {materialSymbol(
                                 projectTreeOpen
@@ -780,9 +735,6 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                                 worktreeDisplayPathByKey
                               }
                               worktreePinBusyPath={worktreePinBusyPath}
-                              worktreeThreadErrorLevel={
-                                worktreeThreadErrorLevel
-                              }
                             />
                           ) : null}
                         </div>

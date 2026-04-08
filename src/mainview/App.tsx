@@ -938,7 +938,6 @@ export default function App({
     normalizedSidebarSearchQuery,
     projectActionMenuProject,
     projectById,
-    projectThreadErrorLevel,
     reasoningEffortSelectorDisabled,
     selectedDiffFileChange,
     selectedProject,
@@ -950,7 +949,6 @@ export default function App({
     worktreeByProjectAndPath,
     worktreeDisplayPathByKey,
     worktreeSearchTextByKey,
-    worktreeThreadErrorLevel,
   } = useMainviewDerivedState({
     chatError,
     codexModels,
@@ -5670,7 +5668,6 @@ export default function App({
                     onToggleWorktreePinned: handleToggleWorktreePinned,
                     onToggleWorktreeThreadSwitcher:
                       handleToggleDesktopThreadSwitcher,
-                    projectThreadErrorLevel,
                     selectedProjectId,
                     sidebarActionButtonClass,
                     supportsTildePath,
@@ -5679,7 +5676,6 @@ export default function App({
                     worktreePinBusyPath,
                     worktreeDisplayPathByKey,
                     worktreeSearchTextByKey,
-                    worktreeThreadErrorLevel,
                   }}
                   selectedProjectName={selectedProject?.name ?? null}
                 />
@@ -6085,7 +6081,6 @@ export default function App({
                 onToggleWorktreePinned: handleToggleWorktreePinned,
                 onToggleWorktreeThreadSwitcher:
                   handleToggleDesktopThreadSwitcher,
-                projectThreadErrorLevel,
                 selectedProjectId,
                 sidebarActionButtonClass,
                 supportsTildePath,
@@ -6094,7 +6089,6 @@ export default function App({
                 worktreePinBusyPath,
                 worktreeDisplayPathByKey,
                 worktreeSearchTextByKey,
-                worktreeThreadErrorLevel,
               }}
               selectedProjectName={selectedProject?.name ?? null}
               sidebarSearchQuery={sidebarSearchQuery}

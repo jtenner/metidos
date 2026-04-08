@@ -24,7 +24,6 @@ import { buildDiffFileTree } from "./diff-workspace";
 import {
   findPrimaryWorktree,
   formatPathForDisplay,
-  mergeThreadErrorLevel,
   orderProjectWorktrees,
   type ProjectActionMenuState,
   type ProjectNodeState,
@@ -33,8 +32,6 @@ import {
   shortName,
   sortThreads,
   type ThreadActionMenuState,
-  type ThreadErrorLevel,
-  threadErrorLevel,
   threadRunStatus,
   type WorktreeNodeState,
   worktreeDisplayName,
@@ -366,40 +363,6 @@ export function useMainviewDerivedState({
     [dismissedThreadStatusKeys],
   );
 
-  const projectThreadErrorLevels = useMemo(() => {
-    // Aggregate non-dismissed thread error levels per project, keeping max severity.
-    const next = new Map<number, ThreadErrorLevel>();
-    for (const thread of threads) {
-      const level = isThreadStatusDismissed(thread)
-        ? "none"
-        : threadErrorLevel(thread);
-      if (level === "none") {
-        continue;
-      }
-      next.set(
-        thread.projectId,
-        mergeThreadErrorLevel(next.get(thread.projectId) ?? "none", level),
-      );
-    }
-    return next;
-  }, [isThreadStatusDismissed, threads]);
-
-  const worktreeThreadErrorLevels = useMemo(() => {
-    // Aggregate non-dismissed thread error levels per worktree, keyed by project+path.
-    const next = new Map<string, ThreadErrorLevel>();
-    for (const thread of threads) {
-      const level = isThreadStatusDismissed(thread)
-        ? "none"
-        : threadErrorLevel(thread);
-      if (level === "none") {
-        continue;
-      }
-      const key = worktreeKey(thread.projectId, thread.worktreePath);
-      next.set(key, mergeThreadErrorLevel(next.get(key) ?? "none", level));
-    }
-    return next;
-  }, [isThreadStatusDismissed, threads]);
-
   useEffect(() => {
     // Drop stale dismissals when threads are removed or their status key changes.
     setDismissedThreadStatusKeys((prev) => {
@@ -723,21 +686,6 @@ export function useMainviewDerivedState({
     [activeSelectedWorktreePath, selectedProjectId],
   );
 
-  const projectThreadErrorLevel = useCallback(
-    // Exposed helper for UI badges at project level.
-    (projectId: number): ThreadErrorLevel =>
-      projectThreadErrorLevels.get(projectId) ?? "none",
-    [projectThreadErrorLevels],
-  );
-
-  const worktreeThreadErrorLevel = useCallback(
-    // Exposed helper for UI badges at worktree level.
-    (projectId: number, worktreePath: string): ThreadErrorLevel =>
-      worktreeThreadErrorLevels.get(worktreeKey(projectId, worktreePath)) ??
-      "none",
-    [worktreeThreadErrorLevels],
-  );
-
   return {
     activeChatError,
     activeChatNotice,
@@ -778,7 +726,6 @@ export function useMainviewDerivedState({
     normalizedSidebarSearchQuery,
     projectActionMenuProject,
     projectById,
-    projectThreadErrorLevel,
     reasoningEffortSelectorDisabled,
     selectedDiffFileChange,
     selectedProject,
@@ -792,6 +739,5 @@ export function useMainviewDerivedState({
     worktreeByProjectAndPath,
     worktreeDisplayPathByKey,
     worktreeSearchTextByKey,
-    worktreeThreadErrorLevel,
   };
 }
