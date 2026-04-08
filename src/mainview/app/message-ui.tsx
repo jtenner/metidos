@@ -46,6 +46,14 @@ const DIFF_VIRTUALIZATION_OVERSCAN = 20;
 const MIN_VIRTUALIZED_DIFF_LINES = 400;
 const MARKDOWN_LINK_CLASS_NAME =
   "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
+const COPY_BUTTON_CLASS_NAME =
+  "inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]";
+const INLINE_COMMAND_COPY_BUTTON_CLASS_NAME =
+  "inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[9px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]";
+const COMMAND_PREVIEW_BORDER_PX = 1;
+const COMMAND_PREVIEW_PADDING_X_PX = 12;
+const COMMAND_PREVIEW_PADDING_Y_PX = 12;
+const COMMAND_PREVIEW_TOP_NUDGE_PX = 1;
 
 const PlainTextMessage = memo(function PlainTextMessage({
   segments,
@@ -324,7 +332,7 @@ function AssistantMessageCopyButton({
     <div className="relative inline-flex items-center">
       <button
         aria-label="Copy assistant message"
-        className="inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]"
+        className={COPY_BUTTON_CLASS_NAME}
         onClick={onCopy}
         title="Copy this message"
         type="button"
@@ -721,8 +729,62 @@ export function CommandExecutionMessage({
 }): JSX.Element {
   const hasOutput = output.trim().length > 0;
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const [commandCopied, setCommandCopied] = useState(false);
+  const [commandPreviewLayout, setCommandPreviewLayout] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+  });
   const isExpanded = expanded ?? localIsExpanded;
   const stateLabel = commandStateLabel(state, exitCode);
+  const commandHeaderRef = useRef<HTMLDivElement | null>(null);
+  const commandPreviewAnchorRef = useRef<HTMLElement | null>(null);
+  const hideCommandCopiedTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  const clearCommandCopyTimeout = useCallback((): void => {
+    if (hideCommandCopiedTimeoutRef.current !== null) {
+      clearTimeout(hideCommandCopiedTimeoutRef.current);
+      hideCommandCopiedTimeoutRef.current = null;
+    }
+  }, []);
+
+  const updateCommandPreviewLayout = useCallback((): void => {
+    const headerElement = commandHeaderRef.current;
+    const anchorElement = commandPreviewAnchorRef.current;
+    if (headerElement === null || anchorElement === null) {
+      return;
+    }
+    const headerRect = headerElement.getBoundingClientRect();
+    const anchorRect = anchorElement.getBoundingClientRect();
+    const nextLeft = Math.max(0, anchorRect.left - headerRect.left);
+    const nextTop = Math.max(0, anchorRect.top - headerRect.top);
+    const nextWidth = Math.max(anchorRect.width, headerRect.width - nextLeft);
+    setCommandPreviewLayout((current) => {
+      if (
+        current.left === nextLeft &&
+        current.top === nextTop &&
+        current.width === nextWidth
+      ) {
+        return current;
+      }
+      return {
+        left: nextLeft,
+        top: nextTop,
+        width: nextWidth,
+      };
+    });
+  }, []);
+
+  const setCommandPreviewAnchor = useCallback(
+    (element: HTMLButtonElement | HTMLDivElement | null): void => {
+      commandPreviewAnchorRef.current = element;
+      updateCommandPreviewLayout();
+    },
+    [updateCommandPreviewLayout],
+  );
+
   // Supports controlled expansion from parent when needed; otherwise local toggle state.
   const toggleExpanded = (): void => {
     if (expanded === undefined) {
@@ -731,49 +793,124 @@ export function CommandExecutionMessage({
     }
     onToggleExpanded?.();
   };
-  const headerContent = (
-    <>
-      <div className="min-w-0 text-left">
-        <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-          Command
-        </div>
-        <div className="mt-1 truncate font-mono text-sm text-[#f2f0ef]">
-          {command}
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
-          {stateLabel}
-        </div>
-        {hasOutput ? (
-          <span className="text-[#8ca6b9]">
-            {materialSymbol(
-              isExpanded ? "expand_less" : "expand_more",
-              "text-base",
-            )}
-          </span>
-        ) : null}
-      </div>
-    </>
-  );
+
+  useEffect(() => {
+    return () => {
+      clearCommandCopyTimeout();
+    };
+  }, [clearCommandCopyTimeout]);
+
+  useEffect(() => {
+    const headerElement = commandHeaderRef.current;
+    if (headerElement === null || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      updateCommandPreviewLayout();
+    });
+    observer.observe(headerElement);
+    return () => {
+      observer.disconnect();
+    };
+  }, [updateCommandPreviewLayout]);
+
+  const onCopyCommand = (event: React.MouseEvent<HTMLButtonElement>): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!command.trim()) {
+      return;
+    }
+    copyTextToClipboard(command);
+    clearCommandCopyTimeout();
+    setCommandCopied(true);
+    hideCommandCopiedTimeoutRef.current = setTimeout(() => {
+      setCommandCopied(false);
+      hideCommandCopiedTimeoutRef.current = null;
+    }, 1400);
+  };
 
   return (
-    <div className="overflow-hidden border border-[#2c353c] bg-[#13181b]">
-      {hasOutput ? (
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
-          onClick={toggleExpanded}
-          aria-expanded={isExpanded}
-          aria-label={`Toggle command output for ${command}`}
-        >
-          {headerContent}
-        </button>
-      ) : (
-        <div className="flex items-center justify-between gap-4 px-4 py-4">
-          {headerContent}
+    <div className="relative border border-[#2c353c] bg-[#13181b]">
+      <div
+        className="relative flex items-start justify-between gap-4 px-4 py-4"
+        ref={commandHeaderRef}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+            Command
+          </div>
+          <div className="mt-1">
+            <div className="group/command-preview inline-block max-w-full align-top">
+              {hasOutput ? (
+                <button
+                  aria-expanded={isExpanded}
+                  aria-label={`Toggle command output for ${command}`}
+                  className="block max-w-full truncate font-mono text-left text-sm text-[#f2f0ef] transition-colors hover:text-[#ffffff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#13181b]"
+                  onClick={toggleExpanded}
+                  ref={setCommandPreviewAnchor}
+                  type="button"
+                >
+                  {command}
+                </button>
+              ) : (
+                <div
+                  className="max-w-full truncate font-mono text-sm text-[#f2f0ef]"
+                  ref={setCommandPreviewAnchor}
+                >
+                  {command}
+                </div>
+              )}
+              <div
+                className="pointer-events-none invisible absolute z-30 opacity-0 transition-opacity duration-150 group-hover/command-preview:visible group-hover/command-preview:pointer-events-auto group-hover/command-preview:opacity-100 group-focus-within/command-preview:visible group-focus-within/command-preview:pointer-events-auto group-focus-within/command-preview:opacity-100"
+                style={{
+                  left: `${commandPreviewLayout.left}px`,
+                  top: `${commandPreviewLayout.top}px`,
+                  transform: `translate(-${COMMAND_PREVIEW_PADDING_X_PX + COMMAND_PREVIEW_BORDER_PX}px, -${COMMAND_PREVIEW_PADDING_Y_PX + COMMAND_PREVIEW_BORDER_PX + COMMAND_PREVIEW_TOP_NUDGE_PX}px)`,
+                  width: `${commandPreviewLayout.width + COMMAND_PREVIEW_PADDING_X_PX + COMMAND_PREVIEW_BORDER_PX}px`,
+                }}
+              >
+                <div className="relative box-border w-full border border-[#31404a] bg-[#13181b] px-3 py-3 pr-16 shadow-[0_18px_42px_rgba(0,0,0,0.56)]">
+                  <button
+                    aria-label="Copy full command"
+                    className={`absolute right-2 top-2 ${INLINE_COMMAND_COPY_BUTTON_CLASS_NAME}`}
+                    onClick={onCopyCommand}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    title="Copy full command"
+                    type="button"
+                  >
+                    {materialSymbol("description", "text-[11px] leading-none")}
+                    <span>{commandCopied ? "Copied" : "Copy"}</span>
+                  </button>
+                  <div className="select-text font-mono text-sm leading-6 text-[#f2f0ef] whitespace-pre-wrap break-all">
+                    {command}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+            {stateLabel}
+          </div>
+          {hasOutput ? (
+            <button
+              aria-expanded={isExpanded}
+              aria-label={`Toggle command output for ${command}`}
+              className="flex items-center text-[#8ca6b9] transition-colors hover:text-[#d7e5ee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
+              onClick={toggleExpanded}
+              type="button"
+            >
+              {materialSymbol(
+                isExpanded ? "expand_less" : "expand_more",
+                "text-base",
+              )}
+            </button>
+          ) : null}
+        </div>
+      </div>
       {hasOutput && isExpanded ? (
         <div className="px-4 pb-4">
           <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4]">
