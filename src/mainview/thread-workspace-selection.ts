@@ -15,6 +15,15 @@ export type SelectedThreadWorkspaceTarget = {
 };
 
 /**
+ * Pinned-thread shortcuts always return the main workspace view to chat.
+ */
+export function derivePrimaryViewForPinnedThreadOpen(
+  primaryView: "chat" | "diff" | "cronjobs",
+): "chat" | "diff" | "cronjobs" {
+  return primaryView === "chat" ? primaryView : "chat";
+}
+
+/**
  * Resolve the workspace target implied by the selected thread when it matches the active worktree selection.
  */
 export function deriveSelectedThreadWorkspaceTarget(options: {

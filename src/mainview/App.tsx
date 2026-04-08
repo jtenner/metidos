@@ -155,7 +155,10 @@ import {
   mergeThreadStatusSummaries,
   resolveThreadStatusRefreshOutcome,
 } from "./thread-status-refresh";
-import { deriveSelectedThreadWorkspaceTarget } from "./thread-workspace-selection";
+import {
+  derivePrimaryViewForPinnedThreadOpen,
+  deriveSelectedThreadWorkspaceTarget,
+} from "./thread-workspace-selection";
 
 /**
  * Merges thread message history.
@@ -4431,6 +4434,15 @@ export default function App({
     },
     [openThread],
   );
+  const handleOpenPinnedThread = useCallback(
+    (threadId: number): void => {
+      setPrimaryView((current) =>
+        derivePrimaryViewForPinnedThreadOpen(current),
+      );
+      handleOpenThread(threadId);
+    },
+    [handleOpenThread],
+  );
   const handleOpenThreadFromDesktopThreadSwitcher = useCallback(
     (threadId: number): void => {
       closeDesktopThreadSwitcher(false);
@@ -5668,7 +5680,7 @@ export default function App({
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
                     isThreadStatusDismissed,
-                    onOpenThread: handleOpenThread,
+                    onOpenThread: handleOpenPinnedThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
                     pinnedThreads: desktopPinnedThreads,
                     projectById,

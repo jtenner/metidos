@@ -6,7 +6,10 @@
 import { describe, expect, it } from "bun:test";
 
 import type { RpcProject, RpcThread } from "../bun/rpc-schema";
-import { deriveSelectedThreadWorkspaceTarget } from "./thread-workspace-selection";
+import {
+  derivePrimaryViewForPinnedThreadOpen,
+  deriveSelectedThreadWorkspaceTarget,
+} from "./thread-workspace-selection";
 
 function project(overrides?: Partial<RpcProject>): RpcProject {
   return {
@@ -110,5 +113,19 @@ describe("deriveSelectedThreadWorkspaceTarget", () => {
         sessionStateReady: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe("derivePrimaryViewForPinnedThreadOpen", () => {
+  it("returns chat when the current workspace view is diff", () => {
+    expect(derivePrimaryViewForPinnedThreadOpen("diff")).toBe("chat");
+  });
+
+  it("returns chat when the current workspace view is cronjobs", () => {
+    expect(derivePrimaryViewForPinnedThreadOpen("cronjobs")).toBe("chat");
+  });
+
+  it("keeps chat selected when the workspace is already on chat", () => {
+    expect(derivePrimaryViewForPinnedThreadOpen("chat")).toBe("chat");
   });
 });
