@@ -7,7 +7,10 @@ import { describe, expect, it } from "bun:test";
 
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { buildNormalizedSearchText } from "../controls/search-utils";
-import { deriveProjectsPanelWorktreeData } from "./projects-panel";
+import {
+  deriveProjectsPanelWorktreeData,
+  worktreePinButtonVisibilityClassName,
+} from "./projects-panel";
 import { worktreeKey } from "./state";
 
 function createProject(id: number, name: string, path: string): RpcProject {
@@ -141,6 +144,22 @@ describe("deriveProjectsPanelWorktreeData", () => {
     const sections = data.get(project.id);
     expect(sections?.visibleWorktrees.map((worktree) => worktree.path)).toEqual(
       ["/repos/gamma/release"],
+    );
+  });
+});
+
+describe("worktreePinButtonVisibilityClassName", () => {
+  it("keeps pinned worktree pin buttons visible", () => {
+    expect(worktreePinButtonVisibilityClassName(true)).toBe("opacity-100");
+  });
+
+  it("reveals unpinned worktree pin buttons only on hover or focus", () => {
+    expect(worktreePinButtonVisibilityClassName(false)).toContain("opacity-0");
+    expect(worktreePinButtonVisibilityClassName(false)).toContain(
+      "group-hover/worktree:opacity-100",
+    );
+    expect(worktreePinButtonVisibilityClassName(false)).toContain(
+      "group-focus-within/worktree:opacity-100",
     );
   });
 });

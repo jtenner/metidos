@@ -36,6 +36,16 @@ type ProjectWorktreeListData = {
 const PROJECT_WORKTREE_ROW_ESTIMATE_PX = 56;
 const PROJECT_WORKTREE_LIST_OVERSCAN = 6;
 
+export function worktreePinButtonVisibilityClassName(
+  worktreePinned: boolean,
+): string {
+  if (worktreePinned) {
+    return "opacity-100";
+  }
+
+  return "pointer-events-none opacity-0 group-hover/worktree:pointer-events-auto group-hover/worktree:opacity-100 group-focus-within/worktree:pointer-events-auto group-focus-within/worktree:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100";
+}
+
 /**
  * Row props for one worktree entry in the project selector list.
  */
@@ -208,7 +218,9 @@ function ProjectWorktreeRow({
       ) : null}
       <button
         type="button"
-        className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-[opacity,color,background-color,border-color] disabled:cursor-not-allowed disabled:opacity-60 ${worktreePinButtonVisibilityClassName(
+          worktreePinned,
+        )} ${
           activeWorktree
             ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
             : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
