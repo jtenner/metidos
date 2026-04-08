@@ -82,6 +82,10 @@ import {
   resolveCodexModel,
   resolveCodexReasoningEffort,
 } from "./project-procedures/codex-catalog";
+import {
+  applyCodexSessionUsageTelemetry,
+  readCodexSessionUsageTelemetry,
+} from "./project-procedures/codex-session-telemetry";
 import { normalizeCommandDisplayText } from "./project-procedures/command-normalization";
 import {
   listDirectorySuggestions,
@@ -240,7 +244,11 @@ export async function listThreadStatusesProcedure(
 
   return listThreads(db)
     .filter((thread) => requestedThreadIds.has(thread.id))
-    .map((thread) => toRpcThread(thread, currentThreadRunStatus(thread)));
+    .map((thread) =>
+      applyCodexSessionUsageTelemetry(
+        toRpcThread(thread, currentThreadRunStatus(thread)),
+      ),
+    );
 }
 
 /**
@@ -1150,7 +1158,9 @@ function threadById(threadId: number): ThreadRecord {
 
 function rpcThreadById(threadId: number): RpcThread {
   const thread = threadById(threadId);
-  return toRpcThread(thread, currentThreadRunStatus(thread));
+  return applyCodexSessionUsageTelemetry(
+    toRpcThread(thread, currentThreadRunStatus(thread)),
+  );
 }
 /**
  * Builds thread detail.
@@ -1170,7 +1180,9 @@ async function buildThreadDetail(
     limit: THREAD_DETAIL_PAGE_MESSAGE_LIMIT,
   });
   return {
-    thread: toRpcThread(thread, currentThreadRunStatus(thread)),
+    thread: applyCodexSessionUsageTelemetry(
+      toRpcThread(thread, currentThreadRunStatus(thread)),
+    ),
     messages: toRpcThreadMessages(page.messages),
     nextCursor: page.nextCursor,
   };
@@ -1185,7 +1197,10 @@ async function readThreadDetailCached(
 ): Promise<RpcThreadDetail> {
   const cached = readLruValue(threadDetailCache, threadId);
   if (cached) {
-    return cached;
+    return {
+      ...cached,
+      thread: applyCodexSessionUsageTelemetry(cached.thread),
+    };
   }
 
   const detail = await buildThreadDetail(threadId);
@@ -1533,7 +1548,9 @@ async function runThreadMessageInBackground(
         buildNextCompactionTelemetry(
           currentThread,
           usage,
-          contextWindowTokensForModel(currentThread.model),
+          readCodexSessionUsageTelemetry(currentThread.codexThreadId)
+            ?.contextWindowTokens ??
+            contextWindowTokensForModel(currentThread.model),
         ),
       );
       invalidateThreadDetailCache(threadId);

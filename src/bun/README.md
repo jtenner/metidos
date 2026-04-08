@@ -52,6 +52,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Normalizes and validates configured model and reasoning effort values.
   - Provides token-context utilities used for compaction/size logic.
 
+- `project-procedures/codex-session-telemetry.ts`
+  - Reads the persisted Codex rollout JSONL files to recover live token-count snapshots and the real model context window.
+  - Lets the backend surface accurate context-usage telemetry even though the installed SDK stream types only expose final turn usage.
+
 - `project-procedures/directory-suggestions.ts`
   - Maintains cached directory suggestions for path-like user input.
   - Supports suggestion query parsing (`~`, prefixes), fast reads, periodic refresh, and LRU-style expiry.

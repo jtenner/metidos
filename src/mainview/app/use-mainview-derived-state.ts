@@ -121,6 +121,22 @@ export function deriveWorktreeDisplayPathByKey(
 
   return next;
 }
+
+export function deriveActiveContextUsage(
+  selectedThread: RpcThread | null,
+  activeCodexModelOption: RpcCodexModelOption | null,
+): {
+  contextWindowTokens: number;
+  inputTokens: number;
+} {
+  return {
+    inputTokens: selectedThread?.usage?.inputTokens ?? 0,
+    contextWindowTokens:
+      selectedThread?.usage?.contextWindowTokens ??
+      activeCodexModelOption?.contextWindowTokens ??
+      400_000,
+  };
+}
 /**
  * Provides hook behavior for MainviewDerivedState.
  * @param chatError - chatError argument for useMainviewDerivedState.
@@ -344,9 +360,10 @@ export function useMainviewDerivedState({
     return pendingThreadUnsafeMode;
   }, [pendingThreadUnsafeMode, selectedThread]);
 
-  const activeContextWindowTokens =
-    activeCodexModelOption?.contextWindowTokens ?? 400_000;
-  const activeContextInputTokens = selectedThread?.usage?.inputTokens ?? 0;
+  const {
+    contextWindowTokens: activeContextWindowTokens,
+    inputTokens: activeContextInputTokens,
+  } = deriveActiveContextUsage(selectedThread ?? null, activeCodexModelOption);
 
   const isThreadStatusDismissed = useCallback(
     // A thread is considered dismissed if its current terminal key matches prior state.

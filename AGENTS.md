@@ -53,6 +53,8 @@
 │  │  │  ├─ command-normalization.test.ts
 │  │  │  ├─ command-normalization.ts
 │  │  │  ├─ codex-catalog.ts
+│  │  │  ├─ codex-session-telemetry.test.ts
+│  │  │  ├─ codex-session-telemetry.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
 │  │  │  ├─ project-tasks.ts

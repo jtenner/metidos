@@ -5,9 +5,17 @@
 
 import { describe, expect, it } from "bun:test";
 
-import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
+import type {
+  RpcCodexModelOption,
+  RpcProject,
+  RpcThread,
+  RpcWorktree,
+} from "../../bun/rpc-schema";
 import { worktreeKey } from "./state";
-import { deriveWorktreeDisplayPathByKey } from "./use-mainview-derived-state";
+import {
+  deriveActiveContextUsage,
+  deriveWorktreeDisplayPathByKey,
+} from "./use-mainview-derived-state";
 
 /**
  * Builds a project fixture.
@@ -90,5 +98,46 @@ describe("deriveWorktreeDisplayPathByKey", () => {
     expect(result.get(worktreeKey(3, "/Users/example/project/feature"))).toBe(
       "/Users/example/project/feature",
     );
+  });
+});
+
+describe("deriveActiveContextUsage", () => {
+  it("prefers live thread usage window over the model catalog window", () => {
+    const selectedThread = {
+      usage: {
+        inputTokens: 20_361,
+        cachedInputTokens: 19_584,
+        outputTokens: 341,
+        contextWindowTokens: 121_600,
+      },
+    } as RpcThread;
+
+    expect(
+      deriveActiveContextUsage(selectedThread, {
+        contextWindowTokens: 400_000,
+      } as RpcCodexModelOption),
+    ).toEqual({
+      inputTokens: 20_361,
+      contextWindowTokens: 121_600,
+    });
+  });
+
+  it("falls back to the model catalog when no live session window is available", () => {
+    const selectedThread = {
+      usage: {
+        inputTokens: 11_000,
+        cachedInputTokens: 5_000,
+        outputTokens: 400,
+      },
+    } as RpcThread;
+
+    expect(
+      deriveActiveContextUsage(selectedThread, {
+        contextWindowTokens: 400_000,
+      } as RpcCodexModelOption),
+    ).toEqual({
+      inputTokens: 11_000,
+      contextWindowTokens: 400_000,
+    });
   });
 });

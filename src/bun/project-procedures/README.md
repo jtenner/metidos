@@ -10,6 +10,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
+- `codex-session-telemetry.ts`
+  - Reads the persisted Codex rollout JSONL files under `~/.codex/sessions` (or `CODEX_HOME/sessions`) for live token-count data.
+  - Extracts the latest `token_count.last_token_usage` plus the real `model_context_window` so thread context meters can reflect the actual session budget instead of a static model guess.
+  - Caches resolved session paths and parsed file snapshots by file stat to keep polling cheap while threads are active.
+
 - `command-normalization.ts`
   - Removes shell-wrapper noise from recorded command activity before it is persisted or shown in the UI.
   - Decodes wrapper-specific quoting for POSIX, `cmd.exe`, and PowerShell payloads so command cards display the original executable text instead of transport escaping.

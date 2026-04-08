@@ -310,6 +310,7 @@ export type RpcThreadUsage = {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
+  contextWindowTokens?: number | null;
 };
 
 export type RpcThreadCompaction = {
