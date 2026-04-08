@@ -8,7 +8,7 @@ import type {
   FocusEvent as ReactFocusEvent,
   MouseEvent as ReactMouseEvent,
 } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clampProjectMenuCoordinate,
   type ErrorPreviewPopoverState,
@@ -45,6 +45,17 @@ type UseThreadPreviewsOptions = {
 };
 
 /**
+ * Prevent a deferred hide from clearing a preview after another anchor already took ownership.
+ */
+export function shouldHideDeferredPreview(params: {
+  activeAnchorId: string | null;
+  anchorId: string;
+  anchorIsActive: boolean;
+}): boolean {
+  return !params.anchorIsActive && params.activeAnchorId === params.anchorId;
+}
+
+/**
  * Provides thread popover handlers and computed visibility state for
  * error and summary previews.
  */
@@ -54,15 +65,64 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
     useState<ErrorPreviewPopoverState | null>(null);
   const [threadSummaryPopover, setThreadSummaryPopover] =
     useState<ThreadSummaryPopoverState | null>(null);
+  const errorPreviewPopoverRef = useRef<ErrorPreviewPopoverState | null>(null);
+  const threadSummaryPopoverRef = useRef<ThreadSummaryPopoverState | null>(
+    null,
+  );
+  const errorHideFrameRef = useRef<number | null>(null);
+  const threadSummaryHideFrameRef = useRef<number | null>(null);
+
+  const cancelScheduledHide = useCallback(
+    (frameRef: { current: number | null }): void => {
+      if (typeof window === "undefined" || frameRef.current === null) {
+        return;
+      }
+
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    },
+    [],
+  );
+
+  const updateErrorPreviewPopover = useCallback(
+    (next: ErrorPreviewPopoverState | null): void => {
+      errorPreviewPopoverRef.current = next;
+      setErrorPreviewPopover(next);
+    },
+    [],
+  );
+
+  const updateThreadSummaryPopover = useCallback(
+    (next: ThreadSummaryPopoverState | null): void => {
+      threadSummaryPopoverRef.current = next;
+      setThreadSummaryPopover(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!previewsDisabled) {
       return;
     }
 
-    setErrorPreviewPopover(null);
-    setThreadSummaryPopover(null);
-  }, [previewsDisabled]);
+    cancelScheduledHide(errorHideFrameRef);
+    cancelScheduledHide(threadSummaryHideFrameRef);
+    updateErrorPreviewPopover(null);
+    updateThreadSummaryPopover(null);
+  }, [
+    cancelScheduledHide,
+    previewsDisabled,
+    updateErrorPreviewPopover,
+    updateThreadSummaryPopover,
+  ]);
+
+  useEffect(
+    () => () => {
+      cancelScheduledHide(errorHideFrameRef);
+      cancelScheduledHide(threadSummaryHideFrameRef);
+    },
+    [cancelScheduledHide],
+  );
 
   const showErrorPreview = useCallback(
     (
@@ -72,21 +132,22 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
     ): void => {
       // Early return when disabled or when no valid text is available.
       if (previewsDisabled) {
-        setErrorPreviewPopover(null);
+        updateErrorPreviewPopover(null);
         return;
       }
       const previewText = text.trim();
       if (!previewText) {
-        setErrorPreviewPopover(null);
+        updateErrorPreviewPopover(null);
         return;
       }
       const viewportWidth =
         typeof window === "undefined" ? 1280 : window.innerWidth;
       // Skip hover previews on compact layouts to avoid awkward positioning.
       if (viewportWidth < 768) {
-        setErrorPreviewPopover(null);
+        updateErrorPreviewPopover(null);
         return;
       }
+      cancelScheduledHide(errorHideFrameRef);
       const viewportHeight =
         typeof window === "undefined" ? 720 : window.innerHeight;
       const rect = event.currentTarget.getBoundingClientRect();
@@ -95,19 +156,20 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
         viewportHeight,
         196,
       );
-      setErrorPreviewPopover({
+      updateErrorPreviewPopover({
         anchorId,
         text: previewText,
         x: clampProjectMenuCoordinate(rect.right + 14, viewportWidth, 368),
         y: clampedTop + 98,
       });
     },
-    [previewsDisabled],
+    [cancelScheduledHide, previewsDisabled, updateErrorPreviewPopover],
   );
 
   const hideErrorPreview = useCallback((): void => {
-    setErrorPreviewPopover(null);
-  }, []);
+    cancelScheduledHide(errorHideFrameRef);
+    updateErrorPreviewPopover(null);
+  }, [cancelScheduledHide, updateErrorPreviewPopover]);
 
   const showThreadSummaryPreview = useCallback(
     (
@@ -118,25 +180,26 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
     ): void => {
       // Early return when disabled or summary text is empty.
       if (previewsDisabled) {
-        setThreadSummaryPopover(null);
+        updateThreadSummaryPopover(null);
         return;
       }
       const previewSummary = summary.trim();
       if (!previewSummary) {
-        setThreadSummaryPopover(null);
+        updateThreadSummaryPopover(null);
         return;
       }
       const viewportWidth =
         typeof window === "undefined" ? 1280 : window.innerWidth;
       // Skip summary preview on compact layouts to reduce modal churn.
       if (viewportWidth < 768) {
-        setThreadSummaryPopover(null);
+        updateThreadSummaryPopover(null);
         return;
       }
+      cancelScheduledHide(threadSummaryHideFrameRef);
       const viewportHeight =
         typeof window === "undefined" ? 720 : window.innerHeight;
       const rect = event.currentTarget.getBoundingClientRect();
-      setThreadSummaryPopover({
+      updateThreadSummaryPopover({
         anchorId,
         title,
         summary: previewSummary,
@@ -144,29 +207,52 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
         y: clampProjectMenuCoordinate(rect.top, viewportHeight, 240),
       });
     },
-    [previewsDisabled],
+    [cancelScheduledHide, previewsDisabled, updateThreadSummaryPopover],
   );
 
   const hideThreadSummaryPreview = useCallback((): void => {
-    setThreadSummaryPopover(null);
-  }, []);
+    cancelScheduledHide(threadSummaryHideFrameRef);
+    updateThreadSummaryPopover(null);
+  }, [cancelScheduledHide, updateThreadSummaryPopover]);
 
   const deferHidePreview = useCallback(
-    (anchorId: string, hidePreview: () => void): void => {
+    (
+      anchorId: string,
+      getActiveAnchorId: () => string | null,
+      hidePreview: () => void,
+      hideFrameRef: { current: number | null },
+    ): void => {
       // Defer 1 frame so click/keyboard transitions can resolve before hiding.
+      cancelScheduledHide(hideFrameRef);
+
       if (typeof window === "undefined") {
-        hidePreview();
+        if (
+          shouldHideDeferredPreview({
+            activeAnchorId: getActiveAnchorId(),
+            anchorId,
+            anchorIsActive: anchorStillActive(anchorId),
+          })
+        ) {
+          hidePreview();
+        }
         return;
       }
 
-      window.requestAnimationFrame(() => {
-        if (anchorStillActive(anchorId)) {
+      hideFrameRef.current = window.requestAnimationFrame(() => {
+        hideFrameRef.current = null;
+        if (
+          !shouldHideDeferredPreview({
+            activeAnchorId: getActiveAnchorId(),
+            anchorId,
+            anchorIsActive: anchorStillActive(anchorId),
+          })
+        ) {
           return;
         }
         hidePreview();
       });
     },
-    [],
+    [cancelScheduledHide],
   );
 
   const errorPreviewHandlers = useCallback(
@@ -200,11 +286,21 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
         },
         onMouseLeave: () => {
           // Hide after hover exits unless the anchor remains active.
-          deferHidePreview(anchorId, hideErrorPreview);
+          deferHidePreview(
+            anchorId,
+            () => errorPreviewPopoverRef.current?.anchorId ?? null,
+            hideErrorPreview,
+            errorHideFrameRef,
+          );
         },
         onBlur: () => {
           // Hide after focus exits unless moving to related UI.
-          deferHidePreview(anchorId, hideErrorPreview);
+          deferHidePreview(
+            anchorId,
+            () => errorPreviewPopoverRef.current?.anchorId ?? null,
+            hideErrorPreview,
+            errorHideFrameRef,
+          );
         },
       };
     },
@@ -247,11 +343,21 @@ export function useThreadPreviews(options?: UseThreadPreviewsOptions) {
         },
         onMouseLeave: () => {
           // Defer hide so focus transitions don't close the popover instantly.
-          deferHidePreview(anchorId, hideThreadSummaryPreview);
+          deferHidePreview(
+            anchorId,
+            () => threadSummaryPopoverRef.current?.anchorId ?? null,
+            hideThreadSummaryPreview,
+            threadSummaryHideFrameRef,
+          );
         },
         onBlur: () => {
           // Defer hide so anchor/related focus transitions resolve.
-          deferHidePreview(anchorId, hideThreadSummaryPreview);
+          deferHidePreview(
+            anchorId,
+            () => threadSummaryPopoverRef.current?.anchorId ?? null,
+            hideThreadSummaryPreview,
+            threadSummaryHideFrameRef,
+          );
         },
       };
     },

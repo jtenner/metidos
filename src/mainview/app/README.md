@@ -95,7 +95,7 @@ Central shared types/constants for mainview logic. Includes domain types for thr
 Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including ordered projections over the indexed project/worktree store shape and preformatted worktree display paths reused across hot sidebar renders.
 
 `use-thread-previews.ts`
-Builds compact thread-preview data for list rendering and summary widgets.
+Owns the shared hover/focus preview behavior for thread rows, including summary/error popover state, positioning, and stale-hide protection when pointer movement crosses rows quickly.
 
 `use-worktree-diff.ts`
 Fetches and transforms worktree diff data for diff and chat history contexts.

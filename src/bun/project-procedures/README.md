@@ -10,6 +10,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
+- `command-normalization.ts`
+  - Removes shell-wrapper noise from recorded command activity before it is persisted or shown in the UI.
+  - Decodes wrapper-specific quoting for POSIX, `cmd.exe`, and PowerShell payloads so command cards display the original executable text instead of transport escaping.
+  - Includes special handling for POSIX single-quote splice patterns used when shell commands embed literal single quotes.
+
 - `directory-suggestions.ts`
   - Implements directory autocomplete support used by project and worktree selectors.
   - Maintains an in-memory cache of directory entries keyed by path with TTL + LRU behavior.

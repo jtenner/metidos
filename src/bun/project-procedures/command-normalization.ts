@@ -100,6 +100,15 @@ function parseCommandWrapper(command: string): ParsedCommandWrapper | null {
  * Decode wrapper-specific quoting so the UI shows the original command text.
  */
 function decodeWrappedCommand(wrapper: ParsedCommandWrapper): string | null {
+  if (wrapper.kind === "posix") {
+    const decodedSingleQuotedText = decodePosixSingleQuotedShellText(
+      wrapper.body,
+    );
+    if (typeof decodedSingleQuotedText === "string") {
+      return decodedSingleQuotedText;
+    }
+  }
+
   const quotedBody = unwrapOuterQuotes(wrapper.body);
   if (!quotedBody) {
     const trimmedBody = wrapper.body.trim();
@@ -121,6 +130,80 @@ function decodeWrappedCommand(wrapper: ParsedCommandWrapper): string | null {
         ? decodePowerShellDoubleQuotedText(quotedBody.text)
         : quotedBody.text.replace(/''/g, "'");
   }
+}
+
+/**
+ * Decode a POSIX single shell word that may splice quote segments to embed literal single quotes.
+ */
+function decodePosixSingleQuotedShellText(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("'")) {
+    return null;
+  }
+
+  let result = "";
+  let mode: "double" | "single" | "unquoted" = "unquoted";
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index] ?? "";
+    const nextCharacter = trimmed[index + 1] ?? "";
+
+    if (mode === "single") {
+      if (character === "'") {
+        mode = "unquoted";
+        continue;
+      }
+      result += character;
+      continue;
+    }
+
+    if (mode === "double") {
+      if (character === '"') {
+        mode = "unquoted";
+        continue;
+      }
+      if (character === "\\" && nextCharacter) {
+        if (['"', "$", "\\", "`", "\n"].includes(nextCharacter)) {
+          if (nextCharacter !== "\n") {
+            result += nextCharacter;
+          }
+          index += 1;
+          continue;
+        }
+      }
+      result += character;
+      continue;
+    }
+
+    if (/\s/.test(character)) {
+      return null;
+    }
+
+    if (character === "'") {
+      mode = "single";
+      continue;
+    }
+
+    if (character === '"') {
+      mode = "double";
+      continue;
+    }
+
+    if (character === "\\") {
+      if (!nextCharacter) {
+        return null;
+      }
+      if (nextCharacter !== "\n") {
+        result += nextCharacter;
+      }
+      index += 1;
+      continue;
+    }
+
+    result += character;
+  }
+
+  return mode === "unquoted" ? result : null;
 }
 
 /**

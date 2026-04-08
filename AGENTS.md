@@ -150,6 +150,7 @@
 │     │  ├─ use-add-project-form.ts
 │     │  ├─ use-mainview-derived-state.ts
 │     │  ├─ use-mainview-derived-state.test.ts
+│     │  ├─ use-thread-previews.test.ts
 │     │  ├─ use-thread-previews.ts
 │     │  ├─ use-worktree-diff.ts
 │     │  └─ workspace-panel.tsx

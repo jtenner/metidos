@@ -110,6 +110,16 @@ describe("normalizeCommandDisplayText", () => {
       "/bin/bash -lc 'echo \\\"single\\\"'",
       'echo \\"single\\"',
     ],
+    [
+      "decodes shell-escaped single quotes in POSIX payloads",
+      `/bin/bash -lc 'printf '"'hello'"''`,
+      "printf 'hello'",
+    ],
+    [
+      "decodes the post-code-pushing diff inspection command",
+      `/bin/bash -lc 'rg -n "''^@@|''^[-+]" .tmp/post-code-pushing-simplify-callfed/simplify.diff | sed -n '"'1,220p'"''`,
+      `rg -n "^@@|^[-+]" .tmp/post-code-pushing-simplify-callfed/simplify.diff | sed -n '1,220p'`,
+    ],
     ["unwraps unquoted bash command bodies", "/bin/bash -lc pwd", "pwd"],
     ["unwraps cmd.exe wrappers", 'cmd.exe /d /s /c "dir"', "dir"],
     ["unwraps unquoted cmd.exe commands", "cmd.exe /c dir", "dir"],
