@@ -41,9 +41,19 @@ describe("normalizeCommandDisplayText", () => {
     ["wrapped empty single quote command", "/bin/bash -lc ''", ""],
     ["wrapped empty double quote command", '/bin/bash -lc ""', ""],
     [
-      "keeps /usr/bin/bash wrappers untouched",
+      "unwraps alternate bash executable path",
       '/usr/bin/bash -lc "echo nope"',
-      '/usr/bin/bash -lc "echo nope"',
+      "echo nope",
+    ],
+    [
+      "unwraps env bash wrapper",
+      '/usr/bin/env bash -lc "echo nope"',
+      "echo nope",
+    ],
+    [
+      "unwraps screenshot-like git add command",
+      '/bin/bash -lc "git add CHANGELOG.md agent-todo.md docs/0073-2026-04-02-code-pushing.md"',
+      "git add CHANGELOG.md agent-todo.md docs/0073-2026-04-02-code-pushing.md",
     ],
     [
       "decodes double-escaped quotes",
@@ -100,6 +110,39 @@ describe("normalizeCommandDisplayText", () => {
       "/bin/bash -lc 'echo \\\"single\\\"'",
       'echo \\"single\\"',
     ],
+    ["unwraps unquoted bash command bodies", "/bin/bash -lc pwd", "pwd"],
+    ["unwraps cmd.exe wrappers", 'cmd.exe /d /s /c "dir"', "dir"],
+    ["unwraps unquoted cmd.exe commands", "cmd.exe /c dir", "dir"],
+    [
+      "decodes doubled cmd.exe quotes",
+      'cmd.exe /d /s /c "echo ""hello"""',
+      'echo "hello"',
+    ],
+    [
+      "decodes cmd.exe caret escaping",
+      'cmd.exe /d /s /c "echo first ^& echo second"',
+      "echo first & echo second",
+    ],
+    [
+      "unwraps PowerShell wrappers",
+      'powershell.exe -NoLogo -NoProfile -Command "Get-ChildItem"',
+      "Get-ChildItem",
+    ],
+    [
+      "unwraps unquoted PowerShell commands",
+      "pwsh.exe -NoProfile -Command Get-ChildItem",
+      "Get-ChildItem",
+    ],
+    [
+      "decodes PowerShell backtick escapes",
+      'pwsh.exe -NoProfile -Command "Write-Host `"hello`""',
+      'Write-Host "hello"',
+    ],
+    [
+      "decodes PowerShell doubled single quotes",
+      "pwsh.exe -NoProfile -Command 'Write-Host ''hello'''",
+      "Write-Host 'hello'",
+    ],
   ])("%s", (_, input, expected) => {
     expect(normalizeCommandDisplayText(input)).toBe(expected);
   });
@@ -109,6 +152,8 @@ describe("normalizeCommandDisplayText", () => {
       '/bin/bash -lc "cd /repo && bun run lint"',
       "/bin/bash -lc 'git status --short'",
       "/bin/bash -lc \"printf 'line1\\nline2'\"",
+      'cmd.exe /d /s /c "echo ""ok"""',
+      'pwsh.exe -NoProfile -Command "Write-Host `"done`""',
       "bun run test",
       "docker run --rm node:20 node -e \"console.log('noisy')\"",
     ];
@@ -116,6 +161,8 @@ describe("normalizeCommandDisplayText", () => {
       "cd /repo && bun run lint",
       "git status --short",
       "printf 'line1\nline2'",
+      'echo "ok"',
+      'Write-Host "done"',
       "bun run test",
       "docker run --rm node:20 node -e \"console.log('noisy')\"",
     ];
