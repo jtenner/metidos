@@ -3,15 +3,8 @@
  * @description Module for dev flows.
  */
 
-import { existsSync, rmSync } from "node:fs";
-
 import { deleteAuthSecretKey, getAuthSecretKeyPath } from "./auth-secrets";
-import {
-  type AppDataPathOptions,
-  closeAppDatabase,
-  getAppDatabasePath,
-  resetResolvedAppDataDirectory,
-} from "./db";
+import { type AppDataPathOptions, deleteAppDatabaseFiles } from "./db";
 
 export const DEV_AUTH_BYPASS_ENV = "JOLT_DEV_BYPASS";
 export const DEV_RESET_ENV = "JOLT_DEV_RESET";
@@ -98,25 +91,7 @@ export function issueDevWebSocketTicket(
 export function resetLocalAppState(
   options: ResetLocalAppStateOptions = {},
 ): string[] {
-  closeAppDatabase();
-  resetResolvedAppDataDirectory();
-
-  const deletedPaths: string[] = [];
-  const databasePath = getAppDatabasePath(options);
-  const candidatePaths = [
-    databasePath,
-    `${databasePath}-shm`,
-    `${databasePath}-wal`,
-  ];
-  for (const path of candidatePaths) {
-    if (!existsSync(path)) {
-      continue;
-    }
-    rmSync(path, {
-      force: true,
-    });
-    deletedPaths.push(path);
-  }
+  const deletedPaths = deleteAppDatabaseFiles(options);
 
   if (deleteAuthSecretKey(options)) {
     deletedPaths.push(getAuthSecretKeyPath(options));

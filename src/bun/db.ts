@@ -8,6 +8,7 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -1180,6 +1181,35 @@ export function closeAppDatabase(): void {
 export function resetResolvedAppDataDirectory(): void {
   /** Clear the cached app-data path so follow-up operations re-resolve it from env/defaults. */
   resolvedAppDataDir = null;
+}
+
+/**
+ * Deletes the app database files for the resolved app-data directory.
+ * @param options - Configuration options used by this operation.
+ */
+export function deleteAppDatabaseFiles(options?: AppDataPathOptions): string[] {
+  closeAppDatabase();
+  resetResolvedAppDataDirectory();
+
+  const dbPath = getAppDatabasePath(options);
+  const candidatePaths = [
+    dbPath,
+    `${dbPath}-journal`,
+    `${dbPath}-shm`,
+    `${dbPath}-wal`,
+  ];
+  const deletedPaths: string[] = [];
+  for (const path of candidatePaths) {
+    if (!existsSync(path)) {
+      continue;
+    }
+    rmSync(path, {
+      force: true,
+    });
+    deletedPaths.push(path);
+  }
+
+  return deletedPaths;
 }
 
 /**

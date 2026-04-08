@@ -19,6 +19,7 @@ Holds backend orchestration and server entry logic that powers local project/tas
 - `index.ts`
   - Bun-side entrypoint that wires RPC and process-level handlers.
   - Default local server entrypoint used by `bun start`, `bun start:tls`, and `bun run src/bun/index.ts`.
+  - Also exposes the `--wipe-user-data` maintenance flag for a confirmed local database wipe before server startup.
 - `sidecar-cron-scheduler.ts`
   - Launches and controls the cron worker process that keeps Bun.cron registrations in sync.
 - `sidecar-cron-thread.ts`

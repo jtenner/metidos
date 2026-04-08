@@ -5,6 +5,7 @@
 
 import { readdirSync, realpathSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 import type { ServerWebSocket } from "bun";
 
 import {
@@ -28,7 +29,12 @@ import {
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
 import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
-import { initAppDatabase } from "./db";
+import {
+  closeAppDatabase,
+  deleteAppDatabaseFiles,
+  getAppDatabasePath,
+  initAppDatabase,
+} from "./db";
 import {
   issueDevWebSocketTicket,
   resetLocalAppState,
@@ -306,6 +312,9 @@ function resolveServerPort(args: string[], envPort?: string): number {
   return parsedPort;
 }
 
+const WIPE_USER_DATA_FLAG = "--wipe-user-data";
+const WIPE_USER_DATA_CONFIRMATION = "DELETE";
+
 const SERVER_ARGS = Bun.argv.slice(2);
 const CONFIGURED_SERVER_PORT =
   readCliPort(SERVER_ARGS) ?? process.env.JOLT_PORT;
@@ -332,6 +341,53 @@ process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
 const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
   process.env.JOLT_ALLOWED_WS_ORIGINS,
 );
+
+/**
+ * Runs the destructive local database wipe confirmation flow.
+ */
+async function runUserDataWipeCli(): Promise<boolean> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error("The --wipe-user-data flag requires an interactive TTY.");
+  }
+
+  const databasePath = getAppDatabasePath();
+  const readlineInterface = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+  });
+
+  try {
+    const confirmation = (
+      await readlineInterface.question(
+        [
+          `This will permanently delete all local user data stored in ${databasePath}.`,
+          `Type "${WIPE_USER_DATA_CONFIRMATION}" to continue: `,
+        ].join("\n"),
+      )
+    )
+      .trim()
+      .toUpperCase();
+
+    if (confirmation !== WIPE_USER_DATA_CONFIRMATION) {
+      console.error("User data wipe cancelled.");
+      return false;
+    }
+
+    const deletedPaths = deleteAppDatabaseFiles();
+    if (deletedPaths.length === 0) {
+      console.log(`No database files were present at ${databasePath}.`);
+    } else {
+      console.log(`Deleted database files: ${deletedPaths.join(", ")}`);
+    }
+
+    return true;
+  } finally {
+    readlineInterface.close();
+    closeAppDatabase();
+  }
+}
+
 /**
  * Requires fresh step up for rpc action.
  * @param context - Execution context.
@@ -2718,4 +2774,20 @@ process.on("unhandledRejection", (reason) => {
   void shutdownAndExit(1);
 });
 
-await bootstrap();
+if (import.meta.main) {
+  if (SERVER_ARGS.includes(WIPE_USER_DATA_FLAG)) {
+    try {
+      const completed = await runUserDataWipeCli();
+      process.exitCode = completed ? 0 : 1;
+    } catch (error) {
+      console.error(
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : String(error),
+      );
+      process.exitCode = 1;
+    }
+  } else {
+    await bootstrap();
+  }
+}

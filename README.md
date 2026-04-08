@@ -134,6 +134,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--backend-only` or `JOLT_BACKEND_ONLY=1` to restrict backend mode.
 - `--dev` or `JOLT_DEV=1` for development reconnect behavior and refresh hooks.
 - `--tls` or `JOLT_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
+- `--wipe-user-data` to confirm, delete the local SQLite database files, and exit before startup.
 - `JOLT_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 
 ## Data and performance characteristics

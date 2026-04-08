@@ -7,6 +7,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `index.ts`
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
+  - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files and exiting before server bootstrap.
   - Exposes loopback HTTP routes for mainview assets and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
@@ -39,6 +40,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, usage telemetry, and thread/task state.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
+  - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 
 - `git.ts`
   - Encapsulates all git command execution and parsing used by procedures.
