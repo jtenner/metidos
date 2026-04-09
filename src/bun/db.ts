@@ -46,6 +46,9 @@ type ThreadInput = {
   joltAccess: boolean;
   unsafeMode: boolean;
   codexThreadId?: string | null;
+  piSessionId?: string | null;
+  piSessionFile?: string | null;
+  piLeafEntryId?: string | null;
 };
 
 type ThreadUsageInput = {
@@ -154,6 +157,9 @@ export type ThreadRecord = {
   joltAccess: boolean;
   unsafeMode: 0 | 1;
   codexThreadId: string | null;
+  piSessionId: string | null;
+  piSessionFile: string | null;
+  piLeafEntryId: string | null;
   pinnedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -679,6 +685,9 @@ export function migrateDatabase(db: Database): void {
 				jolt_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				codex_thread_id TEXT,
+				pi_session_id TEXT,
+				pi_session_file TEXT,
+				pi_leaf_entry_id TEXT,
 				pinned_at TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -764,6 +773,9 @@ export function migrateDatabase(db: Database): void {
     "unsafe_mode",
     "unsafe_mode INTEGER NOT NULL DEFAULT 0",
   );
+  ensureThreadColumn(db, "pi_session_id", "pi_session_id TEXT");
+  ensureThreadColumn(db, "pi_session_file", "pi_session_file TEXT");
+  ensureThreadColumn(db, "pi_leaf_entry_id", "pi_leaf_entry_id TEXT");
   runStatement(
     db,
     `
@@ -2190,6 +2202,9 @@ export function listThreads(database: Database): ThreadRecord[] {
 				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				codex_thread_id AS codexThreadId,
+				pi_session_id AS piSessionId,
+				pi_session_file AS piSessionFile,
+				pi_leaf_entry_id AS piLeafEntryId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
 						updated_at AS updatedAt,
@@ -2246,6 +2261,9 @@ export function getThreadById(
 				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
 				codex_thread_id AS codexThreadId,
+				pi_session_id AS piSessionId,
+				pi_session_file AS piSessionFile,
+				pi_leaf_entry_id AS piLeafEntryId,
 					pinned_at AS pinnedAt,
 						created_at AS createdAt,
 						updated_at AS updatedAt,
@@ -2298,9 +2316,15 @@ export function createThread(
 				jolt_access,
 				unsafe_mode,
 				codex_thread_id,
+				pi_session_id,
+				pi_session_file,
+				pi_leaf_entry_id,
 				updated_at
 			)
 				VALUES (
+					?,
+					?,
+					?,
 					?,
 					?,
 					?,
@@ -2324,6 +2348,9 @@ export function createThread(
     input.joltAccess ? 1 : 0,
     input.unsafeMode ? 1 : 0,
     input.codexThreadId ?? null,
+    input.piSessionId ?? null,
+    input.piSessionFile ?? null,
+    input.piLeafEntryId ?? null,
   );
   const threadId = Number(result.lastInsertRowid);
   const thread = getThreadById(database, threadId);
@@ -2342,7 +2369,7 @@ export function createThread(
 export function updateThreadCodexId(
   database: Database,
   threadId: number,
-  codexThreadId: string,
+  codexThreadId: string | null,
 ): void {
   /** Persist the provider thread identifier from external API backfill. */
   runStatement(
@@ -2355,6 +2382,33 @@ export function updateThreadCodexId(
 			WHERE id = ?
 		`,
     codexThreadId,
+    threadId,
+  );
+}
+
+export function updateThreadPiSessionState(
+  database: Database,
+  threadId: number,
+  input: {
+    piSessionId: string | null;
+    piSessionFile: string | null;
+    piLeafEntryId: string | null;
+  },
+): void {
+  runStatement(
+    database,
+    `
+			UPDATE threads
+			SET
+				pi_session_id = ?,
+				pi_session_file = ?,
+				pi_leaf_entry_id = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    input.piSessionId,
+    input.piSessionFile,
+    input.piLeafEntryId,
     threadId,
   );
 }

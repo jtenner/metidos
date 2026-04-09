@@ -25,12 +25,14 @@ import {
   DEFAULT_THREAD_REASONING_EFFORT,
   deleteAppDatabaseFiles,
   getAppDatabasePath,
+  getThreadById,
   initAppDatabase,
   listProjects,
   listSecurityAuditEvents,
   listThreads,
   resetResolvedAppDataDirectory,
   selectWritableAppDataDirectory,
+  updateThreadPiSessionState,
   upsertProject,
 } from "./db";
 
@@ -195,6 +197,54 @@ describe("app database storage", () => {
         threadId: 12,
       }),
     ).toHaveLength(1);
+  });
+
+  it("persists first-class Pi session identity on thread rows", () => {
+    const appDataDir = createTempDirectory();
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Pi Repo",
+      projectPath: join(appDataDir, "project"),
+    });
+    const thread = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      joltAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Pi Thread",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+
+    updateThreadPiSessionState(database, thread.id, {
+      piSessionId: "pi-session-1",
+      piSessionFile: "/tmp/pi-session-1.jsonl",
+      piLeafEntryId: "leaf-1",
+    });
+
+    const persistedThread = getThreadById(database, thread.id);
+
+    expect(persistedThread).toEqual(
+      expect.objectContaining({
+        id: thread.id,
+        piSessionId: "pi-session-1",
+        piSessionFile: "/tmp/pi-session-1.jsonl",
+        piLeafEntryId: "leaf-1",
+      }),
+    );
+    expect(listThreads(database)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: thread.id,
+          piSessionId: "pi-session-1",
+          piSessionFile: "/tmp/pi-session-1.jsonl",
+          piLeafEntryId: "leaf-1",
+        }),
+      ]),
+    );
   });
 
   it("clears stale active worktree sync paths instead of storing them", async () => {

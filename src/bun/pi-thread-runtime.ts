@@ -3,7 +3,7 @@
  * @description Pi-backed per-thread runtime helpers.
  */
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import {
@@ -46,7 +46,12 @@ type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 type PiRuntimeThread = Pick<
   ThreadRecord,
-  "id" | "model" | "reasoningEffort" | "unsafeMode" | "worktreePath"
+  | "id"
+  | "model"
+  | "piSessionFile"
+  | "reasoningEffort"
+  | "unsafeMode"
+  | "worktreePath"
 >;
 
 export type PiThreadRuntime = {
@@ -327,10 +332,14 @@ export async function createPiThreadRuntime(
   });
   await resourceLoader.reload();
 
-  const sessionManager = SessionManager.continueRecent(
-    thread.worktreePath,
-    sessionDirectory,
-  );
+  const sessionManager =
+    thread.piSessionFile && existsSync(thread.piSessionFile)
+      ? SessionManager.open(
+          thread.piSessionFile,
+          sessionDirectory,
+          thread.worktreePath,
+        )
+      : SessionManager.continueRecent(thread.worktreePath, sessionDirectory);
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,

@@ -2,8 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SessionManager } from "@mariozechner/pi-coding-agent";
 
 import {
+  buildPiAgentDirectoryPath,
   buildPiThreadSessionDirectoryPath,
   createPiThreadRuntime,
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
@@ -54,6 +56,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       {
         id: 17,
         model: "gpt-5.4",
+        piSessionFile: null,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,
@@ -90,6 +93,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       {
         id: 17,
         model: "gpt-5.4",
+        piSessionFile: null,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,
@@ -107,6 +111,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       {
         id: 18,
         model: "gpt-5.4",
+        piSessionFile: null,
         reasoningEffort: "medium",
         unsafeMode: 1,
         worktreePath: workspaceDir,
@@ -126,6 +131,88 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "write",
     ]);
     unsafeRuntime.session.dispose();
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("reopens the persisted Pi session file instead of the most recent session", async () => {
+  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
+  const workspaceDir = mkdtempSync(
+    join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
+  );
+  process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
+    PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
+
+  try {
+    const initialRuntime = await createPiThreadRuntime(
+      {
+        id: 21,
+        model: "gpt-5.4",
+        piSessionFile: null,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        worktreePath: workspaceDir,
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    await initialRuntime.session.prompt("persisted-session-target");
+    const initialSessionFile = initialRuntime.session.sessionFile;
+    initialRuntime.session.dispose();
+
+    if (!initialSessionFile) {
+      throw new Error(
+        "Expected the initial Pi runtime to persist a session file.",
+      );
+    }
+
+    const alternateSessionManager = SessionManager.create(
+      workspaceDir,
+      buildPiThreadSessionDirectoryPath(21, appDataDir),
+    );
+    alternateSessionManager.appendMessage({
+      content: [
+        {
+          text: "newer alternate session",
+          type: "text",
+        },
+      ],
+      role: "user",
+      timestamp: Date.now(),
+    });
+    const alternateSessionFile = alternateSessionManager.getSessionFile();
+
+    expect(alternateSessionFile).not.toBe(initialSessionFile);
+
+    const reopenedRuntime = await createPiThreadRuntime(
+      {
+        id: 21,
+        model: "gpt-5.4",
+        piSessionFile: initialSessionFile,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        worktreePath: workspaceDir,
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    expect(reopenedRuntime.agentDirectory).toBe(
+      buildPiAgentDirectoryPath(appDataDir),
+    );
+    expect(reopenedRuntime.session.sessionFile).toBe(initialSessionFile);
+    reopenedRuntime.session.dispose();
   } finally {
     rmSync(appDataDir, {
       force: true,

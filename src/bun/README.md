@@ -50,6 +50,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-thread-runtime.ts`
   - Jolt-owned Pi runtime adapter for per-thread execution.
   - Resolves the Pi model, constructs the bounded tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
+  - Reopens the explicitly persisted Pi session file when a thread already has one instead of relying only on “most recent session” behavior.
   - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
 
 - `pi-thread-runtime.test.ts`
@@ -61,6 +62,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
+  - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) alongside legacy Codex-era fields that still exist for the broader migration.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
   - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 

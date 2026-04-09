@@ -56,6 +56,7 @@ import {
   stopInProgressThreadMessages,
   updateCronJob,
   updateThreadCodexId,
+  updateThreadPiSessionState,
   upsertProject,
   upsertThreadActivities,
 } from "./db";
@@ -1091,19 +1092,43 @@ async function ensurePiThreadRuntime(
 ): Promise<PiThreadRuntime> {
   const active = piThreadRuntimeMap.get(thread.id);
   if (active) {
+    syncPiThreadSessionState(thread, active);
     return active;
   }
 
   const next = await createPiThreadRuntime(thread);
   piThreadRuntimeMap.set(thread.id, next);
-  if (
-    next.session.sessionId &&
-    next.session.sessionId !== thread.codexThreadId
-  ) {
-    updateThreadCodexId(db, thread.id, next.session.sessionId);
-    invalidateThreadDetailCache(thread.id);
-  }
+  syncPiThreadSessionState(thread, next);
   return next;
+}
+
+function syncPiThreadSessionState(
+  thread: Pick<
+    ThreadRecord,
+    "codexThreadId" | "id" | "piLeafEntryId" | "piSessionFile" | "piSessionId"
+  >,
+  runtime: PiThreadRuntime,
+): void {
+  const nextState = {
+    piSessionId: runtime.session.sessionId || null,
+    piSessionFile: runtime.session.sessionFile ?? null,
+    piLeafEntryId: runtime.session.sessionManager.getLeafId(),
+  };
+  const codexThreadIdNeedsClear = thread.codexThreadId !== null;
+  if (
+    !codexThreadIdNeedsClear &&
+    nextState.piSessionId === thread.piSessionId &&
+    nextState.piSessionFile === thread.piSessionFile &&
+    nextState.piLeafEntryId === thread.piLeafEntryId
+  ) {
+    return;
+  }
+
+  if (codexThreadIdNeedsClear) {
+    updateThreadCodexId(db, thread.id, null);
+  }
+  updateThreadPiSessionState(db, thread.id, nextState);
+  invalidateThreadDetailCache(thread.id);
 }
 /**
  * Performs threadById operation.
@@ -1626,13 +1651,7 @@ async function runThreadMessageInBackground(
       finalAssistantTextCandidate,
       thread.model,
     );
-    if (
-      runtime.session.sessionId &&
-      runtime.session.sessionId !== thread.codexThreadId
-    ) {
-      updateThreadCodexId(db, thread.id, runtime.session.sessionId);
-      invalidateThreadDetailCache(thread.id);
-    }
+    syncPiThreadSessionState(threadById(threadId), runtime);
     if (lastAssistantItemId && lastAssistantText.trim()) {
       await upsertAssistantChatActivity(
         threadId,
@@ -3087,6 +3106,9 @@ async function createThreadRecord(
       joltAccess: access.joltAccess,
       unsafeMode: access.unsafeMode,
       codexThreadId: null,
+      piSessionId: null,
+      piSessionFile: null,
+      piLeafEntryId: null,
     }),
   );
   if (access.unsafeMode) {

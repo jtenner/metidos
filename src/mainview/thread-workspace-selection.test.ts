@@ -28,6 +28,9 @@ function thread(overrides?: Partial<RpcThread>): RpcThread {
   return {
     agentsAccess: false,
     codexThreadId: null,
+    piSessionId: null,
+    piSessionFile: null,
+    piLeafEntryId: null,
     compaction: {
       estimatedTriggerSource: "heuristic",
       estimatedTriggerTokens: 120_000,

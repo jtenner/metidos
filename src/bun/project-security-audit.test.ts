@@ -42,6 +42,9 @@ describe("project security audit helpers", () => {
     });
     const thread = createThread(database, {
       codexThreadId: null,
+      piLeafEntryId: null,
+      piSessionFile: null,
+      piSessionId: null,
       agentsAccess: false,
       githubAccess: false,
       model: "gpt-5",

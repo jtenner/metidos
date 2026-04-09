@@ -179,7 +179,7 @@ Pi provides:
 Current Jolt has its own separate thread/session model in SQLite:
 
 - Jolt “threads” are app-level domain entities, not Pi sessions
-- each thread stores `codexThreadId`
+- each thread now stores first-class Pi session references alongside the legacy `codexThreadId` compatibility field
 - Jolt stores transformed thread messages for UI rendering
 - Jolt separately infers compaction behavior from Codex token history
 
@@ -346,9 +346,12 @@ That file currently owns:
 
 ### Persisted schema coupling
 
-Current thread rows include Codex-specific persistence:
+Current thread rows still include Codex-era persistence and telemetry coupling:
 
 - `codexThreadId`
+- `piSessionId`
+- `piSessionFile`
+- `piLeafEntryId`
 - model and reasoning effort validated against a Codex-specific static catalog
 - compaction inference derived from Codex usage patterns
 
@@ -487,7 +490,6 @@ What the current implementation now does:
 
 - creates and resumes Pi sessions behind the existing Jolt thread lifecycle
 - stores Pi sessions under Jolt app data at `.../pi-agent/thread-sessions/thread-<threadId>/`
-- treats the Pi session id as the temporary compatibility value in Jolt’s existing `codexThreadId` field
 - maps Pi assistant text into Jolt `chat` rows
 - maps Pi thinking deltas into Jolt `reasoning` rows
 - maps Pi `bash` executions into Jolt `command` rows
@@ -500,7 +502,7 @@ What the current implementation intentionally does not do yet:
 - it does not port GitHub tools into Pi
 - it does not expose agents/plan-mode parity
 - it does not restore exact `file_change` or `web_search` parity
-- it does not add first-class Pi session columns to SQLite yet
+- it does not expose Pi branching/tree controls in the Jolt UI yet
 
 Current temporary runtime policy:
 
@@ -510,6 +512,34 @@ Current temporary runtime policy:
 - `unsafeMode=true` enables the same tool surface plus `bash`
 
 This closes the runtime-host unknowns and gives Jolt a real Pi-backed execution path, but it leaves transcript parity, custom tool parity, UI parity, and schema cleanup to later slices.
+
+### DB03 implementation status in `jt-ide`
+
+The first persistence-cleanup slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/db.ts](../src/bun/db.ts)
+- [src/bun/db.test.ts](../src/bun/db.test.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/bun/pi-thread-runtime-integration.test.ts](../src/bun/pi-thread-runtime-integration.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+
+What the current implementation now does:
+
+- adds `piSessionId`, `piSessionFile`, and `piLeafEntryId` to persisted Jolt thread rows
+- syncs those fields when a Pi runtime is created or resumed and again after each completed prompt
+- resumes the explicitly stored Pi session file when one exists instead of relying only on “most recent session”
+- exposes the same Pi session identity through RPC thread payloads for later UI work
+- keeps Pi-backed threads out of the old `codexThreadId` compatibility slot
+
+What this still does not do yet:
+
+- it does not expose Pi session branching or tree navigation in the Jolt UI
+- it does not replace Codex-specific model catalog assumptions
+- it does not remove Codex telemetry scraping or the legacy `codexThreadId` column yet
 
 ### Why SDK first
 
@@ -554,6 +584,9 @@ Current Jolt persistence stores:
 - thread metadata
 - transformed messages
 - `codexThreadId`
+- `piSessionId`
+- `piSessionFile`
+- `piLeafEntryId`
 
 Pi persistence wants:
 
@@ -587,11 +620,11 @@ The pragmatic path is:
 - Pi owns session JSONL files
 - Jolt stores references to those Pi sessions
 
-This is now partially implemented in `jt-ide` as:
+This is now implemented in `jt-ide` as:
 
 - Pi-owned session directories under Jolt app data
 - SQLite still acting as the app-level source of truth for threads/messages/status
-- temporary reuse of `codexThreadId` as the compatibility slot for the active Pi session id until the dedicated DB slice lands
+- first-class persisted references to the active Pi session id, session file, and leaf entry on each thread row
 
 Later, if file-backed session storage becomes a problem, revisit deeper customization.
 

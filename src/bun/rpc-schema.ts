@@ -321,6 +321,9 @@ export type RpcThread = {
   joltAccess: boolean;
   unsafeMode: boolean;
   codexThreadId: string | null;
+  piSessionId: string | null;
+  piSessionFile: string | null;
+  piLeafEntryId: string | null;
   pinnedAt: string | null;
   createdAt: string;
   updatedAt: string;
