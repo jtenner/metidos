@@ -24,6 +24,48 @@ export type UpdateThreadAccessRpc = (
   options?: RpcProcedureCallOptions,
 ) => Promise<RpcThread>;
 
+type SidecarThreadUpdateParams = {
+  agentsAccess?: boolean;
+  githubAccess?: boolean;
+  joltAccess?: boolean;
+  pinned?: boolean;
+  summary?: string | null;
+  threadId: number;
+  title?: string;
+  unsafeMode?: boolean;
+};
+
+export type UpdateThreadFromSidecarResult = {
+  accessUpdateWarning: string | null;
+  thread: RpcThread;
+};
+
+function hasThreadMetadataUpdate(params: SidecarThreadUpdateParams): boolean {
+  return (
+    typeof params.title !== "undefined" ||
+    typeof params.summary !== "undefined" ||
+    typeof params.pinned !== "undefined"
+  );
+}
+
+function hasThreadAccessUpdate(params: SidecarThreadUpdateParams): boolean {
+  return (
+    typeof params.githubAccess !== "undefined" ||
+    typeof params.agentsAccess !== "undefined" ||
+    typeof params.joltAccess !== "undefined" ||
+    typeof params.unsafeMode !== "undefined"
+  );
+}
+
+function threadAccessBlockedWhileProcessingMessage(): string {
+  return "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.";
+}
+
+export function isThreadAccessBlockedWhileProcessing(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(threadAccessBlockedWhileProcessingMessage());
+}
+
 /**
  * Normalize summary values so callers can clear with blank input.
  */
@@ -143,4 +185,83 @@ export async function updateThreadAccessFromSidecar(
       },
     );
   }
+}
+
+/**
+ * Route mixed sidecar thread updates through the authoritative RPC path.
+ * Metadata updates are preserved even when access toggles are rejected mid-turn.
+ */
+export async function updateThreadFromSidecar(
+  metadataRpcCall: UpdateThreadMetadataRpc,
+  accessRpcCall: UpdateThreadAccessRpc,
+  params: SidecarThreadUpdateParams,
+  options?: RpcProcedureCallOptions,
+): Promise<UpdateThreadFromSidecarResult> {
+  const hasMetadataUpdate = hasThreadMetadataUpdate(params);
+  const hasAccessUpdate = hasThreadAccessUpdate(params);
+
+  if (!hasMetadataUpdate && !hasAccessUpdate) {
+    throw new Error(
+      "At least one of title, summary, pinned, githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+    );
+  }
+
+  let accessUpdateWarning: string | null = null;
+  let thread: RpcThread | null = null;
+
+  if (hasMetadataUpdate) {
+    thread = await updateThreadMetadataFromSidecar(
+      metadataRpcCall,
+      {
+        threadId: params.threadId,
+        ...(typeof params.title === "undefined" ? {} : { title: params.title }),
+        ...(typeof params.summary === "undefined"
+          ? {}
+          : { summary: params.summary }),
+        ...(typeof params.pinned === "undefined"
+          ? {}
+          : { pinned: params.pinned }),
+      },
+      options,
+    );
+  }
+
+  if (hasAccessUpdate) {
+    try {
+      thread = await updateThreadAccessFromSidecar(
+        accessRpcCall,
+        {
+          threadId: params.threadId,
+          ...(typeof params.githubAccess === "undefined"
+            ? {}
+            : { githubAccess: params.githubAccess }),
+          ...(typeof params.agentsAccess === "undefined"
+            ? {}
+            : { agentsAccess: params.agentsAccess }),
+          ...(typeof params.joltAccess === "undefined"
+            ? {}
+            : { joltAccess: params.joltAccess }),
+          ...(typeof params.unsafeMode === "undefined"
+            ? {}
+            : { unsafeMode: params.unsafeMode }),
+        },
+        options,
+      );
+    } catch (error) {
+      if (!thread || !isThreadAccessBlockedWhileProcessing(error)) {
+        throw error;
+      }
+      accessUpdateWarning =
+        error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  if (!thread) {
+    throw new Error("Thread update did not return a result.");
+  }
+
+  return {
+    accessUpdateWarning,
+    thread,
+  };
 }

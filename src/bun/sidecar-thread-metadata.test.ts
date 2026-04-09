@@ -6,10 +6,12 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  isThreadAccessBlockedWhileProcessing,
   normalizeOptionalSummary,
   type UpdateThreadAccessRpc,
   type UpdateThreadMetadataRpc,
   updateThreadAccessFromSidecar,
+  updateThreadFromSidecar,
   updateThreadMetadataFromSidecar,
 } from "./sidecar-thread-metadata";
 
@@ -185,6 +187,121 @@ describe("sidecar thread metadata updates", () => {
     expect(result.githubAccess).toBeTrue();
     expect(result.joltAccess).toBeFalse();
     expect(result.unsafeMode).toBeTrue();
+  });
+
+  it("keeps metadata updates when access toggles are rejected mid-turn", async () => {
+    const metadataCalls: Array<Parameters<UpdateThreadMetadataRpc>[0]> = [];
+    const accessCalls: Array<Parameters<UpdateThreadAccessRpc>[0]> = [];
+    const metadataRpcCall: UpdateThreadMetadataRpc = async (params) => {
+      metadataCalls.push(params);
+      return {
+        id: 17,
+        projectId: 4,
+        worktreePath: "/repo",
+        title: params.title ?? "Existing title",
+        summary: params.summary ?? "Existing summary",
+        model: "gpt-5.4",
+        reasoningEffort: "medium",
+        githubAccess: false,
+        agentsAccess: false,
+        joltAccess: true,
+        unsafeMode: true,
+        codexThreadId: null,
+        pinnedAt: null,
+        createdAt: "2026-04-04T11:00:00.000Z",
+        updatedAt: "2026-04-04T12:00:00.000Z",
+        lastRunAt: null,
+        usage: null,
+        compaction: {
+          estimatedTriggerTokens: 0,
+          estimatedTriggerSource: "heuristic",
+          maxObservedInputTokens: null,
+          inferredCount: 0,
+          lastInferredAt: null,
+          lastInferredBeforeInputTokens: null,
+          lastInferredAfterInputTokens: null,
+        },
+        runStatus: {
+          state: "working",
+          startedAt: "2026-04-04T12:00:00.000Z",
+          updatedAt: "2026-04-04T12:00:05.000Z",
+          error: null,
+          hasUnreadError: false,
+        },
+      };
+    };
+    const accessRpcCall: UpdateThreadAccessRpc = async (params) => {
+      accessCalls.push(params);
+      throw new Error(
+        "Thread access controls cannot change while Codex is processing.",
+      );
+    };
+
+    const result = await updateThreadFromSidecar(
+      metadataRpcCall,
+      accessRpcCall,
+      {
+        threadId: 17,
+        title: "Keep this title",
+        unsafeMode: false,
+      },
+      {
+        priority: "foreground",
+      },
+    );
+
+    expect(metadataCalls).toEqual([
+      {
+        threadId: 17,
+        title: "Keep this title",
+      },
+    ]);
+    expect(accessCalls).toEqual([
+      {
+        threadId: 17,
+        unsafeMode: false,
+      },
+    ]);
+    expect(result.thread.title).toBe("Keep this title");
+    expect(result.thread.unsafeMode).toBeTrue();
+    expect(result.accessUpdateWarning).toBe(
+      "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+    );
+  });
+
+  it("still fails access-only updates that are rejected mid-turn", async () => {
+    const metadataRpcCall: UpdateThreadMetadataRpc = async () => {
+      throw new Error("Metadata RPC should not run.");
+    };
+    const accessRpcCall: UpdateThreadAccessRpc = async () => {
+      throw new Error(
+        "Thread access controls cannot change while Codex is processing.",
+      );
+    };
+
+    await expect(
+      updateThreadFromSidecar(metadataRpcCall, accessRpcCall, {
+        threadId: 17,
+        unsafeMode: false,
+      }),
+    ).rejects.toThrow(
+      "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+    );
+  });
+
+  it("recognizes blocked mid-turn access-update errors", () => {
+    expect(
+      isThreadAccessBlockedWhileProcessing(
+        new Error(
+          "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+        ),
+      ),
+    ).toBeTrue();
+    expect(
+      isThreadAccessBlockedWhileProcessing(
+        new Error("Thread metadata update did not reach the live app: boom"),
+      ),
+    ).toBeFalse();
   });
 
   it("surfaces RPC timeouts instead of claiming success locally", async () => {

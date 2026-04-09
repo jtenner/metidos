@@ -25,10 +25,7 @@ import type {
   RpcThreadStartRequest,
   RpcWorktree,
 } from "./rpc-schema";
-import {
-  updateThreadAccessFromSidecar,
-  updateThreadMetadataFromSidecar,
-} from "./sidecar-thread-metadata";
+import { updateThreadFromSidecar } from "./sidecar-thread-metadata";
 import {
   formatVm2ExecutionReportText,
   runUntrustedJavaScriptInVm2,
@@ -86,6 +83,7 @@ const worktreePathContext = readStringEnv("JOLT_WORKTREE_PATH");
 const githubAccessContext = readBooleanEnv("JOLT_GITHUB_ACCESS");
 const agentsAccessContext = readBooleanEnv("JOLT_AGENTS_ACCESS");
 const joltAccessContext = readBooleanEnv("JOLT_JOLT_ACCESS", true);
+const unsafeModeContext = readOptionalBooleanEnv("JOLT_UNSAFE_MODE");
 const rpcUrl = readStringEnv("JOLT_RPC_URL") ?? DEFAULT_RPC_URL;
 const rpcHttpOrigin =
   readStringEnv("JOLT_RPC_HTTP_ORIGIN") ?? deriveRpcHttpOrigin(rpcUrl);
@@ -107,6 +105,17 @@ function boundThreadSentence(): string {
   return typeof threadIdContext === "number"
     ? ` Bound thread: ${threadIdContext}.`
     : "";
+}
+
+function currentUnsafeModeSentence(): string {
+  if (unsafeModeContext === null) {
+    return "";
+  }
+  return ` Current thread unsafe mode is ${unsafeModeContext ? "enabled" : "disabled"}.`;
+}
+
+function updateThreadUnsafeModeDescription(): string {
+  return `Optional danger-full-access flag. Omit to keep the current value.${unsafeModeContext === null ? "" : ` Current value for the bound thread is ${unsafeModeContext ? "true" : "false"}.`} Only set this when intentionally changing thread access.`;
 }
 
 /** Input description for thread id with explicit context fallback text. */
@@ -593,6 +602,20 @@ function readBooleanEnv(name: string, defaultValue = false): boolean {
     return false;
   }
   return defaultValue;
+}
+
+function readOptionalBooleanEnv(name: string): boolean | null {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+  if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") {
+    return true;
+  }
+  if (raw === "0" || raw === "false" || raw === "no" || raw === "off") {
+    return false;
+  }
+  return null;
 }
 
 /**
@@ -1310,7 +1333,7 @@ if (joltAccessContext) {
     "update_thread",
     {
       title: "Update Thread",
-      description: `Update Jolt thread metadata and access controls. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, pinning, or access changes would make the thread easier to scan.${boundThreadSentence()}`,
+      description: `Update Jolt thread metadata and access controls. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, pinning, or access changes would make the thread easier to scan. Omit access-control fields unless you are intentionally changing live thread access.${boundThreadSentence()}${currentUnsafeModeSentence()}`,
       inputSchema: {
         title: z
           .string()
@@ -1353,9 +1376,7 @@ if (joltAccessContext) {
         unsafeMode: z
           .boolean()
           .optional()
-          .describe(
-            "Optional danger-full-access flag. Omit to keep the current value.",
-          ),
+          .describe(updateThreadUnsafeModeDescription()),
         threadId: z
           .number()
           .int()
@@ -1396,56 +1417,43 @@ if (joltAccessContext) {
           );
         }
 
-        let thread: RpcThread | null = null;
+        const { accessUpdateWarning, thread } = await updateThreadFromSidecar(
+          (params, options) =>
+            rpcClient.call("updateThreadMetadata", params, options),
+          (params, options) =>
+            rpcClient.call("updateThreadAccess", params, options),
+          {
+            threadId: resolvedThreadId,
+            ...(typeof title === "undefined" ? {} : { title }),
+            ...(typeof summary === "undefined" ? {} : { summary }),
+            ...(typeof pinned === "undefined" ? {} : { pinned }),
+            ...(typeof githubAccess === "undefined" ? {} : { githubAccess }),
+            ...(typeof agentsAccess === "undefined" ? {} : { agentsAccess }),
+            ...(typeof joltAccess === "undefined" ? {} : { joltAccess }),
+            ...(typeof unsafeMode === "undefined" ? {} : { unsafeMode }),
+          },
+          {
+            priority: "foreground",
+          },
+        );
 
-        if (hasMetadataUpdate) {
-          thread = await updateThreadMetadataFromSidecar(
-            (params, options) =>
-              rpcClient.call("updateThreadMetadata", params, options),
-            {
-              threadId: resolvedThreadId,
-              ...(typeof title === "undefined" ? {} : { title }),
-              ...(typeof summary === "undefined" ? {} : { summary }),
-              ...(typeof pinned === "undefined" ? {} : { pinned }),
-            },
-            {
-              priority: "foreground",
-            },
-          );
-        }
-
-        if (hasAccessUpdate) {
-          thread = await updateThreadAccessFromSidecar(
-            (params, options) =>
-              rpcClient.call("updateThreadAccess", params, options),
-            {
-              threadId: resolvedThreadId,
-              ...(typeof githubAccess === "undefined" ? {} : { githubAccess }),
-              ...(typeof agentsAccess === "undefined" ? {} : { agentsAccess }),
-              ...(typeof joltAccess === "undefined" ? {} : { joltAccess }),
-              ...(typeof unsafeMode === "undefined" ? {} : { unsafeMode }),
-            },
-            {
-              priority: "foreground",
-            },
-          );
-        }
-
-        if (!thread) {
-          throw new Error("Thread update did not return a result.");
-        }
-
-        return textResult(`Updated thread ${thread.id}.`, {
-          threadId: thread.id,
-          title: thread.title,
-          summary: thread.summary,
-          pinned: thread.pinnedAt !== null,
-          pinnedAt: thread.pinnedAt,
-          githubAccess: thread.githubAccess,
-          agentsAccess: thread.agentsAccess,
-          joltAccess: thread.joltAccess,
-          unsafeMode: thread.unsafeMode,
-        });
+        return textResult(
+          accessUpdateWarning
+            ? `Updated thread ${thread.id}. Access changes were ignored while Codex is processing.`
+            : `Updated thread ${thread.id}.`,
+          {
+            threadId: thread.id,
+            title: thread.title,
+            summary: thread.summary,
+            pinned: thread.pinnedAt !== null,
+            pinnedAt: thread.pinnedAt,
+            githubAccess: thread.githubAccess,
+            agentsAccess: thread.agentsAccess,
+            joltAccess: thread.joltAccess,
+            unsafeMode: thread.unsafeMode,
+            accessUpdateWarning,
+          },
+        );
       },
     ),
   );

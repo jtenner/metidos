@@ -698,6 +698,7 @@ type CodexClientThreadContext = Pick<
   | "id"
   | "joltAccess"
   | "projectId"
+  | "unsafeMode"
   | "worktreePath"
 >;
 
@@ -948,7 +949,7 @@ function resolveThreadAccessControls(
  * @param unsafeMode - Unsafe-mode setting for thread options.
  */
 
-function codexThreadOptions(
+export function buildCodexThreadOptions(
   worktreePath: string,
   model: string,
   reasoningEffort: RpcReasoningEffort,
@@ -987,6 +988,7 @@ export function buildCodexSidecarEnv(
     | "id"
     | "joltAccess"
     | "projectId"
+    | "unsafeMode"
     | "worktreePath"
   >,
   options?: {
@@ -1008,6 +1010,7 @@ export function buildCodexSidecarEnv(
     JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
     JOLT_RPC_URL: rpcUrl,
     JOLT_THREAD_ID: String(thread.id),
+    JOLT_UNSAFE_MODE: thread.unsafeMode ? "1" : "0",
     JOLT_WORKTREE_PATH: thread.worktreePath,
     ...(sessionId
       ? {
@@ -1036,7 +1039,7 @@ function createManagedCodexThread(
   return thread.codexThreadId
     ? client.resumeThread(
         thread.codexThreadId,
-        codexThreadOptions(
+        buildCodexThreadOptions(
           thread.worktreePath,
           model,
           normalizedReasoningEffort,
@@ -1044,7 +1047,7 @@ function createManagedCodexThread(
         ),
       )
     : client.startThread(
-        codexThreadOptions(
+        buildCodexThreadOptions(
           thread.worktreePath,
           model,
           normalizedReasoningEffort,

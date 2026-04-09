@@ -117,6 +117,7 @@ describe("project procedure configuration helpers", () => {
           agentsAccess: false,
           joltAccess: true,
           projectId: 9,
+          unsafeMode: 1,
           worktreePath: "/repo/worktree",
         },
         {
@@ -148,6 +149,7 @@ describe("project procedure configuration helpers", () => {
             JOLT_PROJECT_ID: "9",
             JOLT_SESSION_ID: "session-123",
             JOLT_THREAD_ID: "17",
+            JOLT_UNSAFE_MODE: "1",
             JOLT_WORKTREE_PATH: "/repo/worktree",
           },
         },
@@ -166,6 +168,7 @@ describe("project procedure configuration helpers", () => {
           agentsAccess: false,
           joltAccess: true,
           projectId: 9,
+          unsafeMode: 1,
           worktreePath: "/repo/worktree",
         },
         {
@@ -183,6 +186,7 @@ describe("project procedure configuration helpers", () => {
       JOLT_RPC_URL: "ws://127.0.0.1:7599/rpc",
       JOLT_SESSION_ID: "session-123",
       JOLT_THREAD_ID: "17",
+      JOLT_UNSAFE_MODE: "1",
       JOLT_WORKTREE_PATH: "/repo/worktree",
     });
   });
@@ -197,6 +201,7 @@ describe("project procedure configuration helpers", () => {
         agentsAccess: true,
         joltAccess: false,
         projectId: 11,
+        unsafeMode: 0,
         worktreePath: "/repo/other-worktree",
       }),
     ).toEqual({
@@ -227,6 +232,7 @@ describe("project procedure configuration helpers", () => {
         agentsAccess: 1 as unknown as boolean,
         joltAccess: 0 as unknown as boolean,
         projectId: 12,
+        unsafeMode: 1,
         worktreePath: "/repo/sqlite-flags",
       }),
     ).toEqual({
@@ -261,6 +267,44 @@ describe("project procedure configuration helpers", () => {
       config: {
         approval_policy: "never",
       },
+    });
+  });
+
+  it("builds danger-full-access thread options for xAI threads in unsafe mode", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexThreadOptions(
+        "/repo/worktree",
+        "grok-4.20-reasoning",
+        "high",
+        true,
+      ),
+    ).toEqual({
+      approvalPolicy: "never",
+      model: "grok-4.20-reasoning",
+      networkAccessEnabled: true,
+      sandboxMode: "danger-full-access",
+      workingDirectory: "/repo/worktree",
+    });
+  });
+
+  it("keeps xAI threads in workspace-write mode when unsafe mode is disabled", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(
+      procedures.buildCodexThreadOptions(
+        "/repo/worktree",
+        "grok-4.20-reasoning",
+        "high",
+        false,
+      ),
+    ).toEqual({
+      approvalPolicy: "never",
+      model: "grok-4.20-reasoning",
+      networkAccessEnabled: false,
+      sandboxMode: "workspace-write",
+      workingDirectory: "/repo/worktree",
     });
   });
 
