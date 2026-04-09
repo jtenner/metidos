@@ -8,7 +8,13 @@ import {
   buildRpcSocketConnectionDetails,
   buildRpcSocketCookieHeader,
   buildSessionCookieHeader,
+  buildUpdateThreadToolPayload,
+  coerceBooleanLikeInput,
+  coercePositiveIntegerLikeInput,
+  collectIgnoredUpdateThreadAccessFields,
   deriveRpcHttpOrigin,
+  ignoredUpdateThreadAccessFieldDescription,
+  updateThreadDescription,
 } from "./codex-sidecar-mcp";
 
 describe("codex sidecar websocket auth handoff", () => {
@@ -86,5 +92,64 @@ describe("codex sidecar websocket auth handoff", () => {
       url: "ws://127.0.0.1:7599/rpc",
     });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("update_thread compatibility helpers", () => {
+  it("states that update_thread is metadata-only", () => {
+    expect(updateThreadDescription()).toContain(
+      "Update Jolt thread metadata only.",
+    );
+    expect(updateThreadDescription()).toContain(
+      "Never send access-control fields",
+    );
+    expect(updateThreadDescription()).toContain("unsafeMode");
+    expect(ignoredUpdateThreadAccessFieldDescription("unsafeMode")).toContain(
+      "Do not send this when updating a thread.",
+    );
+    expect(ignoredUpdateThreadAccessFieldDescription("unsafeMode")).toContain(
+      "ignores it",
+    );
+  });
+
+  it("coerces boolean-like and integer-like string inputs", () => {
+    expect(coerceBooleanLikeInput("false")).toBeFalse();
+    expect(coerceBooleanLikeInput(" TRUE ")).toBeTrue();
+    expect(coerceBooleanLikeInput("")).toBeUndefined();
+    expect(coercePositiveIntegerLikeInput("129")).toBe(129);
+    expect(coercePositiveIntegerLikeInput("  ")).toBeUndefined();
+  });
+
+  it("treats access fields as ignored compatibility inputs", () => {
+    expect(
+      collectIgnoredUpdateThreadAccessFields({
+        githubAccess: true,
+        agentsAccess: null,
+        joltAccess: false,
+        unsafeMode: true,
+      }),
+    ).toEqual(["githubAccess", "joltAccess", "unsafeMode"]);
+  });
+
+  it("builds sparse metadata payloads without exposing access state", () => {
+    expect(
+      buildUpdateThreadToolPayload(
+        {
+          id: 7,
+          title: "Summarize jt-ide codebase",
+          summary: null,
+          pinnedAt: null,
+        },
+        {
+          summary: "",
+          ignoredAccessFields: ["unsafeMode"],
+        },
+      ),
+    ).toEqual({
+      threadId: 7,
+      title: "Summarize jt-ide codebase",
+      summaryCleared: true,
+      ignoredAccessFields: ["unsafeMode"],
+    });
   });
 });

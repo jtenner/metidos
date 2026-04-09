@@ -365,6 +365,19 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("fails empty assistant completions instead of fabricating a reply", async () => {
+    const procedures = await loadProjectProcedures();
+
+    expect(() =>
+      procedures.requireAssistantResponseText("", "grok-4.20-reasoning"),
+    ).toThrow(
+      "Codex completed without returning an assistant response. The xAI provider may have stopped after reasoning without emitting a final answer or tool call.",
+    );
+    expect(procedures.requireAssistantResponseText("  ok  ", "gpt-5.4")).toBe(
+      "ok",
+    );
+  });
+
   it("rejects an aborted active-worktree update before validation completes", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("jolt-active-worktree-repo-");

@@ -8,6 +8,7 @@ import { describe, expect, it } from "bun:test";
 import {
   isThreadAccessBlockedWhileProcessing,
   normalizeOptionalSummary,
+  normalizeSidecarThreadMetadataParams,
   type UpdateThreadAccessRpc,
   type UpdateThreadMetadataRpc,
   updateThreadAccessFromSidecar,
@@ -20,6 +21,33 @@ describe("sidecar thread metadata updates", () => {
     expect(normalizeOptionalSummary(undefined)).toBeUndefined();
     expect(normalizeOptionalSummary("   ")).toBeNull();
     expect(normalizeOptionalSummary(" Summary ")).toBe("Summary");
+  });
+
+  it("treats null sidecar metadata fields as omitted and accepts description aliases", () => {
+    expect(
+      normalizeSidecarThreadMetadataParams({
+        threadId: 17,
+        title: null,
+        summary: null,
+        description: " Alias summary ",
+        pinned: null,
+      }),
+    ).toEqual({
+      threadId: 17,
+      summary: "Alias summary",
+    });
+
+    expect(() =>
+      normalizeSidecarThreadMetadataParams({
+        threadId: 17,
+        title: null,
+        summary: null,
+        description: null,
+        pinned: null,
+      }),
+    ).toThrow(
+      "At least one of title, summary, description, or pinned is required.",
+    );
   });
 
   it("routes thread metadata changes through the authoritative RPC path", async () => {
@@ -105,6 +133,67 @@ describe("sidecar thread metadata updates", () => {
     expect(result.title).toBe("Better title");
     expect(result.summary).toBeNull();
     expect(result.pinnedAt).toBe("2026-04-04T12:00:00.000Z");
+  });
+
+  it("routes description aliases through the authoritative RPC path", async () => {
+    const calls: Array<Parameters<UpdateThreadMetadataRpc>[0]> = [];
+    const rpcCall: UpdateThreadMetadataRpc = async (params) => {
+      calls.push(params);
+      return {
+        id: 17,
+        githubAccess: false,
+        agentsAccess: false,
+        joltAccess: true,
+        projectId: 4,
+        worktreePath: "/repo",
+        title: params.title ?? "Existing title",
+        summary:
+          typeof params.summary === "undefined"
+            ? "Existing summary"
+            : params.summary,
+        model: "gpt-5.4",
+        reasoningEffort: "medium",
+        unsafeMode: false,
+        codexThreadId: null,
+        pinnedAt: null,
+        createdAt: "2026-04-04T11:00:00.000Z",
+        updatedAt: "2026-04-04T12:00:00.000Z",
+        lastRunAt: null,
+        usage: null,
+        compaction: {
+          estimatedTriggerTokens: 0,
+          estimatedTriggerSource: "heuristic",
+          maxObservedInputTokens: null,
+          inferredCount: 0,
+          lastInferredAt: null,
+          lastInferredBeforeInputTokens: null,
+          lastInferredAfterInputTokens: null,
+        },
+        runStatus: {
+          state: "idle",
+          startedAt: null,
+          updatedAt: null,
+          error: null,
+          hasUnreadError: false,
+        },
+      };
+    };
+
+    const result = await updateThreadMetadataFromSidecar(rpcCall, {
+      threadId: 17,
+      title: null,
+      summary: null,
+      description: "  Alias description  ",
+      pinned: null,
+    });
+
+    expect(calls).toEqual([
+      {
+        threadId: 17,
+        summary: "Alias description",
+      },
+    ]);
+    expect(result.summary).toBe("Alias description");
   });
 
   it("routes thread access changes through the authoritative RPC path", async () => {

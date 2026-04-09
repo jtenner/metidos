@@ -100,6 +100,7 @@ import {
 } from "./project-procedures/git-history";
 import {
   buildModelCatalog,
+  codexModelProvider,
   codexModelSupportsReasoningEffort,
   contextWindowTokensForModel,
   normalizeStoredCodexModel,
@@ -1224,6 +1225,28 @@ function interruptionMessageFromAbort(reason: unknown): string {
 function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
   return `${startedAt}:${itemId}`;
 }
+
+export function missingAssistantResponseErrorMessage(
+  model: string | null | undefined,
+): string {
+  const baseMessage =
+    "Codex completed without returning an assistant response.";
+  if (codexModelProvider(model) === "xai") {
+    return `${baseMessage} The xAI provider may have stopped after reasoning without emitting a final answer or tool call.`;
+  }
+  return baseMessage;
+}
+
+export function requireAssistantResponseText(
+  text: string,
+  model: string | null | undefined,
+): string {
+  const normalizedText = text.trim();
+  if (!normalizedText) {
+    throw new Error(missingAssistantResponseErrorMessage(model));
+  }
+  return normalizedText;
+}
 /**
  * Runs thread message in background.
  * @param threadId - Thread identifier.
@@ -1452,8 +1475,10 @@ async function runThreadMessageInBackground(
       throw new Error(terminalError);
     }
 
-    const finalAssistantText =
-      lastAssistantText.trim() || "No response returned.";
+    const finalAssistantText = requireAssistantResponseText(
+      lastAssistantText,
+      thread.model,
+    );
     if (codexThread.id && codexThread.id !== thread.codexThreadId) {
       updateThreadCodexId(db, thread.id, codexThread.id);
       invalidateThreadDetailCache(thread.id);

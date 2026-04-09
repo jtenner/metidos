@@ -26,12 +26,13 @@ export type UpdateThreadAccessRpc = (
 
 type SidecarThreadUpdateParams = {
   agentsAccess?: boolean;
+  description?: string | null;
   githubAccess?: boolean;
   joltAccess?: boolean;
-  pinned?: boolean;
+  pinned?: boolean | null;
   summary?: string | null;
   threadId: number;
-  title?: string;
+  title?: string | null;
   unsafeMode?: boolean;
 };
 
@@ -42,9 +43,10 @@ export type UpdateThreadFromSidecarResult = {
 
 function hasThreadMetadataUpdate(params: SidecarThreadUpdateParams): boolean {
   return (
-    typeof params.title !== "undefined" ||
-    typeof params.summary !== "undefined" ||
-    typeof params.pinned !== "undefined"
+    typeof params.title === "string" ||
+    typeof params.summary === "string" ||
+    typeof params.description === "string" ||
+    typeof params.pinned === "boolean"
   );
 }
 
@@ -78,47 +80,86 @@ export function normalizeOptionalSummary(
   return summary?.trim() || null;
 }
 
+export function normalizeSidecarThreadMetadataParams(params: {
+  description?: string | null;
+  pinned?: boolean | null;
+  summary?: string | null;
+  threadId: number;
+  title?: string | null;
+}): {
+  pinned?: boolean;
+  summary?: string | null;
+  threadId: number;
+  title?: string;
+} {
+  const normalizedTitle =
+    typeof params.title === "string" ? params.title.trim() : undefined;
+  if (typeof normalizedTitle !== "undefined" && !normalizedTitle) {
+    throw new Error("Thread title is required.");
+  }
+
+  const normalizedSummaryInput =
+    typeof params.summary === "string"
+      ? params.summary
+      : typeof params.description === "string"
+        ? params.description
+        : undefined;
+  const normalizedSummary = normalizeOptionalSummary(normalizedSummaryInput);
+  const normalizedPinned =
+    typeof params.pinned === "boolean" ? params.pinned : undefined;
+
+  if (
+    typeof normalizedTitle === "undefined" &&
+    typeof normalizedSummary === "undefined" &&
+    typeof normalizedPinned === "undefined"
+  ) {
+    throw new Error(
+      "At least one of title, summary, description, or pinned is required.",
+    );
+  }
+
+  return {
+    threadId: params.threadId,
+    ...(typeof normalizedTitle === "undefined"
+      ? {}
+      : { title: normalizedTitle }),
+    ...(typeof normalizedSummary === "undefined"
+      ? {}
+      : { summary: normalizedSummary }),
+    ...(typeof normalizedPinned === "undefined"
+      ? {}
+      : { pinned: normalizedPinned }),
+  };
+}
+
 /**
  * Route sidecar thread metadata mutations through the authoritative RPC path.
  */
 export async function updateThreadMetadataFromSidecar(
   rpcCall: UpdateThreadMetadataRpc,
   params: {
-    threadId: number;
-    title?: string;
+    description?: string | null;
+    pinned?: boolean | null;
     summary?: string | null;
-    pinned?: boolean;
+    threadId: number;
+    title?: string | null;
   },
   options?: RpcProcedureCallOptions,
 ): Promise<RpcThread> {
-  if (
-    typeof params.title === "undefined" &&
-    typeof params.summary === "undefined" &&
-    typeof params.pinned === "undefined"
-  ) {
-    throw new Error("At least one of title, summary, or pinned is required.");
-  }
-
-  const normalizedTitle =
-    typeof params.title === "undefined" ? undefined : params.title.trim();
-  if (typeof normalizedTitle !== "undefined" && !normalizedTitle) {
-    throw new Error("Thread title is required.");
-  }
-
-  const normalizedSummary = normalizeOptionalSummary(params.summary);
+  const normalizedParams = normalizeSidecarThreadMetadataParams(params);
 
   try {
     return await rpcCall(
       {
-        threadId: params.threadId,
-        ...(typeof normalizedTitle === "undefined"
+        threadId: normalizedParams.threadId,
+        ...(typeof normalizedParams.title === "undefined"
           ? {}
-          : { title: normalizedTitle }),
-        ...(typeof normalizedSummary === "undefined"
+          : { title: normalizedParams.title }),
+        ...(typeof normalizedParams.summary === "undefined"
           ? {}
-          : { summary: normalizedSummary }),
-        ...(typeof params.pinned === "boolean"
-          ? { pinned: params.pinned }
+          : { summary: normalizedParams.summary }),
+        ...(typeof normalizedParams.pinned === "boolean"
+          ? { pinned: normalizedParams.pinned }
           : {}),
       },
       options,
@@ -202,7 +243,7 @@ export async function updateThreadFromSidecar(
 
   if (!hasMetadataUpdate && !hasAccessUpdate) {
     throw new Error(
-      "At least one of title, summary, pinned, githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+      "At least one of title, summary, description, pinned, githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
     );
   }
 
@@ -218,6 +259,9 @@ export async function updateThreadFromSidecar(
         ...(typeof params.summary === "undefined"
           ? {}
           : { summary: params.summary }),
+        ...(typeof params.description === "undefined"
+          ? {}
+          : { description: params.description }),
         ...(typeof params.pinned === "undefined"
           ? {}
           : { pinned: params.pinned }),

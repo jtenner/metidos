@@ -100,6 +100,17 @@ This closes the gap between Jolt’s thread settings and the effective runtime t
 
 This makes the `Jolt` toggle own the full sidecar surface instead of only the cron/runtime subset.
 
+### 2a. Keep `update_thread` metadata-only inside a running thread
+
+`update_thread` is a metadata tool, not an access-toggle tool.
+
+Inside a running thread:
+
+- `title`, `summary` / `description`, and `pinned` may update thread metadata
+- access-control inputs such as `githubAccess`, `agentsAccess`, `joltAccess`, and `unsafeMode` are legacy compatibility fields and are ignored
+
+That rule is especially important for `unsafeMode`: a thread must never be able to upgrade or downgrade its own sandbox/network policy by calling `update_thread`.
+
 ### 3. Update UI copy to match the real boundaries
 
 `src/mainview/controls/thread-access-control.tsx` now labels the toggles as:
