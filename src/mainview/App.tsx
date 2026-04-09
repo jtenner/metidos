@@ -1940,7 +1940,7 @@ export default function App({
           backfilledMessages.length > 0 &&
           selectedThreadIdRef.current === threadId
         ) {
-          // Commit the full older-history backfill once so large threads do not
+          // Commit the full accumulated history backfill once so large threads do not
           // repeatedly reflow and repaint while pagination is still in flight.
           setThreadMessages((current) =>
             mergeThreadMessageHistory(current, backfilledMessages),

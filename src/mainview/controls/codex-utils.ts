@@ -34,7 +34,7 @@ export function groupCodexModels(
 
 /**
  * Human-readable label for model picker UI.
- * Appends a deprecation marker for deprecated models.
+ * Appends a deprecation marker when model metadata marks a model as deprecated.
  */
 export function codexModelLabel(model: RpcModelOption): string {
   return model.deprecated ? `${model.label} (Deprecated)` : model.label;

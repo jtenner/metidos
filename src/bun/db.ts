@@ -2016,7 +2016,7 @@ export function upsertProject(
 ): ProjectRecord {
   /**
    * Create-or-update a project row and refresh its open/timestamp state.
-   * Returns the canonical row after write to avoid stale callers.
+   * Returns the canonical row after write so callers always read the persisted state.
    */
 
   runStatement(
@@ -3494,7 +3494,7 @@ export function claimCronJobsForScheduledRun(
   schedule: string,
   runDate: number,
 ): CronJobRecord[] {
-  /** Claim due jobs atomically by matching schedule and stale last-run timestamp. */
+  /** Claim due jobs atomically by matching schedule and outdated last-run timestamp. */
   const rows = database
     .query<CronJobSqlRecord, [number, string, number]>(
       `
