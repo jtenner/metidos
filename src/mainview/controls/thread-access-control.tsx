@@ -153,7 +153,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#7ce38d]"
               checked={value.agentsAccess}
-              description="Allow planning and sub-agent tools."
+              description="Allow plan updates and one-shot delegated helper tasks."
               disabled={disabled}
               label="Agents"
               onChange={(checked) => {

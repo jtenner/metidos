@@ -12,6 +12,7 @@ import {
   createPiThreadRuntime,
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
+  runPiDelegatedTask,
 } from "./pi-thread-runtime";
 
 const originalPiRuntimeTestProvider =
@@ -130,6 +131,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     process.env.JOLT_APP_DATA_DIR = appDataDir;
     const safeRuntime = await createPiThreadRuntime(
       {
+        agentsAccess: true,
         githubAccess: true,
         id: 17,
         joltAccess: true,
@@ -170,6 +172,8 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "new_cron",
       "update_cron",
       "new_thread",
+      "update_plan",
+      "delegate_task",
     ]);
 
     const streamed = collectAssistantText(safeRuntime);
@@ -185,6 +189,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
     const resumedRuntime = await createPiThreadRuntime(
       {
+        agentsAccess: true,
         githubAccess: true,
         id: 17,
         joltAccess: true,
@@ -208,6 +213,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
     const unsafeRuntime = await createPiThreadRuntime(
       {
+        agentsAccess: false,
         githubAccess: false,
         id: 18,
         joltAccess: false,
@@ -257,6 +263,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
     process.env.JOLT_APP_DATA_DIR = appDataDir;
     const initialRuntime = await createPiThreadRuntime(
       {
+        agentsAccess: false,
         githubAccess: false,
         id: 21,
         joltAccess: false,
@@ -302,6 +309,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
 
     const reopenedRuntime = await createPiThreadRuntime(
       {
+        agentsAccess: false,
         githubAccess: false,
         id: 21,
         joltAccess: false,
@@ -322,6 +330,60 @@ test("reopens the persisted Pi session file instead of the most recent session",
     );
     expect(reopenedRuntime.session.sessionFile).toBe(initialSessionFile);
     reopenedRuntime.session.dispose();
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("runPiDelegatedTask executes an isolated child session without agent recursion", async () => {
+  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-app-"));
+  const workspaceDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-ws-"));
+  process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
+    PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
+
+  try {
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    const result = await runPiDelegatedTask(
+      {
+        agentsAccess: true,
+        githubAccess: false,
+        id: 23,
+        joltAccess: false,
+        model: "gpt-5.4",
+        piSessionFile: null,
+        projectId: 1,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        worktreePath: workspaceDir,
+      },
+      {
+        model: null,
+        reasoningEffort: "low",
+        task: "delegate-safe-runtime",
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    expect(result.outputText).toContain("pi-runtime-probe");
+    expect(result.outputText).toContain("delegate-safe-runtime");
+    expect(result.reasoningEffort).toBe("low");
+    expect(result.activeToolNames).toEqual([
+      "read",
+      "ls",
+      "find",
+      "grep",
+      "edit",
+      "write",
+    ]);
   } finally {
     rmSync(appDataDir, {
       force: true,

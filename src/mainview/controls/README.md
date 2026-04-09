@@ -38,3 +38,4 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
   - Reusable upward-opening dropdown for thread and cron access flags.
   - Exposes GitHub, Agents, Jolt, and Unsafe toggles with the same defaults used by thread and cron state.
   - The GitHub toggle now maps to the Pi-era current-repository GitHub tool pack instead of being placeholder copy.
+  - The Agents toggle now maps to Pi-era plan updates plus one-shot delegated helper tasks instead of an undefined Codex-only multi-agent surface.

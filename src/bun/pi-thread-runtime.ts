@@ -27,6 +27,14 @@ import {
 
 import { getAppDataDirectoryPath, type ThreadRecord } from "./db";
 import {
+  createPiAgentsTools,
+  defaultPiAgentThinkingLevel,
+  type PiAgentsToolHost,
+  type PiAgentsToolScope,
+  type PiDelegatedTaskRequest,
+  type PiDelegatedTaskRun,
+} from "./pi-agents-tools";
+import {
   createPiGitHubCliHost,
   createPiGitHubTools,
   type PiGitHubToolHost,
@@ -52,6 +60,7 @@ type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 type PiRuntimeThread = Pick<
   ThreadRecord,
+  | "agentsAccess"
   | "githubAccess"
   | "id"
   | "joltAccess"
@@ -75,6 +84,13 @@ export type PiThreadToolPolicy = {
   allowBash: boolean;
   allowUnsafeModeEscalation: boolean;
   runtimePromptLine: string;
+};
+
+type CreatePiRuntimeOptions = {
+  agentsToolHost?: PiAgentsToolHost;
+  appDataDir?: string;
+  githubToolHost?: PiGitHubToolHost;
+  joltToolHost?: PiJoltToolHost;
 };
 
 /**
@@ -134,6 +150,12 @@ export function buildPiThreadToolPolicy(thread: {
 function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
   const toolPolicy = buildPiThreadToolPolicy(thread);
   const customToolLines: string[] = [];
+  if (thread.agentsAccess === true) {
+    customToolLines.push(
+      "Agent coordination tools are installed in this runtime: update_plan and delegate_task.",
+      "These are Pi-era replacements. Persistent child-agent lifecycle tools such as request_user_input, send_input, resume_agent, wait_agent, and close_agent are not installed.",
+    );
+  }
   if (thread.githubAccess === true) {
     customToolLines.push(
       "GitHub-native tools are installed in this runtime: github_repo, github_issue, github_pr, github_pr_checks, and github_pr_diff.",
@@ -151,7 +173,7 @@ function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
     ...(customToolLines.length > 0
       ? customToolLines
       : [
-          "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
+          "No GitHub, Jolt, or agent-coordination tools are installed in this runtime. Web search is not installed.",
         ]),
   ].join("\n");
 }
@@ -340,16 +362,227 @@ function buildPiTools(
   return tools;
 }
 
+function buildPiDelegatedTaskSystemPrompt(thread: PiRuntimeThread): string {
+  return [
+    buildPiRuntimeAppendSystemPrompt({
+      ...thread,
+      agentsAccess: false,
+    }),
+    "You are a delegated helper agent running on behalf of another agent.",
+    "Finish only the assigned task, stay tightly scoped, do not request follow-up lifecycle actions, and do not create additional helper agents.",
+    "Return a concise final answer that the parent agent can reuse directly.",
+  ].join("\n");
+}
+
+function extractAssistantText(message: unknown): string {
+  if (
+    !message ||
+    typeof message !== "object" ||
+    !("role" in message) ||
+    !("content" in message) ||
+    message.role !== "assistant"
+  ) {
+    return "";
+  }
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  return content
+    .filter(
+      (item): item is { text: string; type: "text" } =>
+        !!item &&
+        typeof item === "object" &&
+        "type" in item &&
+        "text" in item &&
+        item.type === "text" &&
+        typeof item.text === "string",
+    )
+    .map((item) => item.text)
+    .join("\n")
+    .trim();
+}
+
+function extractLatestAssistantText(messages: readonly unknown[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const text = extractAssistantText(messages[index]);
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function createPiAgentsToolScope(thread: PiRuntimeThread): PiAgentsToolScope {
+  return {
+    reasoningEffortContext: defaultPiAgentThinkingLevel(thread.reasoningEffort),
+    threadIdContext: thread.id,
+  };
+}
+
+export async function runPiDelegatedTask(
+  thread: PiRuntimeThread,
+  request: PiDelegatedTaskRequest,
+  options?: {
+    appDataDir?: string;
+    githubToolHost?: PiGitHubToolHost;
+    joltToolHost?: PiJoltToolHost;
+    onUpdate?: (partial: PiDelegatedTaskRun) => void;
+    signal?: AbortSignal;
+  },
+): Promise<PiDelegatedTaskRun> {
+  if (options?.signal?.aborted) {
+    throw new Error("Delegated task aborted before it started.");
+  }
+
+  const agentDirectory = buildPiAgentDirectoryPath(options?.appDataDir);
+  mkdirSync(agentDirectory, {
+    recursive: true,
+  });
+  const childThread: PiRuntimeThread = {
+    ...thread,
+    agentsAccess: false,
+    model: request.model ?? thread.model,
+    reasoningEffort: request.reasoningEffort ?? thread.reasoningEffort,
+  };
+  const { authStorage, modelRegistry } = createPiModelRegistry(agentDirectory);
+  const model = resolvePiModel(childThread, modelRegistry);
+  const toolPolicy = buildPiThreadToolPolicy(childThread);
+  const settingsManager = SettingsManager.inMemory({
+    retry: {
+      enabled: false,
+      maxRetries: 0,
+    },
+  });
+  const resourceLoader = new DefaultResourceLoader({
+    agentDir: agentDirectory,
+    appendSystemPrompt: buildPiDelegatedTaskSystemPrompt(childThread),
+    cwd: thread.worktreePath,
+    extensionFactories: [createThreadToolPolicyExtension(childThread)],
+    noExtensions: true,
+    noPromptTemplates: true,
+    noSkills: true,
+    noThemes: true,
+    settingsManager,
+  });
+  await resourceLoader.reload();
+
+  const githubTools =
+    childThread.githubAccess === true
+      ? createPiGitHubTools(
+          {
+            worktreePathContext: childThread.worktreePath,
+          },
+          options?.githubToolHost ??
+            createPiGitHubCliHost(childThread.worktreePath),
+        )
+      : [];
+  const joltTools =
+    childThread.joltAccess === true
+      ? (() => {
+          if (!options?.joltToolHost) {
+            throw new Error(
+              `Delegated Pi task for thread ${thread.id} requires a Jolt tool host while joltAccess is enabled.`,
+            );
+          }
+          return createPiJoltTools(
+            {
+              allowUnsafeModeEscalation: toolPolicy.allowUnsafeModeEscalation,
+              projectIdContext: childThread.projectId,
+              threadIdContext: childThread.id,
+              worktreePathContext: childThread.worktreePath,
+            },
+            options.joltToolHost,
+          );
+        })()
+      : [];
+  const { session } = await createAgentSession({
+    agentDir: agentDirectory,
+    authStorage,
+    customTools: [...githubTools, ...joltTools],
+    cwd: childThread.worktreePath,
+    model,
+    modelRegistry,
+    resourceLoader,
+    sessionManager: SessionManager.inMemory(),
+    settingsManager,
+    thinkingLevel: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+    tools: buildPiTools(childThread.worktreePath, toolPolicy),
+  });
+
+  let delegatedOutputText = "";
+  const unsubscribe = session.subscribe((event) => {
+    if (
+      event.type !== "message_update" ||
+      event.assistantMessageEvent.type !== "text_delta"
+    ) {
+      return;
+    }
+    delegatedOutputText += event.assistantMessageEvent.delta ?? "";
+    options?.onUpdate?.({
+      activeToolNames: session.getActiveToolNames(),
+      model: `${model.provider}:${model.id}`,
+      outputText: delegatedOutputText,
+      reasoningEffort: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+      sessionId: session.sessionId || null,
+    });
+  });
+  const abortListener = () => {
+    void session.abort().catch(() => {});
+  };
+  options?.signal?.addEventListener("abort", abortListener, { once: true });
+
+  try {
+    await session.prompt(request.task);
+    const outputText =
+      delegatedOutputText.trim() ||
+      extractLatestAssistantText(session.messages as readonly unknown[]);
+    const result = {
+      activeToolNames: session.getActiveToolNames(),
+      model: `${model.provider}:${model.id}`,
+      outputText,
+      reasoningEffort: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+      sessionId: session.sessionId || null,
+    } satisfies PiDelegatedTaskRun;
+    if (options?.signal?.aborted) {
+      throw new Error("Delegated task was aborted.");
+    }
+    return result;
+  } finally {
+    options?.signal?.removeEventListener("abort", abortListener);
+    unsubscribe();
+    session.dispose();
+  }
+}
+
+function createPiAgentsToolHost(
+  thread: PiRuntimeThread,
+  options?: CreatePiRuntimeOptions,
+): PiAgentsToolHost {
+  return {
+    runDelegatedTask: (request, signal, onUpdate) =>
+      runPiDelegatedTask(thread, request, {
+        ...(typeof options?.appDataDir === "string"
+          ? { appDataDir: options.appDataDir }
+          : {}),
+        ...(options?.githubToolHost
+          ? { githubToolHost: options.githubToolHost }
+          : {}),
+        ...(options?.joltToolHost
+          ? { joltToolHost: options.joltToolHost }
+          : {}),
+        ...(onUpdate ? { onUpdate } : {}),
+        ...(signal ? { signal } : {}),
+      }),
+  };
+}
+
 /**
  * Create or resume the Pi runtime associated with a thread.
  */
 export async function createPiThreadRuntime(
   thread: PiRuntimeThread,
-  options?: {
-    appDataDir?: string;
-    githubToolHost?: PiGitHubToolHost;
-    joltToolHost?: PiJoltToolHost;
-  },
+  options?: CreatePiRuntimeOptions,
 ): Promise<PiThreadRuntime> {
   const agentDirectory = buildPiAgentDirectoryPath(options?.appDataDir);
   const sessionDirectory = buildPiThreadSessionDirectoryPath(
@@ -420,10 +653,17 @@ export async function createPiThreadRuntime(
           );
         })()
       : [];
+  const agentsTools =
+    thread.agentsAccess === true
+      ? createPiAgentsTools(
+          createPiAgentsToolScope(thread),
+          options?.agentsToolHost ?? createPiAgentsToolHost(thread, options),
+        )
+      : [];
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,
-    customTools: [...githubTools, ...joltTools],
+    customTools: [...githubTools, ...joltTools, ...agentsTools],
     cwd: thread.worktreePath,
     model,
     modelRegistry,

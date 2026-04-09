@@ -52,12 +52,22 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
   - Defines the current Pi-era safe-vs-unsafe policy: safe threads keep worktree-scoped file/search/edit/write tools but lose `bash`, while unsafe threads also gain `bash` and may request unsafe child threads or cron jobs.
   - Installs the Pi-native GitHub tool pack when `githubAccess` is enabled for the thread, binding those tools to the GitHub repository that owns the current worktree.
+  - Installs the Pi-native agents pack when `agentsAccess` is enabled, exposing `update_plan` plus a bounded `delegate_task` helper instead of Codex’s full child-agent lifecycle.
   - Installs the Pi-native Jolt custom tool pack when `joltAccess` is enabled for the thread.
+  - Runs delegated helper tasks as isolated in-process Pi child sessions that inherit the parent thread’s workspace/model/tool policy while excluding recursive agent tools.
   - Reopens the explicitly persisted Pi session file when a thread already has one instead of relying only on “most recent session” behavior.
   - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
 
 - `pi-thread-runtime.test.ts`
-  - Focused unit coverage for deterministic Pi session directories, session resume behavior, and safe-vs-unsafe tool gating.
+  - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, and delegated child-session execution.
+
+- `pi-agents-tools.ts`
+  - Pi-native agents/plan tool pack that gives the `Agents` toggle a real meaning in the Pi runtime.
+  - Exposes `update_plan` for explicit ordered plan tracking plus `delegate_task` for one-shot isolated helper execution.
+  - Intentionally stops short of Codex-style persistent child-agent lifecycle semantics so the browser/UI migration can remain incremental.
+
+- `pi-agents-tools.test.ts`
+  - Focused coverage for plan validation/state updates plus bounded delegated-task host integration and streamed partial results.
 
 - `pi-thread-runtime-integration.test.ts`
   - Backend smoke test proving that `project-procedures.ts` can now execute a real thread lifecycle through the Pi adapter and persist the resulting assistant reply.

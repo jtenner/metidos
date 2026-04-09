@@ -424,8 +424,8 @@ The table below answers the practical question:
 | Built-in coding tools | Codex built-ins and shell/file behavior | Native Pi feature | Decide which Pi built-ins are enabled by default; adapt transcript rendering to Pi tool result shapes |
 | Jolt project/worktree/thread helper tools | Currently exported through Jolt MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces [codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) for the Pi path |
 | GitHub agent tools | Currently from Codex app/plugin surface | Not native | Build or adopt a GitHub Pi extension/package, probably using `gh`, REST, or GraphQL; redefine `githubAccess` semantics |
-| Sub-agents | Currently available through Codex when `agentsAccess` is enabled | Example-level only, not core | Port/adapt Pi example subagent extension or write a Jolt-specific multi-agent extension; redefine UX and access control semantics |
-| Plan mode | Currently exposed by Codex tool surface | Example-level only, not core | Port/adapt Pi plan-mode extension or drop parity; update toggle wording/semantics if not preserved |
+| Sub-agents | Minimal Pi-era `delegate_task` helper now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether one-shot bounded delegation is sufficient or whether Jolt later needs persistent child-agent lifecycle, richer fan-out, or human-in-the-loop orchestration |
+| Plan mode | Minimal Pi-era `update_plan` support now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether runtime-only plan state is enough or whether Jolt later needs Pi extension UI widgets, confirmations, and browser-visible plan orchestration |
 | Thread access controls | Current backend maps toggles directly into Codex config | Possible, but custom | Re-implement access gating by controlling Pi active tools/extensions/provider integrations; current toggle names can stay only if semantics are rebuilt |
 | Unsafe mode / sandbox / network policy | Current Codex thread options support real sandbox/network modes | Major gap | Build a safety model: disable tools, override bash/write/edit, run in container, or adopt sandbox extension; current `unsafeMode` cannot be preserved by a simple flag |
 | Reasoning transcript rows | Current UI stores dedicated `reasoning` rows | Partially supported | Convert Pi `thinking_delta` / assistant thinking blocks into Jolt reasoning rows if that UI is still desired |
@@ -852,7 +852,7 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not remove [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) because the Codex migration path is still incremental and the legacy runtime still exists
-- it does not port sub-agent tools or plan-mode tools; those remain separate migration slices
+- it does not own the agent-coordination surface; those Pi-era tools now live in a separate backend module so the Jolt tool pack can stay focused on app-specific operations
 - it does not package the Jolt tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
 - it does not add any new transcript kinds for these tools; they still flow through the existing `tool_call`, `command`, `reasoning`, and `chat` projection model described in [5. Transcript/Event Mapping](#5-transcriptevent-mapping)
 
@@ -930,7 +930,7 @@ Current Jolt thread toggles mean:
 On Pi, these toggles would need to become:
 
 - `GitHub`: whether Jolt enables a GitHub extension/tool pack
-- `Agents`: whether Jolt enables a subagent/plan-mode extension pack
+- `Agents`: whether Jolt enables Pi-era coordination tools such as plan updates and bounded delegated helper tasks
 - `Jolt`: whether Jolt enables Jolt-specific tools
 - `Unsafe`: whether Jolt enables a broader host-execution/sandbox-bypass tool policy
 
@@ -1004,7 +1004,7 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not provide Codex-equivalent container, network, or host-isolation guarantees; safe mode is still a host-process tool policy
-- it does not wire the `Agents` toggle to a Pi-native tool pack yet; that remains a later slice
+- it does not solve how a future richer multi-agent orchestration model should interact with the current safety policy; the shipped `Agents` meaning is intentionally limited to the minimal coordination pack described in [8. Agents and Plan Mode](#8-agents-and-plan-mode)
 - it does not restrict safe mode down to read-only behavior; safe threads can still edit and write within the bound worktree by design
 - it does not solve the broader “real sandbox” question raised in this section, so a stricter model would still require additional infrastructure beyond Pi’s default tool surface
 
@@ -1076,16 +1076,49 @@ Decide whether Jolt actually needs full parity here, or whether “consistency a
 
 For a first migration:
 
-- do not attempt exact parity with Codex `spawn_agent` and `update_plan`
-- instead, port or adapt Pi’s example extensions:
+- do not attempt exact parity with Codex’s async child-agent lifecycle
+- keep an explicit plan-state tool because `update_plan` maps cleanly to Jolt’s current workflow
+- implement a backend-owned Pi coordination pack first:
+  - `update_plan`
+  - one-shot delegated helper execution such as `delegate_task`
+- treat Pi’s example extensions as references, not as the literal shipped product contract:
   - `examples/extensions/subagent/`
   - `examples/extensions/plan-mode/`
+- leave interactive plan-mode widgets, browser confirmations, and persistent child-agent follow-up workflows to a later UI slice if they still prove necessary
 
 Then reinterpret `agentsAccess` as:
 
-- whether those extension-provided capabilities are active for the thread
+- whether Jolt’s Pi-era coordination tools are active for the thread
 
-This is much cheaper than trying to recreate Codex’s exact agent tool contract.
+This is much cheaper than trying to recreate Codex’s exact agent tool contract while still preserving the core “plan and delegate” workflow.
+
+### AG11 implementation status in `jt-ide`
+
+The first Pi-era agents-and-plan slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/pi-agents-tools.ts](../src/bun/pi-agents-tools.ts)
+- [src/bun/pi-agents-tools.test.ts](../src/bun/pi-agents-tools.test.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/mainview/controls/thread-access-control.tsx](../src/mainview/controls/thread-access-control.tsx)
+
+What the current implementation now does:
+
+- gives `agentsAccess=true` a real Pi-era meaning by installing a backend-owned coordination pack instead of leaving the toggle as placeholder compatibility state
+- keeps `update_plan` as an explicit plan-state tool with ordered step tracking and revisioned updates inside the live runtime
+- adds `delegate_task` as a bounded one-shot helper tool that runs an isolated Pi child session in process instead of depending on Pi’s TUI-oriented example extensions
+- runs delegated helpers under the same workspace binding, model resolution, provider registry, GitHub/Jolt tool access, and safe-vs-unsafe policy as the parent thread
+- deliberately excludes agent recursion from delegated helpers by not installing the agent-coordination pack inside child sessions
+- updates the runtime prompt and browser access-control copy so the visible `Agents` toggle now describes plan updates plus delegated helper tasks instead of an undefined Codex-era multi-agent surface
+
+What this still does not do yet:
+
+- it does not recreate Codex’s persistent child-agent lifecycle; there is still no Pi-era equivalent of `send_input`, `resume_agent`, `wait_agent`, or `close_agent`
+- it does not ship Pi’s interactive plan-mode UI, confirmation prompts, or widgets; that still belongs to the later browser-extension binding work in [12. Browser UI Bindings for Pi Extensions](#12-browser-ui-bindings-for-pi-extensions)
+- it does not persist plan state as a first-class Jolt record outside the current live runtime; the current implementation treats plan updates as runtime/session-level coordination state
+- it does not answer whether Jolt eventually wants richer fan-out, queued delegation, or human-in-the-loop task orchestration beyond this minimal contract
 
 ### 9. Cron Integration
 
