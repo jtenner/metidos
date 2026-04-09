@@ -5,7 +5,7 @@
 
 import type { CodexOptions } from "@openai/codex-sdk";
 
-import { codexModelProvider, normalizeStoredCodexModel } from "./model-catalog";
+import { codexModelApiId, codexModelProvider } from "./model-catalog";
 
 const XAI_API_BASE_URL = "https://api.x.ai/v1";
 const XAI_API_KEY_ENV_NAME = "XAI_API_KEY";
@@ -33,6 +33,7 @@ type ResolvedCodexConstructorInput = Omit<
 > & {
   config: CodexConstructorConfig;
   model: string;
+  requestedModel: string;
 };
 
 function asCodexConfigObject(
@@ -61,7 +62,12 @@ function finalizeCodexConstructorOptions(
 function buildDefaultCodexConstructorOptions(
   input: ResolvedCodexConstructorInput,
 ): CodexConstructorOptions {
-  const { config, model: _model, ...options } = input;
+  const {
+    config,
+    model: _model,
+    requestedModel: _requestedModel,
+    ...options
+  } = input;
   return finalizeCodexConstructorOptions(options, config);
 }
 
@@ -70,11 +76,16 @@ function buildXaiCodexConstructorOptions(
 ): CodexConstructorOptions {
   if (!process.env[XAI_API_KEY_ENV_NAME]?.trim()) {
     throw new Error(
-      `${XAI_API_KEY_ENV_NAME} is required to use the xAI model "${input.model}".`,
+      `${XAI_API_KEY_ENV_NAME} is required to use the xAI model "${input.requestedModel}".`,
     );
   }
 
-  const { config, model: _model, ...options } = input;
+  const {
+    config,
+    model: _model,
+    requestedModel: _requestedModel,
+    ...options
+  } = input;
   const modelProviders = asCodexConfigObject(config.model_providers);
 
   return finalizeCodexConstructorOptions(options, {
@@ -97,10 +108,7 @@ function buildXaiCodexConstructorOptions(
 const CODEX_CONSTRUCTOR_TRANSLATORS = {
   openai: buildDefaultCodexConstructorOptions,
   xai: buildXaiCodexConstructorOptions,
-} satisfies Record<
-  ReturnType<typeof codexModelProvider>,
-  CodexConstructorTranslator
->;
+} satisfies Record<"openai" | "xai", CodexConstructorTranslator>;
 
 /**
  * Translates provider/model selection plus generic inputs into exact Codex constructor options.
@@ -108,11 +116,22 @@ const CODEX_CONSTRUCTOR_TRANSLATORS = {
 export function buildCodexConstructorOptions(
   input: BuildCodexConstructorOptionsInput,
 ): CodexConstructorOptions {
-  const normalizedModel = normalizeStoredCodexModel(input.model);
+  const provider = codexModelProvider(input.model);
+  const modelId = codexModelApiId(input.model);
   const { config, model: _model, ...options } = input;
-  return CODEX_CONSTRUCTOR_TRANSLATORS[codexModelProvider(normalizedModel)]({
+  const translator =
+    provider === "openai" || provider === "xai"
+      ? CODEX_CONSTRUCTOR_TRANSLATORS[provider]
+      : null;
+  if (!translator) {
+    throw new Error(
+      `Legacy Codex constructor does not support provider "${provider}" for model "${modelId}".`,
+    );
+  }
+  return translator({
     ...options,
     config: config ?? {},
-    model: normalizedModel,
+    model: modelId,
+    requestedModel: input.model?.trim() || modelId,
   });
 }

@@ -94,10 +94,14 @@ sidecarLogger.trace({
   agentsAccess: agentsAccessContext,
   joltAccess: joltAccessContext,
 });
-const supportedCodexModels = buildModelCatalog()
-  .models.map((model) => model.id)
-  .join(", ");
-const supportedCodexModelsSentence = `Supported models: ${supportedCodexModels}.`;
+const supportedCodexModels = buildModelCatalog().models.reduce(
+  (countByGroup, model) => {
+    countByGroup.set(model.group, (countByGroup.get(model.group) ?? 0) + 1);
+    return countByGroup;
+  },
+  new Map<string, number>(),
+);
+const supportedCodexModelsSentence = `Supported models are loaded from the Pi-backed catalog across ${supportedCodexModels.size} provider groups.`;
 
 /** Description suffix when a thread id binding is present in environment. */
 function boundThreadSentence(): string {

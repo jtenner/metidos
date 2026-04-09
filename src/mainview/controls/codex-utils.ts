@@ -47,7 +47,15 @@ export function findCodexModel(
   models: RpcModelOption[],
   modelId: string,
 ): RpcModelOption | null {
-  return models.find((model) => model.id === modelId) ?? null;
+  const normalized = modelId.trim();
+  const exact = models.find((model) => model.id === normalized) ?? null;
+  if (exact) {
+    return exact;
+  }
+  if (!normalized || normalized.includes(":")) {
+    return null;
+  }
+  return models.find((model) => model.id.endsWith(`:${normalized}`)) ?? null;
 }
 
 /**

@@ -103,6 +103,7 @@ import {
 } from "./project-procedures/git-history";
 import {
   buildModelCatalog,
+  codexModelApiId,
   codexModelProvider,
   codexModelSupportsReasoningEffort,
   contextWindowTokensForModel,
@@ -967,9 +968,14 @@ export function buildCodexThreadOptions(
   reasoningEffort: RpcReasoningEffort,
   unsafeMode: boolean,
 ) {
+  const normalizedModel = model.trim();
+  const codexModel =
+    normalizeStoredCodexModel(normalizedModel) === normalizedModel
+      ? codexModelApiId(normalizedModel)
+      : normalizedModel;
   return {
     approvalPolicy: "never" as const,
-    model,
+    model: codexModel,
     ...(codexModelSupportsReasoningEffort(model)
       ? {
           modelReasoningEffort: reasoningEffort,
@@ -3440,6 +3446,7 @@ function buildCronJobDefaultDescription(
 function normalizeCronJobReasoningEffort(cronJob: CronJobRecord): RpcCronJob {
   return {
     ...cronJob,
+    model: normalizeStoredCodexModel(cronJob.model),
     unsafeMode: cronJob.unsafeMode === 1,
     reasoningEffort: normalizeStoredCodexReasoningEffort(
       cronJob.reasoningEffort,

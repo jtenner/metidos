@@ -72,9 +72,9 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements worktree snapshots, status/diff scanning, file content paging, history/log parsing, and commit diff retrieval.
 
 - `project-procedures/model-catalog.ts`
-  - Houses Codex model/effort catalog data used by model pickers and validation.
-  - Normalizes and validates configured model and reasoning effort values across OpenAI and xAI model ids.
-  - Tracks provider-specific metadata such as xAI routing and reasoning-effort support.
+  - Houses the Pi-backed model catalog used by model pickers, validation, and provider resolution.
+  - Builds a normalized multi-provider catalog from Pi `ModelRegistry`, emits canonical `provider:modelId` keys, and preserves legacy raw-id fallback for older thread rows.
+  - Tracks provider/model metadata such as reasoning support and context-window size.
   - Provides token-context utilities used for compaction/size logic.
 
 - `project-procedures/codex-constructor.ts`

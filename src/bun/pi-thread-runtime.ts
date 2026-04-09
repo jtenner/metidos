@@ -31,8 +31,8 @@ import {
   PI_RUNTIME_PROBE_RUNTIME_API_KEY,
 } from "./pi-runtime-probe";
 import {
+  codexModelApiId,
   codexModelProvider,
-  normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
 } from "./project-procedures/model-catalog";
 
@@ -254,8 +254,8 @@ function resolvePiModel(
   thread: PiRuntimeThread,
   modelRegistry: ModelRegistry,
 ): Model<Api> {
-  const normalizedModel = normalizeStoredCodexModel(thread.model);
-  const primaryProvider = codexModelProvider(normalizedModel);
+  const normalizedModel = codexModelApiId(thread.model);
+  const primaryProvider = codexModelProvider(thread.model);
   const providerCandidates =
     primaryProvider === "openai"
       ? ["openai", "openai-codex"]

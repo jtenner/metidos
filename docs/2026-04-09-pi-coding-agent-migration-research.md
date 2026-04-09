@@ -538,8 +538,35 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not expose Pi session branching or tree navigation in the Jolt UI
-- it does not replace Codex-specific model catalog assumptions
 - it does not remove Codex telemetry scraping or the legacy `codexThreadId` column yet
+
+### MD04 implementation status in `jt-ide`
+
+The first model-catalog replacement slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+
+What the current implementation now does:
+
+- replaces the hardcoded OpenAI/xAI model list with a Pi `ModelRegistry`-backed catalog
+- emits canonical provider-qualified model ids in the form `provider:modelId`
+- keeps legacy raw ids working by resolving them through provider preference and alias fallback
+- normalizes persisted thread and cron model ids onto the canonical catalog keys when they flow through RPC
+- derives provider, reasoning-capability, and context-window metadata from Pi instead of local source-code tables
+
+What this still does not do yet:
+
+- it does not redesign the frontend controls around explicit provider selection or auth availability
+- it does not expose per-model availability/auth state in the browser UI
+- it does not remove the remaining Codex-only constructor helpers or labels yet
 
 ### Why SDK first
 
@@ -657,6 +684,14 @@ Jolt should stop treating “model” as a flat string catalog owned by local so
 - group models by provider and family
 - map Jolt “reasoning effort” control to Pi “thinking level”
 - decide whether to expose only authenticated models or all known models with availability indicators
+
+This is now partially implemented in `jt-ide` as:
+
+- a Pi-backed backend catalog derived from `ModelRegistry`
+- canonical provider-qualified model ids persisted and surfaced through RPC
+- legacy raw-id fallback so pre-migration thread rows and tests still resolve
+
+The browser still needs a fuller Pi-native provider/model UX layer.
 
 ### Existing UI files affected
 

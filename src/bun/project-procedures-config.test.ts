@@ -11,7 +11,11 @@ import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
 import { buildCodexConstructorOptions } from "./project-procedures/codex-constructor";
-import { codexModelSupportsReasoningEffort } from "./project-procedures/model-catalog";
+import {
+  buildModelCatalog,
+  codexModelSupportsReasoningEffort,
+  resolveCodexModel,
+} from "./project-procedures/model-catalog";
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
@@ -270,6 +274,38 @@ describe("project procedure configuration helpers", () => {
     });
   });
 
+  it("builds a Pi-backed model catalog with canonical provider-qualified ids", () => {
+    const catalog = buildModelCatalog();
+
+    expect(catalog.defaultModel).toBe("openai:gpt-5.4");
+    expect(catalog.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          group: "OpenAI",
+          id: "openai:gpt-5.4",
+          label: "GPT-5.4",
+        }),
+        expect.objectContaining({
+          group: "Anthropic",
+          id: expect.stringMatching(/^anthropic:/u),
+        }),
+        expect.objectContaining({
+          group: "xAI",
+          id: expect.stringMatching(/^xai:/u),
+        }),
+      ]),
+    );
+  });
+
+  it("canonicalizes legacy raw model ids and alias ids through the Pi catalog", () => {
+    expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
+    expect(resolveCodexModel("openai:gpt-5.4")).toBe("openai:gpt-5.4");
+    expect(resolveCodexModel("grok-code-fast-1")).toBe("xai:grok-code-fast-1");
+    expect(resolveCodexModel("grok-4.20-reasoning")).toBe(
+      "xai:grok-4.20-0309-reasoning",
+    );
+  });
+
   it("builds danger-full-access thread options for xAI threads in unsafe mode", async () => {
     const procedures = await loadProjectProcedures();
 
@@ -283,6 +319,7 @@ describe("project procedure configuration helpers", () => {
     ).toEqual({
       approvalPolicy: "never",
       model: "grok-4.20-reasoning",
+      modelReasoningEffort: "high",
       networkAccessEnabled: true,
       sandboxMode: "danger-full-access",
       workingDirectory: "/repo/worktree",
@@ -302,6 +339,7 @@ describe("project procedure configuration helpers", () => {
     ).toEqual({
       approvalPolicy: "never",
       model: "grok-4.20-reasoning",
+      modelReasoningEffort: "high",
       networkAccessEnabled: false,
       sandboxMode: "workspace-write",
       workingDirectory: "/repo/worktree",
@@ -359,10 +397,8 @@ describe("project procedure configuration helpers", () => {
   it("tracks reasoning-effort support per provider model", () => {
     expect(codexModelSupportsReasoningEffort("gpt-5.4")).toBe(true);
     expect(codexModelSupportsReasoningEffort("grok-3-mini")).toBe(true);
-    expect(codexModelSupportsReasoningEffort("grok-code-fast-1")).toBe(false);
-    expect(codexModelSupportsReasoningEffort("grok-4.20-reasoning")).toBe(
-      false,
-    );
+    expect(codexModelSupportsReasoningEffort("grok-code-fast-1")).toBe(true);
+    expect(codexModelSupportsReasoningEffort("grok-4.20-reasoning")).toBe(true);
   });
 
   it("fails empty assistant completions instead of fabricating a reply", async () => {
