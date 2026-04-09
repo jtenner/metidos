@@ -26,6 +26,11 @@ import {
 } from "@mariozechner/pi-coding-agent";
 
 import { getAppDataDirectoryPath, type ThreadRecord } from "./db";
+import {
+  createPiGitHubCliHost,
+  createPiGitHubTools,
+  type PiGitHubToolHost,
+} from "./pi-github-tools";
 import { createPiJoltTools, type PiJoltToolHost } from "./pi-jolt-tools";
 import {
   createPiRuntimeProbeProviderConfig,
@@ -47,6 +52,7 @@ type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 type PiRuntimeThread = Pick<
   ThreadRecord,
+  | "githubAccess"
   | "id"
   | "joltAccess"
   | "model"
@@ -127,13 +133,26 @@ export function buildPiThreadToolPolicy(thread: {
 
 function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
   const toolPolicy = buildPiThreadToolPolicy(thread);
+  const customToolLines: string[] = [];
+  if (thread.githubAccess === true) {
+    customToolLines.push(
+      "GitHub-native tools are installed in this runtime: github_repo, github_issue, github_pr, github_pr_checks, and github_pr_diff.",
+    );
+  }
+  if (thread.joltAccess === true) {
+    customToolLines.push(
+      "Jolt-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
+    );
+  }
   return [
     `The current workspace root is ${thread.worktreePath}.`,
     "Operate only inside this workspace.",
     toolPolicy.runtimePromptLine,
-    thread.joltAccess
-      ? "Jolt-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread."
-      : "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
+    ...(customToolLines.length > 0
+      ? customToolLines
+      : [
+          "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
+        ]),
   ].join("\n");
 }
 
@@ -328,6 +347,7 @@ export async function createPiThreadRuntime(
   thread: PiRuntimeThread,
   options?: {
     appDataDir?: string;
+    githubToolHost?: PiGitHubToolHost;
     joltToolHost?: PiJoltToolHost;
   },
 ): Promise<PiThreadRuntime> {
@@ -372,7 +392,16 @@ export async function createPiThreadRuntime(
           thread.worktreePath,
         )
       : SessionManager.continueRecent(thread.worktreePath, sessionDirectory);
-  const customTools =
+  const githubTools =
+    thread.githubAccess === true
+      ? createPiGitHubTools(
+          {
+            worktreePathContext: thread.worktreePath,
+          },
+          options?.githubToolHost ?? createPiGitHubCliHost(thread.worktreePath),
+        )
+      : [];
+  const joltTools =
     thread.joltAccess === true
       ? (() => {
           if (!options?.joltToolHost) {
@@ -394,7 +423,7 @@ export async function createPiThreadRuntime(
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,
-    customTools,
+    customTools: [...githubTools, ...joltTools],
     cwd: thread.worktreePath,
     model,
     modelRegistry,

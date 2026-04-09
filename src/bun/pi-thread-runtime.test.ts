@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
+import type { PiGitHubToolHost } from "./pi-github-tools";
 import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
   buildPiAgentDirectoryPath,
@@ -15,6 +16,24 @@ import {
 
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
+const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const piGitHubToolHostStub: PiGitHubToolHost = {
+  getIssue: async () => {
+    throw new Error("getIssue should not run in this test.");
+  },
+  getPullRequest: async () => {
+    throw new Error("getPullRequest should not run in this test.");
+  },
+  getPullRequestChecks: async () => {
+    throw new Error("getPullRequestChecks should not run in this test.");
+  },
+  getPullRequestDiff: async () => {
+    throw new Error("getPullRequestDiff should not run in this test.");
+  },
+  getRepositoryContext: async () => {
+    throw new Error("getRepositoryContext should not run in this test.");
+  },
+};
 const piJoltToolHostStub: PiJoltToolHost = {
   createThread: async () => {
     throw new Error("createThread should not run in this test.");
@@ -63,6 +82,11 @@ function collectAssistantText(
 }
 
 afterEach(() => {
+  if (typeof originalAppDataDir === "string") {
+    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+  } else {
+    delete process.env.JOLT_APP_DATA_DIR;
+  }
   if (typeof originalPiRuntimeTestProvider === "string") {
     process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
       originalPiRuntimeTestProvider;
@@ -103,8 +127,10 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
     const safeRuntime = await createPiThreadRuntime(
       {
+        githubAccess: true,
         id: 17,
         joltAccess: true,
         model: "gpt-5.4",
@@ -116,6 +142,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       },
       {
         appDataDir,
+        githubToolHost: piGitHubToolHostStub,
         joltToolHost: piJoltToolHostStub,
       },
     );
@@ -130,6 +157,11 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "grep",
       "edit",
       "write",
+      "github_repo",
+      "github_issue",
+      "github_pr",
+      "github_pr_checks",
+      "github_pr_diff",
       "update_thread",
       "list_threads",
       "run_untrusted_js",
@@ -153,6 +185,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
     const resumedRuntime = await createPiThreadRuntime(
       {
+        githubAccess: true,
         id: 17,
         joltAccess: true,
         model: "gpt-5.4",
@@ -164,6 +197,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       },
       {
         appDataDir,
+        githubToolHost: piGitHubToolHostStub,
         joltToolHost: piJoltToolHostStub,
       },
     );
@@ -174,6 +208,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
     const unsafeRuntime = await createPiThreadRuntime(
       {
+        githubAccess: false,
         id: 18,
         joltAccess: false,
         model: "gpt-5.4",
@@ -219,8 +254,10 @@ test("reopens the persisted Pi session file instead of the most recent session",
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
     const initialRuntime = await createPiThreadRuntime(
       {
+        githubAccess: false,
         id: 21,
         joltAccess: false,
         model: "gpt-5.4",
@@ -265,6 +302,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
 
     const reopenedRuntime = await createPiThreadRuntime(
       {
+        githubAccess: false,
         id: 21,
         joltAccess: false,
         model: "gpt-5.4",

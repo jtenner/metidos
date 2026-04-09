@@ -139,7 +139,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#7ea6ff]"
               checked={value.githubAccess}
-              description="Allow GitHub tools when they become available."
+              description="Allow GitHub repo, issue, pull-request, checks, and diff tools scoped to the current repository."
               disabled={disabled}
               label="GitHub"
               onChange={(checked) => {

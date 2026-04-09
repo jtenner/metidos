@@ -501,7 +501,6 @@ What the current implementation now does:
 What the current implementation intentionally does not do yet:
 
 - it does not port Jolt MCP tools into Pi
-- it does not port GitHub tools into Pi
 - it does not expose agents/plan-mode parity
 - it does not restore `web_search` parity
 - it does not expose Pi branching/tree controls in the Jolt UI yet
@@ -853,7 +852,7 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not remove [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) because the Codex migration path is still incremental and the legacy runtime still exists
-- it does not port GitHub tools, sub-agent tools, or plan-mode tools; those remain separate migration slices
+- it does not port sub-agent tools or plan-mode tools; those remain separate migration slices
 - it does not package the Jolt tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
 - it does not add any new transcript kinds for these tools; they still flow through the existing `tool_call`, `command`, `reasoning`, and `chat` projection model described in [5. Transcript/Event Mapping](#5-transcriptevent-mapping)
 
@@ -1005,7 +1004,7 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not provide Codex-equivalent container, network, or host-isolation guarantees; safe mode is still a host-process tool policy
-- it does not wire the `GitHub` or `Agents` toggles to Pi-native tool packs yet; those remain later slices
+- it does not wire the `Agents` toggle to a Pi-native tool pack yet; that remains a later slice
 - it does not restrict safe mode down to read-only behavior; safe threads can still edit and write within the bound worktree by design
 - it does not solve the broader “real sandbox” question raised in this section, so a stricter model would still require additional infrastructure beyond Pi’s default tool surface
 
@@ -1036,6 +1035,34 @@ Option C: hybrid
 ### Recommendation
 
 If GitHub tools are important to the product, treat this as a first-class workstream, not an afterthought. Without it, the current `GitHub` access toggle loses meaning.
+
+### GH10 implementation status in `jt-ide`
+
+The first Pi-era GitHub integration slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/pi-github-tools.ts](../src/bun/pi-github-tools.ts)
+- [src/bun/pi-github-tools.test.ts](../src/bun/pi-github-tools.test.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/mainview/controls/thread-access-control.tsx](../src/mainview/controls/thread-access-control.tsx)
+
+What the current implementation now does:
+
+- chooses a `gh`-backed Pi-native GitHub tool pack instead of waiting for Codex GitHub parity
+- installs that tool pack only when a thread has `githubAccess=true`, so the existing GitHub toggle now has a real Pi-era meaning
+- scopes every GitHub tool to the repository that owns the current worktree instead of allowing arbitrary cross-repository access
+- uses `gh repo view` plus `gh api` for structured repository, issue, pull-request, check-status, and pull-request-diff reads
+- exposes Pi-native custom tools for `github_repo`, `github_issue`, `github_pr`, `github_pr_checks`, and `github_pr_diff`
+- keeps the implementation backend-owned and testable by separating the Pi tool definitions from the CLI-backed host adapter
+
+What this still does not do yet:
+
+- it does not provide write-side GitHub workflows such as posting issue comments, replying on review threads, labeling pull requests, or enabling auto-merge
+- it does not expose cross-repository GitHub operations; the current implementation is intentionally bound to the repository resolved from the current workspace
+- it does not cover Actions-log streaming or deeper workflow-debug helpers yet; those may still require additional `gh` wrappers or direct API calls
+- it does not replicate the full Codex GitHub app surface, so some historical GitHub workflows still remain future migration work
 
 ### 8. Agents and Plan Mode
 
