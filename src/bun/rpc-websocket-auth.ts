@@ -3,7 +3,7 @@
  * @description Module for rpc websocket auth.
  *
  * Upgrades are accepted when a valid session cookie (`jolt_session`) is present.
- * A short-lived websocket ticket cookie is optional compatibility hardening.
+ * A short-lived websocket ticket cookie is an optional authentication hardening path.
  */
 
 import {

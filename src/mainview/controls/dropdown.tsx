@@ -80,7 +80,7 @@ export function DropdownControl({
     setOpen((current) => !current);
   }, [canOpen]);
 
-  // Notify parent components of visibility changes for analytics/accessibility sync.
+  // Notify parent components when visibility changes so external state stays in sync.
   useEffect(() => {
     onOpenChange?.(open);
   }, [onOpenChange, open]);

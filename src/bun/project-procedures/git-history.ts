@@ -123,7 +123,7 @@ export function buildGitHistoryResultFromCache(
 }
 
 /**
- * Cancel active prefetch for a worktree and clear marker so future callers can start fresh.
+ * Cancel active prefetch for a worktree and clear marker so subsequent callers can start fresh.
  */
 export function abortGitHistoryPrefetch(
   worktreeState: WorktreeGitHistoryCacheState,
