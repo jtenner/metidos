@@ -13,7 +13,7 @@ type SettingsPanelProps = {
 };
 
 /**
- * Top-right settings trigger and placeholder panel for future app preferences.
+ * Top-right settings trigger and shell for app and workspace preferences.
  */
 export function SettingsPanel({ variant }: SettingsPanelProps): JSX.Element {
   const panelId = useId();
@@ -54,8 +54,9 @@ export function SettingsPanel({ variant }: SettingsPanelProps): JSX.Element {
               <span>Settings</span>
             </div>
             <p className="mt-2 text-xs leading-5 text-[#9fb5c4]">
-              No preferences are wired up yet, but this panel is now part of the
-              app shell so future settings have a stable home.
+              Preference surfaces are intentionally minimal today, and this
+              panel is the stable home for app and workspace settings as they
+              are introduced.
             </p>
           </div>
 
@@ -70,7 +71,7 @@ export function SettingsPanel({ variant }: SettingsPanelProps): JSX.Element {
                 <span>Application preferences</span>
               </div>
               <span className="rounded-full border border-[#365264] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb5cd]">
-                Soon
+                Planned
               </span>
             </div>
 
@@ -80,7 +81,7 @@ export function SettingsPanel({ variant }: SettingsPanelProps): JSX.Element {
                 <span>Thread defaults</span>
               </div>
               <span className="rounded-full border border-[#365264] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb5cd]">
-                Soon
+                Planned
               </span>
             </div>
 
@@ -90,7 +91,7 @@ export function SettingsPanel({ variant }: SettingsPanelProps): JSX.Element {
                 <span>Profile and workspace options</span>
               </div>
               <span className="rounded-full border border-[#365264] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb5cd]">
-                Soon
+                Planned
               </span>
             </div>
           </div>

@@ -13,7 +13,7 @@ Provides contextual action menus (`ProjectActionMenu`, `ThreadActionMenu`) used 
 Renders the step-up confirmation dialog used when a privileged action requires a fresh primary-factor plus TOTP re-check.
 
 `settings-panel.tsx`
-Renders the top-right settings trigger and its placeholder popover so application and workspace preferences have a stable home in the shell.
+Renders the top-right settings trigger and settings shell for app and workspace preferences.
 
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.
