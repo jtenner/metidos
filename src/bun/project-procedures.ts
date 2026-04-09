@@ -76,6 +76,7 @@ import {
   readWorktreeSnapshot,
   runGitCommand,
 } from "./git";
+import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
   createPiThreadRuntime,
   type PiThreadRuntime,
@@ -1119,10 +1120,51 @@ async function ensurePiThreadRuntime(
     return active;
   }
 
-  const next = await createPiThreadRuntime(thread);
+  const next = await createPiThreadRuntime(thread, {
+    joltToolHost: createPiJoltToolHost(),
+  });
   piThreadRuntimeMap.set(thread.id, next);
   syncPiThreadSessionState(thread, next);
   return next;
+}
+
+function createPiToolRequestContext(
+  signal?: AbortSignal,
+): RpcRequestContext | undefined {
+  if (!signal) {
+    return undefined;
+  }
+
+  return {
+    auth: {
+      authBypass: false,
+      sessionId: null,
+    },
+    priority: "foreground",
+    signal,
+    timeoutMs: null,
+  };
+}
+
+function createPiJoltToolHost(): PiJoltToolHost {
+  return {
+    createThread: (params) => createThreadProcedure(params),
+    focusContext: (params, signal) =>
+      focusContextProcedure(params, createPiToolRequestContext(signal)),
+    listCrons: () => listCronsProcedure(undefined),
+    listProjectWorktrees: (params, signal) =>
+      listProjectWorktreesProcedure(
+        params,
+        createPiToolRequestContext(signal),
+      ).then((result) => result.worktrees),
+    listProjects: () => listProjectsProcedure(),
+    listThreads: () => listThreadsProcedure(),
+    newCron: (params) => newCronProcedure(params),
+    requestThreadStart: (params) => requestThreadStartProcedure(params),
+    sendThreadMessage: (params) => sendThreadMessageProcedure(params),
+    updateCron: (params) => updateCronProcedure(params),
+    updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
+  };
 }
 
 function syncPiThreadSessionState(

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
-
+import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
   buildPiAgentDirectoryPath,
   buildPiThreadSessionDirectoryPath,
@@ -14,6 +14,33 @@ import {
 
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
+const piJoltToolHostStub: PiJoltToolHost = {
+  createThread: async () => {
+    throw new Error("createThread should not run in this test.");
+  },
+  focusContext: async () => {
+    throw new Error("focusContext should not run in this test.");
+  },
+  listCrons: async () => [],
+  listProjectWorktrees: async () => [],
+  listProjects: async () => [],
+  listThreads: async () => [],
+  newCron: async () => {
+    throw new Error("newCron should not run in this test.");
+  },
+  requestThreadStart: async () => {
+    throw new Error("requestThreadStart should not run in this test.");
+  },
+  sendThreadMessage: async () => {
+    throw new Error("sendThreadMessage should not run in this test.");
+  },
+  updateCron: async () => {
+    throw new Error("updateCron should not run in this test.");
+  },
+  updateThreadMetadata: async () => {
+    throw new Error("updateThreadMetadata should not run in this test.");
+  },
+};
 
 function collectAssistantText(
   runtime: Awaited<ReturnType<typeof createPiThreadRuntime>>,
@@ -55,14 +82,17 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     const safeRuntime = await createPiThreadRuntime(
       {
         id: 17,
+        joltAccess: true,
         model: "gpt-5.4",
         piSessionFile: null,
+        projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,
       },
       {
         appDataDir,
+        joltToolHost: piJoltToolHostStub,
       },
     );
 
@@ -76,6 +106,14 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "grep",
       "edit",
       "write",
+      "update_thread",
+      "list_threads",
+      "run_untrusted_js",
+      "set_context",
+      "list_crons",
+      "new_cron",
+      "update_cron",
+      "new_thread",
     ]);
 
     const streamed = collectAssistantText(safeRuntime);
@@ -92,14 +130,17 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     const resumedRuntime = await createPiThreadRuntime(
       {
         id: 17,
+        joltAccess: true,
         model: "gpt-5.4",
         piSessionFile: null,
+        projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,
       },
       {
         appDataDir,
+        joltToolHost: piJoltToolHostStub,
       },
     );
 
@@ -110,8 +151,10 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     const unsafeRuntime = await createPiThreadRuntime(
       {
         id: 18,
+        joltAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
+        projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 1,
         worktreePath: workspaceDir,
@@ -155,8 +198,10 @@ test("reopens the persisted Pi session file instead of the most recent session",
     const initialRuntime = await createPiThreadRuntime(
       {
         id: 21,
+        joltAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
+        projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,
@@ -197,8 +242,10 @@ test("reopens the persisted Pi session file instead of the most recent session",
     const reopenedRuntime = await createPiThreadRuntime(
       {
         id: 21,
+        joltAccess: false,
         model: "gpt-5.4",
         piSessionFile: initialSessionFile,
+        projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
         worktreePath: workspaceDir,

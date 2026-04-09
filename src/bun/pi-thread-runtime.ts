@@ -26,6 +26,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 
 import { getAppDataDirectoryPath, type ThreadRecord } from "./db";
+import { createPiJoltTools, type PiJoltToolHost } from "./pi-jolt-tools";
 import {
   createPiRuntimeProbeProviderConfig,
   PI_RUNTIME_PROBE_RUNTIME_API_KEY,
@@ -47,8 +48,10 @@ type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 type PiRuntimeThread = Pick<
   ThreadRecord,
   | "id"
+  | "joltAccess"
   | "model"
   | "piSessionFile"
+  | "projectId"
   | "reasoningEffort"
   | "unsafeMode"
   | "worktreePath"
@@ -103,7 +106,9 @@ function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
     thread.unsafeMode === 1
       ? "Unsafe mode is enabled. Bash is available, but stay within the workspace unless the user explicitly asks for broader host access."
       : "Unsafe mode is disabled. Bash is unavailable. Use the installed file and search tools inside the workspace instead.",
-    "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
+    thread.joltAccess
+      ? "Jolt-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread."
+      : "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
   ].join("\n");
 }
 
@@ -298,6 +303,7 @@ export async function createPiThreadRuntime(
   thread: PiRuntimeThread,
   options?: {
     appDataDir?: string;
+    joltToolHost?: PiJoltToolHost;
   },
 ): Promise<PiThreadRuntime> {
   const agentDirectory = buildPiAgentDirectoryPath(options?.appDataDir);
@@ -340,9 +346,28 @@ export async function createPiThreadRuntime(
           thread.worktreePath,
         )
       : SessionManager.continueRecent(thread.worktreePath, sessionDirectory);
+  const customTools =
+    thread.joltAccess === true
+      ? (() => {
+          if (!options?.joltToolHost) {
+            throw new Error(
+              `Pi runtime for thread ${thread.id} requires a Jolt tool host while joltAccess is enabled.`,
+            );
+          }
+          return createPiJoltTools(
+            {
+              projectIdContext: thread.projectId,
+              threadIdContext: thread.id,
+              worktreePathContext: thread.worktreePath,
+            },
+            options.joltToolHost,
+          );
+        })()
+      : [];
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,
+    customTools,
     cwd: thread.worktreePath,
     model,
     modelRegistry,

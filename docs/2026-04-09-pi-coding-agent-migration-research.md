@@ -274,6 +274,8 @@ Pi’s philosophy is the opposite:
 
 This means a Pi migration should **remove** the Jolt MCP bridge as a runtime dependency for Jolt’s own agent. It should port that behavior into Pi-native tools/extensions instead.
 
+This is now partially implemented in `jt-ide`. See [JT08 implementation status in `jt-ide`](#jt08-implementation-status-in-jt-ide).
+
 ### No built-in GitHub connector
 
 Current Jolt relies on Codex’s GitHub app/tool surface and threads can toggle that surface on/off:
@@ -823,6 +825,35 @@ Likely split:
 - Pi’s own philosophy is extension/tool-first, not MCP-first
 - Jolt no longer needs a second protocol bridge to talk to itself
 - thread access control can be implemented by deciding which Pi tools/extensions are active, instead of by injecting an MCP server conditionally
+
+### JT08 implementation status in `jt-ide`
+
+The first Jolt-tool porting slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/pi-jolt-tools.test.ts](../src/bun/pi-jolt-tools.test.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+
+What the current implementation now does:
+
+- adds Pi-native custom tools for `update_thread`, `list_threads`, `run_untrusted_js`, `set_context`, `list_crons`, `new_cron`, `update_cron`, and `new_thread`
+- installs that tool pack only when a thread has `joltAccess=true`, so the existing Jolt access toggle now has a real Pi-era meaning
+- routes those Pi tool calls directly into the existing backend procedure layer through an in-process host adapter instead of going through websocket RPC plus a self-hosted MCP sidecar
+- reuses the current scope-enforcement helpers so bound threads cannot escape their current project/worktree when they list threads, move UI context, or create new cron/thread work
+- preserves the current metadata semantics for `update_thread`, including ignoring in-thread access-control changes and routing summary/title normalization through the authoritative backend helper
+- preserves the current `new_thread` split between “request permission first” and “create immediately” behavior, including the explicit `requestThreadStart(...)` path when `autoStart=true` and `unsafeMode` is still off
+- keeps the vm2-backed untrusted JS runner available as a Pi tool without expanding its filesystem reach beyond the bound worktree
+
+What this still does not do yet:
+
+- it does not remove [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) because the Codex migration path is still incremental and the legacy runtime still exists
+- it does not port GitHub tools, sub-agent tools, or plan-mode tools; those remain separate migration slices
+- it does not package the Jolt tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
+- it does not add any new transcript kinds for these tools; they still flow through the existing `tool_call`, `command`, `reasoning`, and `chat` projection model described in [5. Transcript/Event Mapping](#5-transcriptevent-mapping)
 
 ### 5. Transcript/Event Mapping
 
