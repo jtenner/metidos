@@ -101,7 +101,6 @@ export type RpcAppBootstrapHint = {
 
 export type RpcOpenWorktreeResult = {
   project: RpcProject;
-  tasks: RpcProjectTask[];
   worktree: RpcWorktreeSnapshot;
   history: RpcWorktreeGitHistoryResult;
 };
@@ -124,20 +123,6 @@ export type RpcDirectorySuggestionsResult = {
 export type RpcCreateWorktreeResult = {
   project: RpcProject;
   worktrees: RpcWorktree[];
-  worktreePath: string;
-};
-
-export type RpcProjectTask = {
-  id: string;
-  kind: "file" | "script";
-  path: string;
-  title: string;
-  scriptName?: string | null;
-  command?: string | null;
-};
-
-export type RpcWorktreeTasksChanged = {
-  projectId: number;
   worktreePath: string;
 };
 
@@ -538,10 +523,6 @@ export type AppRPCSchema = {
       params: { projectId: number };
       response: RpcProjectWorktreesResult;
     };
-    listProjectTasks: {
-      params: { projectId: number; worktreePath: string };
-      response: RpcProjectTask[];
-    };
     createWorktree: {
       params: { projectId: number; name: string };
       response: RpcCreateWorktreeResult;
@@ -722,21 +703,6 @@ export type AppRPCSchema = {
       params: { threadId: number };
       response: RpcThreadDetail;
     };
-    runProjectTask: {
-      params: {
-        projectId: number;
-        worktreePath: string;
-        task: RpcProjectTask;
-        threadId?: number | null;
-        model?: string | null;
-        reasoningEffort?: RpcCodexReasoningEffort | null;
-        githubAccess?: boolean | null;
-        agentsAccess?: boolean | null;
-        joltAccess?: boolean | null;
-        unsafeMode?: boolean | null;
-      };
-      response: RpcThreadDetail;
-    };
     updateThreadAccess: {
       params: {
         threadId: number;
@@ -844,10 +810,6 @@ export interface ProjectProcedures {
     AppRPCSchema["requests"]["listProjectWorktrees"]["params"],
     RpcProjectWorktreesResult
   >;
-  listProjectTasks: RpcProcedureCall<
-    AppRPCSchema["requests"]["listProjectTasks"]["params"],
-    AppRPCSchema["requests"]["listProjectTasks"]["response"]
-  >;
   createWorktree: RpcProcedureCall<
     AppRPCSchema["requests"]["createWorktree"]["params"],
     RpcCreateWorktreeResult
@@ -927,10 +889,6 @@ export interface ProjectProcedures {
   stopThreadTurn: RpcProcedureCall<
     AppRPCSchema["requests"]["stopThreadTurn"]["params"],
     AppRPCSchema["requests"]["stopThreadTurn"]["response"]
-  >;
-  runProjectTask: RpcProcedureCall<
-    AppRPCSchema["requests"]["runProjectTask"]["params"],
-    AppRPCSchema["requests"]["runProjectTask"]["response"]
   >;
   newCron: RpcProcedureCall<
     AppRPCSchema["requests"]["newCron"]["params"],

@@ -603,12 +603,12 @@ describe("auth service", () => {
 
     expect(() =>
       requireFreshStepUp(database, {
-        actionDescription: "run project tasks",
+        actionDescription: "delete a project",
         nowMs: nowMs + 1_000,
         sessionId: setupResult.session.id,
       }),
     ).toThrow(
-      "A fresh step-up authentication is required to run project tasks.",
+      "A fresh step-up authentication is required to delete a project.",
     );
 
     const stepUpResult = await stepUpSession(database, {
@@ -624,7 +624,7 @@ describe("auth service", () => {
 
     expect(
       requireFreshStepUp(database, {
-        actionDescription: "run project tasks",
+        actionDescription: "delete a project",
         nowMs: nowMs + 3_000,
         sessionId: setupResult.session.id,
       }).id,
@@ -632,12 +632,12 @@ describe("auth service", () => {
 
     expect(() =>
       requireFreshStepUp(database, {
-        actionDescription: "run project tasks",
+        actionDescription: "delete a project",
         nowMs: nowMs + DEFAULT_STEP_UP_LIFETIME_MS + 3_000,
         sessionId: setupResult.session.id,
       }),
     ).toThrow(
-      "A fresh step-up authentication is required to run project tasks.",
+      "A fresh step-up authentication is required to delete a project.",
     );
   });
 

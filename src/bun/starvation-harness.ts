@@ -8,7 +8,6 @@ import { basename, resolve } from "node:path";
 import type {
   AppRPCSchema,
   RpcProject,
-  RpcProjectTask,
   RpcRequestPriority,
   RpcWorktree,
 } from "./rpc-schema";
@@ -34,8 +33,6 @@ type HarnessOptions = {
   rpcPort: number | null;
   rpcUrl: string | null;
   startupBudgetMs: number;
-  taskId: string | null;
-  taskRuns: number;
   warmupMs: number;
   workers: number;
   worktreePath: string | null;
@@ -97,8 +94,6 @@ type HarnessContext = {
   project: RpcProject;
   projectWasCreated: boolean;
   projectWasInitiallyOpen: boolean;
-  task: RpcProjectTask | null;
-  taskThreadIds: number[];
   worktree: RpcWorktree;
 };
 
@@ -109,8 +104,6 @@ const DEFAULT_RPC_BUDGET_MS = 5_000;
 const DEFAULT_STARTUP_BUDGET_MS = 12_000;
 const DEFAULT_WARMUP_MS = 300;
 const DEFAULT_WORKER_COUNT = 3;
-const DEFAULT_TASK_RUNS = 1;
-const SAFE_TASK_SCRIPT_NAMES = ["validate", "typecheck", "build:dev", "format"];
 
 /**
  * Lightweight websocket JSON-RPC request/response client used by the harness.
@@ -273,8 +266,6 @@ function parseArgs(argv: string[]): HarnessOptions {
     rpcPort: null,
     rpcUrl: null,
     startupBudgetMs: DEFAULT_STARTUP_BUDGET_MS,
-    taskId: null,
-    taskRuns: DEFAULT_TASK_RUNS,
     warmupMs: DEFAULT_WARMUP_MS,
     workers: DEFAULT_WORKER_COUNT,
     worktreePath: null,
@@ -324,9 +315,6 @@ function parseArgs(argv: string[]): HarnessOptions {
       case "--worktree-path":
         options.worktreePath = resolve(readValue());
         break;
-      case "--task-id":
-        options.taskId = readValue();
-        break;
       case "--duration-ms":
         options.durationMs = parseIntegerOption(flag, readValue(), 1);
         break;
@@ -344,9 +332,6 @@ function parseArgs(argv: string[]): HarnessOptions {
         break;
       case "--workers":
         options.workers = parseIntegerOption(flag, readValue(), 1);
-        break;
-      case "--task-runs":
-        options.taskRuns = parseIntegerOption(flag, readValue(), 0);
         break;
       default:
         throw new Error(`Unknown option: ${flag}`);
@@ -386,8 +371,6 @@ Options:
   --project-id <id>             Existing tracked project id to target.
   --project-path <path>         Project path to target. Default: current working directory.
   --worktree-path <path>        Worktree path to target. Default: inferred from project/worktrees.
-  --task-id <id>                Specific project task id to run for pressure.
-  --task-runs <count>           Number of task runs to start. Default: ${DEFAULT_TASK_RUNS}
   --workers <count>             Background pressure workers. Default: ${DEFAULT_WORKER_COUNT}
   --duration-ms <ms>            Pressure window. Default: ${DEFAULT_DURATION_MS}
   --warmup-ms <ms>              Delay before startup measurement. Default: ${DEFAULT_WARMUP_MS}
@@ -525,35 +508,7 @@ async function measureRpc<K extends RpcMethodName>(
   }
 }
 /**
- * Performs choosePreferredTask operation.
- * @param tasks - tasks argument for choosePreferredTask.
- * @param requestedTaskId - requestedTaskId identifier.
- */
-
-function choosePreferredTask(
-  tasks: RpcProjectTask[],
-  requestedTaskId: string | null,
-): RpcProjectTask | null {
-  if (requestedTaskId) {
-    return tasks.find((task) => task.id === requestedTaskId) ?? null;
-  }
-
-  for (const scriptName of SAFE_TASK_SCRIPT_NAMES) {
-    const task =
-      tasks.find(
-        (candidate) =>
-          candidate.kind === "script" && candidate.scriptName === scriptName,
-      ) ?? null;
-    if (task) {
-      return task;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Build/resolve project, worktree, and task context prior to running measurements.
+ * Build/resolve project and worktree context prior to running measurements.
  */
 
 async function ensureHarnessContext(
@@ -607,74 +562,12 @@ async function ensureHarnessContext(
     throw new Error(`No worktrees available for project ${project.path}.`);
   }
 
-  const tasks = await client.call(
-    "listProjectTasks",
-    {
-      projectId: project.id,
-      worktreePath: worktree.path,
-    },
-    {
-      priority: "foreground",
-      timeoutMs: options.rpcBudgetMs,
-    },
-  );
-
   return {
     project,
     projectWasCreated,
     projectWasInitiallyOpen,
-    task: choosePreferredTask(tasks, options.taskId),
-    taskThreadIds: [],
     worktree,
   };
-}
-
-/**
- * Optionally create background tasks to produce active thread pressure.
- */
-
-async function startProjectTaskPressure(
-  client: RpcHarnessClient,
-  context: HarnessContext,
-  options: HarnessOptions,
-): Promise<void> {
-  if (!context.task || options.taskRuns < 1) {
-    return;
-  }
-
-  for (let index = 0; index < options.taskRuns; index += 1) {
-    const created = await client.call(
-      "createThread",
-      {
-        model: null,
-        projectId: context.project.id,
-        reasoningEffort: null,
-        unsafeMode: null,
-        worktreePath: context.worktree.path,
-      },
-      {
-        priority: "background",
-        timeoutMs: options.rpcBudgetMs,
-      },
-    );
-    context.taskThreadIds.push(created.thread.id);
-    await client.call(
-      "runProjectTask",
-      {
-        model: null,
-        projectId: context.project.id,
-        reasoningEffort: null,
-        task: context.task,
-        threadId: created.thread.id,
-        unsafeMode: null,
-        worktreePath: context.worktree.path,
-      },
-      {
-        priority: "background",
-        timeoutMs: options.rpcBudgetMs,
-      },
-    );
-  }
 }
 
 /**
@@ -697,17 +590,6 @@ async function runPressureWorker(
     try {
       const opened = await client.call(
         "openWorktree",
-        {
-          projectId: context.project.id,
-          worktreePath: context.worktree.path,
-        },
-        {
-          priority: "background",
-          timeoutMs: options.rpcBudgetMs,
-        },
-      );
-      await client.call(
-        "listProjectTasks",
         {
           projectId: context.project.id,
           worktreePath: context.worktree.path,
@@ -829,40 +711,6 @@ async function cleanupHarness(
   client: RpcHarnessClient,
   context: HarnessContext,
 ): Promise<void> {
-  for (const threadId of context.taskThreadIds) {
-    try {
-      const detail = await client.call(
-        "getThread",
-        { threadId },
-        {
-          priority: "foreground",
-          timeoutMs: 2_000,
-        },
-      );
-      if (detail.thread.runStatus.state === "working") {
-        await client.call(
-          "stopThreadTurn",
-          { threadId },
-          {
-            priority: "foreground",
-            timeoutMs: 2_000,
-          },
-        );
-        await waitForThreadIdle(client, threadId, 4_000);
-      }
-      await client.call(
-        "deleteThread",
-        { threadId },
-        {
-          priority: "foreground",
-          timeoutMs: 2_000,
-        },
-      );
-    } catch {
-      // Ignore cleanup failures so benchmark timing and assertions remain authoritative.
-    }
-  }
-
   if (context.projectWasCreated) {
     try {
       await client.call(
@@ -892,32 +740,6 @@ async function cleanupHarness(
     } catch {
       // Ignore cleanup failures.
     }
-  }
-}
-
-/**
- * Poll thread state until not working or timeout elapses.
- */
-
-async function waitForThreadIdle(
-  client: RpcHarnessClient,
-  threadId: number,
-  timeoutMs: number,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const detail = await client.call(
-      "getThread",
-      { threadId },
-      {
-        priority: "foreground",
-        timeoutMs: 2_000,
-      },
-    );
-    if (detail.thread.runStatus.state !== "working") {
-      return;
-    }
-    await sleep(150);
   }
 }
 
@@ -1063,7 +885,6 @@ function printStartupSummary(
   console.log(`  rpc: ${rpcUrl}`);
   console.log(`  project: ${context.project.name} (#${context.project.id})`);
   console.log(`  worktree: ${context.worktree.path}`);
-  console.log(`  task: ${context.task?.id ?? "none"}`);
   console.log("");
   console.log("HTTP");
   for (const result of startup.http) {
@@ -1127,7 +948,6 @@ async function main(): Promise<void> {
 
   try {
     const context = await ensureHarnessContext(controlClient, options);
-    await startProjectTaskPressure(controlClient, context, options);
 
     const pressureWorkers = Array.from({ length: options.workers }, () =>
       runPressureWorker(

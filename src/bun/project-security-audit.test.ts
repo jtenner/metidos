@@ -15,7 +15,6 @@ import {
 import {
   recordCrossWorkspaceThreadAuditEvent,
   recordProjectDeletedAuditEvent,
-  recordProjectTaskQueuedAuditEvent,
 } from "./project-security-audit";
 
 const openDatabases = new Set<Database>();
@@ -80,50 +79,6 @@ describe("project security audit helpers", () => {
     expect(events[0]?.payloadJson).toContain(
       '"currentWorktreePath":"/repo/feature-a"',
     );
-  });
-
-  it("records queued project-task executions with thread context", () => {
-    const database = createTestDatabase();
-    const project = upsertProject(database, {
-      name: "Repo",
-      projectPath: "/repo",
-    });
-    const thread = createThread(database, {
-      codexThreadId: null,
-      agentsAccess: false,
-      githubAccess: false,
-      model: "gpt-5",
-      projectId: project.id,
-      reasoningEffort: "medium",
-      title: "Task thread",
-      joltAccess: true,
-      unsafeMode: true,
-      worktreePath: "/repo",
-    });
-
-    recordProjectTaskQueuedAuditEvent(database, {
-      createdThread: false,
-      params: {
-        projectId: project.id,
-        task: {
-          command: "bun test",
-          id: "task-1",
-          kind: "script",
-          path: "/repo/package.json",
-          scriptName: "test",
-          title: "test",
-        },
-        threadId: thread.id,
-        worktreePath: "/repo",
-      },
-      thread,
-    });
-
-    const event = listSecurityAuditEvents(database)[0];
-    expect(event?.eventType).toBe("project_task_queued");
-    expect(event?.threadId).toBe(thread.id);
-    expect(event?.payloadJson).toContain('"taskKind":"script"');
-    expect(event?.payloadJson).toContain('"unsafeMode":true');
   });
 
   it("records project deletions with the affected project metadata", () => {

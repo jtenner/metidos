@@ -34,19 +34,19 @@ describe("security audit CLI helpers", () => {
     const output = formatSecurityAuditEventsForCli([
       {
         createdAt: "2026-04-03T12:00:00.000Z",
-        eventType: "project_task_queued",
+        eventType: "project_deleted",
         id: 1,
         payload: {
-          taskKind: "script",
+          projectName: "Repo",
         },
         projectId: 4,
-        summaryText: "Queued a project task for Codex execution.",
+        summaryText: "Deleted project Repo.",
         threadId: 9,
         worktreePath: "/repo",
       },
     ]);
 
-    expect(output).toContain("[2026-04-03T12:00:00.000Z] project_task_queued");
+    expect(output).toContain("[2026-04-03T12:00:00.000Z] project_deleted");
     expect(output).toContain("project: 4");
     expect(output).toContain("thread: 9");
     expect(output).toContain("payload:");

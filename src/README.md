@@ -6,7 +6,7 @@ Source code for both halves of this repository:
 
 ## `src/bun`
 
-Holds backend orchestration and server entry logic that powers local project/task/thread workflows.
+Holds backend orchestration and server entry logic that powers local project and thread workflows.
 
 - `codex-sidecar-mcp.ts`
   - Sidecar MCP configuration used by Codex tooling.
@@ -41,7 +41,7 @@ Holds backend orchestration and server entry logic that powers local project/tas
 
 ### `src/bun/project-procedures/`
 
-Specialized procedure modules with smaller responsibilities for project-level tasks and metadata operations.
+Specialized procedure modules with smaller responsibilities for project metadata, history, and thread operations.
 
 - `codex-catalog.ts`
   - Loads/manages Codex model catalog data and metadata.
@@ -49,8 +49,6 @@ Specialized procedure modules with smaller responsibilities for project-level ta
   - Project root and directory suggestion helpers.
 - `git-history.ts`
   - Git history retrieval and transformation logic.
-- `project-tasks.ts`
-  - Discovery and handling of project-level task scripts/work items.
 - `shared.ts`
   - Shared utility helpers used by multiple procedure modules.
 - `thread-detail.ts`

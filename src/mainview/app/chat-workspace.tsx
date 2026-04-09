@@ -25,12 +25,10 @@ import type {
   RpcCodexModelOption,
   RpcCodexReasoningEffort,
   RpcCodexReasoningEffortOption,
-  RpcProjectTask,
 } from "../../bun/rpc-schema";
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
-import { ProjectTaskSelector } from "../controls/project-task-selector";
 import { ReasoningEffortSelector } from "../controls/reasoning-effort-selector";
 import {
   ThreadAccessControl,
@@ -61,22 +59,17 @@ type SharedChatControlsProps = {
   composerDisabled: boolean;
   hasSelectedThread: boolean;
   initialChatInput: string;
-  isLoadingProjectTasks: boolean;
   isWorking: boolean;
   modelControlError: string;
   modelSelectorDisabled: boolean;
   onChangeModel: (value: string) => void;
   onChangeReasoningEffort: (value: RpcCodexReasoningEffort) => void;
   onChangeThreadAccess: (value: ThreadAccessValue) => void;
-  onSelectTask: (task: RpcProjectTask) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmitMessage: () => void;
-  projectTasks: RpcProjectTask[];
   reasoningEffortControlError: string;
   reasoningEffortSelectorDisabled: boolean;
   reasoningEfforts: RpcCodexReasoningEffortOption[];
-  taskControlError: string;
-  taskSelectorDisabled: boolean;
   threadAccessControlError: string;
   threadAccessControlDisabled: boolean;
   threadAccessValue: ThreadAccessValue;
@@ -1153,7 +1146,7 @@ type DesktopChatViewProps = SharedChatControlsProps & {
 };
 
 /**
- * Main desktop chat experience: transcript, model/reasoning/task controls, and composer.
+ * Main desktop chat experience: transcript, model/reasoning controls, and composer.
  */
 export function DesktopChatView({
   activeCodexModel,
@@ -1171,7 +1164,6 @@ export function DesktopChatView({
   expandedItemIds,
   hasSelectedThread,
   initialChatInput,
-  isLoadingProjectTasks,
   isWorking,
   localUserLabel,
   messages,
@@ -1180,17 +1172,13 @@ export function DesktopChatView({
   onChangeModel,
   onChangeReasoningEffort,
   onChangeThreadAccess,
-  onSelectTask,
   onSubmit,
   onSubmitMessage,
   onToggleItemExpanded,
-  projectTasks,
   reasoningEffortControlError,
   reasoningEffortSelectorDisabled,
   reasoningEfforts,
   selectedThreadIsWorking,
-  taskControlError,
-  taskSelectorDisabled,
   threadAccessControlError,
   threadAccessControlDisabled,
   threadAccessValue,
@@ -1249,13 +1237,6 @@ export function DesktopChatView({
                 variant="desktop"
               />
             </div>
-            <ProjectTaskSelector
-              tasks={projectTasks}
-              loading={isLoadingProjectTasks}
-              disabled={taskSelectorDisabled}
-              onSelect={onSelectTask}
-              variant="desktop"
-            />
             <ThreadAccessControl
               disabled={threadAccessControlDisabled}
               onChange={onChangeThreadAccess}
@@ -1276,11 +1257,6 @@ export function DesktopChatView({
           {reasoningEffortControlError ? (
             <div className="mt-2 text-xs text-[#ff6e84]">
               {reasoningEffortControlError}
-            </div>
-          ) : null}
-          {taskControlError ? (
-            <div className="mt-2 text-xs text-[#ff6e84]">
-              {taskControlError}
             </div>
           ) : null}
           {threadAccessControlError ? (
@@ -1347,7 +1323,6 @@ export function MobileChatView({
   expandedItemIds,
   hasSelectedThread,
   initialChatInput,
-  isLoadingProjectTasks,
   isWorking,
   localUserLabel,
   messages,
@@ -1356,17 +1331,13 @@ export function MobileChatView({
   onChangeModel,
   onChangeReasoningEffort,
   onChangeThreadAccess,
-  onSelectTask,
   onSubmit,
   onSubmitMessage,
   onToggleItemExpanded,
-  projectTasks,
   reasoningEffortControlError,
   reasoningEffortSelectorDisabled,
   reasoningEfforts,
   selectedThreadIsWorking,
-  taskControlError,
-  taskSelectorDisabled,
   threadAccessControlError,
   threadAccessControlDisabled,
   threadAccessValue,
@@ -1454,7 +1425,7 @@ export function MobileChatView({
           <div className="overflow-visible border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
             <div className="border-b border-[#313a40] px-2 py-2">
               <div className="flex items-center gap-2">
-                <div className="min-w-0 w-1/2">
+                <div className="min-w-0 flex-1">
                   <CodexModelSelector
                     models={codexModels}
                     value={activeCodexModel}
@@ -1467,16 +1438,7 @@ export function MobileChatView({
                     variant="mobile"
                   />
                 </div>
-                <div className="flex min-w-0 w-1/2 items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <ProjectTaskSelector
-                      tasks={projectTasks}
-                      loading={isLoadingProjectTasks}
-                      disabled={taskSelectorDisabled}
-                      onSelect={onSelectTask}
-                      variant="mobile"
-                    />
-                  </div>
+                <div className="flex shrink-0 items-center gap-2">
                   <ThreadAccessControl
                     disabled={threadAccessControlDisabled}
                     onChange={onChangeThreadAccess}
@@ -1504,9 +1466,6 @@ export function MobileChatView({
             <div className="text-xs text-[#ff6e84]">
               {reasoningEffortControlError}
             </div>
-          ) : null}
-          {taskControlError ? (
-            <div className="text-xs text-[#ff6e84]">{taskControlError}</div>
           ) : null}
           {threadAccessControlError ? (
             <div className="text-xs text-[#ff6e84]">

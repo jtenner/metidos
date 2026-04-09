@@ -61,7 +61,6 @@ import {
   listCronsProcedure,
   listDirectorySuggestionsProcedure,
   listProjectsProcedure,
-  listProjectTasksProcedure,
   listProjectWorktreesProcedure,
   listThreadStatusesProcedure,
   listThreadsProcedure,
@@ -78,13 +77,11 @@ import {
   renameThreadProcedure,
   requestThreadStartProcedure,
   runCronNowProcedure,
-  runProjectTaskProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
   setThreadPinnedProcedure,
   setWorktreeGitHistoryChangeListener,
   setWorktreePinnedProcedure,
-  setWorktreeTaskChangeListener,
   shutdownActiveThreadTurns,
   shutdownProcedureCacheMaintenance,
   shutdownProjectPolling,
@@ -107,7 +104,6 @@ import type {
   RpcRequestPriority,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
-  RpcWorktreeTasksChanged,
 } from "./rpc-schema";
 import {
   authorizeRpcWebSocketUpgrade,
@@ -202,10 +198,6 @@ type RpcReloadMessage = {
   reason: string;
 };
 
-type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
-  type: "tasks-changed";
-};
-
 type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
@@ -221,7 +213,6 @@ type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
-  | RpcTasksChangedMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage;
@@ -434,8 +425,6 @@ const rpcHandlers: RpcRequestHandlerMap = {
   },
   listProjectWorktrees: (params, context) =>
     listProjectWorktreesProcedure(params, context),
-  listProjectTasks: (params, context) =>
-    listProjectTasksProcedure(params, context),
   createWorktree: (params) => createWorktreeProcedure(params),
   createThread: (params, context) => {
     if (createThreadRequiresStepUp(params)) {
@@ -468,10 +457,6 @@ const rpcHandlers: RpcRequestHandlerMap = {
   sendThreadMessage: (params, context) =>
     sendThreadMessageProcedure(params, context),
   stopThreadTurn: (params) => stopThreadTurnProcedure(params),
-  runProjectTask: (params, context) => {
-    requireFreshStepUpForRpcAction(context, "run project tasks");
-    return runProjectTaskProcedure(params, context);
-  },
   updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
   updateThreadAccess: (params) => updateThreadAccessProcedure(params),
   renameThread: (params) => renameThreadProcedure(params),
@@ -1424,7 +1409,6 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
       health.git.queuedBackgroundCount > 0 ||
       health.git.queuedForegroundCount > 0 ||
       health.procedures.foregroundReadCount > 0 ||
-      health.procedures.taskCacheRefreshLimit.pendingCount > 0 ||
       health.procedures.gitHistoryReadLimit.pendingCount > 0 ||
       health.procedures.diffLoadLimit.pendingCount > 0;
 
@@ -1879,31 +1863,6 @@ function broadcastReload(reason: string): void {
 }
 
 /**
- * Broadcast that a worktree task list changed.
- * @param projectId - Project identifier.
- * @param worktreePath - Worktree path.
- */
-function broadcastTasksChanged(projectId: number, worktreePath: string): void {
-  if (rpcClients.size === 0) {
-    return;
-  }
-
-  const payload: RpcTasksChangedMessage = {
-    type: "tasks-changed",
-    projectId,
-    worktreePath,
-  };
-  const raw = JSON.stringify(payload satisfies RpcSocketMessage);
-  for (const client of rpcClients) {
-    try {
-      client.send(raw);
-    } catch {
-      rpcClients.delete(client);
-    }
-  }
-}
-
-/**
  * Broadcast that git history changed for a tracked worktree.
  */
 
@@ -2188,9 +2147,6 @@ async function bootstrap(): Promise<void> {
     startDevMainviewWatcher();
   }
   startProcedureCacheMaintenance();
-  setWorktreeTaskChangeListener((projectId, worktreePath) => {
-    broadcastTasksChanged(projectId, worktreePath);
-  });
   setWorktreeGitHistoryChangeListener((projectId, worktreePath) => {
     broadcastGitHistoryChanged(projectId, worktreePath);
   });
@@ -2731,7 +2687,6 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
       overloadMonitorTimer = null;
     }
     setWorktreeGitHistoryChangeListener(null);
-    setWorktreeTaskChangeListener(null);
     shutdownProcedureCacheMaintenance();
     shutdownProjectPolling();
     await stopCronScheduler();

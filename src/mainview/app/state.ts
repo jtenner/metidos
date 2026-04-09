@@ -286,7 +286,6 @@ const formatPathForDisplayCache = new Map<string, string>();
  */
 export const GIT_HISTORY_PAGE_SIZE = 20;
 export const GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES = 8;
-export const PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES = 8;
 export const GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES = 24;
 export const GIT_HISTORY_ROW_HEIGHT_PX = 58;
 export const GIT_HISTORY_DOM_WINDOW_SIZE = 20;

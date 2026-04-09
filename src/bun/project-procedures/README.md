@@ -1,7 +1,7 @@
 # src/bun/project-procedures
 
 This folder contains the Bun backend procedure layer that powers most RPC behavior exposed to the UI.
-It is organized by concern so each module has a narrow responsibility for data models, git orchestration, task discovery, and thread rendering.
+It is organized by concern so each module has a narrow responsibility for data models, git orchestration, and thread rendering.
 
 ## Purpose of each file
 
@@ -31,12 +31,6 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Supports background prefetch and foreground escalation, with abortable fills to avoid blocking UI-critical paths.
   - Coalesces in-flight commit-diff reads so duplicate requests share work.
 
-- `project-tasks.ts`
-  - Discovers runnable project work tasks from `.tasks` directories and `package.json` scripts.
-  - Traverses candidate directories safely (symlink/real-path and ignore-list aware) to avoid loops and huge scans.
-  - Normalizes task IDs, task titles, and prompt payloads (`formatTaskPrompt`, `formatPackageScriptTaskPrompt`) so worker execution is deterministic.
-  - Also resolves stale task selections into validated runnable payloads before a new thread is created, so missing `.tasks` files or removed package scripts fail cleanly without leaking empty threads.
-
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.
   - Exposes LRU helpers, abort normalization, abort-aware Promise awaiting, and bounded concurrency limiting.
@@ -54,4 +48,4 @@ It is organized by concern so each module has a narrow responsibility for data m
   - persistence mapping in `thread-detail.ts`
   - metadata normalization in `codex-catalog.ts`
   - async policy in `shared.ts`
-  - external data producers in `directory-suggestions.ts`, `git-history.ts`, and `project-tasks.ts`.
+  - external data producers in `directory-suggestions.ts` and `git-history.ts`.

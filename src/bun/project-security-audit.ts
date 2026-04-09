@@ -14,8 +14,6 @@ import { createThreadRequiresStepUp } from "./rpc-authz";
 import type { AppRPCSchema } from "./rpc-schema";
 
 type CreateThreadParams = AppRPCSchema["requests"]["createThread"]["params"];
-type RunProjectTaskParams =
-  AppRPCSchema["requests"]["runProjectTask"]["params"];
 /**
  * Stringifies payload.
  * @param payload - payload argument for stringifyPayload.
@@ -33,17 +31,6 @@ function stringifyPayload(
 
 function normalizeUnsafeMode(value: boolean | number): boolean {
   return value === true || value === 1;
-}
-/**
- * Performs taskLabel operation.
- * @param task - task argument for taskLabel.
- */
-
-function taskLabel(task: RunProjectTaskParams["task"]): string {
-  if (task.kind === "script") {
-    return task.scriptName?.trim() || task.title;
-  }
-  return task.path;
 }
 /**
  * Performs recordCrossWorkspaceThreadAuditEvent operation.
@@ -75,37 +62,6 @@ export function recordCrossWorkspaceThreadAuditEvent(
     projectId: input.thread.projectId,
     summaryText:
       "Created a thread outside the current workspace after step-up authentication.",
-    threadId: input.thread.id,
-    worktreePath: input.thread.worktreePath,
-  });
-}
-/**
- * Performs recordProjectTaskQueuedAuditEvent operation.
- * @param database - database argument for recordProjectTaskQueuedAuditEvent.
- * @param input - input argument for recordProjectTaskQueuedAuditEvent.
- */
-
-export function recordProjectTaskQueuedAuditEvent(
-  database: Database,
-  input: {
-    createdThread: boolean;
-    params: RunProjectTaskParams;
-    thread: Pick<
-      ThreadRecord,
-      "id" | "projectId" | "unsafeMode" | "worktreePath"
-    >;
-  },
-): void {
-  createSecurityAuditEvent(database, {
-    eventType: "project_task_queued",
-    payloadJson: stringifyPayload({
-      createdThread: input.createdThread,
-      taskKind: input.params.task.kind,
-      taskLabel: taskLabel(input.params.task),
-      unsafeMode: normalizeUnsafeMode(input.thread.unsafeMode),
-    }),
-    projectId: input.thread.projectId,
-    summaryText: "Queued a project task for Codex execution.",
     threadId: input.thread.id,
     worktreePath: input.thread.worktreePath,
   });

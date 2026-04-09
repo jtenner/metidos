@@ -128,11 +128,11 @@ That wording matches the runtime model and should reduce confusion during manual
 
 Targeted validation completed during the fix:
 
-- `bun test src/bun/project-task-run.test.ts src/bun/codex-sidecar-mcp.test.ts src/bun/sidecar-thread-metadata.test.ts`
-- `bunx biome check src/bun/project-procedures.ts src/bun/codex-sidecar-mcp.ts src/bun/project-task-run.test.ts src/mainview/controls/thread-access-control.tsx`
+- `bun test src/bun/project-procedures-config.test.ts src/bun/codex-sidecar-mcp.test.ts src/bun/sidecar-thread-metadata.test.ts`
+- `bunx biome check src/bun/project-procedures.ts src/bun/project-procedures-config.test.ts src/bun/codex-sidecar-mcp.ts src/mainview/controls/thread-access-control.tsx`
 - `bun run typecheck`
 
-New test coverage was added in `src/bun/project-task-run.test.ts` to assert:
+New test coverage was added in `src/bun/project-procedures-config.test.ts` to assert:
 
 - thread-scoped Codex config disables GitHub and agent tool families when requested
 - the Jolt sidecar is omitted entirely when `joltAccess` is disabled
@@ -157,7 +157,7 @@ Recommended manual spot check after future access-control changes:
   - registers the Jolt MCP tools and applies access gating
 - `src/mainview/controls/thread-access-control.tsx`
   - renders thread access toggle labels
-- `src/bun/project-task-run.test.ts`
+- `src/bun/project-procedures-config.test.ts`
   - verifies generated runtime config behavior
 
 ## Maintenance Note
@@ -165,6 +165,6 @@ Recommended manual spot check after future access-control changes:
 This integration depends on the current Codex CLI config surface for app and feature gating. If the upstream Codex config keys or tool-family boundaries change, update both:
 
 - the generated config in `src/bun/project-procedures.ts`
-- the assertions in `src/bun/project-task-run.test.ts`
+- the assertions in `src/bun/project-procedures-config.test.ts`
 
 The highest-risk future regression is reintroducing a mismatch where Jolt persists a thread flag but the Codex client still advertises a broader tool surface than that thread should have.

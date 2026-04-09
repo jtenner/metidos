@@ -92,12 +92,12 @@ describe("security audit procedures", () => {
     const database = createTestDatabase();
 
     createSecurityAuditEvent(database, {
-      eventType: "project_task_queued",
+      eventType: "project_deleted",
       payloadJson: JSON.stringify({
-        taskKind: "script",
+        projectName: "Repo",
       }),
       projectId: 5,
-      summaryText: "Queued a project task for Codex execution.",
+      summaryText: "Deleted project Repo.",
       threadId: 51,
     });
     createSecurityAuditEvent(database, {
@@ -115,6 +115,6 @@ describe("security audit procedures", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.projectId).toBe(5);
-    expect(result[0]?.eventType).toBe("project_task_queued");
+    expect(result[0]?.eventType).toBe("project_deleted");
   });
 });

@@ -58,7 +58,7 @@ Implements the browser worker entrypoint used to parse and summarize large diffs
 Displays commit/history data for active workspace context in a memoized panel view.
 
 `invalidation-events.ts`
-Provides coalesced subscription channels for websocket-driven worktree invalidations so task and git-history refreshes can batch repeated same-worktree signals on one tick.
+Provides coalesced subscription channels for websocket-driven worktree invalidations so repeated same-worktree git-history refreshes can batch on one tick.
 
 ## Message rendering modules
 

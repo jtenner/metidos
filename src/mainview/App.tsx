@@ -22,7 +22,6 @@ import type {
   RpcCronJob,
   RpcGitHistoryEntry,
   RpcProject,
-  RpcProjectTask,
   RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
@@ -45,10 +44,7 @@ import {
   deriveDesktopThreadSwitcherSections,
 } from "./app/desktop-thread-switcher";
 import { DiffWorkspace } from "./app/diff-workspace";
-import {
-  subscribeToWorktreeGitHistoryChanged,
-  subscribeToWorktreeTasksChanged,
-} from "./app/invalidation-events";
+import { subscribeToWorktreeGitHistoryChanged } from "./app/invalidation-events";
 import { GitHistoryDiffModal } from "./app/message-ui";
 import { SidebarContent } from "./app/sidebar-content";
 import {
@@ -87,7 +83,6 @@ import {
   type OpenThreadOptions,
   type PendingSharedRequest,
   type PersistedMainviewState,
-  PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
@@ -533,7 +528,6 @@ export default function App({
   const [threadStore, setThreadStore] = useState<ThreadStore>(() =>
     emptyThreadStore(),
   );
-  const [projectTasks, setProjectTasks] = useState<RpcProjectTask[]>([]);
   const [gitHistory, setGitHistory] =
     useState<RpcWorktreeGitHistoryResult | null>(null);
   const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
@@ -575,7 +569,6 @@ export default function App({
   const [threadMessages, setThreadMessages] = useState<RpcThreadMessage[]>([]);
   const [threadsError, setThreadsError] = useState("");
   const [modelControlError, setModelControlError] = useState("");
-  const [taskControlError, setTaskControlError] = useState("");
   const [chatError, setChatError] = useState("");
   const [pendingThreadStartRequests, setPendingThreadStartRequests] = useState<
     RpcThreadStartRequest[]
@@ -613,8 +606,6 @@ export default function App({
   const [cronEditingCronJobId, setCronEditingCronJobId] = useState<
     number | null
   >(null);
-  const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
-  const [isRunningProjectTask, setIsRunningProjectTask] = useState(false);
   const [isUpdatingThreadModel, setIsUpdatingThreadModel] = useState(false);
   const [isUpdatingThreadReasoningEffort, setIsUpdatingThreadReasoningEffort] =
     useState(false);
@@ -696,8 +687,6 @@ export default function App({
     ((authorized: boolean) => void) | null
   >(null);
   const projectActionMenuRequestId = useRef(0);
-  const projectTasksRequestIdRef = useRef(0);
-  const projectTasksAbortControllerRef = useRef<AbortController | null>(null);
   const gitHistoryRequestIdRef = useRef(0);
   const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
   const persistedMainviewStateWriteTimeoutRef = useRef<number | null>(null);
@@ -831,9 +820,7 @@ export default function App({
   const gitHistoryCacheRef = useRef(
     new Map<string, RpcWorktreeGitHistoryResult>(),
   );
-  const projectTaskCacheRef = useRef(new Map<string, RpcProjectTask[]>());
   const skipFreshGitHistoryRefreshRef = useRef(new Set<string>());
-  const skipFreshProjectTaskRefreshRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const selectedThreadHistoryCursorRef = useRef<number | null>(null);
@@ -947,7 +934,6 @@ export default function App({
     selectedProject,
     selectedThread,
     selectedThreadIsWorking,
-    taskSelectorDisabled,
     threadActionMenuThread,
     threadAccessControlDisabled,
     worktreeByProjectAndPath,
@@ -964,8 +950,6 @@ export default function App({
     homeDirectory,
     isCreatingThread,
     isDocumentVisible,
-    isLoadingProjectTasks,
-    isRunningProjectTask,
     isSending,
     isStoppingThread,
     isThreadLoading,
@@ -1825,16 +1809,6 @@ export default function App({
     setWorktreeState,
   });
 
-  const abortProjectTasksRequest = useCallback((reason: string) => {
-    const controller = projectTasksAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    projectTasksAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
-
   const abortGitHistoryRequests = useCallback((reason: string) => {
     const historyController = gitHistoryAbortControllerRef.current;
     if (historyController) {
@@ -2033,103 +2007,6 @@ export default function App({
       }
     },
     [procedures, removeThread],
-  );
-
-  const loadProjectTasks = useCallback(
-    async (
-      projectId: number,
-      worktreePath: string,
-      options?: {
-        preferCached?: boolean;
-        priority?: RpcRequestPriority;
-        skipRefreshWhenCached?: boolean;
-      },
-    ): Promise<void> => {
-      const requestId = ++projectTasksRequestIdRef.current;
-      abortProjectTasksRequest("Project task request was superseded.");
-      const cacheKey = worktreeKey(projectId, worktreePath);
-      const cachedTasks = readLruValue(projectTaskCacheRef.current, cacheKey);
-      const serveCachedTasks = Boolean(options?.preferCached && cachedTasks);
-      const skipRefreshWhenCached = Boolean(
-        serveCachedTasks && options?.skipRefreshWhenCached,
-      );
-      const silentRefresh = serveCachedTasks;
-
-      if (serveCachedTasks && cachedTasks) {
-        setProjectTasks(cachedTasks);
-        setIsLoadingProjectTasks(false);
-        setTaskControlError("");
-      }
-      if (skipRefreshWhenCached) {
-        projectTasksAbortControllerRef.current = null;
-        return;
-      }
-
-      const controller = new AbortController();
-      projectTasksAbortControllerRef.current = controller;
-      if (!silentRefresh) {
-        setIsLoadingProjectTasks(true);
-        setTaskControlError("");
-      }
-
-      try {
-        const tasks = await procedures.listProjectTasks(
-          {
-            projectId,
-            worktreePath,
-          },
-          {
-            priority: options?.priority ?? "default",
-            signal: controller.signal,
-          },
-        );
-        if (projectTasksRequestIdRef.current !== requestId) {
-          return;
-        }
-        writeLruValue(
-          projectTaskCacheRef.current,
-          cacheKey,
-          tasks,
-          PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
-        );
-        setProjectTasks(tasks);
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (projectTasksRequestIdRef.current !== requestId) {
-          return;
-        }
-        if (!silentRefresh || !cachedTasks) {
-          setProjectTasks([]);
-          setTaskControlError(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      } finally {
-        if (projectTasksAbortControllerRef.current === controller) {
-          projectTasksAbortControllerRef.current = null;
-        }
-        if (projectTasksRequestIdRef.current === requestId) {
-          setIsLoadingProjectTasks(false);
-        }
-      }
-    },
-    [abortProjectTasksRequest, procedures],
-  );
-
-  const primeProjectTasks = useCallback(
-    (projectId: number, worktreePath: string, tasks: RpcProjectTask[]) => {
-      const cacheKey = worktreeKey(projectId, worktreePath);
-      writeLruValue(
-        projectTaskCacheRef.current,
-        cacheKey,
-        tasks,
-        PROJECT_TASK_RESULT_CACHE_MAX_ENTRIES,
-      );
-      skipFreshProjectTaskRefreshRef.current.add(cacheKey);
-    },
-    [],
   );
 
   const cacheGitHistoryResult = useCallback(
@@ -3073,11 +2950,6 @@ export default function App({
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
           primeGitHistoryResult(result.history);
-          primeProjectTasks(
-            result.projectId,
-            result.worktreePath,
-            result.tasks,
-          );
           setWorktreeState(result.projectId, result.worktreePath, {
             loading: false,
             opened: true,
@@ -3156,7 +3028,6 @@ export default function App({
     initialMainviewState,
     openThread,
     prefetchDirectorySuggestions,
-    primeProjectTasks,
     primeGitHistoryResult,
     procedures,
     replaceProjects,
@@ -3784,41 +3655,6 @@ export default function App({
     if (!sessionStateReady) {
       return;
     }
-    if (
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened
-    ) {
-      projectTasksRequestIdRef.current += 1;
-      abortProjectTasksRequest("Project task request was cleared.");
-      setProjectTasks([]);
-      setIsLoadingProjectTasks(false);
-      setTaskControlError("");
-      return;
-    }
-    const cacheKey = worktreeKey(
-      selectedProject.id,
-      activeSelectedWorktreePath,
-    );
-    void loadProjectTasks(selectedProject.id, activeSelectedWorktreePath, {
-      preferCached: true,
-      priority: "default",
-      skipRefreshWhenCached:
-        skipFreshProjectTaskRefreshRef.current.delete(cacheKey),
-    });
-  }, [
-    activeSelectedWorktreePath,
-    activeSelectedWorktreeOpened,
-    abortProjectTasksRequest,
-    loadProjectTasks,
-    sessionStateReady,
-    selectedProject,
-  ]);
-
-  useEffect(() => {
-    if (!sessionStateReady) {
-      return;
-    }
     if (!selectedProject || !activeSelectedWorktreePath) {
       gitHistoryRequestIdRef.current += 1;
       abortGitHistoryRequests("Git history request was cleared.");
@@ -3876,37 +3712,6 @@ export default function App({
     selectedProject,
     selectedThread,
     sessionStateReady,
-  ]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToWorktreeTasksChanged((payload) => {
-      if (!sessionStateReady) {
-        return;
-      }
-      if (
-        !selectedProject ||
-        !activeSelectedWorktreePath ||
-        !activeSelectedWorktreeOpened
-      ) {
-        return;
-      }
-      if (
-        payload.projectId !== selectedProject.id ||
-        payload.worktreePath !== activeSelectedWorktreePath
-      ) {
-        return;
-      }
-      void loadProjectTasks(payload.projectId, payload.worktreePath, {
-        priority: "default",
-      });
-    });
-    return unsubscribe;
-  }, [
-    activeSelectedWorktreePath,
-    activeSelectedWorktreeOpened,
-    loadProjectTasks,
-    sessionStateReady,
-    selectedProject,
   ]);
 
   useEffect(() => {
@@ -4196,11 +4001,10 @@ export default function App({
 
   useEffect(() => {
     return () => {
-      abortProjectTasksRequest("Project task request was canceled.");
       abortGitHistoryRequests("Git history request was canceled.");
       abortCronJobsRequest("Cron job request was canceled.");
     };
-  }, [abortCronJobsRequest, abortGitHistoryRequests, abortProjectTasksRequest]);
+  }, [abortCronJobsRequest, abortGitHistoryRequests]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
@@ -4320,95 +4124,6 @@ export default function App({
       }
     },
     [isUpdatingThreadAccess, procedures, selectedThread, upsertThread],
-  );
-
-  const runSelectedTask = useCallback(
-    async (task: RpcProjectTask) => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        setTaskControlError("Select a project worktree before running a task.");
-        return;
-      }
-
-      const requestedProjectId = selectedProject.id;
-      const requestedWorktreePath = activeSelectedWorktreePath;
-      setIsRunningProjectTask(true);
-      setTaskControlError("");
-      setThreadsError("");
-      setChatError("");
-      setReasoningEffortControlError("");
-      setThreadAccessControlError("");
-      try {
-        const detail = await executeWithStepUp("run this project task", () =>
-          procedures.runProjectTask({
-            projectId: requestedProjectId,
-            worktreePath: requestedWorktreePath,
-            task,
-            threadId: selectedThread?.id ?? null,
-            model: selectedThread
-              ? null
-              : activeCodexModel || defaultCodexModel || null,
-            reasoningEffort: selectedThread
-              ? null
-              : activeReasoningEffort || defaultCodexReasoningEffort || null,
-            githubAccess: selectedThread ? null : activeGithubAccess,
-            agentsAccess: selectedThread ? null : activeAgentsAccess,
-            joltAccess: selectedThread ? null : activeJoltAccess,
-            unsafeMode: selectedThread ? null : activeUnsafeMode,
-          }),
-        );
-        if (!detail) {
-          return;
-        }
-        upsertThread(detail.thread);
-        if (
-          selectedProjectIdRef.current !== requestedProjectId ||
-          selectedWorktreePathRef.current !== requestedWorktreePath
-        ) {
-          return;
-        }
-        setSelectedThreadId(detail.thread.id);
-        selectedThreadIdRef.current = detail.thread.id;
-        selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-        if (selectedThreadIdRef.current === detail.thread.id) {
-          mergeSelectedThreadMessageHistory(detail);
-        } else {
-          replaceSelectedThreadMessageHistory(detail);
-        }
-        syncThreadContext(detail.thread);
-        setMobileProjectListOpen(false);
-        try {
-          await loadProjectWorktrees(detail.thread.projectId);
-        } catch {
-          // Ignore worktree-refresh failures so task execution remains available.
-        }
-      } catch (error) {
-        setTaskControlError(
-          error instanceof Error ? error.message : String(error),
-        );
-      } finally {
-        setIsRunningProjectTask(false);
-      }
-    },
-    [
-      activeCodexModel,
-      activeReasoningEffort,
-      activeGithubAccess,
-      activeAgentsAccess,
-      activeJoltAccess,
-      activeUnsafeMode,
-      activeSelectedWorktreePath,
-      defaultCodexModel,
-      defaultCodexReasoningEffort,
-      executeWithStepUp,
-      loadProjectWorktrees,
-      mergeSelectedThreadMessageHistory,
-      procedures,
-      replaceSelectedThreadMessageHistory,
-      selectedProject,
-      selectedThread,
-      syncThreadContext,
-      upsertThread,
-    ],
   );
 
   const handleCreateThreadForActiveWorktree = useCallback(() => {
@@ -4621,7 +4336,6 @@ export default function App({
           return;
         }
         primeGitHistoryResult(result.history);
-        primeProjectTasks(projectId, worktreePath, result.tasks);
         setWorktreeState(projectId, worktreePath, {
           loading: false,
           opened: true,
@@ -4650,7 +4364,6 @@ export default function App({
       getWorktreeState,
       finishWorktreeToggleRequest,
       isCurrentWorktreeToggleRequest,
-      primeProjectTasks,
       primeGitHistoryResult,
       procedures,
       setWorktreeState,
@@ -5754,7 +5467,6 @@ export default function App({
                   expandedItemIds={expandedTranscriptItemIds}
                   hasSelectedThread={Boolean(selectedThread)}
                   initialChatInput={initialMainviewState.chatInput}
-                  isLoadingProjectTasks={isLoadingProjectTasks}
                   isWorking={selectedThreadIsWorking}
                   localUserLabel={localUserLabel}
                   messages={visibleMessages}
@@ -5769,21 +5481,15 @@ export default function App({
                   onChangeThreadAccess={(value) => {
                     void updateActiveThreadAccess(value);
                   }}
-                  onSelectTask={(task) => {
-                    void runSelectedTask(task);
-                  }}
                   onSubmit={onSubmit}
                   onSubmitMessage={postMessage}
                   onToggleItemExpanded={toggleTranscriptItemExpanded}
-                  projectTasks={projectTasks}
                   reasoningEffortControlError={reasoningEffortControlError}
                   reasoningEffortSelectorDisabled={
                     reasoningEffortSelectorDisabled
                   }
                   reasoningEfforts={reasoningEfforts}
                   selectedThreadIsWorking={selectedThreadIsWorking}
-                  taskControlError={taskControlError}
-                  taskSelectorDisabled={taskSelectorDisabled}
                   threadAccessControlError={threadAccessControlError}
                   threadAccessControlDisabled={threadAccessControlDisabled}
                   threadAccessValue={activeThreadAccessValue}
@@ -6199,7 +5905,6 @@ export default function App({
                 expandedItemIds={expandedTranscriptItemIds}
                 hasSelectedThread={Boolean(selectedThread)}
                 initialChatInput={initialMainviewState.chatInput}
-                isLoadingProjectTasks={isLoadingProjectTasks}
                 isWorking={selectedThreadIsWorking}
                 localUserLabel={localUserLabel}
                 messages={visibleMessages}
@@ -6214,21 +5919,15 @@ export default function App({
                 onChangeThreadAccess={(value) => {
                   void updateActiveThreadAccess(value);
                 }}
-                onSelectTask={(task) => {
-                  void runSelectedTask(task);
-                }}
                 onSubmit={onSubmit}
                 onSubmitMessage={postMessage}
                 onToggleItemExpanded={toggleTranscriptItemExpanded}
-                projectTasks={projectTasks}
                 reasoningEffortControlError={reasoningEffortControlError}
                 reasoningEffortSelectorDisabled={
                   reasoningEffortSelectorDisabled
                 }
                 reasoningEfforts={reasoningEfforts}
                 selectedThreadIsWorking={selectedThreadIsWorking}
-                taskControlError={taskControlError}
-                taskSelectorDisabled={taskSelectorDisabled}
                 threadAccessControlError={threadAccessControlError}
                 threadAccessControlDisabled={threadAccessControlDisabled}
                 threadAccessValue={activeThreadAccessValue}

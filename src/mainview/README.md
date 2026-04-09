@@ -22,7 +22,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `startup-project-restore.ts` isolates startup restore reconciliation for project reopen state so the UI keeps projects closed until batch restore confirms them and can roll back failed restore targets cleanly.
 
-`startup-worktree-restore.ts` isolates startup worktree-restore filtering and selection fallback so stale persisted worktree paths are pruned before the rest of the UI starts reading git history, tasks, or active-worktree state from them.
+`startup-worktree-restore.ts` isolates startup worktree-restore filtering and selection fallback so stale persisted worktree paths are pruned before the rest of the UI starts reading git history or active-worktree state from them.
 
 `thread-workspace-selection.ts` isolates the thread-driven workspace-target derivation used when a selected thread needs to reopen its project and worktree context before diff or history panels can load live worktree data.
 
@@ -98,7 +98,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/use-worktree-diff.ts` pulls and transforms worktree diff data for diff viewers and history tooling.
 
-`app/workspace-panel.tsx` contains the workspace-level shell for switching among chat/diff/task content panes.
+`app/workspace-panel.tsx` contains the workspace-level shell for switching among the major workspace panes.
 
 ## `controls/` subfolder
 
@@ -115,8 +115,6 @@ This contains the workspace feature modules that implement every visible workspa
 `controls/dropdown.tsx` is the shared dropdown primitive used by action and selection controls.
 
 `controls/icons.tsx` centralizes icon exports used by controls and panels.
-
-`controls/project-task-selector.tsx` renders project/task picker controls in the workspace.
 
 `controls/reasoning-effort-selector.tsx` provides model reasoning effort selection for request tuning.
 

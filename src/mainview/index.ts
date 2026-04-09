@@ -15,16 +15,12 @@ import type {
   RpcRequestPriority,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
-  RpcWorktreeTasksChanged,
 } from "../bun/rpc-schema";
 import {
   type InjectedRuntimeConfig,
   RUNTIME_CONFIG_ELEMENT_ID,
 } from "../bun/server-security";
-import {
-  publishWorktreeGitHistoryChanged,
-  publishWorktreeTasksChanged,
-} from "./app/invalidation-events";
+import { publishWorktreeGitHistoryChanged } from "./app/invalidation-events";
 import { loadRichMarkdownModule } from "./app/message-markdown-loader";
 import { CONTEXT_FOCUS_CHANGED_EVENT_NAME } from "./app/state";
 import { dispatchAuthRequired } from "./auth-client";
@@ -74,10 +70,6 @@ type RpcReloadMessage = {
   reason: string;
 };
 
-type RpcTasksChangedMessage = RpcWorktreeTasksChanged & {
-  type: "tasks-changed";
-};
-
 type RpcGitHistoryChangedMessage = RpcWorktreeGitHistoryChanged & {
   type: "git-history-changed";
 };
@@ -93,7 +85,6 @@ type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
-  | RpcTasksChangedMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage;
@@ -490,13 +481,6 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         reloadWindow(payload.reason);
         return;
       }
-      if (payload.type === "tasks-changed") {
-        publishWorktreeTasksChanged({
-          projectId: payload.projectId,
-          worktreePath: payload.worktreePath,
-        });
-        return;
-      }
       if (payload.type === "git-history-changed") {
         publishWorktreeGitHistoryChanged({
           projectId: payload.projectId,
@@ -847,7 +831,6 @@ const procedures: ProjectProcedures = {
   closeProject: createProcedure("closeProject"),
   deleteProject: createProcedure("deleteProject"),
   listProjectWorktrees: createProcedure("listProjectWorktrees"),
-  listProjectTasks: createProcedure("listProjectTasks"),
   createWorktree: createProcedure("createWorktree"),
   openWorktreesBatch: createProcedure("openWorktreesBatch"),
   createThread: createProcedure("createThread"),
@@ -856,7 +839,6 @@ const procedures: ProjectProcedures = {
   markThreadErrorSeen: createProcedure("markThreadErrorSeen"),
   sendThreadMessage: createProcedure("sendThreadMessage"),
   stopThreadTurn: createProcedure("stopThreadTurn"),
-  runProjectTask: createProcedure("runProjectTask"),
   newCron: createProcedure("newCron"),
   updateCron: createProcedure("updateCron"),
   listCrons: createProcedure("listCrons"),

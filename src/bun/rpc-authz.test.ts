@@ -74,7 +74,7 @@ describe("rpc authz helpers", () => {
     const onRequireStepUp = mock(() => {});
 
     enforceRpcStepUp({
-      actionDescription: "run project tasks",
+      actionDescription: "delete a project",
       context: {
         auth: {
           authBypass: false,
@@ -88,7 +88,7 @@ describe("rpc authz helpers", () => {
     });
 
     expect(onRequireStepUp).toHaveBeenCalledWith({
-      actionDescription: "run project tasks",
+      actionDescription: "delete a project",
       sessionId: "session-123",
     });
   });

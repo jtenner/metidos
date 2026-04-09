@@ -57,12 +57,11 @@
 │  │  │  ├─ codex-session-telemetry.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
-│  │  │  ├─ project-tasks.ts
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
+│  │  ├─ project-procedures-config.test.ts
 │  │  ├─ project-security-audit.test.ts
-│  │  ├─ project-task-run.test.ts
 │  │  ├─ project-security-audit.ts
 │  │  ├─ rpc-authz.test.ts
 │  │  ├─ rpc-authz.ts
@@ -165,7 +164,6 @@
 │     │  ├─ codex-utils.ts
 │     │  ├─ dropdown.tsx
 │     │  ├─ icons.tsx
-│     │  ├─ project-task-selector.tsx
 │     │  ├─ reasoning-effort-selector.tsx
 │     │  ├─ search-utils.ts
 │     │  ├─ sidebar-search-control.tsx

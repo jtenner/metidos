@@ -22,9 +22,6 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
 - `icons.tsx`
   - Houses the project’s icon contract with a typed `AppIconName` union.
   - Maps each icon name to a material-style SVG glyph and exposes `materialSymbol` for consistent icon rendering.
-- `project-task-selector.tsx`
-  - Dropdown selector for per-project task choices.
-  - Handles empty/loading/no-op states, accessible disabled hints, and emits selected `RpcProjectTask` payloads.
 - `reasoning-effort-selector.tsx`
   - Compact selector for Codex reasoning effort values (for example low/medium/high).
   - Integrates with `DropdownControl` and shows loading/fallback labels when options are unavailable.

@@ -3,7 +3,7 @@
  * @description Module for project procedures.
  */
 
-import { existsSync, type FSWatcher, watch } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import {
@@ -103,12 +103,6 @@ import {
   warmGitHistoryCache,
 } from "./project-procedures/git-history";
 import {
-  readProjectTasksFromDisk,
-  readTaskWatchTargets,
-  resolveProjectTaskExecution,
-  type TaskWatchTarget,
-} from "./project-procedures/project-tasks";
-import {
   awaitAbortableResult,
   createAbortError,
   createAsyncConcurrencyLimit,
@@ -132,7 +126,6 @@ import {
 import {
   recordCrossWorkspaceThreadAuditEvent,
   recordProjectDeletedAuditEvent,
-  recordProjectTaskQueuedAuditEvent,
 } from "./project-security-audit";
 import type {
   AppRPCSchema,
@@ -149,7 +142,6 @@ import type {
   RpcOpenWorktreeResult,
   RpcOpenWorktreesBatchResultItem,
   RpcProject,
-  RpcProjectTask,
   RpcProjectWorktreesResult,
   RpcRequestContext,
   RpcRequestPriority,
@@ -436,10 +428,7 @@ const GIT_COMMIT_DIFF_CACHE_MAX_ENTRIES = 64;
 const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 500;
 const WORKTREE_OPEN_CONCURRENCY = 2;
 const GIT_HISTORY_READ_CONCURRENCY = 2;
-const TASK_CACHE_REFRESH_CONCURRENCY = 1;
 const DIFF_LOAD_CONCURRENCY = 2;
-const WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS = 30_000;
-const TASK_WATCH_RETRY_DELAY_MS = 60_000;
 const JOLT_THREAD_START_METADATA_INSTRUCTION =
   "Before you do anything, please update the jolt thread metadata by calling 'update_thread'.";
 
@@ -470,13 +459,6 @@ type WorktreePollState = {
   historyPrefetch: PendingGitHistoryPrefetch | null;
   historySignature: string | null;
   historyTimer: ReturnType<typeof setInterval> | null;
-  tasks: RpcProjectTask[] | null;
-  taskWatchTargets: TaskWatchTarget[];
-  taskWatchTargetRetryAt: Map<string, number>;
-  taskWatchers: FSWatcher[];
-  taskRefreshPromise: Promise<RpcProjectTask[]> | null;
-  taskRefreshQueued: boolean;
-  taskCacheRefreshedAt: number;
   lastUpdatedAt: string;
 };
 
@@ -519,17 +501,9 @@ const worktreeOpenLimit = createAsyncConcurrencyLimit(
 const gitHistoryReadLimit = createAsyncConcurrencyLimit(
   GIT_HISTORY_READ_CONCURRENCY,
 );
-const taskCacheRefreshLimit = createAsyncConcurrencyLimit(
-  TASK_CACHE_REFRESH_CONCURRENCY,
-);
 const diffLoadLimit = createAsyncConcurrencyLimit(DIFF_LOAD_CONCURRENCY);
-let lastTaskCacheRefreshDurationMs = 0;
-let peakTaskCacheRefreshDurationMs = 0;
 let lastThreadActivityPersistenceDurationMs = 0;
 let peakThreadActivityPersistenceDurationMs = 0;
-let worktreeTaskChangeListener:
-  | ((projectId: number, worktreePath: string) => void)
-  | null = null;
 let worktreeGitHistoryChangeListener:
   | ((projectId: number, worktreePath: string) => void)
   | null = null;
@@ -537,19 +511,6 @@ let worktreeGitHistoryChangeListener:
 function hasForegroundReadPressure(): boolean {
   return foregroundReadCount > 0;
 }
-/**
- * Should refresh worktree task cache.
- * @param state - Current state value.
- */
-
-function shouldRefreshWorktreeTaskCache(state: WorktreePollState): boolean {
-  return (
-    state.taskCacheRefreshedAt === 0 ||
-    Date.now() - state.taskCacheRefreshedAt >=
-      WORKTREE_TASK_CACHE_REFRESH_INTERVAL_MS
-  );
-}
-
 function flushDeferredBackgroundWork(): void {
   if (hasForegroundReadPressure() || deferredBackgroundWork.size === 0) {
     return;
@@ -598,16 +559,6 @@ async function withForegroundRead<T>(callback: () => Promise<T>): Promise<T> {
     syncAllProjectBackgroundPolling();
     flushDeferredBackgroundWork();
   }
-}
-/**
- * Runs task cache refresh limited.
- * @param callback - Callback to invoke.
- */
-
-function runTaskCacheRefreshLimited<T>(callback: () => Promise<T>): Promise<T> {
-  return taskCacheRefreshLimit.run(callback, {
-    abortMessage: "Project task refresh was aborted.",
-  });
 }
 /**
  * Runs worktree open limited.
@@ -659,18 +610,6 @@ function runDiffLoadLimited<T>(
   });
 }
 /**
- * Performs recordTaskCacheRefreshDuration operation.
- * @param durationMs - durationMs argument for recordTaskCacheRefreshDuration.
- */
-
-function recordTaskCacheRefreshDuration(durationMs: number): void {
-  lastTaskCacheRefreshDurationMs = durationMs;
-  peakTaskCacheRefreshDurationMs = Math.max(
-    peakTaskCacheRefreshDurationMs,
-    durationMs,
-  );
-}
-/**
  * Performs recordThreadActivityPersistenceDuration operation.
  * @param durationMs - durationMs argument for recordThreadActivityPersistenceDuration.
  */
@@ -690,12 +629,6 @@ export function getProcedureRuntimeStats(): {
   gitHistoryReadLimit: ReturnType<typeof gitHistoryReadLimit.stats>;
   openWorktreeCount: number;
   projectPollerCount: number;
-  taskCacheRefreshInFlightCount: number;
-  taskCacheRefreshDurationMs: {
-    last: number;
-    peak: number;
-  };
-  taskCacheRefreshLimit: ReturnType<typeof taskCacheRefreshLimit.stats>;
   threadActivityPersistenceDurationMs: {
     last: number;
     peak: number;
@@ -703,15 +636,9 @@ export function getProcedureRuntimeStats(): {
   worktreeOpenLimit: ReturnType<typeof worktreeOpenLimit.stats>;
 } {
   let openWorktreeCount = 0;
-  let taskCacheRefreshInFlightCount = 0;
 
   for (const state of projectPollMap.values()) {
     openWorktreeCount += state.openWorktrees.size;
-    for (const worktreeState of state.openWorktrees.values()) {
-      if (worktreeState.taskRefreshPromise !== null) {
-        taskCacheRefreshInFlightCount += 1;
-      }
-    }
   }
 
   return {
@@ -721,12 +648,6 @@ export function getProcedureRuntimeStats(): {
     gitHistoryReadLimit: gitHistoryReadLimit.stats(),
     openWorktreeCount,
     projectPollerCount: projectPollMap.size,
-    taskCacheRefreshInFlightCount,
-    taskCacheRefreshDurationMs: {
-      last: lastTaskCacheRefreshDurationMs,
-      peak: peakTaskCacheRefreshDurationMs,
-    },
-    taskCacheRefreshLimit: taskCacheRefreshLimit.stats(),
     threadActivityPersistenceDurationMs: {
       last: lastThreadActivityPersistenceDurationMs,
       peak: peakThreadActivityPersistenceDurationMs,
@@ -2534,7 +2455,6 @@ function stopWorktreePolling(
     active,
     `Stopped worktree polling for ${worktreePath}.`,
   );
-  closeTaskWatchers(active);
   state.openWorktrees.delete(worktreePath);
 }
 /**
@@ -2566,13 +2486,6 @@ function createWorktreePollState(
     historyPrefetch: null,
     historySignature: null,
     historyTimer: null,
-    tasks: null,
-    taskWatchTargets: [],
-    taskWatchTargetRetryAt: new Map(),
-    taskWatchers: [],
-    taskRefreshPromise: null,
-    taskRefreshQueued: false,
-    taskCacheRefreshedAt: 0,
     lastUpdatedAt,
   };
 }
@@ -2596,164 +2509,6 @@ function ensureWorktreePollState(
   return worktreeState;
 }
 /**
- * Closes task watchers.
- * @param worktreeState - worktreeState argument for closeTaskWatchers.
- */
-
-function closeTaskWatchers(worktreeState: WorktreePollState): void {
-  for (const watcher of worktreeState.taskWatchers) {
-    try {
-      watcher.close();
-    } catch {
-      // Ignore watcher shutdown failures during task watcher cleanup.
-    }
-  }
-  worktreeState.taskWatchers = [];
-}
-/**
- * Performs areTaskWatchTargetsEqual operation.
- * @param left - left argument for areTaskWatchTargetsEqual.
- * @param right - right argument for areTaskWatchTargetsEqual.
- */
-
-function areTaskWatchTargetsEqual(
-  left: TaskWatchTarget[],
-  right: TaskWatchTarget[],
-): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every(
-    (target, index) =>
-      target.kind === right[index]?.kind && target.path === right[index]?.path,
-  );
-}
-/**
- * Performs areProjectTasksEqual operation.
- * @param left - left argument for areProjectTasksEqual.
- * @param right - right argument for areProjectTasksEqual.
- */
-
-function areProjectTasksEqual(
-  left: RpcProjectTask[],
-  right: RpcProjectTask[],
-): boolean {
-  if (left === right) {
-    return true;
-  }
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  return left.every((task, index) => {
-    const other = right[index];
-    return (
-      task.id === other?.id &&
-      task.kind === other.kind &&
-      task.path === other.path &&
-      task.title === other.title &&
-      task.scriptName === other.scriptName &&
-      task.command === other.command
-    );
-  });
-}
-/**
- * Performs logBackgroundTaskFailure operation.
- * @param message - Message payload.
- * @param error - Error value to process.
- */
-
-function logBackgroundTaskFailure(message: string, error: unknown): void {
-  if (isAbortError(error)) {
-    return;
-  }
-
-  console.error(message, error);
-}
-/**
- * Performs refreshWorktreeTaskCache operation.
- * @param state - Current state value.
- * @param worktreePath - Worktree path.
- * @param options - Configuration options used by this operation.
- */
-
-async function refreshWorktreeTaskCache(
-  state: ProjectPollState,
-  worktreePath: string,
-  options?: {
-    notify?: boolean;
-    startWatching?: boolean;
-  },
-): Promise<RpcProjectTask[]> {
-  const worktreeState = ensureWorktreePollState(state, worktreePath);
-  if (worktreeState.taskRefreshPromise) {
-    if (options?.notify === true) {
-      worktreeState.taskRefreshQueued = true;
-    }
-    return worktreeState.taskRefreshPromise;
-  }
-
-  const hadTaskWatchers = worktreeState.taskWatchers.length > 0;
-  const previousTasks = worktreeState.tasks ?? [];
-  const previousTaskWatchTargets = worktreeState.taskWatchTargets;
-  const refreshPromise = (async () => {
-    const refreshStartedAt = performance.now();
-    const [taskWatchTargets, tasks] = await runTaskCacheRefreshLimited(() =>
-      Promise.all([
-        readTaskWatchTargets(worktreePath),
-        readProjectTasksFromDisk(worktreePath),
-      ]),
-    );
-    recordTaskCacheRefreshDuration(
-      Math.max(0, performance.now() - refreshStartedAt),
-    );
-    worktreeState.taskWatchTargets = taskWatchTargets;
-    worktreeState.tasks = tasks;
-    worktreeState.taskCacheRefreshedAt = Date.now();
-    worktreeState.lastUpdatedAt = getNow();
-
-    if (hadTaskWatchers || options?.startWatching === true) {
-      closeTaskWatchers(worktreeState);
-      startWorktreeTaskPolling(state, worktreePath);
-    }
-
-    if (
-      options?.notify === true &&
-      (!areTaskWatchTargetsEqual(previousTaskWatchTargets, taskWatchTargets) ||
-        !areProjectTasksEqual(previousTasks, tasks))
-    ) {
-      worktreeTaskChangeListener?.(state.id, worktreePath);
-    }
-
-    return tasks;
-  })();
-  worktreeState.taskRefreshPromise = refreshPromise;
-
-  try {
-    return await refreshPromise;
-  } finally {
-    if (worktreeState.taskRefreshPromise === refreshPromise) {
-      worktreeState.taskRefreshPromise = null;
-    }
-    if (worktreeState.taskRefreshQueued) {
-      worktreeState.taskRefreshQueued = false;
-      void refreshWorktreeTaskCache(state, worktreePath, {
-        notify: true,
-        startWatching: hadTaskWatchers || options?.startWatching === true,
-      }).catch((error) => {
-        logBackgroundTaskFailure(
-          `Task cache refresh failed for ${worktreePath}`,
-          error,
-        );
-      });
-    }
-  }
-}
-/**
  * Performs stopWorktreeBackgroundPolling operation.
  * @param worktreeState - worktreeState argument for stopWorktreeBackgroundPolling.
  * @param reason - Reason for this operation.
@@ -2768,145 +2523,6 @@ function stopWorktreeBackgroundPolling(
     worktreeState.historyTimer = null;
   }
   abortGitHistoryPrefetch(worktreeState, reason);
-}
-/**
- * Performs startWorktreeTaskPolling operation.
- * @param state - Current state value.
- * @param worktreePath - Worktree path.
- */
-
-function startWorktreeTaskPolling(
-  state: ProjectPollState,
-  worktreePath: string,
-): WorktreePollState {
-  const worktreeState = ensureWorktreePollState(state, worktreePath);
-  if (worktreeState.taskWatchers.length > 0) {
-    return worktreeState;
-  }
-
-  const invalidateTaskState = () => {
-    queueBackgroundWorkWhenIdle(
-      `task-cache-refresh:${state.id}:${worktreePath}`,
-      () => {
-        void refreshWorktreeTaskCache(state, worktreePath, {
-          notify: true,
-          startWatching: true,
-        }).catch((error) => {
-          logBackgroundTaskFailure(
-            `Task cache refresh failed for ${worktreePath}`,
-            error,
-          );
-        });
-      },
-    );
-  };
-
-  for (const target of worktreeState.taskWatchTargets) {
-    const nextRetryAt =
-      worktreeState.taskWatchTargetRetryAt.get(target.path) ?? 0;
-    if (Date.now() < nextRetryAt) {
-      continue;
-    }
-    if (!safeIsDirectory(target.path)) {
-      worktreeState.taskWatchTargetRetryAt.set(
-        target.path,
-        Date.now() + TASK_WATCH_RETRY_DELAY_MS,
-      );
-      continue;
-    }
-
-    /**
-     * Performs unregisterWatcher operation.
-     * @param watcherToRemove - watcherToRemove argument for unregisterWatcher.
-     */
-
-    const unregisterWatcher = (watcherToRemove: FSWatcher | null) => {
-      if (!watcherToRemove) {
-        return;
-      }
-
-      const index = worktreeState.taskWatchers.indexOf(watcherToRemove);
-      if (index >= 0) {
-        worktreeState.taskWatchers.splice(index, 1);
-      }
-    };
-
-    let watcher: FSWatcher | null = null;
-    /**
-     * Handles the watch error event.
-     * @param error - Error value to process.
-     */
-
-    const onWatchError = (error: unknown) => {
-      const watchErrorCode =
-        error instanceof Error ? (error as NodeJS.ErrnoException).code : null;
-      const shouldBackoffWatchTarget =
-        watchErrorCode === "EINVAL" ||
-        watchErrorCode === "ENOENT" ||
-        watchErrorCode === "ENOTDIR";
-      if (shouldBackoffWatchTarget) {
-        worktreeState.taskWatchTargetRetryAt.set(
-          target.path,
-          Date.now() + TASK_WATCH_RETRY_DELAY_MS,
-        );
-        unregisterWatcher(watcher);
-        if (watcher) {
-          try {
-            watcher.close();
-          } catch {
-            // Ignore watcher close failures during task watch error recovery.
-          }
-        }
-        return;
-      }
-
-      console.error(`Task watcher failed for ${target.path}`, error);
-      invalidateTaskState();
-    };
-
-    try {
-      watcher = watch(target.path, (eventType, filename) => {
-        const watchedName = filename ? String(filename) : "";
-        if (target.kind === "tasks") {
-          if (watchedName.startsWith(".")) {
-            return;
-          }
-          invalidateTaskState();
-          return;
-        }
-
-        if (
-          eventType === "rename" ||
-          watchedName === "package.json" ||
-          watchedName === ".tasks" ||
-          !watchedName
-        ) {
-          invalidateTaskState();
-        }
-      });
-      watcher.on("error", onWatchError);
-      worktreeState.taskWatchTargetRetryAt.delete(target.path);
-      worktreeState.taskWatchers.push(watcher);
-    } catch (error) {
-      const watchErrorCode =
-        error instanceof Error ? (error as NodeJS.ErrnoException).code : null;
-      if (
-        watchErrorCode === "EINVAL" ||
-        watchErrorCode === "ENOENT" ||
-        watchErrorCode === "ENOTDIR"
-      ) {
-        worktreeState.taskWatchTargetRetryAt.set(
-          target.path,
-          Date.now() + TASK_WATCH_RETRY_DELAY_MS,
-        );
-        continue;
-      }
-
-      console.error(`Failed to watch task inputs in ${target.path}`, error);
-    }
-  }
-
-  return worktreeState;
 }
 /**
  * Performs startWorktreeGitHistoryPolling operation.
@@ -3313,60 +2929,6 @@ export async function listProjectWorktreesProcedure(
       project,
       worktrees,
     };
-  });
-}
-/**
- * Lists project tasks procedure.
- * @param params - Parameters object.
- * @param context - Execution context.
- */
-
-export async function listProjectTasksProcedure(
-  params: AppRPCSchema["requests"]["listProjectTasks"]["params"],
-  context?: RpcRequestContext,
-): Promise<RpcProjectTask[]> {
-  return withForegroundRead(async () => {
-    const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
-    const worktreePath = normalizePath(params.worktreePath);
-    const projectState = ensureProjectPoller(project);
-    await ensureTrackedProjectWorktree(
-      project,
-      projectState,
-      worktreePath,
-      requestGitOptions,
-    );
-    const worktreeState = ensureWorktreePollState(projectState, worktreePath);
-    const shouldRefresh = shouldRefreshWorktreeTaskCache(worktreeState);
-    if (worktreeState.tasks !== null && !shouldRefresh) {
-      startWorktreeTaskPolling(projectState, worktreePath);
-      return worktreeState.tasks;
-    }
-
-    if (worktreeState.tasks !== null && shouldRefresh) {
-      void refreshWorktreeTaskCache(projectState, worktreePath, {
-        notify: true,
-        startWatching: true,
-      }).catch((error) => {
-        logBackgroundTaskFailure(
-          `Task cache refresh failed for ${worktreePath}`,
-          error,
-        );
-      });
-      startWorktreeTaskPolling(projectState, worktreePath);
-      return worktreeState.tasks;
-    }
-
-    throwIfAborted(context?.signal, "Project task read was aborted.");
-    const tasks = await awaitAbortableResult(
-      refreshWorktreeTaskCache(projectState, worktreePath, {
-        startWatching: true,
-      }),
-      context?.signal,
-      "Project task read was aborted.",
-    );
-    startWorktreeTaskPolling(projectState, worktreePath);
-    return tasks;
   });
 }
 /**
@@ -3882,301 +3444,6 @@ async function queueThreadMessage(
   return readThreadDetailCached(thread.id);
 }
 /**
- * Performs packageScriptDisplayCommand operation.
- * @param task - task argument for packageScriptDisplayCommand.
- */
-
-function packageScriptDisplayCommand(task: {
-  packageDirectory: string;
-  scriptName: string;
-}): string {
-  return task.packageDirectory === "."
-    ? `bun run ${task.scriptName}`
-    : `cd ${task.packageDirectory} && bun run ${task.scriptName}`;
-}
-/**
- * Reads process output stream.
- * @param stream - stream argument for readProcessOutputStream.
- * @param onChunk - onChunk argument for readProcessOutputStream.
- * @param signal - Abort signal for cancellation.
- */
-
-async function readProcessOutputStream(
-  stream: ReadableStream<Uint8Array> | null | undefined,
-  onChunk: (chunk: string) => Promise<void>,
-  signal: AbortSignal,
-): Promise<void> {
-  if (!stream) {
-    return;
-  }
-
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      if (!value || value.length === 0) {
-        continue;
-      }
-      const chunk = decoder.decode(value, {
-        stream: true,
-      });
-      if (chunk) {
-        await onChunk(chunk);
-      }
-      if (signal.aborted) {
-        return;
-      }
-    }
-
-    const trailing = decoder.decode();
-    if (trailing) {
-      await onChunk(trailing);
-    }
-  } catch (error) {
-    if (!signal.aborted) {
-      throw error;
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-/**
- * Performs queuePackageScriptTask operation.
- * @param thread - thread argument for queuePackageScriptTask.
- * @param task - task argument for queuePackageScriptTask.
- */
-
-async function queuePackageScriptTask(
-  thread: ThreadRecord,
-  task: {
-    packageDirectory: string;
-    scriptName: string;
-    command: string;
-  },
-): Promise<RpcThreadDetail> {
-  if (currentThreadRunStatus(thread).state === "working") {
-    throw new Error("Thread is already processing a message.");
-  }
-
-  const startedAt = getNow();
-  await withSqliteRetry(() => {
-    return runImmediateSqliteTransaction(() => {
-      markThreadErrorSeen(db, thread.id);
-      markThreadRunStarted(db, thread.id, startedAt);
-    });
-  });
-
-  const controller = new AbortController();
-  threadTurnAbortControllerMap.set(thread.id, controller);
-  setThreadRunStatus(thread.id, {
-    state: "working",
-    startedAt,
-    updatedAt: startedAt,
-    error: null,
-    hasUnreadError: false,
-  });
-
-  const completion = runPackageScriptTaskInBackground(
-    thread.id,
-    thread.worktreePath,
-    task,
-    startedAt,
-    controller,
-  );
-  threadTurnCompletionMap.set(thread.id, completion);
-  void completion;
-
-  return readThreadDetailCached(thread.id);
-}
-/**
- * Runs package script task in background.
- * @param threadId - Thread identifier.
- * @param worktreePath - Worktree path.
- * @param task - task argument for runPackageScriptTaskInBackground.
- * @param startedAt - startedAt argument for runPackageScriptTaskInBackground.
- * @param controller - controller argument for runPackageScriptTaskInBackground.
- */
-
-async function runPackageScriptTaskInBackground(
-  threadId: number,
-  worktreePath: string,
-  task: {
-    packageDirectory: string;
-    scriptName: string;
-    command: string;
-  },
-  startedAt: string,
-  controller: AbortController,
-): Promise<void> {
-  const command = packageScriptDisplayCommand(task);
-  const activityItemId = buildThreadTurnActivityId(
-    startedAt,
-    `project-task:${task.packageDirectory}:${task.scriptName}`,
-  );
-  const cwd = resolve(worktreePath, task.packageDirectory);
-  let output = "";
-  let exitCode: number | null = null;
-  const bufferedActivityWriter = createBufferedThreadActivityWriter();
-
-  /**
-   * Performs queueCommandActivity operation.
-   * @param state - Current state value.
-   * @param options - Configuration options used by this operation.
-   */
-
-  const queueCommandActivity = async (
-    state: "in_progress" | "completed" | "failed" | "stopped",
-    options?: {
-      force?: boolean;
-      terminal?: boolean;
-    },
-  ): Promise<void> => {
-    await bufferedActivityWriter.queue(
-      activityItemId,
-      [state, command, String(exitCode ?? ""), output].join("\u0000"),
-      async () => [
-        buildCommandActivityInputPayload(threadId, activityItemId, {
-          command,
-          exitCode,
-          output,
-          state,
-        }),
-      ],
-      {
-        ...(typeof options?.force === "boolean"
-          ? { force: options.force }
-          : {}),
-        ...(typeof options?.terminal === "boolean"
-          ? { terminal: options.terminal }
-          : {}),
-      },
-    );
-  };
-
-  try {
-    await queueCommandActivity("in_progress");
-
-    const proc = Bun.spawn({
-      cmd: [process.execPath, "run", task.scriptName],
-      cwd,
-      stdout: "pipe",
-      stderr: "pipe",
-      signal: controller.signal,
-    });
-
-    /**
-     * Performs appendOutput operation.
-     * @param chunk - chunk argument for appendOutput.
-     */
-
-    const appendOutput = async (chunk: string) => {
-      output += chunk;
-      await queueCommandActivity("in_progress");
-    };
-
-    const [settledExitCode] = await Promise.all([
-      proc.exited,
-      readProcessOutputStream(proc.stdout, appendOutput, controller.signal),
-      readProcessOutputStream(proc.stderr, appendOutput, controller.signal),
-    ]);
-    exitCode = settledExitCode;
-
-    if (controller.signal.aborted) {
-      await queueCommandActivity("stopped", {
-        force: true,
-        terminal: true,
-      });
-      markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
-      setThreadRunStatus(threadId, {
-        state: "stopped",
-        startedAt,
-        updatedAt: getNow(),
-        error: THREAD_STOPPED_MESSAGE,
-        hasUnreadError: false,
-      });
-      return;
-    }
-
-    if (exitCode === 0) {
-      await queueCommandActivity("completed", {
-        force: true,
-        terminal: true,
-      });
-      markThreadRan(db, threadId);
-      setThreadRunStatus(threadId, {
-        state: "idle",
-        startedAt,
-        updatedAt: getNow(),
-        error: null,
-        hasUnreadError: false,
-      });
-      return;
-    }
-
-    if (!output.trim()) {
-      output = `Command exited with code ${exitCode}.`;
-    }
-    await queueCommandActivity("failed", {
-      force: true,
-      terminal: true,
-    });
-    const errorMessage = `${command} failed with exit code ${exitCode}.`;
-    markThreadFailed(db, threadId, errorMessage);
-    setThreadRunStatus(threadId, {
-      state: "failed",
-      startedAt,
-      updatedAt: getNow(),
-      error: errorMessage,
-      hasUnreadError: true,
-    });
-  } catch (error) {
-    if (isAbortError(error) && controller.signal.aborted) {
-      await queueCommandActivity("stopped", {
-        force: true,
-        terminal: true,
-      });
-      markThreadStopped(db, threadId, THREAD_STOPPED_MESSAGE);
-      setThreadRunStatus(threadId, {
-        state: "stopped",
-        startedAt,
-        updatedAt: getNow(),
-        error: THREAD_STOPPED_MESSAGE,
-        hasUnreadError: false,
-      });
-      return;
-    }
-
-    const message = error instanceof Error ? error.message : String(error);
-    if (!output.trim()) {
-      output = message;
-    }
-    await queueCommandActivity("failed", {
-      force: true,
-      terminal: true,
-    });
-    const errorMessage = `${command} failed: ${message}`;
-    markThreadFailed(db, threadId, errorMessage);
-    setThreadRunStatus(threadId, {
-      state: "failed",
-      startedAt,
-      updatedAt: getNow(),
-      error: errorMessage,
-      hasUnreadError: true,
-    });
-    console.error(`Project task command failed for thread ${threadId}`, error);
-  } finally {
-    if (threadTurnAbortControllerMap.get(threadId) === controller) {
-      threadTurnAbortControllerMap.delete(threadId);
-    }
-    threadTurnCompletionMap.delete(threadId);
-  }
-}
-/**
  * Reads and store worktree snapshot.
  * @param state - Current state value.
  * @param worktreePath - Worktree path.
@@ -4199,83 +3466,6 @@ async function readAndStoreWorktreeSnapshot(
     path: worktreePath,
     ...snapshot,
   };
-}
-/**
- * Runs project task procedure.
- * @param params - Parameters object.
- */
-
-export async function runProjectTaskProcedure(
-  params: AppRPCSchema["requests"]["runProjectTask"]["params"],
-  context?: RpcRequestContext,
-): Promise<RpcThreadDetail> {
-  const project = projectByIdForPath(params.projectId);
-  const worktreePath = normalizePath(params.worktreePath);
-  await assertProjectWorktree(project, worktreePath, {
-    forceRefresh: true,
-  });
-  const resolvedTask = await resolveProjectTaskExecution(
-    worktreePath,
-    params.task,
-  );
-  const access = resolveThreadAccessControls(params);
-
-  let thread = params.threadId ? threadById(params.threadId) : null;
-  const createdThread = thread === null;
-  if (thread) {
-    if (
-      thread.projectId !== project.id ||
-      normalizePath(thread.worktreePath) !== worktreePath
-    ) {
-      throw new Error("Selected task must run in the active worktree thread.");
-    }
-  } else {
-    thread = await createThreadRecord(
-      project,
-      worktreePath,
-      resolveCodexModel(params.model),
-      resolveCodexReasoningEffort(params.reasoningEffort),
-      access,
-      {
-        forceRefresh: true,
-        sessionId: context?.auth.sessionId ?? null,
-      },
-    );
-  }
-
-  try {
-    switch (resolvedTask.kind) {
-      case "script": {
-        const detail = await queuePackageScriptTask(thread, resolvedTask.task);
-        recordProjectTaskQueuedAuditEvent(db, {
-          createdThread,
-          params,
-          thread,
-        });
-        return detail;
-      }
-      case "file": {
-        const detail = await queueThreadMessage(
-          thread,
-          resolvedTask.prompt,
-          context?.auth.sessionId ?? null,
-        );
-        recordProjectTaskQueuedAuditEvent(db, {
-          createdThread,
-          params,
-          thread,
-        });
-        return detail;
-      }
-    }
-  } catch (error) {
-    if (createdThread) {
-      await discardEmptyThreadProcedure({
-        threadId: thread.id,
-      });
-    }
-    throw error;
-  }
 }
 /**
  * Performs stopThreadTurnProcedure operation.
@@ -4584,59 +3774,24 @@ async function openWorktreeWithGitOptions(
   });
 
   const worktreeState = ensureWorktreePollState(state, worktreePath);
-  const shouldRefreshTasks = shouldRefreshWorktreeTaskCache(worktreeState);
-  const tasksPromise =
-    worktreeState.tasks === null && shouldRefreshTasks
-      ? awaitAbortableResult(
-          refreshWorktreeTaskCache(state, worktreePath, {
-            startWatching: true,
-          }),
-          signal ?? null,
-          "Worktree open was aborted.",
-        )
-      : Promise.resolve(worktreeState.tasks ?? []);
-  if (worktreeState.tasks !== null && shouldRefreshTasks) {
-    queueBackgroundWorkWhenIdle(
-      `task-cache-refresh:${project.id}:${worktreePath}`,
-      () => {
-        void refreshWorktreeTaskCache(state, worktreePath, {
-          notify: true,
-          startWatching: true,
-        }).catch((error) => {
-          logBackgroundTaskFailure(
-            `Task cache warm failed for ${worktreePath}`,
-            error,
-          );
-        });
-      },
+  const [{ history, summary, signature }, snapshot] =
+    await runWorktreeOpenLimited(
+      () =>
+        Promise.all([
+          readGitHistoryFirstPage(
+            project.id,
+            worktreePath,
+            DEFAULT_GIT_HISTORY_PAGE_SIZE,
+            requestGitOptions,
+          ),
+          readAndStoreWorktreeSnapshot(state, worktreePath, requestGitOptions),
+        ]),
+      signal,
     );
-  }
-  const [[{ history, summary, signature }, snapshot], tasks] =
-    await Promise.all([
-      runWorktreeOpenLimited(
-        () =>
-          Promise.all([
-            readGitHistoryFirstPage(
-              project.id,
-              worktreePath,
-              DEFAULT_GIT_HISTORY_PAGE_SIZE,
-              requestGitOptions,
-            ),
-            readAndStoreWorktreeSnapshot(
-              state,
-              worktreePath,
-              requestGitOptions,
-            ),
-          ]),
-        signal,
-      ),
-      tasksPromise,
-    ]);
   worktreeState.history = summary;
   worktreeState.historyEntries = history.entries;
   worktreeState.historyNextOffset = history.nextOffset;
   worktreeState.historySignature = signature;
-  startWorktreeTaskPolling(state, worktreePath);
   syncProjectWorktreeBackgroundPolling(state);
   queueBackgroundWorkWhenIdle(
     `git-history-warm:${project.id}:${worktreePath}`,
@@ -4646,7 +3801,6 @@ async function openWorktreeWithGitOptions(
   );
 
   return {
-    tasks,
     project,
     worktree: snapshot,
     history,
@@ -5250,16 +4404,6 @@ export function suspendActiveWorktreePolling(): void {
 
 export function shutdownProcedureCacheMaintenance(): void {
   shutdownDirectorySuggestionCacheMaintenance();
-}
-/**
- * Sets worktree task change listener.
- * @param listener - Event listener callback.
- */
-
-export function setWorktreeTaskChangeListener(
-  listener: ((projectId: number, worktreePath: string) => void) | null,
-): void {
-  worktreeTaskChangeListener = listener;
 }
 /**
  * Sets worktree git history change listener.

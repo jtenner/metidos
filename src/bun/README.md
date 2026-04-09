@@ -31,14 +31,14 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `project-procedures.ts`
   - Exposes all RPC procedure implementations consumed by the frontend.
-  - Coordinates projects, worktrees, threads, tasks, file content reads/diffs, git history, and thread lifecycle operations.
+  - Coordinates projects, worktrees, threads, file content reads/diffs, git history, and thread lifecycle operations.
   - Centralizes authoritative thread metadata mutations so the UI and sidecar invalidate caches through the same backend path.
-  - Maintains in-memory caches/polling state, manages worktree/task background refresh loops, and publishes change events to connected clients.
+  - Maintains in-memory caches/polling state, manages worktree background refresh loops, and publishes change events to connected clients.
   - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
-  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, usage telemetry, and thread/task state.
+  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
   - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 
@@ -66,19 +66,14 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Includes LRU-style cache envelopes for paginated history and commit-diff coalescing.
   - Coordinates with foreground/background scheduling to keep paging smooth under load.
 
-- `project-procedures/project-tasks.ts`
-  - Discovers available `.tasks` and `package.json` script tasks within a project/worktree.
-  - Normalizes task identity/pathing, validates stale task selections, and builds task prompts for worker execution.
-  - Includes filesystem traversal guards, symlink/loop prevention, and safe filtering.
-
 - `project-procedures/thread-detail.ts`
-  - Converts persisted thread/message DB records into frontend RPC thread/task shapes.
+  - Converts persisted thread/message DB records into frontend RPC thread/message shapes.
   - Builds run-state, run-status, usage, compaction telemetry, and message formatting per kind.
   - Contains user-facing message/state normalization used by stream and history views.
 
 - `project-procedures/shared.ts`
   - Shared utility layer for cancellable async helpers, LRU helpers, and concurrency limiting.
-  - Provides reusable normalization/error helpers used across directory, history, and task caching.
+  - Provides reusable normalization/error helpers used across directory and history caching.
 
 - `rpc-schema.ts`
   - Defines typed request/response contracts for all backend RPC methods.
@@ -91,7 +86,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `project-security-audit.ts`
   - Centralizes the persistent security audit helpers for privileged project/workspace actions.
-  - Records cross-workspace thread creation, queued task execution, and project deletion events with stable payloads that are easy to test.
+  - Records cross-workspace thread creation and project deletion events with stable payloads that are easy to test.
 
 - `security-audit.ts`
   - Provides the shared local security audit log read helpers used by the CLI and tests.
@@ -151,7 +146,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Implements the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
   - Coordinates setup, TOTP login, recovery-code login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
   - Persists security audit events for successful auth setup, login, step-up, recovery-code usage, logout transitions, and invalid-credential lockout events.
-  - Also manages the 24-hour idle session timeout plus the short-lived step-up freshness window used to protect high-risk RPC actions such as task execution and project deletion.
+  - Also manages the 24-hour idle session timeout plus the short-lived step-up freshness window used to protect high-risk RPC actions such as project deletion.
   - Also reports auth status to the UI, including the explicit dev-bypass state used by local development flows.
 
 - `auth-reset.ts`

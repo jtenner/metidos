@@ -72,8 +72,6 @@ type UseMainviewDerivedStateParams = {
   homeDirectory: string;
   isCreatingThread: boolean;
   isDocumentVisible: boolean;
-  isLoadingProjectTasks: boolean;
-  isRunningProjectTask: boolean;
   isSending: boolean;
   isStoppingThread: boolean;
   isThreadLoading: boolean;
@@ -149,8 +147,6 @@ export function deriveActiveContextUsage(
  * @param homeDirectory - homeDirectory argument for useMainviewDerivedState.
  * @param isCreatingThread - Boolean flag indicating isCreatingThread.
  * @param isDocumentVisible - Boolean flag indicating isDocumentVisible.
- * @param isLoadingProjectTasks - Boolean flag indicating isLoadingProjectTasks.
- * @param isRunningProjectTask - Boolean flag indicating isRunningProjectTask.
  * @param isSending - Boolean flag indicating isSending.
  * @param isStoppingThread - Boolean flag indicating isStoppingThread.
  * @param isThreadLoading - Boolean flag indicating isThreadLoading.
@@ -187,8 +183,6 @@ export function useMainviewDerivedState({
   homeDirectory,
   isCreatingThread,
   isDocumentVisible,
-  isLoadingProjectTasks,
-  isRunningProjectTask,
   isSending,
   isStoppingThread,
   isThreadLoading,
@@ -621,16 +615,6 @@ export function useMainviewDerivedState({
         )
     : "No worktree selected";
 
-  const taskSelectorDisabled =
-    !selectedProject ||
-    !activeSelectedWorktreePath ||
-    !activeSelectedWorktreeOpened ||
-    isLoadingProjectTasks ||
-    isRunningProjectTask ||
-    isSending ||
-    selectedThreadIsWorking ||
-    isThreadLoading;
-
   const normalizedSidebarSearchQuery = useMemo(
     // Normalize once so every query check uses a canonicalized token stream.
     () => normalizeSearchQuery(sidebarSearchQuery),
@@ -750,7 +734,6 @@ export function useMainviewDerivedState({
     selectedThread,
     selectedThreadIsWorking,
     selectedThreadRunStatus,
-    taskSelectorDisabled,
     threadActionMenuThread,
     threadAccessControlDisabled,
     worktreeByProjectAndPath,

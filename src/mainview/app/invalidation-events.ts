@@ -3,10 +3,7 @@
  * @description Module for invalidation events.
  */
 
-import type {
-  RpcWorktreeGitHistoryChanged,
-  RpcWorktreeTasksChanged,
-} from "../../bun/rpc-schema";
+import type { RpcWorktreeGitHistoryChanged } from "../../bun/rpc-schema";
 import { worktreeKey } from "./state";
 
 type WorktreeInvalidationPayload = {
@@ -87,30 +84,8 @@ export function createCoalescedWorktreeInvalidationChannel<
   };
 }
 
-const worktreeTasksChangedChannel =
-  createCoalescedWorktreeInvalidationChannel<RpcWorktreeTasksChanged>();
 const worktreeGitHistoryChangedChannel =
   createCoalescedWorktreeInvalidationChannel<RpcWorktreeGitHistoryChanged>();
-/**
- * Performs publishWorktreeTasksChanged operation.
- * @param payload - payload argument for publishWorktreeTasksChanged.
- */
-
-export function publishWorktreeTasksChanged(
-  payload: RpcWorktreeTasksChanged,
-): void {
-  worktreeTasksChangedChannel.publish(payload);
-}
-/**
- * Performs subscribeToWorktreeTasksChanged operation.
- * @param subscriber - subscriber argument for subscribeToWorktreeTasksChanged.
- */
-
-export function subscribeToWorktreeTasksChanged(
-  subscriber: WorktreeInvalidationSubscriber<RpcWorktreeTasksChanged>,
-): () => void {
-  return worktreeTasksChangedChannel.subscribe(subscriber);
-}
 /**
  * Performs publishWorktreeGitHistoryChanged operation.
  * @param payload - payload argument for publishWorktreeGitHistoryChanged.
