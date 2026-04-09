@@ -6,6 +6,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
+import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 import {
   Codex,
   type Thread as CodexThread,
@@ -75,13 +76,14 @@ import {
   runGitCommand,
 } from "./git";
 import {
+  createPiThreadRuntime,
+  type PiThreadRuntime,
+} from "./pi-thread-runtime";
+import {
   buildCodexConstructorOptions,
   type CodexConstructorConfig,
 } from "./project-procedures/codex-constructor";
-import {
-  applyCodexSessionUsageTelemetry,
-  readCodexSessionUsageTelemetry,
-} from "./project-procedures/codex-session-telemetry";
+import { applyCodexSessionUsageTelemetry } from "./project-procedures/codex-session-telemetry";
 import { normalizeCommandDisplayText } from "./project-procedures/command-normalization";
 import {
   listDirectorySuggestions,
@@ -435,8 +437,6 @@ const COMMAND_ACTIVITY_FLUSH_INTERVAL_MS = 500;
 const WORKTREE_OPEN_CONCURRENCY = 2;
 const GIT_HISTORY_READ_CONCURRENCY = 2;
 const DIFF_LOAD_CONCURRENCY = 2;
-const JOLT_THREAD_START_METADATA_INSTRUCTION =
-  "Before you do anything, please update the jolt thread metadata by calling 'update_thread'.";
 
 /**
  * Per-worktree command options, including an explicit refresh override.
@@ -489,6 +489,7 @@ type ProjectPollState = {
 
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, CodexThread>();
+const piThreadRuntimeMap = new Map<number, PiThreadRuntime>();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 const threadTurnAbortControllerMap = new Map<number, AbortController>();
 const threadTurnCompletionMap = new Map<number, Promise<void>>();
@@ -852,6 +853,14 @@ function gitCommandOptionsFromRequest(
 function invalidateThreadDetailCache(threadId: number): void {
   threadDetailCache.delete(threadId);
 }
+
+function disposePiThreadRuntime(threadId: number): void {
+  const runtime = piThreadRuntimeMap.get(threadId);
+  if (runtime) {
+    runtime.session.dispose();
+  }
+  piThreadRuntimeMap.delete(threadId);
+}
 /**
  * Performs clearThreadRuntimeState operation.
  * @param threadId - Thread identifier.
@@ -867,6 +876,7 @@ function clearThreadRuntimeState(threadId: number): void {
   threadTurnAbortControllerMap.delete(threadId);
   threadTurnCompletionMap.delete(threadId);
   codexThreadMap.delete(threadId);
+  disposePiThreadRuntime(threadId);
   threadRunStatusMap.delete(threadId);
   invalidateThreadDetailCache(threadId);
 }
@@ -1061,7 +1071,7 @@ function createManagedCodexThread(
  * @param thread - Thread record used to ensure Codex thread existence.
  */
 
-async function ensureCodexThread(
+async function _ensureCodexThread(
   thread: ThreadRecord,
   sessionId: string | null,
 ): Promise<CodexThread> {
@@ -1072,6 +1082,27 @@ async function ensureCodexThread(
 
   const next = createManagedCodexThread(thread, sessionId);
   codexThreadMap.set(thread.id, next);
+  return next;
+}
+
+async function ensurePiThreadRuntime(
+  thread: ThreadRecord,
+  _sessionId: string | null,
+): Promise<PiThreadRuntime> {
+  const active = piThreadRuntimeMap.get(thread.id);
+  if (active) {
+    return active;
+  }
+
+  const next = await createPiThreadRuntime(thread);
+  piThreadRuntimeMap.set(thread.id, next);
+  if (
+    next.session.sessionId &&
+    next.session.sessionId !== thread.codexThreadId
+  ) {
+    updateThreadCodexId(db, thread.id, next.session.sessionId);
+    invalidateThreadDetailCache(thread.id);
+  }
   return next;
 }
 /**
@@ -1230,7 +1261,7 @@ export function missingAssistantResponseErrorMessage(
   model: string | null | undefined,
 ): string {
   const baseMessage =
-    "Codex completed without returning an assistant response.";
+    "Thread run completed without returning an assistant response.";
   if (codexModelProvider(model) === "xai") {
     return `${baseMessage} The xAI provider may have stopped after reasoning without emitting a final answer or tool call.`;
   }
@@ -1264,223 +1295,342 @@ async function runThreadMessageInBackground(
 ): Promise<void> {
   let lastAssistantText = "";
   let lastAssistantItemId: string | null = null;
-  let terminalError: string | null = null;
   let usage: RpcThreadUsage | null = null;
   const bufferedActivityWriter = createBufferedThreadActivityWriter();
 
   try {
     const thread = threadById(threadId);
-    const codexThread = await ensureCodexThread(thread, sessionId);
-    const { events } = await codexThread.runStreamed(input, {
-      signal: controller.signal,
-    });
+    const runtime = await ensurePiThreadRuntime(thread, sessionId);
+    const thinkingTextByActivityId = new Map<string, string>();
+    const assistantTextByActivityId = new Map<string, string>();
+    const toolArgsByCallId = new Map<string, unknown>();
+    let eventProcessingChain = Promise.resolve();
+    let eventProcessingError: unknown = null;
 
-    for await (const event of events) {
-      if (event.type === "thread.started") {
-        if (event.thread_id && event.thread_id !== thread.codexThreadId) {
-          updateThreadCodexId(db, thread.id, event.thread_id);
-          invalidateThreadDetailCache(thread.id);
-        }
-        continue;
-      }
+    const unsubscribe = runtime.session.subscribe(
+      (event: AgentSessionEvent) => {
+        eventProcessingChain = eventProcessingChain
+          .then(async () => {
+            if (
+              event.type === "message_update" &&
+              (event.message as { role?: unknown }).role === "assistant"
+            ) {
+              const assistantActivityId = buildPiAssistantActivityId(
+                startedAt,
+                event.message,
+                "assistant",
+              );
+              const reasoningActivityId = buildPiAssistantActivityId(
+                startedAt,
+                event.message,
+                "reasoning",
+              );
 
-      if (event.type === "turn.failed") {
-        terminalError = event.error.message || "Codex turn failed.";
-        continue;
-      }
+              if (event.assistantMessageEvent.type === "thinking_delta") {
+                const nextThinkingText = `${
+                  thinkingTextByActivityId.get(reasoningActivityId) ?? ""
+                }${event.assistantMessageEvent.delta ?? ""}`;
+                thinkingTextByActivityId.set(
+                  reasoningActivityId,
+                  nextThinkingText,
+                );
+                const persistedThinkingText = nextThinkingText.trim();
+                if (persistedThinkingText) {
+                  await bufferedActivityWriter.queue(
+                    reasoningActivityId,
+                    `in_progress\u0000${persistedThinkingText}`,
+                    async () => [
+                      buildReasoningActivityInputText(
+                        threadId,
+                        reasoningActivityId,
+                        persistedThinkingText,
+                        "in_progress",
+                      ),
+                    ],
+                  );
+                }
+                return;
+              }
 
-      if (event.type === "error") {
-        terminalError = event.message || "Codex event stream failed.";
-        continue;
-      }
+              if (event.assistantMessageEvent.type === "text_delta") {
+                const nextAssistantText = `${
+                  assistantTextByActivityId.get(assistantActivityId) ?? ""
+                }${event.assistantMessageEvent.delta ?? ""}`;
+                assistantTextByActivityId.set(
+                  assistantActivityId,
+                  nextAssistantText,
+                );
+                const persistedAssistantText = nextAssistantText.trim();
+                if (persistedAssistantText) {
+                  lastAssistantText = persistedAssistantText;
+                  lastAssistantItemId = assistantActivityId;
+                  await bufferedActivityWriter.queue(
+                    assistantActivityId,
+                    `in_progress\u0000${persistedAssistantText}`,
+                    async () => [
+                      buildAssistantChatActivityInput(
+                        threadId,
+                        assistantActivityId,
+                        persistedAssistantText,
+                        "in_progress",
+                      ),
+                    ],
+                  );
+                }
+              }
+              return;
+            }
 
-      if (event.type === "turn.completed") {
-        usage = {
-          inputTokens: event.usage.input_tokens,
-          cachedInputTokens: event.usage.cached_input_tokens,
-          outputTokens: event.usage.output_tokens,
-        };
-        continue;
-      }
+            if (
+              event.type === "message_end" &&
+              (event.message as { role?: unknown }).role === "assistant"
+            ) {
+              const assistantActivityId = buildPiAssistantActivityId(
+                startedAt,
+                event.message,
+                "assistant",
+              );
+              const finalAssistantText = extractPiAssistantMessageText(
+                event.message,
+              ).trim();
+              if (finalAssistantText) {
+                assistantTextByActivityId.set(
+                  assistantActivityId,
+                  finalAssistantText,
+                );
+                lastAssistantText = finalAssistantText;
+                lastAssistantItemId = assistantActivityId;
+                await bufferedActivityWriter.queue(
+                  assistantActivityId,
+                  `completed\u0000${finalAssistantText}`,
+                  async () => [
+                    buildAssistantChatActivityInput(
+                      threadId,
+                      assistantActivityId,
+                      finalAssistantText,
+                      "completed",
+                    ),
+                  ],
+                  {
+                    force: true,
+                    terminal: true,
+                  },
+                );
+              }
 
-      if (
-        event.type !== "item.started" &&
-        event.type !== "item.updated" &&
-        event.type !== "item.completed"
-      ) {
-        continue;
-      }
+              const reasoningActivityId = buildPiAssistantActivityId(
+                startedAt,
+                event.message,
+                "reasoning",
+              );
+              const finalThinkingText = (
+                thinkingTextByActivityId.get(reasoningActivityId) ?? ""
+              ).trim();
+              if (finalThinkingText) {
+                await bufferedActivityWriter.queue(
+                  reasoningActivityId,
+                  `completed\u0000${finalThinkingText}`,
+                  async () => [
+                    buildReasoningActivityInputText(
+                      threadId,
+                      reasoningActivityId,
+                      finalThinkingText,
+                      "completed",
+                    ),
+                  ],
+                  {
+                    force: true,
+                    terminal: true,
+                  },
+                );
+              }
 
-      const item = event.item;
-      if (item.type === "agent_message") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        const nextAssistantText = item.text.trim();
-        if (nextAssistantText) {
-          lastAssistantText = nextAssistantText;
-          lastAssistantItemId = activityItemId;
-        }
-        if (nextAssistantText) {
-          const state =
-            event.type === "item.completed" ? "completed" : "in_progress";
-          await bufferedActivityWriter.queue(
-            activityItemId,
-            `${state}\u0000${nextAssistantText}`,
-            async () => [
-              buildAssistantChatActivityInput(
-                threadId,
+              usage = extractPiAssistantUsage(event.message) ?? usage;
+              return;
+            }
+
+            if (event.type === "tool_execution_start") {
+              toolArgsByCallId.set(event.toolCallId, event.args);
+              const activityItemId = buildThreadTurnActivityId(
+                startedAt,
+                `tool:${event.toolCallId}`,
+              );
+              if (event.toolName === "bash") {
+                const command = normalizeCommandDisplayText(
+                  typeof event.args?.command === "string"
+                    ? event.args.command
+                    : "bash",
+                );
+                await bufferedActivityWriter.queue(
+                  activityItemId,
+                  `in_progress\u0000${command}`,
+                  async () => [
+                    buildCommandActivityInputPayload(threadId, activityItemId, {
+                      command,
+                      exitCode: null,
+                      output: "",
+                      state: "in_progress",
+                    }),
+                  ],
+                );
+                return;
+              }
+
+              await bufferedActivityWriter.queue(
                 activityItemId,
-                nextAssistantText,
-                state,
-              ),
-            ],
-            {
-              force: state !== "in_progress",
-              terminal: state !== "in_progress",
-            },
-          );
-        }
-        continue;
-      }
+                `in_progress\u0000${event.toolName}`,
+                async () => [
+                  buildToolCallActivityInputPayload(threadId, activityItemId, {
+                    server: "pi",
+                    tool: event.toolName,
+                    argumentsText: stringifyActivityValue(event.args),
+                    output: "",
+                    state: "in_progress",
+                  }),
+                ],
+              );
+              return;
+            }
 
-      if (item.type === "reasoning") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        const state =
-          event.type === "item.completed" ? "completed" : "in_progress";
-        const text = item.text.trim() || "Reasoning";
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          `${state}\u0000${text}`,
-          async () => [
-            buildReasoningActivityInput(threadId, activityItemId, item, state),
-          ],
-          {
-            force: state !== "in_progress",
-            terminal: state !== "in_progress",
-          },
-        );
-        continue;
-      }
+            if (event.type === "tool_execution_update") {
+              toolArgsByCallId.set(event.toolCallId, event.args);
+              const activityItemId = buildThreadTurnActivityId(
+                startedAt,
+                `tool:${event.toolCallId}`,
+              );
+              const output = extractPiToolExecutionOutput(event.partialResult);
+              if (event.toolName === "bash") {
+                const command = normalizeCommandDisplayText(
+                  typeof event.args?.command === "string"
+                    ? event.args.command
+                    : "bash",
+                );
+                await bufferedActivityWriter.queue(
+                  activityItemId,
+                  `in_progress\u0000${command}\u0000${output}`,
+                  async () => [
+                    buildCommandActivityInputPayload(threadId, activityItemId, {
+                      command,
+                      exitCode: null,
+                      output,
+                      state: "in_progress",
+                    }),
+                  ],
+                );
+                return;
+              }
 
-      if (item.type === "command_execution") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          [
-            item.status,
-            item.command,
-            String(item.exit_code ?? ""),
-            item.aggregated_output,
-          ].join("\u0000"),
-          async () => [
-            buildCommandActivityInput(threadId, activityItemId, item),
-          ],
-          {
-            force: item.status !== "in_progress",
-            terminal: item.status !== "in_progress",
-          },
-        );
-        continue;
-      }
+              await bufferedActivityWriter.queue(
+                activityItemId,
+                `in_progress\u0000${event.toolName}\u0000${output}`,
+                async () => [
+                  buildToolCallActivityInputPayload(threadId, activityItemId, {
+                    server: "pi",
+                    tool: event.toolName,
+                    argumentsText: stringifyActivityValue(event.args),
+                    output,
+                    state: "in_progress",
+                  }),
+                ],
+              );
+              return;
+            }
 
-      if (item.type === "mcp_tool_call") {
-        if (item.server === JOLT_MCP_SERVER_NAME) {
-          continue;
-        }
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          [
-            item.status,
-            item.server,
-            item.tool,
-            stringifyActivityValue(item.arguments),
-            formatToolCallOutput(item),
-          ].join("\u0000"),
-          async () => [
-            buildToolCallActivityInput(threadId, activityItemId, item),
-          ],
-          {
-            force: item.status !== "in_progress",
-            terminal: item.status !== "in_progress",
-          },
-        );
-        continue;
-      }
+            if (event.type === "tool_execution_end") {
+              const toolArgs = toolArgsByCallId.get(event.toolCallId);
+              toolArgsByCallId.delete(event.toolCallId);
+              const activityItemId = buildThreadTurnActivityId(
+                startedAt,
+                `tool:${event.toolCallId}`,
+              );
+              const output = extractPiToolExecutionOutput(event.result);
+              const state = event.isError ? "failed" : "completed";
+              if (event.toolName === "bash") {
+                const command = normalizeCommandDisplayText(
+                  typeof (toolArgs as { command?: unknown } | undefined)
+                    ?.command === "string"
+                    ? String((toolArgs as { command?: unknown }).command)
+                    : "bash",
+                );
+                await bufferedActivityWriter.queue(
+                  activityItemId,
+                  `${state}\u0000${command}\u0000${output}`,
+                  async () => [
+                    buildCommandActivityInputPayload(threadId, activityItemId, {
+                      command,
+                      exitCode: extractPiBashExitCode(output),
+                      output,
+                      state,
+                    }),
+                  ],
+                  {
+                    force: true,
+                    terminal: true,
+                  },
+                );
+                return;
+              }
 
-      if (item.type === "web_search") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        const state =
-          event.type === "item.completed" ? "completed" : "in_progress";
-        const query = item.query.trim() || "Web search";
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          `${state}\u0000${query}`,
-          async () => [
-            buildWebSearchActivityInput(threadId, activityItemId, item, state),
-          ],
-          {
-            force: state !== "in_progress",
-            terminal: state !== "in_progress",
-          },
-        );
-        continue;
-      }
+              await bufferedActivityWriter.queue(
+                activityItemId,
+                `${state}\u0000${event.toolName}\u0000${output}`,
+                async () => [
+                  buildToolCallActivityInputPayload(threadId, activityItemId, {
+                    server: "pi",
+                    tool: event.toolName,
+                    argumentsText: stringifyActivityValue(toolArgs),
+                    output,
+                    state,
+                  }),
+                ],
+                {
+                  force: true,
+                  terminal: true,
+                },
+              );
+            }
+          })
+          .catch((error) => {
+            if (eventProcessingError === null) {
+              eventProcessingError = error;
+            }
+          });
+      },
+    );
+    const abortPiRuntime = () => {
+      void runtime.session.abort();
+    };
+    controller.signal.addEventListener("abort", abortPiRuntime, { once: true });
 
-      if (item.type === "error") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        const state =
-          event.type === "item.completed" ? "completed" : "in_progress";
-        const message =
-          item.message.trim() || "Codex reported a non-fatal error.";
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          `${state}\u0000${message}`,
-          async () => [
-            buildErrorActivityInput(threadId, activityItemId, item, state),
-          ],
-          {
-            force: state !== "in_progress",
-            terminal: state !== "in_progress",
-          },
-        );
-        continue;
-      }
-
-      if (item.type === "file_change") {
-        const activityItemId = buildThreadTurnActivityId(startedAt, item.id);
-        await bufferedActivityWriter.queue(
-          activityItemId,
-          [
-            item.status,
-            ...item.changes.map((change) => `${change.kind}:${change.path}`),
-          ].join("\u0000"),
-          () =>
-            buildFileChangeActivityInputs(
-              threadId,
-              activityItemId,
-              thread.worktreePath,
-              item,
-            ),
-          {
-            force: event.type === "item.completed",
-            terminal: event.type === "item.completed",
-          },
-        );
-      }
+    try {
+      await runtime.session.prompt(input);
+    } finally {
+      controller.signal.removeEventListener("abort", abortPiRuntime);
+      unsubscribe();
     }
 
+    await eventProcessingChain;
+    if (eventProcessingError) {
+      throw eventProcessingError;
+    }
     await bufferedActivityWriter.flushAll();
 
-    if (terminalError) {
-      throw new Error(terminalError);
-    }
-
+    const lastAssistantMessage = [...runtime.session.messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    usage = extractPiAssistantUsage(lastAssistantMessage) ?? usage;
+    const finalAssistantTextCandidate =
+      lastAssistantText ||
+      extractPiAssistantMessageText(lastAssistantMessage).trim();
     const finalAssistantText = requireAssistantResponseText(
-      lastAssistantText,
+      finalAssistantTextCandidate,
       thread.model,
     );
-    if (codexThread.id && codexThread.id !== thread.codexThreadId) {
-      updateThreadCodexId(db, thread.id, codexThread.id);
+    if (
+      runtime.session.sessionId &&
+      runtime.session.sessionId !== thread.codexThreadId
+    ) {
+      updateThreadCodexId(db, thread.id, runtime.session.sessionId);
       invalidateThreadDetailCache(thread.id);
     }
     if (lastAssistantItemId && lastAssistantText.trim()) {
@@ -1507,8 +1657,7 @@ async function runThreadMessageInBackground(
         buildNextCompactionTelemetry(
           currentThread,
           usage,
-          readCodexSessionUsageTelemetry(currentThread.codexThreadId)
-            ?.contextWindowTokens ??
+          runtime.contextWindowTokens ||
             contextWindowTokensForModel(currentThread.model),
         ),
       );
@@ -1551,7 +1700,7 @@ async function runThreadMessageInBackground(
         "failed",
       );
     }
-    const errorMessage = `Codex turn failed: ${message}`;
+    const errorMessage = `Thread run failed: ${message}`;
     markThreadFailed(db, threadId, errorMessage);
     setThreadRunStatus(threadId, {
       state: "failed",
@@ -1560,7 +1709,7 @@ async function runThreadMessageInBackground(
       error: errorMessage,
       hasUnreadError: true,
     });
-    console.error(`Codex turn failed for thread ${threadId}`, error);
+    console.error(`Thread run failed for thread ${threadId}`, error);
   } finally {
     if (threadTurnAbortControllerMap.get(threadId) === controller) {
       threadTurnAbortControllerMap.delete(threadId);
@@ -1749,6 +1898,95 @@ function extractToolCallTextContent(content: unknown): string {
       return [candidate.text];
     })
     .join("\n\n");
+}
+
+function extractPiAssistantMessageText(message: unknown): string {
+  if (!message || typeof message !== "object") {
+    return "";
+  }
+
+  const candidate = message as {
+    content?: string | unknown[];
+  };
+  if (typeof candidate.content === "string") {
+    return candidate.content;
+  }
+  return extractToolCallTextContent(candidate.content);
+}
+
+function extractPiAssistantUsage(message: unknown): RpcThreadUsage | null {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+
+  const usage = (message as { usage?: Record<string, unknown> }).usage;
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens =
+    typeof usage.input === "number" && Number.isFinite(usage.input)
+      ? usage.input
+      : null;
+  const cachedInputTokens =
+    typeof usage.cacheRead === "number" && Number.isFinite(usage.cacheRead)
+      ? usage.cacheRead
+      : null;
+  const outputTokens =
+    typeof usage.output === "number" && Number.isFinite(usage.output)
+      ? usage.output
+      : null;
+
+  if (
+    inputTokens === null &&
+    cachedInputTokens === null &&
+    outputTokens === null
+  ) {
+    return null;
+  }
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    cachedInputTokens: cachedInputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+  };
+}
+
+function buildPiAssistantActivityId(
+  startedAt: string,
+  message: unknown,
+  prefix: string,
+): string {
+  const timestamp =
+    message && typeof message === "object"
+      ? (message as { timestamp?: unknown }).timestamp
+      : null;
+  const suffix =
+    typeof timestamp === "number" && Number.isFinite(timestamp)
+      ? String(timestamp)
+      : prefix;
+  return buildThreadTurnActivityId(startedAt, `${prefix}:${suffix}`);
+}
+
+function extractPiToolExecutionOutput(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const candidate = value as {
+    content?: unknown;
+  };
+  return extractToolCallTextContent(candidate.content);
+}
+
+function extractPiBashExitCode(output: string): number | null {
+  const match = output.match(/Command exited with code (\d+)\s*$/u);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[1] ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 /**
  * Formats tool call output.
@@ -2012,7 +2250,7 @@ function persistThreadActivityInputs(
  * @param state - Current state value.
  */
 
-function buildReasoningActivityInput(
+function _buildReasoningActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "reasoning" }>,
@@ -2094,6 +2332,58 @@ function buildCommandActivityInputPayload(
     } satisfies CommandActivityPayload),
   };
 }
+
+function buildReasoningActivityInputText(
+  threadId: number,
+  itemId: string,
+  text: string,
+  state: "in_progress" | "completed" | "stopped",
+): ThreadActivityInput {
+  return {
+    threadId,
+    itemId,
+    kind: "reasoning",
+    text: text.trim() || "Reasoning",
+    state,
+  };
+}
+
+function buildToolCallActivityInputPayload(
+  threadId: number,
+  itemId: string,
+  payload: ToolCallActivityPayload & {
+    state: "in_progress" | "completed" | "failed" | "stopped";
+  },
+): ThreadActivityInput {
+  return {
+    threadId,
+    itemId,
+    kind: "tool_call",
+    text: `${payload.server}.${payload.tool}`,
+    state: payload.state,
+    payloadJson: JSON.stringify({
+      server: payload.server,
+      tool: payload.tool,
+      argumentsText: payload.argumentsText,
+      output: payload.output,
+    } satisfies ToolCallActivityPayload),
+  };
+}
+
+function _buildErrorActivityInputText(
+  threadId: number,
+  itemId: string,
+  text: string,
+  state: "in_progress" | "completed" | "stopped",
+): ThreadActivityInput {
+  return {
+    threadId,
+    itemId,
+    kind: "error",
+    text: text.trim() || "Thread runtime reported a non-fatal error.",
+    state,
+  };
+}
 /**
  * Builds command activity input.
  * @param threadId - Thread identifier.
@@ -2101,7 +2391,7 @@ function buildCommandActivityInputPayload(
  * @param item - Command tool-call activity to convert into input data.
  */
 
-function buildCommandActivityInput(
+function _buildCommandActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "command_execution" }>,
@@ -2123,7 +2413,7 @@ function buildCommandActivityInput(
  * @param item - File-change activity item to convert into input data.
  */
 
-async function buildFileChangeActivityInputs(
+async function _buildFileChangeActivityInputs(
   threadId: number,
   itemId: string,
   worktreePath: string,
@@ -2158,7 +2448,7 @@ async function buildFileChangeActivityInputs(
  * @param item - Tool-call activity item to convert into input data.
  */
 
-function buildToolCallActivityInput(
+function _buildToolCallActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
@@ -2185,7 +2475,7 @@ function buildToolCallActivityInput(
  * @param state - Current state value.
  */
 
-function buildWebSearchActivityInput(
+function _buildWebSearchActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "web_search" }>,
@@ -2207,7 +2497,7 @@ function buildWebSearchActivityInput(
  * @param state - Current state value.
  */
 
-function buildErrorActivityInput(
+function _buildErrorActivityInput(
   threadId: number,
   itemId: string,
   item: Extract<ThreadItem, { type: "error" }>,
@@ -2217,7 +2507,7 @@ function buildErrorActivityInput(
     threadId,
     itemId,
     kind: "error",
-    text: item.message.trim() || "Codex reported a non-fatal error.",
+    text: item.message.trim() || "Thread runtime reported a non-fatal error.",
     state,
   };
 }
@@ -2799,21 +3089,10 @@ async function createThreadRecord(
       codexThreadId: null,
     }),
   );
-  try {
-    const codexThread = createManagedCodexThread(
-      thread,
-      options?.sessionId ?? null,
-    );
-    codexThreadMap.set(thread.id, codexThread);
-    if (access.unsafeMode) {
-      recordUnsafeModeAuditEvent(thread, true, "thread_create");
-    }
-    return thread;
-  } catch (error) {
-    clearThreadRuntimeState(thread.id);
-    deleteThread(db, thread.id);
-    throw error;
+  if (access.unsafeMode) {
+    recordUnsafeModeAuditEvent(thread, true, "thread_create");
   }
+  return thread;
 }
 /**
  * Performs recordUnsafeModeAuditEvent operation.
@@ -3439,16 +3718,8 @@ async function queueThreadMessage(
     throw new Error("Thread is already processing a message.");
   }
   const startedAt = getNow();
-  let threadedPrompt = input;
   await withSqliteRetry(() => {
     return runImmediateSqliteTransaction(() => {
-      const isFirstTurn =
-        listThreadMessagesPage(db, thread.id, { limit: 1 }).messages.length ===
-        0;
-      threadedPrompt = isFirstTurn
-        ? `${JOLT_THREAD_START_METADATA_INSTRUCTION}\n\n${input}`
-        : input;
-
       markThreadErrorSeen(db, thread.id);
       createThreadMessage(db, {
         threadId: thread.id,
@@ -3471,7 +3742,7 @@ async function queueThreadMessage(
 
   const completion = runThreadMessageInBackground(
     thread.id,
-    threadedPrompt,
+    input,
     startedAt,
     controller,
     sessionId,
@@ -3614,12 +3885,13 @@ export async function updateThreadModelProcedure(
 ): Promise<RpcThread> {
   const thread = threadById(params.threadId);
   if (currentThreadRunStatus(thread).state === "working") {
-    throw new Error("Thread model cannot change while Codex is processing.");
+    throw new Error("Thread model cannot change while a run is processing.");
   }
 
   const model = resolveCodexModel(params.model);
   setThreadModel(db, thread.id, model);
   codexThreadMap.delete(thread.id);
+  disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
@@ -3634,13 +3906,14 @@ export async function updateThreadReasoningEffortProcedure(
   const thread = threadById(params.threadId);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
-      "Thread reasoning effort cannot change while Codex is processing.",
+      "Thread reasoning effort cannot change while a run is processing.",
     );
   }
 
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   setThreadReasoningEffort(db, thread.id, reasoningEffort);
   codexThreadMap.delete(thread.id);
+  disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
@@ -3655,7 +3928,7 @@ export async function updateThreadAccessProcedure(
   const thread = threadById(params.threadId);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
-      "Thread access controls cannot change while Codex is processing.",
+      "Thread access controls cannot change while a run is processing.",
     );
   }
 
@@ -3692,6 +3965,7 @@ export async function updateThreadAccessProcedure(
     recordUnsafeModeAuditEvent(thread, next.unsafeMode, "toggle");
   }
   codexThreadMap.delete(thread.id);
+  disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }
@@ -3706,7 +3980,7 @@ export async function updateThreadUnsafeModeProcedure(
   const thread = threadById(params.threadId);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
-      "Thread unsafe mode cannot change while Codex is processing.",
+      "Thread unsafe mode cannot change while a run is processing.",
     );
   }
 
@@ -3718,6 +3992,7 @@ export async function updateThreadUnsafeModeProcedure(
   setThreadUnsafeMode(db, thread.id, unsafeMode);
   recordUnsafeModeAuditEvent(thread, unsafeMode, "toggle");
   codexThreadMap.delete(thread.id);
+  disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
 }

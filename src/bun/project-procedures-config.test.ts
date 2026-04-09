@@ -371,7 +371,7 @@ describe("project procedure configuration helpers", () => {
     expect(() =>
       procedures.requireAssistantResponseText("", "grok-4.20-reasoning"),
     ).toThrow(
-      "Codex completed without returning an assistant response. The xAI provider may have stopped after reasoning without emitting a final answer or tool call.",
+      "Thread run completed without returning an assistant response. The xAI provider may have stopped after reasoning without emitting a final answer or tool call.",
     );
     expect(procedures.requireAssistantResponseText("  ok  ", "gpt-5.4")).toBe(
       "ok",

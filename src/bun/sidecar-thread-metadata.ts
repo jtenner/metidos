@@ -60,12 +60,17 @@ function hasThreadAccessUpdate(params: SidecarThreadUpdateParams): boolean {
 }
 
 function threadAccessBlockedWhileProcessingMessage(): string {
-  return "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.";
+  return "Thread access update did not reach the live app: Thread access controls cannot change while a run is processing.";
 }
 
 export function isThreadAccessBlockedWhileProcessing(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes(threadAccessBlockedWhileProcessingMessage());
+  return (
+    message.includes(threadAccessBlockedWhileProcessingMessage()) ||
+    message.includes(
+      "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+    )
+  );
 }
 
 /**

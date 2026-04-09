@@ -322,7 +322,7 @@ describe("sidecar thread metadata updates", () => {
     const accessRpcCall: UpdateThreadAccessRpc = async (params) => {
       accessCalls.push(params);
       throw new Error(
-        "Thread access controls cannot change while Codex is processing.",
+        "Thread access controls cannot change while a run is processing.",
       );
     };
 
@@ -354,7 +354,7 @@ describe("sidecar thread metadata updates", () => {
     expect(result.thread.title).toBe("Keep this title");
     expect(result.thread.unsafeMode).toBeTrue();
     expect(result.accessUpdateWarning).toBe(
-      "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+      "Thread access update did not reach the live app: Thread access controls cannot change while a run is processing.",
     );
   });
 
@@ -364,7 +364,7 @@ describe("sidecar thread metadata updates", () => {
     };
     const accessRpcCall: UpdateThreadAccessRpc = async () => {
       throw new Error(
-        "Thread access controls cannot change while Codex is processing.",
+        "Thread access controls cannot change while a run is processing.",
       );
     };
 
@@ -374,7 +374,7 @@ describe("sidecar thread metadata updates", () => {
         unsafeMode: false,
       }),
     ).rejects.toThrow(
-      "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+      "Thread access update did not reach the live app: Thread access controls cannot change while a run is processing.",
     );
   });
 
@@ -382,7 +382,7 @@ describe("sidecar thread metadata updates", () => {
     expect(
       isThreadAccessBlockedWhileProcessing(
         new Error(
-          "Thread access update did not reach the live app: Thread access controls cannot change while Codex is processing.",
+          "Thread access update did not reach the live app: Thread access controls cannot change while a run is processing.",
         ),
       ),
     ).toBeTrue();

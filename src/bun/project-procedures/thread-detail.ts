@@ -115,7 +115,7 @@ export function threadRunStatusFromRecord(
       state: "failed",
       startedAt: null,
       updatedAt: thread.lastErrorAt,
-      error: thread.lastErrorMessage ?? "Codex turn failed.",
+      error: thread.lastErrorMessage ?? "Thread run failed.",
       hasUnreadError,
     };
   }

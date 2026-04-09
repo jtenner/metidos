@@ -53,6 +53,9 @@
 │  │  ├─ pi-rpc-probe-extension.ts
 │  │  ├─ pi-runtime-probe.test.ts
 │  │  ├─ pi-runtime-probe.ts
+│  │  ├─ pi-thread-runtime-integration.test.ts
+│  │  ├─ pi-thread-runtime.test.ts
+│  │  ├─ pi-thread-runtime.ts
 │  │  ├─ project-procedures/
 │  │  │  ├─ README.md
 │  │  │  ├─ command-normalization.test.ts

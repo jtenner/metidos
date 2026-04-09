@@ -47,6 +47,17 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Minimal Pi extension used only by the Node RPC probe fallback.
   - Registers the mock provider contract consumed by `pi-runtime-probe.ts` without pulling in the probe CLI entrypoint itself.
 
+- `pi-thread-runtime.ts`
+  - Jolt-owned Pi runtime adapter for per-thread execution.
+  - Resolves the Pi model, constructs the bounded tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
+  - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
+
+- `pi-thread-runtime.test.ts`
+  - Focused unit coverage for deterministic Pi session directories, session resume behavior, and safe-vs-unsafe tool gating.
+
+- `pi-thread-runtime-integration.test.ts`
+  - Backend smoke test proving that `project-procedures.ts` can now execute a real thread lifecycle through the Pi adapter and persist the resulting assistant reply.
+
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
