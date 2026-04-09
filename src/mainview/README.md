@@ -80,6 +80,8 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
+`app/settings-panel.tsx` renders the top-right settings popover shell and placeholder content for future app and workspace preferences.
+
 `app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 
 `app/sidebar-panels-state.ts` owns persisted sidebar panel open/closed state and cross-panel toggle synchronization.

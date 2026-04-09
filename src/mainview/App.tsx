@@ -46,6 +46,7 @@ import {
 import { DiffWorkspace } from "./app/diff-workspace";
 import { subscribeToWorktreeGitHistoryChanged } from "./app/invalidation-events";
 import { GitHistoryDiffModal } from "./app/message-ui";
+import { SettingsPanel } from "./app/settings-panel";
 import { SidebarContent } from "./app/sidebar-content";
 import {
   readSidebarPanelsSnapshot,
@@ -5319,15 +5320,8 @@ export default function App({
               </button>
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            {materialSymbol(
-              "account_circle",
-              "text-on-surface-variant hover:bg-[#262626] p-2 rounded transition-all",
-            )}
-            {materialSymbol(
-              "settings",
-              "text-on-surface-variant hover:bg-[#262626] p-2 rounded transition-all",
-            )}
+          <div className="flex items-center gap-3">
+            <SettingsPanel variant="desktop" />
           </div>
         </header>
 
@@ -5784,7 +5778,7 @@ export default function App({
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            {materialSymbol("search", "text-on-surface-variant")}
+            <SettingsPanel variant="mobile" />
           </div>
         </header>
 
