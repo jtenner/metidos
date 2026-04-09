@@ -15,13 +15,13 @@ import {
 import type { AuthPrimaryFactorType } from "../bun/db";
 import type {
   ProjectProcedures,
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
   RpcContextFocusChanged,
   RpcCronJob,
   RpcGitHistoryEntry,
+  RpcModelOption,
   RpcProject,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
   RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
@@ -535,18 +535,18 @@ export default function App({
   const [gitHistoryError, setGitHistoryError] = useState("");
   const [gitHistoryModal, setGitHistoryModal] =
     useState<GitHistoryModalState | null>(null);
-  const [codexModels, setCodexModels] = useState<RpcCodexModelOption[]>([]);
+  const [codexModels, setCodexModels] = useState<RpcModelOption[]>([]);
   const [reasoningEfforts, setReasoningEfforts] = useState<
-    RpcCodexReasoningEffortOption[]
+    RpcReasoningEffortOption[]
   >([]);
   const [defaultCodexModel, setDefaultCodexModel] = useState("");
   const [defaultCodexReasoningEffort, setDefaultCodexReasoningEffort] =
-    useState<RpcCodexReasoningEffort>("medium");
+    useState<RpcReasoningEffort>("medium");
   const [pendingThreadModel, setPendingThreadModel] = useState(
     initialMainviewState.pendingThreadModel,
   );
   const [pendingThreadReasoningEffort, setPendingThreadReasoningEffort] =
-    useState<RpcCodexReasoningEffort>(
+    useState<RpcReasoningEffort>(
       isCodexReasoningEffort(initialMainviewState.pendingThreadReasoningEffort)
         ? initialMainviewState.pendingThreadReasoningEffort
         : defaultCodexReasoningEffort,
@@ -592,7 +592,7 @@ export default function App({
   const [cronCreatorError, setCronCreatorError] = useState("");
   const [cronCreatorModel, setCronCreatorModel] = useState("");
   const [cronCreatorReasoningEffort, setCronCreatorReasoningEffort] =
-    useState<RpcCodexReasoningEffort>(defaultCodexReasoningEffort);
+    useState<RpcReasoningEffort>(defaultCodexReasoningEffort);
   const [cronDescribePrompt, setCronDescribePrompt] = useState("");
   const [cronEditTitle, setCronEditTitle] = useState("");
   const [cronEditDescription, setCronEditDescription] = useState("");
@@ -4042,7 +4042,7 @@ export default function App({
   );
 
   const updateActiveReasoningEffort = useCallback(
-    async (reasoningEffort: RpcCodexReasoningEffort) => {
+    async (reasoningEffort: RpcReasoningEffort) => {
       setReasoningEffortControlError("");
       if (!reasoningEffort) {
         return;
@@ -4945,7 +4945,7 @@ export default function App({
   }, []);
 
   const setCronCreatorReasoningEffortValue = useCallback(
-    (nextReasoningEffort: RpcCodexReasoningEffort) => {
+    (nextReasoningEffort: RpcReasoningEffort) => {
       setCronCreatorReasoningEffort(nextReasoningEffort);
     },
     [],

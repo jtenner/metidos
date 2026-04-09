@@ -52,8 +52,8 @@ import {
   discardEmptyThreadProcedure,
   focusContextProcedure,
   getAppBootstrapProcedure,
-  getCodexModelCatalogProcedure,
   getHomeDirectoryProcedure,
+  getModelCatalogProcedure,
   getProcedureRuntimeStats,
   getThreadProcedure,
   getWorktreeGitCommitDiffProcedure,
@@ -408,7 +408,7 @@ const rpcHandlers: RpcRequestHandlerMap = {
   getHomeDirectory: () => getHomeDirectoryProcedure(),
   listDirectorySuggestions: (params) =>
     listDirectorySuggestionsProcedure(params),
-  getCodexModelCatalog: (params) => getCodexModelCatalogProcedure(params),
+  getModelCatalog: (params) => getModelCatalogProcedure(params),
   getAppBootstrap: (params) => getAppBootstrapProcedure(params),
   listProjects: (params) => listProjectsProcedure(params),
   listThreads: (params) => listThreadsProcedure(params),

@@ -5,9 +5,9 @@
 
 import { type JSX, useEffect, useMemo, useRef, useState } from "react";
 import type {
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcModelOption,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 import { codexModelLabel, groupCodexModels } from "./codex-utils";
 import { DropdownControl } from "./dropdown";
@@ -17,12 +17,12 @@ import { matchesSearchQuery, normalizeSearchQuery } from "./search-utils";
 type CodexModelSelectorProps = {
   appTitle?: string;
   disabled: boolean;
-  models: RpcCodexModelOption[];
+  models: RpcModelOption[];
   onChange: (value: string) => void;
-  onChangeReasoningEffort?: (value: RpcCodexReasoningEffort) => void;
+  onChangeReasoningEffort?: (value: RpcReasoningEffort) => void;
   reasoningDisabled?: boolean;
-  reasoningOptions?: RpcCodexReasoningEffortOption[];
-  reasoningValue?: RpcCodexReasoningEffort;
+  reasoningOptions?: RpcReasoningEffortOption[];
+  reasoningValue?: RpcReasoningEffort;
   value: string;
   variant: "desktop" | "mobile";
 };

@@ -149,7 +149,7 @@ export type RpcThreadStartRequest = {
   worktreePath: string;
   input: string;
   model: string | null;
-  reasoningEffort: RpcCodexReasoningEffort | null;
+  reasoningEffort: RpcReasoningEffort | null;
   githubAccess: boolean | null;
   agentsAccess: boolean | null;
   joltAccess: boolean | null;
@@ -244,7 +244,7 @@ export type RpcRequestContext = {
 /**
  * Model/ranking data used by thread creation and UI selectors.
  */
-export type RpcCodexModelOption = {
+export type RpcModelOption = {
   id: string;
   label: string;
   group: string;
@@ -253,28 +253,28 @@ export type RpcCodexModelOption = {
   contextWindowTokens: number;
 };
 
-export type RpcCodexReasoningEffort =
+export type RpcReasoningEffort =
   | "minimal"
   | "low"
   | "medium"
   | "high"
   | "xhigh";
 
-export type RpcCodexReasoningEffortOption = {
-  id: RpcCodexReasoningEffort;
+export type RpcReasoningEffortOption = {
+  id: RpcReasoningEffort;
   label: string;
 };
 
-export type RpcCodexModelCatalog = {
+export type RpcModelCatalog = {
   defaultModel: string;
-  defaultReasoningEffort: RpcCodexReasoningEffort;
-  models: RpcCodexModelOption[];
-  reasoningEfforts: RpcCodexReasoningEffortOption[];
+  defaultReasoningEffort: RpcReasoningEffort;
+  models: RpcModelOption[];
+  reasoningEfforts: RpcReasoningEffortOption[];
 };
 
 export type RpcAppBootstrapResult = {
   homeDirectory: RpcHomeDirectoryResult;
-  modelCatalog: RpcCodexModelCatalog;
+  modelCatalog: RpcModelCatalog;
   projects: RpcProject[];
   threadDetail: RpcThreadDetail | null;
   threads: RpcThread[];
@@ -315,7 +315,7 @@ export type RpcThread = {
   title: string;
   summary: string | null;
   model: string;
-  reasoningEffort: RpcCodexReasoningEffort;
+  reasoningEffort: RpcReasoningEffort;
   githubAccess: boolean;
   agentsAccess: boolean;
   joltAccess: boolean;
@@ -345,7 +345,7 @@ export type RpcCronJob = {
   title: string;
   description: string;
   model: string;
-  reasoningEffort: RpcCodexReasoningEffort;
+  reasoningEffort: RpcReasoningEffort;
   githubAccess: boolean;
   agentsAccess: boolean;
   joltAccess: boolean;
@@ -485,9 +485,9 @@ export type AppRPCSchema = {
       params: { query: string };
       response: RpcDirectorySuggestionsResult;
     };
-    getCodexModelCatalog: {
+    getModelCatalog: {
       params: undefined;
-      response: RpcCodexModelCatalog;
+      response: RpcModelCatalog;
     };
     getAppBootstrap: {
       params: RpcAppBootstrapHint | undefined;
@@ -614,7 +614,7 @@ export type AppRPCSchema = {
         currentProjectId?: number | null;
         currentWorktreePath?: string | null;
         model?: string | null;
-        reasoningEffort?: RpcCodexReasoningEffort | null;
+        reasoningEffort?: RpcReasoningEffort | null;
         githubAccess?: boolean | null;
         agentsAccess?: boolean | null;
         joltAccess?: boolean | null;
@@ -628,7 +628,7 @@ export type AppRPCSchema = {
         worktreePath: string;
         input: string;
         model: string | null;
-        reasoningEffort: RpcCodexReasoningEffort | null;
+        reasoningEffort: RpcReasoningEffort | null;
         githubAccess: boolean | null;
         agentsAccess: boolean | null;
         joltAccess: boolean | null;
@@ -648,7 +648,7 @@ export type AppRPCSchema = {
         joltAccess?: boolean;
         unsafeMode?: boolean;
         model?: string;
-        reasoningEffort?: RpcCodexReasoningEffort;
+        reasoningEffort?: RpcReasoningEffort;
         title?: string;
         description?: string;
         enabled?: boolean;
@@ -659,7 +659,7 @@ export type AppRPCSchema = {
       params: {
         cronJobId: number;
         model?: string;
-        reasoningEffort?: RpcCodexReasoningEffort;
+        reasoningEffort?: RpcReasoningEffort;
         githubAccess?: boolean;
         agentsAccess?: boolean;
         joltAccess?: boolean;
@@ -737,7 +737,7 @@ export type AppRPCSchema = {
     updateThreadReasoningEffort: {
       params: {
         threadId: number;
-        reasoningEffort: RpcCodexReasoningEffort;
+        reasoningEffort: RpcReasoningEffort;
       };
       response: RpcThread;
     };
@@ -778,9 +778,9 @@ export interface ProjectProcedures {
     AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
     AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]
   >;
-  getCodexModelCatalog: RpcProcedureCall<
-    AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
-    AppRPCSchema["requests"]["getCodexModelCatalog"]["response"]
+  getModelCatalog: RpcProcedureCall<
+    AppRPCSchema["requests"]["getModelCatalog"]["params"],
+    AppRPCSchema["requests"]["getModelCatalog"]["response"]
   >;
   getAppBootstrap: RpcProcedureCall<
     AppRPCSchema["requests"]["getAppBootstrap"]["params"],

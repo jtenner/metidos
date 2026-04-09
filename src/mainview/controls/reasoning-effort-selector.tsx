@@ -5,8 +5,8 @@
 
 import type { JSX } from "react";
 import type {
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 import { findReasoningEffortOption } from "./codex-utils";
 import { DropdownControl } from "./dropdown";
@@ -14,9 +14,9 @@ import { materialSymbol } from "./icons";
 
 type ReasoningEffortSelectorProps = {
   disabled: boolean;
-  onChange: (value: RpcCodexReasoningEffort) => void;
-  options: RpcCodexReasoningEffortOption[];
-  value: RpcCodexReasoningEffort;
+  onChange: (value: RpcReasoningEffort) => void;
+  options: RpcReasoningEffortOption[];
+  value: RpcReasoningEffort;
   variant: "desktop" | "mobile";
 };
 

@@ -52,7 +52,7 @@
 │  │  │  ├─ README.md
 │  │  │  ├─ command-normalization.test.ts
 │  │  │  ├─ command-normalization.ts
-│  │  │  ├─ codex-catalog.ts
+│  │  │  ├─ model-catalog.ts
 │  │  │  ├─ codex-session-telemetry.test.ts
 │  │  │  ├─ codex-session-telemetry.ts
 │  │  │  ├─ directory-suggestions.ts

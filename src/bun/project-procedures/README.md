@@ -5,9 +5,10 @@ It is organized by concern so each module has a narrow responsibility for data m
 
 ## Purpose of each file
 
-- `codex-catalog.ts`
-  - Defines the Codex model catalog and reasoning effort options.
+- `model-catalog.ts`
+  - Defines the Codex model catalog and reasoning effort options across the supported providers.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
+  - Tracks provider metadata such as xAI routing and which model ids accept reasoning-effort overrides.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
 - `codex-session-telemetry.ts`
@@ -46,6 +47,6 @@ It is organized by concern so each module has a narrow responsibility for data m
 - This module family is the operational core behind `src/bun/project-procedures.ts`.
 - Files here are intentionally separated to avoid a monolithic RPC implementation and to keep runtime responsibilities testable by boundary:
   - persistence mapping in `thread-detail.ts`
-  - metadata normalization in `codex-catalog.ts`
+  - metadata normalization in `model-catalog.ts`
   - async policy in `shared.ts`
   - external data producers in `directory-suggestions.ts` and `git-history.ts`.

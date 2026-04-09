@@ -5,10 +5,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcModelOption,
   RpcProject,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
   RpcThread,
   RpcThreadRunStatus,
   RpcWorktree,
@@ -60,9 +60,9 @@ function dismissibleThreadStatusKey(
 /** Parameters required by {@link useMainviewDerivedState}. */
 type UseMainviewDerivedStateParams = {
   chatError: string;
-  codexModels: RpcCodexModelOption[];
+  codexModels: RpcModelOption[];
   defaultCodexModel: string;
-  defaultCodexReasoningEffort: RpcCodexReasoningEffort;
+  defaultCodexReasoningEffort: RpcReasoningEffort;
   getProjectState: (projectId: number) => ProjectNodeState;
   getWorktreeState: (
     projectId: number,
@@ -82,11 +82,11 @@ type UseMainviewDerivedStateParams = {
   pendingThreadAgentsAccess: boolean;
   pendingThreadJoltAccess: boolean;
   pendingThreadModel: string;
-  pendingThreadReasoningEffort: RpcCodexReasoningEffort;
+  pendingThreadReasoningEffort: RpcReasoningEffort;
   pendingThreadUnsafeMode: boolean;
   projectActionMenu: ProjectActionMenuState | null;
   projects: RpcProject[];
-  reasoningEfforts: RpcCodexReasoningEffortOption[];
+  reasoningEfforts: RpcReasoningEffortOption[];
   selectedDiffFilePath: string | null;
   selectedProjectId: number | null;
   selectedThreadId: number | null;
@@ -122,7 +122,7 @@ export function deriveWorktreeDisplayPathByKey(
 
 export function deriveActiveContextUsage(
   selectedThread: RpcThread | null,
-  activeCodexModelOption: RpcCodexModelOption | null,
+  activeCodexModelOption: RpcModelOption | null,
 ): {
   contextWindowTokens: number;
   inputTokens: number;

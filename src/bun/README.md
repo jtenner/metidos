@@ -47,9 +47,10 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Resolves `git` binary, schedules commands with foreground/background priority, and enforces abort/cancel behavior.
   - Implements worktree snapshots, status/diff scanning, file content paging, history/log parsing, and commit diff retrieval.
 
-- `project-procedures/codex-catalog.ts`
+- `project-procedures/model-catalog.ts`
   - Houses Codex model/effort catalog data used by model pickers and validation.
-  - Normalizes and validates configured model and reasoning effort values.
+  - Normalizes and validates configured model and reasoning effort values across OpenAI and xAI model ids.
+  - Tracks provider-specific metadata such as xAI routing and reasoning-effort support.
   - Provides token-context utilities used for compaction/size logic.
 
 - `project-procedures/codex-session-telemetry.ts`

@@ -12,12 +12,12 @@ import type {
   RpcThreadUsage,
   RpcWorktree,
 } from "../rpc-schema";
+import { normalizeCommandDisplayText } from "./command-normalization";
 import {
   heuristicCompactionTriggerTokens,
   normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
-} from "./codex-catalog";
-import { normalizeCommandDisplayText } from "./command-normalization";
+} from "./model-catalog";
 import { shortName } from "./shared";
 
 const LEGACY_THREAD_STOPPED_MESSAGE = "Codex turn was stopped by the user.";

@@ -4,9 +4,9 @@
  */
 
 import type {
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcModelOption,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 
 /**
@@ -16,9 +16,9 @@ import type {
  * group was encountered in the input list.
  */
 export function groupCodexModels(
-  models: RpcCodexModelOption[],
-): Array<{ group: string; models: RpcCodexModelOption[] }> {
-  const grouped = new Map<string, RpcCodexModelOption[]>();
+  models: RpcModelOption[],
+): Array<{ group: string; models: RpcModelOption[] }> {
+  const grouped = new Map<string, RpcModelOption[]>();
   for (const model of models) {
     // Reuse the existing array for each group to avoid unnecessary allocations.
     const entries = grouped.get(model.group) ?? [];
@@ -36,7 +36,7 @@ export function groupCodexModels(
  * Human-readable label for model picker UI.
  * Appends a deprecation marker for deprecated models.
  */
-export function codexModelLabel(model: RpcCodexModelOption): string {
+export function codexModelLabel(model: RpcModelOption): string {
   return model.deprecated ? `${model.label} (Deprecated)` : model.label;
 }
 
@@ -44,9 +44,9 @@ export function codexModelLabel(model: RpcCodexModelOption): string {
  * Find a model by stable model id, returning `null` when not present.
  */
 export function findCodexModel(
-  models: RpcCodexModelOption[],
+  models: RpcModelOption[],
   modelId: string,
-): RpcCodexModelOption | null {
+): RpcModelOption | null {
   return models.find((model) => model.id === modelId) ?? null;
 }
 
@@ -54,8 +54,8 @@ export function findCodexModel(
  * Find a reasoning-effort option by id, returning `null` when not present.
  */
 export function findReasoningEffortOption(
-  options: RpcCodexReasoningEffortOption[],
-  reasoningEffort: RpcCodexReasoningEffort,
-): RpcCodexReasoningEffortOption | null {
+  options: RpcReasoningEffortOption[],
+  reasoningEffort: RpcReasoningEffort,
+): RpcReasoningEffortOption | null {
   return options.find((option) => option.id === reasoningEffort) ?? null;
 }

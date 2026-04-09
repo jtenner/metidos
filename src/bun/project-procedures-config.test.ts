@@ -10,9 +10,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
+import { codexModelSupportsReasoningEffort } from "./project-procedures/model-catalog";
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalXaiApiKey = process.env.XAI_API_KEY;
 
 type ProjectProceduresModule = typeof import("./project-procedures");
 
@@ -68,6 +70,11 @@ beforeAll(async () => {
 
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
+  if (typeof originalXaiApiKey === "string") {
+    process.env.XAI_API_KEY = originalXaiApiKey;
+  } else {
+    delete process.env.XAI_API_KEY;
+  }
 });
 
 afterAll(async () => {
@@ -80,6 +87,12 @@ afterAll(async () => {
     process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
   } else {
     delete process.env.JOLT_APP_DATA_DIR;
+  }
+
+  if (typeof originalXaiApiKey === "string") {
+    process.env.XAI_API_KEY = originalXaiApiKey;
+  } else {
+    delete process.env.XAI_API_KEY;
   }
 
   for (const path of tempDirectories) {
@@ -231,6 +244,40 @@ describe("project procedure configuration helpers", () => {
         multi_agent_v2: true,
       },
     });
+  });
+
+  it("uses xAI provider settings for xAI model ids", async () => {
+    const procedures = await loadProjectProcedures();
+    process.env.XAI_API_KEY = "xai-test-key";
+
+    expect(
+      procedures.buildCodexClientProviderOptions("grok-code-fast-1"),
+    ).toEqual({
+      apiKey: "xai-test-key",
+      baseUrl: "https://api.x.ai/v1",
+    });
+
+    expect(procedures.buildCodexClientProviderOptions("gpt-5.4")).toEqual({});
+  });
+
+  it("requires XAI_API_KEY before using xAI model ids", async () => {
+    const procedures = await loadProjectProcedures();
+    delete process.env.XAI_API_KEY;
+
+    expect(() =>
+      procedures.buildCodexClientProviderOptions("grok-4.20-reasoning"),
+    ).toThrow(
+      'XAI_API_KEY is required to use the xAI model "grok-4.20-reasoning".',
+    );
+  });
+
+  it("tracks reasoning-effort support per provider model", () => {
+    expect(codexModelSupportsReasoningEffort("gpt-5.4")).toBe(true);
+    expect(codexModelSupportsReasoningEffort("grok-3-mini")).toBe(true);
+    expect(codexModelSupportsReasoningEffort("grok-code-fast-1")).toBe(false);
+    expect(codexModelSupportsReasoningEffort("grok-4.20-reasoning")).toBe(
+      false,
+    );
   });
 
   it("rejects an aborted active-worktree update before validation completes", async () => {

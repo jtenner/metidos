@@ -75,14 +75,6 @@ import {
   runGitCommand,
 } from "./git";
 import {
-  buildCodexModelCatalog,
-  contextWindowTokensForModel,
-  normalizeStoredCodexModel,
-  normalizeStoredCodexReasoningEffort,
-  resolveCodexModel,
-  resolveCodexReasoningEffort,
-} from "./project-procedures/codex-catalog";
-import {
   applyCodexSessionUsageTelemetry,
   readCodexSessionUsageTelemetry,
 } from "./project-procedures/codex-session-telemetry";
@@ -102,6 +94,16 @@ import {
   type PendingGitHistoryPrefetch,
   warmGitHistoryCache,
 } from "./project-procedures/git-history";
+import {
+  buildModelCatalog,
+  codexModelProvider,
+  codexModelSupportsReasoningEffort,
+  contextWindowTokensForModel,
+  normalizeStoredCodexModel,
+  normalizeStoredCodexReasoningEffort,
+  resolveCodexModel,
+  resolveCodexReasoningEffort,
+} from "./project-procedures/model-catalog";
 import {
   awaitAbortableResult,
   createAbortError,
@@ -130,19 +132,19 @@ import {
 import type {
   AppRPCSchema,
   RpcAppBootstrapResult,
-  RpcCodexModelCatalog,
-  RpcCodexReasoningEffort,
   RpcContextFocusChanged,
   RpcCreateWorktreeResult,
   RpcCronJob,
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
+  RpcModelCatalog,
   RpcOpenProjectsBatchResultItem,
   RpcOpenWorktreeResult,
   RpcOpenWorktreesBatchResultItem,
   RpcProject,
   RpcProjectWorktreesResult,
+  RpcReasoningEffort,
   RpcRequestContext,
   RpcRequestPriority,
   RpcThread,
@@ -186,6 +188,8 @@ const JOLT_SIDECAR_SERVER_PATH = resolve(
   process.cwd(),
   "src/bun/codex-sidecar-mcp.ts",
 );
+const XAI_API_BASE_URL = "https://api.x.ai/v1";
+const XAI_API_KEY_ENV_NAME = "XAI_API_KEY";
 
 /**
  * RPC procedure: returns OS home directory and whether shell-like `~` expansion
@@ -380,10 +384,10 @@ export function recoverInterruptedThreadTurnsOnStartup(): void {
  * RPC procedure: return the current codex model catalog.
  */
 
-export async function getCodexModelCatalogProcedure(
-  _params?: AppRPCSchema["requests"]["getCodexModelCatalog"]["params"],
-): Promise<RpcCodexModelCatalog> {
-  return buildCodexModelCatalog();
+export async function getModelCatalogProcedure(
+  _params?: AppRPCSchema["requests"]["getModelCatalog"]["params"],
+): Promise<RpcModelCatalog> {
+  return buildModelCatalog();
 }
 
 /**
@@ -396,7 +400,7 @@ export async function getAppBootstrapProcedure(
 ): Promise<RpcAppBootstrapResult> {
   const [homeDirectory, modelCatalog] = await Promise.all([
     getHomeDirectoryProcedure(),
-    getCodexModelCatalogProcedure(),
+    getModelCatalogProcedure(),
   ]);
   const threads = listThreads(db);
   const hintedThread = pickBootstrapThreadRecord(threads, params);
@@ -696,8 +700,13 @@ type CodexClientThreadContext = Pick<
   | "worktreePath"
 >;
 
-type CodexClientConfig = NonNullable<
-  NonNullable<ConstructorParameters<typeof Codex>[0]>["config"]
+type CodexConstructorOptions = NonNullable<
+  ConstructorParameters<typeof Codex>[0]
+>;
+type CodexClientConfig = NonNullable<CodexConstructorOptions["config"]>;
+type CodexClientProviderOptions = Pick<
+  CodexConstructorOptions,
+  "apiKey" | "baseUrl"
 >;
 
 type CodexAccessFlag = boolean | 0 | 1 | null | undefined;
@@ -797,13 +806,40 @@ export function buildCodexClientConfig(
   };
 }
 
+/**
+ * Resolves provider-specific Codex constructor options from the selected model id.
+ * xAI models use the OpenAI-compatible endpoint plus `XAI_API_KEY`.
+ */
+export function buildCodexClientProviderOptions(
+  model: string | null | undefined,
+): CodexClientProviderOptions {
+  const normalizedModel = normalizeStoredCodexModel(model);
+  if (codexModelProvider(normalizedModel) !== "xai") {
+    return {};
+  }
+
+  const apiKey = process.env[XAI_API_KEY_ENV_NAME]?.trim();
+  if (!apiKey) {
+    throw new Error(
+      `${XAI_API_KEY_ENV_NAME} is required to use the xAI model "${normalizedModel}".`,
+    );
+  }
+
+  return {
+    apiKey,
+    baseUrl: XAI_API_BASE_URL,
+  };
+}
+
 function createCodexClient(
   thread: ThreadRecord,
   options?: {
     sessionId?: string | null;
   },
 ): Codex {
+  const model = normalizeStoredCodexModel(thread.model);
   return new Codex({
+    ...buildCodexClientProviderOptions(model),
     config: buildCodexClientConfig(thread, {
       sessionId: options?.sessionId ?? null,
     }),
@@ -945,13 +981,17 @@ function resolveThreadAccessControls(
 function codexThreadOptions(
   worktreePath: string,
   model: string,
-  reasoningEffort: RpcCodexReasoningEffort,
+  reasoningEffort: RpcReasoningEffort,
   unsafeMode: boolean,
 ) {
   return {
     approvalPolicy: "never" as const,
     model,
-    modelReasoningEffort: reasoningEffort,
+    ...(codexModelSupportsReasoningEffort(model)
+      ? {
+          modelReasoningEffort: reasoningEffort,
+        }
+      : {}),
     networkAccessEnabled: unsafeMode,
     sandboxMode: unsafeMode
       ? ("danger-full-access" as const)
@@ -2738,7 +2778,7 @@ async function createThreadRecord(
   project: ProjectRecord,
   worktreePath: string,
   model: string,
-  reasoningEffort: RpcCodexReasoningEffort,
+  reasoningEffort: RpcReasoningEffort,
   access: ThreadAccessControls,
   options?: CreateThreadRecordOptions,
 ): Promise<ThreadRecord> {

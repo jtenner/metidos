@@ -43,7 +43,7 @@ Holds backend orchestration and server entry logic that powers local project and
 
 Specialized procedure modules with smaller responsibilities for project metadata, history, and thread operations.
 
-- `codex-catalog.ts`
+- `model-catalog.ts`
   - Loads/manages Codex model catalog data and metadata.
 - `directory-suggestions.ts`
   - Project root and directory suggestion helpers.

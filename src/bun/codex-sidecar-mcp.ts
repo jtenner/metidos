@@ -13,7 +13,7 @@ import {
   enforceTargetScope,
 } from "./codex-sidecar-scope";
 import { createSubsystemLogger } from "./logging";
-import { buildCodexModelCatalog } from "./project-procedures/codex-catalog";
+import { buildModelCatalog } from "./project-procedures/model-catalog";
 import type {
   AppRPCSchema,
   RpcCronJob,
@@ -97,7 +97,7 @@ sidecarLogger.trace({
   agentsAccess: agentsAccessContext,
   joltAccess: joltAccessContext,
 });
-const supportedCodexModels = buildCodexModelCatalog()
+const supportedCodexModels = buildModelCatalog()
   .models.map((model) => model.id)
   .join(", ");
 const supportedCodexModelsSentence = `Supported models: ${supportedCodexModels}.`;

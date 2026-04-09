@@ -821,7 +821,7 @@ function createProcedure<K extends RpcMethodName>(
 const procedures: ProjectProcedures = {
   getHomeDirectory: createProcedure("getHomeDirectory"),
   listDirectorySuggestions: createProcedure("listDirectorySuggestions"),
-  getCodexModelCatalog: createProcedure("getCodexModelCatalog"),
+  getModelCatalog: createProcedure("getModelCatalog"),
   getAppBootstrap: createProcedure("getAppBootstrap"),
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),

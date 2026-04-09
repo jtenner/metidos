@@ -6,9 +6,9 @@
 import type { UIEvent } from "react";
 
 import type {
-  RpcCodexReasoningEffort,
   RpcGitHistoryEntry,
   RpcProject,
+  RpcReasoningEffort,
   RpcThread,
   RpcThreadDetail,
   RpcThreadRunStatus,
@@ -308,7 +308,7 @@ const GIT_HISTORY_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-const CODEX_REASONING_EFFORT_VALUES: RpcCodexReasoningEffort[] = [
+const CODEX_REASONING_EFFORT_VALUES: RpcReasoningEffort[] = [
   "minimal",
   "low",
   "medium",
@@ -791,10 +791,10 @@ function parsePositiveInteger(value: unknown): number | null {
 
 export function isCodexReasoningEffort(
   value: unknown,
-): value is RpcCodexReasoningEffort {
+): value is RpcReasoningEffort {
   return (
     typeof value === "string" &&
-    CODEX_REASONING_EFFORT_VALUES.includes(value as RpcCodexReasoningEffort)
+    CODEX_REASONING_EFFORT_VALUES.includes(value as RpcReasoningEffort)
   );
 }
 

@@ -19,7 +19,7 @@ import {
   createThreadProcedure,
   sendThreadMessageProcedure,
 } from "./project-procedures";
-import { normalizeStoredCodexReasoningEffort } from "./project-procedures/codex-catalog";
+import { normalizeStoredCodexReasoningEffort } from "./project-procedures/model-catalog";
 import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 
 /** Poll interval used while waiting for the cron-spawned thread to finish. */

@@ -22,9 +22,9 @@ import {
   useState,
 } from "react";
 import type {
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcModelOption,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
@@ -53,7 +53,7 @@ import { APP_TITLE, type VisibleMessage } from "./state";
 
 type SharedChatControlsProps = {
   activeCodexModel: string;
-  activeReasoningEffort: RpcCodexReasoningEffort;
+  activeReasoningEffort: RpcReasoningEffort;
   composerActionDisabled: boolean;
   composerActionLabel: string;
   composerDisabled: boolean;
@@ -63,17 +63,17 @@ type SharedChatControlsProps = {
   modelControlError: string;
   modelSelectorDisabled: boolean;
   onChangeModel: (value: string) => void;
-  onChangeReasoningEffort: (value: RpcCodexReasoningEffort) => void;
+  onChangeReasoningEffort: (value: RpcReasoningEffort) => void;
   onChangeThreadAccess: (value: ThreadAccessValue) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmitMessage: () => void;
   reasoningEffortControlError: string;
   reasoningEffortSelectorDisabled: boolean;
-  reasoningEfforts: RpcCodexReasoningEffortOption[];
+  reasoningEfforts: RpcReasoningEffortOption[];
   threadAccessControlError: string;
   threadAccessControlDisabled: boolean;
   threadAccessValue: ThreadAccessValue;
-  codexModels: RpcCodexModelOption[];
+  codexModels: RpcModelOption[];
 };
 
 type TranscriptMessageGroup =

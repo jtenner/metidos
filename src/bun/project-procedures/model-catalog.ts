@@ -1,5 +1,5 @@
 /**
- * @file src/bun/project-procedures/codex-catalog.ts
+ * @file src/bun/project-procedures/model-catalog.ts
  * @description Module for codex catalog.
  */
 
@@ -7,20 +7,25 @@ import type { ModelReasoningEffort } from "@openai/codex-sdk";
 
 import { DEFAULT_THREAD_MODEL, DEFAULT_THREAD_REASONING_EFFORT } from "../db";
 import type {
-  RpcCodexModelCatalog,
-  RpcCodexModelOption,
-  RpcCodexReasoningEffort,
-  RpcCodexReasoningEffortOption,
+  RpcModelCatalog,
+  RpcModelOption,
+  RpcReasoningEffort,
+  RpcReasoningEffortOption,
 } from "../rpc-schema";
 
 const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
+type ModelProvider = "openai" | "xai";
+type ModelDefinition = RpcModelOption & {
+  provider: ModelProvider;
+  supportsReasoningEffort: boolean;
+};
 
 /**
- * Sourced from OpenAI's official models docs and kept aligned with active model IDs.
+ * Sourced from provider docs and kept aligned with active model IDs.
  * The SDK accepts raw model IDs but does not expose a discovery API,
  * so this list is treated as the source of truth for UI/model validation.
  */
-const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
+const MODEL_DEFINITIONS: ModelDefinition[] = [
   {
     id: "gpt-5.4",
     label: "GPT-5.4",
@@ -28,6 +33,8 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     summary: "Latest flagship model for complex reasoning and coding.",
     deprecated: false,
     contextWindowTokens: 400_000,
+    provider: "openai",
+    supportsReasoningEffort: true,
   },
   {
     id: "gpt-5.4-mini",
@@ -36,6 +43,8 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     summary: "Faster lower-cost GPT-5.4 model for coding and subagents.",
     deprecated: false,
     contextWindowTokens: 400_000,
+    provider: "openai",
+    supportsReasoningEffort: true,
   },
   {
     id: "gpt-5.4-nano",
@@ -44,6 +53,8 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     summary: "Cheapest GPT-5.4-class model for simple tasks.",
     deprecated: false,
     contextWindowTokens: 400_000,
+    provider: "openai",
+    supportsReasoningEffort: true,
   },
   {
     id: "gpt-5.3-codex",
@@ -52,6 +63,8 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     summary: "Previous high-capability agentic coding model.",
     deprecated: false,
     contextWindowTokens: 400_000,
+    provider: "openai",
+    supportsReasoningEffort: true,
   },
   {
     id: "gpt-5.3-codex-spark",
@@ -60,17 +73,69 @@ const CODEX_MODEL_OPTIONS: RpcCodexModelOption[] = [
     summary: "Lower-latency Codex-focused variant for faster coding tasks.",
     deprecated: false,
     contextWindowTokens: 400_000,
+    provider: "openai",
+    supportsReasoningEffort: true,
+  },
+  {
+    id: "grok-code-fast-1",
+    label: "Grok Code Fast 1",
+    group: "xAI Coding",
+    summary:
+      "xAI coding model for editor-style workflows and fast agent turns.",
+    deprecated: false,
+    contextWindowTokens: 256_000,
+    provider: "xai",
+    supportsReasoningEffort: false,
+  },
+  {
+    id: "grok-4-1-fast-reasoning",
+    label: "Grok 4.1 Fast Reasoning",
+    group: "xAI Frontier",
+    summary: "Fast Grok reasoning model for general chat, tools, and search.",
+    deprecated: false,
+    contextWindowTokens: 256_000,
+    provider: "xai",
+    supportsReasoningEffort: false,
+  },
+  {
+    id: "grok-4.20-reasoning",
+    label: "Grok 4.20 Reasoning",
+    group: "xAI Frontier",
+    summary: "Latest Grok 4.20 flagship reasoning model with agentic tool use.",
+    deprecated: false,
+    contextWindowTokens: 2_000_000,
+    provider: "xai",
+    supportsReasoningEffort: false,
+  },
+  {
+    id: "grok-3-mini",
+    label: "Grok 3 Mini",
+    group: "xAI Fast",
+    summary: "Lower-latency xAI model that still supports reasoning effort.",
+    deprecated: false,
+    contextWindowTokens: 256_000,
+    provider: "xai",
+    supportsReasoningEffort: true,
   },
 ];
 
 const codexModelOptionMap = new Map(
-  CODEX_MODEL_OPTIONS.map((model) => [model.id, model]),
+  MODEL_DEFINITIONS.map((model) => [model.id, model]),
 );
+
+function publicCodexModelOption(model: ModelDefinition): RpcModelOption {
+  const {
+    provider: _provider,
+    supportsReasoningEffort: _supportsReasoningEffort,
+    ...publicModel
+  } = model;
+  return publicModel;
+}
 
 /**
  * Available reasoning-effort values mirrored from supported model controls.
  */
-const CODEX_REASONING_EFFORT_OPTIONS: RpcCodexReasoningEffortOption[] = [
+const REASONING_EFFORT_OPTIONS: RpcReasoningEffortOption[] = [
   {
     id: "minimal",
     label: "Minimal",
@@ -93,19 +158,19 @@ const CODEX_REASONING_EFFORT_OPTIONS: RpcCodexReasoningEffortOption[] = [
   },
 ];
 
-const codexReasoningEffortOptionMap = new Map(
-  CODEX_REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
+const reasoningEffortOptionMap = new Map(
+  REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
 );
 
 /**
  * Build the full model catalog payload consumed by front-end settings.
  */
-export function buildCodexModelCatalog(): RpcCodexModelCatalog {
+export function buildModelCatalog(): RpcModelCatalog {
   return {
     defaultModel: DEFAULT_THREAD_MODEL,
     defaultReasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
-    models: CODEX_MODEL_OPTIONS,
-    reasoningEfforts: CODEX_REASONING_EFFORT_OPTIONS,
+    models: MODEL_DEFINITIONS.map(publicCodexModelOption),
+    reasoningEfforts: REASONING_EFFORT_OPTIONS,
   };
 }
 
@@ -162,19 +227,40 @@ export function normalizeStoredCodexModel(
 }
 
 /**
+ * Resolve the API provider backing a configured model id.
+ * Unknown/null values normalize through the default model first.
+ */
+export function codexModelProvider(
+  model: string | null | undefined,
+): ModelProvider {
+  const normalized = normalizeStoredCodexModel(model);
+  return codexModelOptionMap.get(normalized)?.provider ?? "openai";
+}
+
+/**
+ * Whether the selected model accepts a reasoning-effort override.
+ */
+export function codexModelSupportsReasoningEffort(
+  model: string | null | undefined,
+): boolean {
+  const normalized = normalizeStoredCodexModel(model);
+  return codexModelOptionMap.get(normalized)?.supportsReasoningEffort ?? true;
+}
+
+/**
  * Validate and return a reasoning-effort value.
  * Throws if the value is not supported.
  */
 export function resolveCodexReasoningEffort(
   reasoningEffort: string | null | undefined,
-): RpcCodexReasoningEffort {
+): RpcReasoningEffort {
   const normalized = reasoningEffort?.trim() as
     | ModelReasoningEffort
     | undefined;
   if (!normalized) {
-    return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
+    return DEFAULT_THREAD_REASONING_EFFORT as RpcReasoningEffort;
   }
-  if (!codexReasoningEffortOptionMap.has(normalized)) {
+  if (!reasoningEffortOptionMap.has(normalized)) {
     throw new Error(`Unsupported reasoning effort: ${normalized}`);
   }
   return normalized;
@@ -186,12 +272,12 @@ export function resolveCodexReasoningEffort(
  */
 export function normalizeStoredCodexReasoningEffort(
   reasoningEffort: string | null | undefined,
-): RpcCodexReasoningEffort {
+): RpcReasoningEffort {
   const normalized = reasoningEffort?.trim() as
     | ModelReasoningEffort
     | undefined;
-  if (!normalized || !codexReasoningEffortOptionMap.has(normalized)) {
-    return DEFAULT_THREAD_REASONING_EFFORT as RpcCodexReasoningEffort;
+  if (!normalized || !reasoningEffortOptionMap.has(normalized)) {
+    return DEFAULT_THREAD_REASONING_EFFORT as RpcReasoningEffort;
   }
   return normalized;
 }

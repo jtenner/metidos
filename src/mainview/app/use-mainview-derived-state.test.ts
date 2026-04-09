@@ -6,7 +6,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type {
-  RpcCodexModelOption,
+  RpcModelOption,
   RpcProject,
   RpcThread,
   RpcWorktree,
@@ -115,7 +115,7 @@ describe("deriveActiveContextUsage", () => {
     expect(
       deriveActiveContextUsage(selectedThread, {
         contextWindowTokens: 400_000,
-      } as RpcCodexModelOption),
+      } as RpcModelOption),
     ).toEqual({
       inputTokens: 20_361,
       contextWindowTokens: 121_600,
@@ -134,7 +134,7 @@ describe("deriveActiveContextUsage", () => {
     expect(
       deriveActiveContextUsage(selectedThread, {
         contextWindowTokens: 400_000,
-      } as RpcCodexModelOption),
+      } as RpcModelOption),
     ).toEqual({
       inputTokens: 11_000,
       contextWindowTokens: 400_000,
