@@ -324,7 +324,14 @@ type CronJobRunInput = {
   runStatus: CronJobRunStatus;
 };
 
-type CronJobSqlRecord = Omit<CronJobRecord, "nextRunDate">;
+type CronJobSqlRecord = Omit<
+  CronJobRecord,
+  "agentsAccess" | "githubAccess" | "joltAccess" | "nextRunDate"
+> & {
+  agentsAccess: 0 | 1;
+  githubAccess: 0 | 1;
+  joltAccess: 0 | 1;
+};
 
 const DEFAULT_APP_DATA_DIR =
   process.platform === "darwin"
@@ -372,6 +379,9 @@ function hydrateCronJobFromSqlRow(
 ): CronJobRecord {
   return {
     ...cronJob,
+    githubAccess: cronJob.githubAccess === 1,
+    agentsAccess: cronJob.agentsAccess === 1,
+    joltAccess: cronJob.joltAccess === 1,
     nextRunDate: includeNextRunDate
       ? computeCronJobNextRunDate(cronJob.schedule)
       : null,
@@ -3216,6 +3226,7 @@ export function createCronJob(
 				enabled
 			)
 				VALUES (
+					?,
 					?,
 					?,
 					?,

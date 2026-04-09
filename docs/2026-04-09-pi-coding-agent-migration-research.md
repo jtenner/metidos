@@ -434,7 +434,7 @@ The table below answers the practical question:
 | Web-search transcript rows | Current Codex may emit `web_search` items | Not native | Add web-search as a custom Pi tool/skill or drop this transcript kind |
 | Tool-call transcript rows | Current UI stores `tool_call` rows, excluding Jolt MCP calls | Supported generically | Map Pi tool execution lifecycle into Jolt tool-call rows; redesign if current schema is too Codex-specific |
 | Usage/context window telemetry | Current Jolt scrapes Codex session JSONL | Native Pi concepts | Read usage/context from Pi session stats/events instead of scraping external files |
-| Cron jobs that spawn agent work | Current cron scheduler creates Jolt thread + Codex run | App-owned today | Keep current cron scheduler, but change execution target from Codex thread to Pi session/thread runtime |
+| Cron jobs that spawn agent work | Current cron scheduler is app-owned and now enters the Pi-backed thread path in `jt-ide` | App-owned today | Keep current cron scheduler, but continue expanding cron coverage around hosted providers, long-running runs, and any scheduler/worker lifecycle edge cases |
 | Local app auth, step-up auth, websocket auth | Jolt-owned auth stack in [auth-service.ts](../src/bun/auth-service.ts) and related files | Unrelated to Pi | Keep as-is; Pi provider auth is separate from Jolt local app auth |
 | Project/worktree model, snapshots, git history, diffs | Jolt-owned RPC domain | Unrelated to Pi | Keep as-is; Pi becomes only the agent runtime inside that shell |
 | React frontend | Jolt-owned mainview app | Unrelated to Pi | Keep UI, but change data models for sessions/models/messages where necessary |
@@ -1144,6 +1144,32 @@ The larger work is therefore:
 - reuse existing cron scheduler
 - change thread runtime implementation
 - ensure cron-created threads receive the correct Pi model/provider/tools/extensions/thinking level/safety policy
+
+### CR12 implementation status in `jt-ide`
+
+The first Pi-era cron-execution slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/sidecar-cron-runner.ts](../src/bun/sidecar-cron-runner.ts)
+- [src/bun/sidecar-cron-runner.test.ts](../src/bun/sidecar-cron-runner.test.ts)
+- [src/bun/db.ts](../src/bun/db.ts)
+
+What the current implementation now does:
+
+- keeps the existing Jolt cron scheduler and Bun worker registration model intact instead of replacing cron orchestration wholesale
+- runs both immediate and scheduled cron fires through the same Pi-backed thread path used by interactive threads by creating a child thread and sending the cron prompt through the normal thread procedures
+- verifies through integration coverage that cron-created threads now persist `piSessionId`, `piSessionFile`, and `piLeafEntryId` rather than only exercising the legacy thread shell
+- records completed cron history after the spawned Pi-backed thread settles, covering both direct `runCronJobById(...)` and scheduled `runDueCronJobs(...)`
+- fixes two real cron-path bugs uncovered by the new coverage:
+  - `createCronJob(...)` now inserts the full enabled/access column set correctly
+  - cron rows now hydrate SQLite `0/1` access flags back into booleans before those values are reused to create child threads
+
+What this still does not do yet:
+
+- it does not add special cron-only Pi behavior; cron runs intentionally inherit the same model resolution, access toggles, and safety policy as ordinary Jolt threads
+- it does not add hosted-provider stress coverage for long-running cron runs, provider auth expiry, or worker restarts; the new tests still use the probe-backed runtime provider
+- it does not expose richer cron-run telemetry in the UI beyond the existing thread and cron last-run fields; that remains part of the later telemetry slice in [10. Telemetry, Usage, and Compaction UI](#10-telemetry-usage-and-compaction-ui)
 
 ### 10. Telemetry, Usage, and Compaction UI
 

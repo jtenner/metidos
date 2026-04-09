@@ -1,6 +1,6 @@
 /**
  * @file src/bun/sidecar-cron-runner.ts
- * @description Cron job execution logic used by in-process Bun.cron callbacks.
+ * @description Pi-backed cron job execution logic used by in-process Bun.cron callbacks.
  */
 
 import { Database } from "bun:sqlite";
@@ -133,19 +133,31 @@ type CronJobExecution = {
   runStartedAt: string | null;
 };
 
+export type CronThreadExecutionHost = {
+  createThread: typeof createThreadProcedure;
+  sendThreadMessage: typeof sendThreadMessageProcedure;
+};
+
+const defaultCronThreadExecutionHost: CronThreadExecutionHost = {
+  createThread: createThreadProcedure,
+  sendThreadMessage: sendThreadMessageProcedure,
+};
+
 /**
  * Create the cron job run record and execute the cron prompt in a child thread.
+ * The default host flows through the same Pi-backed thread runtime used by interactive threads.
  */
 async function executeCronJob(
   database: Database,
   cronJob: CronJobRecord,
   scheduledTime: number,
+  host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<CronJobExecution | null> {
   const cronJobId = cronJob.id;
   let runId: number | null = null;
 
   try {
-    const threadResult = await createThreadProcedure({
+    const threadResult = await host.createThread({
       projectId: cronJob.projectId,
       worktreePath: cronJob.worktreePath,
       model: cronJob.model ?? null,
@@ -166,7 +178,7 @@ async function executeCronJob(
     });
     runId = run.id;
 
-    const execution = await sendThreadMessageProcedure({
+    const execution = await host.sendThreadMessage({
       threadId,
       input: cronJob.prompt,
     });
@@ -201,6 +213,7 @@ async function executeCronJob(
 export async function runDueCronJobs(
   schedule: string,
   scheduledTime: number,
+  host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<void> {
   const database = openCronDatabase();
   try {
@@ -214,7 +227,7 @@ export async function runDueCronJobs(
     }
 
     for (const job of jobs) {
-      await executeCronJob(database, job, scheduledTime);
+      await executeCronJob(database, job, scheduledTime, host);
     }
   } finally {
     database.close(false);
@@ -227,6 +240,7 @@ export async function runDueCronJobs(
 export async function runCronJobById(
   cronJobId: number,
   scheduledTime: number,
+  host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<number | null> {
   const database = openCronDatabase();
   try {
@@ -241,7 +255,12 @@ export async function runCronJobById(
     let runThreadId: number | null = null;
 
     for (const job of jobs) {
-      const execution = await executeCronJob(database, job, scheduledTime);
+      const execution = await executeCronJob(
+        database,
+        job,
+        scheduledTime,
+        host,
+      );
       if (runThreadId === null && execution !== null) {
         runThreadId = execution.threadId;
       }

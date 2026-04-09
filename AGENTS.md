@@ -104,6 +104,7 @@
 │  │  ├─ thread-metadata.test.ts
 │  │  ├─ tls-config.test.ts
 │  │  ├─ tls-config.ts
+│  │  ├─ sidecar-cron-runner.test.ts
 │  │  ├─ sidecar-cron-runner.ts
 │  │  ├─ sidecar-cron-scheduler.ts
 │  │  └─ sidecar-cron-thread.ts

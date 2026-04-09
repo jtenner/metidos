@@ -194,6 +194,23 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Normalizes optional summary/title inputs and routes updates through `updateThreadMetadata(...)`.
   - Surfaces timeout and connection failures instead of silently falling back to local-only writes.
 
+- `sidecar-cron-runner.ts`
+  - Executes cron rows by creating Jolt child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
+  - Records cron run history, updates last-run metadata, and waits for the spawned thread to settle before marking completion, stop, or error state.
+  - Also exposes a small execution-host seam so runtime integration can be tested without changing the production scheduler path.
+
+- `sidecar-cron-runner.test.ts`
+  - Integration coverage for immediate and scheduled cron execution through the Pi-backed thread path.
+  - Verifies that cron-created threads persist Pi session identity and that cron rows record completed runs.
+
+- `sidecar-cron-scheduler.ts`
+  - Main-process wrapper around the cron worker thread.
+  - Starts or stops the worker, syncs cron registrations after DB changes, and exposes the on-demand “run now” entrypoint used by RPC.
+
+- `sidecar-cron-thread.ts`
+  - Worker module that registers active cron jobs with `Bun.cron`.
+  - Reconciles enabled cron rows into active registrations and forwards due fires to the cron runner.
+
 - `auth.ts`
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
