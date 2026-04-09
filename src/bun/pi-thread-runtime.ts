@@ -65,6 +65,12 @@ export type PiThreadRuntime = {
   sessionDirectory: string;
 };
 
+export type PiThreadToolPolicy = {
+  allowBash: boolean;
+  allowUnsafeModeEscalation: boolean;
+  runtimePromptLine: string;
+};
+
 /**
  * Resolve the Jolt-owned Pi agent directory under the app data folder.
  */
@@ -99,13 +105,32 @@ function resolvePiThinkingLevel(
   ) as PiThinkingLevel;
 }
 
+export function buildPiThreadToolPolicy(thread: {
+  unsafeMode: PiRuntimeThread["unsafeMode"];
+}): PiThreadToolPolicy {
+  if (thread.unsafeMode === 1) {
+    return {
+      allowBash: true,
+      allowUnsafeModeEscalation: true,
+      runtimePromptLine:
+        "Unsafe mode is enabled. Bash is available, and Jolt tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
+    };
+  }
+
+  return {
+    allowBash: false,
+    allowUnsafeModeEscalation: false,
+    runtimePromptLine:
+      "Unsafe mode is disabled. Bash is unavailable. Use the installed worktree-scoped file/search tools instead, and do not create unsafe child threads or cron jobs.",
+  };
+}
+
 function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
+  const toolPolicy = buildPiThreadToolPolicy(thread);
   return [
     `The current workspace root is ${thread.worktreePath}.`,
     "Operate only inside this workspace.",
-    thread.unsafeMode === 1
-      ? "Unsafe mode is enabled. Bash is available, but stay within the workspace unless the user explicitly asks for broader host access."
-      : "Unsafe mode is disabled. Bash is unavailable. Use the installed file and search tools inside the workspace instead.",
+    toolPolicy.runtimePromptLine,
     thread.joltAccess
       ? "Jolt-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread."
       : "No GitHub, MCP, web search, sub-agent, or Jolt-specific tools are installed in this runtime.",
@@ -280,7 +305,7 @@ function resolvePiModel(
 
 function buildPiTools(
   worktreePath: string,
-  unsafeMode: boolean,
+  toolPolicy: PiThreadToolPolicy,
 ): NonNullable<CreateAgentSessionOptions["tools"]> {
   const tools: NonNullable<CreateAgentSessionOptions["tools"]> = [
     createReadTool(worktreePath),
@@ -290,7 +315,7 @@ function buildPiTools(
     createEditTool(worktreePath),
     createWriteTool(worktreePath),
   ];
-  if (unsafeMode) {
+  if (toolPolicy.allowBash) {
     tools.splice(1, 0, createBashTool(worktreePath));
   }
   return tools;
@@ -319,6 +344,7 @@ export async function createPiThreadRuntime(
   });
   const { authStorage, modelRegistry } = createPiModelRegistry(agentDirectory);
   const model = resolvePiModel(thread, modelRegistry);
+  const toolPolicy = buildPiThreadToolPolicy(thread);
   const settingsManager = SettingsManager.inMemory({
     retry: {
       enabled: false,
@@ -356,6 +382,7 @@ export async function createPiThreadRuntime(
           }
           return createPiJoltTools(
             {
+              allowUnsafeModeEscalation: toolPolicy.allowUnsafeModeEscalation,
               projectIdContext: thread.projectId,
               threadIdContext: thread.id,
               worktreePathContext: thread.worktreePath,
@@ -375,7 +402,7 @@ export async function createPiThreadRuntime(
     sessionManager,
     settingsManager,
     thinkingLevel: resolvePiThinkingLevel(thread.reasoningEffort),
-    tools: buildPiTools(thread.worktreePath, thread.unsafeMode === 1),
+    tools: buildPiTools(thread.worktreePath, toolPolicy),
   });
 
   return {

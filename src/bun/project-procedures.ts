@@ -2955,8 +2955,8 @@ function recordUnsafeModeAuditEvent(
   createSecurityAuditEvent(db, {
     eventType: unsafeMode ? "unsafe_mode_enabled" : "unsafe_mode_disabled",
     summaryText: unsafeMode
-      ? "Unsafe mode enabled. This thread can use the danger-full-access sandbox."
-      : "Unsafe mode disabled. This thread returned to the standard sandbox.",
+      ? "Unsafe mode enabled. Bash access and unsafe child thread or cron creation are allowed for this thread."
+      : "Unsafe mode disabled. Bash access and unsafe child thread or cron creation are blocked for this thread.",
     threadId: thread.id,
     projectId: thread.projectId,
     worktreePath: thread.worktreePath,

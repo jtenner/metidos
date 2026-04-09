@@ -17,11 +17,13 @@ import type {
 
 const NOW = "2026-04-09T12:00:00.000Z";
 
-function makeScope(): PiJoltToolScope {
+function makeScope(overrides: Partial<PiJoltToolScope> = {}): PiJoltToolScope {
   return {
+    allowUnsafeModeEscalation: false,
     projectIdContext: 7,
     threadIdContext: 11,
     worktreePathContext: "/repo/alpha/feature-a",
+    ...overrides,
   };
 }
 
@@ -432,7 +434,9 @@ describe("createPiJoltTools", () => {
   });
 
   it("creates and starts a new thread immediately when autoStart is not requested", async () => {
-    const scope = makeScope();
+    const scope = makeScope({
+      allowUnsafeModeEscalation: true,
+    });
     let createdParams: Record<string, unknown> | null = null;
     let messageParams: Record<string, unknown> | null = null;
     const host = createHost({
@@ -493,6 +497,20 @@ describe("createPiJoltTools", () => {
     });
   });
 
+  it("blocks unsafe child thread creation from a safe thread", async () => {
+    const scope = makeScope();
+    const host = createHost();
+
+    await expect(
+      executeTool(scope, host, "new_thread", {
+        input: "Ship it",
+        unsafeMode: "true",
+      }),
+    ).rejects.toThrow(
+      "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
+    );
+  });
+
   it("creates and updates cron jobs through the direct host callbacks", async () => {
     const scope = makeScope();
     let createdParams: Record<string, unknown> | null = null;
@@ -549,5 +567,29 @@ describe("createPiJoltTools", () => {
       `Created cron job 9 in ${scope.worktreePathContext}.`,
     );
     expect(resultText(updated)).toBe("Updated cron job 9.");
+  });
+
+  it("blocks unsafe cron creation and escalation from a safe thread", async () => {
+    const scope = makeScope();
+    const host = createHost();
+
+    await expect(
+      executeTool(scope, host, "new_cron", {
+        prompt: "Summarize the repo",
+        schedule: "0 0 * * *",
+        unsafeMode: "true",
+      }),
+    ).rejects.toThrow(
+      "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
+    );
+
+    await expect(
+      executeTool(scope, host, "update_cron", {
+        cronJobId: "9",
+        unsafeMode: "true",
+      }),
+    ).rejects.toThrow(
+      "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
+    );
   });
 });

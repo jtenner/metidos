@@ -167,7 +167,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#8ed0ff]"
               checked={value.joltAccess}
-              description="Allow Jolt MCP tools such as thread, cron, and workspace helpers."
+              description="Allow Jolt tools such as thread, cron, workspace, and vm2 helpers."
               disabled={disabled}
               label="Jolt"
               onChange={(checked) => {
@@ -181,7 +181,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#d89256]"
               checked={value.unsafeMode}
-              description="Enable elevated-risk thread sandbox behavior. Use only when you want to run unsafe operations."
+              description="Enable shell access and allow Jolt tools to create unsafe child threads or cron jobs."
               disabled={disabled}
               label="Unsafe"
               onChange={(checked) => {

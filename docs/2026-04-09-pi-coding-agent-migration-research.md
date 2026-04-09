@@ -510,8 +510,10 @@ Current temporary runtime policy:
 
 - `unsafeMode=false` enables Pi built-ins `read`, `ls`, `find`, `grep`, `edit`, and `write`
 - `unsafeMode=false` disables `bash`
+- `unsafeMode=false` keeps Pi Jolt tools bound to safe child resources, so they cannot create unsafe child threads or cron jobs
 - all enabled path-based Pi tools are restricted to the bound thread worktree through a Pi tool-call policy hook
 - `unsafeMode=true` enables the same tool surface plus `bash`
+- `unsafeMode=true` allows Pi Jolt tools to create unsafe child threads or cron jobs
 
 This closes the runtime-host unknowns and gives Jolt a real Pi-backed execution path, but it leaves transcript parity, custom tool parity, UI parity, and schema cleanup to later slices.
 
@@ -975,6 +977,37 @@ Pi examples that are relevant here:
 - `protected-paths.ts`
 - `sandbox/`
 - `tool-override.ts`
+
+### SA09 implementation status in `jt-ide`
+
+The first explicit Pi-era safety-policy slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/pi-jolt-tools.test.ts](../src/bun/pi-jolt-tools.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/db.test.ts](../src/bun/db.test.ts)
+- [src/mainview/controls/thread-access-control.tsx](../src/mainview/controls/thread-access-control.tsx)
+
+What the current implementation now does:
+
+- defines an explicit Pi thread tool policy instead of treating `unsafeMode` as an unspoken side effect
+- keeps safe threads useful for coding by allowing worktree-scoped `read`, `ls`, `find`, `grep`, `edit`, `write`, and any enabled Jolt tools
+- disables `bash` when `unsafeMode=false`
+- blocks Pi Jolt tools from creating or updating child threads or cron jobs with `unsafeMode=true` when the current thread is safe
+- allows `bash` plus unsafe child thread/cron creation when `unsafeMode=true`
+- updates persisted unsafe-mode audit entries so they describe Pi-era behavior rather than Codex `danger-full-access` wording
+- updates the browser access-control copy so the visible toggle descriptions match the actual Pi runtime policy
+
+What this still does not do yet:
+
+- it does not provide Codex-equivalent container, network, or host-isolation guarantees; safe mode is still a host-process tool policy
+- it does not wire the `GitHub` or `Agents` toggles to Pi-native tool packs yet; those remain later slices
+- it does not restrict safe mode down to read-only behavior; safe threads can still edit and write within the bound worktree by design
+- it does not solve the broader “real sandbox” question raised in this section, so a stricter model would still require additional infrastructure beyond Pi’s default tool surface
 
 ### 7. GitHub Integration
 

@@ -50,6 +50,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-thread-runtime.ts`
   - Jolt-owned Pi runtime adapter for per-thread execution.
   - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
+  - Defines the current Pi-era safe-vs-unsafe policy: safe threads keep worktree-scoped file/search/edit/write tools but lose `bash`, while unsafe threads also gain `bash` and may request unsafe child threads or cron jobs.
   - Installs the Pi-native Jolt custom tool pack when `joltAccess` is enabled for the thread.
   - Reopens the explicitly persisted Pi session file when a thread already has one instead of relying only on “most recent session” behavior.
   - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
@@ -63,6 +64,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-jolt-tools.ts`
   - Pi-native Jolt custom tool pack for thread metadata, thread listing/creation, cron management, UI context focus, and the vm2-backed untrusted JS runner.
   - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Jolt MCP bridge for those operations.
+  - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools.
 
 - `pi-jolt-tools.test.ts`
   - Focused coverage for the Pi Jolt-tool port, including metadata updates, scoped thread listing, context focusing, cron creation/update, and the auto-start versus immediate-start thread flow.

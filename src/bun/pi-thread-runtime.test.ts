@@ -7,6 +7,7 @@ import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
   buildPiAgentDirectoryPath,
   buildPiThreadSessionDirectoryPath,
+  buildPiThreadToolPolicy,
   createPiThreadRuntime,
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
@@ -68,6 +69,29 @@ afterEach(() => {
   } else {
     delete process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
   }
+});
+
+test("buildPiThreadToolPolicy disables bash and unsafe child escalation in safe mode", () => {
+  expect(
+    buildPiThreadToolPolicy({
+      unsafeMode: 0,
+    }),
+  ).toEqual({
+    allowBash: false,
+    allowUnsafeModeEscalation: false,
+    runtimePromptLine:
+      "Unsafe mode is disabled. Bash is unavailable. Use the installed worktree-scoped file/search tools instead, and do not create unsafe child threads or cron jobs.",
+  });
+  expect(
+    buildPiThreadToolPolicy({
+      unsafeMode: 1,
+    }),
+  ).toEqual({
+    allowBash: true,
+    allowUnsafeModeEscalation: true,
+    runtimePromptLine:
+      "Unsafe mode is enabled. Bash is available, and Jolt tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
+  });
 });
 
 test("creates deterministic Pi sessions and resumes them for the same thread", async () => {

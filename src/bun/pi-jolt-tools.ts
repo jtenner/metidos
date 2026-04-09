@@ -56,6 +56,7 @@ type UpdateThreadToolInput = {
 };
 
 export type PiJoltToolScope = {
+  allowUnsafeModeEscalation: boolean;
   projectIdContext: number;
   threadIdContext: number;
   worktreePathContext: string;
@@ -548,6 +549,17 @@ function prepareThreadIdAndBooleanArguments<TParams extends TSchema>(
     record[key] = coercePositiveIntegerLikeInput(record[key]);
   }
   return record as Static<TParams>;
+}
+
+function assertUnsafeModeEscalationAllowed(
+  scope: PiJoltToolScope,
+  requestedUnsafeMode: boolean | null | undefined,
+): void {
+  if (requestedUnsafeMode === true && !scope.allowUnsafeModeEscalation) {
+    throw new Error(
+      "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
+    );
+  }
 }
 
 async function resolveProjectByName(
@@ -1191,8 +1203,9 @@ export function createPiJoltTools(
       promptSnippet: "List Jolt cron jobs",
     }),
     defineTool({
-      description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
+      description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. Safe threads must leave unsafeMode off. ${SUPPORTED_MODELS_SENTENCE}`,
       execute: async (_toolCallId, params) => {
+        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
         const target = await resolveWorktreeTarget(
           {
             projectId: params.projectId,
@@ -1261,7 +1274,7 @@ export function createPiJoltTools(
       promptSnippet: "Create a Jolt cron job for recurring work",
     }),
     defineTool({
-      description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. ${SUPPORTED_MODELS_SENTENCE}`,
+      description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. Safe threads cannot turn cron jobs into unsafe jobs. ${SUPPORTED_MODELS_SENTENCE}`,
       execute: async (_toolCallId, params) => {
         if (
           params.deleted === undefined &&
@@ -1279,6 +1292,7 @@ export function createPiJoltTools(
         ) {
           throw new Error("At least one update field is required.");
         }
+        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
         const updated = await host.updateCron({
           ...(typeof params.agentsAccess === "boolean"
             ? { agentsAccess: params.agentsAccess }
@@ -1342,8 +1356,9 @@ export function createPiJoltTools(
       promptSnippet: "Update or delete a Jolt cron job",
     }),
     defineTool<typeof NewThreadToolParameters, Record<string, unknown>>({
-      description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
+      description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Safe threads must leave unsafeMode off. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
       execute: async (_toolCallId, params) => {
+        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
         const target = await resolveWorktreeTarget(
           {
             projectId: params.projectId,

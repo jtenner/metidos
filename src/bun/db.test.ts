@@ -174,7 +174,7 @@ describe("app database storage", () => {
     createSecurityAuditEvent(database, {
       eventType: "unsafe_mode_enabled",
       summaryText:
-        "Unsafe mode enabled. This thread can use the danger-full-access sandbox.",
+        "Unsafe mode enabled. Bash access and unsafe child thread or cron creation are allowed for this thread.",
       threadId: 12,
       projectId: 5,
       worktreePath: "/tmp/worktree",
