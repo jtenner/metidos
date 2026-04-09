@@ -3,9 +3,12 @@
  * @description Pi session event projection into Jolt thread-activity writes.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
 import type { ThreadActivityInput } from "../db";
+import { normalizeGitPath } from "../git";
 import type { RpcThreadUsage } from "../rpc-schema";
 import { normalizeCommandDisplayText } from "./command-normalization";
 
@@ -15,11 +18,27 @@ type CommandActivityPayload = {
   exitCode: number | null;
 };
 
+type FileChangeActivityPayload = {
+  path: string;
+  changeKind: "add" | "delete" | "update";
+  diffText: string;
+};
+
 type ToolCallActivityPayload = {
   server: string;
   tool: string;
   argumentsText: string;
   output: string;
+};
+
+type PiToolFileMutationSnapshot = {
+  gitPath: string;
+  previousContent: string | null;
+};
+
+type TrackedPiToolCallState = {
+  args: unknown;
+  fileMutation: PiToolFileMutationSnapshot | null;
 };
 
 export type ProjectedPiActivityWrite = {
@@ -268,15 +287,255 @@ function buildProjectedWrite(
 export function createPiThreadEventProjector(input: {
   startedAt: string;
   threadId: number;
+  worktreePath: string;
 }): PiThreadEventProjector {
-  const { startedAt, threadId } = input;
+  const { startedAt, threadId, worktreePath } = input;
   const thinkingTextByActivityId = new Map<string, string>();
   const assistantTextByActivityId = new Map<string, string>();
-  const toolArgsByCallId = new Map<string, unknown>();
+  const trackedToolCallsByCallId = new Map<string, TrackedPiToolCallState>();
 
   let lastAssistantItemId: string | null = null;
   let lastAssistantText = "";
   let usage: RpcThreadUsage | null = null;
+
+  function splitDiffLines(value: string): string[] {
+    if (!value) {
+      return [];
+    }
+    const lines = value.replace(/\r\n/g, "\n").split("\n");
+    if (lines[lines.length - 1] === "") {
+      lines.pop();
+    }
+    return lines;
+  }
+
+  function buildSyntheticAddDiff(path: string, content: string): string {
+    const lines = splitDiffLines(content);
+    const header = ["--- /dev/null", `+++ b/${path}`];
+    if (lines.length === 0) {
+      return [...header, "@@ -0,0 +1,0 @@"].join("\n");
+    }
+    return [
+      ...header,
+      `@@ -0,0 +1,${lines.length} @@`,
+      ...lines.map((line) => `+${line}`),
+    ].join("\n");
+  }
+
+  function formatSyntheticUpdateRange(lineCount: number): string {
+    return lineCount === 0 ? "0,0" : `1,${lineCount}`;
+  }
+
+  function buildSyntheticUpdateDiff(
+    path: string,
+    previousContent: string,
+    nextContent: string,
+  ): string {
+    if (previousContent === nextContent) {
+      return "";
+    }
+
+    const previousLines = splitDiffLines(previousContent);
+    const nextLines = splitDiffLines(nextContent);
+    return [
+      `--- a/${path}`,
+      `+++ b/${path}`,
+      `@@ -${formatSyntheticUpdateRange(previousLines.length)} +${formatSyntheticUpdateRange(nextLines.length)} @@`,
+      ...previousLines.map((line) => `-${line}`),
+      ...nextLines.map((line) => `+${line}`),
+    ].join("\n");
+  }
+
+  function extractPiToolPathArg(value: unknown): string | null {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const candidate = value as {
+      file_path?: unknown;
+      path?: unknown;
+    };
+    const rawPath =
+      typeof candidate.path === "string"
+        ? candidate.path
+        : typeof candidate.file_path === "string"
+          ? candidate.file_path
+          : null;
+    if (!rawPath) {
+      return null;
+    }
+    return rawPath;
+  }
+
+  function extractPiWriteContentArg(value: unknown): string | null {
+    if (!value || typeof value !== "object") {
+      return null;
+    }
+
+    const candidate = value as {
+      content?: unknown;
+    };
+    return typeof candidate.content === "string" ? candidate.content : null;
+  }
+
+  function extractPiToolExecutionDiff(value: unknown): string {
+    if (!value || typeof value !== "object") {
+      return "";
+    }
+
+    const details = (value as { details?: Record<string, unknown> }).details;
+    return typeof details?.diff === "string" ? details.diff : "";
+  }
+
+  function readPiToolFileMutationSnapshot(
+    args: unknown,
+  ): PiToolFileMutationSnapshot | null {
+    const rawPath = extractPiToolPathArg(args);
+    if (!rawPath) {
+      return null;
+    }
+
+    try {
+      const gitPath = normalizeGitPath(worktreePath, rawPath);
+      const fullPath = resolve(worktreePath, gitPath);
+      let previousContent: string | null = null;
+      if (existsSync(fullPath)) {
+        try {
+          previousContent = readFileSync(fullPath, "utf8");
+        } catch {
+          previousContent = null;
+        }
+      }
+      return {
+        gitPath,
+        previousContent,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function buildFileChangeActivityInputPayload(
+    itemId: string,
+    payload: FileChangeActivityPayload & {
+      state: "completed";
+    },
+  ): ThreadActivityInput {
+    return {
+      threadId,
+      itemId,
+      kind: "file_change",
+      text: payload.path,
+      state: payload.state,
+      payloadJson: JSON.stringify({
+        path: payload.path,
+        changeKind: payload.changeKind,
+        diffText: payload.diffText,
+      } satisfies FileChangeActivityPayload),
+    };
+  }
+
+  function buildPiFileChangeWrite(input: {
+    changeKind: "add" | "delete" | "update";
+    diffText: string;
+    gitPath: string;
+    toolCallId: string;
+  }): ProjectedPiActivityWrite | null {
+    const normalizedDiffText = input.diffText.trim();
+    if (!normalizedDiffText) {
+      return null;
+    }
+
+    const activityItemId = buildThreadTurnActivityId(
+      startedAt,
+      `file:${input.toolCallId}:${input.gitPath}`,
+    );
+    return buildProjectedWrite(
+      activityItemId,
+      `completed\u0000${input.changeKind}\u0000${input.gitPath}\u0000${normalizedDiffText}`,
+      [
+        buildFileChangeActivityInputPayload(activityItemId, {
+          changeKind: input.changeKind,
+          diffText: normalizedDiffText,
+          path: input.gitPath,
+          state: "completed",
+        }),
+      ],
+      {
+        force: true,
+        terminal: true,
+      },
+    );
+  }
+
+  function buildPiToolFileChangeWrite(input: {
+    result: unknown;
+    toolCallId: string;
+    toolName: string;
+    trackedToolCallState: TrackedPiToolCallState | null;
+  }): ProjectedPiActivityWrite | null {
+    const toolArgs = input.trackedToolCallState?.args ?? null;
+    const fileMutation = input.trackedToolCallState?.fileMutation ?? null;
+    const fallbackRawPath = extractPiToolPathArg(toolArgs);
+    let gitPath = fileMutation?.gitPath ?? null;
+    if (gitPath === null && fallbackRawPath) {
+      try {
+        gitPath = normalizeGitPath(worktreePath, fallbackRawPath);
+      } catch {
+        return null;
+      }
+    }
+    if (!gitPath) {
+      return null;
+    }
+
+    if (input.toolName === "edit") {
+      return buildPiFileChangeWrite({
+        changeKind: "update",
+        diffText: extractPiToolExecutionDiff(input.result),
+        gitPath,
+        toolCallId: input.toolCallId,
+      });
+    }
+
+    if (input.toolName !== "write") {
+      return null;
+    }
+
+    const nextContent = extractPiWriteContentArg(toolArgs);
+    if (nextContent === null) {
+      return null;
+    }
+
+    const previousContent = fileMutation?.previousContent ?? null;
+    return buildPiFileChangeWrite({
+      changeKind: previousContent === null ? "add" : "update",
+      diffText:
+        previousContent === null
+          ? buildSyntheticAddDiff(gitPath, nextContent)
+          : buildSyntheticUpdateDiff(gitPath, previousContent, nextContent),
+      gitPath,
+      toolCallId: input.toolCallId,
+    });
+  }
+
+  function upsertTrackedPiToolCallState(
+    toolCallId: string,
+    toolName: string,
+    args: unknown,
+  ): TrackedPiToolCallState {
+    const existing = trackedToolCallsByCallId.get(toolCallId);
+    const nextState: TrackedPiToolCallState = existing ?? {
+      args,
+      fileMutation:
+        toolName === "edit" || toolName === "write"
+          ? readPiToolFileMutationSnapshot(args)
+          : null,
+    };
+    nextState.args = args;
+    trackedToolCallsByCallId.set(toolCallId, nextState);
+    return nextState;
+  }
 
   return {
     project: (event) => {
@@ -428,7 +687,11 @@ export function createPiThreadEventProjector(input: {
       }
 
       if (event.type === "tool_execution_start") {
-        toolArgsByCallId.set(event.toolCallId, event.args);
+        upsertTrackedPiToolCallState(
+          event.toolCallId,
+          event.toolName,
+          event.args,
+        );
         const activityItemId = buildThreadTurnActivityId(
           startedAt,
           `tool:${event.toolCallId}`,
@@ -469,7 +732,11 @@ export function createPiThreadEventProjector(input: {
       }
 
       if (event.type === "tool_execution_update") {
-        toolArgsByCallId.set(event.toolCallId, event.args);
+        upsertTrackedPiToolCallState(
+          event.toolCallId,
+          event.toolName,
+          event.args,
+        );
         const activityItemId = buildThreadTurnActivityId(
           startedAt,
           `tool:${event.toolCallId}`,
@@ -515,8 +782,10 @@ export function createPiThreadEventProjector(input: {
       }
 
       if (event.type === "tool_execution_end") {
-        const toolArgs = toolArgsByCallId.get(event.toolCallId);
-        toolArgsByCallId.delete(event.toolCallId);
+        const trackedToolCallState =
+          trackedToolCallsByCallId.get(event.toolCallId) ?? null;
+        const toolArgs = trackedToolCallState?.args;
+        trackedToolCallsByCallId.delete(event.toolCallId);
         const activityItemId = buildThreadTurnActivityId(
           startedAt,
           `tool:${event.toolCallId}`,
@@ -550,7 +819,7 @@ export function createPiThreadEventProjector(input: {
           ];
         }
 
-        return [
+        const writes = [
           buildProjectedWrite(
             activityItemId,
             `${state}\u0000${event.toolName}\u0000${output}`,
@@ -569,6 +838,19 @@ export function createPiThreadEventProjector(input: {
             },
           ),
         ];
+        if (!event.isError) {
+          const fileChangeWrite = buildPiToolFileChangeWrite({
+            result: event.result,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            trackedToolCallState,
+          });
+          if (fileChangeWrite) {
+            writes.push(fileChangeWrite);
+          }
+        }
+
+        return writes;
       }
 
       return [];

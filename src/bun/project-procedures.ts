@@ -1352,6 +1352,7 @@ async function runThreadMessageInBackground(
     const piEventProjector = createPiThreadEventProjector({
       startedAt,
       threadId,
+      worktreePath: thread.worktreePath,
     });
     let eventProcessingChain = Promise.resolve();
     let eventProcessingError: unknown = null;

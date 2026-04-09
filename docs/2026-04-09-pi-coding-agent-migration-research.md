@@ -428,7 +428,7 @@ The table below answers the practical question:
 | Unsafe mode / sandbox / network policy | Current Codex thread options support real sandbox/network modes | Major gap | Build a safety model: disable tools, override bash/write/edit, run in container, or adopt sandbox extension; current `unsafeMode` cannot be preserved by a simple flag |
 | Reasoning transcript rows | Current UI stores dedicated `reasoning` rows | Partially supported | Convert Pi `thinking_delta` / assistant thinking blocks into Jolt reasoning rows if that UI is still desired |
 | Command transcript rows | Current UI stores dedicated command rows | Supported via Pi `bash` tool | Adapt `tool_execution_*` and bash details into current Jolt command message schema |
-| File-change transcript rows and inline diffs | Current Codex emits `file_change` items | Partial | Pi `edit` returns diff details, but `write` does not; if parity matters, synthesize file-change records from tool results and/or git diffs |
+| File-change transcript rows and inline diffs | Current Codex emits `file_change` items | Partial | Pi `edit` returns diff details, but `write` does not; if parity matters, synthesize file-change records from tool results and/or git diffs. `jt-ide` now does this minimal parity work for successful `edit`/`write` completions. |
 | Web-search transcript rows | Current Codex may emit `web_search` items | Not native | Add web-search as a custom Pi tool/skill or drop this transcript kind |
 | Tool-call transcript rows | Current UI stores `tool_call` rows, excluding Jolt MCP calls | Supported generically | Map Pi tool execution lifecycle into Jolt tool-call rows; redesign if current schema is too Codex-specific |
 | Usage/context window telemetry | Current Jolt scrapes Codex session JSONL | Native Pi concepts | Read usage/context from Pi session stats/events instead of scraping external files |
@@ -501,7 +501,7 @@ What the current implementation intentionally does not do yet:
 - it does not port Jolt MCP tools into Pi
 - it does not port GitHub tools into Pi
 - it does not expose agents/plan-mode parity
-- it does not restore exact `file_change` or `web_search` parity
+- it does not restore `web_search` parity
 - it does not expose Pi branching/tree controls in the Jolt UI yet
 
 Current temporary runtime policy:
@@ -624,9 +624,33 @@ What the current implementation now does:
 
 What this still does not do yet:
 
-- it does not synthesize `file_change` rows from Pi `edit` or `write` activity yet
 - it does not add `web_search` parity because Pi still has no built-in web-search tool in this runtime
 - it does not introduce a new live push transport; Jolt still relies on its existing RPC polling/detail refresh loop for browser updates
+
+### TL07 implementation status in `jt-ide`
+
+The first transcript-parity cleanup slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/project-procedures/pi-event-projection.ts](../src/bun/project-procedures/pi-event-projection.ts)
+- [src/bun/project-procedures/pi-event-projection.test.ts](../src/bun/project-procedures/pi-event-projection.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/project-procedures/README.md](../src/bun/project-procedures/README.md)
+
+What the current implementation now does:
+
+- keeps the EV06 `reasoning`, `chat`, `command`, and generic `tool_call` mappings as the minimum accepted parity baseline for the Pi runtime path
+- records successful Pi `edit` completions as both the existing `tool_call` row and a dedicated `file_change` row using Pi’s own returned unified diff
+- records successful Pi `write` completions as both the existing `tool_call` row and a dedicated `file_change` row by synthesizing a unified diff from the pre-write file contents plus the final write payload
+- uses worktree-normalized file paths for those synthesized `file_change` rows so existing transcript cards and diff viewers continue to work without frontend changes
+- makes the transcript-parity decision explicit: minimal parity in `jt-ide` means preserving command cards, tool cards, reasoning rows, and successful file-change cards, not recreating every historical Codex item shape
+
+What this still does not do yet:
+
+- it does not create `file_change` rows for failed or aborted Pi file tools; those cases still settle only through the `tool_call` row
+- it does not add `web_search` parity because Pi still has no built-in web-search tool in this runtime
+- it does not define any richer transcript contract for future Pi-native extensions beyond the current `tool_call` fallback
 
 ### Why SDK first
 
@@ -853,6 +877,8 @@ Pi `edit` does provide unified diff details. Pi `write` does not. Therefore Jolt
 - synthesize all file change cards by comparing pre/post filesystem state or git diff snapshots
 
 If maintaining the current diff-centric transcript UX matters, this is a real implementation task.
+
+This minimum parity decision is now implemented in `jt-ide`: successful Pi `edit` and `write` calls emit `file_change` rows, while `web_search` and any richer extension-specific transcript kinds remain future work. See [TL07 implementation status in `jt-ide`](#tl07-implementation-status-in-jt-ide).
 
 ### 6. Access Controls and Unsafe Mode
 
