@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
+import { buildCodexConstructorOptions } from "./project-procedures/codex-constructor";
 import { codexModelSupportsReasoningEffort } from "./project-procedures/model-catalog";
 
 const tempDirectories = new Set<string>();
@@ -246,26 +247,66 @@ describe("project procedure configuration helpers", () => {
     });
   });
 
-  it("uses xAI provider settings for xAI model ids", async () => {
-    const procedures = await loadProjectProcedures();
+  it("passes OpenAI models through to Codex constructor inputs unchanged", () => {
+    expect(
+      buildCodexConstructorOptions({
+        apiKey: "openai-key",
+        config: {
+          approval_policy: "never",
+        },
+        model: "gpt-5.4",
+      }),
+    ).toEqual({
+      apiKey: "openai-key",
+      config: {
+        approval_policy: "never",
+      },
+    });
+  });
+
+  it("uses xAI provider settings when building Codex constructor inputs", () => {
     process.env.XAI_API_KEY = "xai-test-key";
 
     expect(
-      procedures.buildCodexClientProviderOptions("grok-code-fast-1"),
+      buildCodexConstructorOptions({
+        config: {
+          approval_policy: "never",
+          model_providers: {
+            openai: {
+              name: "OpenAI",
+            },
+          },
+        },
+        model: "grok-code-fast-1",
+      }),
     ).toEqual({
-      apiKey: "xai-test-key",
-      baseUrl: "https://api.x.ai/v1",
+      config: {
+        approval_policy: "never",
+        model_provider: "xai",
+        model_providers: {
+          openai: {
+            name: "OpenAI",
+          },
+          xai: {
+            base_url: "https://api.x.ai/v1",
+            env_key: "XAI_API_KEY",
+            name: "xAI",
+            supports_websockets: false,
+            wire_api: "responses",
+          },
+        },
+        web_search: "disabled",
+      },
     });
-
-    expect(procedures.buildCodexClientProviderOptions("gpt-5.4")).toEqual({});
   });
 
-  it("requires XAI_API_KEY before using xAI model ids", async () => {
-    const procedures = await loadProjectProcedures();
+  it("requires XAI_API_KEY before using xAI model ids", () => {
     delete process.env.XAI_API_KEY;
 
     expect(() =>
-      procedures.buildCodexClientProviderOptions("grok-4.20-reasoning"),
+      buildCodexConstructorOptions({
+        model: "grok-4.20-reasoning",
+      }),
     ).toThrow(
       'XAI_API_KEY is required to use the xAI model "grok-4.20-reasoning".',
     );
@@ -309,5 +350,42 @@ describe("project procedure configuration helpers", () => {
         },
       ),
     ).rejects.toThrow("Active worktree update was aborted.");
+  });
+
+  it("falls back to cached worktrees when foreground git preempts active-worktree validation", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-active-worktree-preempt-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Active Worktree Repo",
+      projectPath: repoPath,
+    });
+
+    const selectionPromise = procedures.setActiveWorktreeProcedure({
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+    });
+
+    await expect(
+      procedures.listProjectWorktreesProcedure({
+        projectId: opened.project.id,
+      }),
+    ).resolves.toEqual({
+      project: expect.objectContaining({
+        id: opened.project.id,
+      }),
+      worktrees: expect.arrayContaining([
+        expect.objectContaining({
+          path: repoPath,
+        }),
+      ]),
+    });
+
+    await expect(selectionPromise).resolves.toEqual({
+      success: true,
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+    });
   });
 });

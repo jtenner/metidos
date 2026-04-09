@@ -17,8 +17,8 @@ type ResolveTlsRuntimeConfigOptions = {
 };
 /**
  * Formats loopback http origin.
- * @param port - port argument for formatLoopbackHttpOrigin.
- * @param tlsEnabled - tlsEnabled argument for formatLoopbackHttpOrigin.
+ * @param port - Loopback HTTP port used for origin construction.
+ * @param tlsEnabled - Whether HTTPS is enabled for loopback URL generation.
  */
 
 export function formatLoopbackHttpOrigin(
@@ -29,8 +29,8 @@ export function formatLoopbackHttpOrigin(
 }
 /**
  * Formats loopback web socket url.
- * @param port - port argument for formatLoopbackWebSocketUrl.
- * @param tlsEnabled - tlsEnabled argument for formatLoopbackWebSocketUrl.
+ * @param port - Loopback WebSocket port used for URL construction.
+ * @param tlsEnabled - Whether WSS should be used for loopback sockets.
  */
 
 export function formatLoopbackWebSocketUrl(
@@ -42,7 +42,7 @@ export function formatLoopbackWebSocketUrl(
 /**
  * Is public tls enabled.
  * @param args - Argument list passed to isPublicTlsEnabled.
- * @param env - env argument for isPublicTlsEnabled.
+ * @param env - Environment variables used to detect TLS availability.
  */
 
 export function isPublicTlsEnabled(

@@ -19,7 +19,7 @@ type ProjectProceduresModule = typeof import("./project-procedures");
 let projectProcedures: ProjectProceduresModule | null = null;
 /**
  * Creates temp directory.
- * @param prefix - prefix argument for createTempDirectory.
+ * @param prefix - Directory name prefix for temp directory creation.
  */
 
 function createTempDirectory(prefix: string): string {

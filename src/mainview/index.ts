@@ -235,7 +235,7 @@ let nextRequestId = 1;
 let resolveConnection = () => {};
 /**
  * Rejects connection.
- * @param _reason - _reason argument for rejectConnection.
+ * @param _reason - _reason value.
  */
 let rejectConnection = (_reason?: unknown) => {};
 let connectionReadyResolved = false;
@@ -278,8 +278,8 @@ function clearRpcReconnectTimer(): void {
   }
 }
 /**
- * Performs reloadWindow operation.
- * @param reason - Reason for this operation.
+ * Reloads the app window in dev mode after backend recovery.
+ * @param reason - Human-readable reason for the reload.
  */
 
 function reloadWindow(reason: string): void {
@@ -319,8 +319,8 @@ async function waitForDevServer(): Promise<void> {
   }, 250);
 }
 /**
- * Performs scheduleDevRecovery operation.
- * @param reason - Reason for this operation.
+ * Schedules a delayed dev recovery check and reload flow.
+ * @param reason - Human-readable reason for waiting for recovery.
  */
 
 function scheduleDevRecovery(reason: string): void {
@@ -356,8 +356,8 @@ function rejectPendingRequests(reason: unknown): void {
   pendingRequests.clear();
 }
 /**
- * Performs scheduleRpcReconnect operation.
- * @param reason - Reason for this operation.
+ * Schedules websocket reconnect with exponential backoff.
+ * @param reason - Human-readable reason for reconnection scheduling.
  */
 
 function scheduleRpcReconnect(reason: string): void {
@@ -570,9 +570,9 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
   });
 }
 /**
- * Creates abort error.
- * @param reason - Reason for this operation.
- * @param fallbackMessage - fallbackMessage argument for createAbortError.
+ * Creates a normalized abort error for cancellation and timeout paths.
+ * @param reason - Reason value supplied by the caller.
+ * @param fallbackMessage - Error message fallback.
  */
 
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
@@ -592,8 +592,8 @@ function createAbortError(reason: unknown, fallbackMessage: string): Error {
   return error;
 }
 /**
- * Normalizes timeout ms.
- * @param timeoutMs - timeoutMs argument for normalizeTimeoutMs.
+ * Normalizes an optional timeout to a minimum positive integer, or null.
+ * @param timeoutMs - Raw timeout in milliseconds.
  */
 
 function normalizeTimeoutMs(timeoutMs?: number): number | null {
@@ -608,8 +608,8 @@ function normalizeTimeoutMs(timeoutMs?: number): number | null {
   return Math.max(1, Math.floor(timeoutMs));
 }
 /**
- * Builds request signal.
- * @param options - Configuration options used by this operation.
+ * Builds a combined abort signal from caller options.
+ * @param options - Request options that may include abort and timeout.
  */
 
 function buildRequestSignal(
@@ -634,8 +634,8 @@ function buildRequestSignal(
   return AbortSignal.any(signals);
 }
 /**
- * Performs waitForConnection operation.
- * @param signal - Abort signal for cancellation.
+ * Waits for websocket transport readiness, honoring abort signals.
+ * @param signal - Optional abort signal for cancellation.
  */
 
 async function waitForConnection(signal: AbortSignal | null): Promise<void> {
@@ -665,8 +665,8 @@ async function waitForConnection(signal: AbortSignal | null): Promise<void> {
   ]);
 }
 /**
- * Performs waitForOpenSocket operation.
- * @param signal - Abort signal for cancellation.
+ * Waits for an OPEN websocket before returning the socket.
+ * @param signal - Optional abort signal for cancellation.
  */
 
 async function waitForOpenSocket(
@@ -682,9 +682,9 @@ async function waitForOpenSocket(
   }
 }
 /**
- * Sends socket message.
- * @param targetSocket - targetSocket argument for sendSocketMessage.
- * @param message - Message payload.
+ * Sends a typed payload over the active websocket connection.
+ * @param targetSocket - Target websocket.
+ * @param message - Serialized payload to send.
  */
 
 function sendSocketMessage(
@@ -695,10 +695,10 @@ function sendSocketMessage(
   targetSocket.send(JSON.stringify(message));
 }
 /**
- * Sends request.
- * @param method - method argument for sendRequest.
- * @param params - Parameters object.
- * @param options - Configuration options used by this operation.
+ * Sends an RPC request and returns a typed response promise.
+ * @param method - RPC method key.
+ * @param params - Request parameters.
+ * @param options - Request options including signal and timeout.
  */
 
 async function sendRequest<K extends RpcMethodName>(
@@ -799,8 +799,8 @@ async function sendRequest<K extends RpcMethodName>(
   return response;
 }
 /**
- * Creates procedure.
- * @param method - method argument for createProcedure.
+ * Binds an RPC method to a callable procedure.
+ * @param method - RPC request method name.
  */
 
 function createProcedure<K extends RpcMethodName>(

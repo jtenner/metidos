@@ -158,8 +158,8 @@ import {
 
 /**
  * Merges thread message history.
- * @param current - current argument for mergeThreadMessageHistory.
- * @param incoming - incoming argument for mergeThreadMessageHistory.
+ * @param current - current value.
+ * @param incoming - incoming value.
  */
 
 function mergeThreadMessageHistory(
@@ -209,11 +209,11 @@ type VisibleMessageCacheEntry = {
 };
 
 /**
- * Reads cached visible message.
- * @param cache - cache argument for readCachedVisibleMessage.
- * @param cacheKey - cacheKey argument for readCachedVisibleMessage.
- * @param signature - signature argument for readCachedVisibleMessage.
- * @param createValue - createValue argument for readCachedVisibleMessage.
+ * Reads a memoized cached visible message entry.
+ * @param cache - cache value.
+ * @param cacheKey - cacheKey value.
+ * @param signature - signature value.
+ * @param createValue - createValue value.
  */
 
 function readCachedVisibleMessage(
@@ -236,7 +236,7 @@ function readCachedVisibleMessage(
 }
 
 /**
- * Performs threadMessageVisibleSignature operation.
+ * Builds a stable visible-message signature for cache invalidation.
  * @param message - Message payload.
  */
 
@@ -363,7 +363,7 @@ function useDesktopViewport(): boolean {
     const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
     /**
      * Handles change.
-     * @param event - event argument for handleChange.
+     * @param event - event value.
      */
 
     const handleChange = (event: MediaQueryListEvent): void => {
@@ -418,8 +418,8 @@ function areWorktreeChangesEqual(
 
 /**
  * Compares simple string arrays in a deterministic, order-sensitive way.
- * @param left - left argument for left.
- * @param right - right argument for right.
+ * @param left - left value.
+ * @param right - right value.
  */
 function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left === right) {
@@ -458,8 +458,8 @@ function areWorktreeSnapshotsEquivalent(
 
 /**
  * Builds loaded project worktrees state.
- * @param worktrees - worktrees argument for buildLoadedProjectWorktreesState.
- * @param loadedAtMs - loadedAtMs argument for buildLoadedProjectWorktreesState.
+ * @param worktrees - worktrees value.
+ * @param loadedAtMs - loadedAtMs value.
  */
 
 function buildLoadedProjectWorktreesState(
@@ -3367,7 +3367,7 @@ export default function App({
 
     /**
      * Handles pointer down.
-     * @param event - event argument for handlePointerDown.
+     * @param event - event value.
      */
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -3381,7 +3381,7 @@ export default function App({
 
     /**
      * Handles key down.
-     * @param event - event argument for handleKeyDown.
+     * @param event - event value.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -3411,7 +3411,7 @@ export default function App({
 
     /**
      * Handles pointer down.
-     * @param event - event argument for handlePointerDown.
+     * @param event - event value.
      */
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -3425,7 +3425,7 @@ export default function App({
 
     /**
      * Handles key down.
-     * @param event - event argument for handleKeyDown.
+     * @param event - event value.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -3736,7 +3736,7 @@ export default function App({
   useEffect(() => {
     /**
      * Handles thread start request created.
-     * @param event - event argument for handleThreadStartRequestCreated.
+     * @param event - event value.
      */
 
     const handleThreadStartRequestCreated = (
@@ -3801,7 +3801,7 @@ export default function App({
 
     /**
      * Handles key down.
-     * @param event - event argument for handleKeyDown.
+     * @param event - event value.
      */
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -4375,7 +4375,7 @@ export default function App({
   useEffect(() => {
     /**
      * Handles context focus changed.
-     * @param event - event argument for handleContextFocusChanged.
+     * @param event - event value.
      */
 
     const handleContextFocusChanged = (

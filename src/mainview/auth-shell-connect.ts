@@ -51,8 +51,8 @@ export type InitialRpcConnectRetryInfo = {
 
 export class AuthShellTimeoutError extends Error {
   /**
-   * Creates and initializes a new instance.
-   * @param message - Message payload.
+   * Construct the timeout error with a caller-facing message.
+   * @param message - Timeout message shown to the auth-shell caller.
    */
 
   constructor(message: string) {
@@ -77,8 +77,8 @@ type ResolveAuthShellGateOptions = {
   statusTimeoutMs?: number;
 };
 /**
- * Performs defaultRetryWait operation.
- * @param delayMs - delayMs argument for defaultRetryWait.
+ * Sleep for the requested number of milliseconds.
+ * @param delayMs - Milliseconds to wait.
  */
 
 function defaultRetryWait(delayMs: number): Promise<void> {
@@ -102,8 +102,8 @@ export function shouldRetryInitialRpcConnect(error: unknown): boolean {
   );
 }
 /**
- * Performs withTimeout operation.
- * @param options - Configuration options used by this operation.
+ * Wrap an async operation with a hard timeout and reject on expiry.
+ * @param options - Timeout configuration and operation.
  */
 
 function withTimeout<T>(options: {

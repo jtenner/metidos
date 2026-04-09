@@ -23,24 +23,24 @@ type AuthSecretOptions = {
   appDataDir?: string;
 };
 /**
- * Performs authSecretDirectory operation.
- * @param options - Configuration options used by this operation.
+ * Resolve the directory for persisted auth secret key material.
+ * @param options - Optional app-data override.
  */
 
 function authSecretDirectory(options?: AuthSecretOptions): string {
   return options?.appDataDir ?? dirname(getAppDatabasePath());
 }
 /**
- * Gets auth secret key path.
- * @param options - Configuration options used by this operation.
+ * Get the full path to the auth secret key file.
+ * @param options - Optional app-data override.
  */
 
 export function getAuthSecretKeyPath(options?: AuthSecretOptions): string {
   return resolve(authSecretDirectory(options), AUTH_SECRET_KEY_FILE_NAME);
 }
 /**
- * Applies owner only directory permissions.
- * @param path - Filesystem path.
+ * Apply owner-only permissions to a directory where supported.
+ * @param path - Directory path.
  */
 
 function applyOwnerOnlyDirectoryPermissions(path: string): void {
@@ -51,8 +51,8 @@ function applyOwnerOnlyDirectoryPermissions(path: string): void {
   }
 }
 /**
- * Performs ensureDirectory operation.
- * @param path - Filesystem path.
+ * Ensure the directory exists and enforce owner-only permissions.
+ * @param path - Directory path.
  */
 
 function ensureDirectory(path: string): void {
@@ -65,8 +65,8 @@ function ensureDirectory(path: string): void {
   applyOwnerOnlyDirectoryPermissions(path);
 }
 /**
- * Applies owner only file permissions.
- * @param path - Filesystem path.
+ * Apply owner-only permissions to a key file where supported.
+ * @param path - File path.
  */
 
 function applyOwnerOnlyFilePermissions(path: string): void {
@@ -77,32 +77,32 @@ function applyOwnerOnlyFilePermissions(path: string): void {
   }
 }
 /**
- * Performs base64UrlEncode operation.
- * @param bytes - bytes argument for base64UrlEncode.
+ * Base64URL-encode bytes for file storage.
+ * @param bytes - Raw key bytes.
  */
 
 function base64UrlEncode(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
 /**
- * Performs base64UrlDecode operation.
- * @param value - Input value.
+ * Decode base64url data into bytes.
+ * @param value - Base64url-encoded input.
  */
 
 function base64UrlDecode(value: string): Uint8Array {
   return new Uint8Array(Buffer.from(value, "base64url"));
 }
 /**
- * Performs randomBytes operation.
- * @param length - length argument for randomBytes.
+ * Generate random bytes from the WebCrypto source.
+ * @param length - Number of bytes to generate.
  */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 /**
- * Converts array buffer value.
- * @param bytes - bytes argument for toArrayBuffer.
+ * Convert bytes to an ArrayBuffer for crypto APIs.
+ * @param bytes - Raw bytes.
  */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -111,8 +111,8 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 /**
- * Loads or create raw key.
- * @param options - Configuration options used by this operation.
+ * Load existing auth key or create a new one if missing.
+ * @param options - Optional app-data override.
  */
 
 function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
@@ -138,9 +138,9 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
   return created;
 }
 /**
- * Performs importSecretKey operation.
- * @param usages - usages argument for importSecretKey.
- * @param options - Configuration options used by this operation.
+ * Import the auth secret into an AES-GCM CryptoKey.
+ * @param usages - Key usages (encrypt/decrypt).
+ * @param options - Optional app-data override.
  */
 
 async function importSecretKey(

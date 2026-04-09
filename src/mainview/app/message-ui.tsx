@@ -145,8 +145,8 @@ export const MarkdownMessage = memo(function MarkdownMessage({
 
 /**
  * Performs ContextUsageMeter operation.
- * @param inputTokens - inputTokens argument for ContextUsageMeter.
- * @param contextWindowTokens - contextWindowTokens argument for ContextUsageMeter.
+ * @param inputTokens - inputTokens value.
+ * @param contextWindowTokens - contextWindowTokens value.
  */
 export function ContextUsageMeter({
   inputTokens,
@@ -389,7 +389,7 @@ export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
 /**
  * Performs commandStateLabel operation.
  * @param state - Current state value.
- * @param exitCode - exitCode argument for commandStateLabel.
+ * @param exitCode - exitCode value.
  */
 function commandStateLabel(
   state: "in_progress" | "completed" | "failed" | "stopped",
@@ -460,7 +460,7 @@ function errorItemStateLabel(
 
 /**
  * Performs diffLineClassName operation.
- * @param kind - kind argument for diffLineClassName.
+ * @param kind - kind value.
  */
 function diffLineClassName(kind: DiffLineKind): string {
   if (kind === "meta") {
@@ -583,10 +583,10 @@ export function DiffViewer({
 
 /**
  * Performs ToolCallMessage operation.
- * @param server - server argument for ToolCallMessage.
- * @param tool - tool argument for ToolCallMessage.
- * @param argumentsText - argumentsText argument for ToolCallMessage.
- * @param output - output argument for ToolCallMessage.
+ * @param server - server value.
+ * @param tool - tool value.
+ * @param argumentsText - argumentsText value.
+ * @param output - output value.
  * @param state - Current state value.
  */
 export function ToolCallMessage({
@@ -705,10 +705,10 @@ export function ErrorItemMessage({
 
 /**
  * Performs CommandExecutionMessage operation.
- * @param command - command argument for CommandExecutionMessage.
- * @param output - output argument for CommandExecutionMessage.
+ * @param command - command value.
+ * @param output - output value.
  * @param state - Current state value.
- * @param exitCode - exitCode argument for CommandExecutionMessage.
+ * @param exitCode - exitCode value.
  * @param expanded - Whether the section is expanded.
  * @param onToggleExpanded - Callback invoked when expansion changes.
  */
@@ -958,7 +958,7 @@ export function ReasoningMessage({
  * Performs FileChangeMessage operation.
  * @param path - Filesystem path.
  * @param diffText - Diff content to process.
- * @param changeKind - changeKind argument for FileChangeMessage.
+ * @param changeKind - changeKind value.
  * @param state - Current state value.
  * @param expanded - Whether the section is expanded.
  * @param onToggleExpanded - Callback invoked when expansion changes.
@@ -1069,7 +1069,7 @@ export function FileChangeMessage({
 /**
  * Renders the GitHistoryDiffModal component.
  * @param state - Current state value.
- * @param onClose - onClose argument for GitHistoryDiffModal.
+ * @param onClose - onClose value.
  */
 export function GitHistoryDiffModal({
   state,
@@ -1151,9 +1151,9 @@ export function GitHistoryDiffModal({
 
 /**
  * Performs DesktopMessageGroups operation.
- * @param groups - groups argument for DesktopMessageGroups.
- * @param localUserLabel - localUserLabel argument for DesktopMessageGroups.
- * @param renderAssistantMessageContent - renderAssistantMessageContent argument for DesktopMessageGroups.
+ * @param groups - groups value.
+ * @param localUserLabel - localUserLabel value.
+ * @param renderAssistantMessageContent - renderAssistantMessageContent value.
  */
 export function DesktopMessageGroups({
   groups,
@@ -1230,9 +1230,9 @@ export function DesktopMessageGroups({
 
 /**
  * Performs MobileMessageGroups operation.
- * @param groups - groups argument for MobileMessageGroups.
- * @param localUserLabel - localUserLabel argument for MobileMessageGroups.
- * @param renderAssistantMessageContent - renderAssistantMessageContent argument for MobileMessageGroups.
+ * @param groups - groups value.
+ * @param localUserLabel - localUserLabel value.
+ * @param renderAssistantMessageContent - renderAssistantMessageContent value.
  */
 export function MobileMessageGroups({
   groups,
@@ -1308,8 +1308,8 @@ export function MobileMessageGroups({
 /**
  * Performs ErrorPreviewPopover operation.
  * @param text - Input text content.
- * @param x - x argument for ErrorPreviewPopover.
- * @param y - y argument for ErrorPreviewPopover.
+ * @param x - x value.
+ * @param y - y value.
  */
 export function ErrorPreviewPopover({
   text,
@@ -1339,10 +1339,10 @@ export function ErrorPreviewPopover({
 
 /**
  * Performs ThreadSummaryPopover operation.
- * @param title - title argument for ThreadSummaryPopover.
- * @param summary - summary argument for ThreadSummaryPopover.
- * @param x - x argument for ThreadSummaryPopover.
- * @param y - y argument for ThreadSummaryPopover.
+ * @param title - title value.
+ * @param summary - summary value.
+ * @param x - x value.
+ * @param y - y value.
  */
 export function ThreadSummaryPopover({
   title,

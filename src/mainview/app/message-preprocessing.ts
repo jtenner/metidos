@@ -39,16 +39,16 @@ export type PreparedMessageRenderPlan =
       kind: "rich";
     };
 /**
- * Should workerize message preprocessing.
- * @param text - Input text content.
+ * Decide if preprocessing should run in a worker for long messages.
+ * @param text - Message text.
  */
 
 export function shouldWorkerizeMessagePreprocessing(text: string): boolean {
   return text.length >= LARGE_MARKDOWN_PREPROCESS_TEXT_LENGTH;
 }
 /**
- * Should skip syntax highlighting.
- * @param code - code argument for shouldSkipSyntaxHighlighting.
+ * Decide whether a code block is too large for inline highlighting.
+ * @param code - Full code block text.
  */
 
 export function shouldSkipSyntaxHighlighting(code: string): boolean {
@@ -59,8 +59,8 @@ export function shouldSkipSyntaxHighlighting(code: string): boolean {
   return code.split("\n").length > MAX_HIGHLIGHTED_CODE_BLOCK_LINES;
 }
 /**
- * Performs splitMarkdownTextForPreparedRendering operation.
- * @param text - Input text content.
+ * Split very large markdown text into bounded chunks.
+ * @param text - Markdown text to split.
  */
 
 function splitMarkdownTextForPreparedRendering(text: string): string[] {
@@ -97,10 +97,10 @@ function splitMarkdownTextForPreparedRendering(text: string): string[] {
   return chunks.length > 0 ? chunks : [text];
 }
 /**
- * Performs pushPreparedMarkdownBlocks operation.
- * @param blocks - blocks argument for pushPreparedMarkdownBlocks.
- * @param text - Input text content.
- * @param startIndex - startIndex argument for pushPreparedMarkdownBlocks.
+ * Append markdown chunks into blocks with stable keys.
+ * @param blocks - Output block collection to mutate.
+ * @param text - Markdown text segment.
+ * @param startIndex - Next key index.
  */
 
 function pushPreparedMarkdownBlocks(
@@ -126,8 +126,8 @@ function pushPreparedMarkdownBlocks(
   return nextIndex;
 }
 /**
- * Performs prepareRichMarkdownBlocks operation.
- * @param text - Input text content.
+ * Parse markdown into alternating markdown and code blocks.
+ * @param text - Raw markdown message text.
  */
 
 function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
@@ -200,8 +200,8 @@ function prepareRichMarkdownBlocks(text: string): PreparedRichMarkdownBlock[] {
   return blocks;
 }
 /**
- * Performs prepareMessageRenderPlan operation.
- * @param text - Input text content.
+ * Build a render plan that toggles between plain and rich rendering.
+ * @param text - Message text to normalize.
  */
 
 export function prepareMessageRenderPlan(

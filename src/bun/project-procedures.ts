@@ -75,6 +75,10 @@ import {
   runGitCommand,
 } from "./git";
 import {
+  buildCodexConstructorOptions,
+  type CodexConstructorConfig,
+} from "./project-procedures/codex-constructor";
+import {
   applyCodexSessionUsageTelemetry,
   readCodexSessionUsageTelemetry,
 } from "./project-procedures/codex-session-telemetry";
@@ -96,7 +100,6 @@ import {
 } from "./project-procedures/git-history";
 import {
   buildModelCatalog,
-  codexModelProvider,
   codexModelSupportsReasoningEffort,
   contextWindowTokensForModel,
   normalizeStoredCodexModel,
@@ -188,8 +191,6 @@ const JOLT_SIDECAR_SERVER_PATH = resolve(
   process.cwd(),
   "src/bun/codex-sidecar-mcp.ts",
 );
-const XAI_API_BASE_URL = "https://api.x.ai/v1";
-const XAI_API_KEY_ENV_NAME = "XAI_API_KEY";
 
 /**
  * RPC procedure: returns OS home directory and whether shell-like `~` expansion
@@ -270,7 +271,7 @@ export function warmProcedureStartupCaches(): void {
 
 /**
  * Return the latest terminal timestamp from a thread (run or error), if any.
- * @param thread - thread argument for thread.
+ * @param thread - The thread entity currently being processed.
  */
 function latestSettledThreadTimestamp(thread: ThreadRecord): string | null {
   if (thread.lastRunAt && thread.lastErrorAt) {
@@ -528,7 +529,7 @@ function flushDeferredBackgroundWork(): void {
 }
 /**
  * Performs queueBackgroundWorkWhenIdle operation.
- * @param key - key argument for queueBackgroundWorkWhenIdle.
+ * @param key - Queue key used to de-dupe background tasks.
  * @param callback - Callback to invoke.
  */
 
@@ -583,7 +584,7 @@ function runWorktreeOpenLimited<T>(
  * Runs git history read limited.
  * @param callback - Callback to invoke.
  * @param signal - Abort signal for cancellation.
- * @param abortMessage - abortMessage argument for runGitHistoryReadLimited.
+ * @param abortMessage - Error message used if the git history read is aborted.
  */
 
 function runGitHistoryReadLimited<T>(
@@ -600,7 +601,7 @@ function runGitHistoryReadLimited<T>(
  * Runs diff load limited.
  * @param callback - Callback to invoke.
  * @param signal - Abort signal for cancellation.
- * @param abortMessage - abortMessage argument for runDiffLoadLimited.
+ * @param abortMessage - Error message used if the diff load is aborted.
  */
 
 function runDiffLoadLimited<T>(
@@ -615,7 +616,7 @@ function runDiffLoadLimited<T>(
 }
 /**
  * Performs recordThreadActivityPersistenceDuration operation.
- * @param durationMs - durationMs argument for recordThreadActivityPersistenceDuration.
+ * @param durationMs - Milliseconds elapsed before activity persistence completes.
  */
 
 function recordThreadActivityPersistenceDuration(durationMs: number): void {
@@ -700,14 +701,7 @@ type CodexClientThreadContext = Pick<
   | "worktreePath"
 >;
 
-type CodexConstructorOptions = NonNullable<
-  ConstructorParameters<typeof Codex>[0]
->;
-type CodexClientConfig = NonNullable<CodexConstructorOptions["config"]>;
-type CodexClientProviderOptions = Pick<
-  CodexConstructorOptions,
-  "apiKey" | "baseUrl"
->;
+type CodexClientConfig = CodexConstructorConfig;
 
 type CodexAccessFlag = boolean | 0 | 1 | null | undefined;
 
@@ -759,7 +753,7 @@ function buildThreadAccessDeveloperInstructions(thread: {
 
 /**
  * Creates codex client.
- * @param thread - thread argument for createCodexClient.
+ * @param thread - Thread data used to construct a Codex client.
  */
 
 export function buildCodexClientConfig(
@@ -806,48 +800,24 @@ export function buildCodexClientConfig(
   };
 }
 
-/**
- * Resolves provider-specific Codex constructor options from the selected model id.
- * xAI models use the OpenAI-compatible endpoint plus `XAI_API_KEY`.
- */
-export function buildCodexClientProviderOptions(
-  model: string | null | undefined,
-): CodexClientProviderOptions {
-  const normalizedModel = normalizeStoredCodexModel(model);
-  if (codexModelProvider(normalizedModel) !== "xai") {
-    return {};
-  }
-
-  const apiKey = process.env[XAI_API_KEY_ENV_NAME]?.trim();
-  if (!apiKey) {
-    throw new Error(
-      `${XAI_API_KEY_ENV_NAME} is required to use the xAI model "${normalizedModel}".`,
-    );
-  }
-
-  return {
-    apiKey,
-    baseUrl: XAI_API_BASE_URL,
-  };
-}
-
 function createCodexClient(
   thread: ThreadRecord,
   options?: {
     sessionId?: string | null;
   },
 ): Codex {
-  const model = normalizeStoredCodexModel(thread.model);
-  return new Codex({
-    ...buildCodexClientProviderOptions(model),
-    config: buildCodexClientConfig(thread, {
-      sessionId: options?.sessionId ?? null,
+  return new Codex(
+    buildCodexConstructorOptions({
+      config: buildCodexClientConfig(thread, {
+        sessionId: options?.sessionId ?? null,
+      }),
+      model: thread.model,
     }),
-  });
+  );
 }
 /**
  * Performs gitPriorityFromRpcRequest operation.
- * @param priority - priority argument for gitPriorityFromRpcRequest.
+ * @param priority - Priority hint supplied in the RPC request.
  */
 
 function gitPriorityFromRpcRequest(
@@ -914,7 +884,7 @@ function clearProjectThreadRuntimeState(projectId: number): void {
 /**
  * Sets thread run status.
  * @param threadId - Thread identifier.
- * @param status - status argument for setThreadRunStatus.
+ * @param status - New run status to persist for the thread.
  */
 
 function setThreadRunStatus(
@@ -926,7 +896,7 @@ function setThreadRunStatus(
 }
 /**
  * Performs currentThreadRunStatus operation.
- * @param thread - thread argument for currentThreadRunStatus.
+ * @param thread - Thread whose current run status is being read.
  */
 
 function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
@@ -945,7 +915,7 @@ type ThreadAccessControls = {
 
 /**
  * Resolves unsafe mode.
- * @param unsafeMode - unsafeMode argument for resolveUnsafeMode.
+ * @param unsafeMode - Requested unsafe-mode value to resolve.
  */
 
 function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
@@ -973,9 +943,9 @@ function resolveThreadAccessControls(
 /**
  * Performs codexThreadOptions operation.
  * @param worktreePath - Worktree path.
- * @param model - model argument for codexThreadOptions.
- * @param reasoningEffort - reasoningEffort argument for codexThreadOptions.
- * @param unsafeMode - unsafeMode argument for codexThreadOptions.
+ * @param model - Preferred model for the Codex thread.
+ * @param reasoningEffort - Configured reasoning effort for the run.
+ * @param unsafeMode - Unsafe-mode setting for thread options.
  */
 
 function codexThreadOptions(
@@ -1048,7 +1018,7 @@ export function buildCodexSidecarEnv(
 }
 /**
  * Creates managed codex thread.
- * @param thread - thread argument for createManagedCodexThread.
+ * @param thread - Thread configuration used to create a managed Codex thread.
  */
 
 function createManagedCodexThread(
@@ -1084,7 +1054,7 @@ function createManagedCodexThread(
 }
 /**
  * Performs ensureCodexThread operation.
- * @param thread - thread argument for ensureCodexThread.
+ * @param thread - Thread record used to ensure Codex thread existence.
  */
 
 async function ensureCodexThread(
@@ -1186,9 +1156,9 @@ function warmThreadDetailCache(threadId: number): void {
 /**
  * Performs settleCanceledThreadTurn operation.
  * @param threadId - Thread identifier.
- * @param startedAt - startedAt argument for settleCanceledThreadTurn.
+ * @param startedAt - Turn start timestamp used to compute cancellation timing.
  * @param lastAssistantItemId - lastAssistantItemId identifier.
- * @param lastAssistantText - lastAssistantText argument for settleCanceledThreadTurn.
+ * @param lastAssistantText - Last assistant text emitted before cancellation.
  * @param message - Message payload.
  */
 
@@ -1244,7 +1214,7 @@ function interruptionMessageFromAbort(reason: unknown): string {
 }
 /**
  * Builds thread turn activity id.
- * @param startedAt - startedAt argument for buildThreadTurnActivityId.
+ * @param startedAt - Turn start timestamp included in the activity ID.
  * @param itemId - itemId identifier.
  */
 
@@ -1254,9 +1224,9 @@ function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
 /**
  * Runs thread message in background.
  * @param threadId - Thread identifier.
- * @param input - input argument for runThreadMessageInBackground.
- * @param startedAt - startedAt argument for runThreadMessageInBackground.
- * @param controller - controller argument for runThreadMessageInBackground.
+ * @param input - Message payload for the background thread message handler.
+ * @param startedAt - Start timestamp for background message processing.
+ * @param controller - Abort controller for cancellation of background work.
  */
 
 async function runThreadMessageInBackground(
@@ -1573,7 +1543,7 @@ async function runThreadMessageInBackground(
 /**
  * Performs worktreePathFromName operation.
  * @param projectPath - projectPath path used by worktreePathFromName.
- * @param worktreeName - worktreeName argument for worktreePathFromName.
+ * @param worktreeName - Worktree name to resolve into a filesystem path.
  */
 
 function worktreePathFromName(
@@ -1727,7 +1697,7 @@ function stringifyActivityValue(value: unknown): string {
 }
 /**
  * Performs extractToolCallTextContent operation.
- * @param content - content argument for extractToolCallTextContent.
+ * @param content - Raw tool-call content to extract human-readable text from.
  */
 
 function extractToolCallTextContent(content: unknown): string {
@@ -1754,7 +1724,7 @@ function extractToolCallTextContent(content: unknown): string {
 }
 /**
  * Formats tool call output.
- * @param item - item argument for formatToolCallOutput.
+ * @param item - Tool call item to format for display.
  */
 
 function formatToolCallOutput(
@@ -1826,7 +1796,7 @@ function createBufferedThreadActivityWriter(): {
 
   /**
    * Performs flushEntries operation.
-   * @param force - force argument for flushEntries.
+   * @param force - Whether to force immediate persistence.
    */
 
   const flushEntries = async (force: boolean): Promise<void> => {
@@ -1926,7 +1896,7 @@ function createBufferedThreadActivityWriter(): {
 
   /**
    * Performs enqueueFlush operation.
-   * @param force - force argument for enqueueFlush.
+   * @param force - Whether to schedule an immediate flush cycle.
    */
 
   const enqueueFlush = (force: boolean): Promise<void> => {
@@ -1980,7 +1950,7 @@ function createBufferedThreadActivityWriter(): {
 }
 /**
  * Performs persistThreadActivityInputs operation.
- * @param inputs - inputs argument for persistThreadActivityInputs.
+ * @param inputs - Activity input records queued for persistence.
  */
 
 function persistThreadActivityInputs(
@@ -2010,7 +1980,7 @@ function persistThreadActivityInputs(
  * Builds reasoning activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param item - item argument for buildReasoningActivityInput.
+ * @param item - Reasoning activity item being serialized for storage.
  * @param state - Current state value.
  */
 
@@ -2073,7 +2043,7 @@ async function upsertAssistantChatActivity(
  * Builds command activity input payload.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param payload - payload argument for buildCommandActivityInputPayload.
+ * @param payload - Command tool-call payload to convert to an activity input.
  */
 
 function buildCommandActivityInputPayload(
@@ -2100,7 +2070,7 @@ function buildCommandActivityInputPayload(
  * Builds command activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param item - item argument for buildCommandActivityInput.
+ * @param item - Command tool-call activity to convert into input data.
  */
 
 function buildCommandActivityInput(
@@ -2122,7 +2092,7 @@ function buildCommandActivityInput(
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
  * @param worktreePath - Worktree path.
- * @param item - item argument for buildFileChangeActivityInputs.
+ * @param item - File-change activity item to convert into input data.
  */
 
 async function buildFileChangeActivityInputs(
@@ -2157,7 +2127,7 @@ async function buildFileChangeActivityInputs(
  * Builds tool call activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param item - item argument for buildToolCallActivityInput.
+ * @param item - Tool-call activity item to convert into input data.
  */
 
 function buildToolCallActivityInput(
@@ -2183,7 +2153,7 @@ function buildToolCallActivityInput(
  * Builds web search activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param item - item argument for buildWebSearchActivityInput.
+ * @param item - Web-search activity item to convert into input data.
  * @param state - Current state value.
  */
 
@@ -2205,7 +2175,7 @@ function buildWebSearchActivityInput(
  * Builds error activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
- * @param item - item argument for buildErrorActivityInput.
+ * @param item - Error activity item to convert into input data.
  * @param state - Current state value.
  */
 
@@ -2226,7 +2196,7 @@ function buildErrorActivityInput(
 /**
  * Merges project worktree pins.
  * @param projectId - Project identifier.
- * @param worktrees - worktrees argument for mergeProjectWorktreePins.
+ * @param worktrees - Worktree descriptors to merge into pinning metadata.
  */
 
 function mergeProjectWorktreePins(
@@ -2453,7 +2423,7 @@ function syncProjectRefreshPolling(state: ProjectPollState): void {
 }
 /**
  * Performs ensureProjectPoller operation.
- * @param project - project argument for ensureProjectPoller.
+ * @param project - Project descriptor used to ensure polling is configured.
  */
 
 function ensureProjectPoller(project: ProjectRecord): ProjectPollState {
@@ -2550,7 +2520,7 @@ function ensureWorktreePollState(
 }
 /**
  * Performs stopWorktreeBackgroundPolling operation.
- * @param worktreeState - worktreeState argument for stopWorktreeBackgroundPolling.
+ * @param worktreeState - Worktree state object to stop polling for.
  * @param reason - Reason for this operation.
  */
 
@@ -2682,7 +2652,7 @@ function projectByIdForPath(projectId: number): ProjectRecord {
 }
 /**
  * Finds project worktree.
- * @param project - project argument for findProjectWorktree.
+ * @param project - Project to locate an associated worktree for.
  * @param worktreePath - Worktree path.
  * @param options - Configuration options used by this operation.
  */
@@ -2701,7 +2671,7 @@ async function findProjectWorktree(
 }
 /**
  * Performs assertProjectWorktree operation.
- * @param project - project argument for assertProjectWorktree.
+ * @param project - Project expected to have a tracked worktree.
  * @param worktreePath - Worktree path.
  * @param options - Configuration options used by this operation.
  */
@@ -2733,7 +2703,7 @@ function trackedProjectWorktree(
 }
 /**
  * Performs ensureTrackedProjectWorktree operation.
- * @param project - project argument for ensureTrackedProjectWorktree.
+ * @param project - Project metadata used to manage tracked worktrees.
  * @param state - Current state value.
  * @param worktreePath - Worktree path.
  * @param options - Configuration options used by this operation.
@@ -2766,11 +2736,11 @@ async function ensureTrackedProjectWorktree(
 }
 /**
  * Creates thread record.
- * @param project - project argument for createThreadRecord.
+ * @param project - Project associated with the new thread record.
  * @param worktreePath - Worktree path.
- * @param model - model argument for createThreadRecord.
- * @param reasoningEffort - reasoningEffort argument for createThreadRecord.
- * @param access - access argument for createThreadRecord.
+ * @param model - Model identifier assigned to the new thread record.
+ * @param reasoningEffort - Reasoning effort assigned to the new thread record.
+ * @param access - Access level assigned at thread creation time.
  * @param options - Configuration options used by this operation.
  */
 
@@ -2819,9 +2789,9 @@ async function createThreadRecord(
 }
 /**
  * Performs recordUnsafeModeAuditEvent operation.
- * @param thread - thread argument for recordUnsafeModeAuditEvent.
- * @param unsafeMode - unsafeMode argument for recordUnsafeModeAuditEvent.
- * @param source - source argument for recordUnsafeModeAuditEvent.
+ * @param thread - Thread tied to the unsafe-mode audit event.
+ * @param unsafeMode - Unsafe-mode value being audited.
+ * @param source - Event source that triggered the audit entry.
  */
 
 function recordUnsafeModeAuditEvent(
@@ -2867,7 +2837,7 @@ export async function openProjectProcedure(
 /**
  * Opens project with git options.
  * @param params - Parameters object.
- * @param requestGitOptions - requestGitOptions argument for openProjectWithGitOptions.
+ * @param requestGitOptions - Git-specific options requested for project opening.
  */
 
 async function openProjectWithGitOptions(
@@ -3428,8 +3398,8 @@ export async function sendThreadMessageProcedure(
 }
 /**
  * Performs queueThreadMessage operation.
- * @param thread - thread argument for queueThreadMessage.
- * @param input - input argument for queueThreadMessage.
+ * @param thread - Target thread receiving the message to queue.
+ * @param input - Raw input payload for the queued message.
  */
 
 async function queueThreadMessage(
@@ -3797,7 +3767,7 @@ export async function openWorktreeProcedure(
 /**
  * Opens worktree with git options.
  * @param params - Parameters object.
- * @param requestGitOptions - requestGitOptions argument for openWorktreeWithGitOptions.
+ * @param requestGitOptions - Git options used when opening a worktree.
  * @param signal - Abort signal for cancellation.
  */
 
@@ -4199,10 +4169,20 @@ export async function setActiveWorktreeProcedure(
           ? requestedWorktreePath
           : null;
       } catch (error) {
-        if (isAbortError(error)) {
-          throw error;
+        if (isAbortError(error) && context?.signal?.aborted) {
+          throw createAbortError(
+            context.signal.reason,
+            "Active worktree update was aborted.",
+          );
         }
-        worktreePath = null;
+        // This validation intentionally runs as background work so user-facing
+        // foreground git reads can preempt it. In that case, fall back to the
+        // freshest cached worktree list instead of failing the RPC outright.
+        worktreePath =
+          requestedWorktreePath &&
+          findKnownProjectWorktree(project.id, requestedWorktreePath)
+            ? requestedWorktreePath
+            : null;
       }
     } else {
       stopProjectPoller(project.id);

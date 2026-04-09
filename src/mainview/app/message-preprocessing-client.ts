@@ -77,11 +77,11 @@ export class MessagePreprocessingRequestManager {
   private worker: MessagePreprocessingWorkerLike | null = null;
   private workerFailed = false;
   /**
-   * Creates and initializes a new instance.
-   * @param canUseWorker - canUseWorker argument for constructor.
-   * @param createWorker - createWorker argument for constructor.
-   * @param maxCacheEntries - maxCacheEntries argument for constructor.
-   * @param prepareSynchronously - prepareSynchronously argument for constructor.
+   * Create a caching client with configurable worker/sync fallback behavior.
+   * @param canUseWorker - Whether a browser worker is available.
+   * @param createWorker - Factory for creating a preprocessing worker.
+   * @param maxCacheEntries - Maximum plans to keep in cache.
+   * @param prepareSynchronously - Synchronous fallback parser.
    */
 
   constructor({
@@ -101,8 +101,8 @@ export class MessagePreprocessingRequestManager {
     this.prepareSynchronously = prepareSynchronously;
   }
   /**
-   * Reads data as part of processing.
-   * @param text - Input text content.
+   * Read a cached or in-flight snapshot for the provided message text.
+   * @param text - Message text to process.
    */
 
   read(text: string): MessagePreprocessingSnapshot {
@@ -158,9 +158,9 @@ export class MessagePreprocessingRequestManager {
     return loadingSnapshot;
   }
   /**
-   * Subscribes to async worker events.
-   * @param text - Input text content.
-   * @param listener - Event listener callback.
+   * Subscribe to updates when a worker result is ready.
+   * @param text - Message text being tracked.
+   * @param listener - Listener called with latest snapshot.
    */
 
   subscribe(text: string, listener: MessagePreprocessingListener): () => void {
@@ -199,8 +199,8 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Handles worker message.
-   * @param data - data argument for handleWorkerMessage.
+   * Handle responses from the preprocessing worker.
+   * @param data - Parsed worker response payload.
    */
 
   private handleWorkerMessage(data: MessagePreprocessingWorkerResponse): void {
@@ -234,8 +234,8 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Resolves synchronously.
-   * @param text - Input text content.
+   * Resolve a text entry synchronously when worker path is unavailable.
+   * @param text - Message text to process synchronously.
    */
 
   private resolveSynchronously(text: string): void {
@@ -246,9 +246,9 @@ export class MessagePreprocessingRequestManager {
     this.finishPendingText(text, this.prepareSynchronously(text));
   }
   /**
-   * Performs finishPendingText operation.
-   * @param text - Input text content.
-   * @param plan - plan argument for finishPendingText.
+   * Finalize a pending snapshot and notify listeners.
+   * @param text - Message text resolved.
+   * @param plan - Computed render plan.
    */
 
   private finishPendingText(
@@ -267,9 +267,9 @@ export class MessagePreprocessingRequestManager {
     }
   }
   /**
-   * Performs storeReadySnapshot operation.
-   * @param text - Input text content.
-   * @param plan - plan argument for storeReadySnapshot.
+   * Persist a ready snapshot in the internal LRU cache.
+   * @param text - Message text key.
+   * @param plan - Finalized render plan.
    */
 
   private storeReadySnapshot(
@@ -301,8 +301,8 @@ export class MessagePreprocessingRequestManager {
 const sharedMessagePreprocessingRequestManager =
   new MessagePreprocessingRequestManager();
 /**
- * Provides hook behavior for PreparedMessageRenderPlan.
- * @param text - Input text content.
+ * Hook to obtain a cached or async-prepared message render snapshot.
+ * @param text - Message text to render.
  */
 
 export function usePreparedMessageRenderPlan(

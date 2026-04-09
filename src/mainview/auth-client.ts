@@ -26,10 +26,10 @@ export type TotpEnrollment = {
 export class AuthApiError extends Error {
   /**
    * Creates and initializes a new instance.
-   * @param code - code argument for constructor.
+   * @param code - code value.
    * @param message - Message payload.
-   * @param status - status argument for constructor.
-   * @param details - details argument for constructor.
+   * @param status - status value.
+   * @param details - details value.
    */
 
   constructor(
@@ -102,7 +102,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
 /**
  * Converts auth api error value.
  * @param response - Response payload.
- * @param payload - payload argument for toAuthApiError.
+ * @param payload - payload value.
  */
 
 function toAuthApiError(response: Response, payload: unknown): AuthApiError {
@@ -121,9 +121,9 @@ function toAuthApiError(response: Response, payload: unknown): AuthApiError {
   );
 }
 /**
- * Performs requestAuthJson operation.
- * @param path - Filesystem path.
- * @param init - init argument for requestAuthJson.
+ * Sends an authenticated request and decodes the JSON payload from auth endpoints.
+ * @param path - Auth endpoint path.
+ * @param init - Request init options.
  */
 
 async function requestAuthJson<T>(
@@ -148,8 +148,8 @@ async function requestAuthJson<T>(
   return payload as T;
 }
 /**
- * Performs dispatchAuthRequired operation.
- * @param reason - Reason for this operation.
+ * Broadcasts an auth-required event to prompt re-authentication.
+ * @param reason - Reason auth is required.
  */
 
 export function dispatchAuthRequired(reason: string): void {
@@ -197,8 +197,8 @@ export async function prepareSetupEnrollment(): Promise<TotpEnrollment> {
   return payload.enrollment;
 }
 /**
- * Performs completeAuthSetup operation.
- * @param input - input argument for completeAuthSetup.
+ * Sends setup completion credentials and reads generated recovery material.
+ * @param input - Enrollment completion request payload.
  */
 
 export async function completeAuthSetup(input: {
@@ -221,8 +221,8 @@ export async function completeAuthSetup(input: {
   });
 }
 /**
- * Performs loginAuth operation.
- * @param input - input argument for loginAuth.
+ * Exchanges primary factor credentials for an authenticated session.
+ * @param input - Login credentials.
  */
 
 export async function loginAuth(input: {
@@ -240,8 +240,8 @@ export async function loginAuth(input: {
   });
 }
 /**
- * Performs loginWithRecoveryCodeAuth operation.
- * @param input - input argument for loginWithRecoveryCodeAuth.
+ * Exchanges a recovery code for an authenticated session.
+ * @param input - Recovery login payload.
  */
 
 export async function loginWithRecoveryCodeAuth(input: {
@@ -270,8 +270,8 @@ export async function logoutAuth(): Promise<AuthStatus> {
   return payload.status;
 }
 /**
- * Performs stepUpAuth operation.
- * @param input - input argument for stepUpAuth.
+ * Performs a step-up authentication exchange for elevated privileges.
+ * @param input - Step-up credential payload.
  */
 
 export async function stepUpAuth(input: {

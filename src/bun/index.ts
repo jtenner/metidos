@@ -283,7 +283,7 @@ function readCliPort(args: string[]): string | null {
  * Resolve and validate server port from CLI arguments and optional env value.
  * @throws if port is non-numeric or outside 1..65535.
  * @param args - Argument list passed to args.
- * @param envPort - envPort argument for envPort.
+ * @param envPort - Environment-provided port used for local auth redirects.
  */
 function resolveServerPort(args: string[], envPort?: string): number {
   const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
@@ -382,7 +382,7 @@ async function runUserDataWipeCli(): Promise<boolean> {
 /**
  * Requires fresh step up for rpc action.
  * @param context - Execution context.
- * @param actionDescription - actionDescription argument for requireFreshStepUpForRpcAction.
+ * @param actionDescription - Human-readable action label requiring fresh step-up auth.
  */
 
 function requireFreshStepUpForRpcAction(
@@ -509,7 +509,7 @@ let peakEventLoopLagMs = 0;
 let lastOverloadLogAt = 0;
 /**
  * Builds response headers.
- * @param contentType - contentType argument for buildResponseHeaders.
+ * @param contentType - MIME type applied to response headers.
  * @param headers - HTTP headers.
  */
 
@@ -525,8 +525,8 @@ function buildResponseHeaders(
 /**
  * Performs stringResponse operation.
  * @param body - Request body payload.
- * @param contentType - contentType argument for stringResponse.
- * @param status - status argument for stringResponse.
+ * @param contentType - MIME type returned in a plain-text response.
+ * @param status - HTTP status code for the plain-text response.
  * @param headers - HTTP headers.
  */
 
@@ -544,7 +544,7 @@ function stringResponse(
 /**
  * Performs jsonResponse operation.
  * @param value - Input value.
- * @param status - status argument for jsonResponse.
+ * @param status - HTTP status code for the JSON response.
  * @param headers - HTTP headers.
  */
 
@@ -562,7 +562,7 @@ function jsonResponse(
 /**
  * Build a file-backed HTTP response with explicit no-cache header.
  * @param path - Filesystem path.
- * @param contentType - contentType argument for contentType.
+ * @param contentType - MIME type string returned for response serialization.
  */
 function fileResponse(path: string, contentType: string): Response {
   return new Response(Bun.file(path), {
@@ -620,7 +620,7 @@ function isSecureRequest(request: Request): boolean {
 }
 /**
  * Normalizes browser origin.
- * @param origin - origin argument for normalizeBrowserOrigin.
+ * @param origin - Browser origin string being normalized.
  */
 
 function normalizeBrowserOrigin(origin: string): string | null {
@@ -674,7 +674,7 @@ function resolveRpcClientOriginFromRequest(request: Request): string | null {
 }
 /**
  * Normalizes auth route origin.
- * @param origin - origin argument for normalizeAuthRouteOrigin.
+ * @param origin - Auth-route origin string being normalized.
  */
 
 function normalizeAuthRouteOrigin(origin: string): string | null {
@@ -778,8 +778,8 @@ function enforceAuthMutationRequestSecurity(request: Request): void {
 }
 /**
  * Performs sessionCookieMaxAgeSeconds operation.
- * @param expiresAt - expiresAt argument for sessionCookieMaxAgeSeconds.
- * @param nowMs - nowMs argument for sessionCookieMaxAgeSeconds.
+ * @param expiresAt - Session expiration timestamp.
+ * @param nowMs - Current timestamp used to compute remaining session lifetime.
  */
 
 function sessionCookieMaxAgeSeconds(expiresAt: string, nowMs: number): number {
@@ -817,7 +817,7 @@ async function readJsonBody(
 /**
  * Reads required string.
  * @param body - Request body payload.
- * @param fieldName - fieldName argument for readRequiredString.
+ * @param fieldName - Request field expected to be a required string.
  */
 
 function readRequiredString(
@@ -835,7 +835,7 @@ function readRequiredString(
 /**
  * Reads optional string.
  * @param body - Request body payload.
- * @param fieldName - fieldName argument for readOptionalString.
+ * @param fieldName - Request field expected to be optional string.
  */
 
 function readOptionalString(
@@ -854,7 +854,7 @@ function readOptionalString(
 /**
  * Reads optional integer.
  * @param body - Request body payload.
- * @param fieldName - fieldName argument for readOptionalInteger.
+ * @param fieldName - Request field expected to be optional integer.
  */
 
 function readOptionalInteger(
@@ -1344,7 +1344,7 @@ function decrementPendingRpcRequestCount(count = 1): void {
 
 /**
  * Create a diagnostic snapshot used for overload warning logs.
- * @param activeServerPort - activeServerPort argument for activeServerPort.
+ * @param activeServerPort - Current server port used for route normalization.
  */
 function buildServerHealthSnapshot(activeServerPort: number): {
   backendOnly: boolean;
@@ -1387,7 +1387,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
 
 /**
  * Periodically emit overload telemetry for backlog and event loop lag conditions.
- * @param activeServerPort - activeServerPort argument for activeServerPort.
+ * @param activeServerPort - Active server port after fallback selection.
  */
 function startOverloadMonitoring(activeServerPort: () => number): void {
   if (overloadMonitorTimer) {
@@ -1467,7 +1467,7 @@ async function htmlResponse(): Promise<Response> {
 
 /**
  * Parse and validate inbound websocket request messages.
- * @param raw - raw argument for raw.
+ * @param raw - Raw response payload to convert into text.
  */
 function parseRpcRequestMessage(raw: string): RpcRequestMessage {
   // Parse first, then validate shape so runtime schema errors are surfaced consistently.
@@ -1516,7 +1516,7 @@ function parseRpcRequestMessage(raw: string): RpcRequestMessage {
 
 /**
  * Parse either a request or cancel message from a websocket payload.
- * @param raw - raw argument for raw.
+ * @param raw - Raw request body value to stringify.
  */
 function parseRpcClientMessage(raw: string): RpcClientMessage {
   let parsed: Partial<RpcClientMessage>;
@@ -1584,7 +1584,7 @@ function buildRpcErrorPayload(
 /**
  * Build cancellation `Error` with causal metadata while preserving names.
  * @param reason - Reason for this operation.
- * @param fallbackMessage - fallbackMessage argument for fallbackMessage.
+ * @param fallbackMessage - Fallback error message when decoding fails.
  */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
@@ -1754,7 +1754,7 @@ async function awaitRequestResult<T>(
 
 /**
  * Normalize raw websocket data to a string payload.
- * @param rawMessage - rawMessage argument for rawMessage.
+ * @param rawMessage - Unprocessed message body from the socket.
  */
 function parseRawSocketMessage(rawMessage: string | Buffer): string {
   return typeof rawMessage === "string"
@@ -1764,7 +1764,7 @@ function parseRawSocketMessage(rawMessage: string | Buffer): string {
 
 /**
  * Create an abort controller and optionally attach timeout behavior.
- * @param timeoutMs - timeoutMs argument for timeoutMs.
+ * @param timeoutMs - Timeout duration in milliseconds.
  */
 function buildRequestSignal(timeoutMs: number | null): {
   controller: AbortController;
@@ -1891,7 +1891,7 @@ function broadcastGitHistoryChanged(
 
 /**
  * Broadcast that the UI should focus a specific project/worktree/thread context.
- * @param payload - payload argument for payload.
+ * @param payload - JSON payload used for tracing and response.
  */
 function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
   if (rpcClients.size === 0) {
@@ -2158,7 +2158,7 @@ async function bootstrap(): Promise<void> {
     idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS /**
      * Fetches data from the configured endpoint.
      * @param request - Incoming request payload.
-     * @param serverInstance - serverInstance argument for fetch.
+     * @param serverInstance - HTTP server instance being queried.
      */,
 
     async fetch(request, serverInstance) {
@@ -2398,7 +2398,7 @@ async function bootstrap(): Promise<void> {
     websocket: {
       /**
        * Opens .
-       * @param ws - ws argument for open.
+       * @param ws - WebSocket instance passed to open handler.
        */
 
       open(ws) {
@@ -2412,7 +2412,7 @@ async function bootstrap(): Promise<void> {
         });
       } /**
        * Closes .
-       * @param ws - ws argument for close.
+       * @param ws - WebSocket instance being closed.
        */,
 
       close(ws) {
@@ -2433,8 +2433,8 @@ async function bootstrap(): Promise<void> {
         }
       } /**
        * Processes message events.
-       * @param ws - ws argument for message.
-       * @param rawMessage - rawMessage argument for message.
+       * @param ws - WebSocket instance that received a message.
+       * @param rawMessage - Raw message payload from websocket.
        */,
 
       message(ws, rawMessage) {
@@ -2673,7 +2673,7 @@ let shutdownPromise: Promise<void> | null = null;
 
 /**
  * Run coordinated shutdown steps once, then exit with the requested process code.
- * @param exitCode - exitCode argument for exitCode.
+ * @param exitCode - Exit status code from child process execution.
  */
 async function shutdownAndExit(exitCode: number): Promise<void> {
   if (shutdownPromise) {

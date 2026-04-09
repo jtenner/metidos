@@ -61,11 +61,11 @@ export class DiffParseRequestManager {
   private worker: DiffParseWorkerLike | null = null;
   private workerFailed = false;
   /**
-   * Creates and initializes a new instance.
-   * @param canUseWorker - canUseWorker argument for constructor.
-   * @param createWorker - createWorker argument for constructor.
-   * @param maxCacheEntries - maxCacheEntries argument for constructor.
-   * @param parseSynchronously - parseSynchronously argument for constructor.
+   * Create a caching diff parser with configurable worker usage.
+   * @param canUseWorker - Whether a browser worker can be used.
+   * @param createWorker - Factory for creating the diff worker.
+   * @param maxCacheEntries - Maximum cached parse results.
+   * @param parseSynchronously - Synchronous fallback parser.
    */
 
   constructor({
@@ -85,8 +85,8 @@ export class DiffParseRequestManager {
     this.parseSynchronously = parseSynchronously;
   }
   /**
-   * Reads data as part of processing.
-   * @param diffText - Diff content to process.
+   * Read a cached result or queue parsing for the diff text.
+   * @param diffText - Diff text to parse.
    */
 
   read(diffText: string): DiffParseSnapshot {
@@ -148,9 +148,9 @@ export class DiffParseRequestManager {
     return loadingSnapshot;
   }
   /**
-   * Subscribes to async worker events.
-   * @param diffText - Diff content to process.
-   * @param listener - Event listener callback.
+   * Subscribe to updates when a background diff result is ready.
+   * @param diffText - Diff text key being tracked.
+   * @param listener - Listener to receive updated snapshots.
    */
 
   subscribe(diffText: string, listener: DiffParseListener): () => void {
@@ -189,8 +189,8 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Handles worker message.
-   * @param data - data argument for handleWorkerMessage.
+   * Handle responses from the parsing worker.
+   * @param data - Worker response payload.
    */
 
   private handleWorkerMessage(data: DiffParsingWorkerResponse): void {
@@ -224,8 +224,8 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Resolves synchronously.
-   * @param diffText - Diff content to process.
+   * Resolve a pending request synchronously when worker path is unavailable.
+   * @param diffText - Diff text to parse.
    */
 
   private resolveSynchronously(diffText: string): void {
@@ -236,9 +236,9 @@ export class DiffParseRequestManager {
     this.finishPendingDiff(diffText, this.parseSynchronously(diffText));
   }
   /**
-   * Performs finishPendingDiff operation.
-   * @param diffText - Diff content to process.
-   * @param result - result argument for finishPendingDiff.
+   * Finalize a pending diff request and notify listeners.
+   * @param diffText - Diff text that finished processing.
+   * @param result - Parsed diff result.
    */
 
   private finishPendingDiff(diffText: string, result: DiffParseResult): void {
@@ -254,9 +254,9 @@ export class DiffParseRequestManager {
     }
   }
   /**
-   * Performs storeReadySnapshot operation.
-   * @param diffText - Diff content to process.
-   * @param result - result argument for storeReadySnapshot.
+   * Cache a ready snapshot and trim old entries when over capacity.
+   * @param diffText - Diff text key.
+   * @param result - Parsed diff result.
    */
 
   private storeReadySnapshot(
@@ -287,8 +287,8 @@ export class DiffParseRequestManager {
 
 const sharedDiffParseRequestManager = new DiffParseRequestManager();
 /**
- * Provides hook behavior for DiffParseResult.
- * @param diffText - Diff content to process.
+ * Hook for consuming diff parse results with async worker support.
+ * @param diffText - Diff text to parse.
  */
 
 export function useDiffParseResult(diffText: string): DiffParseSnapshot {

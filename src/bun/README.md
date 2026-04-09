@@ -53,6 +53,11 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Tracks provider-specific metadata such as xAI routing and reasoning-effort support.
   - Provides token-context utilities used for compaction/size logic.
 
+- `project-procedures/codex-constructor.ts`
+  - Converts selected provider/model metadata plus shared runtime config into exact Codex constructor inputs.
+  - Keeps provider-specific constructor overrides, such as xAI transport/search compatibility settings, out of the main RPC module.
+  - Provides a single extension point for future non-OpenAI providers.
+
 - `project-procedures/codex-session-telemetry.ts`
   - Reads the persisted Codex rollout JSONL files to recover live token-count snapshots and the real model context window.
   - Lets the backend surface accurate context-usage telemetry even though the installed SDK stream types only expose final turn usage.

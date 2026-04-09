@@ -92,7 +92,7 @@ function getNow(): string {
  * Build a stable `AbortError`-shaped object from either a DOM abort reason
  * or a fallback string, preserving original cause when available.
  * @param reason - Reason for this operation.
- * @param fallbackMessage - fallbackMessage argument for fallbackMessage.
+ * @param fallbackMessage - Message returned when parsing the error fails.
  */
 function createAbortError(reason: unknown, fallbackMessage: string): Error {
   if (reason instanceof Error) {
@@ -276,7 +276,7 @@ function removeGitCommandTask(
 
 /**
  * Reject a queued task with a normalized abort error.
- * @param task - task argument for task.
+ * @param task - A function wrapping the current git operation.
  * @param reason - Reason for this operation.
  */
 function abortQueuedGitTask(task: GitCommandQueueTask, reason: string): void {
@@ -665,7 +665,7 @@ function splitLines(value: string): string[] {
 /**
  * Build a synthetic add diff for binary/add-only files where `git diff` may be empty.
  * @param path - Filesystem path.
- * @param content - content argument for content.
+ * @param content - Content read from the repository metadata.
  */
 function buildSyntheticAddDiff(path: string, content: string): string {
   const lines = splitLines(content);
@@ -683,7 +683,7 @@ function buildSyntheticAddDiff(path: string, content: string): string {
 /**
  * Build a synthetic delete diff for deleted files when HEAD content must be rendered.
  * @param path - Filesystem path.
- * @param content - content argument for content.
+ * @param content - Content written into the repository metadata.
  */
 function buildSyntheticDeleteDiff(path: string, content: string): string {
   const lines = splitLines(content);
@@ -1249,7 +1249,7 @@ function emptyGitHistorySummary(
 
 /**
  * Parse a single non-decorated log record emitted with known field separators.
- * @param record - record argument for record.
+ * @param record - Audit record describing the current run.
  */
 function parseGitHistoryEntryRecord(record: string): RpcGitHistoryEntry | null {
   const [hash, shortHash, subject, authorName, committedAt] = record.split(
@@ -1353,7 +1353,7 @@ function buildGitHistorySignature(
 /** Convert page-limit request to an integer in [1, DEFAULT_GIT_HISTORY_PAGE_SIZE]. */
 /**
  * Convert page-limit request to a bounded positive integer.
- * @param limit - limit argument for limit.
+ * @param limit - Maximum number of entries returned.
  */
 export function normalizeGitHistoryPageLimit(limit?: number): number {
   if (typeof limit !== "number" || !Number.isInteger(limit)) {

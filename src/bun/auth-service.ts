@@ -1,6 +1,6 @@
 /**
  * @file src/bun/auth-service.ts
- * @description Module for auth service.
+ * @description Auth service orchestration for setup, login, sessions, and websocket tickets.
  */
 
 import type { Database } from "bun:sqlite";
@@ -150,11 +150,8 @@ type StepUpResult = {
 
 export class AuthServiceError extends Error {
   /**
-   * Creates and initializes a new instance.
-   * @param code - code argument for constructor.
-   * @param message - Message payload.
-   * @param status - status argument for constructor.
-   * @param details - details argument for constructor.
+   * Error object used for auth service failures.
+   * Includes a stable error code and HTTP status.
    */
 
   constructor(
@@ -176,35 +173,35 @@ export class AuthServiceError extends Error {
   }
 }
 /**
- * Performs nowDate operation.
- * @param nowMs - nowMs argument for nowDate.
+ * Return a Date from an optional override timestamp.
+ * @param nowMs - Timestamp in milliseconds, or current time if omitted.
  */
 
 function nowDate(nowMs = Date.now()): Date {
   return new Date(nowMs);
 }
 /**
- * Adds days.
- * @param date - date argument for addDays.
- * @param days - days argument for addDays.
+ * Add whole days to a Date.
+ * @param date - Base date.
+ * @param days - Number of days to add.
  */
 
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 /**
- * Adds milliseconds.
- * @param date - date argument for addMilliseconds.
- * @param milliseconds - milliseconds argument for addMilliseconds.
+ * Add milliseconds to a Date.
+ * @param date - Base date.
+ * @param milliseconds - Milliseconds to add.
  */
 
 function addMilliseconds(date: Date, milliseconds: number): Date {
   return new Date(date.getTime() + milliseconds);
 }
 /**
- * Is session idle expired.
- * @param session - session argument for isSessionIdleExpired.
- * @param now - now argument for isSessionIdleExpired.
+ * Check if a session has exceeded the idle timeout window.
+ * @param session - Session row to inspect.
+ * @param now - Current timestamp.
  */
 
 function isSessionIdleExpired(session: AuthSessionRecord, now: Date): boolean {
@@ -214,16 +211,16 @@ function isSessionIdleExpired(session: AuthSessionRecord, now: Date): boolean {
   );
 }
 /**
- * Formats http date.
- * @param date - date argument for formatHttpDate.
+ * Format a date for HTTP cookie headers.
+ * @param date - Date to format.
  */
 
 function formatHttpDate(date: Date): string {
   return date.toUTCString();
 }
 /**
- * Normalizes session lifetime days.
- * @param value - Input value.
+ * Normalize session lifetime days and enforce bounds.
+ * @param value - Optional custom lifetime.
  */
 
 function normalizeSessionLifetimeDays(value?: number): number {
@@ -236,25 +233,25 @@ function normalizeSessionLifetimeDays(value?: number): number {
   return value;
 }
 /**
- * Builds timestamp options.
- * @param nowMs - nowMs argument for buildTimestampOptions.
+ * Build timestamp options from optional override.
+ * @param nowMs - Optional override timestamp.
  */
 
 function buildTimestampOptions(nowMs?: number): TimestampOptions {
   return typeof nowMs === "number" ? { nowMs } : {};
 }
 /**
- * Builds auth secret options.
- * @param appDataDir - appDataDir argument for buildAuthSecretOptions.
+ * Build auth secret options from app-data override.
+ * @param appDataDir - Optional app data directory.
  */
 
 function buildAuthSecretOptions(appDataDir?: string): AuthSecretOptions {
   return typeof appDataDir === "string" ? { appDataDir } : {};
 }
 /**
- * Builds session.
- * @param sessionLifetimeDays - sessionLifetimeDays argument for buildSession.
- * @param now - now argument for buildSession.
+ * Build a new session record object with expiration timestamps.
+ * @param sessionLifetimeDays - Session TTL in days.
+ * @param now - Timestamp for issued/last-used values.
  */
 
 function buildSession(
@@ -274,10 +271,10 @@ function buildSession(
   };
 }
 /**
- * Performs incrementFailedAttempts operation.
- * @param database - database argument for incrementFailedAttempts.
- * @param failedAttempts - failedAttempts argument for incrementFailedAttempts.
- * @param now - now argument for incrementFailedAttempts.
+ * Increment failed login attempts and update lockout state.
+ * @param database - Database handle.
+ * @param failedAttempts - Prior failed attempt count.
+ * @param now - Current timestamp.
  */
 
 function incrementFailedAttempts(
@@ -303,9 +300,9 @@ function incrementFailedAttempts(
   };
 }
 /**
- * Reads current auth settings.
- * @param database - database argument for readCurrentAuthSettings.
- * @param now - now argument for readCurrentAuthSettings.
+ * Read current auth settings and clear stale lockout state.
+ * @param database - Database handle.
+ * @param now - Current timestamp.
  */
 
 function readCurrentAuthSettings(
@@ -328,9 +325,9 @@ function readCurrentAuthSettings(
   return settings;
 }
 /**
- * Performs enforceConfigured operation.
- * @param database - database argument for enforceConfigured.
- * @param now - now argument for enforceConfigured.
+ * Load auth settings and ensure authentication is configured and unlocked.
+ * @param database - Database handle.
+ * @param now - Timestamp used for lockout checks.
  */
 
 function enforceConfigured(
@@ -358,10 +355,10 @@ function enforceConfigured(
   return settings;
 }
 /**
- * Creates session record.
- * @param database - database argument for createSessionRecord.
- * @param sessionLifetimeDays - sessionLifetimeDays argument for createSessionRecord.
- * @param now - now argument for createSessionRecord.
+ * Create and persist a session row after cleaning expired auth data.
+ * @param database - Database handle.
+ * @param sessionLifetimeDays - Session TTL in days.
+ * @param now - Current timestamp.
  */
 
 async function createSessionRecord(
@@ -381,9 +378,9 @@ async function createSessionRecord(
   });
 }
 /**
- * Performs recordAuthAuditEvent operation.
- * @param database - database argument for recordAuthAuditEvent.
- * @param input - input argument for recordAuthAuditEvent.
+ * Persist an auth audit event with normalized payload.
+ * @param database - Database handle.
+ * @param input - Audit event details.
  */
 
 function recordAuthAuditEvent(
@@ -401,9 +398,9 @@ function recordAuthAuditEvent(
   });
 }
 /**
- * Performs recordInvalidAuthAttempt operation.
- * @param database - database argument for recordInvalidAuthAttempt.
- * @param input - input argument for recordInvalidAuthAttempt.
+ * Record failed auth attempts and lockout state transitions.
+ * @param database - Database handle.
+ * @param input - Failure metadata.
  */
 
 function recordInvalidAuthAttempt(
@@ -439,9 +436,9 @@ function recordInvalidAuthAttempt(
   });
 }
 /**
- * Parses cookie header value.
- * @param cookieHeader - cookieHeader argument for parseCookieHeaderValue.
- * @param name - Display or identifier name.
+ * Parse one cookie value from a Cookie header.
+ * @param cookieHeader - Raw Cookie header.
+ * @param name - Cookie name to parse.
  */
 
 function parseCookieHeaderValue(
@@ -460,7 +457,7 @@ function parseCookieHeaderValue(
 
 /**
  * Parse the session cookie from an incoming Cookie header.
- * @param cookieHeader - cookieHeader argument for cookieHeader.
+ * @param cookieHeader - Raw Cookie header.
  */
 export function readSessionCookie(cookieHeader: string | null): string | null {
   if (!cookieHeader) {
@@ -471,7 +468,7 @@ export function readSessionCookie(cookieHeader: string | null): string | null {
 
 /**
  * Parse the websocket ticket cookie from an incoming Cookie header.
- * @param cookieHeader - cookieHeader argument for cookieHeader.
+ * @param cookieHeader - Raw Cookie header.
  */
 export function readWebSocketTicketCookie(
   cookieHeader: string | null,
@@ -483,7 +480,9 @@ export function readWebSocketTicketCookie(
 }
 
 /**
- * Serialize the authenticated session cookie.
+ * Serialize an authenticated session cookie header.
+ * @param sessionId - Session identifier value.
+ * @param options - Session cookie attributes.
  */
 
 export function buildSessionCookieHeader(
@@ -505,6 +504,8 @@ export function buildSessionCookieHeader(
 
 /**
  * Serialize the short-lived websocket ticket cookie used during RPC upgrades.
+ * @param ticketId - Ticket identifier.
+ * @param options - Ticket cookie attributes.
  */
 export function buildWebSocketTicketCookieHeader(
   ticketId: string,
@@ -524,8 +525,8 @@ export function buildWebSocketTicketCookieHeader(
 }
 
 /**
- * Serialize an expired session cookie so browsers remove it immediately.
- * @param secure - secure argument for secure.
+ * Serialize a session cookie that forces immediate browser removal.
+ * @param secure - Whether to include the Secure attribute.
  */
 export function buildClearedSessionCookieHeader(secure: boolean): string {
   const parts = [
@@ -543,8 +544,8 @@ export function buildClearedSessionCookieHeader(secure: boolean): string {
 }
 
 /**
- * Serialize an expired websocket ticket cookie so browsers remove it immediately.
- * @param secure - secure argument for secure.
+ * Serialize a websocket ticket cookie that forces immediate removal.
+ * @param secure - Whether to include the Secure attribute.
  */
 export function buildClearedWebSocketTicketCookieHeader(
   secure: boolean,
@@ -932,8 +933,8 @@ export function resolveSession(
 
 /**
  * Delete one authenticated session.
- * @param database - database argument for database.
- * @param sessionId - sessionId identifier.
+ * @param database - Database handle.
+ * @param sessionId - Session identifier from cookie/JWT context.
  */
 export function logout(database: Database, sessionId: string | null): void {
   if (!sessionId) {

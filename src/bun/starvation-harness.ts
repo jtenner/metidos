@@ -220,7 +220,7 @@ class RpcHarnessClient {
   }
   /**
    * Handles message.
-   * @param raw - raw argument for handleMessage.
+   * @param raw - Raw payload returned from the subprocess.
    */
 
   private handleMessage(raw: string): void {
@@ -251,7 +251,7 @@ class RpcHarnessClient {
 }
 /**
  * Parses args.
- * @param argv - argv argument for parseArgs.
+ * @param argv - CLI arguments passed to the harness command parser.
  */
 
 function parseArgs(argv: string[]): HarnessOptions {
@@ -383,7 +383,7 @@ Options:
 
 /**
  * Promise-based timer utility.
- * @param ms - ms argument for ms.
+ * @param ms - Delay in milliseconds.
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -756,7 +756,7 @@ function toErrorLabel(error: unknown): string {
 
 /**
  * Compose default websocket URL from port.
- * @param port - port argument for port.
+ * @param port - HTTP server port used by the harness.
  */
 function websocketUrlFromPort(port: number): string {
   return `ws://127.0.0.1:${port}/rpc`;
@@ -780,7 +780,7 @@ function readRpcWebSocketUrl(value: unknown): string | null {
 
 /**
  * Extract the injected runtime config from the main HTML page.
- * @param html - html argument for html.
+ * @param html - HTML content generated for the test page.
  */
 function readRuntimeConfigFromHtml(html: string): unknown {
   const match = html.match(/window\.__joltRuntime=(\{.+?\});<\/script>/s);
@@ -851,7 +851,7 @@ async function resolveRpcUrl(
 
 /**
  * Combine per-worker pressure counts.
- * @param results - results argument for results.
+ * @param results - Per-run results collected during the test.
  */
 function summarizePressure(results: PressureSummary[]): PressureSummary {
   return results.reduce(

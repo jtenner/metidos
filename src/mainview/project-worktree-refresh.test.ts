@@ -14,7 +14,7 @@ import {
 
 /**
  * Builds a worktree fixture.
- * @param overrides - overrides argument for worktree.
+ * @param overrides - Optional test overrides used to construct the worktree state.
  */
 
 function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
@@ -29,7 +29,7 @@ function worktree(overrides?: Partial<RpcWorktree>): RpcWorktree {
 }
 /**
  * Performs projectState operation.
- * @param overrides - overrides argument for projectState.
+ * @param overrides - Optional test overrides used to construct project state.
  */
 
 function projectState(overrides?: Partial<ProjectNodeState>): ProjectNodeState {

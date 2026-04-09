@@ -1,6 +1,6 @@
 /**
  * @file src/bun/auth.ts
- * @description Module for auth.
+ * @description Authentication primitives for hashing factors, TOTP, and recovery codes.
  */
 
 import { timingSafeEqual } from "node:crypto";
@@ -41,8 +41,8 @@ export type AuthSetupMaterial = {
   totpUri: string;
 };
 /**
- * Encodes base32.
- * @param bytes - bytes argument for encodeBase32.
+ * Base32-encodes raw bytes using RFC 4648 alphabet.
+ * @param bytes - Input bytes to encode.
  */
 
 function encodeBase32(bytes: Uint8Array): string {
@@ -66,8 +66,8 @@ function encodeBase32(bytes: Uint8Array): string {
   return output;
 }
 /**
- * Decodes base32.
- * @param secret - secret argument for decodeBase32.
+ * Decodes an RFC 4648 base32 value back into bytes.
+ * @param secret - RFC 4648 base32-encoded secret to decode.
  */
 
 function decodeBase32(secret: string): Uint8Array {
@@ -96,9 +96,9 @@ function decodeBase32(secret: string): Uint8Array {
   return Uint8Array.from(bytes);
 }
 /**
- * Performs timingSafeTextEqual operation.
- * @param left - left argument for timingSafeTextEqual.
- * @param right - right argument for timingSafeTextEqual.
+ * Compare two strings in constant-time to reduce timing leakage.
+ * @param left - Expected value.
+ * @param right - Value to compare against.
  */
 
 function timingSafeTextEqual(left: string, right: string): boolean {
@@ -110,24 +110,24 @@ function timingSafeTextEqual(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 /**
- * Normalizes recovery code.
- * @param code - code argument for normalizeRecoveryCode.
+ * Normalize recovery-code formatting for comparison and persistence.
+ * @param code - Raw recovery code string.
  */
 
 function normalizeRecoveryCode(code: string): string {
   return code.toUpperCase().replace(/[\s-]/g, "");
 }
 /**
- * Performs randomBytes operation.
- * @param length - length argument for randomBytes.
+ * Return cryptographically random bytes.
+ * @param length - Number of random bytes to generate.
  */
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
 }
 /**
- * Converts array buffer value.
- * @param bytes - bytes argument for toArrayBuffer.
+ * Copy bytes into an ArrayBuffer for WebCrypto APIs.
+ * @param bytes - Input bytes.
  */
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -136,8 +136,8 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 /**
- * Generates random token.
- * @param length - length argument for generateRandomToken.
+ * Generate a random URL-safe opaque token.
+ * @param length - Characteristic entropy in bytes of the generated token.
  */
 
 function generateRandomToken(length = 32): string {
@@ -153,8 +153,8 @@ function generateRecoveryCode(): string {
   return `${raw.slice(0, 5)}-${raw.slice(5, 10)}`;
 }
 /**
- * Validates totp digits.
- * @param digits - digits argument for validateTotpDigits.
+ * Validate supported TOTP digit lengths.
+ * @param digits - Requested number of digits.
  */
 
 function validateTotpDigits(digits: number): void {
@@ -163,8 +163,8 @@ function validateTotpDigits(digits: number): void {
   }
 }
 /**
- * Validates totp period seconds.
- * @param periodSeconds - periodSeconds argument for validateTotpPeriodSeconds.
+ * Validate a positive integer TOTP step period.
+ * @param periodSeconds - Step size in seconds.
  */
 
 function validateTotpPeriodSeconds(periodSeconds: number): void {
@@ -221,7 +221,7 @@ export async function verifyPrimaryFactor(
 
 /**
  * Generate a new RFC 4648 base32 TOTP secret.
- * @param byteLength - byteLength argument for byteLength.
+ * @param byteLength - Number of random bytes to encode.
  */
 export function generateTotpSecret(byteLength = 20): string {
   if (!Number.isInteger(byteLength) || byteLength < 10) {
@@ -249,10 +249,10 @@ export function buildTotpUri({
   return `otpauth://totp/${label}?secret=${encodedSecret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=${DEFAULT_TOTP_DIGITS}&period=${DEFAULT_TOTP_PERIOD_SECONDS}`;
 }
 /**
- * Generates an HMAC-based one-time password.
- * @param secret - secret argument for hotp.
- * @param counter - counter argument for hotp.
- * @param digits - digits argument for hotp.
+ * Generate an HMAC-based one-time password for a specific counter.
+ * @param secret - Base32 encoded TOTP secret.
+ * @param counter - Time-step counter value.
+ * @param digits - Desired token width.
  */
 
 async function hotp(
@@ -360,7 +360,8 @@ export async function verifyTotpCode(
 }
 
 /**
- * Generate the view-once recovery codes shown during initial setup.
+ * Generate one-time recovery codes for first-run output.
+ * @param count - Number of codes to generate.
  */
 
 export function generateRecoveryCodes(
@@ -378,8 +379,8 @@ export function generateRecoveryCodes(
 }
 
 /**
- * Hash one recovery code for storage.
- * @param code - code argument for code.
+ * Hash a recovery code for storage.
+ * @param code - Recovery code in user-provided form.
  */
 export async function hashRecoveryCode(code: string): Promise<string> {
   return Bun.password.hash(

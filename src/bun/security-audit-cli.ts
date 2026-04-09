@@ -29,7 +29,7 @@ Options:
 /**
  * Parses positive integer flag.
  * @param value - Input value.
- * @param flagName - flagName argument for parsePositiveIntegerFlag.
+ * @param flagName - CLI flag name expected to contain a positive integer.
  */
 
 function parsePositiveIntegerFlag(value: string, flagName: string): number {

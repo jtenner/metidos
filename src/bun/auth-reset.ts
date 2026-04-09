@@ -62,10 +62,10 @@ Commands:
 class MutedOutput extends Writable {
   muted = false;
   /**
-   * Writes .
-   * @param chunk - chunk argument for _write.
-   * @param encoding - encoding argument for _write.
-   * @param callback - Callback to invoke.
+   * Write to stdout only when not currently collecting a secret.
+   * @param chunk - Output chunk.
+   * @param encoding - Output encoding.
+   * @param callback - Completion callback.
    */
 
   override _write(
@@ -80,8 +80,8 @@ class MutedOutput extends Writable {
   }
 }
 /**
- * Is auth primary factor type.
- * @param value - Input value.
+ * Narrow a string to a supported primary-factor type.
+ * @param value - Raw command input.
  */
 
 function isAuthPrimaryFactorType(
@@ -90,8 +90,8 @@ function isAuthPrimaryFactorType(
   return value === "pin" || value === "password";
 }
 /**
- * Formats primary factor label.
- * @param primaryFactorType - primaryFactorType argument for formatPrimaryFactorLabel.
+ * Convert primary-factor type into user-facing label text.
+ * @param primaryFactorType - "pin" or "password".
  */
 
 function formatPrimaryFactorLabel(
@@ -100,8 +100,8 @@ function formatPrimaryFactorLabel(
   return primaryFactorType === "pin" ? "PIN" : "password";
 }
 /**
- * Converts cli error message value.
- * @param error - Error value to process.
+ * Convert a CLI auth error into a message suitable for terminal output.
+ * @param error - Error from CLI flow.
  */
 
 function toCliErrorMessage(error: unknown): string {
@@ -120,8 +120,8 @@ function toCliErrorMessage(error: unknown): string {
   return String(error);
 }
 /**
- * Parses args.
- * @param args - Argument list passed to parseArgs.
+ * Parse and validate CLI command arguments.
+ * @param args - CLI argv entries.
  */
 
 function parseArgs(args: string[]): ParsedArgs {
@@ -176,8 +176,8 @@ function parseArgs(args: string[]): ParsedArgs {
   };
 }
 /**
- * Builds cli auth proof input.
- * @param input - input argument for buildCliAuthProofInput.
+ * Build the minimal proof payload used by auth verification operations.
+ * @param input - Parsed input arguments from this CLI.
  */
 
 function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
@@ -197,9 +197,9 @@ function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
   };
 }
 /**
- * Resets primary factor from cli.
- * @param database - database argument for resetPrimaryFactorFromCli.
- * @param input - input argument for resetPrimaryFactorFromCli.
+ * Reset the primary factor after successful proof verification.
+ * @param database - Database handle.
+ * @param input - New credentials plus current proof credentials.
  */
 
 export async function resetPrimaryFactorFromCli(
@@ -240,9 +240,9 @@ export async function resetPrimaryFactorFromCli(
   };
 }
 /**
- * Performs regenerateRecoveryCodesFromCli operation.
- * @param database - database argument for regenerateRecoveryCodesFromCli.
- * @param input - input argument for regenerateRecoveryCodesFromCli.
+ * Regenerate recovery codes after successful proof verification.
+ * @param database - Database handle.
+ * @param input - Proof credentials for the current authenticated user.
  */
 
 export async function regenerateRecoveryCodesFromCli(
@@ -266,9 +266,9 @@ export async function regenerateRecoveryCodesFromCli(
   return recoveryCodes;
 }
 /**
- * Performs promptVisible operation.
- * @param readlineInterface - readlineInterface argument for promptVisible.
- * @param question - question argument for promptVisible.
+ * Prompt for user input that should stay visible.
+ * @param readlineInterface - Active readline interface.
+ * @param question - Prompt text to display.
  */
 
 async function promptVisible(
@@ -278,10 +278,10 @@ async function promptVisible(
   return (await readlineInterface.question(question)).trim();
 }
 /**
- * Performs promptSecret operation.
- * @param readlineInterface - readlineInterface argument for promptSecret.
- * @param output - output argument for promptSecret.
- * @param question - question argument for promptSecret.
+ * Prompt for input while temporarily muting terminal echo.
+ * @param readlineInterface - Active readline interface.
+ * @param output - Writable wrapper that supports muting.
+ * @param question - Prompt text to display.
  */
 
 async function promptSecret(
@@ -300,8 +300,8 @@ async function promptSecret(
   }
 }
 /**
- * Performs promptPrimaryFactorType operation.
- * @param readlineInterface - readlineInterface argument for promptPrimaryFactorType.
+ * Prompt until the user selects a supported primary-factor type.
+ * @param readlineInterface - Active readline interface.
  */
 
 async function promptPrimaryFactorType(
@@ -321,8 +321,8 @@ async function promptPrimaryFactorType(
   }
 }
 /**
- * Runs interactive cli.
- * @param args - Argument list passed to runInteractiveCli.
+ * Run the interactive reset flow from command line prompts.
+ * @param args - Process argv arguments.
  */
 
 async function runInteractiveCli(args: string[]): Promise<void> {

@@ -39,7 +39,7 @@ function isRpcSecurityAuditPayloadValue(
 }
 /**
  * Normalizes security audit limit.
- * @param limit - limit argument for normalizeSecurityAuditLimit.
+ * @param limit - Maximum number of security audit items to return.
  */
 
 function normalizeSecurityAuditLimit(limit?: number): number {
@@ -74,7 +74,7 @@ function normalizeProjectId(projectId?: number | null): number | undefined {
 }
 /**
  * Parses security audit payload.
- * @param payloadJson - payloadJson argument for parseSecurityAuditPayload.
+ * @param payloadJson - Raw JSON payload string for audit payload parsing.
  */
 
 function parseSecurityAuditPayload(
@@ -104,7 +104,7 @@ function parseSecurityAuditPayload(
 }
 /**
  * Lists security audit events from database.
- * @param database - database argument for listSecurityAuditEventsFromDatabase.
+ * @param database - Database instance used to list audit events.
  * @param params - Parameters object.
  */
 

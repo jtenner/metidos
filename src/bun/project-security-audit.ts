@@ -16,7 +16,7 @@ import type { AppRPCSchema } from "./rpc-schema";
 type CreateThreadParams = AppRPCSchema["requests"]["createThread"]["params"];
 /**
  * Stringifies payload.
- * @param payload - payload argument for stringifyPayload.
+ * @param payload - payload value.
  */
 
 function stringifyPayload(
@@ -33,9 +33,9 @@ function normalizeUnsafeMode(value: boolean | number): boolean {
   return value === true || value === 1;
 }
 /**
- * Performs recordCrossWorkspaceThreadAuditEvent operation.
- * @param database - database argument for recordCrossWorkspaceThreadAuditEvent.
- * @param input - input argument for recordCrossWorkspaceThreadAuditEvent.
+ * Records an audit event when a thread is created outside the current workspace.
+ * @param database - Database handle for audit persistence.
+ * @param input - Input payload and thread metadata.
  */
 
 export function recordCrossWorkspaceThreadAuditEvent(
@@ -67,9 +67,9 @@ export function recordCrossWorkspaceThreadAuditEvent(
   });
 }
 /**
- * Performs recordProjectDeletedAuditEvent operation.
- * @param database - database argument for recordProjectDeletedAuditEvent.
- * @param input - input argument for recordProjectDeletedAuditEvent.
+ * Records an audit event when a project is deleted.
+ * @param database - Database handle for audit persistence.
+ * @param input - Deleted project and thread count metadata.
  */
 
 export function recordProjectDeletedAuditEvent(

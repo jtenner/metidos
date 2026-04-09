@@ -531,9 +531,9 @@ function applyAppDatabasePermissions(dbPath: string): void {
 }
 /**
  * Performs tableHasColumn operation.
- * @param db - db argument for tableHasColumn.
- * @param tableName - tableName argument for tableHasColumn.
- * @param columnName - columnName argument for tableHasColumn.
+ * @param db - Database connection used for schema introspection.
+ * @param tableName - Name of the table being checked for a column.
+ * @param columnName - Column name whose existence is being validated.
  */
 
 function tableHasColumn(
@@ -634,7 +634,7 @@ function dedupeActiveCronJobTitles(database: Database): void {
 /**
  * Migrate/create schema and apply incremental column backfills on startup.
  * Keeps the on-disk DB in sync with expected runtime shape.
- * @param db - db argument for db.
+ * @param db - Database handle to open a transaction against.
  */
 export function migrateDatabase(db: Database): void {
   runStatement(
@@ -1236,7 +1236,7 @@ export function initAppDatabase(): Database {
 }
 /**
  * Gets auth settings.
- * @param database - database argument for getAuthSettings.
+ * @param database - Database instance to read authentication settings from.
  */
 
 export function getAuthSettings(database: Database): AuthSettingsRecord | null {
@@ -1262,8 +1262,8 @@ export function getAuthSettings(database: Database): AuthSettingsRecord | null {
 }
 /**
  * Upserts auth settings.
- * @param database - database argument for upsertAuthSettings.
- * @param input - input argument for upsertAuthSettings.
+ * @param database - Database instance used to upsert auth settings.
+ * @param input - Auth settings payload to persist.
  */
 
 export function upsertAuthSettings(
@@ -1316,9 +1316,9 @@ export function upsertAuthSettings(
 }
 /**
  * Sets auth failure state.
- * @param database - database argument for setAuthFailureState.
- * @param failedPrimaryFactorAttempts - failedPrimaryFactorAttempts argument for setAuthFailureState.
- * @param lockedUntil - lockedUntil argument for setAuthFailureState.
+ * @param database - Database instance used to update failure counters.
+ * @param failedPrimaryFactorAttempts - Counter for failed primary factor attempts.
+ * @param lockedUntil - Timestamp until which account lockout remains.
  */
 
 export function setAuthFailureState(
@@ -1343,7 +1343,7 @@ export function setAuthFailureState(
 }
 /**
  * Resets auth failure state.
- * @param database - database argument for resetAuthFailureState.
+ * @param database - Database instance used to clear failure state.
  */
 
 export function resetAuthFailureState(database: Database): void {
@@ -1353,7 +1353,7 @@ export function resetAuthFailureState(database: Database): void {
 }
 /**
  * Lists auth recovery codes.
- * @param database - database argument for listAuthRecoveryCodes.
+ * @param database - Database instance used to list recovery codes.
  */
 
 export function listAuthRecoveryCodes(
@@ -1376,8 +1376,8 @@ export function listAuthRecoveryCodes(
 }
 /**
  * Replaces auth recovery code hashes.
- * @param database - database argument for replaceAuthRecoveryCodeHashes.
- * @param codeHashes - codeHashes argument for replaceAuthRecoveryCodeHashes.
+ * @param database - Database instance used to replace recovery hashes.
+ * @param codeHashes - New recovery code hash list to persist.
  */
 
 export function replaceAuthRecoveryCodeHashes(
@@ -1407,9 +1407,9 @@ export function replaceAuthRecoveryCodeHashes(
 }
 /**
  * Marks auth recovery code used.
- * @param database - database argument for markAuthRecoveryCodeUsed.
- * @param codeHash - codeHash argument for markAuthRecoveryCodeUsed.
- * @param usedAt - usedAt argument for markAuthRecoveryCodeUsed.
+ * @param database - Database instance marking a code as used.
+ * @param codeHash - Recovery code hash that was used.
+ * @param usedAt - Timestamp at which the recovery code was consumed.
  */
 
 export function markAuthRecoveryCodeUsed(
@@ -1433,8 +1433,8 @@ export function markAuthRecoveryCodeUsed(
 }
 /**
  * Creates auth session.
- * @param database - database argument for createAuthSession.
- * @param input - input argument for createAuthSession.
+ * @param database - Database handle used to create an auth session.
+ * @param input - Auth session creation payload.
  */
 
 export function createAuthSession(
@@ -1470,7 +1470,7 @@ export function createAuthSession(
 }
 /**
  * Gets auth session.
- * @param database - database argument for getAuthSession.
+ * @param database - Database handle used to fetch a session.
  * @param sessionId - sessionId identifier.
  */
 
@@ -1496,10 +1496,10 @@ export function getAuthSession(
 }
 /**
  * Touches auth session.
- * @param database - database argument for touchAuthSession.
+ * @param database - Database handle used to refresh session activity.
  * @param sessionId - sessionId identifier.
- * @param lastUsedAt - lastUsedAt argument for touchAuthSession.
- * @param expiresAt - expiresAt argument for touchAuthSession.
+ * @param lastUsedAt - Timestamp to update as most recent usage.
+ * @param expiresAt - Optional new expiration timestamp.
  */
 
 export function touchAuthSession(
@@ -1540,9 +1540,9 @@ export function touchAuthSession(
 }
 /**
  * Sets auth session step up valid until.
- * @param database - database argument for setAuthSessionStepUpValidUntil.
+ * @param database - Database handle used to set step-up expiry.
  * @param sessionId - sessionId identifier.
- * @param stepUpValidUntil - stepUpValidUntil argument for setAuthSessionStepUpValidUntil.
+ * @param stepUpValidUntil - Timestamp until step-up authentication remains valid.
  */
 
 export function setAuthSessionStepUpValidUntil(
@@ -1564,7 +1564,7 @@ export function setAuthSessionStepUpValidUntil(
 }
 /**
  * Deletes auth session.
- * @param database - database argument for deleteAuthSession.
+ * @param database - Database handle used to delete a session.
  * @param sessionId - sessionId identifier.
  */
 
@@ -1575,7 +1575,7 @@ export function deleteAuthSession(database: Database, sessionId: string): void {
 }
 /**
  * Deletes all auth sessions.
- * @param database - database argument for deleteAllAuthSessions.
+ * @param database - Database handle used to purge all sessions.
  */
 
 export function deleteAllAuthSessions(database: Database): number {
@@ -1585,8 +1585,8 @@ export function deleteAllAuthSessions(database: Database): number {
 }
 /**
  * Deletes expired auth sessions.
- * @param database - database argument for deleteExpiredAuthSessions.
- * @param now - now argument for deleteExpiredAuthSessions.
+ * @param database - Database handle used to remove expired sessions.
+ * @param now - Current timestamp used to evaluate expiration.
  */
 
 export function deleteExpiredAuthSessions(
@@ -1607,8 +1607,8 @@ export function deleteExpiredAuthSessions(
 }
 /**
  * Creates auth web socket ticket.
- * @param database - database argument for createAuthWebSocketTicket.
- * @param input - input argument for createAuthWebSocketTicket.
+ * @param database - Database handle used to create a websocket ticket.
+ * @param input - Websocket ticket creation input payload.
  */
 
 export function createAuthWebSocketTicket(
@@ -1642,7 +1642,7 @@ export function createAuthWebSocketTicket(
 }
 /**
  * Gets auth web socket ticket.
- * @param database - database argument for getAuthWebSocketTicket.
+ * @param database - Database handle used to fetch a websocket ticket.
  * @param ticketId - ticketId identifier.
  */
 
@@ -1669,9 +1669,9 @@ export function getAuthWebSocketTicket(
 }
 /**
  * Performs consumeAuthWebSocketTicket operation.
- * @param database - database argument for consumeAuthWebSocketTicket.
+ * @param database - Database handle used to consume a websocket ticket.
  * @param ticketId - ticketId identifier.
- * @param consumedAt - consumedAt argument for consumeAuthWebSocketTicket.
+ * @param consumedAt - Timestamp marking ticket consumption time.
  */
 
 export function consumeAuthWebSocketTicket(
@@ -1698,8 +1698,8 @@ export function consumeAuthWebSocketTicket(
 }
 /**
  * Deletes expired auth web socket tickets.
- * @param database - database argument for deleteExpiredAuthWebSocketTickets.
- * @param now - now argument for deleteExpiredAuthWebSocketTickets.
+ * @param database - Database handle used to purge expired tickets.
+ * @param now - Current timestamp used to determine ticket expiry.
  */
 
 export function deleteExpiredAuthWebSocketTickets(
@@ -1721,8 +1721,8 @@ export function deleteExpiredAuthWebSocketTickets(
 }
 /**
  * Creates security audit event.
- * @param database - database argument for createSecurityAuditEvent.
- * @param input - input argument for createSecurityAuditEvent.
+ * @param database - Database handle used to create an audit event.
+ * @param input - Audit event payload to persist.
  */
 
 export function createSecurityAuditEvent(
@@ -1775,7 +1775,7 @@ export function createSecurityAuditEvent(
 }
 /**
  * Lists security audit events.
- * @param database - database argument for listSecurityAuditEvents.
+ * @param database - Database handle used to list security audit events.
  * @param options - Configuration options used by this operation.
  */
 
@@ -1922,7 +1922,7 @@ export function listSecurityAuditEvents(
 }
 /**
  * Gets project.
- * @param database - database argument for getProject.
+ * @param database - Database handle used to fetch a project by path.
  * @param projectPath - projectPath path used by getProject.
  */
 
@@ -1951,7 +1951,7 @@ export function getProject(
 }
 /**
  * Gets project by id.
- * @param database - database argument for getProjectById.
+ * @param database - Database handle used to fetch a project by ID.
  * @param projectId - Project identifier.
  */
 
@@ -1981,7 +1981,7 @@ export function getProjectById(
 }
 /**
  * Lists projects.
- * @param database - database argument for listProjects.
+ * @param database - Database handle used to list projects.
  */
 
 export function listProjects(database: Database): ProjectRecord[] {
@@ -2006,8 +2006,8 @@ export function listProjects(database: Database): ProjectRecord[] {
 }
 /**
  * Upserts project.
- * @param database - database argument for upsertProject.
- * @param input - input argument for upsertProject.
+ * @param database - Database handle used to upsert project metadata.
+ * @param input - Project metadata to insert or update.
  */
 
 export function upsertProject(
@@ -2041,7 +2041,7 @@ export function upsertProject(
 }
 /**
  * Lists open projects.
- * @param database - database argument for listOpenProjects.
+ * @param database - Database handle used to list open projects.
  */
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
@@ -2067,7 +2067,7 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 }
 /**
  * Sets project closed.
- * @param database - database argument for setProjectClosed.
+ * @param database - Database handle used to mark a project as closed.
  * @param projectId - Project identifier.
  */
 
@@ -2082,7 +2082,7 @@ export function setProjectClosed(database: Database, projectId: number): void {
 }
 /**
  * Deletes project.
- * @param database - database argument for deleteProject.
+ * @param database - Database handle used to delete a project.
  * @param projectId - Project identifier.
  */
 
@@ -2092,7 +2092,7 @@ export function deleteProject(database: Database, projectId: number): void {
 }
 /**
  * Lists project worktree pins.
- * @param database - database argument for listProjectWorktreePins.
+ * @param database - Database handle used to fetch project worktree pins.
  * @param projectId - Project identifier.
  */
 
@@ -2117,10 +2117,10 @@ export function listProjectWorktreePins(
 }
 /**
  * Sets project worktree pinned.
- * @param database - database argument for setProjectWorktreePinned.
+ * @param database - Database handle used to update pin state.
  * @param projectId - Project identifier.
  * @param worktreePath - Worktree path.
- * @param pinned - pinned argument for setProjectWorktreePinned.
+ * @param pinned - Whether the worktree pin should be set or cleared.
  */
 
 export function setProjectWorktreePinned(
@@ -2169,7 +2169,7 @@ export function setProjectWorktreePinned(
 }
 /**
  * Lists threads.
- * @param database - database argument for listThreads.
+ * @param database - Database handle used to list threads.
  */
 
 export function listThreads(database: Database): ThreadRecord[] {
@@ -2220,7 +2220,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 }
 /**
  * Gets thread by id.
- * @param database - database argument for getThreadById.
+ * @param database - Database handle used to fetch a thread by ID.
  * @param threadId - Thread identifier.
  */
 
@@ -2271,8 +2271,8 @@ export function getThreadById(
 }
 /**
  * Creates thread.
- * @param database - database argument for createThread.
- * @param input - input argument for createThread.
+ * @param database - Database handle used to create a new thread.
+ * @param input - Thread creation payload.
  */
 
 export function createThread(
@@ -2334,7 +2334,7 @@ export function createThread(
 }
 /**
  * Updates thread codex id.
- * @param database - database argument for updateThreadCodexId.
+ * @param database - Database handle used to update thread Codex ID.
  * @param threadId - Thread identifier.
  * @param codexThreadId - codexThreadId identifier.
  */
@@ -2360,10 +2360,10 @@ export function updateThreadCodexId(
 }
 /**
  * Performs renameThread operation.
- * @param database - database argument for renameThread.
+ * @param database - Database handle used to rename a thread.
  * @param threadId - Thread identifier.
- * @param title - title argument for renameThread.
- * @param summary - summary argument for renameThread.
+ * @param title - New thread title.
+ * @param summary - New thread summary text.
  */
 
 export function renameThread(
@@ -2404,9 +2404,9 @@ export function renameThread(
 }
 /**
  * Sets thread model.
- * @param database - database argument for setThreadModel.
+ * @param database - Database handle used to set thread model.
  * @param threadId - Thread identifier.
- * @param model - model argument for setThreadModel.
+ * @param model - Model to configure for the thread.
  */
 
 export function setThreadModel(
@@ -2430,9 +2430,9 @@ export function setThreadModel(
 }
 /**
  * Sets thread reasoning effort.
- * @param database - database argument for setThreadReasoningEffort.
+ * @param database - Database handle used to set reasoning effort.
  * @param threadId - Thread identifier.
- * @param reasoningEffort - reasoningEffort argument for setThreadReasoningEffort.
+ * @param reasoningEffort - Reasoning effort value to persist.
  */
 
 export function setThreadReasoningEffort(
@@ -2457,7 +2457,7 @@ export function setThreadReasoningEffort(
 }
 /**
  * Sets thread access controls.
- * @param database - database argument for setThreadAccess.
+ * @param database - Database handle used to update thread access.
  * @param threadId - Thread identifier.
  * @param input - Access flag input.
  */
@@ -2494,9 +2494,9 @@ export function setThreadAccess(
 }
 /**
  * Sets thread unsafe mode.
- * @param database - database argument for setThreadUnsafeMode.
+ * @param database - Database handle used to update thread unsafe-mode.
  * @param threadId - Thread identifier.
- * @param unsafeMode - unsafeMode argument for setThreadUnsafeMode.
+ * @param unsafeMode - Unsafe-mode value to persist.
  */
 
 export function setThreadUnsafeMode(
@@ -2520,9 +2520,9 @@ export function setThreadUnsafeMode(
 }
 /**
  * Sets thread pinned.
- * @param database - database argument for setThreadPinned.
+ * @param database - Database handle used to pin or unpin a thread.
  * @param threadId - Thread identifier.
- * @param pinned - pinned argument for setThreadPinned.
+ * @param pinned - Desired thread pinned state.
  */
 
 export function setThreadPinned(
@@ -2551,7 +2551,7 @@ export function setThreadPinned(
 }
 /**
  * Deletes thread.
- * @param database - database argument for deleteThread.
+ * @param database - Database handle used to delete a thread.
  * @param threadId - Thread identifier.
  */
 
@@ -2561,7 +2561,7 @@ export function deleteThread(database: Database, threadId: number): void {
 }
 /**
  * Marks thread ran.
- * @param database - database argument for markThreadRan.
+ * @param database - Database handle used to mark thread as executed.
  * @param threadId - Thread identifier.
  */
 
@@ -2586,9 +2586,9 @@ export function markThreadRan(database: Database, threadId: number): void {
 }
 /**
  * Marks thread run started.
- * @param database - database argument for markThreadRunStarted.
+ * @param database - Database handle used to mark thread run start.
  * @param threadId - Thread identifier.
- * @param startedAt - startedAt argument for markThreadRunStarted.
+ * @param startedAt - Timestamp when thread run started.
  */
 
 export function markThreadRunStarted(
@@ -2617,7 +2617,7 @@ export function markThreadRunStarted(
 }
 /**
  * Marks thread stopped.
- * @param database - database argument for markThreadStopped.
+ * @param database - Database handle used to mark thread as stopped.
  * @param threadId - Thread identifier.
  * @param message - Message payload.
  */
@@ -2647,10 +2647,10 @@ export function markThreadStopped(
 }
 /**
  * Sets thread usage.
- * @param database - database argument for setThreadUsage.
+ * @param database - Database handle used to set thread usage metrics.
  * @param threadId - Thread identifier.
- * @param usage - usage argument for setThreadUsage.
- * @param compactionStats - compactionStats argument for setThreadUsage.
+ * @param usage - Usage metrics payload for the thread.
+ * @param compactionStats - Compaction metadata included in usage metrics.
  */
 
 export function setThreadUsage(
@@ -2692,9 +2692,9 @@ export function setThreadUsage(
 }
 /**
  * Marks thread failed.
- * @param database - database argument for markThreadFailed.
+ * @param database - Database handle used to mark thread as failed.
  * @param threadId - Thread identifier.
- * @param errorMessage - errorMessage argument for markThreadFailed.
+ * @param errorMessage - Failure message to persist for the thread.
  */
 
 export function markThreadFailed(
@@ -2721,7 +2721,7 @@ export function markThreadFailed(
 }
 /**
  * Marks thread error seen.
- * @param database - database argument for markThreadErrorSeen.
+ * @param database - Database handle used to mark thread error as acknowledged.
  * @param threadId - Thread identifier.
  */
 
@@ -2750,7 +2750,7 @@ export function markThreadErrorSeen(
 }
 /**
  * Lists threads with in progress messages.
- * @param database - database argument for listThreadsWithInProgressMessages.
+ * @param database - Database handle used to list in-progress thread messages.
  */
 
 export function listThreadsWithInProgressMessages(
@@ -2772,7 +2772,7 @@ export function listThreadsWithInProgressMessages(
 }
 /**
  * Lists thread messages.
- * @param database - database argument for listThreadMessages.
+ * @param database - Database handle used to list thread messages.
  * @param threadId - Thread identifier.
  */
 
@@ -2805,7 +2805,7 @@ export function listThreadMessages(
 }
 /**
  * Lists thread messages page.
- * @param database - database argument for listThreadMessagesPage.
+ * @param database - Database handle used to fetch a paginated message list.
  * @param threadId - Thread identifier.
  * @param options - Configuration options used by this operation.
  */
@@ -2879,8 +2879,8 @@ export function listThreadMessagesPage(
 }
 /**
  * Creates thread message.
- * @param database - database argument for createThreadMessage.
- * @param input - input argument for createThreadMessage.
+ * @param database - Database handle used to create a thread message.
+ * @param input - Message payload to persist for the thread.
  */
 
 export function createThreadMessage(
@@ -2936,8 +2936,8 @@ export function createThreadMessage(
 }
 /**
  * Upserts thread activity.
- * @param database - database argument for upsertThreadActivity.
- * @param input - input argument for upsertThreadActivity.
+ * @param database - Database handle used to upsert thread activity.
+ * @param input - Activity input payload for upsert.
  */
 
 export function upsertThreadActivity(
@@ -2953,7 +2953,7 @@ export function upsertThreadActivity(
 }
 /**
  * Finds thread activity message id.
- * @param database - database argument for findThreadActivityMessageId.
+ * @param database - Database handle used to locate activity message ID.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
  */
@@ -2979,9 +2979,9 @@ function findThreadActivityMessageId(
 }
 /**
  * Updates thread activity by id.
- * @param database - database argument for updateThreadActivityById.
+ * @param database - Database handle used to update activity by ID.
  * @param messageId - messageId identifier.
- * @param input - input argument for updateThreadActivityById.
+ * @param input - Updated activity fields.
  */
 
 function updateThreadActivityById(
@@ -3018,8 +3018,8 @@ function updateThreadActivityById(
 }
 /**
  * Inserts thread activity.
- * @param database - database argument for insertThreadActivity.
- * @param input - input argument for insertThreadActivity.
+ * @param database - Database handle used to insert thread activity.
+ * @param input - Activity payload to insert.
  */
 
 function insertThreadActivity(
@@ -3054,8 +3054,8 @@ function insertThreadActivity(
 }
 /**
  * Upserts thread activities.
- * @param database - database argument for upsertThreadActivities.
- * @param inputs - inputs argument for upsertThreadActivities.
+ * @param database - Database handle used to bulk-upsert thread activities.
+ * @param inputs - Activity payloads to upsert in batch.
  */
 
 export function upsertThreadActivities(
@@ -3111,7 +3111,7 @@ export function upsertThreadActivities(
 }
 /**
  * Performs stopInProgressThreadMessages operation.
- * @param database - database argument for stopInProgressThreadMessages.
+ * @param database - Database handle used to stop in-progress messages.
  * @param threadId - Thread identifier.
  */
 
@@ -3136,7 +3136,7 @@ export function stopInProgressThreadMessages(
 
 /**
  * Creates a cron job row.
- * @param database - database argument for createCronJob.
+ * @param database - Database handle used to create cron jobs.
  * @param input - Input row.
  */
 export function createCronJob(
@@ -3201,7 +3201,7 @@ export function createCronJob(
 
 /**
  * Lists cron jobs.
- * @param database - database argument for listCronJobs.
+ * @param database - Database handle used to list cron jobs.
  */
 export function listCronJobs(database: Database): CronJobRecord[] {
   /** Load all cron jobs with latest settings. */
@@ -3238,7 +3238,7 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 
 /**
  * Gets a single cron job by id.
- * @param database - database argument for getCronJobById.
+ * @param database - Database handle used to fetch a cron job by ID.
  * @param cronJobId - Cron job identifier.
  */
 export function getCronJobById(
@@ -3281,7 +3281,7 @@ export function getCronJobById(
 
 /**
  * Updates a cron job row.
- * @param database - database argument for updateCronJob.
+ * @param database - Database handle used to update cron job metadata.
  * @param cronJobId - Cron job identifier.
  * @param input - patch input.
  */
@@ -3370,7 +3370,7 @@ export function updateCronJob(
 
 /**
  * Lists enabled, non-deleted cron jobs.
- * @param database - database argument for listActiveCronJobs.
+ * @param database - Database handle used to list active cron jobs.
  */
 export function listActiveCronJobs(database: Database): CronJobRecord[] {
   /** Read cron jobs that are enabled and not soft-deleted. */
@@ -3408,7 +3408,7 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 
 /**
  * Sets cron job enabled state.
- * @param database - database argument for setCronJobEnabled.
+ * @param database - Database handle used to enable/disable cron job.
  * @param cronJobId - Cron job identifier.
  * @param enabled - enabled state.
  */
@@ -3434,7 +3434,7 @@ export function setCronJobEnabled(
 
 /**
  * Soft deletes a cron job by setting deletedAt.
- * @param database - database argument for softDeleteCronJob.
+ * @param database - Database handle used to mark a cron job as deleted.
  * @param cronJobId - Cron job identifier.
  */
 export function softDeleteCronJob(database: Database, cronJobId: number): void {
@@ -3455,7 +3455,7 @@ export function softDeleteCronJob(database: Database, cronJobId: number): void {
 
 /**
  * Updates cron job last-run metadata.
- * @param database - database argument for updateCronJobLastRun.
+ * @param database - Database handle used to record cron last run timestamp.
  * @param cronJobId - Cron job identifier.
  * @param inputRunDate - Last run date (ms since epoch).
  * @param status - Last run status.
@@ -3485,7 +3485,7 @@ export function updateCronJobLastRun(
 
 /**
  * Claims due cron jobs and marks them as in progress.
- * @param database - database argument for claimCronJobsForScheduledRun.
+ * @param database - Database handle used to claim cron jobs for execution.
  * @param schedule - Cron schedule expression that triggered.
  * @param runDate - Run time in ms since epoch.
  */
@@ -3592,7 +3592,7 @@ export function claimCronJobForScheduledRunById(
 
 /**
  * Creates a cron job run row.
- * @param database - database argument for createCronJobRun.
+ * @param database - Database handle used to create a cron run record.
  * @param input - Input row.
  */
 export function createCronJobRun(
@@ -3627,7 +3627,7 @@ export function createCronJobRun(
 
 /**
  * Reads a cron job run by id.
- * @param database - database argument for getCronJobRunById.
+ * @param database - Database handle used to fetch cron run details.
  * @param runId - Run identifier.
  */
 export function getCronJobRunById(
@@ -3653,7 +3653,7 @@ export function getCronJobRunById(
 
 /**
  * Updates cron job run status.
- * @param database - database argument for updateCronJobRunStatus.
+ * @param database - Database handle used to update cron run status.
  * @param runId - Run identifier.
  * @param status - New status.
  */
@@ -3677,7 +3677,7 @@ export function updateCronJobRunStatus(
 
 /**
  * Lists run rows for a specific cron job.
- * @param database - database argument for listCronJobRuns.
+ * @param database - Database handle used to list cron run history.
  * @param cronJobId - Cron job identifier.
  */
 export function listCronJobRuns(

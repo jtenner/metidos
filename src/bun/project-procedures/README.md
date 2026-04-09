@@ -5,6 +5,11 @@ It is organized by concern so each module has a narrow responsibility for data m
 
 ## Purpose of each file
 
+- `codex-constructor.ts`
+  - Translates provider/model selection plus generic inputs into exact `new Codex(...)` constructor options.
+  - Centralizes provider-specific constructor overrides so routing rules stay out of the main RPC module.
+  - Currently injects the xAI custom provider config and transport/search compatibility overrides, while preserving shared base config from callers.
+
 - `model-catalog.ts`
   - Defines the Codex model catalog and reasoning effort options across the supported providers.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.

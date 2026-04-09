@@ -1146,7 +1146,7 @@ function summarizeThreadStatus(detail: RpcThreadDetail): ThreadLifecycleStatus {
 }
 
 /** Build metadata payload for thread details from db rows or rpc thread objects.
- * @param thread - thread argument for thread.
+ * @param thread - thread value.
  */
 function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
   return {
@@ -1254,7 +1254,7 @@ function normalizeToolError(error: unknown): unknown {
 /**
  * Build MCP text output with optional structured payload for downstream clients.
  * @param text - Input text content.
- * @param structuredContent - structuredContent argument for structuredContent.
+ * @param structuredContent - structuredContent value.
  */
 function textResult(text: string, structuredContent?: Record<string, unknown>) {
   return {

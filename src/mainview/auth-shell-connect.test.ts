@@ -20,7 +20,7 @@ import { RpcError } from "./rpc-errors";
 
 /**
  * Builds auth status.
- * @param overrides - overrides argument for buildAuthStatus.
+ * @param overrides - Optional overrides passed to construct auth status in tests.
  */
 
 function buildAuthStatus(overrides: Partial<AuthStatus> = {}): AuthStatus {

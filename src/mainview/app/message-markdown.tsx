@@ -32,10 +32,10 @@ const codeTagStyle = {
 } satisfies CSSProperties;
 
 /**
- * Renders prepared code block.
- * @param code - code argument for renderPreparedCodeBlock.
- * @param language - language argument for renderPreparedCodeBlock.
- * @param shouldHighlight - Boolean flag indicating shouldHighlight.
+ * Render a prepared code block with optional syntax highlighting.
+ * @param code - Preformatted source text.
+ * @param language - Code language hint.
+ * @param shouldHighlight - Whether syntax highlighting is enabled.
  */
 function renderPreparedCodeBlock({
   code,
@@ -75,10 +75,10 @@ function renderPreparedCodeBlock({
 
 const markdownComponents: Components = {
   /**
-   * Renders markdown link elements.
-   * @param href - href argument for a.
-   * @param children - Nested child content.
-   * @param props - props argument for a.
+   * Render markdown links as external links.
+   * @param href - Link destination.
+   * @param children - Link text/content.
+   * @param props - Additional anchor props.
    */
 
   a({ href, children, ...props }) {
@@ -94,11 +94,11 @@ const markdownComponents: Components = {
       </a>
     );
   } /**
-   * Renders inline and block markdown code elements.
-   * @param children - Nested child content.
-   * @param className - Optional CSS class names.
-   * @param _node - _node argument for code.
-   * @param props - props argument for code.
+   * Render markdown code blocks and inline code snippets.
+   * @param children - Raw code content.
+   * @param className - Syntax highlighting class name from markdown parser.
+   * @param _node - Unused markdown AST node.
+   * @param props - Additional code element props.
    */,
 
   code({ children, className, node: _node, ...props }) {
@@ -144,15 +144,15 @@ const markdownComponents: Components = {
       </code>
     );
   } /**
-   * Renders preformatted markdown blocks.
-   * @param children - Nested child content.
+   * Render markdown preformatted block wrapper.
+   * @param children - Preformatted block content.
    */,
 
   pre({ children }) {
     return <div className="my-3 overflow-x-auto">{children}</div>;
   } /**
-   * Renders markdown table blocks.
-   * @param children - Nested child content.
+   * Render markdown table blocks in a scrollable wrapper.
+   * @param children - Table row/column content.
    */,
 
   table({ children }) {
@@ -165,8 +165,8 @@ const markdownComponents: Components = {
 };
 
 /**
- * Performs RichMarkdownMessage operation.
- * @param text - Input text content.
+ * Render raw text as markdown with GitHub-flavored markdown support.
+ * @param text - Input markdown text.
  */
 export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
   return (
@@ -182,8 +182,8 @@ export function RichMarkdownMessage({ text }: { text: string }): JSX.Element {
 }
 
 /**
- * Performs PreparedRichMarkdownMessage operation.
- * @param plan - plan argument for PreparedRichMarkdownMessage.
+ * Render pre-segmented plan output from message preprocessing.
+ * @param plan - Prepared message render plan.
  */
 export function PreparedRichMarkdownMessage({
   plan,

@@ -9,8 +9,8 @@ export class RpcError extends Error {
   /**
    * Creates and initializes a new instance.
    * @param message - Message payload.
-   * @param code - code argument for constructor.
-   * @param details - details argument for constructor.
+   * @param code - Error code associated with this RPC error.
+   * @param details - Additional structured details for the RPC error.
    */
 
   constructor(

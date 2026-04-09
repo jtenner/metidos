@@ -67,8 +67,8 @@ function formatDateTime(value: string | null): string | null {
 }
 
 /**
- * Performs errorMessage operation.
- * @param error - Error value to process.
+ * Convert common auth errors to user-facing messages.
+ * @param error - Unknown error payload from API or UI.
  */
 function errorMessage(error: unknown): string {
   if (error instanceof AuthApiError) {
@@ -81,9 +81,9 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Reads locked until.
- * @param status - status argument for readLockedUntil.
- * @param error - Error value to process.
+ * Resolve the lockout expiry timestamp from auth state or error details.
+ * @param status - Latest auth status state.
+ * @param error - Error that triggered status refresh.
  */
 function readLockedUntil(
   status: AuthStatus | null,
@@ -99,8 +99,8 @@ function readLockedUntil(
 }
 
 /**
- * Performs AuthActionButton operation.
- * @param props - props argument for AuthActionButton.
+ * Render a consistent action button with shared style variants.
+ * @param props - Button configuration for auth UI actions.
  */
 function AuthActionButton(props: {
   children: JSX.Element | string;
@@ -129,8 +129,8 @@ function AuthActionButton(props: {
 }
 
 /**
- * Performs AuthChoiceButton operation.
- * @param props - props argument for AuthChoiceButton.
+ * Render a selectable auth-flow choice control.
+ * @param props - Choice button content and click handler.
  */
 function AuthChoiceButton(props: {
   active: boolean;
@@ -163,8 +163,8 @@ function AuthChoiceButton(props: {
 }
 
 /**
- * Performs AuthInput operation.
- * @param props - props argument for AuthInput.
+ * Render a styled labeled text/password input field.
+ * @param props - Input field properties.
  */
 function AuthInput(props: {
   autoComplete?: string;
@@ -204,8 +204,8 @@ function AuthInput(props: {
 }
 
 /**
- * Performs authConsoleShell operation.
- * @param props - props argument for authConsoleShell.
+ * Render the shared auth shell chrome used for setup/login screens.
+ * @param props - Shell container props for title, error, and footer.
  */
 function authConsoleShell(props: {
   children: JSX.Element;
@@ -260,10 +260,10 @@ function authConsoleShell(props: {
 }
 
 /**
- * Performs AuthShell operation.
- * @param connectRpcTransport - connectRpcTransport argument for AuthShell.
- * @param disconnectRpcTransport - disconnectRpcTransport argument for AuthShell.
- * @param procedures - procedures argument for AuthShell.
+ * Render authentication flows (setup/login/recovery) and return the active shell.
+ * @param connectRpcTransport - Connect callback for authenticated RPC session.
+ * @param disconnectRpcTransport - Disconnect callback for teardown.
+ * @param procedures - Auth RPC procedures for status and actions.
  */
 export default function AuthShell({
   connectRpcTransport,
@@ -382,8 +382,8 @@ export default function AuthShell({
 
   useEffect(() => {
     /**
-     * Handles auth required.
-     * @param event - event argument for handleAuthRequired.
+     * Handle an auth-required event emitted from backend procedures.
+     * @param event - Auth-required custom event payload.
      */
     const handleAuthRequired = (
       event: WindowEventMap["jolt:auth-required"],

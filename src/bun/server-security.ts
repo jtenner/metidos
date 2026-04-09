@@ -27,9 +27,9 @@ export type InjectedRuntimeConfig = {
 };
 /**
  * Formats browser origin.
- * @param protocol - protocol argument for formatBrowserOrigin.
- * @param host - host argument for formatBrowserOrigin.
- * @param port - port argument for formatBrowserOrigin.
+ * @param protocol - The protocol string used to build browser origins.
+ * @param host - The host used to build browser origins.
+ * @param port - The port used to build browser origins.
  */
 
 function formatBrowserOrigin(
@@ -46,7 +46,7 @@ function formatBrowserOrigin(
 
 /**
  * Normalize a browser origin for exact allowlist comparison.
- * @param origin - origin argument for origin.
+ * @param origin - The request origin string to validate.
  */
 function normalizeBrowserOrigin(origin: string): string | null {
   try {
@@ -162,7 +162,7 @@ function normalizeConnectSource(url: string): string | null {
 }
 /**
  * Builds content security policy.
- * @param connectUrls - connectUrls argument for buildContentSecurityPolicy.
+ * @param connectUrls - The allowed connect URLs used for CSP directives.
  */
 
 export function buildContentSecurityPolicy(connectUrls: string[] = []): string {
@@ -212,7 +212,7 @@ export function applySecurityHeaders(
 }
 /**
  * Builds runtime config element.
- * @param runtimeConfig - runtimeConfig argument for buildRuntimeConfigElement.
+ * @param runtimeConfig - Runtime configuration data embedded into the meta element.
  */
 
 export function buildRuntimeConfigElement(
@@ -225,7 +225,7 @@ export function buildRuntimeConfigElement(
 
 /**
  * Smallest health payload allowed before authentication exists.
- * @param ok - ok argument for ok.
+ * @param ok - The boolean result returned by the check.
  */
 export function buildLivenessPayload(ok: boolean): { ok: boolean } {
   return {

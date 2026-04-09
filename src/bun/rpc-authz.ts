@@ -35,8 +35,8 @@ export function createThreadRequiresStepUp(
   );
 }
 /**
- * Performs enforceRpcStepUp operation.
- * @param options - Configuration options used by this operation.
+ * Enforces step-up authentication when action context does not match current workspace.
+ * @param options - Operation context and callback for step-up requests.
  */
 
 export function enforceRpcStepUp(options: {

@@ -29,17 +29,17 @@ export type DevWebSocketTicket = {
   ticket: string;
 };
 /**
- * Performs envFlagEnabled operation.
- * @param value - Input value.
+ * Checks whether an environment flag value represents an enabled state.
+ * @param value - Environment value to parse.
  */
 
 function envFlagEnabled(value: string | undefined): boolean {
   return value?.trim() === "1";
 }
 /**
- * Performs assertDevOnlyFlag operation.
- * @param enabled - enabled argument for assertDevOnlyFlag.
- * @param flagName - flagName argument for assertDevOnlyFlag.
+ * Ensures a dev-only flag is only enabled when running in dev mode.
+ * @param enabled - Whether the flag is enabled.
+ * @param flagName - Flag environment variable name.
  * @param isDevServer - Boolean flag indicating isDevServer.
  */
 
@@ -71,8 +71,8 @@ export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
   };
 }
 /**
- * Performs issueDevWebSocketTicket operation.
- * @param nowMs - nowMs argument for issueDevWebSocketTicket.
+ * Issues a short-lived dev websocket ticket with expiration.
+ * @param nowMs - Timestamp used as the ticket creation baseline.
  */
 
 export function issueDevWebSocketTicket(

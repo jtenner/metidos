@@ -27,8 +27,8 @@ function thread(threadId: number): RpcThread {
 /**
  * Performs sortableThread operation.
  * @param threadId - Thread identifier.
- * @param updatedAt - updatedAt argument for sortableThread.
- * @param pinnedAt - pinnedAt argument for sortableThread.
+ * @param updatedAt - Timestamp used to order threads by update recency.
+ * @param pinnedAt - Timestamp used to prioritize pinned threads in sorting.
  */
 
 function sortableThread(
