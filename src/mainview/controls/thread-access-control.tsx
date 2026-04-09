@@ -181,7 +181,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#d89256]"
               checked={value.unsafeMode}
-              description="Danger-full-access sandbox. Same implications as the old unsafe checkbox."
+              description="Enable elevated-risk thread sandbox behavior. Use only when you want to run unsafe operations."
               disabled={disabled}
               label="Unsafe"
               onChange={(checked) => {
