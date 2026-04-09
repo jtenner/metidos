@@ -97,7 +97,7 @@ Primary local files inspected:
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
-- [src/bun/project-procedures/codex-session-telemetry.ts](../src/bun/project-procedures/codex-session-telemetry.ts)
+- [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
 - [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
@@ -181,14 +181,14 @@ Current Jolt has its own separate thread/session model in SQLite:
 - Jolt “threads” are app-level domain entities, not Pi sessions
 - each thread now stores first-class Pi session references alongside the legacy `codexThreadId` compatibility field
 - Jolt stores transformed thread messages for UI rendering
-- Jolt separately infers compaction behavior from Codex token history
+- Jolt historically inferred compaction behavior from Codex token history, but the active Pi path can replace that with live session compaction data
 
 Relevant local files:
 
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
-- [src/bun/project-procedures/codex-session-telemetry.ts](../src/bun/project-procedures/codex-session-telemetry.ts)
+- [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 
 ### 4. Pi already has built-in coding tools and a strong extension surface
 
@@ -397,11 +397,11 @@ See:
 
 ### Telemetry coupling
 
-Current context window / usage telemetry is read from Codex’s on-disk session JSONL files:
+Historically, current context window / usage telemetry was read from Codex’s on-disk session JSONL files:
 
-- [src/bun/project-procedures/codex-session-telemetry.ts](../src/bun/project-procedures/codex-session-telemetry.ts)
+- [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 
-That entire subsystem becomes obsolete once Codex SDK is removed.
+That external-file scraping subsystem becomes obsolete once Codex SDK is removed. The Pi migration replaces it with an in-process adapter over active Pi sessions.
 
 ## Migration Requirement Matrix
 
@@ -1173,7 +1173,7 @@ What this still does not do yet:
 
 ### 10. Telemetry, Usage, and Compaction UI
 
-Current Jolt does extra work because Codex SDK does not expose the exact live telemetry Jolt wants during runs. That is why Jolt reads Codex JSONL files from disk.
+Before the Pi telemetry slice, Jolt did extra work because Codex SDK did not expose the exact live telemetry Jolt wanted during runs. That is why Jolt read Codex JSONL files from disk.
 
 With Pi:
 
@@ -1182,16 +1182,45 @@ With Pi:
 - compaction is a first-class concept
 - queue state is first-class
 
+### TM13 implementation status in `jt-ide`
+
+The first Pi-era telemetry slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
+- [src/bun/project-procedures/pi-session-telemetry.test.ts](../src/bun/project-procedures/pi-session-telemetry.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/pi-thread-runtime-integration.test.ts](../src/bun/pi-thread-runtime-integration.test.ts)
+
+What the current implementation now does:
+
+- deletes the active Codex JSONL scraping path entirely and replaces it with live Pi session telemetry
+- hydrates `RpcThread.usage.inputTokens` from Pi `session.getContextUsage()` so the browser context meter reflects current session context rather than Codex-sidecar file scraping
+- hydrates `contextWindowTokens` from the active Pi model/session so status and detail payloads use the real Pi session budget
+- derives observed compaction history from Pi `compaction` entries on the active session branch instead of relying on Codex-era drop heuristics while the runtime is live
+- persists Pi-derived compaction statistics back onto thread rows at the end of a run so inactive threads keep the latest observed compaction metadata
+- exposes Pi-native runtime phase and queued-message counts on `RpcThread.runStatus` via optional `phase` and `queue` fields without forcing an immediate frontend rewrite
+- applies the live Pi overlay consistently across thread detail, thread-by-id, thread list, bootstrap thread summaries, and status-polling surfaces
+
+What this still does not do yet:
+
+- it does not add new browser chrome for the newly exposed `runStatus.phase` or `runStatus.queue` fields; the existing UI only consumes the refreshed context meter today
+- it does not surface Pi cost totals or cache-write totals because Jolt’s current RPC usage shape still matches the older thread meter contract
+- it does not remove every Codex-era compaction field name from the schema or UI; it reuses the existing `RpcThread.compaction` shape with Pi-backed data so the migration stays incremental
+- it does not solve cron-specific UI telemetry beyond the thread surfaces themselves; cron-specific presentation remains part of later UI work
+
 ### What can be deleted after migration
 
-Assuming Pi provides sufficient runtime data for Jolt’s UI:
+TM13 has already deleted the live Codex session scraper and replaced it with [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts).
 
-- [src/bun/project-procedures/codex-session-telemetry.ts](../src/bun/project-procedures/codex-session-telemetry.ts)
-- Codex-specific compaction inference heuristics that only exist because of Codex telemetry gaps
+Remaining cleanup after full migration still includes:
+
+- removing any leftover Codex-specific compaction heuristics or labels that survive only for backward-compatible schema reuse
 
 ### What still needs custom work
 
-If Jolt wants to preserve its current exact compaction telemetry fields, an adapter may still be required because Pi’s model is not identical.
+Jolt still needs a small adapter because Pi’s telemetry model is not identical to Jolt’s legacy `RpcThread` contract. TM13 implements that adapter in [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts).
 
 ### 11. Local Auth and Security Auditing
 
@@ -1427,7 +1456,7 @@ The migration is worth doing if the team accepts these truths up front:
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
-- [src/bun/project-procedures/codex-session-telemetry.ts](../src/bun/project-procedures/codex-session-telemetry.ts)
+- [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
 - [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
 - [src/bun/db.ts](../src/bun/db.ts)

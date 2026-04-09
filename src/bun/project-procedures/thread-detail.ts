@@ -28,10 +28,6 @@ export const THREAD_STOPPED_MESSAGE = "Thread run was stopped by the user.";
 export const THREAD_INTERRUPTED_MESSAGE =
   "Thread run was interrupted before completion.";
 
-const COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO = 0.72;
-const COMPACTION_INFERENCE_MAX_CURRENT_RATIO = 0.68;
-const COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO = 0.16;
-
 /**
  * Activity payload stored for command/file/tool messages.
  */
@@ -183,87 +179,6 @@ export function toRpcThread(
     usage: threadUsageFromRecord(thread),
     compaction: threadCompactionFromRecord(thread),
     runStatus: threadRunStatusFromRecord(thread, activeStatus),
-  };
-}
-
-/**
- * Build updated compaction telemetry from latest usage sample.
- */
-export function buildNextCompactionTelemetry(
-  thread: ThreadRecord,
-  usage: RpcThreadUsage,
-  contextWindowTokens: number,
-): {
-  maxInputTokens: number;
-  estimatedCompactionTriggerTokens: number | null;
-  compactionCount: number;
-  lastCompactionAt: string | null;
-  lastCompactionBeforeInputTokens: number | null;
-  lastCompactionAfterInputTokens: number | null;
-} {
-  const previousInputTokens = thread.lastInputTokens;
-  const currentInputTokens = usage.inputTokens;
-  const heuristicTriggerTokens = heuristicCompactionTriggerTokens(thread.model);
-  const baselineTriggerTokens =
-    thread.estimatedCompactionTriggerTokens ?? heuristicTriggerTokens;
-  const maxInputTokens = Math.max(
-    thread.maxInputTokens ?? 0,
-    currentInputTokens,
-  );
-
-  let estimatedCompactionTriggerTokens =
-    thread.estimatedCompactionTriggerTokens ?? null;
-  let compactionCount = thread.compactionCount;
-  let lastCompactionAt = thread.lastCompactionAt;
-  let lastCompactionBeforeInputTokens = thread.lastCompactionBeforeInputTokens;
-  let lastCompactionAfterInputTokens = thread.lastCompactionAfterInputTokens;
-
-  if (typeof previousInputTokens === "number" && previousInputTokens > 0) {
-    const previousNearCompaction =
-      previousInputTokens >=
-      Math.round(
-        Math.min(
-          baselineTriggerTokens,
-          contextWindowTokens * COMPACTION_INFERENCE_MIN_PREVIOUS_WINDOW_RATIO,
-        ),
-      );
-    const currentDroppedSharply =
-      currentInputTokens <=
-      Math.round(previousInputTokens * COMPACTION_INFERENCE_MAX_CURRENT_RATIO);
-    const droppedByMeaningfulWindowShare =
-      previousInputTokens - currentInputTokens >=
-      Math.round(
-        contextWindowTokens * COMPACTION_INFERENCE_MIN_DROP_WINDOW_RATIO,
-      );
-
-    if (
-      previousNearCompaction &&
-      currentDroppedSharply &&
-      droppedByMeaningfulWindowShare
-    ) {
-      const nextSample = previousInputTokens;
-      const sampleCount = Math.max(compactionCount, 0);
-      estimatedCompactionTriggerTokens =
-        sampleCount > 0 && estimatedCompactionTriggerTokens
-          ? Math.round(
-              (estimatedCompactionTriggerTokens * sampleCount + nextSample) /
-                (sampleCount + 1),
-            )
-          : nextSample;
-      compactionCount += 1;
-      lastCompactionAt = new Date().toISOString();
-      lastCompactionBeforeInputTokens = previousInputTokens;
-      lastCompactionAfterInputTokens = currentInputTokens;
-    }
-  }
-
-  return {
-    maxInputTokens,
-    estimatedCompactionTriggerTokens,
-    compactionCount,
-    lastCompactionAt,
-    lastCompactionBeforeInputTokens,
-    lastCompactionAfterInputTokens,
   };
 }
 

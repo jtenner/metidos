@@ -16,10 +16,10 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Tracks provider metadata such as xAI routing and which model ids accept reasoning-effort overrides.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
-- `codex-session-telemetry.ts`
-  - Reads the persisted Codex rollout JSONL files under `~/.codex/sessions` (or `CODEX_HOME/sessions`) for live token-count data.
-  - Extracts the latest `token_count.last_token_usage` plus the real `model_context_window` so thread context meters can reflect the actual session budget instead of a static model guess.
-  - Caches resolved session paths and parsed file snapshots by file stat to keep polling cheap while threads are active.
+- `pi-session-telemetry.ts`
+  - Projects active Pi session telemetry into Jolt thread payloads without scraping external files.
+  - Uses Pi `getContextUsage()` for live context-window hydration, session-branch `compaction` entries for observed compaction history, and runtime queue/streaming state for richer thread status overlays.
+  - Keeps the Pi-to-Jolt telemetry mapping isolated so later UI work can consume new runtime fields without touching the persistence/rendering helpers.
 
 - `command-normalization.ts`
   - Removes shell-wrapper noise from recorded command activity before it is persisted or shown in the UI.

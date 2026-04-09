@@ -142,6 +142,9 @@ describe("Pi thread runtime integration", () => {
     });
 
     const settled = await waitForThreadToSettle(procedures, created.thread.id);
+    const liveStatuses = await procedures.listThreadStatusesProcedure({
+      threadIds: [created.thread.id],
+    });
     const assistantMessages = settled.messages.filter(
       (message) => message.role === "assistant",
     );
@@ -153,6 +156,9 @@ describe("Pi thread runtime integration", () => {
     expect(settled.thread.piSessionId).toBeString();
     expect(settled.thread.piSessionFile).toBeString();
     expect(settled.thread.piLeafEntryId).toBeString();
+    expect(settled.thread.usage?.contextWindowTokens).toBe(8_192);
+    expect(settled.thread.usage?.inputTokens ?? 0).toBeGreaterThan(0);
+    expect(liveStatuses[0]?.usage?.contextWindowTokens).toBe(8_192);
     expect(lastAssistantMessage?.text).toContain("pi-runtime-probe");
     expect(lastAssistantMessage?.text).toContain(
       "pi runtime integration smoke",

@@ -293,6 +293,8 @@ export type RpcThreadRunStatus = {
   updatedAt: string | null;
   error: string | null;
   hasUnreadError: boolean;
+  phase?: "streaming" | "compacting";
+  queue?: RpcThreadQueueStatus;
 };
 
 export type RpcThreadUsage = {
@@ -310,6 +312,12 @@ export type RpcThreadCompaction = {
   lastInferredAt: string | null;
   lastInferredBeforeInputTokens: number | null;
   lastInferredAfterInputTokens: number | null;
+};
+
+export type RpcThreadQueueStatus = {
+  pendingMessageCount: number;
+  steeringMessageCount: number;
+  followUpMessageCount: number;
 };
 
 export type RpcThread = {

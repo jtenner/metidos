@@ -85,7 +85,6 @@ import {
   buildCodexConstructorOptions,
   type CodexConstructorConfig,
 } from "./project-procedures/codex-constructor";
-import { applyCodexSessionUsageTelemetry } from "./project-procedures/codex-session-telemetry";
 import { normalizeCommandDisplayText } from "./project-procedures/command-normalization";
 import {
   listDirectorySuggestions,
@@ -107,7 +106,6 @@ import {
   codexModelApiId,
   codexModelProvider,
   codexModelSupportsReasoningEffort,
-  contextWindowTokensForModel,
   normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
   resolveCodexModel,
@@ -117,6 +115,11 @@ import {
   createPiThreadEventProjector,
   type ProjectedPiActivityWrite,
 } from "./project-procedures/pi-event-projection";
+import {
+  applyPiRuntimeTelemetry,
+  buildPiRuntimeCompaction,
+  buildPiRuntimeUsage,
+} from "./project-procedures/pi-session-telemetry";
 import {
   awaitAbortableResult,
   createAbortError,
@@ -129,7 +132,6 @@ import {
   writeLruValue,
 } from "./project-procedures/shared";
 import {
-  buildNextCompactionTelemetry,
   buildThreadTitle,
   isStoppedThreadMessage,
   THREAD_INTERRUPTED_MESSAGE,
@@ -233,7 +235,9 @@ export async function listThreadsProcedure(
   _params?: AppRPCSchema["requests"]["listThreads"]["params"],
 ): Promise<RpcThread[]> {
   return listThreads(db).map((thread) =>
-    toRpcThread(thread, currentThreadRunStatus(thread)),
+    applyActiveThreadRuntimeTelemetry(
+      toRpcThread(thread, currentThreadRunStatus(thread)),
+    ),
   );
 }
 
@@ -252,7 +256,7 @@ export async function listThreadStatusesProcedure(
   return listThreads(db)
     .filter((thread) => requestedThreadIds.has(thread.id))
     .map((thread) =>
-      applyCodexSessionUsageTelemetry(
+      applyActiveThreadRuntimeTelemetry(
         toRpcThread(thread, currentThreadRunStatus(thread)),
       ),
     );
@@ -426,7 +430,9 @@ export async function getAppBootstrapProcedure(
     projects: listProjects(db),
     threadDetail,
     threads: threads.map((thread) =>
-      toRpcThread(thread, currentThreadRunStatus(thread)),
+      applyActiveThreadRuntimeTelemetry(
+        toRpcThread(thread, currentThreadRunStatus(thread)),
+      ),
     ),
   };
 }
@@ -934,6 +940,10 @@ function touchWorkingThreadRunStatus(threadId: number): void {
 function currentThreadRunStatus(thread: ThreadRecord): RpcThreadRunStatus {
   return threadRunStatusFromRecord(thread, threadRunStatusMap.get(thread.id));
 }
+
+function applyActiveThreadRuntimeTelemetry(thread: RpcThread): RpcThread {
+  return applyPiRuntimeTelemetry(thread, piThreadRuntimeMap.get(thread.id));
+}
 /**
  * Thread access flags used for thread and cron creation.
  */
@@ -1214,9 +1224,27 @@ function threadById(threadId: number): ThreadRecord {
 
 function rpcThreadById(threadId: number): RpcThread {
   const thread = threadById(threadId);
-  return applyCodexSessionUsageTelemetry(
+  return applyActiveThreadRuntimeTelemetry(
     toRpcThread(thread, currentThreadRunStatus(thread)),
   );
+}
+
+async function buildThreadDetailRaw(
+  threadId: number,
+  options?: {
+    cursor?: number | null;
+  },
+): Promise<RpcThreadDetail> {
+  const thread = threadById(threadId);
+  const page = listThreadMessagesPage(db, thread.id, {
+    cursor: options?.cursor ?? null,
+    limit: THREAD_DETAIL_PAGE_MESSAGE_LIMIT,
+  });
+  return {
+    thread: toRpcThread(thread, currentThreadRunStatus(thread)),
+    messages: toRpcThreadMessages(page.messages),
+    nextCursor: page.nextCursor,
+  };
 }
 /**
  * Builds thread detail.
@@ -1230,17 +1258,10 @@ async function buildThreadDetail(
     cursor?: number | null;
   },
 ): Promise<RpcThreadDetail> {
-  const thread = threadById(threadId);
-  const page = listThreadMessagesPage(db, thread.id, {
-    cursor: options?.cursor ?? null,
-    limit: THREAD_DETAIL_PAGE_MESSAGE_LIMIT,
-  });
+  const detail = await buildThreadDetailRaw(threadId, options);
   return {
-    thread: applyCodexSessionUsageTelemetry(
-      toRpcThread(thread, currentThreadRunStatus(thread)),
-    ),
-    messages: toRpcThreadMessages(page.messages),
-    nextCursor: page.nextCursor,
+    ...detail,
+    thread: applyActiveThreadRuntimeTelemetry(detail.thread),
   };
 }
 /**
@@ -1255,18 +1276,21 @@ async function readThreadDetailCached(
   if (cached) {
     return {
       ...cached,
-      thread: applyCodexSessionUsageTelemetry(cached.thread),
+      thread: applyActiveThreadRuntimeTelemetry(cached.thread),
     };
   }
 
-  const detail = await buildThreadDetail(threadId);
+  const detail = await buildThreadDetailRaw(threadId);
   writeLruValue(
     threadDetailCache,
     threadId,
     detail,
     THREAD_DETAIL_CACHE_MAX_ENTRIES,
   );
-  return detail;
+  return {
+    ...detail,
+    thread: applyActiveThreadRuntimeTelemetry(detail.thread),
+  };
 }
 /**
  * Performs warmThreadDetailCache operation.
@@ -1403,6 +1427,7 @@ async function runThreadMessageInBackground(
       (event: AgentSessionEvent) => {
         eventProcessingChain = eventProcessingChain
           .then(async () => {
+            touchWorkingThreadRunStatus(threadId);
             const projectedWrites = piEventProjector.project(event);
             if (projectedWrites.length === 0) {
               return;
@@ -1416,7 +1441,6 @@ async function runThreadMessageInBackground(
             lastAssistantItemId = snapshot.lastAssistantItemId;
             lastAssistantText = snapshot.lastAssistantText;
             usage = snapshot.usage ?? usage;
-            touchWorkingThreadRunStatus(threadId);
           })
           .catch((error) => {
             if (eventProcessingError === null) {
@@ -1476,17 +1500,31 @@ async function runThreadMessageInBackground(
     }
     if (usage) {
       const currentThread = threadById(threadId);
-      setThreadUsage(
-        db,
-        threadId,
-        usage,
-        buildNextCompactionTelemetry(
-          currentThread,
-          usage,
-          runtime.contextWindowTokens ||
-            contextWindowTokensForModel(currentThread.model),
-        ),
+      const currentRpcThread = toRpcThread(
+        currentThread,
+        currentThreadRunStatus(currentThread),
       );
+      const persistedUsage = buildPiRuntimeUsage(
+        currentRpcThread.usage,
+        runtime,
+      );
+      const persistedCompaction = buildPiRuntimeCompaction(
+        currentRpcThread.compaction,
+        runtime,
+      );
+      setThreadUsage(db, threadId, persistedUsage ?? usage, {
+        maxInputTokens: persistedCompaction.maxObservedInputTokens ?? 0,
+        estimatedCompactionTriggerTokens:
+          persistedCompaction.estimatedTriggerSource === "observed"
+            ? persistedCompaction.estimatedTriggerTokens
+            : null,
+        compactionCount: persistedCompaction.inferredCount,
+        lastCompactionAt: persistedCompaction.lastInferredAt,
+        lastCompactionBeforeInputTokens:
+          persistedCompaction.lastInferredBeforeInputTokens,
+        lastCompactionAfterInputTokens:
+          persistedCompaction.lastInferredAfterInputTokens,
+      });
       invalidateThreadDetailCache(threadId);
     }
     markThreadRan(db, threadId);

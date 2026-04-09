@@ -111,9 +111,9 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Keeps provider-specific constructor overrides, such as xAI transport/search compatibility settings, out of the main RPC module.
   - Provides a single extension point for future non-OpenAI providers.
 
-- `project-procedures/codex-session-telemetry.ts`
-  - Reads the persisted Codex rollout JSONL files to recover live token-count snapshots and the real model context window.
-  - Lets the backend surface accurate context-usage telemetry even though the installed SDK stream types only expose final turn usage.
+- `project-procedures/pi-session-telemetry.ts`
+  - Maps live Pi `AgentSession` telemetry onto Jolt thread payloads.
+  - Hydrates thread usage from Pi context-usage estimates, derives compaction history from Pi session entries, and surfaces live streaming/compaction phase plus queued-message counts on thread status payloads.
 
 - `project-procedures/directory-suggestions.ts`
   - Maintains cached directory suggestions for path-like user input.

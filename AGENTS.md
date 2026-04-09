@@ -68,12 +68,12 @@
 │  │  │  ├─ command-normalization.ts
 │  │  │  ├─ codex-constructor.ts
 │  │  │  ├─ model-catalog.ts
-│  │  │  ├─ codex-session-telemetry.test.ts
-│  │  │  ├─ codex-session-telemetry.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
 │  │  │  ├─ pi-event-projection.test.ts
 │  │  │  ├─ pi-event-projection.ts
+│  │  │  ├─ pi-session-telemetry.test.ts
+│  │  │  ├─ pi-session-telemetry.ts
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts
