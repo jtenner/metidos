@@ -116,7 +116,7 @@ function readDirectorySuggestionNamesFromDisk(
 
 /**
  * Refresh a cache entry from disk and store it in LRU map.
- * On read failure, invalidates the cache key to avoid serving stale data.
+ * On read failure, invalidates the cache key to avoid serving outdated data.
  */
 function refreshDirectorySuggestionEntries(
   searchDirectory: string,

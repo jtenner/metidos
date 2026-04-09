@@ -121,7 +121,7 @@ export function useAddProjectForm({
   );
 
   const clearDirectorySuggestionPrefetchTimer = useCallback(() => {
-    // Avoid stale debounced prefetch when query changes or UI is closed.
+    // Avoid obsolete debounced prefetch when query changes or UI is closed.
     if (directorySuggestionPrefetchTimerRef.current !== null) {
       window.clearTimeout(directorySuggestionPrefetchTimerRef.current);
       directorySuggestionPrefetchTimerRef.current = null;
