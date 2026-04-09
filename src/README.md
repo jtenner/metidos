@@ -32,6 +32,10 @@ Holds backend orchestration and server entry logic that powers local project and
   - Shared reverse-proxy TLS policy helper used by the Bun entrypoints.
 - `project-procedures.ts`
   - High-level project orchestration: open/close workflows, background tasks, and thread command lifecycle.
+- `pi-runtime-probe.ts`
+  - Pi feasibility probe covering direct Bun embedding and the Node RPC fallback.
+- `pi-runtime-probe.test.ts`
+  - Targeted tests for the Pi feasibility probe paths.
 - `rpc-websocket-auth.ts`
   - Shared websocket-upgrade auth gate used to verify session/ticket requirements before `/rpc` upgrades.
 - `rpc-schema.ts`

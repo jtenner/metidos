@@ -36,6 +36,17 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Maintains in-memory caches/polling state, manages worktree background refresh loops, and publishes change events to connected clients.
   - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
+- `pi-runtime-probe.ts`
+  - Lightweight integration probe for Pi runtime adoption.
+  - Verifies direct Bun SDK embedding plus a Node RPC fallback with a local mock provider, including streaming, abort, provider auth, and session-resume behavior.
+
+- `pi-runtime-probe.test.ts`
+  - Focused tests that keep the Pi runtime probe honest and regression-test the Bun SDK and Node RPC probe paths.
+
+- `pi-rpc-probe-extension.ts`
+  - Minimal Pi extension used only by the Node RPC probe fallback.
+  - Registers the mock provider contract consumed by `pi-runtime-probe.ts` without pulling in the probe CLI entrypoint itself.
+
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.

@@ -50,6 +50,9 @@
 │  │  ├─ git.ts
 │  │  ├─ git.test.ts
 │  │  ├─ index.ts
+│  │  ├─ pi-rpc-probe-extension.ts
+│  │  ├─ pi-runtime-probe.test.ts
+│  │  ├─ pi-runtime-probe.ts
 │  │  ├─ project-procedures/
 │  │  │  ├─ README.md
 │  │  │  ├─ command-normalization.test.ts

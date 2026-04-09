@@ -448,6 +448,30 @@ Use Pi SDK as the primary target:
 - embed `createAgentSession()` or `createAgentSessionRuntime()` behind Jolt’s Bun RPC layer
 - keep Jolt’s current browser UI, SQLite, auth, project/worktree model, and websocket architecture
 
+### Validation status in `jt-ide`
+
+The initial runtime-host spike is now complete inside this repository.
+
+Validated on 2026-04-09 with:
+
+- [src/bun/pi-runtime-probe.ts](../src/bun/pi-runtime-probe.ts)
+- [src/bun/pi-runtime-probe.test.ts](../src/bun/pi-runtime-probe.test.ts)
+- [src/bun/pi-rpc-probe-extension.ts](../src/bun/pi-rpc-probe-extension.ts)
+
+What passed:
+
+- direct Bun SDK embedding with Pi
+- provider auth resolution through Pi auth/model plumbing
+- streamed text events from a custom provider
+- abort behavior during an active prompt
+- persistent session reopen/resume through Pi `SessionManager`
+- a Node subprocess fallback using Pi RPC mode plus a local extension-registered provider
+
+Current decision:
+
+- use direct Bun SDK embedding as the primary integration target
+- keep the Node Pi RPC sidecar as the fallback path if a provider-specific Bun incompatibility appears later
+
 ### Why SDK first
 
 Benefits:
