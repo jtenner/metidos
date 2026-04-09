@@ -14,12 +14,14 @@
 ├─ .git
 ├─ .gitignore
 ├─ AGENTS.md
+├─ agents-todo.md
 ├─ biome.json
 ├─ bun-plugin-react-compiler.ts
 ├─ bun.lock
 ├─ bunfig.toml
 ├─ docs/
-│  └─ 2026-04-07-thread-tool-access-controls.md
+│  ├─ 2026-04-07-thread-tool-access-controls.md
+│  └─ 2026-04-09-pi-coding-agent-migration-research.md
 ├─ package.json
 ├─ src/
 │  ├─ README.md
