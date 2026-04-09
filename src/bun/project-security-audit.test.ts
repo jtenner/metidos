@@ -41,7 +41,6 @@ describe("project security audit helpers", () => {
       projectPath: "/repo",
     });
     const thread = createThread(database, {
-      codexThreadId: null,
       piLeafEntryId: null,
       piSessionFile: null,
       piSessionId: null,

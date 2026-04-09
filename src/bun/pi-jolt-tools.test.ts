@@ -54,7 +54,6 @@ function makeWorktree(input?: Partial<RpcWorktree>): RpcWorktree {
 function makeThread(input?: Partial<RpcThread>): RpcThread {
   return {
     agentsAccess: false,
-    codexThreadId: null,
     compaction: {
       estimatedTriggerSource: "heuristic",
       estimatedTriggerTokens: 1000,

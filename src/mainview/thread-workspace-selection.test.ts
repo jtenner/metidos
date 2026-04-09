@@ -27,7 +27,6 @@ function project(overrides?: Partial<RpcProject>): RpcProject {
 function thread(overrides?: Partial<RpcThread>): RpcThread {
   return {
     agentsAccess: false,
-    codexThreadId: null,
     piSessionId: null,
     piSessionFile: null,
     piLeafEntryId: null,

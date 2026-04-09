@@ -1,21 +1,21 @@
 /**
- * @file src/bun/codex-sidecar-scope.test.ts
- * @description Test file for codex sidecar scope.
+ * @file src/bun/thread-tool-scope.test.ts
+ * @description Test file for thread tool scope helpers.
  */
 
 import { describe, expect, it } from "bun:test";
 
 import {
-  canonicalizeSidecarPath,
+  canonicalizeThreadToolPath,
   enforceBoundThreadScope,
   enforceTargetScope,
-  sidecarPathsEqual,
-} from "./codex-sidecar-scope";
+  threadToolPathsEqual,
+} from "./thread-tool-scope";
 
-describe("codex sidecar scope helpers", () => {
+describe("thread tool scope helpers", () => {
   it("canonicalizes relative paths against a base directory", () => {
     expect(
-      canonicalizeSidecarPath("subdir/file.ts", {
+      canonicalizeThreadToolPath("subdir/file.ts", {
         baseDirectory: "/repo/worktree",
         platform: "linux",
       }),
@@ -24,7 +24,7 @@ describe("codex sidecar scope helpers", () => {
 
   it("compares paths after canonical normalization", () => {
     expect(
-      sidecarPathsEqual("/repo/worktree", "/repo/worktree/", {
+      threadToolPathsEqual("/repo/worktree", "/repo/worktree/", {
         platform: "linux",
       }),
     ).toBeTrue();
@@ -32,7 +32,7 @@ describe("codex sidecar scope helpers", () => {
 
   it("rejects thread ids outside the bound thread scope", () => {
     expect(() => enforceBoundThreadScope(12, 11)).toThrow(
-      "Thread 12 is outside the bound sidecar thread 11.",
+      "Thread 12 is outside the bound thread 11.",
     );
   });
 
@@ -47,19 +47,17 @@ describe("codex sidecar scope helpers", () => {
     ).not.toThrow();
   });
 
-  it("rejects cross-project targets from a bound sidecar project", () => {
+  it("rejects cross-project targets from a bound project", () => {
     expect(() =>
       enforceTargetScope({
         projectIdContext: 7,
         targetProjectId: 9,
         targetWorktreePath: "/repo/worktree",
       }),
-    ).toThrow(
-      "Cross-project access is not allowed from bound sidecar project 7.",
-    );
+    ).toThrow("Cross-project access is not allowed from bound project 7.");
   });
 
-  it("rejects cross-worktree targets from a bound sidecar worktree", () => {
+  it("rejects cross-worktree targets from a bound worktree", () => {
     expect(() =>
       enforceTargetScope({
         baseDirectory: "/repo",
@@ -69,7 +67,7 @@ describe("codex sidecar scope helpers", () => {
         worktreePathContext: "/repo/feature-a",
       }),
     ).toThrow(
-      "Cross-worktree access is not allowed from bound sidecar worktree /repo/feature-a.",
+      "Cross-worktree access is not allowed from bound worktree /repo/feature-a.",
     );
   });
 

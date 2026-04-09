@@ -1,6 +1,6 @@
 /**
- * @file src/bun/codex-sidecar-scope.ts
- * @description Module for codex sidecar scope.
+ * @file src/bun/thread-tool-scope.ts
+ * @description Shared thread-scoping helpers for Jolt-owned tool packs.
  */
 
 import { isAbsolute, resolve } from "node:path";
@@ -10,7 +10,7 @@ type CanonicalizePathOptions = {
   platform?: NodeJS.Platform;
 };
 
-type SidecarScopeOptions = CanonicalizePathOptions & {
+type ThreadToolScopeOptions = CanonicalizePathOptions & {
   projectIdContext?: number | null;
   targetProjectId: number;
   targetWorktreePath: string;
@@ -20,7 +20,7 @@ type SidecarScopeOptions = CanonicalizePathOptions & {
 /**
  * Resolve and normalize a path to a canonical, cross-platform string.
  */
-export function canonicalizeSidecarPath(
+export function canonicalizeThreadToolPath(
   value: string,
   options: CanonicalizePathOptions = {},
 ): string {
@@ -41,19 +41,19 @@ export function canonicalizeSidecarPath(
 /**
  * Compare two user-provided paths for equality after canonicalization.
  */
-export function sidecarPathsEqual(
+export function threadToolPathsEqual(
   left: string,
   right: string,
   options: CanonicalizePathOptions = {},
 ): boolean {
   return (
-    canonicalizeSidecarPath(left, options) ===
-    canonicalizeSidecarPath(right, options)
+    canonicalizeThreadToolPath(left, options) ===
+    canonicalizeThreadToolPath(right, options)
   );
 }
 
 /**
- * Enforce optional thread binding from sidecar environment context.
+ * Enforce optional thread binding from the current tool context.
  */
 export function enforceBoundThreadScope(
   threadId: number,
@@ -61,27 +61,27 @@ export function enforceBoundThreadScope(
 ): void {
   if (typeof boundThreadId === "number" && threadId !== boundThreadId) {
     throw new Error(
-      `Thread ${threadId} is outside the bound sidecar thread ${boundThreadId}.`,
+      `Thread ${threadId} is outside the bound thread ${boundThreadId}.`,
     );
   }
 }
 
 /**
- * Enforce optional project/worktree scoping restrictions from sidecar environment.
+ * Enforce optional project/worktree scoping restrictions from the current tool context.
  */
-export function enforceTargetScope(options: SidecarScopeOptions): void {
+export function enforceTargetScope(options: ThreadToolScopeOptions): void {
   if (
     typeof options.projectIdContext === "number" &&
     options.targetProjectId !== options.projectIdContext
   ) {
     throw new Error(
-      `Cross-project access is not allowed from bound sidecar project ${options.projectIdContext}.`,
+      `Cross-project access is not allowed from bound project ${options.projectIdContext}.`,
     );
   }
 
   if (
     options.worktreePathContext &&
-    !sidecarPathsEqual(
+    !threadToolPathsEqual(
       options.targetWorktreePath,
       options.worktreePathContext,
       {
@@ -99,7 +99,7 @@ export function enforceTargetScope(options: SidecarScopeOptions): void {
     )
   ) {
     throw new Error(
-      `Cross-worktree access is not allowed from bound sidecar worktree ${options.worktreePathContext}.`,
+      `Cross-worktree access is not allowed from bound worktree ${options.worktreePathContext}.`,
     );
   }
 }

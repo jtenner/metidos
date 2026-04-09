@@ -36,10 +36,6 @@
 │  │  ├─ auth.test.ts
 │  │  ├─ auth.ts
 │  │  ├─ build-mainview.ts
-│  │  ├─ codex-sidecar-scope.test.ts
-│  │  ├─ codex-sidecar-scope.ts
-│  │  ├─ codex-sidecar-mcp.test.ts
-│  │  ├─ codex-sidecar-mcp.ts
 │  │  ├─ pi-agents-tools.test.ts
 │  │  ├─ pi-agents-tools.ts
 │  │  ├─ logging.test.ts
@@ -68,7 +64,6 @@
 │  │  │  ├─ README.md
 │  │  │  ├─ command-normalization.test.ts
 │  │  │  ├─ command-normalization.ts
-│  │  │  ├─ codex-constructor.ts
 │  │  │  ├─ model-catalog.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
@@ -103,6 +98,8 @@
 │  │  ├─ vm2-runner-worktree.test.ts
 │  │  ├─ vm2-runner.ts
 │  │  ├─ starvation-harness.ts
+│  │  ├─ thread-tool-scope.test.ts
+│  │  ├─ thread-tool-scope.ts
 │  │  ├─ thread-metadata.test.ts
 │  │  ├─ tls-config.test.ts
 │  │  ├─ tls-config.ts

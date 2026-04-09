@@ -1,5 +1,9 @@
 # Thread Tool Access Controls
 
+Superseded note
+
+This 2026-04-07 write-up documents the original access-control fix when Jolt still ran through the Codex client and MCP sidecar. After the Pi migration cleanup in RM15, the live equivalents are the Pi-native tool packs in `src/bun/pi-jolt-tools.ts`, `src/bun/pi-github-tools.ts`, and `src/bun/pi-agents-tools.ts`.
+
 Summary
 
 Thread-level tool access drifted out of sync with the actual tool surface exposed to Codex. A thread could show only `Jolt` and `Unsafe` as enabled in the UI while still reporting access to planning/sub-agent tools, GitHub connector tools, and only a partial subset of Jolt tools. The fix on 2026-04-07 aligned the runtime with the thread toggles by explicitly configuring the Codex client per thread, moving Jolt-sidecar thread tools behind the `Jolt` toggle, and tightening test coverage around the generated config.
@@ -38,7 +42,7 @@ That meant a thread could disable `GitHub` or `Agents` in Jolt while the underly
 
 ### 2. Jolt tools were split across two toggles
 
-`src/bun/codex-sidecar-mcp.ts` registered these tools behind `agentsAccess` instead of `joltAccess`:
+The old sidecar path registered these tools behind `agentsAccess` instead of `joltAccess`:
 
 - `update_thread`
 - `list_threads`
@@ -92,7 +96,7 @@ This closes the gap between Jolt’s thread settings and the effective runtime t
 
 ### 2. Move Jolt thread tools behind `joltAccess`
 
-`src/bun/codex-sidecar-mcp.ts` now registers all Jolt-sidecar thread/workspace tools behind `joltAccess`, including:
+The current Pi-native Jolt tool pack in `src/bun/pi-jolt-tools.ts` now exposes all Jolt thread/workspace tools behind `joltAccess`, including:
 
 - `update_thread`
 - `list_threads`
@@ -137,10 +141,10 @@ That wording matches the runtime model and should reduce confusion during manual
 
 ## Verification
 
-Targeted validation completed during the fix:
+Targeted validation completed during the fix, using the current Pi-native tool-pack coverage paths:
 
-- `bun test src/bun/project-procedures-config.test.ts src/bun/codex-sidecar-mcp.test.ts src/bun/sidecar-thread-metadata.test.ts`
-- `bunx biome check src/bun/project-procedures.ts src/bun/project-procedures-config.test.ts src/bun/codex-sidecar-mcp.ts src/mainview/controls/thread-access-control.tsx`
+- `bun test src/bun/project-procedures-config.test.ts src/bun/pi-jolt-tools.test.ts src/bun/sidecar-thread-metadata.test.ts`
+- `bunx biome check src/bun/project-procedures.ts src/bun/project-procedures-config.test.ts src/bun/pi-jolt-tools.ts src/mainview/controls/thread-access-control.tsx`
 - `bun run typecheck`
 
 New test coverage was added in `src/bun/project-procedures-config.test.ts` to assert:
@@ -162,10 +166,9 @@ Recommended manual spot check after future access-control changes:
 ## Relevant Code Paths
 
 - `src/bun/project-procedures.ts`
-  - builds per-thread Codex config
-  - injects the Jolt sidecar environment
-- `src/bun/codex-sidecar-mcp.ts`
-  - registers the Jolt MCP tools and applies access gating
+  - now routes thread access semantics into the Pi-backed runtime path
+- `src/bun/pi-jolt-tools.ts`
+  - registers the Pi-native Jolt tool pack and applies access gating
 - `src/mainview/controls/thread-access-control.tsx`
   - renders thread access toggle labels
 - `src/bun/project-procedures-config.test.ts`
@@ -173,9 +176,9 @@ Recommended manual spot check after future access-control changes:
 
 ## Maintenance Note
 
-This integration depends on the current Codex CLI config surface for app and feature gating. If the upstream Codex config keys or tool-family boundaries change, update both:
+This access-control area now depends on Jolt’s own Pi-native tool-pack wiring. If the thread-access boundaries change again, update both:
 
-- the generated config in `src/bun/project-procedures.ts`
+- the runtime/tool wiring in `src/bun/project-procedures.ts` and `src/bun/pi-thread-runtime.ts`
 - the assertions in `src/bun/project-procedures-config.test.ts`
 
-The highest-risk future regression is reintroducing a mismatch where Jolt persists a thread flag but the Codex client still advertises a broader tool surface than that thread should have.
+The highest-risk future regression is reintroducing a mismatch where Jolt persists a thread flag but the Pi-native tool packs still expose a broader surface than that thread should have.

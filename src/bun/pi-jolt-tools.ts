@@ -9,11 +9,6 @@ import {
   type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
-import {
-  canonicalizeSidecarPath,
-  enforceBoundThreadScope,
-  enforceTargetScope,
-} from "./codex-sidecar-scope";
 import type {
   AppRPCSchema,
   RpcContextFocusChanged,
@@ -25,6 +20,11 @@ import type {
   RpcWorktree,
 } from "./rpc-schema";
 import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
+import {
+  canonicalizeThreadToolPath,
+  enforceBoundThreadScope,
+  enforceTargetScope,
+} from "./thread-tool-scope";
 import {
   formatVm2ExecutionReportText,
   runUntrustedJavaScriptInVm2,
@@ -273,7 +273,7 @@ const NewThreadToolParameters = Type.Object({
 });
 
 function canonicalPath(value: string, scope: PiJoltToolScope): string {
-  return canonicalizeSidecarPath(value, {
+  return canonicalizeThreadToolPath(value, {
     baseDirectory: scope.worktreePathContext,
   });
 }

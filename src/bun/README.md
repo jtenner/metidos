@@ -99,7 +99,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
-  - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) alongside legacy Codex-era fields that still exist for the broader migration.
+  - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) as the authoritative runtime identity for active agent sessions.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
   - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 
@@ -113,11 +113,6 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Builds a normalized multi-provider catalog from Pi `ModelRegistry`, emits canonical `provider:modelId` keys, and preserves legacy raw-id fallback for older thread rows.
   - Tracks provider/model metadata such as reasoning support and context-window size.
   - Provides token-context utilities used for compaction/size logic.
-
-- `project-procedures/codex-constructor.ts`
-  - Converts selected provider/model metadata plus shared runtime config into exact Codex constructor inputs.
-  - Keeps provider-specific constructor overrides, such as xAI transport/search compatibility settings, out of the main RPC module.
-  - Provides a single extension point for future non-OpenAI providers.
 
 - `project-procedures/pi-session-telemetry.ts`
   - Maps live Pi `AgentSession` telemetry onto Jolt thread payloads.
@@ -167,19 +162,8 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Centralizes websocket-upgrade authorization before `/rpc` is allowed to connect.
   - Encapsulates the authenticated-session requirement plus optional websocket-ticket compatibility checks so those rules stay regression-tested independently from the full server bootstrap.
 
-- `codex-sidecar-mcp.ts`
-  - Implements the MCP sidecar process that bridges Codex SDK tool execution with Jolt RPC.
-  - Adapts environment/project/thread/worktree context into RPC calls and exposes them as MCP tools.
-  - Routes thread metadata writes through authoritative RPC updates so tool success matches visible app state.
-  - Treats in-thread access-control fields on `update_thread` as legacy compatibility inputs; fields such as `unsafeMode` are ignored and must be changed outside the running thread.
-  - Exposes thread and cron access flags for GitHub, Agents, Jolt, and Unsafe mode, and only registers the related tools when the matching access is enabled.
-  - Reuses the active authenticated session id (`JOLT_SESSION_ID`) to fetch a fresh websocket ticket, then opens `/rpc` with both the ticket and the `jolt_session` cookie header.
-  - Reads `JOLT_RPC_URL` plus derived `JOLT_RPC_HTTP_ORIGIN` from the thread environment so the sidecar can locate `/auth/ws-ticket`.
-  - Exposes `run_untrusted_js`, which executes untrusted JS/TS through the vm2 runner with redirected console output and worktree-limited writes.
-  - Handles websocket protocol, request correlation, and resilient startup/path resolution.
-
-- `codex-sidecar-scope.ts`
-  - Provides the scope-enforcement helpers used by the MCP sidecar.
+- `thread-tool-scope.ts`
+  - Provides the scope-enforcement helpers shared by Jolt-owned Pi tool packs.
   - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes.
 
 - `vm2-runner.ts`

@@ -1,6 +1,6 @@
 # mainview
 
-This folder contains the browser-facing React UI layer for Codex’ main application view, including the workspace screen composition, routing-free panel orchestration, and all chat/thread/project interaction surfaces used by the desktop and mobile experiences.
+This folder contains the browser-facing React UI layer for Jolt’s Pi-backed main application view, including the workspace screen composition, routing-free panel orchestration, and all chat/thread/project interaction surfaces used by the desktop and mobile experiences.
 
 Files in this folder are split by responsibility: app bootstrap, global UI styling, and stateful workspace components.
 
@@ -116,7 +116,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/codex-model-selector.tsx` controls provider-aware model selection and Pi-compatible thinking-level state for chat routing.
 
-`controls/codex-utils.ts` provides shared utility helpers used by codex-oriented controls.
+`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls.
 
 `controls/dropdown.tsx` is the shared dropdown primitive used by action and selection controls.
 
@@ -134,7 +134,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 ## Why this folder exists
 
-`src/mainview` is the boundary between data/services and user-facing UI logic for Codex’ primary screen. The folder ensures:
+`src/mainview` is the boundary between data/services and user-facing UI logic for Jolt’s primary screen. The folder ensures:
 
 1. All main UI panels are discoverable and co-located.
 2. Feature modules stay decoupled from backend bootstrap (`src/bun`) and from styling/asset-only docs.

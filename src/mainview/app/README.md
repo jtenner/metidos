@@ -1,6 +1,6 @@
 # mainview/app
 
-This folder contains the primary feature modules that render the interactive main interface for the Codex application. It is where project/thread/chat/workspace state is transformed into visible UI and where UI state transitions are coordinated between desktop and mobile layouts.
+This folder contains the primary feature modules that render the interactive main interface for the Pi-backed Jolt application. It is where project/thread/chat/workspace state is transformed into visible UI and where UI state transitions are coordinated between desktop and mobile layouts.
 
 The modules below are grouped into action panels, data derivation/state, workspace composition, and reusable hooks.
 

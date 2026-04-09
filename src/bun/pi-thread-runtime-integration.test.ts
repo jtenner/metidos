@@ -152,7 +152,6 @@ describe("Pi thread runtime integration", () => {
       assistantMessages[assistantMessages.length - 1] ?? null;
 
     expect(settled.thread.runStatus.state).toBe("idle");
-    expect(settled.thread.codexThreadId).toBeNull();
     expect(settled.thread.piSessionId).toBeString();
     expect(settled.thread.piSessionFile).toBeString();
     expect(settled.thread.piLeafEntryId).toBeString();

@@ -1,6 +1,6 @@
 /**
  * @file src/bun/project-procedures-config.test.ts
- * @description Test file for project procedure configuration helpers.
+ * @description Test file for Pi-era project procedure configuration helpers.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
@@ -10,7 +10,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
-import { buildCodexConstructorOptions } from "./project-procedures/codex-constructor";
 import {
   buildModelCatalog,
   codexModelSupportsReasoningEffort,
@@ -19,7 +18,6 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
-const originalXaiApiKey = process.env.XAI_API_KEY;
 
 type ProjectProceduresModule = typeof import("./project-procedures");
 
@@ -75,11 +73,6 @@ beforeAll(async () => {
 
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
-  if (typeof originalXaiApiKey === "string") {
-    process.env.XAI_API_KEY = originalXaiApiKey;
-  } else {
-    delete process.env.XAI_API_KEY;
-  }
 });
 
 afterAll(async () => {
@@ -94,12 +87,6 @@ afterAll(async () => {
     delete process.env.JOLT_APP_DATA_DIR;
   }
 
-  if (typeof originalXaiApiKey === "string") {
-    process.env.XAI_API_KEY = originalXaiApiKey;
-  } else {
-    delete process.env.XAI_API_KEY;
-  }
-
   for (const path of tempDirectories) {
     rmSync(path, {
       force: true,
@@ -110,170 +97,6 @@ afterAll(async () => {
 });
 
 describe("project procedure configuration helpers", () => {
-  it("builds a codex config that enforces thread-scoped access controls", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexClientConfig(
-        {
-          id: 17,
-          githubAccess: false,
-          agentsAccess: false,
-          joltAccess: true,
-          projectId: 9,
-          unsafeMode: 1,
-          worktreePath: "/repo/worktree",
-        },
-        {
-          sessionId: "session-123",
-        },
-      ),
-    ).toMatchObject({
-      apps: {
-        github: {
-          enabled: false,
-        },
-      },
-      developer_instructions: expect.stringContaining(
-        "Treat `update_plan`, `request_user_input`, `spawn_agent`, `send_input`, `resume_agent`, `wait_agent`, and `close_agent` as unavailable.",
-      ),
-      features: {
-        default_mode_request_user_input: false,
-        enable_fanout: false,
-        multi_agent: false,
-        multi_agent_v2: false,
-      },
-      mcp_servers: {
-        jolt: {
-          command: process.execPath,
-          env: {
-            JOLT_AGENTS_ACCESS: "0",
-            JOLT_GITHUB_ACCESS: "0",
-            JOLT_JOLT_ACCESS: "1",
-            JOLT_PROJECT_ID: "9",
-            JOLT_SESSION_ID: "session-123",
-            JOLT_THREAD_ID: "17",
-            JOLT_UNSAFE_MODE: "1",
-            JOLT_WORKTREE_PATH: "/repo/worktree",
-          },
-        },
-      },
-    });
-  });
-
-  it("builds a sidecar environment with the active session id", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexSidecarEnv(
-        {
-          id: 17,
-          githubAccess: false,
-          agentsAccess: false,
-          joltAccess: true,
-          projectId: 9,
-          unsafeMode: 1,
-          worktreePath: "/repo/worktree",
-        },
-        {
-          rpcHttpOrigin: "http://127.0.0.1:7599",
-          rpcUrl: "ws://127.0.0.1:7599/rpc",
-          sessionId: "session-123",
-        },
-      ),
-    ).toEqual({
-      JOLT_AGENTS_ACCESS: "0",
-      JOLT_GITHUB_ACCESS: "0",
-      JOLT_JOLT_ACCESS: "1",
-      JOLT_PROJECT_ID: "9",
-      JOLT_RPC_HTTP_ORIGIN: "http://127.0.0.1:7599",
-      JOLT_RPC_URL: "ws://127.0.0.1:7599/rpc",
-      JOLT_SESSION_ID: "session-123",
-      JOLT_THREAD_ID: "17",
-      JOLT_UNSAFE_MODE: "1",
-      JOLT_WORKTREE_PATH: "/repo/worktree",
-    });
-  });
-
-  it("omits the Jolt sidecar server when Jolt access is disabled", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexClientConfig({
-        id: 23,
-        githubAccess: true,
-        agentsAccess: true,
-        joltAccess: false,
-        projectId: 11,
-        unsafeMode: 0,
-        worktreePath: "/repo/other-worktree",
-      }),
-    ).toEqual({
-      apps: {
-        github: {
-          enabled: true,
-        },
-      },
-      developer_instructions: expect.stringContaining(
-        "Treat all `mcp__jolt__*` tools as unavailable.",
-      ),
-      features: {
-        default_mode_request_user_input: true,
-        enable_fanout: true,
-        multi_agent: true,
-        multi_agent_v2: true,
-      },
-    });
-  });
-
-  it("normalizes numeric SQLite-style access flags before building Codex config", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexClientConfig({
-        id: 31,
-        githubAccess: 0 as unknown as boolean,
-        agentsAccess: 1 as unknown as boolean,
-        joltAccess: 0 as unknown as boolean,
-        projectId: 12,
-        unsafeMode: 1,
-        worktreePath: "/repo/sqlite-flags",
-      }),
-    ).toEqual({
-      apps: {
-        github: {
-          enabled: false,
-        },
-      },
-      developer_instructions: expect.stringContaining(
-        "Treat all `mcp__jolt__*` tools as unavailable.",
-      ),
-      features: {
-        default_mode_request_user_input: true,
-        enable_fanout: true,
-        multi_agent: true,
-        multi_agent_v2: true,
-      },
-    });
-  });
-
-  it("passes OpenAI models through to Codex constructor inputs unchanged", () => {
-    expect(
-      buildCodexConstructorOptions({
-        apiKey: "openai-key",
-        config: {
-          approval_policy: "never",
-        },
-        model: "gpt-5.4",
-      }),
-    ).toEqual({
-      apiKey: "openai-key",
-      config: {
-        approval_policy: "never",
-      },
-    });
-  });
-
   it("builds a Pi-backed model catalog with canonical provider-qualified ids", () => {
     const catalog = buildModelCatalog();
 
@@ -309,94 +132,6 @@ describe("project procedure configuration helpers", () => {
     expect(resolveCodexModel("grok-code-fast-1")).toBe("xai:grok-code-fast-1");
     expect(resolveCodexModel("grok-4.20-reasoning")).toBe(
       "xai:grok-4.20-0309-reasoning",
-    );
-  });
-
-  it("builds danger-full-access thread options for xAI threads in unsafe mode", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexThreadOptions(
-        "/repo/worktree",
-        "grok-4.20-reasoning",
-        "high",
-        true,
-      ),
-    ).toEqual({
-      approvalPolicy: "never",
-      model: "grok-4.20-reasoning",
-      modelReasoningEffort: "high",
-      networkAccessEnabled: true,
-      sandboxMode: "danger-full-access",
-      workingDirectory: "/repo/worktree",
-    });
-  });
-
-  it("keeps xAI threads in workspace-write mode when unsafe mode is disabled", async () => {
-    const procedures = await loadProjectProcedures();
-
-    expect(
-      procedures.buildCodexThreadOptions(
-        "/repo/worktree",
-        "grok-4.20-reasoning",
-        "high",
-        false,
-      ),
-    ).toEqual({
-      approvalPolicy: "never",
-      model: "grok-4.20-reasoning",
-      modelReasoningEffort: "high",
-      networkAccessEnabled: false,
-      sandboxMode: "workspace-write",
-      workingDirectory: "/repo/worktree",
-    });
-  });
-
-  it("uses xAI provider settings when building Codex constructor inputs", () => {
-    process.env.XAI_API_KEY = "xai-test-key";
-
-    expect(
-      buildCodexConstructorOptions({
-        config: {
-          approval_policy: "never",
-          model_providers: {
-            openai: {
-              name: "OpenAI",
-            },
-          },
-        },
-        model: "grok-code-fast-1",
-      }),
-    ).toEqual({
-      config: {
-        approval_policy: "never",
-        model_provider: "xai",
-        model_providers: {
-          openai: {
-            name: "OpenAI",
-          },
-          xai: {
-            base_url: "https://api.x.ai/v1",
-            env_key: "XAI_API_KEY",
-            name: "xAI",
-            supports_websockets: false,
-            wire_api: "responses",
-          },
-        },
-        web_search: "disabled",
-      },
-    });
-  });
-
-  it("requires XAI_API_KEY before using xAI model ids", () => {
-    delete process.env.XAI_API_KEY;
-
-    expect(() =>
-      buildCodexConstructorOptions({
-        model: "grok-4.20-reasoning",
-      }),
-    ).toThrow(
-      'XAI_API_KEY is required to use the xAI model "grok-4.20-reasoning".',
     );
   });
 

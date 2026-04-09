@@ -443,7 +443,6 @@ export type RpcThread = {
   agentsAccess: boolean;
   joltAccess: boolean;
   unsafeMode: boolean;
-  codexThreadId: string | null;
   piSessionId: string | null;
   piSessionFile: string | null;
   piLeafEntryId: string | null;

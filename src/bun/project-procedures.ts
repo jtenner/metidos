@@ -7,11 +7,6 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
-import {
-  Codex,
-  type Thread as CodexThread,
-  type ThreadItem,
-} from "@openai/codex-sdk";
 
 import type {
   CronJobRecord,
@@ -55,7 +50,6 @@ import {
   softDeleteCronJob,
   stopInProgressThreadMessages,
   updateCronJob,
-  updateThreadCodexId,
   updateThreadPiSessionState,
   upsertProject,
   upsertThreadActivities,
@@ -68,7 +62,6 @@ import {
   normalizeGitCommandOptions,
   normalizeGitHistoryPageLimit,
   normalizeGitPath,
-  readFileChangeDiff,
   readGitHistoryFirstPage,
   readGitHistorySummary,
   readWorktreeChangeDiff,
@@ -82,11 +75,6 @@ import {
   createPiThreadRuntime,
   type PiThreadRuntime,
 } from "./pi-thread-runtime";
-import {
-  buildCodexConstructorOptions,
-  type CodexConstructorConfig,
-} from "./project-procedures/codex-constructor";
-import { normalizeCommandDisplayText } from "./project-procedures/command-normalization";
 import {
   listDirectorySuggestions,
   shutdownDirectorySuggestionCacheMaintenance,
@@ -104,9 +92,7 @@ import {
 } from "./project-procedures/git-history";
 import {
   buildModelCatalog,
-  codexModelApiId,
   codexModelProvider,
-  codexModelSupportsReasoningEffort,
   normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
   resolveCodexModel,
@@ -184,27 +170,6 @@ import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
  */
 
 const db = initAppDatabase();
-
-/**
- * Default RPC websocket URL used when no MCP override is supplied.
- */
-
-const JOLT_DEFAULT_RPC_URL = "ws://127.0.0.1:7599/rpc";
-
-/**
- * Stable MCP server identity for Codex sidecar integration.
- */
-
-const JOLT_MCP_SERVER_NAME = "jolt";
-
-/**
- * Entry point used by procedures that launch/connect to the MCP wrapper script.
- */
-
-const JOLT_SIDECAR_SERVER_PATH = resolve(
-  process.cwd(),
-  "src/bun/codex-sidecar-mcp.ts",
-);
 
 /**
  * RPC procedure: returns OS home directory and whether shell-like `~` expansion
@@ -398,7 +363,7 @@ export function recoverInterruptedThreadTurnsOnStartup(): void {
 }
 
 /**
- * RPC procedure: return the current codex model catalog.
+ * RPC procedure: return the current provider-backed model catalog.
  */
 
 export async function getModelCatalogProcedure(
@@ -503,7 +468,6 @@ type ProjectPollState = {
  */
 
 const projectPollMap = new Map<number, ProjectPollState>();
-const codexThreadMap = new Map<number, CodexThread>();
 const piThreadRuntimeMap = new Map<number, PiThreadRuntime>();
 const piThreadExtensionUiBridge = createPiThreadExtensionUiBridge();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
@@ -686,161 +650,6 @@ export function getProcedureRuntimeStats(): {
   };
 }
 
-function joltRpcUrl(): string {
-  const configured = process.env.JOLT_RPC_URL?.trim();
-  if (configured) {
-    return configured;
-  }
-
-  const configuredPort = process.env.JOLT_PORT?.trim();
-  if (configuredPort) {
-    return `ws://127.0.0.1:${configuredPort}/rpc`;
-  }
-
-  return JOLT_DEFAULT_RPC_URL;
-}
-
-/**
- * Derives the HTTP origin that pairs with the configured RPC websocket URL.
- *
- * This keeps `/auth/ws-ticket` and `/rpc` aligned on the same scheme/host/port when the
- * sidecar needs to exchange a session for a websocket ticket.
- * @param rpcUrl - RPC websocket URL.
- */
-function joltRpcHttpOrigin(rpcUrl: string): string {
-  const url = new URL(rpcUrl);
-  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
-  url.pathname = "/";
-  url.search = "";
-  url.hash = "";
-  return url.origin;
-}
-
-type CodexClientThreadContext = Pick<
-  ThreadRecord,
-  | "agentsAccess"
-  | "githubAccess"
-  | "id"
-  | "joltAccess"
-  | "projectId"
-  | "unsafeMode"
-  | "worktreePath"
->;
-
-type CodexClientConfig = CodexConstructorConfig;
-
-type CodexAccessFlag = boolean | 0 | 1 | null | undefined;
-
-function normalizeCodexAccessFlag(value: CodexAccessFlag): boolean {
-  return value === true || value === 1;
-}
-
-/**
- * Builds per-thread developer instructions that keep access reporting aligned with thread flags.
- */
-function buildThreadAccessDeveloperInstructions(thread: {
-  agentsAccess: CodexAccessFlag;
-  githubAccess: CodexAccessFlag;
-  joltAccess: CodexAccessFlag;
-}): string | null {
-  const lines: string[] = [];
-  const agentsAccess = normalizeCodexAccessFlag(thread.agentsAccess);
-  const githubAccess = normalizeCodexAccessFlag(thread.githubAccess);
-  const joltAccess = normalizeCodexAccessFlag(thread.joltAccess);
-
-  if (!agentsAccess) {
-    lines.push(
-      "Agent access is disabled for this thread. Treat `update_plan`, `request_user_input`, `spawn_agent`, `send_input`, `resume_agent`, `wait_agent`, and `close_agent` as unavailable. Do not use them and do not mention them when listing available tools.",
-    );
-  }
-
-  if (!githubAccess) {
-    lines.push(
-      "GitHub access is disabled for this thread. Treat all `mcp__codex_apps__github_*` tools as unavailable. Do not use them and do not mention them when listing available tools.",
-    );
-  }
-
-  if (!joltAccess) {
-    lines.push(
-      "Jolt access is disabled for this thread. Treat all `mcp__jolt__*` tools as unavailable. Do not use them and do not mention them when listing available tools.",
-    );
-  }
-
-  if (lines.length === 0) {
-    return null;
-  }
-
-  return [
-    "Thread access controls override any broader default tool surface.",
-    ...lines,
-    "When the user asks which tools are available, list only tools that are enabled for this thread and callable in the current mode.",
-  ].join("\n");
-}
-
-/**
- * Creates codex client.
- * @param thread - Thread data used to construct a Codex client.
- */
-
-export function buildCodexClientConfig(
-  thread: CodexClientThreadContext,
-  options?: {
-    sessionId?: string | null;
-  },
-): CodexClientConfig {
-  const githubAccess = normalizeCodexAccessFlag(thread.githubAccess);
-  const agentsAccess = normalizeCodexAccessFlag(thread.agentsAccess);
-  const joltAccess = normalizeCodexAccessFlag(thread.joltAccess);
-  const developerInstructions = buildThreadAccessDeveloperInstructions(thread);
-
-  return {
-    apps: {
-      github: {
-        enabled: githubAccess,
-      },
-    },
-    ...(developerInstructions
-      ? {
-          developer_instructions: developerInstructions,
-        }
-      : {}),
-    features: {
-      default_mode_request_user_input: agentsAccess,
-      enable_fanout: agentsAccess,
-      multi_agent: agentsAccess,
-      multi_agent_v2: agentsAccess,
-    },
-    ...(joltAccess
-      ? {
-          mcp_servers: {
-            [JOLT_MCP_SERVER_NAME]: {
-              command: process.execPath,
-              args: [JOLT_SIDECAR_SERVER_PATH],
-              env: buildCodexSidecarEnv(thread, {
-                sessionId: options?.sessionId ?? null,
-              }),
-            },
-          },
-        }
-      : {}),
-  };
-}
-
-function createCodexClient(
-  thread: ThreadRecord,
-  options?: {
-    sessionId?: string | null;
-  },
-): Codex {
-  return new Codex(
-    buildCodexConstructorOptions({
-      config: buildCodexClientConfig(thread, {
-        sessionId: options?.sessionId ?? null,
-      }),
-      model: thread.model,
-    }),
-  );
-}
 /**
  * Performs gitPriorityFromRpcRequest operation.
  * @param priority - Priority hint supplied in the RPC request.
@@ -898,7 +707,6 @@ function clearThreadRuntimeState(threadId: number): void {
   }
   threadTurnAbortControllerMap.delete(threadId);
   threadTurnCompletionMap.delete(threadId);
-  codexThreadMap.delete(threadId);
   piThreadExtensionUiBridge.clearThread(threadId);
   disposePiThreadRuntime(threadId);
   threadRunStatusMap.delete(threadId);
@@ -993,143 +801,6 @@ function resolveThreadAccessControls(
     unsafeMode: resolveUnsafeMode(input.unsafeMode ?? null),
   };
 }
-/**
- * Performs codexThreadOptions operation.
- * @param worktreePath - Worktree path.
- * @param model - Preferred model for the Codex thread.
- * @param reasoningEffort - Configured reasoning effort for the run.
- * @param unsafeMode - Unsafe-mode setting for thread options.
- */
-
-export function buildCodexThreadOptions(
-  worktreePath: string,
-  model: string,
-  reasoningEffort: RpcReasoningEffort,
-  unsafeMode: boolean,
-) {
-  const normalizedModel = model.trim();
-  const codexModel =
-    normalizeStoredCodexModel(normalizedModel) === normalizedModel
-      ? codexModelApiId(normalizedModel)
-      : normalizedModel;
-  return {
-    approvalPolicy: "never" as const,
-    model: codexModel,
-    ...(codexModelSupportsReasoningEffort(model)
-      ? {
-          modelReasoningEffort: reasoningEffort,
-        }
-      : {}),
-    networkAccessEnabled: unsafeMode,
-    sandboxMode: unsafeMode
-      ? ("danger-full-access" as const)
-      : ("workspace-write" as const),
-    workingDirectory: worktreePath,
-  };
-}
-/**
- * Builds the environment passed to the Codex MCP sidecar for a thread.
- *
- * The sidecar receives identifiers for thread/project/worktree context and the
- * current access flags so it can gate tool registration.
- * @param thread - Thread metadata needed to scope MCP sidecar access.
- * @param options - Optional overrides used by tests and callers. `sessionId` is injected as
- * `JOLT_SESSION_ID` only when present.
- */
-
-export function buildCodexSidecarEnv(
-  thread: Pick<
-    ThreadRecord,
-    | "agentsAccess"
-    | "githubAccess"
-    | "id"
-    | "joltAccess"
-    | "projectId"
-    | "unsafeMode"
-    | "worktreePath"
-  >,
-  options?: {
-    rpcHttpOrigin?: string | null;
-    rpcUrl?: string | null;
-    sessionId?: string | null;
-  },
-): Record<string, string> {
-  const rpcUrl = options?.rpcUrl?.trim() || joltRpcUrl();
-  const rpcHttpOrigin =
-    options?.rpcHttpOrigin?.trim() || joltRpcHttpOrigin(rpcUrl);
-  const sessionId = options?.sessionId?.trim() || null;
-
-  return {
-    JOLT_AGENTS_ACCESS: thread.agentsAccess ? "1" : "0",
-    JOLT_GITHUB_ACCESS: thread.githubAccess ? "1" : "0",
-    JOLT_JOLT_ACCESS: thread.joltAccess ? "1" : "0",
-    JOLT_PROJECT_ID: String(thread.projectId),
-    JOLT_RPC_HTTP_ORIGIN: rpcHttpOrigin,
-    JOLT_RPC_URL: rpcUrl,
-    JOLT_THREAD_ID: String(thread.id),
-    JOLT_UNSAFE_MODE: thread.unsafeMode ? "1" : "0",
-    JOLT_WORKTREE_PATH: thread.worktreePath,
-    ...(sessionId
-      ? {
-          JOLT_SESSION_ID: sessionId,
-        }
-      : {}),
-  };
-}
-/**
- * Creates managed codex thread.
- * @param thread - Thread configuration used to create a managed Codex thread.
- */
-
-function createManagedCodexThread(
-  thread: ThreadRecord,
-  sessionId: string | null,
-): CodexThread {
-  const client = createCodexClient(thread, {
-    sessionId,
-  });
-  const model = normalizeStoredCodexModel(thread.model);
-  const normalizedReasoningEffort = normalizeStoredCodexReasoningEffort(
-    thread.reasoningEffort,
-  );
-
-  return thread.codexThreadId
-    ? client.resumeThread(
-        thread.codexThreadId,
-        buildCodexThreadOptions(
-          thread.worktreePath,
-          model,
-          normalizedReasoningEffort,
-          thread.unsafeMode === 1,
-        ),
-      )
-    : client.startThread(
-        buildCodexThreadOptions(
-          thread.worktreePath,
-          model,
-          normalizedReasoningEffort,
-          thread.unsafeMode === 1,
-        ),
-      );
-}
-/**
- * Performs ensureCodexThread operation.
- * @param thread - Thread record used to ensure Codex thread existence.
- */
-
-async function _ensureCodexThread(
-  thread: ThreadRecord,
-  sessionId: string | null,
-): Promise<CodexThread> {
-  const active = codexThreadMap.get(thread.id);
-  if (active) {
-    return active;
-  }
-
-  const next = createManagedCodexThread(thread, sessionId);
-  codexThreadMap.set(thread.id, next);
-  return next;
-}
 
 async function ensurePiThreadRuntime(
   thread: ThreadRecord,
@@ -1192,7 +863,7 @@ function createPiJoltToolHost(): PiJoltToolHost {
 function syncPiThreadSessionState(
   thread: Pick<
     ThreadRecord,
-    "codexThreadId" | "id" | "piLeafEntryId" | "piSessionFile" | "piSessionId"
+    "id" | "piLeafEntryId" | "piSessionFile" | "piSessionId"
   >,
   runtime: PiThreadRuntime,
 ): void {
@@ -1201,9 +872,7 @@ function syncPiThreadSessionState(
     piSessionFile: runtime.session.sessionFile ?? null,
     piLeafEntryId: runtime.session.sessionManager.getLeafId(),
   };
-  const codexThreadIdNeedsClear = thread.codexThreadId !== null;
   if (
-    !codexThreadIdNeedsClear &&
     nextState.piSessionId === thread.piSessionId &&
     nextState.piSessionFile === thread.piSessionFile &&
     nextState.piLeafEntryId === thread.piLeafEntryId
@@ -1211,9 +880,6 @@ function syncPiThreadSessionState(
     return;
   }
 
-  if (codexThreadIdNeedsClear) {
-    updateThreadCodexId(db, thread.id, null);
-  }
   updateThreadPiSessionState(db, thread.id, nextState);
   invalidateThreadDetailCache(thread.id);
 }
@@ -1702,25 +1368,6 @@ function logBackgroundGitFailure(message: string, error: unknown): void {
   console.error(message, error);
 }
 
-type CommandActivityPayload = {
-  command: string;
-  output: string;
-  exitCode: number | null;
-};
-
-type FileChangeActivityPayload = {
-  path: string;
-  changeKind: "add" | "delete" | "update";
-  diffText: string;
-};
-
-type ToolCallActivityPayload = {
-  server: string;
-  tool: string;
-  argumentsText: string;
-  output: string;
-};
-
 type BufferedThreadActivityWrite = {
   buildInputs: () => Promise<ThreadActivityInput[]>;
   lastPersistedAt: number;
@@ -1730,24 +1377,6 @@ type BufferedThreadActivityWrite = {
   signature: string;
   terminal: boolean;
 };
-/**
- * Stringifies activity value.
- * @param value - Input value.
- */
-
-function stringifyActivityValue(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "undefined") {
-    return "";
-  }
-  try {
-    return JSON.stringify(value, null, 2) ?? "";
-  } catch {
-    return String(value);
-  }
-}
 /**
  * Performs extractToolCallTextContent operation.
  * @param content - Raw tool-call content to extract human-readable text from.
@@ -1863,42 +1492,6 @@ function _extractPiBashExitCode(output: string): number | null {
 
   const parsed = Number.parseInt(match[1] ?? "", 10);
   return Number.isFinite(parsed) ? parsed : null;
-}
-/**
- * Formats tool call output.
- * @param item - Tool call item to format for display.
- */
-
-function formatToolCallOutput(
-  item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
-): string {
-  const errorMessage = item.error?.message?.trim();
-  if (errorMessage) {
-    return errorMessage;
-  }
-
-  const sections: string[] = [];
-  const textContent = extractToolCallTextContent(item.result?.content);
-  if (textContent) {
-    sections.push(textContent);
-  }
-  if (typeof item.result?.structured_content !== "undefined") {
-    const structuredContent = stringifyActivityValue(
-      item.result.structured_content,
-    );
-    if (structuredContent) {
-      sections.push(
-        textContent
-          ? `Structured content\n${structuredContent}`
-          : structuredContent,
-      );
-    }
-  }
-  if (sections.length > 0) {
-    return sections.join("\n\n");
-  }
-
-  return stringifyActivityValue(item.result?.content);
 }
 
 function createBufferedThreadActivityWriter(): {
@@ -2136,28 +1729,6 @@ async function queueProjectedPiActivities(
   }
 }
 /**
- * Builds reasoning activity input.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param item - Reasoning activity item being serialized for storage.
- * @param state - Current state value.
- */
-
-function _buildReasoningActivityInput(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "reasoning" }>,
-  state: "in_progress" | "completed" | "stopped",
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "reasoning",
-    text: item.text.trim() || "Thinking",
-    state,
-  };
-}
-/**
  * Builds assistant chat activity input.
  * @param threadId - Thread identifier.
  * @param itemId - itemId identifier.
@@ -2197,212 +1768,6 @@ async function upsertAssistantChatActivity(
   persistThreadActivityInputs([
     buildAssistantChatActivityInput(threadId, itemId, text, state),
   ]);
-}
-/**
- * Builds command activity input payload.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param payload - Command tool-call payload to convert to an activity input.
- */
-
-function buildCommandActivityInputPayload(
-  threadId: number,
-  itemId: string,
-  payload: CommandActivityPayload & {
-    state: "in_progress" | "completed" | "failed" | "stopped";
-  },
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "command",
-    text: payload.command,
-    state: payload.state,
-    payloadJson: JSON.stringify({
-      command: payload.command,
-      output: payload.output,
-      exitCode: payload.exitCode,
-    } satisfies CommandActivityPayload),
-  };
-}
-
-function _buildReasoningActivityInputText(
-  threadId: number,
-  itemId: string,
-  text: string,
-  state: "in_progress" | "completed" | "stopped",
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "reasoning",
-    text: text.trim() || "Thinking",
-    state,
-  };
-}
-
-function _buildToolCallActivityInputPayload(
-  threadId: number,
-  itemId: string,
-  payload: ToolCallActivityPayload & {
-    state: "in_progress" | "completed" | "failed" | "stopped";
-  },
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "tool_call",
-    text: `${payload.server}.${payload.tool}`,
-    state: payload.state,
-    payloadJson: JSON.stringify({
-      server: payload.server,
-      tool: payload.tool,
-      argumentsText: payload.argumentsText,
-      output: payload.output,
-    } satisfies ToolCallActivityPayload),
-  };
-}
-
-function _buildErrorActivityInputText(
-  threadId: number,
-  itemId: string,
-  text: string,
-  state: "in_progress" | "completed" | "stopped",
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "error",
-    text: text.trim() || "Thread runtime reported a non-fatal error.",
-    state,
-  };
-}
-/**
- * Builds command activity input.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param item - Command tool-call activity to convert into input data.
- */
-
-function _buildCommandActivityInput(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "command_execution" }>,
-): ThreadActivityInput {
-  const command = normalizeCommandDisplayText(item.command);
-  return buildCommandActivityInputPayload(threadId, itemId, {
-    command,
-    exitCode: item.exit_code ?? null,
-    output: item.aggregated_output,
-    state: item.status,
-  });
-}
-
-/**
- * Builds file change activity inputs.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param worktreePath - Worktree path.
- * @param item - File-change activity item to convert into input data.
- */
-
-async function _buildFileChangeActivityInputs(
-  threadId: number,
-  itemId: string,
-  worktreePath: string,
-  item: Extract<ThreadItem, { type: "file_change" }>,
-): Promise<ThreadActivityInput[]> {
-  return Promise.all(
-    item.changes.map(async (change) => {
-      const diffText =
-        item.status === "completed"
-          ? await readFileChangeDiff(worktreePath, change.path, change.kind)
-          : "";
-      const gitPath = normalizeGitPath(worktreePath, change.path);
-      return {
-        threadId,
-        itemId: `${itemId}:${gitPath}`,
-        kind: "file_change",
-        text: gitPath,
-        state: item.status,
-        payloadJson: JSON.stringify({
-          path: gitPath,
-          changeKind: change.kind,
-          diffText,
-        } satisfies FileChangeActivityPayload),
-      } satisfies ThreadActivityInput;
-    }),
-  );
-}
-/**
- * Builds tool call activity input.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param item - Tool-call activity item to convert into input data.
- */
-
-function _buildToolCallActivityInput(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "mcp_tool_call" }>,
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "tool_call",
-    text: `${item.server}.${item.tool}`,
-    state: item.status,
-    payloadJson: JSON.stringify({
-      server: item.server,
-      tool: item.tool,
-      argumentsText: stringifyActivityValue(item.arguments),
-      output: formatToolCallOutput(item),
-    } satisfies ToolCallActivityPayload),
-  };
-}
-/**
- * Builds web search activity input.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param item - Web-search activity item to convert into input data.
- * @param state - Current state value.
- */
-
-function _buildWebSearchActivityInput(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "web_search" }>,
-  state: "in_progress" | "completed" | "stopped",
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "web_search",
-    text: item.query.trim() || "Web search",
-    state,
-  };
-}
-/**
- * Builds error activity input.
- * @param threadId - Thread identifier.
- * @param itemId - itemId identifier.
- * @param item - Error activity item to convert into input data.
- * @param state - Current state value.
- */
-
-function _buildErrorActivityInput(
-  threadId: number,
-  itemId: string,
-  item: Extract<ThreadItem, { type: "error" }>,
-  state: "in_progress" | "completed" | "stopped",
-): ThreadActivityInput {
-  return {
-    threadId,
-    itemId,
-    kind: "error",
-    text: item.message.trim() || "Thread runtime reported a non-fatal error.",
-    state,
-  };
 }
 /**
  * Merges project worktree pins.
@@ -2979,7 +2344,6 @@ async function createThreadRecord(
       agentsAccess: access.agentsAccess,
       joltAccess: access.joltAccess,
       unsafeMode: access.unsafeMode,
-      codexThreadId: null,
       piSessionId: null,
       piSessionFile: null,
       piLeafEntryId: null,
@@ -3787,7 +3151,6 @@ export async function updateThreadModelProcedure(
 
   const model = resolveCodexModel(params.model);
   setThreadModel(db, thread.id, model);
-  codexThreadMap.delete(thread.id);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
@@ -3809,7 +3172,6 @@ export async function updateThreadReasoningEffortProcedure(
 
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   setThreadReasoningEffort(db, thread.id, reasoningEffort);
-  codexThreadMap.delete(thread.id);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
@@ -3861,7 +3223,6 @@ export async function updateThreadAccessProcedure(
   if (next.unsafeMode !== (thread.unsafeMode === 1)) {
     recordUnsafeModeAuditEvent(thread, next.unsafeMode, "toggle");
   }
-  codexThreadMap.delete(thread.id);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);
@@ -3888,7 +3249,6 @@ export async function updateThreadUnsafeModeProcedure(
 
   setThreadUnsafeMode(db, thread.id, unsafeMode);
   recordUnsafeModeAuditEvent(thread, unsafeMode, "toggle");
-  codexThreadMap.delete(thread.id);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
   return rpcThreadById(thread.id);

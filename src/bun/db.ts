@@ -45,7 +45,6 @@ type ThreadInput = {
   agentsAccess: boolean;
   joltAccess: boolean;
   unsafeMode: boolean;
-  codexThreadId?: string | null;
   piSessionId?: string | null;
   piSessionFile?: string | null;
   piLeafEntryId?: string | null;
@@ -156,7 +155,6 @@ export type ThreadRecord = {
   agentsAccess: boolean;
   joltAccess: boolean;
   unsafeMode: 0 | 1;
-  codexThreadId: string | null;
   piSessionId: string | null;
   piSessionFile: string | null;
   piLeafEntryId: string | null;
@@ -694,7 +692,6 @@ export function migrateDatabase(db: Database): void {
 				agents_access INTEGER NOT NULL DEFAULT 0,
 				jolt_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
-				codex_thread_id TEXT,
 				pi_session_id TEXT,
 				pi_session_file TEXT,
 				pi_leaf_entry_id TEXT,
@@ -2211,7 +2208,6 @@ export function listThreads(database: Database): ThreadRecord[] {
 				agents_access AS agentsAccess,
 				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
-				codex_thread_id AS codexThreadId,
 				pi_session_id AS piSessionId,
 				pi_session_file AS piSessionFile,
 				pi_leaf_entry_id AS piLeafEntryId,
@@ -2270,7 +2266,6 @@ export function getThreadById(
 				agents_access AS agentsAccess,
 				jolt_access AS joltAccess,
 				unsafe_mode AS unsafeMode,
-				codex_thread_id AS codexThreadId,
 				pi_session_id AS piSessionId,
 				pi_session_file AS piSessionFile,
 				pi_leaf_entry_id AS piLeafEntryId,
@@ -2325,14 +2320,12 @@ export function createThread(
 				agents_access,
 				jolt_access,
 				unsafe_mode,
-				codex_thread_id,
 				pi_session_id,
 				pi_session_file,
 				pi_leaf_entry_id,
 				updated_at
 			)
 				VALUES (
-					?,
 					?,
 					?,
 					?,
@@ -2357,7 +2350,6 @@ export function createThread(
     input.agentsAccess ? 1 : 0,
     input.joltAccess ? 1 : 0,
     input.unsafeMode ? 1 : 0,
-    input.codexThreadId ?? null,
     input.piSessionId ?? null,
     input.piSessionFile ?? null,
     input.piLeafEntryId ?? null,
@@ -2369,33 +2361,6 @@ export function createThread(
   }
   return thread;
 }
-/**
- * Updates thread codex id.
- * @param database - Database handle used to update thread Codex ID.
- * @param threadId - Thread identifier.
- * @param codexThreadId - codexThreadId identifier.
- */
-
-export function updateThreadCodexId(
-  database: Database,
-  threadId: number,
-  codexThreadId: string | null,
-): void {
-  /** Persist the provider thread identifier from external API backfill. */
-  runStatement(
-    database,
-    `
-			UPDATE threads
-			SET
-				codex_thread_id = ?,
-				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = ?
-		`,
-    codexThreadId,
-    threadId,
-  );
-}
-
 export function updateThreadPiSessionState(
   database: Database,
   threadId: number,

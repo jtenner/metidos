@@ -27,7 +27,6 @@ function createThread(
     agentsAccess: false,
     joltAccess: true,
     unsafeMode: false,
-    codexThreadId: null,
     piSessionId: null,
     piSessionFile: null,
     piLeafEntryId: null,

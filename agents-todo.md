@@ -21,9 +21,8 @@ This file is the execution backlog for replacing `@openai/codex-sdk` with Pi in 
 
 ## Blockers
 
-- None currently. The remaining work is now final Codex-path removal, dependency cleanup, and whatever parity gaps survive that deletion pass. See [UX14 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#ux14-implementation-status-in-jt-ide), [TM13 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#tm13-implementation-status-in-jt-ide), and [Recommended Phased Plan](./docs/2026-04-09-pi-coding-agent-migration-research.md#recommended-phased-plan).
+- None currently. The planned migration slices are complete, and the remaining work is follow-up hardening against the risks listed above. See [RM15 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#rm15-implementation-status-in-jt-ide), [UX14 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#ux14-implementation-status-in-jt-ide), and [TM13 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#tm13-implementation-status-in-jt-ide).
 
 ## Todo Items
 
-- [RM][15] - Remove Codex SDK and Legacy Codex Paths
-After Pi reaches acceptable parity, delete the Codex SDK dependency, Codex-specific runtime code, telemetry adapters, schema remnants, labels, and MCP bridge paths that no longer serve the product. This slice should be the final cleanup described in [Current Codex-Specific Surface In Jolt](./docs/2026-04-09-pi-coding-agent-migration-research.md#current-codex-specific-surface-in-jolt), [Phase 7](./docs/2026-04-09-pi-coding-agent-migration-research.md#recommended-phased-plan), and [Recommendation](./docs/2026-04-09-pi-coding-agent-migration-research.md#recommendation).
+- None currently. The planned Codex-to-Pi migration slices are complete; remaining work is follow-up hardening against the risks listed above. See [RM15 implementation status in `jt-ide`](./docs/2026-04-09-pi-coding-agent-migration-research.md#rm15-implementation-status-in-jt-ide), [Phase 7](./docs/2026-04-09-pi-coding-agent-migration-research.md#recommended-phased-plan), and [Recommendation](./docs/2026-04-09-pi-coding-agent-migration-research.md#recommendation).

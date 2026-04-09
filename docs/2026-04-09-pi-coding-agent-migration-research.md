@@ -95,11 +95,11 @@ Primary local files inspected:
 - [src/bun/project-procedures/README.md](../src/bun/project-procedures/README.md)
 - [src/mainview/README.md](../src/mainview/README.md)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
-- [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
-- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
+- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 - [src/mainview/App.tsx](../src/mainview/App.tsx)
@@ -155,12 +155,11 @@ Relevant built-in/provider docs explicitly cover:
 Current Jolt does not have a general provider abstraction. It hardcodes:
 
 - OpenAI/Codex
-- xAI through a custom Codex constructor path
+- xAI through provider-specific model-catalog normalization
 
 That hardcoding lives primarily in:
 
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
-- [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
 
 ### 3. Pi already has a full session system
 
@@ -179,7 +178,7 @@ Pi provides:
 Current Jolt has its own separate thread/session model in SQLite:
 
 - Jolt “threads” are app-level domain entities, not Pi sessions
-- each thread now stores first-class Pi session references alongside the legacy `codexThreadId` compatibility field
+- each thread now stores first-class Pi session references; the legacy `codexThreadId` compatibility field was later removed in RM15
 - Jolt stores transformed thread messages for UI rendering
 - Jolt historically inferred compaction behavior from Codex token history, but the active Pi path can replace that with live session compaction data
 
@@ -263,7 +262,7 @@ For Jolt, the most important non-goals are:
 
 Current Jolt agent tooling is implemented as a Codex MCP sidecar:
 
-- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
+- the historical `src/bun/codex-sidecar-mcp.ts` bridge, which RM15 later removes
 
 Pi’s philosophy is the opposite:
 
@@ -422,7 +421,7 @@ The table below answers the practical question:
 | Streaming events | Explicit Pi event projector now maps `AgentSessionEvent` activity into Jolt message records | Native Pi event stream | Extend the projector for remaining event kinds and keep browser refresh behavior aligned with that adapter |
 | Abort/stop current turn | Current abort controller around Codex run | Native Pi feature | Call `session.abort()` and map abort semantics to current Jolt stopped-state behavior |
 | Built-in coding tools | Codex built-ins and shell/file behavior | Native Pi feature | Decide which Pi built-ins are enabled by default; adapt transcript rendering to Pi tool result shapes |
-| Jolt project/worktree/thread helper tools | Currently exported through Jolt MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces [codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) for the Pi path |
+| Jolt project/worktree/thread helper tools | Currently exported through Jolt MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces the old Codex MCP bridge for the Pi path |
 | GitHub agent tools | Currently from Codex app/plugin surface | Not native | Build or adopt a GitHub Pi extension/package, probably using `gh`, REST, or GraphQL; redefine `githubAccess` semantics |
 | Sub-agents | Minimal Pi-era `delegate_task` helper now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether one-shot bounded delegation is sufficient or whether Jolt later needs persistent child-agent lifecycle, richer fan-out, or human-in-the-loop orchestration |
 | Plan mode | Minimal Pi-era `update_plan` support now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether runtime-only plan state is enough or whether Jolt later needs Pi extension UI widgets, confirmations, and browser-visible plan orchestration |
@@ -536,12 +535,12 @@ What the current implementation now does:
 - syncs those fields when a Pi runtime is created or resumed and again after each completed prompt
 - resumes the explicitly stored Pi session file when one exists instead of relying only on “most recent session”
 - exposes the same Pi session identity through RPC thread payloads for later UI work
-- keeps Pi-backed threads out of the old `codexThreadId` compatibility slot
+- keeps Pi-backed threads out of the old `codexThreadId` compatibility slot, which RM15 later removed from the live thread contract entirely
 
 What this still does not do yet:
 
 - it does not expose Pi session branching or tree navigation in the Jolt UI
-- it does not remove Codex telemetry scraping or the legacy `codexThreadId` column yet
+- it does not remove Codex telemetry scraping or the legacy `codexThreadId` column yet, though those were later addressed by TM13 and RM15
 
 ### MD04 implementation status in `jt-ide`
 
@@ -550,10 +549,8 @@ The first model-catalog replacement slice is now complete in this repository.
 Implemented on 2026-04-09 with:
 
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
-- [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
-- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
 - [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
 - [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 
@@ -801,7 +798,7 @@ Current Jolt MCP tools include:
 
 They are registered in:
 
-- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
+- the old Codex MCP sidecar, which was later removed in RM15 after the Pi-native tool pack was in place
 
 ### Recommended migration
 
@@ -851,7 +848,7 @@ What the current implementation now does:
 
 What this still does not do yet:
 
-- it does not remove [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) because the Codex migration path is still incremental and the legacy runtime still exists
+- it does not remove the old Codex MCP bridge yet because the migration path is still incremental at this stage of the plan, though RM15 later deletes it
 - it does not own the agent-coordination surface; those Pi-era tools now live in a separate backend module so the Jolt tool pack can stay focused on app-specific operations
 - it does not package the Jolt tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
 - it does not add any new transcript kinds for these tools; they still flow through the existing `tool_call`, `command`, `reasoning`, and `chat` projection model described in [5. Transcript/Event Mapping](#5-transcriptevent-mapping)
@@ -1294,6 +1291,33 @@ What is still intentionally out of scope:
 - There is still no persisted replay/snapshot model for extension UI state across browser reconnects beyond the currently connected live session flow.
 - This slice binds Pi extension UI into Jolt, but it does not by itself remove the remaining Codex-era runtime and dependency surface.
 
+### RM15 implementation status in `jt-ide`
+
+The final Codex-removal slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [package.json](../package.json)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/db.ts](../src/bun/db.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+
+What the current implementation now does:
+
+- removes the `@openai/codex-sdk` and `@modelcontextprotocol/sdk` dependencies from the live product
+- deletes the dead Codex constructor bridge, Codex MCP sidecar, and their dedicated tests
+- removes `codexThreadId` from the live thread storage, RPC, and fixture contracts while keeping the existing SQLite column harmlessly ignored on older databases
+- promotes the remaining reusable scope helper to the generic [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts) module so Jolt’s Pi tool packs no longer depend on Codex-named runtime files
+- updates repo docs and backlog state so Pi is documented as the only active agent harness
+
+What is still intentionally out of scope:
+
+- it does not rename every internal `codex-*` frontend helper or model utility filename; some code-local naming remnants remain, but they are no longer runtime dependencies or public product semantics
+- it does not run a destructive SQLite rewrite to physically drop `codex_thread_id` from already-existing user databases
+
 ## What Pi Saves Us From Building Ourselves
 
 If Jolt adopts Pi, the team does **not** need to hand-build these foundational pieces:
@@ -1474,10 +1498,10 @@ The migration is worth doing if the team accepts these truths up front:
 - [package.json](../package.json)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
-- [src/bun/project-procedures/codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts)
 - [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
-- [src/bun/codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts)
+- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 - [src/mainview/App.tsx](../src/mainview/App.tsx)

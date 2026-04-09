@@ -8,8 +8,8 @@ Source code for both halves of this repository:
 
 Holds backend orchestration and server entry logic that powers local project and thread workflows.
 
-- `codex-sidecar-mcp.ts`
-  - Sidecar MCP configuration used by Codex tooling.
+- `pi-jolt-tools.ts`
+  - Pi-native Jolt tool pack used for project, thread, cron, and JS-sandbox helpers.
 - `build-mainview.ts`
   - Build script/entry used to produce the mainview application bundle or runtime artifacts.
 - `db.ts`
@@ -48,7 +48,7 @@ Holds backend orchestration and server entry logic that powers local project and
 Specialized procedure modules with smaller responsibilities for project metadata, history, and thread operations.
 
 - `model-catalog.ts`
-  - Loads/manages Codex model catalog data and metadata.
+  - Loads/manages the Pi-backed model catalog data and metadata.
 - `directory-suggestions.ts`
   - Project root and directory suggestion helpers.
 - `git-history.ts`
