@@ -12,6 +12,8 @@ The concrete product goal is:
 
 - let Jolt use ChatGPT-plan-backed Codex through Pi's built-in `openai-codex` provider
 - keep the existing Pi-backed thread/session/tool architecture
+- move the browser model picker to a three-level selection flow: `Provider -> Model -> Reasoning effort`
+- make provider identity first-class so `openai-codex` and plain `openai` are always distinguishable in both catalog data and UI as two separate providers, each with its own model list
 - avoid bringing back `@openai/codex-sdk` as a parallel runtime unless it is strictly necessary
 
 ## Bottom Line
@@ -28,6 +30,7 @@ Jolt does not currently expose that provider correctly. Today it:
 So Codex usage can be restored without reintroducing the Codex SDK, but it is not "already wired." The required work is mostly:
 
 - provider exposure
+- hierarchical catalog and selector semantics
 - backend OAuth orchestration
 - browser auth UI
 - runtime selection and billing-precedence fixes
@@ -209,10 +212,11 @@ Use this implementation strategy unless product requirements change:
 
 1. Keep Pi as the only runtime.
 2. Add `openai-codex` as a first-class provider in Jolt's catalog and UI.
-3. Build backend-managed Pi OAuth login/logout/status around Jolt's existing Bun RPC layer.
-4. Make provider choice explicit in the UI and runtime instead of silently preferring plain `openai`.
-5. Start with Pi's own `auth.json` store under Jolt app data.
-6. Treat Codex-like keyring storage, device-code parity, and `~/.codex/auth.json` import as follow-on work unless they become hard requirements.
+3. Change the model-selection contract to `Provider -> Model -> Reasoning effort`, where the reasoning-effort step appears only when the chosen model supports it.
+4. Build backend-managed Pi OAuth login/logout/status around Jolt's existing Bun RPC layer.
+5. Make provider choice explicit in the UI and runtime instead of silently preferring plain `openai`.
+6. Start with Pi's own `auth.json` store under Jolt app data.
+7. Treat Codex-like keyring storage, device-code parity, and `~/.codex/auth.json` import as follow-on work unless they become hard requirements.
 
 This gives Jolt:
 
@@ -224,12 +228,36 @@ This gives Jolt:
 
 ## Requirements For Jolt
 
-## 1. Expose `openai-codex` in the model catalog
+## 1. Define the selector as `Provider -> Model -> Reasoning effort`
+
+Required changes:
+
+- make provider identity a first-class selector step instead of a secondary label on a flat model list
+- represent `openai` and `openai-codex` as two separate providers in the first step, each with its own models listed beneath it in the second step
+- ensure `openai-codex` and `openai` remain distinct even when they expose the same model ids such as `gpt-5.4`
+- make model selection provider-scoped so the second step only shows models for the chosen provider
+- make reasoning-effort selection conditional on the chosen model supporting it
+- keep provider-qualified ids authoritative in persistence and runtime resolution even if the browser presents the flow as three separate choices
+
+Jolt can reuse from Pi:
+
+- provider-qualified model metadata
+- per-model reasoning support flags
+- built-in provider and model discovery
+
+Jolt must implement:
+
+- hierarchical selector semantics
+- RPC data shape or client-side derivation that can drive the three-step flow
+- unambiguous persistence rules so `openai:gpt-5.4` and `openai-codex:gpt-5.4` never collapse together
+
+## 2. Expose `openai-codex` in the model catalog
 
 Required changes:
 
 - add `openai-codex` to the provider allowlist
 - give it a human label and sensible sort order
+- ensure the catalog preserves enough provider metadata for a provider-first selector instead of flattening overlapping GPT ids into an ambiguous list
 - decide whether the default model should remain `openai:gpt-5.4` or become `openai-codex:gpt-5.4`
 - stop normalizing raw GPT ids to plain `openai` when the user explicitly wants Codex
 
@@ -242,10 +270,10 @@ Jolt can reuse from Pi:
 Jolt must implement:
 
 - catalog exposure
-- UI grouping/labels
+- provider/model grouping for the selector
 - migration of persisted defaults if the canonical default changes
 
-## 2. Add backend provider-auth procedures
+## 3. Add backend provider-auth procedures
 
 Required backend capabilities:
 
@@ -270,7 +298,7 @@ Jolt must implement:
 - persistence handoff into Jolt's configured Pi agent directory
 - error mapping for failed login or refresh
 
-## 3. Add browser provider-auth UI
+## 4. Add browser provider-auth UI
 
 Required browser capabilities:
 
@@ -279,6 +307,7 @@ Required browser capabilities:
 - show auth instructions and progress
 - allow logout
 - explain the difference between ChatGPT-plan Codex and API-billed OpenAI
+- host the provider step of the `Provider -> Model -> Reasoning effort` flow or clearly coordinate with the surface that does
 
 Jolt can reuse from Pi:
 
@@ -290,7 +319,7 @@ Jolt must implement:
 - a provider-auth state machine
 - modal/dialog surfaces for auth prompts and success/failure states
 
-## 4. Fix runtime provider selection and billing precedence
+## 5. Fix runtime provider selection and billing precedence
 
 Required runtime changes:
 
@@ -312,7 +341,7 @@ Jolt must implement:
 - migration logic for stored defaults
 - tests for `openai` versus `openai-codex` ambiguity
 
-## 5. Decide on auth-storage parity
+## 6. Decide on auth-storage parity
 
 The recommended first implementation is:
 
@@ -328,7 +357,7 @@ If exact Codex parity is later required, Jolt would need to add by-hand work for
 
 This is not required to make Codex work through Pi, but it is the clearest gap between "Pi-native Codex support" and "Codex-auth parity."
 
-## 6. Add diagnostics and recovery
+## 7. Add diagnostics and recovery
 
 Required operational surfaces:
 
@@ -336,23 +365,28 @@ Required operational surfaces:
 - visible status when `openai-codex` is unauthenticated
 - clear indication when a thread is API-billed OpenAI versus ChatGPT-plan Codex
 - recovery steps for stale credentials or revoked sessions
+- clear indication in the selector when a chosen provider/model pair supports reasoning effort and when it does not
 
 OpenAI publicly documents device-code and localhost-callback troubleshooting for Codex. Pi's public built-in `openai-codex` docs do not document that same end-user flow in the browser, so Jolt should not assume it gets full Codex CLI recovery behavior for free.
 
-## 7. Test the full Codex path
+## 8. Test the full Codex path
 
 Minimum coverage should include:
 
+- model selector logic proves `Provider -> Model -> Reasoning effort` works as intended
 - model catalog exposes `openai-codex`
+- overlapping model ids remain distinct by provider
 - default/normalized model selection behaves as intended
 - login status surfaces to the UI
 - login/logout updates the model catalog and availability
 - runtime uses the intended provider for overlapping ids like `gpt-5.4`
+- reasoning-effort controls only appear for models that support them
 - regression tests prove Jolt does not silently bill through plain `openai` when `openai-codex` is intended
 
 ## Risks
 
 - Billing-precedence risk. The current runtime and default model handling still lean toward `openai`, which can route traffic to API billing instead of ChatGPT-plan Codex.
+- Selector-ambiguity risk. A flat model picker can still collapse `openai-codex:gpt-5.4` and `openai:gpt-5.4` into a confusing single choice unless provider is the first-class selector dimension.
 - Storage-parity risk. Pi documents `auth.json` storage, while Codex documents `auth.json` or keyring storage. If keyring parity is a product or security requirement, extra implementation is needed.
 - Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
 - Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Pi's built-in OpenAI Codex docs do not promise the same end-user recovery story.
@@ -371,17 +405,32 @@ Minimum coverage should include:
 Deliverables:
 
 - add provider allowlist, labels, and sort order
-- surface `openai-codex:*` ids in RPC payloads and the browser selector
+- surface `openai-codex:*` ids in RPC payloads
+- guarantee that provider-qualified ids remain distinct for overlapping GPT model ids
 - decide and encode default-model behavior
 
 Primary files:
 
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+
+### CD02 - Build the three-level model selector
+
+Deliverables:
+
+- change the browser model-picker flow to `Provider -> Model -> Reasoning effort`
+- make `openai` and `openai-codex` separate provider choices with separate model lists beneath them even when they expose the same model ids
+- only show the reasoning-effort step when the selected model supports it
+- preserve provider-qualified ids in RPC payloads and persistence while presenting a structured selection flow
+
+Primary files:
+
 - [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
 - [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+- [src/mainview/controls/reasoning-effort-selector.tsx](../src/mainview/controls/reasoning-effort-selector.tsx)
+- [src/mainview/app/use-mainview-derived-state.ts](../src/mainview/app/use-mainview-derived-state.ts)
 
-### CD02 - Add backend `openai-codex` auth procedures
+### CD03 - Add backend `openai-codex` auth procedures
 
 Deliverables:
 
@@ -396,7 +445,7 @@ Primary files:
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 - [src/bun/index.ts](../src/bun/index.ts)
 
-### CD03 - Add browser provider-auth UI
+### CD04 - Add browser provider-auth UI
 
 Deliverables:
 
@@ -404,13 +453,14 @@ Deliverables:
 - login/logout actions
 - login progress and failure states
 - copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
+- copy that explains why provider is selected before model
 
 Primary files:
 
 - [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
 - [src/mainview/App.tsx](../src/mainview/App.tsx)
 
-### CD04 - Fix runtime provider selection and billing precedence
+### CD05 - Fix runtime provider selection and billing precedence
 
 Deliverables:
 
@@ -424,7 +474,7 @@ Primary files:
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 
-### CD05 - Implement auth-storage behavior and diagnostics
+### CD06 - Implement auth-storage behavior and diagnostics
 
 Deliverables:
 
@@ -438,12 +488,13 @@ Primary files:
 - [src/bun/index.ts](../src/bun/index.ts)
 - [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
 
-### CD06 - Verify the full Codex path and document operator behavior
+### CD07 - Verify the full Codex path and document operator behavior
 
 Deliverables:
 
 - focused backend and frontend tests
 - manual verification notes for ChatGPT-plan login, logout, and thread execution
+- selector verification for provider/model/reasoning behavior
 - final doc updates once the path is working
 
 Primary files:
@@ -451,6 +502,7 @@ Primary files:
 - [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 - [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
 - [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
 
 ## Recommendation
 
