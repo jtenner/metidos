@@ -550,7 +550,7 @@ function tableHasColumn(
 
 /**
  * Ensure `threads` has a column for evolving schema versions.
- * This lets older databases safely add newer nullable/default fields.
+ * This lets existing databases safely add newer nullable/default fields.
  */
 
 function ensureThreadColumn(
@@ -585,7 +585,7 @@ function ensureThreadMessageColumn(
 
 /**
  * Ensure `cron_jobs` has a column for evolving schema versions.
- * This keeps older databases compatible with new cron metadata fields.
+ * This keeps existing databases compatible with new cron metadata fields.
  */
 function ensureCronJobColumn(
   db: Database,

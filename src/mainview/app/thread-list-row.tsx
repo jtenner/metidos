@@ -70,7 +70,7 @@ type ThreadListPreviewProps = {
   >;
   /** Currently open error popover state for this list's render scope. */
   errorPreviewPopover: ErrorPreviewPopoverState | null;
-  /** Hides active error preview to prevent stale overlays. */
+  /** Hides active error preview to prevent lingering overlays after focus changes. */
   hideErrorPreview: () => void;
   /** Hides thread summary overlay when pointer focus leaves or opens another view. */
   hideThreadSummaryPreview: () => void;

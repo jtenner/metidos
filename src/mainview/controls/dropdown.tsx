@@ -85,8 +85,8 @@ export function DropdownControl({
     onOpenChange?.(open);
   }, [onOpenChange, open]);
 
-  // If parent disables opening while open, force close to avoid stale UI state unless
-  // the caller explicitly wants the panel to remain visible during transient disablement.
+  // If parent disables opening while open, force close to avoid an inconsistent open state
+  // unless the caller explicitly wants the panel to remain visible during temporary disablement.
   useEffect(() => {
     if (closeOnDisable && !canOpen && open) {
       setOpen(false);

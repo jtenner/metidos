@@ -1731,7 +1731,7 @@ export default function App({
               threadId: detail.thread.id,
             })
             .catch(() => {
-              // Ignore stale auto-thread cleanup failures; UI state stays tied to current selection.
+              // Ignore cleanup failures for auto-created threads that are no longer current; UI state stays tied to current selection.
             });
           return null;
         }

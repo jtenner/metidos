@@ -4180,7 +4180,7 @@ export async function setActiveWorktreeProcedure(
     if (project.isOpen === 1) {
       ensureProjectPoller(project);
       projectId = project.id;
-      // Validate against a fresh worktree listing so stale UI selections do not
+      // Validate against a fresh worktree listing so outdated UI selections do not
       // become the backend's active worktree.
       try {
         const worktrees = await awaitAbortableResult(

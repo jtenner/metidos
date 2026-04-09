@@ -375,7 +375,7 @@ export function useMainviewDerivedState({
   );
 
   useEffect(() => {
-    // Drop stale dismissals when threads are removed or their status key changes.
+    // Drop outdated dismissal records when threads are removed or their status key changes.
     setDismissedThreadStatusKeys((prev) => {
       const nextEntries = Object.entries(prev).filter(
         ([threadId, statusKey]) => {

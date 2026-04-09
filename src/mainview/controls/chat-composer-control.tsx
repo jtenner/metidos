@@ -152,7 +152,7 @@ export function ChatComposerControl({
 
   useEffect(() => {
     // Only resize when the DOM value is already aligned with controlled draft state.
-    // During transitional updates, skipping prevents cursor jumps and stale measurements.
+    // During transitional updates, skipping prevents cursor jumps and intermediate measurements.
     if (textareaRef.current && textareaRef.current.value !== draft) {
       return;
     }

@@ -190,7 +190,7 @@ export function ThreadActionMenu({
   threadRenameSummary,
   threadRenameTitle,
 }: ThreadActionMenuProps): JSX.Element | null {
-  // Guard against stale menu references when the selected thread is removed.
+  // Guard against invalid menu state when the selected thread is removed.
   if (!menu || !thread) {
     return null;
   }

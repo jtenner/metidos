@@ -618,7 +618,8 @@ export function threadStoreGet(
 }
 
 /**
- * Replace current page while preserving older entries that are not duplicated by server page.
+ * Replace current page while preserving pre-existing entries that are not duplicated by
+ * the server page.
  */
 export function mergeResetGitHistory(
   current: RpcWorktreeGitHistoryResult | null,

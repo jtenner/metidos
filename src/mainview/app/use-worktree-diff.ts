@@ -204,7 +204,7 @@ export function useWorktreeDiff({
         }
 
         setDiffFilePatchState((current) => {
-          // Success path: stash loaded patch and clear any stale error.
+          // Success path: stash loaded patch and clear any previous error.
           const next = {
             diffText: result.diffText,
             error: "",
@@ -265,7 +265,7 @@ export function useWorktreeDiff({
       }
 
       const requestId = ++diffSnapshotRequestIdRef.current;
-      // Start from a clean in-flight state and clear stale worktree snapshots.
+      // Start from a clean in-flight state and clear prior worktree snapshots.
       abortDiffSnapshotRequest(
         "Worktree diff snapshot request was superseded.",
       );
@@ -374,7 +374,7 @@ export function useWorktreeDiff({
   }, [abortDiffFilePatchRequest, abortDiffSnapshotRequest]);
 
   useEffect(() => {
-    // Close worktree/selection means patch state is stale; clear local view state.
+    // Closed worktree/selection means patch state is no longer valid; clear local view state.
     if (
       selectedProject &&
       activeSelectedWorktreePath &&

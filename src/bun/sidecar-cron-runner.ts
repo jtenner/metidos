@@ -49,8 +49,8 @@ function parseThreadDate(value: string | null): number | null {
 /**
  * Wait for a thread run to exit active work, or timeout.
  *
- * Uses `runStartedAt` as the cut-off to disambiguate stale thread status from an
- * unrelated previous run.
+ * Uses `runStartedAt` as the cut-off to ignore status updates from an unrelated
+ * previous run.
  */
 async function waitForThreadRunCompletion(
   threadId: number,
