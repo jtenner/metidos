@@ -55,7 +55,7 @@ export async function buildMainviewBundle(): Promise<string> {
 
 /** CLI entrypoint: build and print the produced bundle path when directly executed. */
 if (import.meta.main) {
-  // Useful for ad-hoc local builds and scripts that just need a single status line.
+  // Useful for one-off local builds and scripts that only need a single status line.
   const mainviewBundlePath = await buildMainviewBundle();
   console.log(`Built mainview bundle at ${mainviewBundlePath}`);
 }
