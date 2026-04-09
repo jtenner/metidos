@@ -417,7 +417,7 @@ The table below answers the practical question:
 | Session persistence and resume | Jolt SQLite thread rows + Codex thread id | Native Pi sessions | Decide whether Jolt stores Pi session file path/id in DB or whether Pi sessions stay entirely internal; likely add `piSessionId`/`piSessionFile` fields |
 | Branch/fork/tree navigation | Jolt has separate app threads; no Pi-style in-thread tree UI | Native Pi feature | Decide whether to expose Pi tree navigation in Jolt UI or ignore it initially; if ignored, still preserve it in session files |
 | Compaction | Current Jolt infers compaction from Codex token drops | Native Pi feature | Replace Codex telemetry scraper with Pi compaction events and context usage; decide how much current “compaction telemetry” UI survives |
-| Streaming events | Current Codex events mapped to Jolt message records | Native Pi event stream | Build a new adapter from Pi `AgentSessionEvent` to Jolt message rows and run-status updates |
+| Streaming events | Explicit Pi event projector now maps `AgentSessionEvent` activity into Jolt message records | Native Pi event stream | Extend the projector for remaining event kinds and keep browser refresh behavior aligned with that adapter |
 | Abort/stop current turn | Current abort controller around Codex run | Native Pi feature | Call `session.abort()` and map abort semantics to current Jolt stopped-state behavior |
 | Built-in coding tools | Codex built-ins and shell/file behavior | Native Pi feature | Decide which Pi built-ins are enabled by default; adapt transcript rendering to Pi tool result shapes |
 | Jolt project/worktree/thread helper tools | Currently exported through Jolt MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces [codex-sidecar-mcp.ts](../src/bun/codex-sidecar-mcp.ts) for the Pi path |
@@ -602,6 +602,31 @@ What this still does not do yet:
 - it does not expose provider login state or “missing API key” hints in the browser UI
 - it does not rename the persisted `reasoningEffort` field or remove internal Codex naming yet
 - it does not redesign the settings surface around provider management beyond selector-level metadata
+
+### EV06 implementation status in `jt-ide`
+
+The first explicit Pi event-mapping slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/project-procedures/pi-event-projection.ts](../src/bun/project-procedures/pi-event-projection.ts)
+- [src/bun/project-procedures/pi-event-projection.test.ts](../src/bun/project-procedures/pi-event-projection.test.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/project-procedures/README.md](../src/bun/project-procedures/README.md)
+
+What the current implementation now does:
+
+- routes Pi `message_update`, `message_end`, and `tool_execution_*` events through a dedicated projector instead of inlining that mapping inside the main RPC procedure file
+- projects assistant thinking deltas into `reasoning` activity rows and assistant text deltas/completion into `chat` activity rows
+- projects Pi `bash` executions into `command` rows and non-bash Pi tools into generic `tool_call` rows with stable signatures and payload JSON
+- keeps the latest assistant text, assistant activity id, and Pi usage snapshot inside the projection layer so final turn settlement can reuse one coherent state source
+- touches live working-thread status timestamps when projected activity is persisted, which keeps polling-based status refreshes aligned with real Pi event flow
+
+What this still does not do yet:
+
+- it does not synthesize `file_change` rows from Pi `edit` or `write` activity yet
+- it does not add `web_search` parity because Pi still has no built-in web-search tool in this runtime
+- it does not introduce a new live push transport; Jolt still relies on its existing RPC polling/detail refresh loop for browser updates
 
 ### Why SDK first
 

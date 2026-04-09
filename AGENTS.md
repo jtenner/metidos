@@ -66,6 +66,8 @@
 │  │  │  ├─ codex-session-telemetry.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
+│  │  │  ├─ pi-event-projection.test.ts
+│  │  │  ├─ pi-event-projection.ts
 │  │  │  ├─ shared.ts
 │  │  │  └─ thread-detail.ts
 │  │  ├─ project-procedures.ts

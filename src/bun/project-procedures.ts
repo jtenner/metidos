@@ -113,6 +113,10 @@ import {
   resolveCodexReasoningEffort,
 } from "./project-procedures/model-catalog";
 import {
+  createPiThreadEventProjector,
+  type ProjectedPiActivityWrite,
+} from "./project-procedures/pi-event-projection";
+import {
   awaitAbortableResult,
   createAbortError,
   createAsyncConcurrencyLimit,
@@ -908,6 +912,19 @@ function setThreadRunStatus(
   threadRunStatusMap.set(threadId, status);
   invalidateThreadDetailCache(threadId);
 }
+
+function touchWorkingThreadRunStatus(threadId: number): void {
+  const current = threadRunStatusMap.get(threadId);
+  if (!current || current.state !== "working") {
+    return;
+  }
+
+  threadRunStatusMap.set(threadId, {
+    ...current,
+    updatedAt: getNow(),
+  });
+  invalidateThreadDetailCache(threadId);
+}
 /**
  * Performs currentThreadRunStatus operation.
  * @param thread - Thread whose current run status is being read.
@@ -1332,9 +1349,10 @@ async function runThreadMessageInBackground(
   try {
     const thread = threadById(threadId);
     const runtime = await ensurePiThreadRuntime(thread, sessionId);
-    const thinkingTextByActivityId = new Map<string, string>();
-    const assistantTextByActivityId = new Map<string, string>();
-    const toolArgsByCallId = new Map<string, unknown>();
+    const piEventProjector = createPiThreadEventProjector({
+      startedAt,
+      threadId,
+    });
     let eventProcessingChain = Promise.resolve();
     let eventProcessingError: unknown = null;
 
@@ -1342,284 +1360,20 @@ async function runThreadMessageInBackground(
       (event: AgentSessionEvent) => {
         eventProcessingChain = eventProcessingChain
           .then(async () => {
-            if (
-              event.type === "message_update" &&
-              (event.message as { role?: unknown }).role === "assistant"
-            ) {
-              const assistantActivityId = buildPiAssistantActivityId(
-                startedAt,
-                event.message,
-                "assistant",
-              );
-              const reasoningActivityId = buildPiAssistantActivityId(
-                startedAt,
-                event.message,
-                "reasoning",
-              );
-
-              if (event.assistantMessageEvent.type === "thinking_delta") {
-                const nextThinkingText = `${
-                  thinkingTextByActivityId.get(reasoningActivityId) ?? ""
-                }${event.assistantMessageEvent.delta ?? ""}`;
-                thinkingTextByActivityId.set(
-                  reasoningActivityId,
-                  nextThinkingText,
-                );
-                const persistedThinkingText = nextThinkingText.trim();
-                if (persistedThinkingText) {
-                  await bufferedActivityWriter.queue(
-                    reasoningActivityId,
-                    `in_progress\u0000${persistedThinkingText}`,
-                    async () => [
-                      buildReasoningActivityInputText(
-                        threadId,
-                        reasoningActivityId,
-                        persistedThinkingText,
-                        "in_progress",
-                      ),
-                    ],
-                  );
-                }
-                return;
-              }
-
-              if (event.assistantMessageEvent.type === "text_delta") {
-                const nextAssistantText = `${
-                  assistantTextByActivityId.get(assistantActivityId) ?? ""
-                }${event.assistantMessageEvent.delta ?? ""}`;
-                assistantTextByActivityId.set(
-                  assistantActivityId,
-                  nextAssistantText,
-                );
-                const persistedAssistantText = nextAssistantText.trim();
-                if (persistedAssistantText) {
-                  lastAssistantText = persistedAssistantText;
-                  lastAssistantItemId = assistantActivityId;
-                  await bufferedActivityWriter.queue(
-                    assistantActivityId,
-                    `in_progress\u0000${persistedAssistantText}`,
-                    async () => [
-                      buildAssistantChatActivityInput(
-                        threadId,
-                        assistantActivityId,
-                        persistedAssistantText,
-                        "in_progress",
-                      ),
-                    ],
-                  );
-                }
-              }
+            const projectedWrites = piEventProjector.project(event);
+            if (projectedWrites.length === 0) {
               return;
             }
 
-            if (
-              event.type === "message_end" &&
-              (event.message as { role?: unknown }).role === "assistant"
-            ) {
-              const assistantActivityId = buildPiAssistantActivityId(
-                startedAt,
-                event.message,
-                "assistant",
-              );
-              const finalAssistantText = extractPiAssistantMessageText(
-                event.message,
-              ).trim();
-              if (finalAssistantText) {
-                assistantTextByActivityId.set(
-                  assistantActivityId,
-                  finalAssistantText,
-                );
-                lastAssistantText = finalAssistantText;
-                lastAssistantItemId = assistantActivityId;
-                await bufferedActivityWriter.queue(
-                  assistantActivityId,
-                  `completed\u0000${finalAssistantText}`,
-                  async () => [
-                    buildAssistantChatActivityInput(
-                      threadId,
-                      assistantActivityId,
-                      finalAssistantText,
-                      "completed",
-                    ),
-                  ],
-                  {
-                    force: true,
-                    terminal: true,
-                  },
-                );
-              }
-
-              const reasoningActivityId = buildPiAssistantActivityId(
-                startedAt,
-                event.message,
-                "reasoning",
-              );
-              const finalThinkingText = (
-                thinkingTextByActivityId.get(reasoningActivityId) ?? ""
-              ).trim();
-              if (finalThinkingText) {
-                await bufferedActivityWriter.queue(
-                  reasoningActivityId,
-                  `completed\u0000${finalThinkingText}`,
-                  async () => [
-                    buildReasoningActivityInputText(
-                      threadId,
-                      reasoningActivityId,
-                      finalThinkingText,
-                      "completed",
-                    ),
-                  ],
-                  {
-                    force: true,
-                    terminal: true,
-                  },
-                );
-              }
-
-              usage = extractPiAssistantUsage(event.message) ?? usage;
-              return;
-            }
-
-            if (event.type === "tool_execution_start") {
-              toolArgsByCallId.set(event.toolCallId, event.args);
-              const activityItemId = buildThreadTurnActivityId(
-                startedAt,
-                `tool:${event.toolCallId}`,
-              );
-              if (event.toolName === "bash") {
-                const command = normalizeCommandDisplayText(
-                  typeof event.args?.command === "string"
-                    ? event.args.command
-                    : "bash",
-                );
-                await bufferedActivityWriter.queue(
-                  activityItemId,
-                  `in_progress\u0000${command}`,
-                  async () => [
-                    buildCommandActivityInputPayload(threadId, activityItemId, {
-                      command,
-                      exitCode: null,
-                      output: "",
-                      state: "in_progress",
-                    }),
-                  ],
-                );
-                return;
-              }
-
-              await bufferedActivityWriter.queue(
-                activityItemId,
-                `in_progress\u0000${event.toolName}`,
-                async () => [
-                  buildToolCallActivityInputPayload(threadId, activityItemId, {
-                    server: "pi",
-                    tool: event.toolName,
-                    argumentsText: stringifyActivityValue(event.args),
-                    output: "",
-                    state: "in_progress",
-                  }),
-                ],
-              );
-              return;
-            }
-
-            if (event.type === "tool_execution_update") {
-              toolArgsByCallId.set(event.toolCallId, event.args);
-              const activityItemId = buildThreadTurnActivityId(
-                startedAt,
-                `tool:${event.toolCallId}`,
-              );
-              const output = extractPiToolExecutionOutput(event.partialResult);
-              if (event.toolName === "bash") {
-                const command = normalizeCommandDisplayText(
-                  typeof event.args?.command === "string"
-                    ? event.args.command
-                    : "bash",
-                );
-                await bufferedActivityWriter.queue(
-                  activityItemId,
-                  `in_progress\u0000${command}\u0000${output}`,
-                  async () => [
-                    buildCommandActivityInputPayload(threadId, activityItemId, {
-                      command,
-                      exitCode: null,
-                      output,
-                      state: "in_progress",
-                    }),
-                  ],
-                );
-                return;
-              }
-
-              await bufferedActivityWriter.queue(
-                activityItemId,
-                `in_progress\u0000${event.toolName}\u0000${output}`,
-                async () => [
-                  buildToolCallActivityInputPayload(threadId, activityItemId, {
-                    server: "pi",
-                    tool: event.toolName,
-                    argumentsText: stringifyActivityValue(event.args),
-                    output,
-                    state: "in_progress",
-                  }),
-                ],
-              );
-              return;
-            }
-
-            if (event.type === "tool_execution_end") {
-              const toolArgs = toolArgsByCallId.get(event.toolCallId);
-              toolArgsByCallId.delete(event.toolCallId);
-              const activityItemId = buildThreadTurnActivityId(
-                startedAt,
-                `tool:${event.toolCallId}`,
-              );
-              const output = extractPiToolExecutionOutput(event.result);
-              const state = event.isError ? "failed" : "completed";
-              if (event.toolName === "bash") {
-                const command = normalizeCommandDisplayText(
-                  typeof (toolArgs as { command?: unknown } | undefined)
-                    ?.command === "string"
-                    ? String((toolArgs as { command?: unknown }).command)
-                    : "bash",
-                );
-                await bufferedActivityWriter.queue(
-                  activityItemId,
-                  `${state}\u0000${command}\u0000${output}`,
-                  async () => [
-                    buildCommandActivityInputPayload(threadId, activityItemId, {
-                      command,
-                      exitCode: extractPiBashExitCode(output),
-                      output,
-                      state,
-                    }),
-                  ],
-                  {
-                    force: true,
-                    terminal: true,
-                  },
-                );
-                return;
-              }
-
-              await bufferedActivityWriter.queue(
-                activityItemId,
-                `${state}\u0000${event.toolName}\u0000${output}`,
-                async () => [
-                  buildToolCallActivityInputPayload(threadId, activityItemId, {
-                    server: "pi",
-                    tool: event.toolName,
-                    argumentsText: stringifyActivityValue(toolArgs),
-                    output,
-                    state,
-                  }),
-                ],
-                {
-                  force: true,
-                  terminal: true,
-                },
-              );
-            }
+            await queueProjectedPiActivities(
+              bufferedActivityWriter,
+              projectedWrites,
+            );
+            const snapshot = piEventProjector.snapshot();
+            lastAssistantItemId = snapshot.lastAssistantItemId;
+            lastAssistantText = snapshot.lastAssistantText;
+            usage = snapshot.usage ?? usage;
+            touchWorkingThreadRunStatus(threadId);
           })
           .catch((error) => {
             if (eventProcessingError === null) {
@@ -1649,6 +1403,10 @@ async function runThreadMessageInBackground(
     const lastAssistantMessage = [...runtime.session.messages]
       .reverse()
       .find((message) => message.role === "assistant");
+    const projectionSnapshot = piEventProjector.snapshot();
+    lastAssistantItemId = projectionSnapshot.lastAssistantItemId;
+    lastAssistantText = projectionSnapshot.lastAssistantText;
+    usage = projectionSnapshot.usage ?? usage;
     usage = extractPiAssistantUsage(lastAssistantMessage) ?? usage;
     const finalAssistantTextCandidate =
       lastAssistantText ||
@@ -1701,7 +1459,7 @@ async function runThreadMessageInBackground(
       await bufferedActivityWriter.flushAll();
     } catch (flushError) {
       console.error(
-        `Failed to flush buffered Codex activity for thread ${threadId}`,
+        `Failed to flush buffered thread activity for thread ${threadId}`,
         flushError,
       );
     }
@@ -1977,7 +1735,7 @@ function extractPiAssistantUsage(message: unknown): RpcThreadUsage | null {
   };
 }
 
-function buildPiAssistantActivityId(
+function _buildPiAssistantActivityId(
   startedAt: string,
   message: unknown,
   prefix: string,
@@ -1993,7 +1751,7 @@ function buildPiAssistantActivityId(
   return buildThreadTurnActivityId(startedAt, `${prefix}:${suffix}`);
 }
 
-function extractPiToolExecutionOutput(value: unknown): string {
+function _extractPiToolExecutionOutput(value: unknown): string {
   if (!value || typeof value !== "object") {
     return "";
   }
@@ -2004,7 +1762,7 @@ function extractPiToolExecutionOutput(value: unknown): string {
   return extractToolCallTextContent(candidate.content);
 }
 
-function extractPiBashExitCode(output: string): number | null {
+function _extractPiBashExitCode(output: string): number | null {
   const match = output.match(/Command exited with code (\d+)\s*$/u);
   if (!match) {
     return null;
@@ -2267,6 +2025,23 @@ function persistThreadActivityInputs(
     invalidateThreadDetailCache(threadId);
   }
 }
+
+async function queueProjectedPiActivities(
+  bufferedActivityWriter: ReturnType<typeof createBufferedThreadActivityWriter>,
+  writes: readonly ProjectedPiActivityWrite[],
+): Promise<void> {
+  for (const write of writes) {
+    await bufferedActivityWriter.queue(
+      write.activityId,
+      write.signature,
+      async () => write.inputs,
+      {
+        ...(write.force === true ? { force: true } : {}),
+        ...(write.terminal === true ? { terminal: true } : {}),
+      },
+    );
+  }
+}
 /**
  * Builds reasoning activity input.
  * @param threadId - Thread identifier.
@@ -2358,7 +2133,7 @@ function buildCommandActivityInputPayload(
   };
 }
 
-function buildReasoningActivityInputText(
+function _buildReasoningActivityInputText(
   threadId: number,
   itemId: string,
   text: string,
@@ -2373,7 +2148,7 @@ function buildReasoningActivityInputText(
   };
 }
 
-function buildToolCallActivityInputPayload(
+function _buildToolCallActivityInputPayload(
   threadId: number,
   itemId: string,
   payload: ToolCallActivityPayload & {

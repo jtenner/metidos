@@ -37,6 +37,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Supports background prefetch and foreground escalation, with abortable fills to avoid blocking UI-critical paths.
   - Coalesces in-flight commit-diff reads so duplicate requests share work.
 
+- `pi-event-projection.ts`
+  - Projects Pi `AgentSessionEvent` updates into Jolt thread-activity writes without assuming Codex item types.
+  - Tracks assistant thinking/text state, tool-call arguments, and final usage snapshots across a streamed run.
+  - Keeps the Pi-to-Jolt transcript mapping explicit so later slices can extend file-change or custom tool semantics cleanly.
+
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.
   - Exposes LRU helpers, abort normalization, abort-aware Promise awaiting, and bounded concurrency limiting.
