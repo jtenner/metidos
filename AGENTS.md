@@ -21,6 +21,7 @@
 ├─ bunfig.toml
 ├─ docs/
 │  ├─ 2026-04-07-thread-tool-access-controls.md
+│  ├─ 2026-04-09-codex-via-pi-wiring.md
 │  └─ 2026-04-09-pi-coding-agent-migration-research.md
 ├─ package.json
 ├─ src/

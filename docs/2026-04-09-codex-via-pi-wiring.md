@@ -1,0 +1,465 @@
+# Research: Wiring Codex Back Into Jolt Through Pi
+
+Date: 2026-04-09  
+Repository: `jt-ide`  
+Primary target: enable ChatGPT-plan-backed Codex usage in Jolt without restoring a second runtime
+
+## Goal
+
+Reintroduce Codex usage in `jt-ide` while keeping Pi as the only agent runtime.
+
+The concrete product goal is:
+
+- let Jolt use ChatGPT-plan-backed Codex through Pi's built-in `openai-codex` provider
+- keep the existing Pi-backed thread/session/tool architecture
+- avoid bringing back `@openai/codex-sdk` as a parallel runtime unless it is strictly necessary
+
+## Bottom Line
+
+Pi already has the main primitive Jolt needs: a built-in `openai-codex` provider with OAuth login support and a first-class model catalog.
+
+Jolt does not currently expose that provider correctly. Today it:
+
+- hides `openai-codex` from the model catalog
+- defaults raw GPT model ids like `gpt-5.4` to the plain `openai` provider
+- has no browser-visible provider login/logout/status flow
+- keeps a runtime fallback that tries `openai` before `openai-codex`
+
+So Codex usage can be restored without reintroducing the Codex SDK, but it is not "already wired." The required work is mostly:
+
+- provider exposure
+- backend OAuth orchestration
+- browser auth UI
+- runtime selection and billing-precedence fixes
+- auth-storage and diagnostics decisions
+
+## Why Jolt Should Not Restore The Codex SDK
+
+The installed local `@openai/codex-sdk` package explicitly says the SDK wraps the `codex` CLI and communicates over JSONL stdin/stdout. That means restoring it would reintroduce a second agent runtime on top of the Pi runtime Jolt already uses.
+
+That conflicts with the current product goal:
+
+- one harness
+- many endpoints
+- one tool/session/runtime model
+
+For Jolt, the clean path is:
+
+- keep Pi for execution
+- use Pi's `openai-codex` provider for Codex access
+- copy the public Codex authentication behavior where it matters
+
+Restoring the Codex SDK only makes sense if Jolt decides it needs exact Codex CLI semantics that Pi cannot reproduce.
+
+## What Was Researched
+
+### Local Jolt files
+
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/bun/db.ts](../src/bun/db.ts)
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [agents-todo.md](../agents-todo.md)
+
+### Local Pi sources
+
+- `node_modules/@mariozechner/pi-coding-agent/docs/providers.md`
+- `node_modules/@mariozechner/pi-coding-agent/docs/sdk.md`
+- `node_modules/@mariozechner/pi-coding-agent/docs/custom-provider.md`
+- `node_modules/@mariozechner/pi-coding-agent/examples/sdk/09-api-keys-and-oauth.ts`
+- `node_modules/@mariozechner/pi-coding-agent/examples/extensions/preset.ts`
+- `node_modules/@mariozechner/pi-coding-agent/CHANGELOG.md`
+- `node_modules/@mariozechner/pi-ai/README.md`
+
+### Local Codex sources
+
+- `node_modules/@openai/codex/README.md`
+- `node_modules/@openai/codex-sdk/README.md`
+- `node_modules/@openai/codex-sdk/dist/index.js`
+
+### Official OpenAI sources
+
+- [Codex authentication](https://developers.openai.com/codex/auth)
+- [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)
+- [Billing settings in ChatGPT vs Platform](https://help.openai.com/en/articles/9039756-billing-settings-in-chatgpt-vs-platform)
+- [Codex SDK overview](https://developers.openai.com/codex/sdk)
+
+## Upstream Facts That Matter
+
+## 1. Pi already has a built-in `openai-codex` provider
+
+Pi documents `ChatGPT Plus/Pro (Codex)` as a subscription-backed provider in `providers.md`. Pi AI also exposes programmatic OAuth helpers including `loginOpenAICodex` and `getOAuthApiKey` through `@mariozechner/pi-ai/oauth`.
+
+Important constraints:
+
+- Pi stores provider credentials in `auth.json`
+- Pi auto-refreshes OAuth credentials
+- Pi's OAuth login flow is a Node/backend concern, not a browser concern
+- Pi's browser notes explicitly say OAuth login flows are not supported in browser environments
+
+This aligns with Jolt's architecture because Jolt already has a Bun backend and browser frontend.
+
+## 2. Pi can already see current `openai-codex` models
+
+The installed Pi version in this repo (`0.66.1`) exposes the following built-in `openai-codex` models through `ModelRegistry`:
+
+- `gpt-5.1`
+- `gpt-5.1-codex-max`
+- `gpt-5.1-codex-mini`
+- `gpt-5.2`
+- `gpt-5.2-codex`
+- `gpt-5.3-codex`
+- `gpt-5.3-codex-spark`
+- `gpt-5.4`
+- `gpt-5.4-mini`
+
+That means Jolt does not need to hand-maintain a Codex model list. It only needs to stop filtering the provider out.
+
+## 3. Public Codex authentication behavior is documented
+
+OpenAI's current Codex authentication docs say:
+
+- Codex supports ChatGPT sign-in for subscription access
+- Codex supports API-key sign-in for usage-based access
+- Codex cloud requires ChatGPT sign-in
+- Codex CLI defaults to ChatGPT authentication when no valid session is available
+- cached credentials live in `~/.codex/auth.json` or an OS credential store
+- Codex supports device-code authentication for headless situations
+- ChatGPT-authenticated Codex usage follows ChatGPT workspace controls and retention policies, while API-key usage follows API org policies instead
+
+This is the public behavior Jolt can reasonably mirror.
+
+## 4. The Codex SDK does not give Jolt a separate auth model
+
+The installed `@openai/codex-sdk` package says it wraps the `codex` CLI. Its shipped `dist/index.js` confirms that:
+
+- it spawns the `codex` executable
+- it communicates over JSONL stdin/stdout
+- it injects `CODEX_API_KEY` only when the caller passes an `apiKey`
+
+Inference from the local SDK code:
+
+- when an SDK caller does not pass `apiKey`, authentication is delegated to the CLI's normal login state and config
+- the SDK is therefore not a separate authentication platform
+- restoring the SDK would reintroduce the Codex CLI runtime, not a reusable auth primitive Jolt is missing today
+
+## 5. Pi and Codex are similar at the behavior level, not identical in storage details
+
+Codex publicly documents:
+
+- `~/.codex/auth.json`
+- optional keyring storage
+- forced login mode / forced workspace controls
+- dedicated login diagnostics
+- device-code fallback
+
+Pi publicly documents:
+
+- `auth.json` storage under the configured Pi agent directory
+- OAuth login and refresh
+- provider/model discovery
+- backend-friendly programmatic OAuth helpers
+
+Pi does not publicly document Codex-style keyring storage or built-in managed-login restrictions for the built-in `openai-codex` provider. Those pieces would need Jolt work if exact parity is desired.
+
+## Current Jolt State
+
+## 1. Jolt currently filters `openai-codex` out of the model catalog
+
+[src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts) allowlists `openai` but not `openai-codex`. Because of that:
+
+- browser users cannot select `openai-codex`
+- raw model ids like `gpt-5.4` normalize to the `openai` provider
+- default model selection stays API-billed OpenAI instead of plan-backed Codex
+
+## 2. Jolt already keeps Pi auth and model files under app data
+
+Both the model catalog and the runtime create Pi storage under the Jolt app-data directory:
+
+- `.../pi-agent/auth.json`
+- `.../pi-agent/models.json`
+
+This is a good foundation for backend-managed provider login, status, and logout.
+
+## 3. Jolt has no provider-auth RPC or UI
+
+There is currently:
+
+- no RPC shape for provider auth status
+- no procedure to start or finish provider login
+- no provider logout procedure
+- no browser settings UI for provider auth
+
+[src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) is still a placeholder shell, which makes it the obvious landing zone for this work.
+
+## 4. Jolt's runtime fallback is backwards for plan-backed Codex
+
+[src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts) currently resolves an `openai` model by trying:
+
+1. `openai`
+2. `openai-codex`
+
+That is convenient for API-key compatibility, but wrong for the stated goal of using ChatGPT-plan Codex allocation. If a model id exists in both providers, the current order points Jolt at the plain OpenAI provider first.
+
+## Recommended Direction
+
+Use this implementation strategy unless product requirements change:
+
+1. Keep Pi as the only runtime.
+2. Add `openai-codex` as a first-class provider in Jolt's catalog and UI.
+3. Build backend-managed Pi OAuth login/logout/status around Jolt's existing Bun RPC layer.
+4. Make provider choice explicit in the UI and runtime instead of silently preferring plain `openai`.
+5. Start with Pi's own `auth.json` store under Jolt app data.
+6. Treat Codex-like keyring storage, device-code parity, and `~/.codex/auth.json` import as follow-on work unless they become hard requirements.
+
+This gives Jolt:
+
+- one runtime
+- one session system
+- one tool system
+- Codex plan usage through Pi
+- no need to bring back `@openai/codex-sdk`
+
+## Requirements For Jolt
+
+## 1. Expose `openai-codex` in the model catalog
+
+Required changes:
+
+- add `openai-codex` to the provider allowlist
+- give it a human label and sensible sort order
+- decide whether the default model should remain `openai:gpt-5.4` or become `openai-codex:gpt-5.4`
+- stop normalizing raw GPT ids to plain `openai` when the user explicitly wants Codex
+
+Jolt can reuse from Pi:
+
+- built-in provider definition
+- built-in model discovery
+- built-in model metadata
+
+Jolt must implement:
+
+- catalog exposure
+- UI grouping/labels
+- migration of persisted defaults if the canonical default changes
+
+## 2. Add backend provider-auth procedures
+
+Required backend capabilities:
+
+- read provider auth status for `openai-codex`
+- start login
+- surface login instructions or auth URL to the browser
+- complete login and persist credentials into the Pi `auth.json`
+- logout and clear stored credentials
+- return refreshed provider availability to the UI after login/logout
+
+Jolt can reuse from Pi:
+
+- `AuthStorage`
+- `loginOpenAICodex`
+- `getOAuthApiKey`
+- Pi's existing `auth.json` contract
+
+Jolt must implement:
+
+- RPC schema
+- Bun procedures
+- persistence handoff into Jolt's configured Pi agent directory
+- error mapping for failed login or refresh
+
+## 3. Add browser provider-auth UI
+
+Required browser capabilities:
+
+- show whether `openai-codex` is configured
+- start login
+- show auth instructions and progress
+- allow logout
+- explain the difference between ChatGPT-plan Codex and API-billed OpenAI
+
+Jolt can reuse from Pi:
+
+- nothing directly in the browser; Pi's OAuth flow is backend-side
+
+Jolt must implement:
+
+- settings panel UI
+- a provider-auth state machine
+- modal/dialog surfaces for auth prompts and success/failure states
+
+## 4. Fix runtime provider selection and billing precedence
+
+Required runtime changes:
+
+- stop silently preferring plain `openai` when a thread should use `openai-codex`
+- keep explicit provider-qualified ids authoritative
+- make plan-backed Codex the default only when that is an intentional product choice
+- avoid accidental PAYG fallback when the user expects ChatGPT-plan usage
+
+This matters because Pi's changelog explicitly notes prior billing bugs where the wrong credential source could send plan users through PAYG instead.
+
+Jolt can reuse from Pi:
+
+- provider-qualified model ids
+- provider-specific auth lookup
+
+Jolt must implement:
+
+- selection policy
+- migration logic for stored defaults
+- tests for `openai` versus `openai-codex` ambiguity
+
+## 5. Decide on auth-storage parity
+
+The recommended first implementation is:
+
+- store Pi/Codex OAuth credentials in Jolt's Pi agent directory
+- do not attempt to share or import `~/.codex/auth.json`
+- do not block on Codex-style keyring parity
+
+If exact Codex parity is later required, Jolt would need to add by-hand work for:
+
+- keyring-backed credential storage
+- optional import/export or sync with `~/.codex/auth.json`
+- managed restrictions similar to `forced_login_method` and `forced_chatgpt_workspace_id`
+
+This is not required to make Codex work through Pi, but it is the clearest gap between "Pi-native Codex support" and "Codex-auth parity."
+
+## 6. Add diagnostics and recovery
+
+Required operational surfaces:
+
+- login failure logging
+- visible status when `openai-codex` is unauthenticated
+- clear indication when a thread is API-billed OpenAI versus ChatGPT-plan Codex
+- recovery steps for stale credentials or revoked sessions
+
+OpenAI publicly documents device-code and localhost-callback troubleshooting for Codex. Pi's public built-in `openai-codex` docs do not document that same end-user flow in the browser, so Jolt should not assume it gets full Codex CLI recovery behavior for free.
+
+## 7. Test the full Codex path
+
+Minimum coverage should include:
+
+- model catalog exposes `openai-codex`
+- default/normalized model selection behaves as intended
+- login status surfaces to the UI
+- login/logout updates the model catalog and availability
+- runtime uses the intended provider for overlapping ids like `gpt-5.4`
+- regression tests prove Jolt does not silently bill through plain `openai` when `openai-codex` is intended
+
+## Risks
+
+- Billing-precedence risk. The current runtime and default model handling still lean toward `openai`, which can route traffic to API billing instead of ChatGPT-plan Codex.
+- Storage-parity risk. Pi documents `auth.json` storage, while Codex documents `auth.json` or keyring storage. If keyring parity is a product or security requirement, extra implementation is needed.
+- Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
+- Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Pi's built-in OpenAI Codex docs do not promise the same end-user recovery story.
+- Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls, while API-key usage follows API org controls. Jolt must make the chosen auth mode obvious to users.
+- Exact-parity risk. OpenAI publicly documents the Codex auth contract, not every internal desktop-app detail. Jolt can match behavior, but not assume undocumented cache formats or token plumbing are safe to clone.
+
+## Blockers
+
+- None for the recommended Pi-native path.
+- Exact Codex credential-store parity is not a blocker for making Codex work, but it becomes a blocker if Jolt requires OS keyring storage or direct reuse of `~/.codex/auth.json` before shipping the first implementation.
+
+## Suggested Execution Slices
+
+### CD01 - Expose `openai-codex` in the model catalog
+
+Deliverables:
+
+- add provider allowlist, labels, and sort order
+- surface `openai-codex:*` ids in RPC payloads and the browser selector
+- decide and encode default-model behavior
+
+Primary files:
+
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+
+### CD02 - Add backend `openai-codex` auth procedures
+
+Deliverables:
+
+- provider-auth status/read API
+- login start/finish orchestration
+- logout
+- persistence into Jolt's Pi `auth.json`
+
+Primary files:
+
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/bun/index.ts](../src/bun/index.ts)
+
+### CD03 - Add browser provider-auth UI
+
+Deliverables:
+
+- settings panel surfaces for provider status
+- login/logout actions
+- login progress and failure states
+- copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
+
+Primary files:
+
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [src/mainview/App.tsx](../src/mainview/App.tsx)
+
+### CD04 - Fix runtime provider selection and billing precedence
+
+Deliverables:
+
+- make explicit provider-qualified thread models authoritative
+- stop preferring plain `openai` when `openai-codex` is intended
+- add regression coverage around overlapping model ids
+
+Primary files:
+
+- [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/db.ts](../src/bun/db.ts)
+
+### CD05 - Implement auth-storage behavior and diagnostics
+
+Deliverables:
+
+- finalize first-pass storage behavior in Jolt's Pi agent directory
+- add visible diagnostics and stale-session recovery
+- document whether keyring parity and `~/.codex/auth.json` import are deferred or implemented
+
+Primary files:
+
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/index.ts](../src/bun/index.ts)
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+
+### CD06 - Verify the full Codex path and document operator behavior
+
+Deliverables:
+
+- focused backend and frontend tests
+- manual verification notes for ChatGPT-plan login, logout, and thread execution
+- final doc updates once the path is working
+
+Primary files:
+
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+
+## Recommendation
+
+Do not reintroduce `@openai/codex-sdk` as a live runtime dependency.
+
+Instead:
+
+- restore Codex usage through Pi's `openai-codex` provider
+- model the user-facing auth experience on Codex's documented ChatGPT/API-key behavior
+- keep the implementation Jolt-native and Pi-native
+
+That preserves the original reason for moving to Pi at all: one consistent agent runtime across providers.
