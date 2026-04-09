@@ -50,7 +50,7 @@ export type PendingGitHistoryPrefetch = {
  * - loaded entries
  * - next pagination offset
  * - active prefetch request
- * - signature to invalidate stale fills
+ * - signature used to invalidate prefetched pages when the worktree context changes
  */
 export type WorktreeGitHistoryCacheState = {
   history: RpcWorktreeGitHistorySummary;

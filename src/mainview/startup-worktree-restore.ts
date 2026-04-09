@@ -22,8 +22,8 @@ export function filterStartupWorktreeRestoreRequests(
 }
 
 /**
- * Ensure startup never keeps a stale selected worktree path once restore
- * results prove that path is invalid or failed to reopen.
+ * Keep the selected worktree path in sync with startup restore outcomes.
+ * If restore fails or indicates an invalid path, fall back to a valid one.
  */
 export function reconcileStartupSelectedWorktreePath(options: {
   allowFallback: boolean;
