@@ -12,6 +12,9 @@ Provides contextual action menus (`ProjectActionMenu`, `ThreadActionMenu`) used 
 `auth-step-up-dialog.tsx`
 Renders the step-up confirmation dialog used when a privileged action requires a fresh primary-factor plus TOTP re-check.
 
+`thread-extension-ui-dialog.tsx`
+Renders the shared browser prompt dialog used for Pi extension `confirm`, `select`, `input`, and `editor` requests.
+
 `settings-panel.tsx`
 Renders the top-right settings trigger and settings shell for app and workspace preferences.
 
@@ -43,7 +46,7 @@ Defines the thread row component (`ThreadList`) and shared thread-listing prop s
 Hosts the active workspace panel shell and swaps between available workspace modes.
 
 `chat-workspace.tsx`
-Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization and cached row-height reuse for unchanged rows.
+Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization, cached row-height reuse for unchanged rows, and browser-visible Pi extension status/widget surfaces around the composer.
 
 `diff-workspace.tsx`
 Builds and renders the diff tree/panel view, including helpers like `emptyDiffFilePatchState` and `buildDiffFileTree`, and now reuses shared parsed-diff state so large patches can prepare off the main thread.

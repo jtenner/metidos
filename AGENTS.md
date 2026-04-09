@@ -54,6 +54,8 @@
 │  │  ├─ index.ts
 │  │  ├─ pi-github-tools.test.ts
 │  │  ├─ pi-github-tools.ts
+│  │  ├─ pi-extension-ui.test.ts
+│  │  ├─ pi-extension-ui.ts
 │  │  ├─ pi-rpc-probe-extension.ts
 │  │  ├─ pi-jolt-tools.test.ts
 │  │  ├─ pi-jolt-tools.ts
@@ -132,6 +134,8 @@
 │     ├─ thread-send.ts
 │     ├─ thread-status-refresh.test.ts
 │     ├─ thread-status-refresh.ts
+│     ├─ thread-extension-ui.test.ts
+│     ├─ thread-extension-ui.ts
 │     ├─ app/
 │     │  ├─ README.md
 │     │  ├─ action-menus.tsx
@@ -167,6 +171,7 @@
 │     │  ├─ sidebar-panels-state.ts
 │     │  ├─ state.test.ts
 │     │  ├─ state.ts
+│     │  ├─ thread-extension-ui-dialog.tsx
 │     │  ├─ thread-list-row.tsx
 │     │  ├─ threads-panel.tsx
 │     │  ├─ use-add-project-form.ts

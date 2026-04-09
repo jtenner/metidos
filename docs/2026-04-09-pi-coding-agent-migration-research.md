@@ -1275,6 +1275,25 @@ Without this layer:
 - extension UI-heavy capabilities will be degraded
 - plan mode or approval flows will be harder to port cleanly
 
+### UX14 implementation status in `jt-ide`
+
+This is now implemented in `jt-ide`.
+
+What is now present:
+
+- Bun now binds Pi sessions with `session.bindExtensions(...)` through a Jolt-owned bridge instead of leaving extension UI disconnected.
+- The backend can push Pi extension UI requests over the existing Jolt websocket transport and accept browser responses over typed RPC procedures.
+- The browser app now handles Pi `confirm`, `select`, `input`, and `editor` prompts with a React dialog.
+- Fire-and-forget Pi UI updates now map into the browser for notifications, status lines, widgets, title overrides, working-message overrides, hidden-thinking labels, and composer text updates.
+- The active chat view now renders extension status pills plus above/below-editor widgets, and the transcript working/thinking labels can be overridden by Pi extension UI calls.
+- The composer now syncs its draft text back to the backend bridge so Pi `getEditorText()` can reflect current browser input for the active thread.
+
+What is still intentionally out of scope:
+
+- Pi TUI-only primitives such as `custom(...)`, custom header/footer components, terminal-input listeners, and custom editor components are still unsupported in Jolt’s browser runtime.
+- There is still no persisted replay/snapshot model for extension UI state across browser reconnects beyond the currently connected live session flow.
+- This slice binds Pi extension UI into Jolt, but it does not by itself remove the remaining Codex-era runtime and dependency surface.
+
 ## What Pi Saves Us From Building Ourselves
 
 If Jolt adopts Pi, the team does **not** need to hand-build these foundational pieces:

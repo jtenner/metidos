@@ -928,9 +928,11 @@ export function CommandExecutionMessage({
  * @param text - Input text content.
  */
 export function ReasoningMessage({
+  label = "Thinking",
   state,
   text,
 }: {
+  label?: string;
   state: "in_progress" | "completed" | "stopped";
   text: string;
 }): JSX.Element {
@@ -939,7 +941,7 @@ export function ReasoningMessage({
     <div className="border border-[#2a3339] bg-[#11171a] px-4 py-3">
       <div className="flex items-center justify-between gap-4">
         <div className="font-label text-[10px] uppercase tracking-widest text-[#8fb5cd]">
-          Thinking
+          {label}
         </div>
         <div className="text-[10px] uppercase tracking-widest text-[#70808c]">
           {state === "completed"

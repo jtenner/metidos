@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
+import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiGitHubToolHost } from "./pi-github-tools";
 import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
@@ -144,6 +145,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       },
       {
         appDataDir,
+        extensionUiBridge: createPiThreadExtensionUiBridge(),
         githubToolHost: piGitHubToolHostStub,
         joltToolHost: piJoltToolHostStub,
       },
@@ -175,6 +177,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "update_plan",
       "delegate_task",
     ]);
+    expect(safeRuntime.session.extensionRunner).toBeDefined();
 
     const streamed = collectAssistantText(safeRuntime);
     await safeRuntime.session.prompt("resume-safe-runtime");

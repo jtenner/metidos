@@ -34,6 +34,7 @@ import {
   ThreadAccessControl,
   type ThreadAccessValue,
 } from "../controls/thread-access-control";
+import type { ThreadExtensionUiWidget } from "../thread-extension-ui";
 import {
   ChatErrorMessage,
   ChatNoticeMessage,
@@ -65,6 +66,7 @@ type SharedChatControlsProps = {
   onChangeModel: (value: string) => void;
   onChangeReasoningEffort: (value: RpcReasoningEffort) => void;
   onChangeThreadAccess: (value: ThreadAccessValue) => void;
+  onComposerDraftChange?: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmitMessage: () => void;
   reasoningEffortControlError: string;
@@ -74,6 +76,13 @@ type SharedChatControlsProps = {
   threadAccessControlDisabled: boolean;
   threadAccessValue: ThreadAccessValue;
   codexModels: RpcModelOption[];
+  extensionHiddenThinkingLabel: string | null;
+  extensionStatusEntries: Array<{
+    key: string;
+    text: string;
+  }>;
+  extensionWidgetsAbove: ThreadExtensionUiWidget[];
+  extensionWidgetsBelow: ThreadExtensionUiWidget[];
 };
 
 type TranscriptMessageGroup =
@@ -123,6 +132,7 @@ type ChatVirtualizerOptions = ReactVirtualizerOptions<
 type TranscriptProps = {
   activeThreadId: number | null;
   expandedItemIds: ReadonlySet<string>;
+  extensionHiddenThinkingLabel: string | null;
   localUserLabel: string;
   messages: VisibleMessage[];
   onToggleItemExpanded: (messageKey: string) => void;
@@ -802,9 +812,60 @@ function copyTextToClipboard(text: string): void {
   fallbackCopy();
 }
 
+function ExtensionStatusPills({
+  entries,
+}: {
+  entries: Array<{
+    key: string;
+    text: string;
+  }>;
+}): JSX.Element {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {entries.map((entry) => (
+        <div
+          className="border border-[#2f3b43] bg-[#182026] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[#bcd1df]"
+          key={entry.key}
+        >
+          <span className="text-[#7f9aab]">{entry.key}</span>
+          <span className="mx-1 text-[#50616d]">/</span>
+          <span className="text-[#e5edf3]">{entry.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExtensionWidgetStack({
+  widgets,
+}: {
+  widgets: ThreadExtensionUiWidget[];
+}): JSX.Element {
+  return (
+    <div className="mb-3 space-y-2">
+      {widgets.map((widget) => (
+        <div
+          className="border border-[#2e3941] bg-[#141a1d] px-3 py-3 text-sm text-[#d6e7f2]"
+          key={widget.key}
+        >
+          <div className="mb-2 font-label text-[10px] uppercase tracking-[0.16em] text-[#8fb5cd]">
+            {widget.key}
+          </div>
+          <div className="space-y-1">
+            {widget.lines.map((line) => (
+              <div key={`${widget.key}:${line}`}>{line}</div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const ChatTranscript = memo(function ChatTranscript({
   activeThreadId,
   expandedItemIds,
+  extensionHiddenThinkingLabel,
   localUserLabel,
   messages,
   onToggleItemExpanded,
@@ -886,7 +947,13 @@ const ChatTranscript = memo(function ChatTranscript({
         return <MarkdownMessage text={message.text} />;
       }
       if (message.kind === "reasoning") {
-        return <ReasoningMessage state={message.state} text={message.text} />;
+        return (
+          <ReasoningMessage
+            label={extensionHiddenThinkingLabel ?? "Thinking"}
+            state={message.state}
+            text={message.text}
+          />
+        );
       }
       if (message.kind === "command") {
         return (
@@ -932,7 +999,7 @@ const ChatTranscript = memo(function ChatTranscript({
         />
       );
     },
-    [expandedItemIds, onToggleItemExpanded],
+    [expandedItemIds, extensionHiddenThinkingLabel, onToggleItemExpanded],
   );
 
   const measureTranscriptRowElement = useCallback(
@@ -1161,6 +1228,10 @@ export function DesktopChatView({
   composerActionDisabled,
   composerActionLabel,
   composerDisabled,
+  extensionHiddenThinkingLabel,
+  extensionStatusEntries,
+  extensionWidgetsAbove,
+  extensionWidgetsBelow,
   expandedItemIds,
   hasSelectedThread,
   initialChatInput,
@@ -1172,6 +1243,7 @@ export function DesktopChatView({
   onChangeModel,
   onChangeReasoningEffort,
   onChangeThreadAccess,
+  onComposerDraftChange,
   onSubmit,
   onSubmitMessage,
   onToggleItemExpanded,
@@ -1204,6 +1276,7 @@ export function DesktopChatView({
       <ChatTranscript
         activeThreadId={activeThreadId}
         expandedItemIds={expandedItemIds}
+        extensionHiddenThinkingLabel={extensionHiddenThinkingLabel}
         localUserLabel={localUserLabel}
         messages={messages}
         onToggleItemExpanded={onToggleItemExpanded}
@@ -1218,6 +1291,9 @@ export function DesktopChatView({
         onSubmit={onSubmit}
       >
         <div className="mx-auto max-w-4xl">
+          {extensionWidgetsAbove.length > 0 ? (
+            <ExtensionWidgetStack widgets={extensionWidgetsAbove} />
+          ) : null}
           <div className="flex items-center gap-2 border-b border-[#484848]/10 p-2">
             <div className="min-w-[15rem] max-w-[22rem]">
               <CodexModelSelector
@@ -1243,6 +1319,9 @@ export function DesktopChatView({
               value={threadAccessValue}
               variant="desktop"
             />
+            {extensionStatusEntries.length > 0 ? (
+              <ExtensionStatusPills entries={extensionStatusEntries} />
+            ) : null}
             <div className="flex-1" />
             <ContextUsageMeter
               inputTokens={activeContextInputTokens}
@@ -1271,9 +1350,13 @@ export function DesktopChatView({
             hasSelectedThread={hasSelectedThread}
             initialValue={initialChatInput}
             isWorking={selectedThreadIsWorking || isWorking}
+            onDraftChange={onComposerDraftChange}
             onSubmitMessage={onSubmitMessage}
             variant="desktop"
           />
+          {extensionWidgetsBelow.length > 0 ? (
+            <ExtensionWidgetStack widgets={extensionWidgetsBelow} />
+          ) : null}
         </div>
       </form>
     </>
@@ -1320,6 +1403,10 @@ export function MobileChatView({
   composerActionDisabled,
   composerActionLabel,
   composerDisabled,
+  extensionHiddenThinkingLabel,
+  extensionStatusEntries,
+  extensionWidgetsAbove,
+  extensionWidgetsBelow,
   expandedItemIds,
   hasSelectedThread,
   initialChatInput,
@@ -1331,6 +1418,7 @@ export function MobileChatView({
   onChangeModel,
   onChangeReasoningEffort,
   onChangeThreadAccess,
+  onComposerDraftChange,
   onSubmit,
   onSubmitMessage,
   onToggleItemExpanded,
@@ -1405,6 +1493,7 @@ export function MobileChatView({
       <ChatTranscript
         activeThreadId={activeThreadId}
         expandedItemIds={expandedItemIds}
+        extensionHiddenThinkingLabel={extensionHiddenThinkingLabel}
         localUserLabel={localUserLabel}
         messages={messages}
         onToggleItemExpanded={onToggleItemExpanded}
@@ -1422,6 +1511,9 @@ export function MobileChatView({
           className="mx-auto flex max-w-2xl flex-col gap-3"
           onSubmit={onSubmit}
         >
+          {extensionWidgetsAbove.length > 0 ? (
+            <ExtensionWidgetStack widgets={extensionWidgetsAbove} />
+          ) : null}
           <div className="overflow-visible border border-[#384249] bg-[#181b1e] shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
             <div className="border-b border-[#313a40] px-2 py-2">
               <div className="flex items-center gap-2">
@@ -1447,6 +1539,11 @@ export function MobileChatView({
                   />
                 </div>
               </div>
+              {extensionStatusEntries.length > 0 ? (
+                <div className="mt-2">
+                  <ExtensionStatusPills entries={extensionStatusEntries} />
+                </div>
+              ) : null}
             </div>
             <ChatComposerControl
               actionDisabled={composerActionDisabled}
@@ -1455,10 +1552,14 @@ export function MobileChatView({
               hasSelectedThread={hasSelectedThread}
               initialValue={initialChatInput}
               isWorking={selectedThreadIsWorking || isWorking}
+              onDraftChange={onComposerDraftChange}
               onSubmitMessage={onSubmitMessage}
               variant="mobile"
             />
           </div>
+          {extensionWidgetsBelow.length > 0 ? (
+            <ExtensionWidgetStack widgets={extensionWidgetsBelow} />
+          ) : null}
           {modelControlError ? (
             <div className="text-xs text-[#ff6e84]">{modelControlError}</div>
           ) : null}

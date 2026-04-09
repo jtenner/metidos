@@ -273,6 +273,7 @@ export type OpenThreadOptions = {
 export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "jolt:thread-start-request-created";
 export const CONTEXT_FOCUS_CHANGED_EVENT_NAME = "jolt:context-focus-changed";
+export const THREAD_EXTENSION_UI_EVENT_NAME = "jolt:thread-extension-ui";
 /**
  * Delay before firing directory suggestion network calls to avoid noisy typing.
  */

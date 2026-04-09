@@ -13,6 +13,7 @@ import type {
   RpcContextFocusChanged,
   RpcProcedureCallOptions,
   RpcRequestPriority,
+  RpcThreadExtensionUiRequest,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
 } from "../bun/rpc-schema";
@@ -22,7 +23,10 @@ import {
 } from "../bun/server-security";
 import { publishWorktreeGitHistoryChanged } from "./app/invalidation-events";
 import { loadRichMarkdownModule } from "./app/message-markdown-loader";
-import { CONTEXT_FOCUS_CHANGED_EVENT_NAME } from "./app/state";
+import {
+  CONTEXT_FOCUS_CHANGED_EVENT_NAME,
+  THREAD_EXTENSION_UI_EVENT_NAME,
+} from "./app/state";
 import { dispatchAuthRequired } from "./auth-client";
 import AuthShell from "./auth-shell";
 import {
@@ -82,12 +86,18 @@ type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
   type: "thread-start-request-created";
 };
 
+type RpcThreadExtensionUiMessage = {
+  type: "thread-extension-ui";
+  event: RpcThreadExtensionUiRequest;
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
-  | RpcThreadStartRequestCreatedMessage;
+  | RpcThreadStartRequestCreatedMessage
+  | RpcThreadExtensionUiMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -102,6 +112,7 @@ const RICH_MARKDOWN_WARMUP_DELAY_MS = 1_500;
 declare global {
   interface WindowEventMap {
     "jolt:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
+    "jolt:thread-extension-ui": CustomEvent<RpcThreadExtensionUiRequest>;
   }
 
   interface Window {
@@ -510,6 +521,17 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         );
         return;
       }
+      if (payload.type === "thread-extension-ui") {
+        window.dispatchEvent(
+          new CustomEvent<RpcThreadExtensionUiRequest>(
+            THREAD_EXTENSION_UI_EVENT_NAME,
+            {
+              detail: payload.event,
+            },
+          ),
+        );
+        return;
+      }
 
       const pending = pendingRequests.get(payload.id);
       if (!pending) {
@@ -858,6 +880,8 @@ const procedures: ProjectProcedures = {
   readWorktreeFileDiff: createProcedure("readWorktreeFileDiff"),
   setActiveWorktree: createProcedure("setActiveWorktree"),
   focusContext: createProcedure("focusContext"),
+  respondThreadExtensionUi: createProcedure("respondThreadExtensionUi"),
+  updateThreadExtensionEditor: createProcedure("updateThreadExtensionEditor"),
   listWorktreeGitHistory: createProcedure("listWorktreeGitHistory"),
   getWorktreeGitCommitDiff: createProcedure("getWorktreeGitCommitDiff"),
   closeWorktree: createProcedure("closeWorktree"),

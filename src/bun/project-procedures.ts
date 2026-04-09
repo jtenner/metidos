@@ -76,6 +76,7 @@ import {
   readWorktreeSnapshot,
   runGitCommand,
 } from "./git";
+import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
   createPiThreadRuntime,
@@ -164,6 +165,7 @@ import type {
   RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
+  RpcThreadExtensionUiRequest,
   RpcThreadRunStatus,
   RpcThreadStartRequest,
   RpcThreadUsage,
@@ -503,6 +505,7 @@ type ProjectPollState = {
 const projectPollMap = new Map<number, ProjectPollState>();
 const codexThreadMap = new Map<number, CodexThread>();
 const piThreadRuntimeMap = new Map<number, PiThreadRuntime>();
+const piThreadExtensionUiBridge = createPiThreadExtensionUiBridge();
 const threadRunStatusMap = new Map<number, RpcThreadRunStatus>();
 const threadTurnAbortControllerMap = new Map<number, AbortController>();
 const threadTurnCompletionMap = new Map<number, Promise<void>>();
@@ -527,6 +530,13 @@ let peakThreadActivityPersistenceDurationMs = 0;
 let worktreeGitHistoryChangeListener:
   | ((projectId: number, worktreePath: string) => void)
   | null = null;
+let threadExtensionUiMessageListener:
+  | ((request: RpcThreadExtensionUiRequest) => boolean)
+  | null = null;
+
+piThreadExtensionUiBridge.setMessageListener(
+  (request) => threadExtensionUiMessageListener?.(request) ?? false,
+);
 
 function hasForegroundReadPressure(): boolean {
   return foregroundReadCount > 0;
@@ -889,6 +899,7 @@ function clearThreadRuntimeState(threadId: number): void {
   threadTurnAbortControllerMap.delete(threadId);
   threadTurnCompletionMap.delete(threadId);
   codexThreadMap.delete(threadId);
+  piThreadExtensionUiBridge.clearThread(threadId);
   disposePiThreadRuntime(threadId);
   threadRunStatusMap.delete(threadId);
   invalidateThreadDetailCache(threadId);
@@ -1131,6 +1142,7 @@ async function ensurePiThreadRuntime(
   }
 
   const next = await createPiThreadRuntime(thread, {
+    extensionUiBridge: piThreadExtensionUiBridge,
     joltToolHost: createPiJoltToolHost(),
   });
   piThreadRuntimeMap.set(thread.id, next);
@@ -4471,6 +4483,31 @@ export async function focusContextProcedure(
     };
   });
 }
+
+export async function respondThreadExtensionUiProcedure(
+  params: AppRPCSchema["requests"]["respondThreadExtensionUi"]["params"],
+): Promise<AppRPCSchema["requests"]["respondThreadExtensionUi"]["response"]> {
+  threadById(params.threadId);
+  return {
+    accepted: piThreadExtensionUiBridge.handleResponse(
+      params.threadId,
+      params.response,
+    ),
+  };
+}
+
+export async function updateThreadExtensionEditorProcedure(
+  params: AppRPCSchema["requests"]["updateThreadExtensionEditor"]["params"],
+): Promise<
+  AppRPCSchema["requests"]["updateThreadExtensionEditor"]["response"]
+> {
+  threadById(params.threadId);
+  piThreadExtensionUiBridge.updateEditorText(params.threadId, params.text);
+  return {
+    success: true,
+    threadId: params.threadId,
+  };
+}
 /**
  * Closes worktree procedure.
  * @param params - Parameters object.
@@ -4622,4 +4659,10 @@ export function setWorktreeGitHistoryChangeListener(
   listener: ((projectId: number, worktreePath: string) => void) | null,
 ): void {
   worktreeGitHistoryChangeListener = listener;
+}
+
+export function setThreadExtensionUiMessageListener(
+  listener: ((request: RpcThreadExtensionUiRequest) => boolean) | null,
+): void {
+  threadExtensionUiMessageListener = listener;
 }

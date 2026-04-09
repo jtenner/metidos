@@ -28,6 +28,7 @@ type ChatComposerControlProps = {
   hasSelectedThread: boolean;
   initialValue: string;
   isWorking: boolean;
+  onDraftChange?: ((value: string) => void) | undefined;
   onSubmitMessage: () => void;
   variant: "desktop" | "mobile";
 };
@@ -130,6 +131,7 @@ export function ChatComposerControl({
   hasSelectedThread,
   initialValue,
   isWorking,
+  onDraftChange,
   onSubmitMessage,
   variant,
 }: ChatComposerControlProps): JSX.Element {
@@ -161,10 +163,12 @@ export function ChatComposerControl({
 
   const onChatInputChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
-      setChatComposerDraft(event.currentTarget.value);
+      const nextValue = event.currentTarget.value;
+      setChatComposerDraft(nextValue);
+      onDraftChange?.(nextValue);
       resizeComposerTextarea(event.currentTarget, minHeightPx);
     },
-    [minHeightPx],
+    [minHeightPx, onDraftChange],
   );
 
   const onEnter = useCallback(

@@ -76,9 +76,11 @@ import {
   recoverInterruptedThreadTurnsOnStartup,
   renameThreadProcedure,
   requestThreadStartProcedure,
+  respondThreadExtensionUiProcedure,
   runCronNowProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
+  setThreadExtensionUiMessageListener,
   setThreadPinnedProcedure,
   setWorktreeGitHistoryChangeListener,
   setWorktreePinnedProcedure,
@@ -90,6 +92,7 @@ import {
   suspendActiveWorktreePolling,
   updateCronProcedure,
   updateThreadAccessProcedure,
+  updateThreadExtensionEditorProcedure,
   updateThreadMetadataProcedure,
   updateThreadModelProcedure,
   updateThreadReasoningEffortProcedure,
@@ -102,6 +105,7 @@ import type {
   RpcContextFocusChanged,
   RpcRequestContext,
   RpcRequestPriority,
+  RpcThreadExtensionUiRequest,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
 } from "./rpc-schema";
@@ -210,12 +214,18 @@ type RpcThreadStartRequestCreatedMessage = RpcThreadStartRequest & {
   type: "thread-start-request-created";
 };
 
+type RpcThreadExtensionUiMessage = {
+  type: "thread-extension-ui";
+  event: RpcThreadExtensionUiRequest;
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
-  | RpcThreadStartRequestCreatedMessage;
+  | RpcThreadStartRequestCreatedMessage
+  | RpcThreadExtensionUiMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -480,6 +490,10 @@ const rpcHandlers: RpcRequestHandlerMap = {
     broadcastContextFocusChanged(result);
     return result;
   },
+  respondThreadExtensionUi: (params) =>
+    respondThreadExtensionUiProcedure(params),
+  updateThreadExtensionEditor: (params) =>
+    updateThreadExtensionEditorProcedure(params),
   listWorktreeGitHistory: (params, context) =>
     listWorktreeGitHistoryProcedure(params, context),
   getWorktreeGitCommitDiff: (params, context) =>
@@ -1936,6 +1950,30 @@ function broadcastThreadStartRequestCreated(
     }
   }
 }
+
+function broadcastThreadExtensionUiRequest(
+  event: RpcThreadExtensionUiRequest,
+): boolean {
+  if (rpcClients.size === 0) {
+    return false;
+  }
+
+  const payload: RpcThreadExtensionUiMessage = {
+    type: "thread-extension-ui",
+    event,
+  };
+  const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  let delivered = false;
+  for (const client of rpcClients) {
+    try {
+      client.send(raw);
+      delivered = true;
+    } catch {
+      rpcClients.delete(client);
+    }
+  }
+  return delivered;
+}
 /**
  * Normalizes watch filename.
  * @param filename - Target filename.
@@ -2150,6 +2188,9 @@ async function bootstrap(): Promise<void> {
   setWorktreeGitHistoryChangeListener((projectId, worktreePath) => {
     broadcastGitHistoryChanged(projectId, worktreePath);
   });
+  setThreadExtensionUiMessageListener((request) =>
+    broadcastThreadExtensionUiRequest(request),
+  );
 
   let activeServerPort = SERVER_PORT;
   startOverloadMonitoring(() => activeServerPort);
@@ -2687,6 +2728,7 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
       overloadMonitorTimer = null;
     }
     setWorktreeGitHistoryChangeListener(null);
+    setThreadExtensionUiMessageListener(null);
     shutdownProcedureCacheMaintenance();
     shutdownProjectPolling();
     await stopCronScheduler();

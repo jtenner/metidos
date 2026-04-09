@@ -6,7 +6,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 ## Top-level entry files
 
-`App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries. It now keeps the source-of-truth project and thread collections in indexed stores so hot mutation paths can update incrementally while memoized ordered arrays remain available for component APIs.
+`App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries. It now keeps the source-of-truth project and thread collections in indexed stores so hot mutation paths can update incrementally while memoized ordered arrays remain available for component APIs, and it also owns the browser-side Pi extension UI bridge state for prompts, notifications, widgets, and composer synchronization.
 
 `auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
 
@@ -26,6 +26,8 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `thread-workspace-selection.ts` isolates the thread-driven workspace-target derivation used when a selected thread needs to reopen its project and worktree context before diff or history panels can load live worktree data.
 
+`thread-extension-ui.ts` isolates the browser-side reducer/selectors used to project Pi extension UI websocket events into React dialog, notification, status, widget, and editor state.
+
 `rpc-errors.ts` defines the typed RPC error surface used by the frontend to react to privileged-action failures such as `step_up_required`.
 
 `index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.
@@ -43,6 +45,8 @@ This contains the workspace feature modules that implement every visible workspa
 `app/action-menus.tsx` defines context/action menus for project and thread operations.
 
 `app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile, coordinates composer + message flow, and now caches transcript row measurements so unchanged virtualized rows can reuse prior heights across ordinary rerenders.
+
+`app/thread-extension-ui-dialog.tsx` renders the shared Pi extension prompt dialog used for browser-backed confirm/select/input/editor requests.
 
 `app/desktop-sidebar.tsx` defines the desktop layout shell and sidebar affordances for wide screens.
 

@@ -25,6 +25,7 @@ import type {
   RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
+  RpcThreadExtensionUiRequest,
   RpcThreadMessage,
   RpcThreadRunStatus,
   RpcThreadStartRequest,
@@ -99,6 +100,7 @@ import {
   removeThreadFromStore,
   serializeOpenWorktrees,
   sortThreads,
+  THREAD_EXTENSION_UI_EVENT_NAME,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
   THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
@@ -116,6 +118,7 @@ import {
   writeLruValue,
   writePersistedMainviewState,
 } from "./app/state";
+import { ThreadExtensionUiDialog } from "./app/thread-extension-ui-dialog";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
@@ -149,6 +152,16 @@ import {
   filterStartupWorktreeRestoreRequests,
   reconcileStartupSelectedWorktreePath,
 } from "./startup-worktree-restore";
+import {
+  dismissThreadExtensionUiDialog,
+  dismissThreadExtensionUiNotification,
+  EMPTY_THREAD_EXTENSION_UI_STORE,
+  listThreadExtensionUiStatuses,
+  listThreadExtensionUiWidgets,
+  readThreadExtensionUiState,
+  reduceThreadExtensionUiStore,
+  type ThreadExtensionUiStore,
+} from "./thread-extension-ui";
 import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
@@ -654,6 +667,14 @@ export default function App({
   const [stepUpPrimaryFactor, setStepUpPrimaryFactor] = useState("");
   const [stepUpTotpCode, setStepUpTotpCode] = useState("");
   const [isSubmittingStepUp, setIsSubmittingStepUp] = useState(false);
+  const [threadExtensionUiStore, setThreadExtensionUiStore] =
+    useState<ThreadExtensionUiStore>(EMPTY_THREAD_EXTENSION_UI_STORE);
+  const [threadExtensionUiDialogDraft, setThreadExtensionUiDialogDraft] =
+    useState("");
+  const [threadExtensionUiDialogBusy, setThreadExtensionUiDialogBusy] =
+    useState(false);
+  const [threadExtensionUiDialogError, setThreadExtensionUiDialogError] =
+    useState("");
   const [expandedTranscriptItemIds, setExpandedTranscriptItemIds] = useState(
     () => new Set<string>(),
   );
@@ -699,6 +720,9 @@ export default function App({
   const persistedMainviewStateWriteTimeoutRef = useRef<number | null>(null);
   const pendingPersistedMainviewStateRef =
     useRef<PersistedMainviewState | null>(null);
+  const threadExtensionUiNotificationTimeoutsRef = useRef(
+    new Map<string, number>(),
+  );
 
   const closeStepUpDialog = useCallback((authorized: boolean) => {
     setStepUpDialogOpen(false);
@@ -988,6 +1012,26 @@ export default function App({
     joltAccess: activeJoltAccess,
     unsafeMode: activeUnsafeMode,
   };
+  const activeThreadExtensionUiState = useMemo(
+    () => readThreadExtensionUiState(threadExtensionUiStore, selectedThreadId),
+    [selectedThreadId, threadExtensionUiStore],
+  );
+  const activeThreadExtensionStatuses = useMemo(
+    () => listThreadExtensionUiStatuses(activeThreadExtensionUiState),
+    [activeThreadExtensionUiState],
+  );
+  const activeThreadExtensionWidgetsAbove = useMemo(
+    () =>
+      listThreadExtensionUiWidgets(activeThreadExtensionUiState, "aboveEditor"),
+    [activeThreadExtensionUiState],
+  );
+  const activeThreadExtensionWidgetsBelow = useMemo(
+    () =>
+      listThreadExtensionUiWidgets(activeThreadExtensionUiState, "belowEditor"),
+    [activeThreadExtensionUiState],
+  );
+  const currentThreadExtensionUiDialog =
+    threadExtensionUiStore.dialogs[0] ?? null;
 
   // Request queue handling: show and resolve the oldest pending thread-start request
   // first so users always act on the oldest queued action.
@@ -1031,6 +1075,188 @@ export default function App({
         ? currentThreadStartRequestReasoningOption.label
         : `Default (${currentThreadStartRequestReasoningOption.label})`
       : (currentThreadStartRequest?.reasoningEffort ?? "default");
+
+  const syncThreadExtensionEditor = useCallback(
+    (threadId: number | null, text: string): void => {
+      if (threadId === null) {
+        return;
+      }
+      void procedures
+        .updateThreadExtensionEditor({
+          threadId,
+          text,
+        })
+        .catch((error) => {
+          console.error("Failed to sync Pi extension editor text", error);
+        });
+    },
+    [procedures],
+  );
+
+  const respondToCurrentThreadExtensionUiDialog = useCallback(
+    async (value: boolean | string | undefined) => {
+      const dialog = currentThreadExtensionUiDialog;
+      if (!dialog) {
+        return;
+      }
+
+      setThreadExtensionUiDialogBusy(true);
+      setThreadExtensionUiDialogError("");
+      try {
+        const response =
+          typeof value === "boolean"
+            ? {
+                requestId: dialog.requestId,
+                confirmed: value,
+              }
+            : typeof value === "string"
+              ? {
+                  requestId: dialog.requestId,
+                  value,
+                }
+              : {
+                  requestId: dialog.requestId,
+                  cancelled: true as const,
+                };
+        await procedures.respondThreadExtensionUi({
+          threadId: dialog.threadId,
+          response,
+        });
+        setThreadExtensionUiStore((current) =>
+          dismissThreadExtensionUiDialog(current, dialog.requestId),
+        );
+        setThreadExtensionUiDialogDraft("");
+      } catch (error) {
+        setThreadExtensionUiDialogError(
+          error instanceof Error ? error.message : String(error),
+        );
+        return;
+      } finally {
+        setThreadExtensionUiDialogBusy(false);
+      }
+    },
+    [currentThreadExtensionUiDialog, procedures],
+  );
+
+  useEffect(() => {
+    const dialog = currentThreadExtensionUiDialog;
+    setThreadExtensionUiDialogError("");
+    setThreadExtensionUiDialogBusy(false);
+    if (!dialog) {
+      setThreadExtensionUiDialogDraft("");
+      return;
+    }
+    if (dialog.method === "editor") {
+      setThreadExtensionUiDialogDraft(dialog.prefill ?? "");
+      return;
+    }
+    if (dialog.method === "input") {
+      setThreadExtensionUiDialogDraft("");
+      return;
+    }
+    setThreadExtensionUiDialogDraft("");
+  }, [currentThreadExtensionUiDialog]);
+
+  useEffect(() => {
+    const handleThreadExtensionUiEvent = (event: Event): void => {
+      const request = (event as CustomEvent<RpcThreadExtensionUiRequest>)
+        .detail;
+      setThreadExtensionUiStore((current) =>
+        reduceThreadExtensionUiStore(current, request),
+      );
+
+      if (selectedThreadIdRef.current !== request.threadId) {
+        return;
+      }
+
+      if (request.method === "set_editor_text") {
+        setChatComposerDraft(request.text);
+        return;
+      }
+      if (request.method === "append_editor_text") {
+        setChatComposerDraft(
+          `${readChatComposerDraft(initialMainviewState.chatInput)}${request.text}`,
+        );
+      }
+    };
+
+    window.addEventListener(
+      THREAD_EXTENSION_UI_EVENT_NAME,
+      handleThreadExtensionUiEvent,
+    );
+    return () => {
+      window.removeEventListener(
+        THREAD_EXTENSION_UI_EVENT_NAME,
+        handleThreadExtensionUiEvent,
+      );
+    };
+  }, [initialMainviewState.chatInput]);
+
+  useEffect(() => {
+    const activeNotificationIds = new Set(
+      threadExtensionUiStore.notifications.map(
+        (notification) => notification.id,
+      ),
+    );
+    for (const notification of threadExtensionUiStore.notifications) {
+      if (
+        threadExtensionUiNotificationTimeoutsRef.current.has(notification.id)
+      ) {
+        continue;
+      }
+      const timeoutId = window.setTimeout(() => {
+        setThreadExtensionUiStore((current) =>
+          dismissThreadExtensionUiNotification(current, notification.id),
+        );
+        threadExtensionUiNotificationTimeoutsRef.current.delete(
+          notification.id,
+        );
+      }, 4_500);
+      threadExtensionUiNotificationTimeoutsRef.current.set(
+        notification.id,
+        timeoutId,
+      );
+    }
+    for (const [
+      notificationId,
+      timeoutId,
+    ] of threadExtensionUiNotificationTimeoutsRef.current) {
+      if (activeNotificationIds.has(notificationId)) {
+        continue;
+      }
+      window.clearTimeout(timeoutId);
+      threadExtensionUiNotificationTimeoutsRef.current.delete(notificationId);
+    }
+  }, [threadExtensionUiStore.notifications]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of threadExtensionUiNotificationTimeoutsRef.current.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      threadExtensionUiNotificationTimeoutsRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    syncThreadExtensionEditor(
+      selectedThreadId,
+      readChatComposerDraft(initialMainviewState.chatInput),
+    );
+  }, [
+    initialMainviewState.chatInput,
+    selectedThreadId,
+    syncThreadExtensionEditor,
+  ]);
+
+  useEffect(() => {
+    const nextDocumentTitle =
+      activeThreadExtensionUiState?.title?.trim() || activeScreenTitle;
+    document.title = nextDocumentTitle
+      ? `${nextDocumentTitle} · ${APP_TITLE}`
+      : APP_TITLE;
+  }, [activeScreenTitle, activeThreadExtensionUiState?.title]);
+
   const desktopThreadSwitcherOpen =
     desktopThreadSwitcherTarget !== null &&
     selectedProject?.id === desktopThreadSwitcherTarget.projectId &&
@@ -4750,17 +4976,19 @@ export default function App({
       selectedThread?.runStatus.state === "working" &&
       !hasInProgressAssistantChat
     ) {
+      const workingMessageText =
+        activeThreadExtensionUiState?.workingMessage?.trim() || "Processing";
       messages.push(
         readCachedVisibleMessage(
           visibleMessageCache,
           `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
-          "chat:working:assistant:Processing",
+          `chat:working:assistant:${workingMessageText}`,
           () => ({
             key: `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
             kind: "chat",
             speaker: "assistant",
             tone: "working",
-            text: "Processing",
+            text: workingMessageText,
           }),
         ),
       );
@@ -4802,6 +5030,7 @@ export default function App({
     activeSelectedWorktreeFolder,
     activeChatError,
     activeChatNotice,
+    activeThreadExtensionUiState?.workingMessage,
     activeSelectedWorktreePath,
     isThreadLoading,
     selectedProject,
@@ -5500,6 +5729,12 @@ export default function App({
                   composerActionDisabled={composerActionDisabled}
                   composerActionLabel={composerActionLabel}
                   composerDisabled={composerDisabled}
+                  extensionHiddenThinkingLabel={
+                    activeThreadExtensionUiState?.hiddenThinkingLabel ?? null
+                  }
+                  extensionStatusEntries={activeThreadExtensionStatuses}
+                  extensionWidgetsAbove={activeThreadExtensionWidgetsAbove}
+                  extensionWidgetsBelow={activeThreadExtensionWidgetsBelow}
                   expandedItemIds={expandedTranscriptItemIds}
                   hasSelectedThread={Boolean(selectedThread)}
                   initialChatInput={initialMainviewState.chatInput}
@@ -5516,6 +5751,9 @@ export default function App({
                   }}
                   onChangeThreadAccess={(value) => {
                     void updateActiveThreadAccess(value);
+                  }}
+                  onComposerDraftChange={(value) => {
+                    syncThreadExtensionEditor(selectedThreadId, value);
                   }}
                   onSubmit={onSubmit}
                   onSubmitMessage={postMessage}
@@ -5938,6 +6176,12 @@ export default function App({
                 composerActionDisabled={composerActionDisabled}
                 composerActionLabel={composerActionLabel}
                 composerDisabled={composerDisabled}
+                extensionHiddenThinkingLabel={
+                  activeThreadExtensionUiState?.hiddenThinkingLabel ?? null
+                }
+                extensionStatusEntries={activeThreadExtensionStatuses}
+                extensionWidgetsAbove={activeThreadExtensionWidgetsAbove}
+                extensionWidgetsBelow={activeThreadExtensionWidgetsBelow}
                 expandedItemIds={expandedTranscriptItemIds}
                 hasSelectedThread={Boolean(selectedThread)}
                 initialChatInput={initialMainviewState.chatInput}
@@ -5954,6 +6198,9 @@ export default function App({
                 }}
                 onChangeThreadAccess={(value) => {
                   void updateActiveThreadAccess(value);
+                }}
+                onComposerDraftChange={(value) => {
+                  syncThreadExtensionEditor(selectedThreadId, value);
                 }}
                 onSubmit={onSubmit}
                 onSubmitMessage={postMessage}
@@ -6323,6 +6570,44 @@ export default function App({
               )}`
             : activeSelectedWorktreeFolder || "Current worktree"
         }
+      />
+      <div className="pointer-events-none fixed right-4 top-4 z-[109] flex max-w-sm flex-col gap-2">
+        {threadExtensionUiStore.notifications.map((notification) => (
+          <button
+            className={`pointer-events-auto rounded-xl border px-4 py-3 text-left text-sm shadow-xl shadow-black/35 ${
+              notification.type === "error"
+                ? "border-[#6b3a3a] bg-[#2a1717] text-[#ffb9b9]"
+                : notification.type === "warning"
+                  ? "border-[#6a5a2c] bg-[#231d11] text-[#f2d79b]"
+                  : "border-[#32414b] bg-[#141a1d] text-[#d6e7f2]"
+            }`}
+            key={notification.id}
+            onClick={() => {
+              setThreadExtensionUiStore((current) =>
+                dismissThreadExtensionUiNotification(current, notification.id),
+              );
+            }}
+            type="button"
+          >
+            <div className="font-label text-[10px] uppercase tracking-[0.14em] opacity-75">
+              Thread #{notification.threadId}
+            </div>
+            <div className="mt-1">{notification.message}</div>
+          </button>
+        ))}
+      </div>
+      <ThreadExtensionUiDialog
+        busy={threadExtensionUiDialogBusy}
+        dialog={currentThreadExtensionUiDialog}
+        error={threadExtensionUiDialogError}
+        onCancel={() => {
+          void respondToCurrentThreadExtensionUiDialog(undefined);
+        }}
+        onConfirm={(value) => {
+          void respondToCurrentThreadExtensionUiDialog(value);
+        }}
+        onDraftChange={setThreadExtensionUiDialogDraft}
+        value={threadExtensionUiDialogDraft}
       />
       <AuthStepUpDialog
         actionLabel={stepUpActionLabel}

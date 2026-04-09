@@ -54,12 +54,20 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Installs the Pi-native GitHub tool pack when `githubAccess` is enabled for the thread, binding those tools to the GitHub repository that owns the current worktree.
   - Installs the Pi-native agents pack when `agentsAccess` is enabled, exposing `update_plan` plus a bounded `delegate_task` helper instead of Codex’s full child-agent lifecycle.
   - Installs the Pi-native Jolt custom tool pack when `joltAccess` is enabled for the thread.
+  - Binds the shared browser-facing Pi extension UI bridge when the Bun runtime provides one, allowing session extension prompts and status/widget updates to escape the headless session layer.
   - Runs delegated helper tasks as isolated in-process Pi child sessions that inherit the parent thread’s workspace/model/tool policy while excluding recursive agent tools.
   - Reopens the explicitly persisted Pi session file when a thread already has one instead of relying only on “most recent session” behavior.
   - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
 
 - `pi-thread-runtime.test.ts`
   - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, and delegated child-session execution.
+
+- `pi-extension-ui.ts`
+  - Shared Bun-side bridge that turns Pi `ExtensionUIContext` calls into Jolt websocket/RPC traffic.
+  - Tracks thread-scoped editor text, handles interactive prompt responses, and emits browser-facing events for notifications, status lines, widgets, title changes, working-message overrides, and hidden-thinking labels.
+
+- `pi-extension-ui.test.ts`
+  - Focused coverage for Pi extension dialog fallbacks, round-trip browser responses, and editor/status/widget event emission.
 
 - `pi-agents-tools.ts`
   - Pi-native agents/plan tool pack that gives the `Agents` toggle a real meaning in the Pi runtime.

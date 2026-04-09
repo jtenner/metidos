@@ -34,6 +34,7 @@ import {
   type PiDelegatedTaskRequest,
   type PiDelegatedTaskRun,
 } from "./pi-agents-tools";
+import type { PiThreadExtensionUiBridge } from "./pi-extension-ui";
 import {
   createPiGitHubCliHost,
   createPiGitHubTools,
@@ -89,6 +90,7 @@ export type PiThreadToolPolicy = {
 type CreatePiRuntimeOptions = {
   agentsToolHost?: PiAgentsToolHost;
   appDataDir?: string;
+  extensionUiBridge?: PiThreadExtensionUiBridge;
   githubToolHost?: PiGitHubToolHost;
   joltToolHost?: PiJoltToolHost;
 };
@@ -673,6 +675,11 @@ export async function createPiThreadRuntime(
     thinkingLevel: resolvePiThinkingLevel(thread.reasoningEffort),
     tools: buildPiTools(thread.worktreePath, toolPolicy),
   });
+  if (options?.extensionUiBridge) {
+    await session.bindExtensions(
+      options.extensionUiBridge.bindingsForThread(thread.id),
+    );
+  }
 
   return {
     agentDirectory,
