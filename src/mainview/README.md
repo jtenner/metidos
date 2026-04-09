@@ -110,7 +110,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/chat-composer-control.tsx` renders the message composer and send/compose interactions.
 
-`controls/codex-model-selector.tsx` controls model-selection and selection state for chat routing.
+`controls/codex-model-selector.tsx` controls provider-aware model selection and Pi-compatible thinking-level state for chat routing.
 
 `controls/codex-utils.ts` provides shared utility helpers used by codex-oriented controls.
 
@@ -118,7 +118,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/icons.tsx` centralizes icon exports used by controls and panels.
 
-`controls/reasoning-effort-selector.tsx` provides model reasoning effort selection for request tuning.
+`controls/reasoning-effort-selector.tsx` provides model thinking-level selection for request tuning when the selected model supports it.
 
 `controls/search-utils.ts` contains search/filter helpers used by sidebar and workspace find surfaces.
 

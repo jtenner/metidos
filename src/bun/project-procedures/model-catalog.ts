@@ -184,17 +184,20 @@ function compareCatalogEntries(
 
 function buildModelSummary(model: Model<Api>): string {
   const inputKinds = model.input.join(", ");
+  const providerName = providerLabel(model.provider);
   return [
-    `Provider: ${providerLabel(model.provider)}.`,
+    `Provider: ${providerName}.`,
+    `Model ID: ${model.id}.`,
     `Inputs: ${inputKinds}.`,
     model.reasoning
-      ? "Supports reasoning effort."
-      : "No reasoning-effort control.",
+      ? "Supports thinking level control."
+      : "No thinking-level control.",
     `Context window: ${TOKEN_FORMATTER.format(model.contextWindow)} tokens.`,
   ].join(" ");
 }
 
 function publicCatalogModelOption(model: Model<Api>): ModelCatalogEntry {
+  const providerName = providerLabel(model.provider);
   return {
     contextWindowTokens: model.contextWindow,
     key: canonicalModelKey(model.provider, model.id),
@@ -202,10 +205,14 @@ function publicCatalogModelOption(model: Model<Api>): ModelCatalogEntry {
     option: {
       contextWindowTokens: model.contextWindow,
       deprecated: false,
-      group: providerLabel(model.provider),
+      group: providerName,
       id: canonicalModelKey(model.provider, model.id),
       label: model.name,
+      modelId: model.id,
+      providerId: model.provider,
+      providerLabel: providerName,
       summary: buildModelSummary(model),
+      supportsReasoningEffort: model.reasoning,
     },
     provider: model.provider,
     supportsReasoningEffort: model.reasoning,

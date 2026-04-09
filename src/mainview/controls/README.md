@@ -1,6 +1,6 @@
 # Controls
 
-This folder contains shared UI controls used by the main view interface for composer workflow, sidebar tools, and codex model configuration.  
+This folder contains shared UI controls used by the main view interface for composer workflow, sidebar tools, and Pi-backed model configuration.  
 Each file is designed to be imported by `src/mainview/app/*` screens and keeps interaction behavior, styling, and accessibility concerns close to the control surface.
 
 ## Files
@@ -10,12 +10,12 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
   - Owns shared draft state through a tiny external store so typing state survives remounts and state transitions.
   - Handles resizing, placeholder text, Enter/Cmd+Enter send behavior, and disabled/loading affordances.
 - `codex-model-selector.tsx`
-  - Implements the model picker UI (desktop + mobile variants) for Codex model selection.
-  - Groups models by category for readable browsing, supports search filtering, and can include reasoning-effort controls in mobile contexts.
+  - Implements the model picker UI (desktop + mobile variants) for provider-aware Pi model selection.
+  - Groups models by provider for readable browsing, supports search filtering, and can include thinking-level controls in mobile contexts.
   - Keeps selection and submenu positioning state in sync while models/reasoning metadata load asynchronously.
 - `codex-utils.ts`
-  - Helper utilities for Codex model/reasoning UI wiring.
-  - Groups model options, formats user-facing labels (including deprecation marking), and resolves selected IDs to model/effort records.
+  - Helper utilities for model/thinking UI wiring.
+  - Groups model options, formats provider-aware labels (including deprecation marking), and resolves selected IDs to model/effort records.
 - `dropdown.tsx`
   - Provides a reusable render-prop dropdown primitive used across control UIs.
   - Manages open/close state, outside-click and Escape-key dismissal, and open-state callbacks for parent integrations.
@@ -23,7 +23,7 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
   - Houses the project’s icon contract with a typed `AppIconName` union.
   - Maps each icon name to a material-style SVG glyph and exposes `materialSymbol` for consistent icon rendering.
 - `reasoning-effort-selector.tsx`
-  - Compact selector for Codex reasoning effort values (for example low/medium/high).
+  - Compact selector for Pi-style thinking-level values (for example low/medium/high).
   - Integrates with `DropdownControl` and shows loading/fallback labels when options are unavailable.
 - `search-utils.ts`
   - Utility for query preprocessing and matching behavior used by selector search UIs.

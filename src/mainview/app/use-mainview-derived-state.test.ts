@@ -8,12 +8,14 @@ import { describe, expect, it } from "bun:test";
 import type {
   RpcModelOption,
   RpcProject,
+  RpcReasoningEffortOption,
   RpcThread,
   RpcWorktree,
 } from "../../bun/rpc-schema";
 import { worktreeKey } from "./state";
 import {
   deriveActiveContextUsage,
+  deriveReasoningEffortSelectorDisabled,
   deriveWorktreeDisplayPathByKey,
 } from "./use-mainview-derived-state";
 
@@ -49,6 +51,29 @@ function worktree(path: string, branch: string | null = "main"): RpcWorktree {
     pinnedAt: null,
   };
 }
+
+function modelOption(overrides: Partial<RpcModelOption> = {}): RpcModelOption {
+  return {
+    contextWindowTokens: 400_000,
+    deprecated: false,
+    group: "OpenAI",
+    id: "openai:gpt-5.4",
+    label: "GPT-5.4",
+    modelId: "gpt-5.4",
+    providerId: "openai",
+    providerLabel: "OpenAI",
+    summary: "Provider: OpenAI. Supports thinking level control.",
+    supportsReasoningEffort: true,
+    ...overrides,
+  };
+}
+
+const THINKING_OPTIONS: RpcReasoningEffortOption[] = [
+  {
+    id: "medium",
+    label: "Medium",
+  },
+];
 
 describe("deriveWorktreeDisplayPathByKey", () => {
   it("preformats worktree display paths with home-directory shorthand", () => {
@@ -139,5 +164,43 @@ describe("deriveActiveContextUsage", () => {
       inputTokens: 11_000,
       contextWindowTokens: 400_000,
     });
+  });
+});
+
+describe("deriveReasoningEffortSelectorDisabled", () => {
+  it("disables thinking control when the selected model has no thinking-level override", () => {
+    expect(
+      deriveReasoningEffortSelectorDisabled({
+        activeCodexModelOption: modelOption({
+          id: "anthropic:claude-sonnet-4",
+          label: "Claude Sonnet 4",
+          modelId: "claude-sonnet-4",
+          providerId: "anthropic",
+          providerLabel: "Anthropic",
+          group: "Anthropic",
+          supportsReasoningEffort: false,
+        }),
+        isCreatingThread: false,
+        isSending: false,
+        isThreadLoading: false,
+        isUpdatingThreadReasoningEffort: false,
+        reasoningEfforts: THINKING_OPTIONS,
+        selectedThreadIsWorking: false,
+      }),
+    ).toBeTrue();
+  });
+
+  it("keeps thinking control enabled for supported models while the UI is idle", () => {
+    expect(
+      deriveReasoningEffortSelectorDisabled({
+        activeCodexModelOption: modelOption(),
+        isCreatingThread: false,
+        isSending: false,
+        isThreadLoading: false,
+        isUpdatingThreadReasoningEffort: false,
+        reasoningEfforts: THINKING_OPTIONS,
+        selectedThreadIsWorking: false,
+      }),
+    ).toBeFalse();
   });
 });

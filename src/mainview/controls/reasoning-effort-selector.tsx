@@ -1,6 +1,6 @@
 /**
  * @file src/mainview/controls/reasoning-effort-selector.tsx
- * @description Module for reasoning effort selector.
+ * @description Module for thinking-level selector.
  */
 
 import type { JSX } from "react";
@@ -21,7 +21,7 @@ type ReasoningEffortSelectorProps = {
 };
 
 /**
- * Selects a model reasoning effort level (for example "low", "medium", "high").
+ * Selects a model thinking level (for example "low", "medium", "high").
  * Renders a compact button + popover menu with clear label fallbacks while data loads.
  */
 export function ReasoningEffortSelector({
@@ -40,7 +40,7 @@ export function ReasoningEffortSelector({
     ? activeOption.label
     : options.length === 0
       ? "Loading"
-      : "Effort";
+      : "Thinking";
 
   return (
     <DropdownControl
@@ -48,8 +48,8 @@ export function ReasoningEffortSelector({
       disabled={disabled}
       title={
         activeOption
-          ? `Reasoning effort: ${activeOption.label}`
-          : "Reasoning effort"
+          ? `Thinking level: ${activeOption.label}`
+          : "Thinking level"
       }
       renderButton={({ open, toggle }) => (
         <button
@@ -111,7 +111,7 @@ export function ReasoningEffortSelector({
           }`}
         >
           <div className="border-b border-[#3c4c58] px-3 py-2 font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
-            Reasoning Effort
+            Thinking Level
           </div>
           <div className="py-2">
             {options.map((option) => {

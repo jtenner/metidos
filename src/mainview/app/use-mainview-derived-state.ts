@@ -14,7 +14,10 @@ import type {
   RpcWorktree,
   RpcWorktreeGitHistoryResult,
 } from "../../bun/rpc-schema";
-import { findCodexModel } from "../controls/codex-utils";
+import {
+  codexModelSupportsThinkingLevel,
+  findCodexModel,
+} from "../controls/codex-utils";
 import {
   buildNormalizedSearchText,
   matchesNormalizedSearchText,
@@ -134,6 +137,34 @@ export function deriveActiveContextUsage(
       activeCodexModelOption?.contextWindowTokens ??
       400_000,
   };
+}
+
+export function deriveReasoningEffortSelectorDisabled({
+  activeCodexModelOption,
+  isCreatingThread,
+  isSending,
+  isThreadLoading,
+  isUpdatingThreadReasoningEffort,
+  reasoningEfforts,
+  selectedThreadIsWorking,
+}: {
+  activeCodexModelOption: RpcModelOption | null;
+  isCreatingThread: boolean;
+  isSending: boolean;
+  isThreadLoading: boolean;
+  isUpdatingThreadReasoningEffort: boolean;
+  reasoningEfforts: RpcReasoningEffortOption[];
+  selectedThreadIsWorking: boolean;
+}): boolean {
+  return (
+    reasoningEfforts.length === 0 ||
+    !codexModelSupportsThinkingLevel(activeCodexModelOption) ||
+    isCreatingThread ||
+    isThreadLoading ||
+    isSending ||
+    isUpdatingThreadReasoningEffort ||
+    selectedThreadIsWorking
+  );
 }
 /**
  * Provides hook behavior for MainviewDerivedState.
@@ -419,13 +450,17 @@ export function useMainviewDerivedState({
     isSending ||
     isUpdatingThreadModel ||
     selectedThreadIsWorking;
-  const reasoningEffortSelectorDisabled =
-    reasoningEfforts.length === 0 ||
-    isCreatingThread ||
-    isThreadLoading ||
-    isSending ||
-    isUpdatingThreadReasoningEffort ||
-    selectedThreadIsWorking;
+  const reasoningEffortSelectorDisabled = deriveReasoningEffortSelectorDisabled(
+    {
+      activeCodexModelOption,
+      isCreatingThread,
+      isSending,
+      isThreadLoading,
+      isUpdatingThreadReasoningEffort,
+      reasoningEfforts,
+      selectedThreadIsWorking,
+    },
+  );
   const threadAccessControlDisabled =
     isCreatingThread ||
     isThreadLoading ||

@@ -125,6 +125,12 @@ import {
   setChatComposerDraft,
 } from "./controls/chat-composer-control";
 import { CodexModelSelector } from "./controls/codex-model-selector";
+import {
+  codexModelSelectorLabel,
+  codexModelSupportsThinkingLevel,
+  findCodexModel,
+  findReasoningEffortOption,
+} from "./controls/codex-utils";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
 import { ReasoningEffortSelector } from "./controls/reasoning-effort-selector";
 import {
@@ -997,6 +1003,34 @@ export default function App({
         supportsTildePath,
       )
     : "";
+  const currentThreadStartRequestModelOption = useMemo(() => {
+    if (!currentThreadStartRequest) {
+      return null;
+    }
+    return findCodexModel(
+      codexModels,
+      currentThreadStartRequest.model ?? defaultCodexModel,
+    );
+  }, [codexModels, currentThreadStartRequest, defaultCodexModel]);
+  const currentThreadStartRequestModelLabel =
+    currentThreadStartRequestModelOption
+      ? currentThreadStartRequest?.model
+        ? codexModelSelectorLabel(currentThreadStartRequestModelOption)
+        : `Default (${codexModelSelectorLabel(currentThreadStartRequestModelOption)})`
+      : (currentThreadStartRequest?.model ?? "default");
+  const currentThreadStartRequestReasoningOption = currentThreadStartRequest
+    ? findReasoningEffortOption(
+        reasoningEfforts,
+        currentThreadStartRequest.reasoningEffort ??
+          defaultCodexReasoningEffort,
+      )
+    : null;
+  const currentThreadStartRequestThinkingLabel =
+    currentThreadStartRequestReasoningOption
+      ? currentThreadStartRequest?.reasoningEffort
+        ? currentThreadStartRequestReasoningOption.label
+        : `Default (${currentThreadStartRequestReasoningOption.label})`
+      : (currentThreadStartRequest?.reasoningEffort ?? "default");
   const desktopThreadSwitcherOpen =
     desktopThreadSwitcherTarget !== null &&
     selectedProject?.id === desktopThreadSwitcherTarget.projectId &&
@@ -5219,6 +5253,13 @@ export default function App({
   const cronCreatorModelValue = cronCreatorModel.trim()
     ? cronCreatorModel
     : activeCodexModel || defaultCodexModel || "";
+  const cronCreatorModelOption = findCodexModel(
+    codexModels,
+    cronCreatorModelValue,
+  );
+  const cronThinkingLevelDisabled =
+    isCreatingCronJob ||
+    !codexModelSupportsThinkingLevel(cronCreatorModelOption);
   const isEditingExistingCron =
     cronCreatorMode === "edit" && cronEditingCronJobId !== null;
   const cronCreatorSubmitLabel = isCreatingCronJob
@@ -5245,6 +5286,7 @@ export default function App({
           disabled={isCreatingCronJob}
           models={codexModels}
           onChange={setCronCreatorModel}
+          reasoningDisabled={cronThinkingLevelDisabled}
           reasoningOptions={reasoningEfforts}
           onChangeReasoningEffort={setCronCreatorReasoningEffortValue}
           reasoningValue={cronCreatorReasoningEffort}
@@ -5255,10 +5297,10 @@ export default function App({
       {variant === "desktop" ? (
         <div className="space-y-1">
           <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
-            Reasoning effort
+            Thinking level
           </div>
           <ReasoningEffortSelector
-            disabled={isCreatingCronJob}
+            disabled={cronThinkingLevelDisabled}
             onChange={setCronCreatorReasoningEffort}
             options={reasoningEfforts}
             value={cronCreatorReasoningEffort}
@@ -6334,11 +6376,10 @@ export default function App({
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs text-[#9db4c2]">
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
-                Model: {currentThreadStartRequest.model ?? "default"}
+                Model: {currentThreadStartRequestModelLabel}
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
-                Reasoning:{" "}
-                {currentThreadStartRequest.reasoningEffort ?? "default"}
+                Thinking: {currentThreadStartRequestThinkingLabel}
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
                 GitHub:{" "}

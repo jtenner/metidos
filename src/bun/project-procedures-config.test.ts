@@ -284,14 +284,20 @@ describe("project procedure configuration helpers", () => {
           group: "OpenAI",
           id: "openai:gpt-5.4",
           label: "GPT-5.4",
+          modelId: "gpt-5.4",
+          providerId: "openai",
+          providerLabel: "OpenAI",
+          supportsReasoningEffort: true,
         }),
         expect.objectContaining({
           group: "Anthropic",
           id: expect.stringMatching(/^anthropic:/u),
+          providerId: "anthropic",
         }),
         expect.objectContaining({
           group: "xAI",
           id: expect.stringMatching(/^xai:/u),
+          providerId: "xai",
         }),
       ]),
     );

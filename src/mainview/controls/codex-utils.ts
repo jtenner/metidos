@@ -41,6 +41,36 @@ export function codexModelLabel(model: RpcModelOption): string {
 }
 
 /**
+ * Human-readable provider label for model picker UI.
+ */
+export function codexModelProviderLabel(model: RpcModelOption): string {
+  return model.providerLabel || model.group;
+}
+
+/**
+ * Combined provider/model label used when the active selection needs to be explicit.
+ */
+export function codexModelSelectorLabel(model: RpcModelOption): string {
+  return `${codexModelProviderLabel(model)} / ${codexModelLabel(model)}`;
+}
+
+/**
+ * Stable provider/model identity line used inside selector rows.
+ */
+export function codexModelIdentityLabel(model: RpcModelOption): string {
+  return `${codexModelProviderLabel(model)} / ${model.modelId}`;
+}
+
+/**
+ * Whether the selected model exposes a configurable thinking-level control.
+ */
+export function codexModelSupportsThinkingLevel(
+  model: RpcModelOption | null | undefined,
+): boolean {
+  return model?.supportsReasoningEffort ?? true;
+}
+
+/**
  * Find a model by stable model id, returning `null` when not present.
  */
 export function findCodexModel(

@@ -246,11 +246,15 @@ export type RpcRequestContext = {
  */
 export type RpcModelOption = {
   id: string;
+  providerId: string;
+  providerLabel: string;
+  modelId: string;
   label: string;
   group: string;
   summary: string;
   deprecated: boolean;
   contextWindowTokens: number;
+  supportsReasoningEffort: boolean;
 };
 
 export type RpcReasoningEffort =

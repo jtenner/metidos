@@ -352,7 +352,7 @@ Current thread rows still include Codex-era persistence and telemetry coupling:
 - `piSessionId`
 - `piSessionFile`
 - `piLeafEntryId`
-- model and reasoning effort validated against a Codex-specific static catalog
+- model ids now normalized through a Pi-backed provider catalog, but the persisted field is still named `reasoningEffort`
 - compaction inference derived from Codex usage patterns
 
 See:
@@ -409,11 +409,11 @@ The table below answers the practical question:
 
 | Requirement | Current Jolt implementation | Pi status | Custom work still required on top of Pi |
 |---|---|---|---|
-| Multiple providers/endpoints behind one interface | Static Codex/xAI catalog in [model-catalog.ts](../src/bun/project-procedures/model-catalog.ts) and constructor overrides in [codex-constructor.ts](../src/bun/project-procedures/codex-constructor.ts) | Native strength | Replace static Jolt catalog with Pi `ModelRegistry`-driven catalog and update UI to show provider/model identity dynamically |
+| Multiple providers/endpoints behind one interface | Pi-backed provider catalog in [model-catalog.ts](../src/bun/project-procedures/model-catalog.ts) plus provider-aware browser controls | Native strength | Expose provider auth/availability hints and finish removing Codex-only naming from the remaining runtime/config surfaces |
 | Provider auth storage and login | Mostly delegated to Codex/OpenAI ecosystem; xAI env special-cased | Native strength | Wire Pi `AuthStorage` into Jolt settings/auth UX; decide whether Jolt exposes Pi provider login flows in web UI |
 | Embeddable agent runtime | Codex thread objects managed in [project-procedures.ts](../src/bun/project-procedures.ts) | Native strength | Replace Codex thread lifecycle with Pi `AgentSession` or `AgentSessionRuntime`; confirm Bun compatibility or use Node sidecar |
-| Per-thread model selection | Supported today via Jolt DB + Codex thread options | Supported, but model object shape differs | Store provider + model id, not just raw model id; migrate current DB schema or normalize Pi model identity into Jolt-friendly fields |
-| Per-thread reasoning control | Current UI uses Codex-style `reasoningEffort` | Similar but not identical | Map Jolt “reasoning effort” to Pi “thinking level”; rename UI/DB if needed; handle models without reasoning support |
+| Per-thread model selection | Supported today via Jolt DB, provider-qualified model ids, and provider-aware frontend selectors | Supported, but model object shape differs | Remove the remaining Codex-only field names and surface provider auth/availability in settings |
+| Per-thread reasoning control | Current UI now labels this as “thinking level” but persistence still uses `reasoningEffort` | Similar but not identical | Finish any DB/API renames if desired and keep handling models without thinking support |
 | Session persistence and resume | Jolt SQLite thread rows + Codex thread id | Native Pi sessions | Decide whether Jolt stores Pi session file path/id in DB or whether Pi sessions stay entirely internal; likely add `piSessionId`/`piSessionFile` fields |
 | Branch/fork/tree navigation | Jolt has separate app threads; no Pi-style in-thread tree UI | Native Pi feature | Decide whether to expose Pi tree navigation in Jolt UI or ignore it initially; if ignored, still preserve it in session files |
 | Compaction | Current Jolt infers compaction from Codex token drops | Native Pi feature | Replace Codex telemetry scraper with Pi compaction events and context usage; decide how much current “compaction telemetry” UI survives |
@@ -567,6 +567,41 @@ What this still does not do yet:
 - it does not redesign the frontend controls around explicit provider selection or auth availability
 - it does not expose per-model availability/auth state in the browser UI
 - it does not remove the remaining Codex-only constructor helpers or labels yet
+
+### UI05 implementation status in `jt-ide`
+
+The first frontend migration slice is now complete in this repository.
+
+Implemented on 2026-04-09 with:
+
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+- [src/mainview/App.tsx](../src/mainview/App.tsx)
+- [src/mainview/app/message-ui.tsx](../src/mainview/app/message-ui.tsx)
+- [src/mainview/app/use-mainview-derived-state.ts](../src/mainview/app/use-mainview-derived-state.ts)
+- [src/mainview/app/use-mainview-derived-state.test.ts](../src/mainview/app/use-mainview-derived-state.test.ts)
+- [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+- [src/mainview/controls/reasoning-effort-selector.tsx](../src/mainview/controls/reasoning-effort-selector.tsx)
+- [src/mainview/README.md](../src/mainview/README.md)
+- [src/mainview/controls/README.md](../src/mainview/controls/README.md)
+
+What the current implementation now does:
+
+- sends provider id, provider label, provider-native model id, and thinking-support metadata through the RPC model catalog
+- shows provider-qualified model labels in the browser instead of bare model names
+- renders explicit provider/model identity lines inside desktop and mobile selector rows
+- switches visible control language from “Reasoning effort” to “Thinking level” in model controls, cron controls, request summaries, and transcript cards
+- disables thinking-level controls for models that do not expose that provider capability
+- keeps mobile model selection usable for non-thinking models by falling back to model-only selection instead of disabling the combined picker
+
+What this still does not do yet:
+
+- it does not expose provider login state or “missing API key” hints in the browser UI
+- it does not rename the persisted `reasoningEffort` field or remove internal Codex naming yet
+- it does not redesign the settings surface around provider management beyond selector-level metadata
 
 ### Why SDK first
 

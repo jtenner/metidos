@@ -2285,7 +2285,7 @@ function _buildReasoningActivityInput(
     threadId,
     itemId,
     kind: "reasoning",
-    text: item.text.trim() || "Reasoning",
+    text: item.text.trim() || "Thinking",
     state,
   };
 }
@@ -2368,7 +2368,7 @@ function buildReasoningActivityInputText(
     threadId,
     itemId,
     kind: "reasoning",
-    text: text.trim() || "Reasoning",
+    text: text.trim() || "Thinking",
     state,
   };
 }

@@ -9,7 +9,14 @@ import type {
   RpcReasoningEffort,
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
-import { codexModelLabel, groupCodexModels } from "./codex-utils";
+import {
+  codexModelIdentityLabel,
+  codexModelLabel,
+  codexModelSelectorLabel,
+  codexModelSupportsThinkingLevel,
+  findCodexModel,
+  groupCodexModels,
+} from "./codex-utils";
 import { DropdownControl } from "./dropdown";
 import { materialSymbol } from "./icons";
 import { matchesSearchQuery, normalizeSearchQuery } from "./search-utils";
@@ -56,7 +63,11 @@ export function CodexModelSelector({
     [reasoningOptions],
   );
   // Keep local title/selection display in sync with a stable model id.
-  const activeModel = modelById.get(value) ?? null;
+  const activeModel = useMemo(
+    () => findCodexModel(models, value),
+    [models, value],
+  );
+  const activeModelId = activeModel?.id ?? value;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const [submenuTop, setSubmenuTop] = useState(0);
@@ -70,7 +81,7 @@ export function CodexModelSelector({
 
   // Primary button should remain deterministic even while async models/metadata loads.
   const buttonLabel = activeModel
-    ? codexModelLabel(activeModel)
+    ? codexModelSelectorLabel(activeModel)
     : models.length === 0
       ? "Loading models"
       : "Select model";
@@ -78,11 +89,14 @@ export function CodexModelSelector({
     reasoningValue == null
       ? null
       : (reasoningOptionById.get(reasoningValue) ?? null);
+  const activeModelSupportsThinking =
+    codexModelSupportsThinkingLevel(activeModel);
 
   // Mobile-only combined selector is used when we can set both model + reasoning effort
   // in one control flow and avoid opening a second popover.
   const combinedMobileSelectorEnabled =
     variant === "mobile" &&
+    activeModelSupportsThinking &&
     reasoningValue != null &&
     onChangeReasoningEffort != null &&
     reasoningOptions.length > 0;
@@ -102,6 +116,9 @@ export function CodexModelSelector({
               model.label,
               model.summary,
               model.group,
+              model.providerId,
+              model.providerLabel,
+              model.modelId,
             ),
           ),
         }))
@@ -171,7 +188,7 @@ export function CodexModelSelector({
     // Mobile combined mode shows model + reasoning together in one nested flyout.
     const reasoningLabel = activeReasoningOption?.label ?? "Loading";
     const mobileButtonLabel = activeModel
-      ? codexModelLabel(activeModel)
+      ? codexModelSelectorLabel(activeModel)
       : models.length === 0
         ? "Loading models"
         : "Select model";
@@ -183,8 +200,10 @@ export function CodexModelSelector({
         onOpenChange={setDropdownOpen}
         title={
           activeModel && activeReasoningOption
-            ? `${codexModelLabel(activeModel)} with ${activeReasoningOption.label} reasoning`
-            : (activeModel?.summary ?? `${appTitle} model`)
+            ? `${codexModelSelectorLabel(activeModel)} with ${activeReasoningOption.label} thinking`
+            : activeModel
+              ? `${codexModelSelectorLabel(activeModel)}. ${activeModel.summary}`
+              : `${appTitle} model`
         }
         renderButton={({ open, toggle }) => (
           <button
@@ -274,7 +293,7 @@ export function CodexModelSelector({
                   </div>
                   <div>
                     {group.models.map((model) => {
-                      const selected = model.id === value;
+                      const selected = model.id === activeModelId;
                       const expanded = model.id === expandedModelId;
                       return (
                         <button
@@ -323,6 +342,15 @@ export function CodexModelSelector({
                               {codexModelLabel(model)}
                             </span>
                             <span
+                              className={`mt-1 block font-mono text-[10px] leading-4 ${
+                                selected || expanded
+                                  ? "text-[#a8c9df]"
+                                  : "text-[#7790a2]"
+                              }`}
+                            >
+                              {codexModelIdentityLabel(model)}
+                            </span>
+                            <span
                               className={`mt-1 block text-[11px] leading-4 ${
                                 selected || expanded
                                   ? "text-[#d5e4ef]"
@@ -356,10 +384,10 @@ export function CodexModelSelector({
               >
                 <div className="border-b border-[#3c4c58] px-3 py-2">
                   <div className="font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
-                    Reasoning Effort
+                    Thinking Level
                   </div>
                   <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#e3edf4]">
-                    {codexModelLabel(expandedModel)}
+                    {codexModelSelectorLabel(expandedModel)}
                   </div>
                 </div>
                 <div className="py-2">
@@ -378,7 +406,7 @@ export function CodexModelSelector({
                           // Close first so any parent overlays collapse before the
                           // app-level state updates run.
                           close();
-                          if (expandedModel.id !== value) {
+                          if (expandedModel.id !== activeModelId) {
                             onChange(expandedModel.id);
                           }
                           if (option.id !== reasoningValue) {
@@ -418,7 +446,11 @@ export function CodexModelSelector({
       canOpen={!controlDisabled}
       disabled={controlDisabled}
       onOpenChange={setDropdownOpen}
-      title={activeModel?.summary ?? `${appTitle} model`}
+      title={
+        activeModel
+          ? `${codexModelSelectorLabel(activeModel)}. ${activeModel.summary}`
+          : `${appTitle} model`
+      }
       renderButton={({ open, toggle }) => (
         <button
           type="button"
@@ -426,7 +458,7 @@ export function CodexModelSelector({
             variant === "desktop"
               ? "h-7 gap-1 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
               : "h-10 gap-2 border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
-          } ${disabled ? "cursor-not-allowed opacity-60" : ""} ${
+          } ${controlDisabled ? "cursor-not-allowed opacity-60" : ""} ${
             open
               ? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
               : ""
@@ -515,7 +547,7 @@ export function CodexModelSelector({
                 </div>
                 <div>
                   {group.models.map((model) => {
-                    const selected = model.id === value;
+                    const selected = model.id === activeModelId;
                     return (
                       <button
                         key={model.id}
@@ -528,7 +560,7 @@ export function CodexModelSelector({
                         onClick={() => {
                           // Desktop path changes only the model and closes immediately.
                           close();
-                          if (model.id !== value) {
+                          if (model.id !== activeModelId) {
                             onChange(model.id);
                           }
                         }}
@@ -548,6 +580,13 @@ export function CodexModelSelector({
                         <span className="min-w-0 flex-1">
                           <span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
                             {codexModelLabel(model)}
+                          </span>
+                          <span
+                            className={`mt-1 block font-mono text-[10px] leading-4 ${
+                              selected ? "text-[#a8c9df]" : "text-[#7790a2]"
+                            }`}
+                          >
+                            {codexModelIdentityLabel(model)}
                           </span>
                           <span
                             className={`mt-1 block text-[11px] leading-4 ${

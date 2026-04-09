@@ -934,12 +934,12 @@ export function ReasoningMessage({
   state: "in_progress" | "completed" | "stopped";
   text: string;
 }): JSX.Element {
-  // Assistant internal reasoning payloads are shown with a compact status pill.
+  // Assistant internal thinking payloads are shown with a compact status pill.
   return (
     <div className="border border-[#2a3339] bg-[#11171a] px-4 py-3">
       <div className="flex items-center justify-between gap-4">
         <div className="font-label text-[10px] uppercase tracking-widest text-[#8fb5cd]">
-          Reasoning
+          Thinking
         </div>
         <div className="text-[10px] uppercase tracking-widest text-[#70808c]">
           {state === "completed"
