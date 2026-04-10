@@ -232,34 +232,6 @@ export function CodexModelSelector({
     );
   }
 
-  function stepHeading(): string {
-    switch (selectorStep) {
-      case "provider":
-        return "Select Provider";
-      case "model":
-        return "Select Model";
-      case "reasoning":
-        return "Thinking Level";
-    }
-  }
-
-  function stepSubheading(): string {
-    switch (selectorStep) {
-      case "provider":
-        return "Start by choosing the endpoint family.";
-      case "model":
-        return selectedProvider
-          ? selectedProviderAvailable
-            ? `${selectedProvider.providerLabel} models`
-            : `${selectedProvider.providerLabel} is unavailable until sign-in`
-          : "Choose a provider first.";
-      case "reasoning":
-        return pendingModel
-          ? codexModelSelectorLabel(pendingModel)
-          : "Choose a model first.";
-    }
-  }
-
   return (
     <DropdownControl
       canOpen={!controlDisabled}
@@ -322,8 +294,8 @@ export function CodexModelSelector({
       renderPanel={({ close }) => (
         <div className={panelClassName}>
           <div className="border-b border-[#3c4c58] px-3 py-3">
-            <div className="flex items-start gap-2">
-              {selectorStep === "provider" ? null : (
+            {selectorStep === "provider" ? null : (
+              <div className="flex items-start gap-2">
                 <button
                   type="button"
                   className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-[#97b5ca] transition-colors hover:bg-[#1e2428] hover:text-[#f2f0ef]"
@@ -332,23 +304,14 @@ export function CodexModelSelector({
                 >
                   {materialSymbol("arrow_forward", "text-[16px] rotate-180")}
                 </button>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="font-label text-[9px] uppercase tracking-[0.18em] text-[#92a7b6]">
-                  {stepHeading()}
-                </div>
-                <div className="mt-1 text-[11px] text-[#d8e4eb]">
-                  {stepSubheading()}
-                </div>
-                {selectedProvider ? (
-                  <div className="mt-2 font-label text-[10px] uppercase tracking-[0.16em] text-[#f4f8fb]">
-                    {`Provider: ${selectedProvider.providerLabel}`}
-                  </div>
-                ) : null}
               </div>
-            </div>
+            )}
             {selectorStep === "reasoning" ? null : (
-              <div className="mt-3 flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
+              <div
+                className={`flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2 ${
+                  selectorStep === "provider" ? "" : "mt-3"
+                }`}
+              >
                 {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
                 <input
                   ref={searchInputRef}
