@@ -134,6 +134,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `project-procedures/model-catalog.ts`
   - Houses the Pi-backed model catalog used by model pickers, validation, and provider resolution.
   - Builds a normalized multi-provider catalog from Pi `ModelRegistry`, emits canonical `provider:modelId` keys, and preserves legacy raw-id fallback for older thread rows.
+  - Curates built-in providers down to a recent-release model set so the selector does not expose every historical Pi registry entry by default.
   - Exposes `openai-codex` as a first-class provider, distinguishes it from `OpenAI API`, and prefers Codex-backed raw GPT defaults only when Codex auth is actually available.
   - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already logged in but Jolt still needs importable or Pi-managed credentials.
   - Tracks provider/model metadata such as reasoning support, context-window size, and whether a provider is currently runnable.

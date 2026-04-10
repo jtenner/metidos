@@ -75,6 +75,85 @@ const LEGACY_MODEL_ALIASES = {
     provider: "xai",
   },
 } satisfies Record<string, { modelId: string; provider: string }>;
+const RECENT_MODEL_ALLOWLIST_BY_PROVIDER = {
+  "amazon-bedrock": [
+    "amazon.nova-premier-v1:0",
+    "amazon.nova-pro-v1:0",
+    "anthropic.claude-haiku-4-5-20251001-v1:0",
+    "anthropic.claude-opus-4-6-v1",
+    "anthropic.claude-sonnet-4-6",
+  ],
+  anthropic: [
+    "claude-haiku-4-5",
+    "claude-opus-4-5",
+    "claude-opus-4-6",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+  ],
+  "azure-openai-responses": [
+    "gpt-5.2",
+    "gpt-5.2-pro",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.4-pro",
+  ],
+  google: [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-pro-preview",
+  ],
+  "google-vertex": [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3-flash-preview",
+    "gemini-3.1-pro-preview",
+  ],
+  groq: [
+    "groq/compound",
+    "groq/compound-mini",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "moonshotai/kimi-k2-instruct-0905",
+  ],
+  mistral: [
+    "codestral-latest",
+    "devstral-medium-latest",
+    "magistral-medium-latest",
+    "mistral-medium-latest",
+    "mistral-small-latest",
+  ],
+  openai: ["gpt-5.2", "gpt-5.2-pro", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro"],
+  "openai-codex": [
+    "gpt-5.2-codex",
+    "gpt-5.3-codex",
+    "gpt-5.3-codex-spark",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+  ],
+  openrouter: [
+    "anthropic/claude-opus-4.6",
+    "anthropic/claude-sonnet-4.6",
+    "google/gemini-3.1-pro-preview",
+    "mistralai/codestral-2508",
+    "openai/gpt-5.4",
+    "openrouter/auto",
+    "x-ai/grok-4.20",
+    "x-ai/grok-code-fast-1",
+  ],
+  xai: ["grok-4-1-fast", "grok-4.20-0309-reasoning", "grok-code-fast-1"],
+} satisfies Record<string, readonly string[]>;
+const RECENT_MODEL_ALLOWLIST_SET_BY_PROVIDER = new Map<
+  string,
+  ReadonlySet<string>
+>(
+  Object.entries(RECENT_MODEL_ALLOWLIST_BY_PROVIDER).map(
+    ([provider, modelIds]) => [provider, new Set(modelIds)],
+  ),
+);
 
 type ModelCatalogEntry = {
   contextWindowTokens: number;
@@ -169,10 +248,17 @@ function providerSortKey(
 }
 
 function shouldIncludeModel(model: Model<Api>): boolean {
-  return (
-    BUILT_IN_PROVIDER_ALLOWLIST.has(model.provider) ||
-    !BUILT_IN_PROVIDER_SET.has(model.provider)
+  if (!BUILT_IN_PROVIDER_ALLOWLIST.has(model.provider)) {
+    return !BUILT_IN_PROVIDER_SET.has(model.provider);
+  }
+
+  const curatedProviderModels = RECENT_MODEL_ALLOWLIST_SET_BY_PROVIDER.get(
+    model.provider,
   );
+  if (!curatedProviderModels) {
+    return true;
+  }
+  return curatedProviderModels.has(model.id);
 }
 
 function compareCatalogEntries(

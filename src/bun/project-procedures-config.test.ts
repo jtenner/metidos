@@ -179,6 +179,7 @@ afterAll(async () => {
 describe("project procedure configuration helpers", () => {
   it("builds a Pi-backed model catalog with canonical provider-qualified ids", () => {
     const catalog = buildModelCatalog();
+    const modelIds = new Set(catalog.models.map((model) => model.id));
 
     expect(catalog.defaultModel).toBe("openai:gpt-5.4");
     expect(catalog.models).toEqual(
@@ -218,6 +219,22 @@ describe("project procedure configuration helpers", () => {
         }),
       ]),
     );
+    expect(
+      catalog.models.filter((model) => model.providerId === "openai"),
+    ).toHaveLength(5);
+    expect(
+      catalog.models.filter((model) => model.providerId === "openai-codex"),
+    ).toHaveLength(5);
+    expect(
+      catalog.models.filter((model) => model.providerId === "anthropic"),
+    ).toHaveLength(5);
+    expect(
+      catalog.models.filter((model) => model.providerId === "openrouter"),
+    ).toHaveLength(8);
+    expect(modelIds.has("anthropic:claude-opus-4-1")).toBe(false);
+    expect(modelIds.has("openai:gpt-4.1")).toBe(false);
+    expect(modelIds.has("google:gemini-1.5-pro")).toBe(false);
+    expect(modelIds.has("xai:grok-3-mini")).toBe(false);
   });
 
   it("prefers openai-codex for raw GPT ids when Codex auth is available", () => {
@@ -314,11 +331,22 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
-  it("tracks reasoning-effort support per provider model", () => {
+  it("tracks reasoning-effort support per curated provider model", () => {
     expect(codexModelSupportsReasoningEffort("gpt-5.4")).toBe(true);
-    expect(codexModelSupportsReasoningEffort("grok-3-mini")).toBe(true);
     expect(codexModelSupportsReasoningEffort("grok-code-fast-1")).toBe(true);
     expect(codexModelSupportsReasoningEffort("grok-4.20-reasoning")).toBe(true);
+  });
+
+  it("rejects stale built-in models that were dropped from the curated catalog", () => {
+    expect(() => resolveCodexModel("anthropic:claude-opus-4-1")).toThrow(
+      "Unsupported model: anthropic:claude-opus-4-1",
+    );
+    expect(() => resolveCodexModel("openai:gpt-4.1")).toThrow(
+      "Unsupported model: openai:gpt-4.1",
+    );
+    expect(() => resolveCodexModel("xai:grok-3-mini")).toThrow(
+      "Unsupported model: xai:grok-3-mini",
+    );
   });
 
   it("rejects unavailable Codex providers before creating threads or cron jobs", async () => {

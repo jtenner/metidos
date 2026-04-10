@@ -7,6 +7,7 @@ It is organized by concern so each module has a narrow responsibility for data m
 
 - `model-catalog.ts`
   - Defines the Pi-backed model catalog and reasoning effort options across the supported providers.
+  - Curates the built-in provider list to recent-release models instead of surfacing the full historical Pi registry by default.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Tracks provider metadata such as xAI routing, current provider availability, and which model ids accept reasoning-effort overrides.
   - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already authenticated but Jolt still cannot import reusable credentials.

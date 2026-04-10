@@ -116,12 +116,7 @@ export function CodexModelSelector({
       activeProvider?.providerId ?? providerGroups[0]?.providerId ?? null,
     );
     setPendingModelId(null);
-  }, [
-    activeModel?.id,
-    activeProvider?.providerId,
-    dropdownOpen,
-    providerGroups,
-  ]);
+  }, [activeProvider?.providerId, dropdownOpen, providerGroups]);
 
   useEffect(() => {
     if (!dropdownOpen) {
@@ -478,20 +473,6 @@ export function CodexModelSelector({
                     <div
                       key={model.id}
                       className="group/model-submenu relative"
-                      onMouseEnter={() => {
-                        if (supportsReasoningSubmenu) {
-                          setPendingModelId(model.id);
-                          return;
-                        }
-                        setPendingModelId((current) =>
-                          current === model.id ? null : current,
-                        );
-                      }}
-                      onFocus={() => {
-                        if (supportsReasoningSubmenu) {
-                          setPendingModelId(model.id);
-                        }
-                      }}
                     >
                       <button
                         type="button"
@@ -500,6 +481,20 @@ export function CodexModelSelector({
                             ? "bg-[#28353e] text-[#f8fafc]"
                             : "text-[#ebf3f8] hover:bg-[#1e2428]"
                         }`}
+                        onMouseEnter={() => {
+                          if (supportsReasoningSubmenu) {
+                            setPendingModelId(model.id);
+                            return;
+                          }
+                          setPendingModelId((current) =>
+                            current === model.id ? null : current,
+                          );
+                        }}
+                        onFocus={() => {
+                          if (supportsReasoningSubmenu) {
+                            setPendingModelId(model.id);
+                          }
+                        }}
                         onClick={() => {
                           handleModelSelect(model, close);
                         }}
