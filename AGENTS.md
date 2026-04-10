@@ -7,6 +7,35 @@
 
 ```text
 .
+├─ .jolt/
+│  └─ tasks/
+│     ├─ config.toml
+│     ├─ items/
+│     │  ├─ tg-01jv6x6kh5z8y4v9m2c3d7pqra/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6x7n4b2d8c5f9h3k6m1pqs/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6x8r2c4f7h9k3m5p8q2stw/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6x9t3d5g8j2m4q6s9v2xzb/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6xav4f6j9m3q5t7w9y2bcd/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6xbw5g7k1n4r6v8x2z5cde/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  ├─ tg-01jv6xcy6h8m2p5s7w9z3b6dfg/
+│     │  │  ├─ body.md
+│     │  │  └─ task.toml
+│     │  └─ tg-01jv6xdz7j9n3q6t8x2a4c7efh/
+│     │     ├─ body.md
+│     │     └─ task.toml
+│     └─ tags.toml
 ├─ .tasks/
 │  ├─ README.md
 │  ├─ commit.md

@@ -1,0 +1,10 @@
+schema = "jolt.task-graph/v2"
+id_prefix = "tg"
+body_format = "markdown"
+strict_tags = false
+strict_types = false
+
+[defaults]
+type = "task"
+status = "open"
+priority = "p2"

@@ -1,0 +1,37 @@
+schema = "jolt.task-tags/v2"
+
+[[tag]]
+name = "area:task-graph"
+description = "Git-native task graph work"
+exclusive_group = "area"
+
+[[tag]]
+name = "component:pi-jolt-tools"
+description = "Jolt tool host and tool exposure"
+
+[[tag]]
+name = "component:project-procedures"
+description = "Backend project procedure modules"
+
+[[tag]]
+name = "component:rpc-schema"
+description = "RPC request and response schemas"
+
+[[tag]]
+name = "discipline:backend"
+description = "Backend and host runtime work"
+exclusive_group = "discipline"
+
+[[tag]]
+name = "discipline:docs"
+description = "Documentation work"
+exclusive_group = "discipline"
+
+[[tag]]
+name = "discipline:test"
+description = "Automated test coverage"
+exclusive_group = "discipline"
+
+[[tag]]
+name = "theme:reliability"
+description = "Correctness, validation, and stable rewrites"

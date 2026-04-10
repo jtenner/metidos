@@ -1,0 +1,18 @@
+schema = "jolt.task/v2"
+id = "tg-01jv6xbw5g7k1n4r6v8x2z5cde"
+title = "Expose task graph admin tools through Jolt host tooling"
+type = "feature"
+status = "open"
+priority = "p1"
+size = "m"
+created_at = "2026-04-10T07:25:00Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:task-graph", "component:pi-jolt-tools", "component:rpc-schema", "discipline:backend"]
+milestone = "task-graph-admin-v1"
+
+[blockers]
+tasks = ["tg-01jv6x8r2c4f7h9k3m5p8q2stw", "tg-01jv6x9t3d5g8j2m4q6s9v2xzb", "tg-01jv6xav4f6j9m3q5t7w9y2bcd"]
+
+[parent]
+task = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"
