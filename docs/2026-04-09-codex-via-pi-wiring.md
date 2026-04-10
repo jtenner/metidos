@@ -42,9 +42,8 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 
 The planned Codex-via-Pi wiring slices are now complete.
 
-The main remaining caveats are:
+The main remaining operator note is:
 
-- keyring-only Codex setups are intentionally unsupported for direct credential import because Jolt can detect those sessions through `codex login status`, but OpenAI does not document a stable OS-keyring export contract that Jolt can safely mirror
 - destructive login/logout verification against a real ChatGPT-plan session should still be done only in an isolated operator environment, not against an active everyday Codex login
 
 ## Why Jolt Should Not Restore The Codex SDK
@@ -396,7 +395,6 @@ If deeper Codex parity is later required, Jolt would need to add by-hand work fo
 Current product decision:
 
 - Jolt supports file-backed Codex auth import and backend-driven device-auth recovery
-- Jolt does not support direct import from the OS keyring
 - when Codex is configured for `keyring` or `auto` without a usable `auth.json`, Jolt should diagnose that state clearly and direct the operator toward file storage or a fresh CLI-managed login flow
 
 This is still a Pi-native implementation because Jolt is not sharing the Codex file schema directly with Pi. It is importing or mirroring Codex auth into the Pi credential shape while treating the Codex file as authoritative when present.
@@ -445,14 +443,11 @@ Verification status on 2026-04-09:
 
 ## Risks
 
-- Unsupported-keyring risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now detects Codex credential-store mode and probes `codex login status`, but it intentionally does not import OS-keyring-backed credentials directly because OpenAI does not document a stable keyring export contract. File auth and device-auth recovery remain the supported paths.
-- Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls, while API-key usage follows API org controls. Jolt must make the chosen auth mode obvious to users.
-- Exact-parity risk. OpenAI publicly documents the Codex auth contract, not every internal desktop-app detail. Jolt can match behavior, but not assume undocumented cache formats or token plumbing are safe to clone.
+- No active product risks are tracked here for the supported path. Unsupported keyring behavior is already called out in the README/settings docs where operators need it, and provider mix-ups are user error: Skill Issue.
 
 ## Blockers
 
 - None for the recommended Pi-native path.
-- OS keyring support is not a blocker for making Codex work when `~/.codex/auth.json` exists because direct keyring import is explicitly out of scope for the supported path today.
 
 ## Suggested Execution Slices
 
