@@ -71,6 +71,36 @@ function createJwt(payload: Record<string, unknown>): string {
   ].join(".");
 }
 
+function writeCodexAuthFile(codexHome: string): void {
+  writeFileSync(
+    join(codexHome, "auth.json"),
+    JSON.stringify(
+      {
+        auth_mode: "chatgpt",
+        tokens: {
+          access_token: createJwt({
+            exp: 1_950_000_000,
+          }),
+          account_id: "acct_live",
+          refresh_token: "refresh_live",
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
+function clearPiAuthFile(): void {
+  const piAuthPath = process.env.JOLT_APP_DATA_DIR
+    ? join(process.env.JOLT_APP_DATA_DIR, "pi-agent", "auth.json")
+    : null;
+  if (piAuthPath && existsSync(piAuthPath)) {
+    writeFileSync(piAuthPath, "{}", "utf8");
+  }
+}
+
 async function loadProjectProcedures() {
   if (projectProcedures) {
     return projectProcedures;
@@ -174,25 +204,7 @@ describe("project procedure configuration helpers", () => {
 
   it("prefers openai-codex for raw GPT ids when Codex auth is available", () => {
     const codexHome = createTempDirectory("jolt-codex-home-");
-    const accessToken = createJwt({
-      exp: 1_950_000_000,
-    });
-    writeFileSync(
-      join(codexHome, "auth.json"),
-      JSON.stringify(
-        {
-          auth_mode: "chatgpt",
-          tokens: {
-            access_token: accessToken,
-            account_id: "acct_live",
-            refresh_token: "refresh_live",
-          },
-        },
-        null,
-        2,
-      ),
-      "utf8",
-    );
+    writeCodexAuthFile(codexHome);
     process.env.CODEX_HOME = codexHome;
 
     const catalog = buildModelCatalog();
@@ -263,6 +275,144 @@ describe("project procedure configuration helpers", () => {
     expect(codexModelSupportsReasoningEffort("grok-3-mini")).toBe(true);
     expect(codexModelSupportsReasoningEffort("grok-code-fast-1")).toBe(true);
     expect(codexModelSupportsReasoningEffort("grok-4.20-reasoning")).toBe(true);
+  });
+
+  it("rejects unavailable Codex providers before creating threads or cron jobs", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-provider-guard-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Provider Guard Repo",
+      projectPath: repoPath,
+    });
+    const unavailableMessage =
+      "OpenAI Codex is unavailable for GPT-5.4. Requires OpenAI Codex sign-in in Settings.";
+
+    await expect(
+      procedures.requestThreadStartProcedure({
+        agentsAccess: false,
+        autoStart: null,
+        githubAccess: false,
+        input: "hello from unavailable codex",
+        joltAccess: false,
+        model: "openai-codex:gpt-5.4",
+        projectId: opened.project.id,
+        reasoningEffort: "medium",
+        unsafeMode: false,
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(unavailableMessage);
+
+    await expect(
+      procedures.createThreadProcedure({
+        agentsAccess: false,
+        githubAccess: false,
+        joltAccess: false,
+        model: "openai-codex:gpt-5.4",
+        projectId: opened.project.id,
+        reasoningEffort: "medium",
+        unsafeMode: false,
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(unavailableMessage);
+
+    await expect(
+      procedures.newCronProcedure({
+        agentsAccess: false,
+        githubAccess: false,
+        joltAccess: false,
+        model: "openai-codex:gpt-5.4",
+        projectId: opened.project.id,
+        prompt: "run unavailable codex",
+        reasoningEffort: "medium",
+        schedule: "* * * * *",
+        unsafeMode: false,
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(unavailableMessage);
+  });
+
+  it("rejects unavailable Codex providers before queued runs or model updates", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("jolt-provider-run-guard-repo-");
+    initializeGitRepository(repoPath);
+
+    const codexHome = createTempDirectory("jolt-codex-home-");
+    writeCodexAuthFile(codexHome);
+    process.env.CODEX_HOME = codexHome;
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Provider Run Guard Repo",
+      projectPath: repoPath,
+    });
+    const codexThread = await procedures.createThreadProcedure({
+      agentsAccess: false,
+      githubAccess: false,
+      joltAccess: false,
+      model: "openai-codex:gpt-5.4",
+      projectId: opened.project.id,
+      reasoningEffort: "medium",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+    const openaiThread = await procedures.createThreadProcedure({
+      agentsAccess: false,
+      githubAccess: false,
+      joltAccess: false,
+      model: "openai:gpt-5.4",
+      projectId: opened.project.id,
+      reasoningEffort: "medium",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+    const cronJob = await procedures.newCronProcedure({
+      agentsAccess: false,
+      githubAccess: false,
+      joltAccess: false,
+      model: "openai:gpt-5.4",
+      projectId: opened.project.id,
+      prompt: "run safely",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+
+    process.env.CODEX_HOME = isolatedCodexHome;
+    clearPiAuthFile();
+    const unavailableMessage =
+      "OpenAI Codex is unavailable for GPT-5.4. Requires OpenAI Codex sign-in in Settings.";
+    const beforeFailedSend = await procedures.getThreadProcedure({
+      threadId: codexThread.thread.id,
+    });
+
+    await expect(
+      procedures.sendThreadMessageProcedure({
+        threadId: codexThread.thread.id,
+        input: "should not queue",
+      }),
+    ).rejects.toThrow(unavailableMessage);
+    await expect(
+      procedures.updateThreadModelProcedure({
+        model: "openai-codex:gpt-5.4",
+        threadId: openaiThread.thread.id,
+      }),
+    ).rejects.toThrow(unavailableMessage);
+    await expect(
+      procedures.updateCronProcedure({
+        cronJobId: cronJob.id,
+        model: "openai-codex:gpt-5.4",
+      }),
+    ).rejects.toThrow(unavailableMessage);
+
+    const afterFailedSend = await procedures.getThreadProcedure({
+      threadId: codexThread.thread.id,
+    });
+    expect(afterFailedSend.thread.runStatus.state).toBe("idle");
+    expect(afterFailedSend.messages).toHaveLength(
+      beforeFailedSend.messages.length,
+    );
   });
 
   it("fails empty assistant completions instead of fabricating a reply", async () => {

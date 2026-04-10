@@ -35,6 +35,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Centralizes authoritative thread metadata mutations so the UI and sidecar invalidate caches through the same backend path.
   - Maintains in-memory caches/polling state, manages worktree background refresh loops, and publishes change events to connected clients.
   - Also exposes the Bun-side provider-auth RPC surface for `openai-codex`, returning live auth status plus refreshed model-catalog payloads after login, refresh, and logout transitions.
+  - Rejects unavailable provider-qualified model selections before thread creation, thread-start requests, queued runs, and cron mutations so stale `openai-codex` state cannot silently fail later in the runtime.
   - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
 - `pi-runtime-probe.ts`
@@ -130,7 +131,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Houses the Pi-backed model catalog used by model pickers, validation, and provider resolution.
   - Builds a normalized multi-provider catalog from Pi `ModelRegistry`, emits canonical `provider:modelId` keys, and preserves legacy raw-id fallback for older thread rows.
   - Exposes `openai-codex` as a first-class provider, distinguishes it from `OpenAI API`, and prefers Codex-backed raw GPT defaults only when Codex auth is actually available.
-  - Tracks provider/model metadata such as reasoning support and context-window size.
+  - Tracks provider/model metadata such as reasoning support, context-window size, and whether a provider is currently runnable.
   - Provides token-context utilities used for compaction/size logic.
 
 - `project-procedures/pi-session-telemetry.ts`

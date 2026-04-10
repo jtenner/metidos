@@ -92,12 +92,13 @@ import {
   warmGitHistoryCache,
 } from "./project-procedures/git-history";
 import {
+  assertCodexModelProviderAvailable,
   buildModelCatalog,
   codexModelProvider,
   normalizeStoredCodexModel,
   normalizeStoredCodexReasoningEffort,
-  resolveCodexModel,
   resolveCodexReasoningEffort,
+  resolveRunnableCodexModel,
 } from "./project-procedures/model-catalog";
 import {
   createPiThreadEventProjector,
@@ -2646,7 +2647,7 @@ export async function createThreadProcedure(
 ): Promise<RpcThreadDetail> {
   const project = projectByIdForPath(params.projectId);
   const worktreePath = normalizePath(params.worktreePath);
-  const model = resolveCodexModel(params.model);
+  const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   const access = resolveThreadAccessControls(params);
   const thread = await createThreadRecord(
@@ -2692,7 +2693,9 @@ export async function requestThreadStartProcedure(
     projectPath: project.path,
     worktreePath,
     input,
-    model: params.model?.trim() ? resolveCodexModel(params.model) : null,
+    model: params.model?.trim()
+      ? resolveRunnableCodexModel(params.model)
+      : null,
     reasoningEffort: params.reasoningEffort?.trim()
       ? resolveCodexReasoningEffort(params.reasoningEffort)
       : null,
@@ -2766,7 +2769,7 @@ export async function newCronProcedure(
   });
   const prompt = params.prompt.trim();
   const schedule = params.schedule.trim();
-  const model = resolveCodexModel(params.model);
+  const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   const access = resolveThreadAccessControls(params);
   if (!schedule) {
@@ -2855,7 +2858,7 @@ export async function updateCronProcedure(
   } = {};
 
   if (typeof params.model !== "undefined") {
-    updates.model = resolveCodexModel(params.model);
+    updates.model = resolveRunnableCodexModel(params.model);
   }
 
   if (typeof params.reasoningEffort !== "undefined") {
@@ -3043,6 +3046,7 @@ async function queueThreadMessage(
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error("Thread is already processing a message.");
   }
+  assertCodexModelProviderAvailable(thread.model);
   const startedAt = getNow();
   await withSqliteRetry(() => {
     return runImmediateSqliteTransaction(() => {
@@ -3214,7 +3218,7 @@ export async function updateThreadModelProcedure(
     throw new Error("Thread model cannot change while a run is processing.");
   }
 
-  const model = resolveCodexModel(params.model);
+  const model = resolveRunnableCodexModel(params.model);
   setThreadModel(db, thread.id, model);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);

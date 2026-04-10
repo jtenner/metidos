@@ -32,6 +32,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers
+- rejects unavailable `openai-codex` selections before thread creation, queued runs, thread-model changes, or cron mutations so stale auth state fails fast with actionable errors
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The planned Codex-via-Pi wiring slices are now complete.
@@ -423,6 +424,7 @@ Minimum coverage should include:
 Verification status on 2026-04-09:
 
 - Automated coverage now explicitly covers missing Codex-file diagnostics, unusable Codex-file diagnostics, selector reasoning-step behavior, and the no-silent-fallback runtime rule when a thread explicitly selects `openai-codex`.
+- Automated coverage now also proves unavailable `openai-codex` selections are rejected before thread-start requests, thread creation, queued sends, thread-model changes, and cron create/update mutations.
 - A non-destructive local status/catalog probe was run on 2026-04-09 with a fresh temporary `JOLT_APP_DATA_DIR`. Result: Jolt detected a real `~/.codex/auth.json`, surfaced `source: codex-file`, and promoted the default model to `openai-codex:gpt-5.4`.
 - A live Pi runtime smoke was run on 2026-04-09 against `openai-codex:gpt-5.4-mini` with the prompt `Reply with exactly OK and nothing else.` Result: the runtime returned `OK`.
 - A live end-to-end Jolt thread smoke was run on 2026-04-09 through `openProjectProcedure(...)`, `createThreadProcedure(...)`, and `sendThreadMessageProcedure(...)` against `openai-codex:gpt-5.4-mini`. Result: the thread settled to `idle`, persisted Pi session metadata, and stored the assistant reply `OK`.
@@ -607,6 +609,24 @@ Primary files:
 - [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 - [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
 - [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+
+### CD11 - Reject unavailable Codex provider selections before execution
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- reject explicit `openai-codex:*` selections before thread-start requests, thread creation, thread-model changes, and cron create/update mutations when Codex auth is unavailable
+- reject queued sends for existing threads whose stored `openai-codex` model becomes unavailable after auth disappears
+- fail fast before persisting a new user message or starting a run so stale auth state cannot drift into ambiguous runtime failures
+
+Primary files:
+
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+- [src/bun/README.md](../src/bun/README.md)
+- [src/bun/project-procedures/README.md](../src/bun/project-procedures/README.md)
 
 ## Recommendation
 

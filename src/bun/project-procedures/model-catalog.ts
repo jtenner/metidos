@@ -82,6 +82,8 @@ type ModelCatalogEntry = {
   modelId: string;
   option: RpcModelOption;
   provider: string;
+  providerAvailabilityNote: string | null;
+  providerAvailable: boolean;
   supportsReasoningEffort: boolean;
 };
 
@@ -91,6 +93,8 @@ export type ResolvedCodexModelDescriptor = Pick<
   | "key"
   | "modelId"
   | "provider"
+  | "providerAvailabilityNote"
+  | "providerAvailable"
   | "supportsReasoningEffort"
 >;
 
@@ -240,6 +244,8 @@ function publicCatalogModelOption(
       supportsReasoningEffort: model.reasoning,
     },
     provider: model.provider,
+    providerAvailabilityNote,
+    providerAvailable,
     supportsReasoningEffort: model.reasoning,
   };
 }
@@ -324,6 +330,24 @@ function findCatalogModelEntry(
   );
 }
 
+function requireCatalogModelEntry(
+  model: string | null | undefined,
+): ModelCatalogEntry {
+  const normalized = model?.trim();
+  const entry = findCatalogModelEntry(normalized);
+  if (!entry) {
+    throw new Error(`Unsupported model: ${normalized}`);
+  }
+  return entry;
+}
+
+function unavailableCatalogModelMessage(entry: ModelCatalogEntry): string {
+  const guidance =
+    entry.providerAvailabilityNote ??
+    `Configure ${entry.option.providerLabel} in Settings before using it.`;
+  return `${entry.option.providerLabel} is unavailable for ${entry.option.label}. ${guidance}`;
+}
+
 /**
  * Build the full model catalog payload consumed by front-end settings.
  */
@@ -344,16 +368,14 @@ export function buildModelCatalog(): RpcModelCatalog {
 export function resolveCodexModelDescriptor(
   model: string | null | undefined,
 ): ResolvedCodexModelDescriptor {
-  const normalized = model?.trim();
-  const entry = findCatalogModelEntry(normalized);
-  if (!entry) {
-    throw new Error(`Unsupported model: ${normalized}`);
-  }
+  const entry = requireCatalogModelEntry(model);
   return {
     contextWindowTokens: entry.contextWindowTokens,
     key: entry.key,
     modelId: entry.modelId,
     provider: entry.provider,
+    providerAvailabilityNote: entry.providerAvailabilityNote,
+    providerAvailable: entry.providerAvailable,
     supportsReasoningEffort: entry.supportsReasoningEffort,
   };
 }
@@ -389,6 +411,32 @@ export function heuristicCompactionTriggerTokens(
  */
 export function resolveCodexModel(model: string | null | undefined): string {
   return resolveCodexModelDescriptor(model).key;
+}
+
+/**
+ * Validate that a model's backing provider is currently available.
+ * Throws when the provider requires additional auth or setup before use.
+ */
+export function assertCodexModelProviderAvailable(
+  model: string | null | undefined,
+): void {
+  const entry = requireCatalogModelEntry(model);
+  if (!entry.providerAvailable) {
+    throw new Error(unavailableCatalogModelMessage(entry));
+  }
+}
+
+/**
+ * Validate that a selected model is both recognized and currently runnable.
+ */
+export function resolveRunnableCodexModel(
+  model: string | null | undefined,
+): string {
+  const entry = requireCatalogModelEntry(model);
+  if (!entry.providerAvailable) {
+    throw new Error(unavailableCatalogModelMessage(entry));
+  }
+  return entry.key;
 }
 
 /**

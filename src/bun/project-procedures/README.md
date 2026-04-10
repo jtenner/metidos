@@ -8,7 +8,7 @@ It is organized by concern so each module has a narrow responsibility for data m
 - `model-catalog.ts`
   - Defines the Pi-backed model catalog and reasoning effort options across the supported providers.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
-  - Tracks provider metadata such as xAI routing and which model ids accept reasoning-effort overrides.
+  - Tracks provider metadata such as xAI routing, current provider availability, and which model ids accept reasoning-effort overrides.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
 - `provider-auth.ts`
@@ -57,6 +57,7 @@ It is organized by concern so each module has a narrow responsibility for data m
 ## Notes
 
 - This module family is the operational core behind `src/bun/project-procedures.ts`.
+- Provider availability is enforced in the procedure layer before thread creation, queued runs, and cron mutations so stale `openai-codex` selections fail fast with actionable errors instead of reaching the runtime.
 - Files here are intentionally separated to avoid a monolithic RPC implementation and to keep runtime responsibilities testable by boundary:
   - persistence mapping in `thread-detail.ts`
   - metadata normalization in `model-catalog.ts`
