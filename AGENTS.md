@@ -169,6 +169,7 @@
 │     │  ├─ projects-panel.tsx
 │     │  ├─ projects-panel.test.ts
 │     │  ├─ settings-panel.tsx
+│     │  ├─ settings-panel.test.ts
 │     │  ├─ sidebar-content.tsx
 │     │  ├─ sidebar-panels-state.ts
 │     │  ├─ state.test.ts

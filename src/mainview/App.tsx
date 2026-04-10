@@ -18,6 +18,7 @@ import type {
   RpcContextFocusChanged,
   RpcCronJob,
   RpcGitHistoryEntry,
+  RpcModelCatalog,
   RpcModelOption,
   RpcProject,
   RpcReasoningEffort,
@@ -683,6 +684,8 @@ export default function App({
   ] = useState("");
   const [desktopThreadSwitcherTarget, setDesktopThreadSwitcherTarget] =
     useState<DesktopThreadSwitcherTarget | null>(null);
+  const defaultCodexModelRef = useRef(defaultCodexModel);
+  const defaultCodexReasoningEffortRef = useRef(defaultCodexReasoningEffort);
   const isDesktopViewport = useDesktopViewport();
   const projects = useMemo(
     () => projectStoreItems(projectStore),
@@ -694,6 +697,43 @@ export default function App({
   useEffect(() => {
     threadStoreRef.current = threadStore;
   }, [threadStore]);
+
+  const applyModelCatalog = useCallback(
+    (modelCatalog: RpcModelCatalog): void => {
+      const previousDefaultModel = defaultCodexModelRef.current;
+      const previousDefaultReasoningEffort =
+        defaultCodexReasoningEffortRef.current;
+      defaultCodexModelRef.current = modelCatalog.defaultModel;
+      defaultCodexReasoningEffortRef.current =
+        modelCatalog.defaultReasoningEffort;
+
+      setCodexModels(modelCatalog.models);
+      setDefaultCodexModel(modelCatalog.defaultModel);
+      setReasoningEfforts(modelCatalog.reasoningEfforts);
+      setDefaultCodexReasoningEffort(modelCatalog.defaultReasoningEffort);
+      setPendingThreadModel((current) =>
+        !current || current === previousDefaultModel
+          ? modelCatalog.defaultModel
+          : current,
+      );
+      setPendingThreadReasoningEffort((current) =>
+        current === previousDefaultReasoningEffort
+          ? modelCatalog.defaultReasoningEffort
+          : current,
+      );
+      setCronCreatorModel((current) =>
+        !current || current === previousDefaultModel
+          ? modelCatalog.defaultModel
+          : current,
+      );
+      setCronCreatorReasoningEffort((current) =>
+        current === previousDefaultReasoningEffort
+          ? modelCatalog.defaultReasoningEffort
+          : current,
+      );
+    },
+    [],
+  );
 
   const handleSidebarCollapsedChange = useCallback(
     (collapsed: boolean): void => {
@@ -3049,14 +3089,7 @@ export default function App({
 
       replaceProjects(startupProjects);
       replaceThreads(startupThreads);
-      setCodexModels(modelCatalog.models);
-      setDefaultCodexModel(modelCatalog.defaultModel);
-      setReasoningEfforts(modelCatalog.reasoningEfforts);
-      setDefaultCodexReasoningEffort(modelCatalog.defaultReasoningEffort);
-      setPendingThreadModel((current) => current || modelCatalog.defaultModel);
-      setPendingThreadReasoningEffort(
-        (current) => current || modelCatalog.defaultReasoningEffort,
-      );
+      applyModelCatalog(modelCatalog);
       hydrateProjectRows(loadedProjects);
       setHomeDirectory(homeDirectoryResult.homeDirectory);
       setSupportsTildePath(homeDirectoryResult.supportsTildePath);
@@ -3283,6 +3316,7 @@ export default function App({
       setSessionStateReady(true);
     }
   }, [
+    applyModelCatalog,
     getProjectState,
     hydrateProjectRows,
     initialMainviewState,
@@ -5577,7 +5611,11 @@ export default function App({
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <SettingsPanel variant="desktop" />
+            <SettingsPanel
+              onModelCatalogChange={applyModelCatalog}
+              procedures={procedures}
+              variant="desktop"
+            />
           </div>
         </header>
 
@@ -6043,7 +6081,11 @@ export default function App({
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <SettingsPanel variant="mobile" />
+            <SettingsPanel
+              onModelCatalogChange={applyModelCatalog}
+              procedures={procedures}
+              variant="mobile"
+            />
           </div>
         </header>
 

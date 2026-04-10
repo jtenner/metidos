@@ -28,13 +28,13 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - imports `~/.codex/auth.json` into Pi's `openai-codex` OAuth shape and treats the Codex file as authoritative when it exists
 - exposes backend RPC procedures for Codex auth status, login start/finish, refresh, and logout
 - mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
+- exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The remaining work is mostly:
 
-- browser-visible login/logout state
-- browser auth orchestration and diagnostics
 - keyring-gap recovery and fuller operator guidance
+- manual end-to-end verification and operator documentation
 
 ## Why Jolt Should Not Restore The Codex SDK
 
@@ -191,7 +191,7 @@ Both the model catalog and the runtime create Pi storage under the Jolt app-data
 
 This is a good foundation for backend-managed provider login, status, and logout.
 
-## 3. Jolt now mirrors Codex file auth into Pi auth and exposes backend provider-auth RPC, but it still has no browser UI
+## 3. Jolt now mirrors Codex file auth into Pi auth and has both backend and browser provider-auth surfaces
 
 [src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts) now imports `~/.codex/auth.json` into Jolt's Pi auth store, gives that file precedence over stale Pi-managed `openai-codex` OAuth state, and can mirror backend-managed login or refresh results back into both stores. The backend also now exposes dedicated provider-auth orchestration through [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts), [src/bun/project-procedures.ts](../src/bun/project-procedures.ts), and [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts):
 
@@ -201,13 +201,19 @@ This is a good foundation for backend-managed provider login, status, and logout
 - logout
 - refreshed model-catalog payloads returned alongside provider-auth status so the browser can react to Codex availability changes without guessing
 
-What is still missing is the browser-visible auth layer:
+[src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) now consumes that RPC surface and provides:
 
-- no settings-panel UI for provider auth
-- no browser state machine around auth progress and failure
-- no browser copy yet for ChatGPT-plan Codex versus API-billed OpenAI
+- provider-status and auth-source visibility for `openai-codex`
+- login/logout actions
+- browser-login progress plus manual-code completion
+- copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
+- copy that explains why provider is selected before model
 
-[src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) is still a placeholder shell, which makes it the obvious landing zone for this work.
+What is still missing is mostly operator polish:
+
+- end-to-end manual verification coverage
+- clearer recovery guidance for keyring-only or revoked Codex sessions
+- fuller operator documentation for recovery and billing expectations
 
 ## 4. Jolt's runtime selection now respects Codex billing precedence for overlapping ids
 
@@ -480,6 +486,8 @@ Primary files:
 - [src/bun/index.ts](../src/bun/index.ts)
 
 ### CD04 - Add browser provider-auth UI
+
+Status: completed on 2026-04-09.
 
 Deliverables:
 
