@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createPiAuthStorage,
+  parseCodexDeviceAuthOutput,
   resetPiCodexAuthTestOverrides,
   resolvePiAuthFilePath,
   setPiCodexAuthTestOverrides,
@@ -68,6 +69,20 @@ test("translateCodexAuthToPiCredential maps Codex auth tokens into Pi OAuth cred
     accountId: "acct_123",
     expires: 1_901_234_567_000,
     refresh: "refresh_123",
+  });
+});
+
+test("parseCodexDeviceAuthOutput extracts the device-auth URL and one-time code from CLI output", () => {
+  expect(
+    parseCodexDeviceAuthOutput(`
+      Welcome to Codex [v\u001b[90m0.118.0\u001b[0m]
+      \u001b[94mhttps://auth.openai.com/codex/device\u001b[0m
+      \u001b[94m9D6L-S4JYZ\u001b[0m
+    `),
+  ).toEqual({
+    authUrl: "https://auth.openai.com/codex/device",
+    deviceCode: "9D6L-S4JYZ",
+    progressMessages: ["https://auth.openai.com/codex/device", "9D6L-S4JYZ"],
   });
 });
 

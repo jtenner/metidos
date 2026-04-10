@@ -15,9 +15,11 @@ import {
   persistCodexAuthFileCredential,
   persistPiOpenAICodexCredential,
   refreshPiOpenAICodexCredential,
+  startPiOpenAICodexDeviceLogin,
 } from "../pi-codex-auth";
 import type {
   RpcProviderAuthLogin,
+  RpcProviderAuthLoginMode,
   RpcProviderAuthLoginState,
   RpcProviderAuthStatus,
 } from "../rpc-schema";
@@ -32,10 +34,13 @@ type Deferred<T> = {
 
 type ProviderAuthLoginAttempt = {
   authUrl: string | null;
+  cancel: (() => void) | null;
   completionPromise: Promise<void>;
+  deviceCode: string | null;
   error: string | null;
   instructions: string | null;
   loginId: string;
+  mode: RpcProviderAuthLoginMode;
   manualCodeDeferred: Deferred<string>;
   progressMessages: string[];
   prompt: string | null;
@@ -80,7 +85,7 @@ function updateLoginAttempt(
   updates: Partial<
     Pick<
       ProviderAuthLoginAttempt,
-      "authUrl" | "error" | "instructions" | "prompt" | "state"
+      "authUrl" | "deviceCode" | "error" | "instructions" | "prompt" | "state"
     >
   > & {
     progressMessage?: string | null;
@@ -91,6 +96,9 @@ function updateLoginAttempt(
   }
   if (typeof updates.error !== "undefined") {
     attempt.error = updates.error;
+  }
+  if (typeof updates.deviceCode !== "undefined") {
+    attempt.deviceCode = updates.deviceCode;
   }
   if (typeof updates.instructions !== "undefined") {
     attempt.instructions = updates.instructions;
@@ -118,9 +126,11 @@ function snapshotLoginAttempt(
 ): RpcProviderAuthLogin {
   return {
     authUrl: attempt.authUrl,
+    deviceCode: attempt.deviceCode,
     error: attempt.error,
     instructions: attempt.instructions,
     loginId: attempt.loginId,
+    mode: attempt.mode,
     progressMessages: [...attempt.progressMessages],
     prompt: attempt.prompt,
     startedAt: attempt.startedAt,
@@ -179,8 +189,13 @@ export function getProviderAuthStatus(
 
 export async function startProviderAuthLogin(
   agentDirectory: string,
-  providerId: string,
+  params: {
+    loginMode?: RpcProviderAuthLoginMode;
+    providerId: string;
+  },
 ): Promise<RpcProviderAuthStatus> {
+  const { providerId } = params;
+  const loginMode = params.loginMode ?? "browser";
   if (!isSupportedProvider(providerId)) {
     throw new Error(`Unsupported provider auth provider: ${providerId}`);
   }
@@ -197,10 +212,13 @@ export async function startProviderAuthLogin(
 
   const attempt: ProviderAuthLoginAttempt = {
     authUrl: null,
+    cancel: null,
     completionPromise: Promise.resolve(),
+    deviceCode: null,
     error: null,
     instructions: null,
     loginId: randomUUID(),
+    mode: loginMode,
     manualCodeDeferred: createDeferred<string>(),
     progressMessages: [],
     prompt: null,
@@ -215,43 +233,69 @@ export async function startProviderAuthLogin(
 
   attempt.completionPromise = (async () => {
     try {
-      const credential = await loginPiOpenAICodex({
-        onAuth: (info) => {
-          updateLoginAttempt(attempt, {
-            authUrl: info.url,
-            instructions: info.instructions ?? null,
-            prompt: null,
-            state: "awaiting_browser",
-          });
-          authReady.resolve();
-        },
-        onManualCodeInput: async () => {
-          updateLoginAttempt(attempt, {
-            prompt: "Paste the authorization code or the full redirect URL.",
-            state: "awaiting_code",
-          });
-          authReady.resolve();
-          return attempt.manualCodeDeferred.promise;
-        },
-        onProgress: (message) => {
-          updateLoginAttempt(attempt, {
-            progressMessage: message,
-          });
-        },
-        onPrompt: async (prompt) => {
-          updateLoginAttempt(attempt, {
-            prompt: prompt.message,
-            state: "awaiting_code",
-          });
-          authReady.resolve();
-          return attempt.manualCodeDeferred.promise;
-        },
-        originator: "jolt",
-      });
+      const credential =
+        loginMode === "device"
+          ? await (() => {
+              const handle = startPiOpenAICodexDeviceLogin(agentDirectory, {
+                onAuth: (info) => {
+                  updateLoginAttempt(attempt, {
+                    authUrl: info.url,
+                    deviceCode: info.code,
+                    instructions: info.instructions,
+                    prompt: null,
+                    state: "awaiting_browser",
+                  });
+                  authReady.resolve();
+                },
+                onProgress: (message) => {
+                  updateLoginAttempt(attempt, {
+                    progressMessage: message,
+                  });
+                },
+              });
+              attempt.cancel = handle.cancel;
+              return handle.completionPromise;
+            })()
+          : await loginPiOpenAICodex({
+              onAuth: (info) => {
+                updateLoginAttempt(attempt, {
+                  authUrl: info.url,
+                  deviceCode: null,
+                  instructions: info.instructions ?? null,
+                  prompt: null,
+                  state: "awaiting_browser",
+                });
+                authReady.resolve();
+              },
+              onManualCodeInput: async () => {
+                updateLoginAttempt(attempt, {
+                  prompt:
+                    "Paste the authorization code or the full redirect URL.",
+                  state: "awaiting_code",
+                });
+                authReady.resolve();
+                return attempt.manualCodeDeferred.promise;
+              },
+              onProgress: (message) => {
+                updateLoginAttempt(attempt, {
+                  progressMessage: message,
+                });
+              },
+              onPrompt: async (prompt) => {
+                updateLoginAttempt(attempt, {
+                  prompt: prompt.message,
+                  state: "awaiting_code",
+                });
+                authReady.resolve();
+                return attempt.manualCodeDeferred.promise;
+              },
+              originator: "jolt",
+            });
       persistPiOpenAICodexCredential(agentDirectory, credential);
       persistCodexAuthFileCredential(credential);
       providerAuthLastErrors.delete(providerId);
       updateLoginAttempt(attempt, {
+        deviceCode: null,
         error: null,
         prompt: null,
         state: "completed",
@@ -371,9 +415,12 @@ export async function logoutProviderAuth(
       error: "OpenAI Codex login cancelled.",
       state: "cancelled",
     });
-    attempt.manualCodeDeferred.reject(
-      new Error("OpenAI Codex login cancelled."),
-    );
+    attempt.cancel?.();
+    if (attempt.mode === "browser") {
+      attempt.manualCodeDeferred.reject(
+        new Error("OpenAI Codex login cancelled."),
+      );
+    }
     providerAuthLoginAttempts.delete(providerId);
   }
 
@@ -386,9 +433,12 @@ export async function logoutProviderAuth(
 
 export function resetProviderAuthStateForTests(): void {
   for (const attempt of providerAuthLoginAttempts.values()) {
-    attempt.manualCodeDeferred.reject(
-      new Error("Provider auth test state reset."),
-    );
+    attempt.cancel?.();
+    if (attempt.mode === "browser") {
+      attempt.manualCodeDeferred.reject(
+        new Error("Provider auth test state reset."),
+      );
+    }
   }
   providerAuthLoginAttempts.clear();
   providerAuthLastErrors.clear();

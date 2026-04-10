@@ -59,9 +59,11 @@ describe("settings panel provider-auth helpers", () => {
         buildProviderAuthStatus({
           login: {
             authUrl: "https://auth.example.test",
+            deviceCode: null,
             error: null,
             instructions: "Finish sign-in in the browser.",
             loginId: "login_123",
+            mode: "browser",
             progressMessages: [],
             prompt: "Paste the redirect URL.",
             startedAt: "2026-04-09T12:00:00.000Z",
@@ -262,9 +264,11 @@ describe("settings panel provider-auth helpers", () => {
   it("only polls and accepts manual-code completion while login remains active", () => {
     const pendingLogin = {
       authUrl: "https://auth.example.test",
+      deviceCode: null,
       error: null,
       instructions: "Finish sign-in in the browser.",
       loginId: "login_123",
+      mode: "browser" as const,
       progressMessages: [],
       prompt: "Paste the redirect URL.",
       startedAt: "2026-04-09T12:00:00.000Z",
@@ -296,5 +300,32 @@ describe("settings panel provider-auth helpers", () => {
     });
     expect(shouldPollProviderAuth(completedStatus)).toBe(false);
     expect(providerAuthNeedsManualCode(completedStatus)).toBe(false);
+  });
+
+  it("keeps the device-auth flow polling without requiring a manual-code paste", () => {
+    const deviceStatus = buildProviderAuthStatus({
+      login: {
+        authUrl: "https://auth.openai.com/codex/device",
+        deviceCode: "ABCD-EFGH",
+        error: null,
+        instructions:
+          "Open the browser link, sign in to ChatGPT, and enter the one-time device code shown below.",
+        loginId: "login_device",
+        mode: "device",
+        progressMessages: [
+          "Follow these steps to sign in with ChatGPT using device code authorization:",
+        ],
+        prompt: null,
+        startedAt: "2026-04-09T12:00:00.000Z",
+        state: "awaiting_browser",
+        updatedAt: "2026-04-09T12:00:01.000Z",
+      },
+    });
+
+    expect(shouldPollProviderAuth(deviceStatus)).toBe(true);
+    expect(providerAuthNeedsManualCode(deviceStatus)).toBe(false);
+    expect(canCompleteProviderAuthLogin(deviceStatus, "code=abc", null)).toBe(
+      false,
+    );
   });
 });

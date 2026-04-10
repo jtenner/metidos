@@ -3,6 +3,7 @@
  * @description Syncs external Codex auth into Jolt's Pi auth store.
  */
 
+import { spawn } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -81,11 +82,29 @@ type OpenAICodexLoginOptions = OAuthLoginCallbacks & {
   originator?: string;
 };
 
+type OpenAICodexDeviceLoginOptions = {
+  onAuth?: (info: {
+    code: string | null;
+    instructions: string | null;
+    url: string | null;
+  }) => void;
+  onProgress?: (message: string) => void;
+};
+
+type PiOpenAICodexDeviceLoginHandle = {
+  cancel: () => void;
+  completionPromise: Promise<PiOpenAICodexCredential>;
+};
+
 type PiCodexAuthTestOverrides = {
   codexCliStatus?: (codexHomeDirectory: string) => {
     detail: string | null;
     status: PiCodexCliAuthStatus;
   };
+  deviceLogin?: (
+    agentDirectory: string,
+    options: OpenAICodexDeviceLoginOptions,
+  ) => PiOpenAICodexDeviceLoginHandle;
   login?: (options: OpenAICodexLoginOptions) => Promise<OAuthCredentials>;
   refresh?: (refreshToken: string) => Promise<OAuthCredentials>;
 };
@@ -235,6 +254,82 @@ function currentProcessEnvironment(): Record<string, string> {
   return Object.fromEntries(entries);
 }
 
+function stripAnsiCodes(text: string): string {
+  return text.replaceAll(
+    new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"),
+    "",
+  );
+}
+
+function readTextChunk(chunk: unknown): string {
+  if (typeof chunk === "string") {
+    return chunk;
+  }
+  if (chunk instanceof Uint8Array) {
+    return Buffer.from(chunk).toString("utf8");
+  }
+  return String(chunk ?? "");
+}
+
+function codexDeviceCode(text: string): string | null {
+  const match = text.match(/\b([A-Z0-9]{4,}(?:-[A-Z0-9]{4,})+)\b/u);
+  return match?.[1] ?? null;
+}
+
+function codexDeviceAuthUrl(text: string): string | null {
+  const match = text.match(/https:\/\/auth\.openai\.com\/codex\/device\S*/u);
+  return match?.[0] ?? null;
+}
+
+function codexDeviceAuthInstructions(
+  authUrl: string | null,
+  deviceCode: string | null,
+): string | null {
+  if (!authUrl || !deviceCode) {
+    return null;
+  }
+  return "Open the browser link, sign in to ChatGPT, and enter the one-time device code shown below.";
+}
+
+export function parseCodexDeviceAuthOutput(text: string): {
+  authUrl: string | null;
+  deviceCode: string | null;
+  progressMessages: string[];
+} {
+  const lines = stripAnsiCodes(text)
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let authUrl: string | null = null;
+  let deviceCode: string | null = null;
+  const progressMessages: string[] = [];
+
+  for (const line of lines) {
+    authUrl ||= codexDeviceAuthUrl(line);
+    deviceCode ||= codexDeviceCode(line);
+    if (
+      !/^welcome to codex\b/iu.test(line) &&
+      !/^openai's command-line coding agent$/iu.test(line)
+    ) {
+      progressMessages.push(line);
+    }
+  }
+
+  return {
+    authUrl,
+    deviceCode,
+    progressMessages,
+  };
+}
+
+function resolveCodexExecutablePath(): string {
+  const codexExecutablePath = Bun.which("codex");
+  if (!codexExecutablePath) {
+    throw new Error("Codex CLI is not installed on PATH.");
+  }
+  return codexExecutablePath;
+}
+
 function readJsonRecord(path: string): CodexAuthJsonRecord {
   if (!existsSync(path)) {
     return {};
@@ -315,10 +410,15 @@ export function probeCodexCliAuthStatus(
     return cached;
   }
 
-  const codexExecutablePath = Bun.which("codex");
-  if (!codexExecutablePath) {
+  let codexExecutablePath = "";
+  try {
+    codexExecutablePath = resolveCodexExecutablePath();
+  } catch (error) {
     return writeCodexCliStatusCache(codexHomeDirectory, {
-      detail: "Codex CLI is not installed on PATH.",
+      detail:
+        error instanceof Error
+          ? error.message
+          : String(error ?? "Codex CLI is not installed on PATH."),
       status: "unavailable",
     });
   }
@@ -438,6 +538,115 @@ export async function loginPiOpenAICodex(
   const login = piCodexAuthTestOverrides?.login ?? loginOpenAICodexWithPiOAuth;
   const credential = await login(options);
   return normalizeOAuthCredential(credential);
+}
+
+export function startPiOpenAICodexDeviceLogin(
+  agentDirectory: string,
+  options: OpenAICodexDeviceLoginOptions,
+): PiOpenAICodexDeviceLoginHandle {
+  const override = piCodexAuthTestOverrides?.deviceLogin;
+  if (override) {
+    return override(agentDirectory, options);
+  }
+
+  const codexHomeDirectory = resolveCodexHomeDirectoryPath();
+  const codexExecutablePath = resolveCodexExecutablePath();
+  const proc = spawn(
+    codexExecutablePath,
+    ["login", "--device-auth", "-c", 'cli_auth_credentials_store="file"'],
+    {
+      env: {
+        ...currentProcessEnvironment(),
+        CODEX_HOME: codexHomeDirectory,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let authUrl: string | null = null;
+  let deviceCode: string | null = null;
+  let settled = false;
+  const applyOutput = (chunk: unknown): void => {
+    const parsed = parseCodexDeviceAuthOutput(readTextChunk(chunk));
+    authUrl ||= parsed.authUrl;
+    deviceCode ||= parsed.deviceCode;
+    const instructions = codexDeviceAuthInstructions(authUrl, deviceCode);
+    if (authUrl || deviceCode) {
+      options.onAuth?.({
+        code: deviceCode,
+        instructions,
+        url: authUrl,
+      });
+    }
+    for (const message of parsed.progressMessages) {
+      options.onProgress?.(message);
+    }
+  };
+
+  proc.stdout.on("data", applyOutput);
+  proc.stderr.on("data", applyOutput);
+
+  const completionPromise = new Promise<PiOpenAICodexCredential>(
+    (resolve, reject) => {
+      proc.once("error", (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(error);
+      });
+      proc.once("exit", (code, signal) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (signal) {
+          reject(
+            new Error(`Codex device-auth login ended with signal ${signal}.`),
+          );
+          return;
+        }
+        if (code !== 0) {
+          reject(
+            new Error(
+              `Codex device-auth login exited with status ${code ?? "unknown"}.`,
+            ),
+          );
+          return;
+        }
+        const { authStorage } = createPiAuthStorage(agentDirectory);
+        const credential = authStorage.get(OPENAI_CODEX_PROVIDER_ID);
+        if (credential?.type !== "oauth") {
+          reject(
+            new Error(
+              "Codex device-auth login finished, but no reusable OpenAI Codex credential was written.",
+            ),
+          );
+          return;
+        }
+        const nextCredential: PiOpenAICodexCredential = {
+          access: credential.access,
+          expires: credential.expires,
+          refresh: credential.refresh,
+        };
+        if (
+          typeof credential.accountId === "string" &&
+          credential.accountId.trim().length > 0
+        ) {
+          nextCredential.accountId = credential.accountId;
+        }
+        resolve(nextCredential);
+      });
+    },
+  );
+
+  return {
+    cancel: () => {
+      if (!settled && proc.exitCode === null) {
+        proc.kill("SIGINT");
+      }
+    },
+    completionPromise,
+  };
 }
 
 export async function refreshPiOpenAICodexCredential(

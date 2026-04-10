@@ -69,6 +69,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Shared auth-bridge helper for Codex-via-Pi support.
   - Imports `~/.codex/auth.json` into Jolt's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
   - Detects Codex CLI credential storage mode from `config.toml` and non-destructively probes `codex login status` so Jolt can distinguish file-cache, keyring, auto-storage, ChatGPT-backed CLI sessions, API-key CLI sessions, and fully signed-out states when `auth.json` is missing.
+  - Also exposes the backend-owned `codex login --device-auth` bridge used for headless OpenAI Codex sign-in, including device-code parsing and automatic import of the resulting Codex credential into Jolt's Pi auth store.
   - Also mirrors backend-managed Codex login and refresh results back into both stores so Jolt's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
 
 - `pi-codex-auth.test.ts`
@@ -76,8 +77,8 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `project-procedures/provider-auth.ts`
   - Backend-managed provider-auth state machine for Codex-via-Pi support.
-  - Implements `openai-codex` auth status reads plus login start/finish, refresh, and logout orchestration on top of the shared auth-file bridge.
-  - Surfaces the detected Codex config path, credential-storage mode, and Codex CLI login-state probe so the browser can give precise file-versus-keyring recovery guidance instead of treating every missing-file case as identical.
+  - Implements `openai-codex` auth status reads plus browser-login start/finish, device-auth login start, refresh, and logout orchestration on top of the shared auth-file bridge.
+  - Surfaces the detected Codex config path, credential-storage mode, Codex CLI login-state probe, and device-auth login metadata so the browser can give precise file-versus-keyring recovery guidance instead of treating every missing-file case as identical.
   - Keeps in-flight login prompts and completion state process-local so the later browser UI can layer on top of a stable RPC contract.
 
 - `project-procedures/provider-auth.test.ts`

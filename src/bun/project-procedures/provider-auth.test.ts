@@ -16,6 +16,12 @@ import {
 import { resetProviderAuthStateForTests } from "./provider-auth";
 
 type ProjectProceduresModule = typeof import("../project-procedures");
+type DeviceLoginCredential = {
+  access: string;
+  accountId: string;
+  expires: number;
+  refresh: string;
+};
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
@@ -205,6 +211,8 @@ describe("provider auth procedures", () => {
         configured: false,
         login: expect.objectContaining({
           authUrl: "https://auth.example.test/openai-codex",
+          deviceCode: null,
+          mode: "browser",
           prompt: "Paste the authorization code or the full redirect URL.",
           state: "awaiting_code",
         }),
@@ -273,6 +281,115 @@ describe("provider auth procedures", () => {
     expect(logoutResult.modelCatalog.defaultModel).toBe("openai:gpt-5.4");
     expect(JSON.parse(readFileSync(piAuthPath, "utf8"))).toEqual({});
     expect(JSON.parse(readFileSync(codexAuthPath, "utf8"))).toEqual({});
+  });
+
+  it("starts a device-auth login through Codex CLI orchestration and imports the resulting credential", async () => {
+    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
+    const codexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const procedures = await loadProjectProceduresForTest({
+      appDataDir,
+      codexHome,
+    });
+
+    const accessToken = createJwt({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: "acct_device",
+      },
+      exp: 2_060_000_000,
+    });
+    let resolveDeviceLogin:
+      | ((value: DeviceLoginCredential) => void)
+      | undefined;
+    setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Not logged in",
+        status: "not_logged_in",
+      }),
+      deviceLogin: (_agentDirectory, options) => {
+        options.onAuth?.({
+          code: "ABCD-EFGH",
+          instructions:
+            "Open the browser link, sign in to ChatGPT, and enter the one-time device code shown below.",
+          url: "https://auth.openai.com/codex/device",
+        });
+        options.onProgress?.(
+          "Follow these steps to sign in with ChatGPT using device code authorization:",
+        );
+        return {
+          cancel: () => undefined,
+          completionPromise: new Promise((resolve) => {
+            resolveDeviceLogin = (value: DeviceLoginCredential) => {
+              writeFileSync(
+                join(codexHome, "auth.json"),
+                JSON.stringify(
+                  {
+                    auth_mode: "chatgpt",
+                    tokens: {
+                      access_token: accessToken,
+                      account_id: "acct_device",
+                      refresh_token: "refresh_device",
+                    },
+                  },
+                  null,
+                  2,
+                ),
+                "utf8",
+              );
+              resolve(value);
+            };
+          }),
+        };
+      },
+    });
+
+    const startResult = await procedures.startProviderAuthLoginProcedure({
+      loginMode: "device",
+      providerId: "openai-codex",
+    });
+
+    expect(startResult.provider).toEqual(
+      expect.objectContaining({
+        configured: false,
+        login: expect.objectContaining({
+          authUrl: "https://auth.openai.com/codex/device",
+          deviceCode: "ABCD-EFGH",
+          mode: "device",
+          prompt: null,
+          state: "awaiting_browser",
+        }),
+        providerId: "openai-codex",
+      }),
+    );
+    expect(startResult.modelCatalog.defaultModel).toBe("openai:gpt-5.4");
+
+    if (!resolveDeviceLogin) {
+      throw new Error("Device login resolver was not captured.");
+    }
+    resolveDeviceLogin({
+      access: accessToken,
+      accountId: "acct_device",
+      expires: 2_060_000_000_000,
+      refresh: "refresh_device",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const finishedStatus = await procedures.getProviderAuthStatusProcedure({
+      providerId: "openai-codex",
+    });
+    expect(finishedStatus.provider).toEqual(
+      expect.objectContaining({
+        accountId: "acct_device",
+        configured: true,
+        login: expect.objectContaining({
+          mode: "device",
+          state: "completed",
+        }),
+        source: "codex-file",
+      }),
+    );
+    expect(finishedStatus.modelCatalog.defaultModel).toBe(
+      "openai-codex:gpt-5.4",
+    );
   });
 
   it("refreshes the effective Codex credential and repairs the authoritative Codex file when needed", async () => {

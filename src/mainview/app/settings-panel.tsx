@@ -64,7 +64,7 @@ export function shouldPollProviderAuth(
 export function providerAuthNeedsManualCode(
   status: RpcProviderAuthStatus | null,
 ): boolean {
-  if (!status?.login?.prompt) {
+  if (!status?.login?.prompt || status.login.mode === "device") {
     return false;
   }
   return (
@@ -498,18 +498,22 @@ export function SettingsPanel({
     [applyProviderAuthResult],
   );
 
-  const handleStartLogin = useCallback((): void => {
-    void runProviderAuthAction("login", () =>
-      procedures.startProviderAuthLogin(
-        {
-          providerId: OPENAI_CODEX_PROVIDER_ID,
-        },
-        {
-          priority: "foreground",
-        },
-      ),
-    );
-  }, [procedures, runProviderAuthAction]);
+  const handleStartLogin = useCallback(
+    (loginMode: "browser" | "device"): void => {
+      void runProviderAuthAction("login", () =>
+        procedures.startProviderAuthLogin(
+          {
+            loginMode,
+            providerId: OPENAI_CODEX_PROVIDER_ID,
+          },
+          {
+            priority: "foreground",
+          },
+        ),
+      );
+    },
+    [procedures, runProviderAuthAction],
+  );
 
   const handleCompleteLogin = useCallback((): void => {
     const loginId = providerAuthResult?.provider.login?.loginId ?? "";
@@ -722,6 +726,24 @@ export function SettingsPanel({
                       </a>
                     ) : null}
 
+                    {providerStatus.login.mode === "device" &&
+                    providerStatus.login.deviceCode ? (
+                      <div className="rounded-xl border border-[#496379] bg-[#0f171c] px-3 py-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb5cd]">
+                          Device Code
+                        </div>
+                        <div className="mt-2 font-mono text-lg tracking-[0.18em] text-[#f4f8fb]">
+                          {providerStatus.login.deviceCode}
+                        </div>
+                        <div className="mt-2 text-[11px] leading-5 text-[#9fc0d7]">
+                          Enter this one-time code in the browser after opening
+                          the device-auth link. Jolt will import the resulting
+                          Codex credentials automatically once the CLI flow
+                          finishes.
+                        </div>
+                      </div>
+                    ) : null}
+
                     {providerAuthNeedsManualCode(providerStatus) ? (
                       <label className="block space-y-2">
                         <span className="font-medium text-[#eef7ff]">
@@ -802,16 +824,36 @@ export function SettingsPanel({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {!providerStatus?.configured &&
                   !shouldPollProviderAuth(providerStatus) ? (
-                    <button
-                      className="rounded-full border border-[#45606f] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={busyAction !== null || statusLoading}
-                      onClick={handleStartLogin}
-                      type="button"
-                    >
-                      {busyAction === "login"
-                        ? "Starting Sign-In..."
-                        : "Start Codex Sign-In"}
-                    </button>
+                    <>
+                      <button
+                        className="rounded-full border border-[#45606f] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={busyAction !== null || statusLoading}
+                        onClick={() => {
+                          handleStartLogin("browser");
+                        }}
+                        type="button"
+                      >
+                        {busyAction === "login"
+                          ? "Starting Sign-In..."
+                          : "Start Codex Sign-In"}
+                      </button>
+                      <button
+                        className="rounded-full border border-[#3f5f73] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={
+                          busyAction !== null ||
+                          statusLoading ||
+                          providerStatus?.codexCliAuthStatus === "unavailable"
+                        }
+                        onClick={() => {
+                          handleStartLogin("device");
+                        }}
+                        type="button"
+                      >
+                        {busyAction === "login"
+                          ? "Starting Device Sign-In..."
+                          : "Start Device Sign-In"}
+                      </button>
+                    </>
                   ) : null}
 
                   {providerAuthNeedsManualCode(providerStatus) ? (

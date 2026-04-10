@@ -396,6 +396,7 @@ export type RpcProviderAuthLoginState =
   | "completed"
   | "failed"
   | "cancelled";
+export type RpcProviderAuthLoginMode = "browser" | "device";
 
 export type RpcProviderAuthSource = "codex-file" | "pi-auth" | "none";
 export type RpcProviderAuthCredentialStoreMode = "auto" | "file" | "keyring";
@@ -417,8 +418,10 @@ export type RpcProviderAuthSourceReason =
 
 export type RpcProviderAuthLogin = {
   loginId: string;
+  mode: RpcProviderAuthLoginMode;
   state: RpcProviderAuthLoginState;
   authUrl: string | null;
+  deviceCode: string | null;
   instructions: string | null;
   prompt: string | null;
   progressMessages: string[];
@@ -685,6 +688,7 @@ export type AppRPCSchema = {
     };
     startProviderAuthLogin: {
       params: {
+        loginMode?: RpcProviderAuthLoginMode;
         providerId: string;
       };
       response: RpcProviderAuthResult;

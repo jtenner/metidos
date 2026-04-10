@@ -404,7 +404,7 @@ export async function getProviderAuthStatusProcedure(
 export async function startProviderAuthLoginProcedure(
   params: AppRPCSchema["requests"]["startProviderAuthLogin"]["params"],
 ): Promise<RpcProviderAuthResult> {
-  await startProviderAuthLogin(buildPiAgentDirectoryPath(), params.providerId);
+  await startProviderAuthLogin(buildPiAgentDirectoryPath(), params);
   return buildProviderAuthResult(params.providerId);
 }
 
