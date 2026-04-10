@@ -40,6 +40,7 @@ import type {
   VisibleMessage,
 } from "./state";
 import { APP_TITLE, formatGitHistoryTimestamp } from "./state";
+import { describeToolCall } from "./tool-call-rendering";
 
 const DIFF_LINE_ESTIMATE_PX = 24;
 const DIFF_VIRTUALIZATION_OVERSCAN = 20;
@@ -590,53 +591,131 @@ export function DiffViewer({
  * @param state - Current state value.
  */
 export function ToolCallMessage({
+  messageKey,
   server,
   tool,
   argumentsText,
   output,
   state,
+  expanded,
+  onToggleExpanded,
 }: {
+  messageKey: string;
   server: string;
   tool: string;
   argumentsText: string;
   output: string;
   state: "in_progress" | "completed" | "failed" | "stopped";
+  expanded?: boolean;
+  onToggleExpanded?: (() => void) | undefined;
 }): JSX.Element {
-  // Tool messages show tool identity, arguments, and output/error with bounded scrolling.
-  return (
-    <div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-            Tool Call
-          </div>
-          <div className="mt-1 truncate font-mono text-sm text-[#f2f0ef]">
+  const hasArguments = argumentsText.trim().length > 0;
+  const hasOutput = output.trim().length > 0;
+  const hasDetails = hasArguments || hasOutput;
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const isExpanded = expanded ?? localIsExpanded;
+  const detailsRegionId = `tool-call-details-${
+    messageKey.replaceAll(/[^a-zA-Z0-9_-]+/g, "-").replaceAll(/^-+|-+$/g, "") ||
+    "content"
+  }`;
+  const presentation = useMemo(
+    () => describeToolCall(tool, argumentsText, state),
+    [argumentsText, state, tool],
+  );
+
+  const toggleExpanded = (): void => {
+    if (!hasDetails) {
+      return;
+    }
+    if (expanded === undefined) {
+      setLocalIsExpanded((current) => !current);
+      return;
+    }
+    onToggleExpanded?.();
+  };
+
+  const headerContent = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="shrink-0 text-sm font-bold tracking-tight text-[#f2f0ef]">
+            Tool
+          </span>
+          <span className="shrink-0 text-sm text-[#7b8992]">-</span>
+          <span className="shrink-0 font-mono text-sm text-[#f2f0ef]">
             {tool}
-          </div>
-          <div className="mt-1 text-[11px] text-[#8f9aa2]">{server}</div>
+          </span>
+          {presentation.preview ? (
+            <span
+              className="min-w-0 flex-1 truncate font-mono text-sm text-[#8f9aa2]"
+              title={presentation.preview}
+            >
+              {presentation.preview}
+            </span>
+          ) : null}
         </div>
-        <div className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+        {server !== "pi" ? (
+          <div className="mt-1 text-[11px] text-[#8f9aa2]">{server}</div>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
           {toolCallStateLabel(state)}
         </div>
+        {hasDetails ? (
+          <span className="text-[#8ca6b9]">
+            {materialSymbol(
+              isExpanded ? "expand_less" : "expand_more",
+              "text-base",
+            )}
+          </span>
+        ) : null}
       </div>
-      {argumentsText.trim() ? (
-        <div className="space-y-2">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
-            Arguments
+    </>
+  );
+
+  return (
+    <div className="overflow-hidden border border-[#2c353c] bg-[#13181b]">
+      <div className="flex items-center gap-3 px-4 py-4">
+        {hasDetails ? (
+          <button
+            aria-controls={detailsRegionId}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} details for ${tool}`}
+            className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left transition-colors hover:bg-[#161d21] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-inset"
+            onClick={toggleExpanded}
+            type="button"
+          >
+            {headerContent}
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+            {headerContent}
           </div>
-          <pre className="app-scrollbar max-h-[12rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
-            {argumentsText}
-          </pre>
-        </div>
-      ) : null}
-      {output.trim() ? (
-        <div className="space-y-2">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
-            {state === "failed" ? "Error" : "Output"}
-          </div>
-          <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
-            {output}
-          </pre>
+        )}
+      </div>
+      {hasDetails && isExpanded ? (
+        <div className="space-y-3 px-4 pb-4" id={detailsRegionId}>
+          {hasArguments ? (
+            <div className="space-y-2">
+              <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+                Arguments
+              </div>
+              <pre className="app-scrollbar max-h-[12rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+                {argumentsText}
+              </pre>
+            </div>
+          ) : null}
+          {hasOutput ? (
+            <div className="space-y-2">
+              <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+                {presentation.outputLabel}
+              </div>
+              <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+                {output}
+              </pre>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -836,16 +915,20 @@ export function CommandExecutionMessage({
         ref={commandHeaderRef}
       >
         <div className="min-w-0 flex-1">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
-            Command
-          </div>
-          <div className="mt-1">
-            <div className="group/command-preview inline-block max-w-full align-top">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 text-sm font-bold tracking-tight text-[#f2f0ef]">
+              Tool
+            </span>
+            <span className="shrink-0 text-sm text-[#7b8992]">-</span>
+            <span className="shrink-0 font-mono text-sm text-[#f2f0ef]">
+              bash
+            </span>
+            <div className="group/command-preview min-w-0 flex-1">
               {hasOutput ? (
                 <button
                   aria-expanded={isExpanded}
                   aria-label={`Toggle command output for ${command}`}
-                  className="block max-w-full truncate font-mono text-left text-sm text-[#f2f0ef] transition-colors hover:text-[#ffffff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#13181b]"
+                  className="block max-w-full truncate font-mono text-left text-sm text-[#8f9aa2] transition-colors hover:text-[#d7e5ee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#13181b]"
                   onClick={toggleExpanded}
                   ref={setCommandPreviewAnchor}
                   type="button"
@@ -854,7 +937,7 @@ export function CommandExecutionMessage({
                 </button>
               ) : (
                 <div
-                  className="max-w-full truncate font-mono text-sm text-[#f2f0ef]"
+                  className="max-w-full truncate font-mono text-sm text-[#8f9aa2]"
                   ref={setCommandPreviewAnchor}
                 >
                   {command}

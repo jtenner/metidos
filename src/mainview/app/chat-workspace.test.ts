@@ -231,6 +231,43 @@ describe("deriveTranscriptMeasurementRows", () => {
     expect(collapsedRows[0]?.cacheKey).toBe(expandedRows[0]?.cacheKey);
     expect(collapsedRows[0]?.contentKey).not.toBe(expandedRows[0]?.contentKey);
   });
+
+  it("invalidates tool-call row measurement fingerprints when expansion changes", () => {
+    const toolCallMessage: VisibleMessage = {
+      argumentsText: '{\n  "path": "src/mainview/App.tsx"\n}',
+      key: "tool-1",
+      kind: "tool_call",
+      output: "file contents",
+      server: "pi",
+      state: "completed",
+      tool: "read",
+    };
+    const grouped = deriveGroupedVisibleMessages(
+      12,
+      [toolCallMessage],
+      null,
+    ).groups;
+
+    const collapsedRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 12,
+      expandedItemIds: new Set(),
+      groupedMessages: grouped,
+      hasTopContent: false,
+      messages: [toolCallMessage],
+      variant: "desktop",
+    });
+    const expandedRows = deriveTranscriptMeasurementRows({
+      activeThreadId: 12,
+      expandedItemIds: new Set(["tool-1"]),
+      groupedMessages: grouped,
+      hasTopContent: false,
+      messages: [toolCallMessage],
+      variant: "desktop",
+    });
+
+    expect(collapsedRows[0]?.cacheKey).toBe(expandedRows[0]?.cacheKey);
+    expect(collapsedRows[0]?.contentKey).not.toBe(expandedRows[0]?.contentKey);
+  });
 });
 
 describe("shouldRenderUnsafeModePopover", () => {

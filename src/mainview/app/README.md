@@ -72,6 +72,9 @@ Provides coalesced subscription channels for websocket-driven worktree invalidat
 `message-ui.tsx`
 Contains every major message renderer used in the chat stream, including the lightweight/plain-text message path, processing/error/notice states, tool/web search output, command output, reasoning traces, and file-change summaries. Diff rendering now consumes the shared parsed-diff cache/worker path for large diffs. Also includes modal/popover helpers such as `GitHistoryDiffModal`, `ErrorPreviewPopover`, and `ThreadSummaryPopover`.
 
+`tool-call-rendering.ts`
+Builds compact Pi tool-call header previews and output labels so core tools such as `read`, `ls`, `find`, `grep`, `bash`, `edit`, and `write` render with message-style collapsed headers instead of generic raw argument summaries.
+
 `message-markdown.tsx`
 Contains the rich markdown renderer and syntax-highlighting path, isolated behind a lazy import so heavy transcript dependencies stay out of the initial UI bundle.
 

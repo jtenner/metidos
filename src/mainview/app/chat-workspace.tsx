@@ -256,6 +256,7 @@ function visibleMessageMeasurementFingerprint(
     return [
       message.kind,
       message.state,
+      expanded ? "expanded" : "collapsed",
       message.server,
       message.tool,
       message.argumentsText.length,
@@ -972,6 +973,11 @@ const ChatTranscript = memo(function ChatTranscript({
         return (
           <ToolCallMessage
             argumentsText={message.argumentsText}
+            expanded={expandedItemIds.has(message.key)}
+            messageKey={message.key}
+            onToggleExpanded={() => {
+              onToggleItemExpanded(message.key);
+            }}
             output={message.output}
             server={message.server}
             state={message.state}

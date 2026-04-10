@@ -80,6 +80,8 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, notices, and the shared diff viewer used across transcript and history surfaces.
 
+`app/tool-call-rendering.ts` isolates Pi tool-call preview parsing so core tools render compact message headers with path/pattern/command context before the details accordion is opened.
+
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
