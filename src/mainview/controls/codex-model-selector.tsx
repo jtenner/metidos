@@ -173,7 +173,7 @@ export function CodexModelSelector({
     : null;
   const panelClassName =
     variant === "desktop"
-      ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[20rem] overflow-hidden border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
+      ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[24rem] overflow-hidden border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
       : "absolute left-0 right-0 bottom-[calc(100%+0.5rem)] z-50 overflow-hidden border border-[#445058] bg-[#171b1d] shadow-[0_18px_38px_rgba(0,0,0,0.42)]";
 
   function resetSearchForNextStep(nextStep: SelectorStep): void {
@@ -407,14 +407,14 @@ export function CodexModelSelector({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-2">
-                          <span className="truncate text-[12px] font-semibold text-[#f4f8fb]">
+                          <span className="text-[12px] font-semibold text-[#f4f8fb]">
                             {provider.providerLabel}
                           </span>
                           <span className="shrink-0 text-[11px] text-[#8f9aa2]">
                             {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
                           </span>
                           {scopeInfo ? (
-                            <span className="ml-auto inline-flex shrink-0 border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                            <span className="ml-auto inline-flex shrink-0 border border-[#45606f] bg-[#132129] pl-[10px] pr-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                               {scopeInfo.badge}
                             </span>
                           ) : null}
