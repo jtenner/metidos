@@ -3,11 +3,19 @@
  * @description Module for settings panel.
  */
 
-import { type JSX, useCallback, useEffect, useId, useState } from "react";
+import {
+  type JSX,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   ProjectProcedures,
   RpcModelCatalog,
+  RpcOllamaProviderConfig,
   RpcProviderAuthResult,
   RpcProviderAuthStatus,
   RpcRequestPriority,
@@ -114,9 +122,15 @@ export function SettingsPanel({
   const [busyAction, setBusyAction] = useState<ProviderAuthBusyAction | null>(
     null,
   );
+  const [ollamaStatusLoading, setOllamaStatusLoading] = useState(false);
   const [panelError, setPanelError] = useState("");
   const [providerAuthResult, setProviderAuthResult] =
     useState<RpcProviderAuthResult | null>(null);
+  const [ollamaConfig, setOllamaConfig] =
+    useState<RpcOllamaProviderConfig | null>(null);
+  const [ollamaUrl, setOllamaUrl] = useState("");
+  const [ollamaApiKey, setOllamaApiKey] = useState("");
+  const ollamaSaveRequestIdRef = useRef(0);
   const triggerButtonClassName =
     variant === "desktop"
       ? "inline-flex h-9 w-9 items-center justify-center border border-[#31414d] bg-[#12181c] text-[#9da8b1] transition hover:border-[#4f6575] hover:text-[#f2f0ef] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#131313] rounded-none"
@@ -142,6 +156,12 @@ export function SettingsPanel({
     },
     [onModelCatalogChange],
   );
+
+  const applyOllamaConfig = useCallback((config: RpcOllamaProviderConfig) => {
+    setOllamaConfig(config);
+    setOllamaUrl(config.url);
+    setOllamaApiKey(config.apiKey);
+  }, []);
 
   const loadProviderAuthStatus = useCallback(
     async (options?: {
@@ -172,6 +192,86 @@ export function SettingsPanel({
       }
     },
     [applyProviderAuthResult, procedures],
+  );
+
+  const loadOllamaProviderConfig = useCallback(
+    async (options?: {
+      priority?: RpcRequestPriority;
+      silent?: boolean;
+    }): Promise<RpcOllamaProviderConfig | null> => {
+      if (!options?.silent) {
+        setOllamaStatusLoading(true);
+      }
+      try {
+        const result = await procedures.getOllamaProviderConfig(undefined, {
+          priority: options?.priority ?? "default",
+        });
+        applyOllamaConfig(result);
+        return result;
+      } catch (error) {
+        console.error("Failed to load Ollama settings", error);
+        return null;
+      } finally {
+        if (!options?.silent) {
+          setOllamaStatusLoading(false);
+        }
+      }
+    },
+    [applyOllamaConfig, procedures],
+  );
+
+  const saveOllamaSettings = useCallback(
+    (options?: { priority?: RpcRequestPriority }): void => {
+      if (
+        ollamaConfig &&
+        ollamaUrl.trim() === ollamaConfig.url &&
+        ollamaApiKey === ollamaConfig.apiKey
+      ) {
+        return;
+      }
+
+      const requestId = ollamaSaveRequestIdRef.current + 1;
+      ollamaSaveRequestIdRef.current = requestId;
+      setOllamaStatusLoading(true);
+
+      void procedures
+        .saveOllamaProviderConfig(
+          {
+            apiKey: ollamaApiKey,
+            url: ollamaUrl,
+          },
+          {
+            priority: options?.priority ?? "foreground",
+          },
+        )
+        .then((result) => {
+          if (requestId !== ollamaSaveRequestIdRef.current) {
+            return;
+          }
+          applyOllamaConfig(result.ollama);
+          onModelCatalogChange(result.modelCatalog);
+        })
+        .catch((error) => {
+          if (requestId !== ollamaSaveRequestIdRef.current) {
+            return;
+          }
+          console.error("Failed to save Ollama settings", error);
+        })
+        .finally(() => {
+          if (requestId !== ollamaSaveRequestIdRef.current) {
+            return;
+          }
+          setOllamaStatusLoading(false);
+        });
+    },
+    [
+      applyOllamaConfig,
+      ollamaApiKey,
+      ollamaConfig,
+      ollamaUrl,
+      onModelCatalogChange,
+      procedures,
+    ],
   );
 
   const handleConnect = useCallback((): void => {
@@ -220,7 +320,10 @@ export function SettingsPanel({
     void loadProviderAuthStatus({
       priority: "foreground",
     });
-  }, [loadProviderAuthStatus, open]);
+    void loadOllamaProviderConfig({
+      priority: "foreground",
+    });
+  }, [loadOllamaProviderConfig, loadProviderAuthStatus, open]);
 
   useEffect(() => {
     if (!open || !loginActive) {
@@ -329,6 +432,65 @@ export function SettingsPanel({
                 {surfaceError}
               </div>
             ) : null}
+
+            <section className="mt-6 border-t border-[#27333c] pt-4">
+              <div className="text-sm font-semibold text-[#f4f8fb]">Ollama</div>
+              <label className="mt-3 block">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
+                  Ollama URL
+                </div>
+                <input
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                  disabled={ollamaStatusLoading}
+                  onBlur={() => {
+                    saveOllamaSettings({
+                      priority: "foreground",
+                    });
+                  }}
+                  onChange={(event) => {
+                    setOllamaUrl(event.currentTarget.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  placeholder="http://localhost:11434"
+                  spellCheck={false}
+                  type="text"
+                  value={ollamaUrl}
+                />
+              </label>
+              <label className="mt-3 block">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
+                  Ollama key
+                </div>
+                <input
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                  disabled={ollamaStatusLoading}
+                  onBlur={() => {
+                    saveOllamaSettings({
+                      priority: "foreground",
+                    });
+                  }}
+                  onChange={(event) => {
+                    setOllamaApiKey(event.currentTarget.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  spellCheck={false}
+                  type="text"
+                  value={ollamaApiKey}
+                />
+              </label>
+            </section>
           </div>
         </div>
       )}

@@ -845,6 +845,8 @@ const procedures: ProjectProcedures = {
   listDirectorySuggestions: createProcedure("listDirectorySuggestions"),
   getModelCatalog: createProcedure("getModelCatalog"),
   getProviderAuthStatus: createProcedure("getProviderAuthStatus"),
+  getOllamaProviderConfig: createProcedure("getOllamaProviderConfig"),
+  saveOllamaProviderConfig: createProcedure("saveOllamaProviderConfig"),
   startProviderAuthLogin: createProcedure("startProviderAuthLogin"),
   completeProviderAuthLogin: createProcedure("completeProviderAuthLogin"),
   refreshProviderAuth: createProcedure("refreshProviderAuth"),

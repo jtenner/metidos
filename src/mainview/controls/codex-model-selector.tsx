@@ -467,6 +467,7 @@ export function CodexModelSelector({
                       provider.providerAvailable ?? true;
                     const providerDisabledNote =
                       provider.providerAvailabilityNote ?? null;
+                    const providerModelCount = provider.modelCount;
                     return (
                       <button
                         key={provider.providerId}
@@ -528,7 +529,9 @@ export function CodexModelSelector({
                               {provider.providerLabel}
                             </span>
                             <span className="shrink-0 text-[11px] text-[#8f9aa2]">
-                              {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
+                              {providerModelCount > 0
+                                ? `${providerModelCount} model${providerModelCount === 1 ? "" : "s"}`
+                                : "Setup required"}
                             </span>
                           </span>
                           <span className="ml-auto flex shrink-0 items-center gap-2">
@@ -538,8 +541,8 @@ export function CodexModelSelector({
                               </span>
                             ) : null}
                             {!providerAvailable ? (
-                              <span className="inline-flex shrink-0 items-center border border-[#7a622c] bg-[#2a2114] px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#f3cf85]">
-                                {materialSymbol("warning", "text-[12px]")}
+                              <span className="inline-flex shrink-0 items-center border border-[#7a622c] bg-[#2a2114] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#f3cf85]">
+                                Disabled
                               </span>
                             ) : null}
                           </span>

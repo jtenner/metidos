@@ -55,6 +55,7 @@ import {
   getAppBootstrapProcedure,
   getHomeDirectoryProcedure,
   getModelCatalogProcedure,
+  getOllamaProviderConfigProcedure,
   getProcedureRuntimeStats,
   getProviderAuthStatusProcedure,
   getThreadProcedure,
@@ -82,6 +83,7 @@ import {
   requestThreadStartProcedure,
   respondThreadExtensionUiProcedure,
   runCronNowProcedure,
+  saveOllamaProviderConfigProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
   setThreadExtensionUiMessageListener,
@@ -446,6 +448,9 @@ const rpcHandlers: RpcRequestHandlerMap = {
     listDirectorySuggestionsProcedure(params),
   getModelCatalog: (params) => getModelCatalogProcedure(params),
   getProviderAuthStatus: (params) => getProviderAuthStatusProcedure(params),
+  getOllamaProviderConfig: (params) => getOllamaProviderConfigProcedure(params),
+  saveOllamaProviderConfig: (params) =>
+    saveOllamaProviderConfigProcedure(params),
   startProviderAuthLogin: (params) => startProviderAuthLoginProcedure(params),
   completeProviderAuthLogin: (params) =>
     completeProviderAuthLoginProcedure(params),

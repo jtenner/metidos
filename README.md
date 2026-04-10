@@ -31,12 +31,13 @@ For OpenAI Codex, use the Codex CLI with file-backed auth so Metidos can reuse t
 codex login
 ```
 
-For API-backed providers, set the env vars for the providers you want to use:
+The provider env requirements are:
 
 | Provider | Required env vars | Notes |
 |----------|-------------------|-------|
 | OpenAI API | `OPENAI_API_KEY` | Standard OpenAI Platform key. |
 | OpenAI Codex | none | Uses `codex login` with file-backed auth instead of an API key env var. |
+| Ollama (custom provider via Pi) | none by default | Configure the endpoint in Metidos's Pi `models.json`. Pi still requires an `apiKey` field there, but Ollama ignores it, so any literal value works. |
 | Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_OAUTH_TOKEN` also works if you already manage Anthropic auth that way. |
 | Google Gemini | `GEMINI_API_KEY` | Used for the `google` provider. |
 | Google Vertex | `GOOGLE_CLOUD_API_KEY` or `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT` + `GOOGLE_CLOUD_LOCATION` | Pi also supports ADC-backed Vertex auth. |
@@ -49,6 +50,8 @@ For API-backed providers, set the env vars for the providers you want to use:
 | OpenRouter | `OPENROUTER_API_KEY` | Used for the `openrouter` provider. |
 | xAI | `XAI_API_KEY` | Used for the `xai` provider. |
 | Z.AI | `ZAI_API_KEY` | Used for the `zai` provider. |
+
+For Ollama and other Pi custom providers, Metidos reads Pi model config from its own app-data directory at `.../pi-agent/models.json`, not from Pi's standalone `~/.pi/agent/models.json`. Use `METIDOS_APP_DATA_DIR` only if you want to relocate that Metidos-owned Pi config root. There is no built-in `OLLAMA_BASE_URL` or `OLLAMA_API_KEY` env contract in Metidos for the endpoint itself. Metidos now shows Ollama as a disabled provider in the model selector until it has settings, and the Settings panel exposes only `Ollama URL` and `Ollama key`. Metidos uses those values to query the Ollama models endpoint and rewrite the Pi `models.json` entry for you. See [docs/2026-04-10-ollama-via-pi-configuration.md](docs/2026-04-10-ollama-via-pi-configuration.md).
 
 Start the app:
 

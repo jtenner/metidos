@@ -101,6 +101,10 @@ import {
   resolveRunnableCodexModel,
 } from "./project-procedures/model-catalog";
 import {
+  getOllamaProviderConfig,
+  saveOllamaProviderConfig,
+} from "./project-procedures/ollama-provider-config";
+import {
   createPiThreadEventProjector,
   type ProjectedPiActivityWrite,
 } from "./project-procedures/pi-event-projection";
@@ -150,6 +154,8 @@ import type {
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
   RpcModelCatalog,
+  RpcOllamaProviderConfig,
+  RpcOllamaProviderConfigResult,
   RpcOpenProjectsBatchResultItem,
   RpcOpenWorktreeResult,
   RpcOpenWorktreesBatchResultItem,
@@ -380,6 +386,31 @@ export async function getModelCatalogProcedure(
   _params?: AppRPCSchema["requests"]["getModelCatalog"]["params"],
 ): Promise<RpcModelCatalog> {
   return buildModelCatalog();
+}
+
+/**
+ * RPC procedure: return the current Ollama provider config editor state.
+ */
+export async function getOllamaProviderConfigProcedure(
+  _params?: AppRPCSchema["requests"]["getOllamaProviderConfig"]["params"],
+): Promise<RpcOllamaProviderConfig> {
+  return getOllamaProviderConfig();
+}
+
+/**
+ * RPC procedure: save Ollama provider settings and refresh the exposed model catalog.
+ */
+export async function saveOllamaProviderConfigProcedure(
+  params: AppRPCSchema["requests"]["saveOllamaProviderConfig"]["params"],
+): Promise<RpcOllamaProviderConfigResult> {
+  const ollama = await saveOllamaProviderConfig({
+    apiKey: params.apiKey,
+    url: params.url,
+  });
+  return {
+    modelCatalog: buildModelCatalog(),
+    ollama,
+  };
 }
 
 function buildProviderAuthResult(providerId: string): RpcProviderAuthResult {

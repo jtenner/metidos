@@ -3,16 +3,12 @@
  * @description Pi-backed model catalog and model-identity helpers.
  */
 
-import { join } from "node:path";
+import { dirname } from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { getProviders } from "@mariozechner/pi-ai";
 import { ModelRegistry } from "@mariozechner/pi-coding-agent";
 
-import {
-  DEFAULT_THREAD_MODEL,
-  DEFAULT_THREAD_REASONING_EFFORT,
-  getAppDataDirectoryPath,
-} from "../db";
+import { DEFAULT_THREAD_MODEL, DEFAULT_THREAD_REASONING_EFFORT } from "../db";
 import { createPiAuthStorage } from "../pi-codex-auth";
 import type {
   RpcModelCatalog,
@@ -20,9 +16,13 @@ import type {
   RpcReasoningEffort,
   RpcReasoningEffortOption,
 } from "../rpc-schema";
+import {
+  buildPiModelsJsonPath,
+  getOllamaProviderConfigSnapshot,
+  OLLAMA_PROVIDER_ID,
+} from "./ollama-provider-config";
 
 const DEFAULT_COMPACTION_ESTIMATE_RATIO = 0.8;
-const PI_AGENT_DIRECTORY_NAME = "pi-agent";
 const TOKEN_FORMATTER = new Intl.NumberFormat("en-US");
 const BUILT_IN_PROVIDER_SET = new Set<string>(getProviders());
 const BUILT_IN_PROVIDER_ALLOWLIST = new Set([
@@ -509,6 +509,7 @@ function publicCatalogModelOption(
       deprecated: false,
       group: providerName,
       id: canonicalModelKey(model.provider, model.id),
+      isPlaceholder: false,
       label: model.name,
       modelId: model.id,
       providerAvailable,
@@ -525,11 +526,38 @@ function publicCatalogModelOption(
   };
 }
 
+function ollamaPlaceholderEntry(note: string): ModelCatalogEntry {
+  const providerName = providerLabel(OLLAMA_PROVIDER_ID);
+  return {
+    contextWindowTokens: 0,
+    key: canonicalModelKey(OLLAMA_PROVIDER_ID, "__setup__"),
+    modelId: "__setup__",
+    option: {
+      contextWindowTokens: 0,
+      deprecated: false,
+      group: providerName,
+      id: canonicalModelKey(OLLAMA_PROVIDER_ID, "__setup__"),
+      isPlaceholder: true,
+      label: "Setup required",
+      modelId: "__setup__",
+      providerAvailable: false,
+      providerAvailabilityNote: note,
+      providerId: OLLAMA_PROVIDER_ID,
+      providerLabel: providerName,
+      summary:
+        "Configure an Ollama provider in Settings to expose local models in the selector.",
+      supportsReasoningEffort: false,
+    },
+    provider: OLLAMA_PROVIDER_ID,
+    providerAvailabilityNote: note,
+    providerAvailable: false,
+    supportsReasoningEffort: false,
+  };
+}
+
 function buildModelCatalogState(): ModelCatalogState {
-  const agentDirectory = join(
-    getAppDataDirectoryPath(),
-    PI_AGENT_DIRECTORY_NAME,
-  );
+  const modelsJsonPath = buildPiModelsJsonPath();
+  const agentDirectory = dirname(modelsJsonPath);
   const { authStorage, codexAuthState } = createPiAuthStorage(agentDirectory);
   const preferCodexProvider = codexAuthState.source !== "none";
   const providerStatuses = resolveProviderSetupStatuses(
@@ -537,16 +565,30 @@ function buildModelCatalogState(): ModelCatalogState {
     codexAuthState,
     process.env,
   );
-  const entries = ModelRegistry.create(
-    authStorage,
-    join(agentDirectory, "models.json"),
-  )
-    .getAll()
+  const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+  const registryModels = registry.getAll();
+  const entries = registryModels
     .filter(shouldIncludeModel)
     .map((model) => publicCatalogModelOption(model, providerStatuses))
     .sort((left, right) =>
       compareCatalogEntries(left, right, preferCodexProvider),
     );
+  const hasOllamaModels = entries.some(
+    (entry) => entry.provider === OLLAMA_PROVIDER_ID,
+  );
+  if (!hasOllamaModels) {
+    const ollamaConfig = getOllamaProviderConfigSnapshot({
+      modelsJsonPath,
+      registryError: registry.getError() ?? null,
+      registryModels,
+    });
+    if (!ollamaConfig.available && ollamaConfig.statusNote) {
+      entries.push(ollamaPlaceholderEntry(ollamaConfig.statusNote));
+      entries.sort((left, right) =>
+        compareCatalogEntries(left, right, preferCodexProvider),
+      );
+    }
+  }
   if (entries.length === 0) {
     throw new Error("Pi model registry did not expose any catalog entries.");
   }

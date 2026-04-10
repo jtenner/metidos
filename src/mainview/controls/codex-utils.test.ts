@@ -62,6 +62,7 @@ describe("stepped codex selector helpers", () => {
   it("groups models into separate providers for OpenAI API and OpenAI Codex", () => {
     expect(groupCodexProviders(MODELS)).toEqual([
       {
+        modelCount: 2,
         models: [OPENAI_API_MODEL, OPENAI_API_NO_REASONING_MODEL],
         providerAvailable: true,
         providerAvailabilityNote: null,
@@ -69,6 +70,7 @@ describe("stepped codex selector helpers", () => {
         providerLabel: "OpenAI API",
       },
       {
+        modelCount: 1,
         models: [OPENAI_CODEX_MODEL],
         providerAvailable: true,
         providerAvailabilityNote: null,
@@ -175,6 +177,7 @@ describe("stepped codex selector helpers", () => {
 
     expect(providers).toEqual([
       {
+        modelCount: 1,
         models: [
           expect.objectContaining({
             id: "openai-codex:gpt-5.4",
@@ -187,6 +190,45 @@ describe("stepped codex selector helpers", () => {
         providerLabel: "OpenAI Codex",
       },
     ]);
+  });
+
+  it("excludes placeholder entries from provider model counts and model filtering", () => {
+    const providers = groupCodexProviders([
+      modelOption({
+        id: "ollama:__setup__",
+        isPlaceholder: true,
+        label: "Setup required",
+        modelId: "__setup__",
+        providerAvailable: false,
+        providerAvailabilityNote:
+          "Ollama is not setup. Open Settings and add an Ollama provider config.",
+        providerId: "ollama",
+        providerLabel: "Ollama",
+        summary:
+          "Configure an Ollama provider in Settings to expose local models in the selector.",
+        supportsReasoningEffort: false,
+      }),
+    ]);
+
+    expect(providers).toEqual([
+      {
+        modelCount: 0,
+        models: [
+          expect.objectContaining({
+            id: "ollama:__setup__",
+            isPlaceholder: true,
+          }),
+        ],
+        providerAvailable: false,
+        providerAvailabilityNote:
+          "Ollama is not setup. Open Settings and add an Ollama provider config.",
+        providerId: "ollama",
+        providerLabel: "Ollama",
+      },
+    ]);
+    expect(
+      filterCodexProviderModels(providers[0], normalizeSearchQuery("")),
+    ).toEqual([]);
   });
 
   it("includes unavailable-provider diagnostics in the active-model callout", () => {

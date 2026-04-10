@@ -11,6 +11,7 @@ import type {
 import { matchesSearchQuery } from "./search-utils";
 
 export type CodexProviderGroup = {
+  modelCount: number;
   models: RpcModelOption[];
   providerAvailable: boolean;
   providerAvailabilityNote: string | null;
@@ -62,6 +63,7 @@ export function groupCodexProviders(
   const grouped = new Map<
     string,
     {
+      modelCount: number;
       models: RpcModelOption[];
       providerAvailable: boolean;
       providerAvailabilityNote: string | null;
@@ -71,14 +73,19 @@ export function groupCodexProviders(
   for (const model of models) {
     const current = grouped.get(model.providerId) ?? {
       models: [],
+      modelCount: 0,
       providerAvailable: model.providerAvailable ?? true,
       providerAvailabilityNote: model.providerAvailabilityNote ?? null,
       providerLabel: model.providerLabel || model.group,
     };
     current.models.push(model);
+    if (!model.isPlaceholder) {
+      current.modelCount += 1;
+    }
     grouped.set(model.providerId, current);
   }
   return [...grouped.entries()].map(([providerId, entry]) => ({
+    modelCount: entry.modelCount,
     models: entry.models,
     providerAvailable: entry.providerAvailable,
     providerAvailabilityNote: entry.providerAvailabilityNote,
@@ -516,17 +523,19 @@ export function filterCodexProviderModels(
   if (!provider) {
     return [];
   }
-  return provider.models.filter((model) =>
-    matchesSearchQuery(
-      normalizedSearchQuery,
-      model.id,
-      model.label,
-      model.summary,
-      model.group,
-      model.providerId,
-      model.providerLabel,
-      model.modelId,
-    ),
+  return provider.models.filter(
+    (model) =>
+      !model.isPlaceholder &&
+      matchesSearchQuery(
+        normalizedSearchQuery,
+        model.id,
+        model.label,
+        model.summary,
+        model.group,
+        model.providerId,
+        model.providerLabel,
+        model.modelId,
+      ),
   );
 }
 

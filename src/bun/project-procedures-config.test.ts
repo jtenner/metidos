@@ -5,7 +5,13 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,6 +25,10 @@ import {
   codexModelSupportsReasoningEffort,
   resolveCodexModel,
 } from "./project-procedures/model-catalog";
+import {
+  getOllamaProviderConfig,
+  saveOllamaProviderConfig,
+} from "./project-procedures/ollama-provider-config";
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
@@ -63,6 +73,7 @@ type ProjectProceduresModule = typeof import("./project-procedures");
 
 let projectProcedures: ProjectProceduresModule | null = null;
 let isolatedCodexHome = "";
+const originalFetch = globalThis.fetch;
 
 function applyDefaultProviderEnv(): void {
   for (const name of PROVIDER_ENV_NAMES) {
@@ -182,6 +193,7 @@ afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
   applyDefaultProviderEnv();
   process.env.CODEX_HOME = isolatedCodexHome;
+  globalThis.fetch = originalFetch;
   setPiCodexAuthTestOverrides({
     codexCliStatus: () => ({
       detail: "Not logged in",
@@ -303,15 +315,133 @@ describe("project procedure configuration helpers", () => {
       catalog.models.filter((model) => model.providerId === "openrouter"),
     ).toHaveLength(5);
     expect(
+      catalog.models.filter((model) => model.providerId === "ollama"),
+    ).toHaveLength(1);
+    expect(
       catalog.models.filter((model) => model.providerId === "zai"),
     ).toHaveLength(5);
     expect(modelIds.has("anthropic:claude-opus-4-1")).toBe(false);
     expect(modelIds.has("openai:gpt-4.1")).toBe(false);
     expect(modelIds.has("google:gemini-1.5-pro")).toBe(false);
+    expect(modelIds.has("ollama:__setup__")).toBe(true);
     expect(modelIds.has("openrouter:qwen/qwen3.6-plus")).toBe(true);
     expect(modelIds.has("zai:glm-5.1")).toBe(true);
     expect(modelIds.has("kimi-coding:k2p5")).toBe(true);
     expect(modelIds.has("xai:grok-3-mini")).toBe(false);
+  });
+
+  it("injects a disabled Ollama selector entry until Ollama is configured", () => {
+    const ollamaModel = buildModelCatalog().models.find(
+      (model) => model.providerId === "ollama",
+    );
+
+    expect(ollamaModel).toEqual(
+      expect.objectContaining({
+        id: "ollama:__setup__",
+        isPlaceholder: true,
+        label: "Setup required",
+        providerAvailable: false,
+        providerAvailabilityNote:
+          "Ollama is not setup. Open Settings and set an Ollama URL.",
+        providerId: "ollama",
+        providerLabel: "Ollama",
+      }),
+    );
+  });
+
+  it("reads and saves Ollama provider config through Pi models.json", async () => {
+    const initialConfig = getOllamaProviderConfig();
+
+    expect(initialConfig).toEqual(
+      expect.objectContaining({
+        apiKey: "",
+        available: false,
+        configured: false,
+        modelIds: [],
+        statusNote: "Ollama is not setup. Open Settings and set an Ollama URL.",
+        url: "",
+      }),
+    );
+
+    globalThis.fetch = (async (input) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url !== "http://127.0.0.1:11434/v1/models") {
+        throw new Error(`Unexpected URL: ${url}`);
+      }
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "qwen2.5-coder:7b",
+            },
+          ],
+        }),
+        {
+          headers: {
+            "content-type": "application/json",
+          },
+          status: 200,
+        },
+      );
+    }) as typeof fetch;
+
+    const savedConfig = await saveOllamaProviderConfig({
+      apiKey: "",
+      url: "http://127.0.0.1:11434",
+    });
+
+    expect(savedConfig).toEqual(
+      expect.objectContaining({
+        apiKey: "",
+        available: true,
+        configured: true,
+        errorDetail: null,
+        modelIds: ["qwen2.5-coder:7b"],
+        statusNote: null,
+        url: "http://127.0.0.1:11434",
+      }),
+    );
+
+    const modelsJsonPath = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "pi-agent",
+      "models.json",
+    );
+    const persisted = JSON.parse(readFileSync(modelsJsonPath, "utf8")) as {
+      providers?: Record<string, unknown>;
+    };
+
+    expect(persisted.providers?.ollama).toEqual(
+      expect.objectContaining({
+        api: "openai-completions",
+        apiKey: "ollama",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        models: [expect.objectContaining({ id: "qwen2.5-coder:7b" })],
+      }),
+    );
+
+    const catalog = buildModelCatalog();
+    expect(
+      catalog.models.some((model) => model.id === "ollama:__setup__"),
+    ).toBe(false);
+    expect(catalog.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "ollama:qwen2.5-coder:7b",
+          isPlaceholder: false,
+          label: "qwen2.5-coder:7b",
+          providerAvailable: true,
+          providerAvailabilityNote: null,
+          providerId: "ollama",
+          providerLabel: "Ollama",
+        }),
+      ]),
+    );
   });
 
   it("marks providers disabled when their required setup env is missing", () => {

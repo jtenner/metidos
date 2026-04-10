@@ -361,6 +361,7 @@ export type RpcModelOption = {
   providerLabel: string;
   providerAvailable?: boolean;
   providerAvailabilityNote?: string | null;
+  isPlaceholder?: boolean;
   modelId: string;
   label: string;
   group: string;
@@ -451,6 +452,22 @@ export type RpcProviderAuthStatus = {
 export type RpcProviderAuthResult = {
   modelCatalog: RpcModelCatalog;
   provider: RpcProviderAuthStatus;
+};
+
+export type RpcOllamaProviderConfig = {
+  apiKey: string;
+  available: boolean;
+  configured: boolean;
+  configFilePath: string;
+  errorDetail: string | null;
+  modelIds: string[];
+  statusNote: string | null;
+  url: string;
+};
+
+export type RpcOllamaProviderConfigResult = {
+  modelCatalog: RpcModelCatalog;
+  ollama: RpcOllamaProviderConfig;
 };
 
 export type RpcAppBootstrapResult = {
@@ -685,6 +702,17 @@ export type AppRPCSchema = {
         providerId: string;
       };
       response: RpcProviderAuthResult;
+    };
+    getOllamaProviderConfig: {
+      params: undefined;
+      response: RpcOllamaProviderConfig;
+    };
+    saveOllamaProviderConfig: {
+      params: {
+        apiKey: string;
+        url: string;
+      };
+      response: RpcOllamaProviderConfigResult;
     };
     startProviderAuthLogin: {
       params: {
@@ -1028,6 +1056,14 @@ export interface ProjectProcedures {
   getProviderAuthStatus: RpcProcedureCall<
     AppRPCSchema["requests"]["getProviderAuthStatus"]["params"],
     AppRPCSchema["requests"]["getProviderAuthStatus"]["response"]
+  >;
+  getOllamaProviderConfig: RpcProcedureCall<
+    AppRPCSchema["requests"]["getOllamaProviderConfig"]["params"],
+    AppRPCSchema["requests"]["getOllamaProviderConfig"]["response"]
+  >;
+  saveOllamaProviderConfig: RpcProcedureCall<
+    AppRPCSchema["requests"]["saveOllamaProviderConfig"]["params"],
+    AppRPCSchema["requests"]["saveOllamaProviderConfig"]["response"]
   >;
   startProviderAuthLogin: RpcProcedureCall<
     AppRPCSchema["requests"]["startProviderAuthLogin"]["params"],
