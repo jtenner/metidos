@@ -33,6 +33,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - detects Codex CLI credential storage mode from `config.toml` and shows whether the current machine is configured for `file`, `keyring`, or `auto` storage
 - non-destructively probes `codex login status` so keyring-backed Codex CLI sessions show up as explicit ChatGPT-versus-API-key diagnostics instead of looking like a generic missing-file failure
 - can launch `codex login --device-auth` from the backend, surface the browser URL plus one-time device code in Settings, and automatically import the resulting Codex credential when the CLI flow completes
+- intentionally does not import or trust OS-keyring-backed Codex credentials directly, because OpenAI does not document a stable keyring schema or export contract that Jolt can safely mirror
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - repeats the provider billing and policy cue at the chat-send and cron-create surfaces so users see the active scope again before they trigger work
 - surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers, and the unavailable note now explains when Codex CLI is already logged in but Jolt still cannot import that session
@@ -43,7 +44,7 @@ The planned Codex-via-Pi wiring slices are now complete.
 
 The main remaining caveats are:
 
-- keyring-only Codex setups still need an operator-visible fallback because Jolt can detect those sessions through `codex login status` and can run a fresh device-auth flow, but it still cannot auto-import existing OS-keyring credentials directly
+- keyring-only Codex setups are intentionally unsupported for direct credential import because Jolt can detect those sessions through `codex login status`, but OpenAI does not document a stable OS-keyring export contract that Jolt can safely mirror
 - destructive login/logout verification against a real ChatGPT-plan session should still be done only in an isolated operator environment, not against an active everyday Codex login
 
 ## Why Jolt Should Not Restore The Codex SDK
@@ -245,7 +246,7 @@ Use this implementation strategy unless product requirements change:
 5. Make provider choice explicit in the UI and runtime instead of silently preferring plain `openai`.
 6. Treat `~/.codex/auth.json` as the preferred source of truth for `openai-codex` when it exists, and translate it into Pi's credential shape automatically when Jolt needs Pi-managed auth state.
 7. Fall back to Jolt's Pi `auth.json` only when `~/.codex/auth.json` is absent or unusable for `openai-codex`.
-8. Treat Codex keyring parity and device-code parity as follow-on work unless they become hard requirements.
+8. Treat direct Codex OS-keyring import as unsupported until OpenAI exposes a much less brittle interface or Jolt adopts another documented, stable bridge. Use file auth and device-auth recovery instead.
 
 This gives Jolt:
 
@@ -377,7 +378,7 @@ The recommended first implementation is:
 - automatically translate Codex auth into Pi's `openai-codex` OAuth shape when Jolt needs Pi-managed credentials
 - prefer the Codex file over any stale Jolt-managed Pi `openai-codex` entry when both exist
 - fall back to Jolt's Pi agent-directory `auth.json` only when `~/.codex/auth.json` is absent, unreadable, or does not contain usable Codex credentials
-- do not block the first implementation on Codex-style keyring parity
+- do not implement direct OS-keyring import until OpenAI exposes a documented, stable contract for it or Jolt adopts another non-brittle bridge
 
 The practical mapping is straightforward for ChatGPT-backed Codex auth:
 
@@ -391,6 +392,12 @@ If deeper Codex parity is later required, Jolt would need to add by-hand work fo
 - keyring-backed credential storage
 - continuous sync or invalidation between `~/.codex/auth.json` and Jolt-managed Pi auth state
 - managed restrictions similar to `forced_login_method` and `forced_chatgpt_workspace_id`
+
+Current product decision:
+
+- Jolt supports file-backed Codex auth import and backend-driven device-auth recovery
+- Jolt does not support direct import from the OS keyring
+- when Codex is configured for `keyring` or `auto` without a usable `auth.json`, Jolt should diagnose that state clearly and direct the operator toward file storage or a fresh device-auth flow
 
 This is still a Pi-native implementation because Jolt is not sharing the Codex file schema directly with Pi. It is importing or mirroring Codex auth into the Pi credential shape while treating the Codex file as authoritative when present.
 
@@ -438,7 +445,7 @@ Verification status on 2026-04-09:
 
 ## Risks
 
-- Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now detects Codex credential-store mode and probes `codex login status`, which narrows the ambiguity around keyring-backed sessions, but the recommended auto-import behavior still only works when the Codex file exists.
+- Unsupported-keyring risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now detects Codex credential-store mode and probes `codex login status`, but it intentionally does not import OS-keyring-backed credentials directly because OpenAI does not document a stable keyring export contract. File auth and device-auth recovery remain the supported paths.
 - Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
 - Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Jolt now drives `codex login --device-auth` directly for the documented headless path, but Pi's built-in OpenAI Codex docs still do not promise full CLI parity beyond that.
 - Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls, while API-key usage follows API org controls. Jolt must make the chosen auth mode obvious to users.
@@ -447,7 +454,7 @@ Verification status on 2026-04-09:
 ## Blockers
 
 - None for the recommended Pi-native path.
-- OS keyring support is not a blocker for making Codex work when `~/.codex/auth.json` exists, but it becomes a blocker for a complete Codex-auth story on machines where Codex is configured for keyring-only storage.
+- OS keyring support is not a blocker for making Codex work when `~/.codex/auth.json` exists because direct keyring import is explicitly out of scope for the supported path today.
 
 ## Suggested Execution Slices
 

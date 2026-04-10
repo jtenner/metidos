@@ -84,7 +84,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
-`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, browser-login and device-auth login actions, device-code display, manual-code completion, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance.
+`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, browser-login and device-auth login actions, device-code display, manual-code completion, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance. Keyring-only Codex auth is documented there as unsupported for direct import today.
 
 `app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 

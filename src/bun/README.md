@@ -69,6 +69,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Shared auth-bridge helper for Codex-via-Pi support.
   - Imports `~/.codex/auth.json` into Jolt's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
   - Detects Codex CLI credential storage mode from `config.toml` and non-destructively probes `codex login status` so Jolt can distinguish file-cache, keyring, auto-storage, ChatGPT-backed CLI sessions, API-key CLI sessions, and fully signed-out states when `auth.json` is missing.
+  - Does not import OS-keyring-backed Codex credentials directly; keyring detection exists only to produce precise unsupported-state diagnostics and recovery guidance.
   - Also exposes the backend-owned `codex login --device-auth` bridge used for headless OpenAI Codex sign-in, including device-code parsing and automatic import of the resulting Codex credential into Jolt's Pi auth store.
   - Also mirrors backend-managed Codex login and refresh results back into both stores so Jolt's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
 

@@ -17,7 +17,7 @@ Renders the shared browser prompt dialog used for Pi extension `confirm`, `selec
 
 `settings-panel.tsx`
 Renders the top-right settings trigger and the current provider-auth settings surface.
-It now shows OpenAI Codex auth status, source, detected Codex credential-storage mode, detected Codex CLI login state, browser-login and device-auth login progress, the one-time device code when headless login is active, manual-code completion, refresh, logout, the browser copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI, and recovery guidance for missing, unusable, keyring-only, or headless Codex setups.
+It now shows OpenAI Codex auth status, source, detected Codex credential-storage mode, detected Codex CLI login state, browser-login and device-auth login progress, the one-time device code when headless login is active, manual-code completion, refresh, logout, the browser copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI, and recovery guidance for missing, unusable, keyring-only, or headless Codex setups. Keyring-only Codex auth is documented there as unsupported for direct import today.
 
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.
