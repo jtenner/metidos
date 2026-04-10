@@ -465,51 +465,26 @@ export function CodexModelSelector({
               ) : (
                 filteredModels.map((model) => {
                   const selected = model.id === activeModelId;
-                  const reasoningSubmenuOpen =
-                    pendingModelId === model.id &&
+                  const supportsReasoningSubmenu =
                     integratedReasoningEnabled &&
                     codexModelSupportsThinkingLevel(model);
                   return (
                     <div
                       key={model.id}
-                      className="relative"
+                      className="group/model-submenu relative"
                       onMouseEnter={() => {
-                        if (
-                          integratedReasoningEnabled &&
-                          codexModelSupportsThinkingLevel(model)
-                        ) {
+                        if (supportsReasoningSubmenu) {
                           setPendingModelId(model.id);
                           return;
                         }
-                        setPendingModelId((current) =>
-                          current === model.id ? null : current,
-                        );
-                      }}
-                      onMouseLeave={() => {
                         setPendingModelId((current) =>
                           current === model.id ? null : current,
                         );
                       }}
                       onFocus={() => {
-                        if (
-                          integratedReasoningEnabled &&
-                          codexModelSupportsThinkingLevel(model)
-                        ) {
+                        if (supportsReasoningSubmenu) {
                           setPendingModelId(model.id);
                         }
-                      }}
-                      onBlur={(event) => {
-                        if (
-                          event.relatedTarget &&
-                          event.currentTarget.contains(
-                            event.relatedTarget as Node,
-                          )
-                        ) {
-                          return;
-                        }
-                        setPendingModelId((current) =>
-                          current === model.id ? null : current,
-                        );
                       }}
                     >
                       <button
@@ -547,36 +522,38 @@ export function CodexModelSelector({
                             {`- ${model.modelId}`}
                           </span>
                         </span>
-                        {integratedReasoningEnabled &&
-                        codexModelSupportsThinkingLevel(model) ? (
+                        {supportsReasoningSubmenu ? (
                           <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
                             {materialSymbol("chevron_right", "text-[16px]")}
                           </span>
                         ) : null}
                       </button>
-                      {reasoningSubmenuOpen ? (
-                        <div className="absolute top-0 left-full z-20 ml-2 min-w-[12rem] border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-                          {reasoningOptions.map((option) => {
-                            const selectedOption = option.id === reasoningValue;
-                            return (
-                              <button
-                                key={option.id}
-                                type="button"
-                                className={`block w-full px-3 py-2 text-left transition-colors ${
-                                  selectedOption
-                                    ? "bg-[#28353e] text-[#f8fafc]"
-                                    : "text-[#ebf3f8] hover:bg-[#1e2428]"
-                                }`}
-                                onClick={() => {
-                                  handleReasoningSelect(option.id, close);
-                                }}
-                              >
-                                <span className="block text-[12px] font-semibold text-inherit">
-                                  {option.label}
-                                </span>
-                              </button>
-                            );
-                          })}
+                      {supportsReasoningSubmenu ? (
+                        <div className="pointer-events-none invisible absolute left-full top-0 z-20 min-w-[12rem] opacity-0 transition-opacity duration-150 group-hover/model-submenu:visible group-hover/model-submenu:pointer-events-auto group-hover/model-submenu:opacity-100 group-focus-within/model-submenu:visible group-focus-within/model-submenu:pointer-events-auto group-focus-within/model-submenu:opacity-100">
+                          <div className="border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+                            {reasoningOptions.map((option) => {
+                              const selectedOption =
+                                option.id === reasoningValue;
+                              return (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  className={`block w-full px-3 py-2 text-left transition-colors ${
+                                    selectedOption
+                                      ? "bg-[#28353e] text-[#f8fafc]"
+                                      : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                                  }`}
+                                  onClick={() => {
+                                    handleReasoningSelect(option.id, close);
+                                  }}
+                                >
+                                  <span className="block text-[12px] font-semibold text-inherit">
+                                    {option.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       ) : null}
                     </div>
