@@ -148,9 +148,6 @@ export function CodexModelSelector({
     () => filterCodexProviderModels(selectedProvider, normalizedSearchQuery),
     [normalizedSearchQuery, selectedProvider],
   );
-  const selectedProviderScope = codexProviderScopeInfo(
-    selectedProvider?.providerId ?? null,
-  );
   const selectedProviderAvailable = selectedProvider?.providerAvailable ?? true;
   const selectedProviderAvailabilityNote =
     selectedProvider?.providerAvailabilityNote ?? null;
@@ -299,34 +296,14 @@ export function CodexModelSelector({
       renderPanel={({ close }) => (
         <div className={panelClassName}>
           <div className="border-b border-[#3c4c58] px-3 py-3">
-            {selectorStep === "provider" ? null : (
-              <div className="flex items-start gap-2">
-                <button
-                  type="button"
-                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-[#97b5ca] transition-colors hover:bg-[#1e2428] hover:text-[#f2f0ef]"
-                  onClick={handleStepBack}
-                  aria-label="Back to previous selector step"
-                >
-                  {materialSymbol("arrow_forward", "text-[16px] rotate-180")}
-                </button>
-              </div>
-            )}
-            {selectorStep === "reasoning" ? null : (
-              <div
-                className={`flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2 ${
-                  selectorStep === "provider" ? "" : "mt-3"
-                }`}
-              >
+            {selectorStep === "provider" ? (
+              <div className="flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
                 {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
                 <input
                   ref={searchInputRef}
                   aria-label="Search providers or models"
                   className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
-                  placeholder={
-                    selectorStep === "provider"
-                      ? "Search providers or models"
-                      : "Search models"
-                  }
+                  placeholder="Search providers or models"
                   value={searchQuery}
                   onChange={(event) => {
                     setSearchQuery(event.currentTarget.value);
@@ -352,25 +329,55 @@ export function CodexModelSelector({
                   </button>
                 ) : null}
               </div>
-            )}
-            {selectorStep !== "provider" && selectedProvider ? (
-              <div className="mt-3 border border-[#31414d] bg-[#101416] px-3 py-3">
-                <div className="text-[12px] font-semibold text-[#f4f8fb]">
-                  {selectedProvider.providerLabel}
+            ) : selectedProvider ? (
+              <div className="border border-[#31414d] bg-[#101416] px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center text-[#97b5ca] transition-colors hover:bg-[#1e2428] hover:text-[#f2f0ef]"
+                    onClick={handleStepBack}
+                    aria-label="Back to previous selector step"
+                  >
+                    {materialSymbol("arrow_forward", "text-[16px] rotate-180")}
+                  </button>
+                  <div className="text-[12px] font-semibold text-[#f4f8fb]">
+                    {selectedProvider.providerLabel}
+                  </div>
                 </div>
-                {selectedProviderScope ? (
-                  <div className="mt-2">
-                    <span className="inline-flex border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                      {selectedProviderScope.badge}
-                    </span>
+                {selectorStep === "reasoning" ? null : (
+                  <div className="mt-3 flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
+                    {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
+                    <input
+                      ref={searchInputRef}
+                      aria-label="Search providers or models"
+                      className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
+                      placeholder="Search models"
+                      value={searchQuery}
+                      onChange={(event) => {
+                        setSearchQuery(event.currentTarget.value);
+                      }}
+                      onKeyDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                    {searchQuery ? (
+                      <button
+                        type="button"
+                        className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
+                        onClick={() => {
+                          setSearchQuery("");
+                          searchInputRef.current?.focus();
+                        }}
+                        aria-label="Clear selector search"
+                      >
+                        ×
+                      </button>
+                    ) : null}
                   </div>
-                ) : null}
-                {!selectedProviderAvailable &&
-                selectedProviderAvailabilityNote ? (
-                  <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
-                    {selectedProviderAvailabilityNote}
-                  </div>
-                ) : null}
+                )}
               </div>
             ) : null}
           </div>
