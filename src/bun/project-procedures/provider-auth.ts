@@ -151,6 +151,8 @@ function buildProviderAuthStatus(
         ? oauthCredential.accountId
         : null,
     codexAuthFilePath: codexAuthState.codexAuthFilePath,
+    codexCliAuthDetail: codexAuthState.codexCliAuthDetail,
+    codexCliAuthStatus: codexAuthState.codexCliAuthStatus,
     codexConfigFilePath: codexAuthState.codexConfigFilePath,
     codexCredentialStoreMode: codexAuthState.credentialStoreMode,
     configured: oauthCredential != null,

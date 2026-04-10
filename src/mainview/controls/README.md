@@ -12,7 +12,7 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
 - `codex-model-selector.tsx`
   - Implements the model picker UI (desktop + mobile variants) for provider-aware Pi model selection.
   - Walks selection through `Provider -> Model -> Thinking level`, keeping `OpenAI API` and `OpenAI Codex` distinct even when they expose the same GPT ids.
-  - Supports search filtering at the provider and model steps, surfaces provider billing/policy scope for `OpenAI API` versus `OpenAI Codex`, marks unauthenticated Codex providers as unavailable, and only shows the thinking-level step when the chosen model supports it.
+  - Supports search filtering at the provider and model steps, surfaces provider billing/policy scope for `OpenAI API` versus `OpenAI Codex`, marks unauthenticated Codex providers as unavailable, explains when Codex CLI is already signed in but Jolt still lacks reusable credentials, and only shows the thinking-level step when the chosen model supports it.
 - `codex-utils.ts`
   - Helper utilities for model/thinking UI wiring.
   - Groups model options by provider, preserves provider availability metadata, filters stepped selector lists, formats provider-aware labels (including deprecation marking), exposes provider-scope guidance, derives active-model scope callouts for composer/cron surfaces, and resolves selected IDs to model/effort records.

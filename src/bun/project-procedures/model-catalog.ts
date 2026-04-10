@@ -217,13 +217,15 @@ function buildModelSummary(model: Model<Api>): string {
 function publicCatalogModelOption(
   model: Model<Api>,
   codexProviderAvailable: boolean,
+  codexProviderAvailabilityNote: string | null,
 ): ModelCatalogEntry {
   const providerName = providerLabel(model.provider);
   const providerAvailable =
     model.provider !== "openai-codex" || codexProviderAvailable;
   const providerAvailabilityNote =
     model.provider === "openai-codex" && !providerAvailable
-      ? "Requires OpenAI Codex sign-in in Settings."
+      ? (codexProviderAvailabilityNote ??
+        "Requires OpenAI Codex sign-in in Settings.")
       : null;
   return {
     contextWindowTokens: model.contextWindow,
@@ -250,6 +252,23 @@ function publicCatalogModelOption(
   };
 }
 
+function unavailableCodexProviderNote(
+  codexAuthState: ReturnType<typeof createPiAuthStorage>["codexAuthState"],
+): string {
+  switch (codexAuthState.codexCliAuthStatus) {
+    case "logged_in_chatgpt":
+      return "Codex CLI is already signed in with ChatGPT, but Jolt cannot import that session automatically from OS or keyring storage. Start OpenAI Codex sign-in in Settings or switch Codex CLI to file storage.";
+    case "logged_in_api_key":
+      return "Codex CLI is signed in with an API key. Use the separate OpenAI API provider, or sign in to OpenAI Codex in Settings for ChatGPT-plan usage.";
+    case "unknown":
+      return codexAuthState.codexCliAuthDetail?.trim()
+        ? `Codex CLI reported an unexpected auth state: ${codexAuthState.codexCliAuthDetail}`
+        : "Requires OpenAI Codex sign-in in Settings.";
+    default:
+      return "Requires OpenAI Codex sign-in in Settings.";
+  }
+}
+
 function buildModelCatalogState(): ModelCatalogState {
   const agentDirectory = join(
     getAppDataDirectoryPath(),
@@ -257,13 +276,22 @@ function buildModelCatalogState(): ModelCatalogState {
   );
   const { authStorage, codexAuthState } = createPiAuthStorage(agentDirectory);
   const preferCodexProvider = codexAuthState.source !== "none";
+  const codexProviderAvailabilityNote = preferCodexProvider
+    ? null
+    : unavailableCodexProviderNote(codexAuthState);
   const entries = ModelRegistry.create(
     authStorage,
     join(agentDirectory, "models.json"),
   )
     .getAll()
     .filter(shouldIncludeModel)
-    .map((model) => publicCatalogModelOption(model, preferCodexProvider))
+    .map((model) =>
+      publicCatalogModelOption(
+        model,
+        preferCodexProvider,
+        codexProviderAvailabilityNote,
+      ),
+    )
     .sort((left, right) =>
       compareCatalogEntries(left, right, preferCodexProvider),
     );

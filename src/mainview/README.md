@@ -84,7 +84,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
-`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, login/logout, manual-code completion, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance.
+`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, login/logout, manual-code completion, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance.
 
 `app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 
@@ -114,7 +114,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/chat-composer-control.tsx` renders the message composer and send/compose interactions.
 
-`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, surfaces their billing/policy scope directly in the selector, and marks unauthenticated Codex providers as unavailable.
+`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, surfaces their billing/policy scope directly in the selector, and marks unauthenticated Codex providers as unavailable with provider notes that can explain when Codex CLI is already signed in but Jolt still lacks reusable credentials.
 
 `controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including the billing/policy guidance, active-model scope callouts, and provider-availability metadata shown for OpenAI provider choices.
 

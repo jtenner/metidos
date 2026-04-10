@@ -36,6 +36,12 @@ type CodexAuthJson = {
 
 export type PiCodexAuthSource = "codex-file" | "pi-auth" | "none";
 export type PiCodexCredentialStoreMode = "auto" | "file" | "keyring";
+export type PiCodexCliAuthStatus =
+  | "logged_in_api_key"
+  | "logged_in_chatgpt"
+  | "not_logged_in"
+  | "unavailable"
+  | "unknown";
 
 export type PiCodexAuthReason =
   | "codex_auth_file_already_current"
@@ -48,6 +54,8 @@ export type PiCodexAuthReason =
 
 export type PiCodexAuthState = {
   codexAuthFilePath: string;
+  codexCliAuthDetail: string | null;
+  codexCliAuthStatus: PiCodexCliAuthStatus;
   codexConfigFilePath: string;
   credentialStoreMode: PiCodexCredentialStoreMode | null;
   overrideApplied: boolean;
@@ -74,11 +82,24 @@ type OpenAICodexLoginOptions = OAuthLoginCallbacks & {
 };
 
 type PiCodexAuthTestOverrides = {
+  codexCliStatus?: (codexHomeDirectory: string) => {
+    detail: string | null;
+    status: PiCodexCliAuthStatus;
+  };
   login?: (options: OpenAICodexLoginOptions) => Promise<OAuthCredentials>;
   refresh?: (refreshToken: string) => Promise<OAuthCredentials>;
 };
 
 let piCodexAuthTestOverrides: PiCodexAuthTestOverrides | null = null;
+let cachedCodexCliStatus: {
+  codexHomeDirectory: string;
+  expiresAt: number;
+  result: {
+    detail: string | null;
+    status: PiCodexCliAuthStatus;
+  };
+} | null = null;
+const CODEX_CLI_STATUS_CACHE_TTL_MS = 5_000;
 
 function decodeBase64Url(segment: string): string | null {
   const normalized = segment.replaceAll("-", "+").replaceAll("_", "/");
@@ -172,6 +193,48 @@ function ensureParentDirectory(path: string): void {
   });
 }
 
+function readCodexCliStatusCache(codexHomeDirectory: string): {
+  detail: string | null;
+  status: PiCodexCliAuthStatus;
+} | null {
+  if (
+    cachedCodexCliStatus?.codexHomeDirectory !== codexHomeDirectory ||
+    cachedCodexCliStatus.expiresAt <= Date.now()
+  ) {
+    return null;
+  }
+  return cachedCodexCliStatus.result;
+}
+
+function clearCodexCliStatusCache(): void {
+  cachedCodexCliStatus = null;
+}
+
+function writeCodexCliStatusCache(
+  codexHomeDirectory: string,
+  result: {
+    detail: string | null;
+    status: PiCodexCliAuthStatus;
+  },
+): {
+  detail: string | null;
+  status: PiCodexCliAuthStatus;
+} {
+  cachedCodexCliStatus = {
+    codexHomeDirectory,
+    expiresAt: Date.now() + CODEX_CLI_STATUS_CACHE_TTL_MS,
+    result,
+  };
+  return result;
+}
+
+function currentProcessEnvironment(): Record<string, string> {
+  const entries = Object.entries(process.env).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+  return Object.fromEntries(entries);
+}
+
 function readJsonRecord(path: string): CodexAuthJsonRecord {
   if (!existsSync(path)) {
     return {};
@@ -236,17 +299,99 @@ export function readCodexCredentialStoreMode(
   }
 }
 
+export function probeCodexCliAuthStatus(
+  codexHomeDirectory: string = resolveCodexHomeDirectoryPath(),
+): {
+  detail: string | null;
+  status: PiCodexCliAuthStatus;
+} {
+  const override = piCodexAuthTestOverrides?.codexCliStatus;
+  if (override) {
+    return override(codexHomeDirectory);
+  }
+
+  const cached = readCodexCliStatusCache(codexHomeDirectory);
+  if (cached) {
+    return cached;
+  }
+
+  const codexExecutablePath = Bun.which("codex");
+  if (!codexExecutablePath) {
+    return writeCodexCliStatusCache(codexHomeDirectory, {
+      detail: "Codex CLI is not installed on PATH.",
+      status: "unavailable",
+    });
+  }
+
+  try {
+    const result = Bun.spawnSync({
+      cmd: [codexExecutablePath, "login", "status"],
+      env: {
+        ...currentProcessEnvironment(),
+        CODEX_HOME: codexHomeDirectory,
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const stdout = Buffer.from(result.stdout).toString("utf8").trim();
+    const stderr = Buffer.from(result.stderr).toString("utf8").trim();
+    const detail = stdout || stderr || null;
+    const combinedOutput = [stdout, stderr].filter(Boolean).join("\n");
+
+    if (result.exitCode === 0) {
+      if (/logged in using chatgpt/iu.test(combinedOutput)) {
+        return writeCodexCliStatusCache(codexHomeDirectory, {
+          detail,
+          status: "logged_in_chatgpt",
+        });
+      }
+      if (/logged in using .*api key/iu.test(combinedOutput)) {
+        return writeCodexCliStatusCache(codexHomeDirectory, {
+          detail,
+          status: "logged_in_api_key",
+        });
+      }
+      return writeCodexCliStatusCache(codexHomeDirectory, {
+        detail,
+        status: "unknown",
+      });
+    }
+
+    if (result.exitCode === 1 && /not logged in/iu.test(combinedOutput)) {
+      return writeCodexCliStatusCache(codexHomeDirectory, {
+        detail: stdout || "Not logged in",
+        status: "not_logged_in",
+      });
+    }
+
+    return writeCodexCliStatusCache(codexHomeDirectory, {
+      detail,
+      status: "unknown",
+    });
+  } catch (error) {
+    return writeCodexCliStatusCache(codexHomeDirectory, {
+      detail:
+        error instanceof Error
+          ? error.message
+          : String(error ?? "Failed to run Codex CLI."),
+      status: "unavailable",
+    });
+  }
+}
+
 export function persistPiOpenAICodexCredential(
   agentDirectory: string,
   credential: PiOpenAICodexCredential,
 ): void {
   const authStorage = AuthStorage.create(resolvePiAuthFilePath(agentDirectory));
   authStorage.set(OPENAI_CODEX_PROVIDER_ID, persistedCredential(credential));
+  clearCodexCliStatusCache();
 }
 
 export function clearPiOpenAICodexCredential(agentDirectory: string): void {
   const authStorage = AuthStorage.create(resolvePiAuthFilePath(agentDirectory));
   authStorage.remove(OPENAI_CODEX_PROVIDER_ID);
+  clearCodexCliStatusCache();
 }
 
 export function persistCodexAuthFileCredential(
@@ -271,6 +416,7 @@ export function persistCodexAuthFileCredential(
       refresh_token: credential.refresh,
     },
   });
+  clearCodexCliStatusCache();
 }
 
 export function clearCodexAuthFileCredential(): void {
@@ -283,6 +429,7 @@ export function clearCodexAuthFileCredential(): void {
   delete existing.auth_mode;
   delete existing.tokens;
   writeJsonRecord(authFilePath, existing);
+  clearCodexCliStatusCache();
 }
 
 export async function loginPiOpenAICodex(
@@ -306,10 +453,12 @@ export function setPiCodexAuthTestOverrides(
   overrides: PiCodexAuthTestOverrides,
 ): void {
   piCodexAuthTestOverrides = overrides;
+  clearCodexCliStatusCache();
 }
 
 export function resetPiCodexAuthTestOverrides(): void {
   piCodexAuthTestOverrides = null;
+  clearCodexCliStatusCache();
 }
 
 export function translateCodexAuthToPiCredential(
@@ -357,10 +506,12 @@ export function createPiAuthStorage(agentDirectory: string): {
     recursive: true,
   });
 
+  const codexHomeDirectory = resolveCodexHomeDirectoryPath();
   const piAuthFilePath = resolvePiAuthFilePath(agentDirectory);
-  const codexAuthFilePath = resolveCodexAuthFilePath();
-  const codexConfigFilePath = resolveCodexConfigFilePath();
+  const codexAuthFilePath = join(codexHomeDirectory, AUTH_FILE_NAME);
+  const codexConfigFilePath = join(codexHomeDirectory, CONFIG_FILE_NAME);
   const credentialStoreMode = readCodexCredentialStoreMode(codexConfigFilePath);
+  const codexCliStatus = probeCodexCliAuthStatus(codexHomeDirectory);
   const authStorage = AuthStorage.create(piAuthFilePath);
 
   const codexAuthFileExists = existsSync(codexAuthFilePath);
@@ -389,6 +540,8 @@ export function createPiAuthStorage(agentDirectory: string): {
       authStorage,
       codexAuthState: {
         codexAuthFilePath,
+        codexCliAuthDetail: codexCliStatus.detail,
+        codexCliAuthStatus: codexCliStatus.status,
         codexConfigFilePath,
         credentialStoreMode,
         overrideApplied,
@@ -408,6 +561,8 @@ export function createPiAuthStorage(agentDirectory: string): {
       authStorage,
       codexAuthState: {
         codexAuthFilePath,
+        codexCliAuthDetail: codexCliStatus.detail,
+        codexCliAuthStatus: codexCliStatus.status,
         codexConfigFilePath,
         credentialStoreMode,
         overrideApplied: false,
@@ -425,6 +580,8 @@ export function createPiAuthStorage(agentDirectory: string): {
     authStorage,
     codexAuthState: {
       codexAuthFilePath,
+      codexCliAuthDetail: codexCliStatus.detail,
+      codexCliAuthStatus: codexCliStatus.status,
       codexConfigFilePath,
       credentialStoreMode,
       overrideApplied: false,

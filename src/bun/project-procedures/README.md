@@ -9,12 +9,13 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Defines the Pi-backed model catalog and reasoning effort options across the supported providers.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Tracks provider metadata such as xAI routing, current provider availability, and which model ids accept reasoning-effort overrides.
+  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already authenticated but Jolt still cannot import reusable credentials.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
 - `provider-auth.ts`
   - Implements the backend-managed `openai-codex` auth state machine used by the Bun RPC layer.
   - Tracks in-flight login attempts, manual-code completion, refresh, and logout behavior while respecting `~/.codex/auth.json` override precedence.
-  - Surfaces the operator-facing missing-versus-unusable Codex-file diagnostics plus the detected Codex credential-storage mode that drive the browser recovery copy.
+  - Surfaces the operator-facing missing-versus-unusable Codex-file diagnostics plus the detected Codex credential-storage mode and Codex CLI login state that drive the browser recovery copy.
   - Keeps provider-auth status shaping isolated so the browser settings work can consume a stable status/result contract later.
 
 - `pi-session-telemetry.ts`

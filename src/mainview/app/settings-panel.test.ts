@@ -9,6 +9,7 @@ import type { RpcProviderAuthStatus } from "../../bun/rpc-schema";
 import {
   canCompleteProviderAuthLogin,
   providerAuthBadge,
+  providerAuthCodexCliStatusLabel,
   providerAuthCredentialStoreLabel,
   providerAuthNeedsManualCode,
   providerAuthRecoverySteps,
@@ -23,6 +24,8 @@ function buildProviderAuthStatus(
   return {
     accountId: null,
     codexAuthFilePath: "/tmp/.codex/auth.json",
+    codexCliAuthDetail: null,
+    codexCliAuthStatus: "not_logged_in",
     codexConfigFilePath: "/tmp/.codex/config.toml",
     codexCredentialStoreMode: null,
     configured: false,
@@ -122,15 +125,40 @@ describe("settings panel provider-auth helpers", () => {
     );
   });
 
+  it("maps Codex CLI auth states into user-facing labels", () => {
+    expect(
+      providerAuthCodexCliStatusLabel(
+        buildProviderAuthStatus({
+          codexCliAuthStatus: "logged_in_chatgpt",
+        }),
+      ),
+    ).toBe("ChatGPT session detected");
+    expect(
+      providerAuthCodexCliStatusLabel(
+        buildProviderAuthStatus({
+          codexCliAuthStatus: "logged_in_api_key",
+        }),
+      ),
+    ).toBe("API key session detected");
+    expect(
+      providerAuthCodexCliStatusLabel(
+        buildProviderAuthStatus({
+          codexCliAuthStatus: "not_logged_in",
+        }),
+      ),
+    ).toBe("Not signed in");
+  });
+
   it("includes operator recovery guidance for missing or unusable Codex auth files", () => {
     expect(
       providerAuthSourceDescription(
         buildProviderAuthStatus({
+          codexCliAuthStatus: "logged_in_chatgpt",
           codexCredentialStoreMode: "keyring",
           sourceReason: "codex_auth_file_missing",
         }),
       ),
-    ).toContain("configured for OS keyring storage");
+    ).toContain("reports an active ChatGPT login");
 
     expect(
       providerAuthSourceDescription(
@@ -145,11 +173,15 @@ describe("settings panel provider-auth helpers", () => {
     expect(
       providerAuthRecoverySteps(
         buildProviderAuthStatus({
+          codexCliAuthStatus: "logged_in_chatgpt",
           codexCredentialStoreMode: "keyring",
           sourceReason: "codex_auth_file_missing",
         }),
       ),
     ).toEqual([
+      expect.objectContaining({
+        title: "Existing Codex CLI login detected",
+      }),
       expect.objectContaining({
         title: "Current Codex CLI storage mode",
       }),
@@ -192,6 +224,7 @@ describe("settings panel provider-auth helpers", () => {
   it("surfaces shared-cache repair steps when Jolt is using Pi auth fallback", () => {
     const steps = providerAuthRecoverySteps(
       buildProviderAuthStatus({
+        codexCliAuthStatus: "logged_in_chatgpt",
         codexCredentialStoreMode: "auto",
         configured: true,
         source: "pi-auth",

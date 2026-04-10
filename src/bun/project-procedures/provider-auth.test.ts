@@ -91,6 +91,13 @@ describe("provider auth procedures", () => {
     const missingCodexHome = createTempDirectory("jolt-provider-auth-codex-");
     const unusableCodexHome = createTempDirectory("jolt-provider-auth-codex-");
 
+    setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Not logged in",
+        status: "not_logged_in",
+      }),
+    });
+
     writeFileSync(
       join(missingCodexHome, "config.toml"),
       'cli_auth_credentials_store = "keyring"\n',
@@ -108,6 +115,8 @@ describe("provider auth procedures", () => {
     expect(missingStatus.provider).toEqual(
       expect.objectContaining({
         codexConfigFilePath: join(missingCodexHome, "config.toml"),
+        codexCliAuthDetail: "Not logged in",
+        codexCliAuthStatus: "not_logged_in",
         codexCredentialStoreMode: "keyring",
         configured: false,
         source: "none",
@@ -165,6 +174,10 @@ describe("provider auth procedures", () => {
       exp: 2_050_000_000,
     });
     setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Not logged in",
+        status: "not_logged_in",
+      }),
       login: async (options) => {
         options.onAuth({
           instructions: "Open the browser and finish sign-in.",
@@ -300,6 +313,10 @@ describe("provider auth procedures", () => {
       exp: 2_100_000_000,
     });
     setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Not logged in",
+        status: "not_logged_in",
+      }),
       refresh: async (refreshToken) => {
         expect(refreshToken).toBe("refresh_stale");
         return {

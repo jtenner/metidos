@@ -399,6 +399,12 @@ export type RpcProviderAuthLoginState =
 
 export type RpcProviderAuthSource = "codex-file" | "pi-auth" | "none";
 export type RpcProviderAuthCredentialStoreMode = "auto" | "file" | "keyring";
+export type RpcProviderAuthCodexCliStatus =
+  | "logged_in_api_key"
+  | "logged_in_chatgpt"
+  | "not_logged_in"
+  | "unavailable"
+  | "unknown";
 
 export type RpcProviderAuthSourceReason =
   | "codex_auth_file_already_current"
@@ -428,6 +434,8 @@ export type RpcProviderAuthStatus = {
   source: RpcProviderAuthSource;
   sourceReason: RpcProviderAuthSourceReason;
   codexAuthFilePath: string;
+  codexCliAuthDetail: string | null;
+  codexCliAuthStatus: RpcProviderAuthCodexCliStatus;
   codexConfigFilePath: string;
   codexCredentialStoreMode: RpcProviderAuthCredentialStoreMode | null;
   piAuthFilePath: string;

@@ -11,6 +11,10 @@ import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
 import {
+  resetPiCodexAuthTestOverrides,
+  setPiCodexAuthTestOverrides,
+} from "./pi-codex-auth";
+import {
   buildModelCatalog,
   codexModelSupportsReasoningEffort,
   resolveCodexModel,
@@ -118,12 +122,24 @@ async function loadProjectProcedures() {
 beforeAll(async () => {
   isolatedCodexHome = createTempDirectory("jolt-codex-home-");
   process.env.CODEX_HOME = isolatedCodexHome;
+  setPiCodexAuthTestOverrides({
+    codexCliStatus: () => ({
+      detail: "Not logged in",
+      status: "not_logged_in",
+    }),
+  });
   await loadProjectProcedures();
 });
 
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
   process.env.CODEX_HOME = isolatedCodexHome;
+  setPiCodexAuthTestOverrides({
+    codexCliStatus: () => ({
+      detail: "Not logged in",
+      status: "not_logged_in",
+    }),
+  });
   const piAuthPath = process.env.JOLT_APP_DATA_DIR
     ? join(process.env.JOLT_APP_DATA_DIR, "pi-agent", "auth.json")
     : null;
@@ -148,6 +164,8 @@ afterAll(async () => {
   } else {
     delete process.env.CODEX_HOME;
   }
+
+  resetPiCodexAuthTestOverrides();
 
   for (const path of tempDirectories) {
     rmSync(path, {
@@ -259,6 +277,31 @@ describe("project procedure configuration helpers", () => {
       }),
     );
     expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
+  });
+
+  it("surfaces Codex CLI keyring-login diagnostics in unavailable provider notes", () => {
+    const codexHome = createTempDirectory("jolt-codex-home-");
+    process.env.CODEX_HOME = codexHome;
+    setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Logged in using ChatGPT",
+        status: "logged_in_chatgpt",
+      }),
+    });
+
+    const catalog = buildModelCatalog();
+    const codexModel = catalog.models.find(
+      (model) => model.id === "openai-codex:gpt-5.4",
+    );
+
+    expect(codexModel).toEqual(
+      expect.objectContaining({
+        providerAvailable: false,
+        providerAvailabilityNote: expect.stringContaining(
+          "Codex CLI is already signed in with ChatGPT",
+        ),
+      }),
+    );
   });
 
   it("canonicalizes legacy raw model ids and alias ids through the Pi catalog", () => {

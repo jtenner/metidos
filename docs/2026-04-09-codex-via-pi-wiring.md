@@ -31,9 +31,10 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - detects Codex CLI credential storage mode from `config.toml` and shows whether the current machine is configured for `file`, `keyring`, or `auto` storage
+- non-destructively probes `codex login status` so keyring-backed Codex CLI sessions show up as explicit ChatGPT-versus-API-key diagnostics instead of looking like a generic missing-file failure
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - repeats the provider billing and policy cue at the chat-send and cron-create surfaces so users see the active scope again before they trigger work
-- surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers
+- surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers, and the unavailable note now explains when Codex CLI is already logged in but Jolt still cannot import that session
 - rejects unavailable `openai-codex` selections before thread creation, queued runs, thread-model changes, or cron mutations so stale auth state fails fast with actionable errors
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
@@ -41,7 +42,7 @@ The planned Codex-via-Pi wiring slices are now complete.
 
 The main remaining caveats are:
 
-- keyring-only Codex setups still need an operator-visible fallback because Jolt can only auto-import `~/.codex/auth.json` when that file exists
+- keyring-only Codex setups still need an operator-visible fallback because Jolt can detect those sessions through `codex login status` but still cannot auto-import OS-keyring credentials directly
 - destructive login/logout verification against a real ChatGPT-plan session should still be done only in an isolated operator environment, not against an active everyday Codex login
 
 ## Why Jolt Should Not Restore The Codex SDK
@@ -436,7 +437,7 @@ Verification status on 2026-04-09:
 
 ## Risks
 
-- Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. The recommended auto-import behavior only works when the Codex file exists, so keyring-backed Codex setups still need a fallback UX.
+- Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now detects Codex credential-store mode and probes `codex login status`, which narrows the ambiguity around keyring-backed sessions, but the recommended auto-import behavior still only works when the Codex file exists.
 - Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
 - Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Pi's built-in OpenAI Codex docs do not promise the same end-user recovery story.
 - Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls, while API-key usage follows API org controls. Jolt must make the chosen auth mode obvious to users.
@@ -667,6 +668,28 @@ Primary files:
 - [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
 - [src/bun/pi-codex-auth.test.ts](../src/bun/pi-codex-auth.test.ts)
 - [src/bun/project-procedures/provider-auth.test.ts](../src/bun/project-procedures/provider-auth.test.ts)
+- [src/mainview/app/settings-panel.test.ts](../src/mainview/app/settings-panel.test.ts)
+
+### CD14 - Probe Codex CLI login status for keyring-backed sessions
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- run a non-destructive `codex login status` probe behind the shared auth bridge so Jolt can distinguish active ChatGPT-backed Codex CLI sessions, API-key-only CLI sessions, and fully signed-out states even when `~/.codex/auth.json` is absent
+- surface that CLI-auth signal through the backend provider-auth status contract and the Settings UI so missing-file diagnostics stop looking like a generic failure when Codex CLI is already authenticated elsewhere
+- reuse the same signal in the model catalog so unavailable `OpenAI Codex` selector rows can explain when Codex CLI is already signed in but Jolt still needs its own importable or Pi-managed credentials
+
+Primary files:
+
+- [src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts)
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [src/bun/pi-codex-auth.test.ts](../src/bun/pi-codex-auth.test.ts)
+- [src/bun/project-procedures/provider-auth.test.ts](../src/bun/project-procedures/provider-auth.test.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 - [src/mainview/app/settings-panel.test.ts](../src/mainview/app/settings-panel.test.ts)
 
 ## Recommendation

@@ -123,12 +123,35 @@ export function providerAuthCredentialStoreLabel(
 }
 
 /**
+ * User-facing label for the detected Codex CLI login state.
+ */
+export function providerAuthCodexCliStatusLabel(
+  status: Pick<RpcProviderAuthStatus, "codexCliAuthStatus">,
+): string {
+  switch (status.codexCliAuthStatus) {
+    case "logged_in_chatgpt":
+      return "ChatGPT session detected";
+    case "logged_in_api_key":
+      return "API key session detected";
+    case "not_logged_in":
+      return "Not signed in";
+    case "unavailable":
+      return "CLI unavailable";
+    default:
+      return "Status unclear";
+  }
+}
+
+/**
  * User-facing explanation for the effective provider-auth source/reason.
  */
 export function providerAuthSourceDescription(
   status: Pick<
     RpcProviderAuthStatus,
-    "codexCredentialStoreMode" | "source" | "sourceReason"
+    | "codexCliAuthStatus"
+    | "codexCredentialStoreMode"
+    | "source"
+    | "sourceReason"
   >,
 ): string {
   switch (status.sourceReason) {
@@ -137,23 +160,37 @@ export function providerAuthSourceDescription(
     case "synced_from_codex_auth_file":
       return "Jolt imported the current Codex file credentials into its Pi auth store so Pi sessions can reuse them.";
     case "using_existing_pi_codex_auth":
-      return status.codexCredentialStoreMode === "keyring"
-        ? "Jolt is using its Pi auth fallback because Codex CLI is configured for OS keyring storage, so no shared ~/.codex/auth.json cache is expected."
-        : status.codexCredentialStoreMode === "auto"
-          ? "Jolt is using its Pi auth fallback because Codex CLI is configured for automatic credential storage, which may prefer the OS keyring on this machine."
-          : "Jolt is using its Pi auth fallback because no usable Codex file credentials were found.";
+      return status.codexCliAuthStatus === "logged_in_chatgpt"
+        ? "Jolt is using its Pi auth fallback while Codex CLI reports an active ChatGPT login from non-shared storage, so the two tools are authenticated separately."
+        : status.codexCliAuthStatus === "logged_in_api_key"
+          ? "Jolt is using its Pi auth fallback, while Codex CLI is authenticated with an API key instead of ChatGPT-backed Codex auth."
+          : status.codexCredentialStoreMode === "keyring"
+            ? "Jolt is using its Pi auth fallback because Codex CLI is configured for OS keyring storage, so no shared ~/.codex/auth.json cache is expected."
+            : status.codexCredentialStoreMode === "auto"
+              ? "Jolt is using its Pi auth fallback because Codex CLI is configured for automatic credential storage, which may prefer the OS keyring on this machine."
+              : "Jolt is using its Pi auth fallback because no usable Codex file credentials were found.";
     case "codex_auth_file_unusable_fell_back_to_pi_auth":
-      return "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
+      return status.codexCliAuthStatus === "logged_in_chatgpt"
+        ? "The Codex auth file exists but could not be used. Codex CLI still reports an active ChatGPT login, so Jolt fell back to its Pi auth store instead."
+        : "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
     case "codex_auth_file_unusable":
       return "The Codex auth file exists but is unreadable or incomplete. Re-run Codex sign-in here to replace it, or remove the broken file and try again.";
     case "codex_auth_file_missing":
-      return status.codexCredentialStoreMode === "keyring"
-        ? "No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
-        : status.codexCredentialStoreMode === "auto"
-          ? "No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
-          : "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
+      return status.codexCliAuthStatus === "logged_in_chatgpt"
+        ? "No ~/.codex/auth.json file was found, but Codex CLI reports an active ChatGPT login. Jolt cannot import that session automatically from OS or keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+        : status.codexCliAuthStatus === "logged_in_api_key"
+          ? "No ~/.codex/auth.json file was found, and Codex CLI reports an API-key login instead of a ChatGPT-backed Codex session. Use the separate OpenAI API provider, or start Codex sign-in here."
+          : status.codexCredentialStoreMode === "keyring"
+            ? "No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+            : status.codexCredentialStoreMode === "auto"
+              ? "No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+              : "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
     case "no_codex_auth_available":
-      return "No Codex credentials are configured yet.";
+      return status.codexCliAuthStatus === "logged_in_chatgpt"
+        ? "Codex CLI reports an active ChatGPT login, but Jolt does not have reusable Codex credentials configured yet."
+        : status.codexCliAuthStatus === "logged_in_api_key"
+          ? "Codex CLI reports an API-key login, but Jolt does not have reusable OpenAI Codex credentials configured yet."
+          : "No Codex credentials are configured yet.";
     default:
       return status.source === "none"
         ? "No Codex credentials are configured yet."
@@ -203,6 +240,7 @@ export function providerAuthBadge(
 export function providerAuthRecoverySteps(
   status: Pick<
     RpcProviderAuthStatus,
+    | "codexCliAuthStatus"
     | "codexAuthFilePath"
     | "codexConfigFilePath"
     | "codexCredentialStoreMode"
@@ -224,6 +262,21 @@ export function providerAuthRecoverySteps(
     case "codex_auth_file_missing":
     case "no_codex_auth_available":
       return [
+        ...(status.codexCliAuthStatus === "logged_in_chatgpt"
+          ? [
+              {
+                body: "Codex CLI already reports a ChatGPT-backed login, but Jolt cannot reuse that session automatically unless Codex writes a shared auth.json cache or Jolt performs its own sign-in.",
+                title: "Existing Codex CLI login detected",
+              },
+            ]
+          : status.codexCliAuthStatus === "logged_in_api_key"
+            ? [
+                {
+                  body: "Codex CLI is authenticated with an API key. For API-billed usage, use the separate OpenAI API provider. For ChatGPT-plan Codex usage, sign in to OpenAI Codex here instead.",
+                  title: "Existing Codex CLI API-key login detected",
+                },
+              ]
+            : []),
         ...(status.codexCredentialStoreMode === "keyring"
           ? [
               {
@@ -620,6 +673,14 @@ export function SettingsPanel({
                     <span className="max-w-[13rem] text-right text-[#f4f8fb]">
                       {providerStatus
                         ? providerAuthCredentialStoreLabel(providerStatus)
+                        : "Loading..."}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-[#7ea2b8]">Codex CLI</span>
+                    <span className="max-w-[13rem] text-right text-[#f4f8fb]">
+                      {providerStatus
+                        ? providerAuthCodexCliStatusLabel(providerStatus)
                         : "Loading..."}
                     </span>
                   </div>

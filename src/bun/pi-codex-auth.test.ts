@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createPiAuthStorage,
+  resetPiCodexAuthTestOverrides,
   resolvePiAuthFilePath,
+  setPiCodexAuthTestOverrides,
   translateCodexAuthToPiCredential,
 } from "./pi-codex-auth";
 
@@ -38,6 +40,7 @@ function writeCodexConfig(
 }
 
 afterEach(() => {
+  resetPiCodexAuthTestOverrides();
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
   } else {
@@ -278,6 +281,38 @@ test("createPiAuthStorage exposes the configured Codex credential store mode", (
       recursive: true,
     });
     rmSync(autoCodexHome, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("createPiAuthStorage surfaces non-file Codex CLI login state through the shared auth state", () => {
+  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
+  const codexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  process.env.CODEX_HOME = codexHome;
+
+  try {
+    setPiCodexAuthTestOverrides({
+      codexCliStatus: () => ({
+        detail: "Logged in using ChatGPT",
+        status: "logged_in_chatgpt",
+      }),
+    });
+
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        codexCliAuthDetail: "Logged in using ChatGPT",
+        codexCliAuthStatus: "logged_in_chatgpt",
+        reason: "codex_auth_file_missing",
+      }),
+    );
+  } finally {
+    rmSync(agentDirectory, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHome, {
       force: true,
       recursive: true,
     });
