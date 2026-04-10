@@ -1,4 +1,4 @@
-Wire the admin procedures into the Jolt host so agents can invoke them when policy allows.
+Wire the admin procedures into the Metidos host so agents can invoke them when policy allows.
 
 ## Scope
 

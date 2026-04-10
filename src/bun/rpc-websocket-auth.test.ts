@@ -53,7 +53,7 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123",
+        cookieHeader: "metidos_session=session-123",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
         validateTicket,
       }),
@@ -73,7 +73,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
+        cookieHeader:
+          "metidos_session=session-123; metidos_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
         validateTicket,
       }),
@@ -101,7 +102,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
+        cookieHeader:
+          "metidos_session=session-123; metidos_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
         validateTicket: () => {
           throw error;
@@ -126,7 +128,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
+        cookieHeader:
+          "metidos_session=session-123; metidos_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
         validateTicket: () => {
           throw error;
@@ -153,7 +156,8 @@ describe("rpc websocket auth helper", () => {
     expect(
       authorizeRpcWebSocketUpgrade({
         authBypass: false,
-        cookieHeader: "jolt_session=session-123; jolt_ws_ticket=ticket-456",
+        cookieHeader:
+          "metidos_session=session-123; metidos_ws_ticket=ticket-456",
         nowMs: Date.parse("2026-04-03T00:00:00.000Z"),
         validateTicket: () => {
           throw error;

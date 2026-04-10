@@ -503,7 +503,7 @@ function buildLoadedProjectWorktreesState(
 
 declare global {
   interface Window {
-    __joltAppMountedAt?: number;
+    __metidosAppMountedAt?: number;
   }
 }
 
@@ -578,8 +578,8 @@ export default function App({
   const [pendingThreadAgentsAccess, setPendingThreadAgentsAccess] = useState(
     initialMainviewState.pendingThreadAgentsAccess,
   );
-  const [pendingThreadJoltAccess, setPendingThreadJoltAccess] = useState(
-    initialMainviewState.pendingThreadJoltAccess,
+  const [pendingThreadMetidosAccess, setPendingThreadMetidosAccess] = useState(
+    initialMainviewState.pendingThreadMetidosAccess,
   );
   const [pendingThreadUnsafeMode, setPendingThreadUnsafeMode] = useState(
     initialMainviewState.pendingThreadUnsafeMode === true,
@@ -622,7 +622,7 @@ export default function App({
   const [cronEditEnabled, setCronEditEnabled] = useState(true);
   const [cronEditGithubAccess, setCronEditGithubAccess] = useState(false);
   const [cronEditAgentsAccess, setCronEditAgentsAccess] = useState(false);
-  const [cronEditJoltAccess, setCronEditJoltAccess] = useState(true);
+  const [cronEditMetidosAccess, setCronEditMetidosAccess] = useState(true);
   const [cronEditUnsafeMode, setCronEditUnsafeMode] = useState(false);
   const [cronEditingCronJobId, setCronEditingCronJobId] = useState<
     number | null
@@ -969,7 +969,7 @@ export default function App({
     activeContextWindowTokens,
     activeGithubAccess,
     activeAgentsAccess,
-    activeJoltAccess,
+    activeMetidosAccess,
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,
@@ -1029,7 +1029,7 @@ export default function App({
     isUpdatingThreadAccess,
     pendingThreadGithubAccess,
     pendingThreadAgentsAccess,
-    pendingThreadJoltAccess,
+    pendingThreadMetidosAccess,
     pendingThreadModel,
     pendingThreadReasoningEffort,
     pendingThreadUnsafeMode,
@@ -1049,7 +1049,7 @@ export default function App({
   const activeThreadAccessValue: ThreadAccessValue = {
     githubAccess: activeGithubAccess,
     agentsAccess: activeAgentsAccess,
-    joltAccess: activeJoltAccess,
+    metidosAccess: activeMetidosAccess,
     unsafeMode: activeUnsafeMode,
   };
   const activeThreadExtensionUiState = useMemo(
@@ -2011,7 +2011,7 @@ export default function App({
                 activeReasoningEffort || defaultCodexReasoningEffort || null,
               githubAccess: activeGithubAccess,
               agentsAccess: activeAgentsAccess,
-              joltAccess: activeJoltAccess,
+              metidosAccess: activeMetidosAccess,
               unsafeMode: activeUnsafeMode,
             }),
         );
@@ -2072,7 +2072,7 @@ export default function App({
       activeReasoningEffort,
       activeAgentsAccess,
       activeGithubAccess,
-      activeJoltAccess,
+      activeMetidosAccess,
       activeUnsafeMode,
       defaultCodexModel,
       defaultCodexReasoningEffort,
@@ -2803,7 +2803,7 @@ export default function App({
               reasoningEffort: request.reasoningEffort,
               githubAccess: request.githubAccess,
               agentsAccess: request.agentsAccess,
-              joltAccess: request.joltAccess,
+              metidosAccess: request.metidosAccess,
               unsafeMode: request.unsafeMode,
             }),
         );
@@ -3856,7 +3856,7 @@ export default function App({
       pendingThreadReasoningEffort,
       pendingThreadGithubAccess,
       pendingThreadAgentsAccess,
-      pendingThreadJoltAccess,
+      pendingThreadMetidosAccess,
       pendingThreadUnsafeMode,
       chatInput: "",
       sidebarCollapsed,
@@ -3868,7 +3868,7 @@ export default function App({
     pendingThreadReasoningEffort,
     pendingThreadGithubAccess,
     pendingThreadAgentsAccess,
-    pendingThreadJoltAccess,
+    pendingThreadMetidosAccess,
     pendingThreadUnsafeMode,
     projectStates,
     selectedProjectId,
@@ -3941,7 +3941,7 @@ export default function App({
     }
     setPendingThreadGithubAccess(selectedThread.githubAccess);
     setPendingThreadAgentsAccess(selectedThread.agentsAccess);
-    setPendingThreadJoltAccess(selectedThread.joltAccess);
+    setPendingThreadMetidosAccess(selectedThread.metidosAccess);
     setPendingThreadUnsafeMode(selectedThread.unsafeMode);
     setThreadAccessControlError("");
   }, [selectedThread]);
@@ -4381,7 +4381,7 @@ export default function App({
       if (!selectedThread) {
         setPendingThreadGithubAccess(access.githubAccess);
         setPendingThreadAgentsAccess(access.agentsAccess);
-        setPendingThreadJoltAccess(access.joltAccess);
+        setPendingThreadMetidosAccess(access.metidosAccess);
         setPendingThreadUnsafeMode(access.unsafeMode);
         return;
       }
@@ -4389,7 +4389,7 @@ export default function App({
       if (
         (selectedThread.githubAccess === access.githubAccess &&
           selectedThread.agentsAccess === access.agentsAccess &&
-          selectedThread.joltAccess === access.joltAccess &&
+          selectedThread.metidosAccess === access.metidosAccess &&
           selectedThread.unsafeMode === access.unsafeMode) ||
         isUpdatingThreadAccess
       ) {
@@ -4402,13 +4402,13 @@ export default function App({
           threadId: selectedThread.id,
           githubAccess: access.githubAccess,
           agentsAccess: access.agentsAccess,
-          joltAccess: access.joltAccess,
+          metidosAccess: access.metidosAccess,
           unsafeMode: access.unsafeMode,
         });
         upsertThread(updatedThread);
         setPendingThreadGithubAccess(updatedThread.githubAccess);
         setPendingThreadAgentsAccess(updatedThread.agentsAccess);
-        setPendingThreadJoltAccess(updatedThread.joltAccess);
+        setPendingThreadMetidosAccess(updatedThread.metidosAccess);
         setPendingThreadUnsafeMode(updatedThread.unsafeMode);
       } catch (error) {
         setThreadAccessControlError(
@@ -4710,7 +4710,7 @@ export default function App({
             await openThread(payload.threadId);
           }
         } catch (error) {
-          console.error("Failed to apply focused Jolt context", error);
+          console.error("Failed to apply focused Metidos context", error);
         }
       })();
     };
@@ -5190,7 +5190,7 @@ export default function App({
     setCronEditEnabled(true);
     setCronEditGithubAccess(activeGithubAccess);
     setCronEditAgentsAccess(activeAgentsAccess);
-    setCronEditJoltAccess(activeJoltAccess);
+    setCronEditMetidosAccess(activeMetidosAccess);
     setCronEditUnsafeMode(activeUnsafeMode);
     setCronCreatorModel(activeCodexModel || defaultCodexModel || "");
     setCronCreatorReasoningEffort(
@@ -5201,7 +5201,7 @@ export default function App({
     activeAgentsAccess,
     activeCodexModel,
     activeGithubAccess,
-    activeJoltAccess,
+    activeMetidosAccess,
     activeReasoningEffort,
     activeUnsafeMode,
     defaultCodexModel,
@@ -5228,7 +5228,7 @@ export default function App({
     setCronEditEnabled(cronJob.enabled === 1);
     setCronEditGithubAccess(cronJob.githubAccess);
     setCronEditAgentsAccess(cronJob.agentsAccess);
-    setCronEditJoltAccess(cronJob.joltAccess);
+    setCronEditMetidosAccess(cronJob.metidosAccess);
     setCronEditUnsafeMode(cronJob.unsafeMode);
     setCronCreatorModel(cronJob.model);
     setCronCreatorReasoningEffort(cronJob.reasoningEffort);
@@ -5286,7 +5286,7 @@ export default function App({
                 reasoningEffort || defaultCodexReasoningEffort || null,
               githubAccess: cronEditGithubAccess,
               agentsAccess: cronEditAgentsAccess,
-              joltAccess: cronEditJoltAccess,
+              metidosAccess: cronEditMetidosAccess,
               unsafeMode: cronEditUnsafeMode,
             }),
         );
@@ -5299,7 +5299,7 @@ export default function App({
           "Use the new_cron tool to create this cron job for the current workspace.",
           `Set githubAccess to ${cronEditGithubAccess ? "true" : "false"}.`,
           `Set agentsAccess to ${cronEditAgentsAccess ? "true" : "false"}.`,
-          `Set joltAccess to ${cronEditJoltAccess ? "true" : "false"}.`,
+          `Set metidosAccess to ${cronEditMetidosAccess ? "true" : "false"}.`,
           `Set unsafeMode to ${cronEditUnsafeMode ? "true" : "false"}.`,
           "",
           describePrompt,
@@ -5350,7 +5350,7 @@ export default function App({
     cronCreatorModel,
     cronEditAgentsAccess,
     cronEditGithubAccess,
-    cronEditJoltAccess,
+    cronEditMetidosAccess,
     cronEditUnsafeMode,
     defaultCodexReasoningEffort,
     cronCreatorReasoningEffort,
@@ -5404,7 +5404,7 @@ export default function App({
               : {}),
             githubAccess: cronEditGithubAccess,
             agentsAccess: cronEditAgentsAccess,
-            joltAccess: cronEditJoltAccess,
+            metidosAccess: cronEditMetidosAccess,
             unsafeMode: cronEditUnsafeMode,
             enabled: cronEditEnabled,
           });
@@ -5425,7 +5425,7 @@ export default function App({
               : {}),
             githubAccess: cronEditGithubAccess,
             agentsAccess: cronEditAgentsAccess,
-            joltAccess: cronEditJoltAccess,
+            metidosAccess: cronEditMetidosAccess,
             unsafeMode: cronEditUnsafeMode,
             enabled: cronEditEnabled,
           });
@@ -5450,7 +5450,7 @@ export default function App({
     cronEditEnabled,
     cronEditAgentsAccess,
     cronEditGithubAccess,
-    cronEditJoltAccess,
+    cronEditMetidosAccess,
     cronEditPrompt,
     cronEditSchedule,
     cronEditTitle,
@@ -5494,21 +5494,21 @@ export default function App({
   }, [initialize]);
 
   useEffect(() => {
-    window.__joltAppMountedAt = Date.now();
-    console.log("App.tsx mounted", window.__joltAppMountedAt);
+    window.__metidosAppMountedAt = Date.now();
+    console.log("App.tsx mounted", window.__metidosAppMountedAt);
   }, []);
 
   const cronEditorAccessValue: ThreadAccessValue = {
     githubAccess: cronEditGithubAccess,
     agentsAccess: cronEditAgentsAccess,
-    joltAccess: cronEditJoltAccess,
+    metidosAccess: cronEditMetidosAccess,
     unsafeMode: cronEditUnsafeMode,
   };
   const handleCronEditorAccessChange = useCallback(
     (value: ThreadAccessValue) => {
       setCronEditGithubAccess(value.githubAccess);
       setCronEditAgentsAccess(value.agentsAccess);
-      setCronEditJoltAccess(value.joltAccess);
+      setCronEditMetidosAccess(value.metidosAccess);
       setCronEditUnsafeMode(value.unsafeMode);
     },
     [],
@@ -6741,10 +6741,10 @@ export default function App({
                     : "off"}
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
-                Jolt:{" "}
-                {currentThreadStartRequest.joltAccess === null
+                Metidos:{" "}
+                {currentThreadStartRequest.metidosAccess === null
                   ? "default"
-                  : currentThreadStartRequest.joltAccess
+                  : currentThreadStartRequest.metidosAccess
                     ? "on"
                     : "off"}
               </span>

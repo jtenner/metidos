@@ -8,8 +8,8 @@ Source code for both halves of this repository:
 
 Holds backend orchestration and server entry logic that powers local project and thread workflows.
 
-- `pi-jolt-tools.ts`
-  - Pi-native Jolt tool pack used for project, thread, cron, and JS-sandbox helpers.
+- `pi-metidos-tools.ts`
+  - Pi-native Metidos tool pack used for project, thread, cron, and JS-sandbox helpers.
 - `build-mainview.ts`
   - Build script/entry used to produce the mainview application bundle or runtime artifacts.
 - `db.ts`

@@ -28,7 +28,7 @@ type SidecarThreadUpdateParams = {
   agentsAccess?: boolean;
   description?: string | null;
   githubAccess?: boolean;
-  joltAccess?: boolean;
+  metidosAccess?: boolean;
   pinned?: boolean | null;
   summary?: string | null;
   threadId: number;
@@ -54,7 +54,7 @@ function hasThreadAccessUpdate(params: SidecarThreadUpdateParams): boolean {
   return (
     typeof params.githubAccess !== "undefined" ||
     typeof params.agentsAccess !== "undefined" ||
-    typeof params.joltAccess !== "undefined" ||
+    typeof params.metidosAccess !== "undefined" ||
     typeof params.unsafeMode !== "undefined"
   );
 }
@@ -187,7 +187,7 @@ export async function updateThreadAccessFromSidecar(
   params: {
     agentsAccess?: boolean;
     githubAccess?: boolean;
-    joltAccess?: boolean;
+    metidosAccess?: boolean;
     threadId: number;
     unsafeMode?: boolean;
   },
@@ -196,11 +196,11 @@ export async function updateThreadAccessFromSidecar(
   if (
     typeof params.githubAccess === "undefined" &&
     typeof params.agentsAccess === "undefined" &&
-    typeof params.joltAccess === "undefined" &&
+    typeof params.metidosAccess === "undefined" &&
     typeof params.unsafeMode === "undefined"
   ) {
     throw new Error(
-      "At least one of githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+      "At least one of githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
     );
   }
 
@@ -214,8 +214,8 @@ export async function updateThreadAccessFromSidecar(
         ...(typeof params.agentsAccess === "boolean"
           ? { agentsAccess: params.agentsAccess }
           : {}),
-        ...(typeof params.joltAccess === "boolean"
-          ? { joltAccess: params.joltAccess }
+        ...(typeof params.metidosAccess === "boolean"
+          ? { metidosAccess: params.metidosAccess }
           : {}),
         ...(typeof params.unsafeMode === "boolean"
           ? { unsafeMode: params.unsafeMode }
@@ -248,7 +248,7 @@ export async function updateThreadFromSidecar(
 
   if (!hasMetadataUpdate && !hasAccessUpdate) {
     throw new Error(
-      "At least one of title, summary, description, pinned, githubAccess, agentsAccess, joltAccess, or unsafeMode is required.",
+      "At least one of title, summary, description, pinned, githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
     );
   }
 
@@ -287,9 +287,9 @@ export async function updateThreadFromSidecar(
           ...(typeof params.agentsAccess === "undefined"
             ? {}
             : { agentsAccess: params.agentsAccess }),
-          ...(typeof params.joltAccess === "undefined"
+          ...(typeof params.metidosAccess === "undefined"
             ? {}
-            : { joltAccess: params.joltAccess }),
+            : { metidosAccess: params.metidosAccess }),
           ...(typeof params.unsafeMode === "undefined"
             ? {}
             : { unsafeMode: params.unsafeMode }),

@@ -24,7 +24,7 @@ type DeviceLoginCredential = {
 };
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 
 function createTempDirectory(prefix: string): string {
@@ -55,7 +55,7 @@ async function loadProjectProceduresForTest(options: {
 }): Promise<ProjectProceduresModule> {
   closeAppDatabase();
   resetResolvedAppDataDirectory();
-  process.env.JOLT_APP_DATA_DIR = options.appDataDir;
+  process.env.METIDOS_APP_DATA_DIR = options.appDataDir;
   process.env.CODEX_HOME = options.codexHome;
 
   return (await import(
@@ -70,9 +70,9 @@ afterEach(async () => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
@@ -93,9 +93,13 @@ afterAll(() => {
 
 describe("provider auth procedures", () => {
   it("surfaces missing and unusable Codex-file diagnostics through provider-auth status", async () => {
-    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
-    const missingCodexHome = createTempDirectory("jolt-provider-auth-codex-");
-    const unusableCodexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const appDataDir = createTempDirectory("metidos-provider-auth-app-");
+    const missingCodexHome = createTempDirectory(
+      "metidos-provider-auth-codex-",
+    );
+    const unusableCodexHome = createTempDirectory(
+      "metidos-provider-auth-codex-",
+    );
 
     setPiCodexAuthTestOverrides({
       codexCliStatus: () => ({
@@ -166,8 +170,8 @@ describe("provider auth procedures", () => {
   });
 
   it("starts and completes a backend-managed Codex login and mirrors it into both auth stores", async () => {
-    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
-    const codexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const appDataDir = createTempDirectory("metidos-provider-auth-app-");
+    const codexHome = createTempDirectory("metidos-provider-auth-codex-");
     const procedures = await loadProjectProceduresForTest({
       appDataDir,
       codexHome,
@@ -284,8 +288,8 @@ describe("provider auth procedures", () => {
   });
 
   it("starts a device-auth login through Codex CLI orchestration and imports the resulting credential", async () => {
-    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
-    const codexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const appDataDir = createTempDirectory("metidos-provider-auth-app-");
+    const codexHome = createTempDirectory("metidos-provider-auth-codex-");
     const procedures = await loadProjectProceduresForTest({
       appDataDir,
       codexHome,
@@ -393,8 +397,8 @@ describe("provider auth procedures", () => {
   });
 
   it("refreshes the effective Codex credential and repairs the authoritative Codex file when needed", async () => {
-    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
-    const codexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const appDataDir = createTempDirectory("metidos-provider-auth-app-");
+    const codexHome = createTempDirectory("metidos-provider-auth-codex-");
     const procedures = await loadProjectProceduresForTest({
       appDataDir,
       codexHome,

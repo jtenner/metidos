@@ -50,7 +50,7 @@ describe("project security audit helpers", () => {
       projectId: project.id,
       reasoningEffort: "medium",
       title: "Feature thread",
-      joltAccess: true,
+      metidosAccess: true,
       unsafeMode: false,
       worktreePath: "/repo/feature-b",
     });

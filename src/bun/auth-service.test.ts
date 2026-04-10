@@ -50,7 +50,7 @@ function createTestDatabase(): Database {
 }
 
 function createTempDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-auth-service-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-auth-service-"));
   tempDirectories.add(path);
   return path;
 }
@@ -653,7 +653,7 @@ describe("auth service", () => {
     expect(readSessionCookie(sessionCookie)).toBe("session-1");
     expect(
       readWebSocketTicketCookie(
-        "jolt_session=session-1; jolt_ws_ticket=ticket-1",
+        "metidos_session=session-1; metidos_ws_ticket=ticket-1",
       ),
     ).toBe("ticket-1");
     expect(ticketCookie).toContain("Path=/rpc");

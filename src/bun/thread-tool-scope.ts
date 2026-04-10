@@ -1,6 +1,6 @@
 /**
  * @file src/bun/thread-tool-scope.ts
- * @description Shared thread-scoping helpers for Jolt-owned tool packs.
+ * @description Shared thread-scoping helpers for Metidos-owned tool packs.
  */
 
 import { isAbsolute, resolve } from "node:path";

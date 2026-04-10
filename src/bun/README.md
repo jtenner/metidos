@@ -1,6 +1,6 @@
 # src/bun
 
-This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC server implementation, git/workspace operations, persistence, and tooling used by the sidecar integration.
+This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC server implementation, git/workspace operations, persistence, and tooling used by the sidecar integration.
 
 ## Purpose of each file
 
@@ -15,16 +15,16 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `tls-config.ts`
   - Resolves the reverse-proxy TLS policy shared across the Bun entrypoints.
-  - Supports `--tls` / `JOLT_TLS=1` for deployments where nginx or another reverse proxy terminates TLS and the browser transport should be treated as HTTPS/WSS.
+  - Supports `--tls` / `METIDOS_TLS=1` for deployments where nginx or another reverse proxy terminates TLS and the browser transport should be treated as HTTPS/WSS.
 
 - `build-mainview.ts`
   - Centralized Bun bundling entry for the React frontend.
-  - Invokes `Bun.build` with the React compiler plugin and writes output to `.jolt-build/index.js`.
+  - Invokes `Bun.build` with the React compiler plugin and writes output to `.metidos-build/index.js`.
   - Provides deterministic bundling and surfaceable build errors used by dev/runtime flows.
 
 - `logging.ts`
   - Centralizes Bun-side subsystem logging and the worker-backed stderr dispatch used by runtime components.
-  - Suppresses `TRACE` output by default; set `JOLT_TRACE_LOGS=1` when you need verbose transport diagnostics.
+  - Suppresses `TRACE` output by default; set `METIDOS_TRACE_LOGS=1` when you need verbose transport diagnostics.
 
 - `logging-thread.ts`
   - Worker thread that serializes structured log entries onto stderr without blocking the main runtime loop.
@@ -50,28 +50,28 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Registers the mock provider contract consumed by `pi-runtime-probe.ts` without pulling in the probe CLI entrypoint itself.
 
 - `pi-thread-runtime.ts`
-  - Jolt-owned Pi runtime adapter for per-thread execution.
-  - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
+  - Metidos-owned Pi runtime adapter for per-thread execution.
+  - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Metidos app data.
   - Treats provider-qualified model ids as authoritative at runtime so `openai-codex` stays distinct from plain `openai` for overlapping GPT model ids.
   - Defines the current Pi-era safe-vs-unsafe policy: safe threads keep worktree-scoped file/search/edit/write tools but lose `bash`, while unsafe threads also gain `bash` and may request unsafe child threads or cron jobs.
   - Installs the Pi-native GitHub tool pack when `githubAccess` is enabled for the thread, binding those tools to the GitHub repository that owns the current worktree.
   - Installs the Pi-native agents pack when `agentsAccess` is enabled, exposing `update_plan` plus a bounded `delegate_task` helper instead of Codex’s full child-agent lifecycle.
-  - Installs the Pi-native Jolt custom tool pack when `joltAccess` is enabled for the thread.
+  - Installs the Pi-native Metidos custom tool pack when `metidosAccess` is enabled for the thread.
   - Binds the shared browser-facing Pi extension UI bridge when the Bun runtime provides one, allowing session extension prompts and status/widget updates to escape the headless session layer.
   - Runs delegated helper tasks as isolated in-process Pi child sessions that inherit the parent thread’s workspace/model/tool policy while excluding recursive agent tools.
   - Reopens the explicitly persisted Pi session file when a thread already has one instead of relying only on “most recent session” behavior.
-  - Serves as the primary bridge between Jolt thread records and Pi `AgentSession` instances.
+  - Serves as the primary bridge between Metidos thread records and Pi `AgentSession` instances.
 
 - `pi-thread-runtime.test.ts`
   - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, and delegated child-session execution.
 
 - `pi-codex-auth.ts`
   - Shared auth-bridge helper for Codex-via-Pi support.
-  - Imports `~/.codex/auth.json` into Jolt's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
-  - Detects Codex CLI credential storage mode from `config.toml` and non-destructively probes `codex login status` so Jolt can distinguish file-cache, keyring, auto-storage, ChatGPT-backed CLI sessions, API-key CLI sessions, and fully signed-out states when `auth.json` is missing.
+  - Imports `~/.codex/auth.json` into Metidos's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
+  - Detects Codex CLI credential storage mode from `config.toml` and non-destructively probes `codex login status` so Metidos can distinguish file-cache, keyring, auto-storage, ChatGPT-backed CLI sessions, API-key CLI sessions, and fully signed-out states when `auth.json` is missing.
   - Does not import OS-keyring-backed Codex credentials directly; keyring detection exists only to produce precise unsupported-state diagnostics and recovery guidance.
-  - Also exposes the backend-owned `codex login --device-auth` bridge used for headless OpenAI Codex sign-in, including device-code parsing and automatic import of the resulting Codex credential into Jolt's Pi auth store.
-  - Also mirrors backend-managed Codex login and refresh results back into both stores so Jolt's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
+  - Also exposes the backend-owned `codex login --device-auth` bridge used for headless OpenAI Codex sign-in, including device-code parsing and automatic import of the resulting Codex credential into Metidos's Pi auth store.
+  - Also mirrors backend-managed Codex login and refresh results back into both stores so Metidos's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
 
 - `pi-codex-auth.test.ts`
   - Focused coverage for Codex auth translation, Codex-file override precedence, fallback to existing Pi-managed Codex OAuth state, and the missing-versus-unusable diagnostics used by the operator UX.
@@ -86,7 +86,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Focused coverage for the backend `openai-codex` auth procedures, including missing/unusable auth-file diagnostics, login start/finish, mirrored persistence into both auth stores, refresh, and logout.
 
 - `pi-extension-ui.ts`
-  - Shared Bun-side bridge that turns Pi `ExtensionUIContext` calls into Jolt websocket/RPC traffic.
+  - Shared Bun-side bridge that turns Pi `ExtensionUIContext` calls into Metidos websocket/RPC traffic.
   - Tracks thread-scoped editor text, handles interactive prompt responses, and emits browser-facing events for notifications, status lines, widgets, title changes, working-message overrides, and hidden-thinking labels.
 
 - `pi-extension-ui.test.ts`
@@ -103,13 +103,13 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-thread-runtime-integration.test.ts`
   - Backend smoke test proving that `project-procedures.ts` can now execute a real thread lifecycle through the Pi adapter and persist the resulting assistant reply.
 
-- `pi-jolt-tools.ts`
-  - Pi-native Jolt custom tool pack for thread metadata, thread listing/creation, cron management, UI context focus, and the vm2-backed untrusted JS runner.
-  - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Jolt MCP bridge for those operations.
+- `pi-metidos-tools.ts`
+  - Pi-native Metidos custom tool pack for thread metadata, thread listing/creation, cron management, UI context focus, and the vm2-backed untrusted JS runner.
+  - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Metidos MCP bridge for those operations.
   - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools.
 
-- `pi-jolt-tools.test.ts`
-  - Focused coverage for the Pi Jolt-tool port, including metadata updates, scoped thread listing, context focusing, cron creation/update, and the auto-start versus immediate-start thread flow.
+- `pi-metidos-tools.test.ts`
+  - Focused coverage for the Pi Metidos-tool port, including metadata updates, scoped thread listing, context focusing, cron creation/update, and the auto-start versus immediate-start thread flow.
 
 - `pi-github-tools.ts`
   - Pi-native GitHub custom tool pack backed by the local GitHub CLI.
@@ -137,12 +137,12 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Curates built-in providers down to a recent-release model set so the selector does not expose every historical Pi registry entry by default.
   - Also keeps a small set of current Chinese-model options by exposing first-class `Kimi Coding`, `MiniMax`, and `Z.AI` providers plus current `Qwen` picks through `OpenRouter`.
   - Exposes `openai-codex` as a first-class provider, distinguishes it from `OpenAI API`, and prefers Codex-backed raw GPT defaults only when Codex auth is actually available.
-  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already logged in but Jolt still needs importable or Pi-managed credentials.
+  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already logged in but Metidos still needs importable or Pi-managed credentials.
   - Tracks provider/model metadata such as reasoning support, context-window size, and whether a provider is currently runnable.
   - Provides token-context utilities used for compaction/size logic.
 
 - `project-procedures/pi-session-telemetry.ts`
-  - Maps live Pi `AgentSession` telemetry onto Jolt thread payloads.
+  - Maps live Pi `AgentSession` telemetry onto Metidos thread payloads.
   - Hydrates thread usage from Pi context-usage estimates, derives compaction history from Pi session entries, and surfaces live streaming/compaction phase plus queued-message counts on thread status payloads.
 
 - `project-procedures/directory-suggestions.ts`
@@ -190,7 +190,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Encapsulates the authenticated-session requirement plus optional websocket-ticket compatibility checks so those rules stay regression-tested independently from the full server bootstrap.
 
 - `thread-tool-scope.ts`
-  - Provides the scope-enforcement helpers shared by Jolt-owned Pi tool packs.
+  - Provides the scope-enforcement helpers shared by Metidos-owned Pi tool packs.
   - Canonicalizes worktree paths and blocks bound thread/project/worktree escapes.
 
 - `vm2-runner.ts`
@@ -214,7 +214,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Surfaces timeout and connection failures instead of silently falling back to local-only writes.
 
 - `sidecar-cron-runner.ts`
-  - Executes cron rows by creating Jolt child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
+  - Executes cron rows by creating Metidos child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
   - Records cron run history, updates last-run metadata, and waits for the spawned thread to settle before marking completion, stop, or error state.
   - Also exposes a small execution-host seam so runtime integration can be tested without changing the production scheduler path.
 
@@ -251,7 +251,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Records security audit events for authenticated primary-factor resets and recovery-code regeneration.
 
 - `dev-flows.ts`
-  - Parses the explicit development-only security flags (`JOLT_DEV_BYPASS=1` and `JOLT_DEV_RESET=1`).
+  - Parses the explicit development-only security flags (`METIDOS_DEV_BYPASS=1` and `METIDOS_DEV_RESET=1`).
   - Provides the local-state reset helper that wipes the SQLite/auth-secret files and the synthetic websocket-ticket path used when auth bypass is intentionally enabled in dev mode.
 
 - `server-security.ts`
@@ -265,5 +265,5 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 ## Notes
 
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
-- Bun listeners stay on loopback HTTP/WS. Use `--tls` or `JOLT_TLS=1` only when an upstream reverse proxy is terminating TLS for browser traffic.
-- Default reverse-proxy loopback origins on `http://localhost`, `https://localhost`, `http://127.0.0.1`, and `https://127.0.0.1` are accepted automatically; set `JOLT_ALLOWED_WS_ORIGINS` to add any non-default browser-facing origin or port.
+- Bun listeners stay on loopback HTTP/WS. Use `--tls` or `METIDOS_TLS=1` only when an upstream reverse proxy is terminating TLS for browser traffic.
+- Default reverse-proxy loopback origins on `http://localhost`, `https://localhost`, `http://127.0.0.1`, and `https://127.0.0.1` are accepted automatically; set `METIDOS_ALLOWED_WS_ORIGINS` to add any non-default browser-facing origin or port.

@@ -6,8 +6,10 @@
 import { deleteAuthSecretKey, getAuthSecretKeyPath } from "./auth-secrets";
 import { type AppDataPathOptions, deleteAppDatabaseFiles } from "./db";
 
-export const DEV_AUTH_BYPASS_ENV = "JOLT_DEV_BYPASS";
-export const DEV_RESET_ENV = "JOLT_DEV_RESET";
+export const DEV_AUTH_BYPASS_ENV = "METIDOS_DEV_BYPASS";
+export const DEV_RESET_ENV = "METIDOS_DEV_RESET";
+const LEGACY_DEV_AUTH_BYPASS_ENV = "JOLT_DEV_BYPASS";
+const LEGACY_DEV_RESET_ENV = "JOLT_DEV_RESET";
 const DEV_WEBSOCKET_TICKET_LIFETIME_MS = 60 * 1000;
 
 type DevFlowOptions = {
@@ -33,8 +35,11 @@ export type DevWebSocketTicket = {
  * @param value - Environment value to parse.
  */
 
-function envFlagEnabled(value: string | undefined): boolean {
-  return value?.trim() === "1";
+function envFlagEnabled(
+  env: NodeJS.ProcessEnv,
+  names: readonly string[],
+): boolean {
+  return names.some((name) => env[name]?.trim() === "1");
 }
 /**
  * Ensures a dev-only flag is only enabled when running in dev mode.
@@ -49,7 +54,7 @@ function assertDevOnlyFlag(
   isDevServer: boolean,
 ): void {
   if (enabled && !isDevServer) {
-    throw new Error(`${flagName}=1 requires --dev or JOLT_DEV=1.`);
+    throw new Error(`${flagName}=1 requires --dev or METIDOS_DEV=1.`);
   }
 }
 /**
@@ -59,8 +64,14 @@ function assertDevOnlyFlag(
 
 export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
   const env = options.env ?? process.env;
-  const authBypass = envFlagEnabled(env[DEV_AUTH_BYPASS_ENV]);
-  const resetOnStartup = envFlagEnabled(env[DEV_RESET_ENV]);
+  const authBypass = envFlagEnabled(env, [
+    DEV_AUTH_BYPASS_ENV,
+    LEGACY_DEV_AUTH_BYPASS_ENV,
+  ]);
+  const resetOnStartup = envFlagEnabled(env, [
+    DEV_RESET_ENV,
+    LEGACY_DEV_RESET_ENV,
+  ]);
 
   assertDevOnlyFlag(authBypass, DEV_AUTH_BYPASS_ENV, options.isDevServer);
   assertDevOnlyFlag(resetOnStartup, DEV_RESET_ENV, options.isDevServer);
@@ -100,8 +111,8 @@ export function resetLocalAppState(
   if (options.logger) {
     options.logger.warn(
       deletedPaths.length > 0
-        ? `[jolt] ${DEV_RESET_ENV}=1 removed local app state at ${deletedPaths.join(", ")}`
-        : `[jolt] ${DEV_RESET_ENV}=1 requested, but no local app state files were present.`,
+        ? `[metidos] ${DEV_RESET_ENV}=1 removed local app state at ${deletedPaths.join(", ")}`
+        : `[metidos] ${DEV_RESET_ENV}=1 requested, but no local app state files were present.`,
     );
   }
 

@@ -6,12 +6,12 @@ Implement the minimal admin tooling needed to support the git-native task graph 
 - implement `init_task_graph`
 - implement `validate_task_graph`
 - implement `normalize_task_graph`
-- expose the admin tools through the Jolt host with runtime gating
+- expose the admin tools through the Metidos host with runtime gating
 - add tests and developer documentation
 
 ## Acceptance
 
-- the Bun backend can initialize the canonical `.jolt/tasks/` layout
+- the Bun backend can initialize the canonical `.metidos/tasks/` layout
 - the backend can validate a repository task graph and report structured findings
 - the backend can normalize canonical files without changing task semantics
 - host policy can allow or deny the admin tools cleanly

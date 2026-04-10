@@ -66,7 +66,7 @@ describe("sidecar thread metadata updates", () => {
         id: 17,
         githubAccess: false,
         agentsAccess: false,
-        joltAccess: true,
+        metidosAccess: true,
         projectId: 4,
         worktreePath: "/repo",
         title: params.title ?? "Existing title",
@@ -145,7 +145,7 @@ describe("sidecar thread metadata updates", () => {
         id: 17,
         githubAccess: false,
         agentsAccess: false,
-        joltAccess: true,
+        metidosAccess: true,
         projectId: 4,
         worktreePath: "/repo",
         title: params.title ?? "Existing title",
@@ -222,7 +222,7 @@ describe("sidecar thread metadata updates", () => {
         reasoningEffort: "medium",
         githubAccess: params.githubAccess ?? false,
         agentsAccess: params.agentsAccess ?? false,
-        joltAccess: params.joltAccess ?? true,
+        metidosAccess: params.metidosAccess ?? true,
         unsafeMode: params.unsafeMode ?? false,
         piSessionId: null,
         piSessionFile: null,
@@ -256,7 +256,7 @@ describe("sidecar thread metadata updates", () => {
       {
         threadId: 17,
         githubAccess: true,
-        joltAccess: false,
+        metidosAccess: false,
         unsafeMode: true,
       },
       {
@@ -270,7 +270,7 @@ describe("sidecar thread metadata updates", () => {
         params: {
           threadId: 17,
           githubAccess: true,
-          joltAccess: false,
+          metidosAccess: false,
           unsafeMode: true,
         },
         options: {
@@ -280,7 +280,7 @@ describe("sidecar thread metadata updates", () => {
       },
     ]);
     expect(result.githubAccess).toBeTrue();
-    expect(result.joltAccess).toBeFalse();
+    expect(result.metidosAccess).toBeFalse();
     expect(result.unsafeMode).toBeTrue();
   });
 
@@ -299,7 +299,7 @@ describe("sidecar thread metadata updates", () => {
         reasoningEffort: "medium",
         githubAccess: false,
         agentsAccess: false,
-        joltAccess: true,
+        metidosAccess: true,
         unsafeMode: true,
         piSessionId: null,
         piSessionFile: null,
@@ -425,7 +425,7 @@ describe("sidecar thread metadata updates", () => {
     const rpcCall: UpdateThreadMetadataRpc = async () => {
       calls += 1;
       throw new Error(
-        "Could not connect to Jolt RPC at ws://127.0.0.1:7599/rpc.",
+        "Could not connect to Metidos RPC at ws://127.0.0.1:7599/rpc.",
       );
     };
 
@@ -435,7 +435,7 @@ describe("sidecar thread metadata updates", () => {
         pinned: false,
       }),
     ).rejects.toThrow(
-      "Thread metadata update did not reach the live app: Could not connect to Jolt RPC at ws://127.0.0.1:7599/rpc.",
+      "Thread metadata update did not reach the live app: Could not connect to Metidos RPC at ws://127.0.0.1:7599/rpc.",
     );
 
     expect(calls).toBe(1);

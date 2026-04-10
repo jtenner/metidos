@@ -21,7 +21,7 @@ import {
 } from "./project-procedures/model-catalog";
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 
 type ProjectProceduresModule = typeof import("./project-procedures");
@@ -97,8 +97,8 @@ function writeCodexAuthFile(codexHome: string): void {
 }
 
 function clearPiAuthFile(): void {
-  const piAuthPath = process.env.JOLT_APP_DATA_DIR
-    ? join(process.env.JOLT_APP_DATA_DIR, "pi-agent", "auth.json")
+  const piAuthPath = process.env.METIDOS_APP_DATA_DIR
+    ? join(process.env.METIDOS_APP_DATA_DIR, "pi-agent", "auth.json")
     : null;
   if (piAuthPath && existsSync(piAuthPath)) {
     writeFileSync(piAuthPath, "{}", "utf8");
@@ -112,7 +112,9 @@ async function loadProjectProcedures() {
 
   closeAppDatabase();
   resetResolvedAppDataDirectory();
-  process.env.JOLT_APP_DATA_DIR = createTempDirectory("jolt-procedures-db-");
+  process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
+    "metidos-procedures-db-",
+  );
   projectProcedures = (await import(
     `./project-procedures?project-procedures-config=${Date.now()}`
   )) as ProjectProceduresModule;
@@ -120,7 +122,7 @@ async function loadProjectProcedures() {
 }
 
 beforeAll(async () => {
-  isolatedCodexHome = createTempDirectory("jolt-codex-home-");
+  isolatedCodexHome = createTempDirectory("metidos-codex-home-");
   process.env.CODEX_HOME = isolatedCodexHome;
   setPiCodexAuthTestOverrides({
     codexCliStatus: () => ({
@@ -140,8 +142,8 @@ afterEach(() => {
       status: "not_logged_in",
     }),
   });
-  const piAuthPath = process.env.JOLT_APP_DATA_DIR
-    ? join(process.env.JOLT_APP_DATA_DIR, "pi-agent", "auth.json")
+  const piAuthPath = process.env.METIDOS_APP_DATA_DIR
+    ? join(process.env.METIDOS_APP_DATA_DIR, "pi-agent", "auth.json")
     : null;
   if (piAuthPath && existsSync(piAuthPath)) {
     writeFileSync(piAuthPath, "{}", "utf8");
@@ -155,9 +157,9 @@ afterAll(async () => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
@@ -260,7 +262,7 @@ describe("project procedure configuration helpers", () => {
   });
 
   it("prefers openai-codex for raw GPT ids when Codex auth is available", () => {
-    const codexHome = createTempDirectory("jolt-codex-home-");
+    const codexHome = createTempDirectory("metidos-codex-home-");
     writeCodexAuthFile(codexHome);
     process.env.CODEX_HOME = codexHome;
 
@@ -284,7 +286,7 @@ describe("project procedure configuration helpers", () => {
   });
 
   it("keeps OpenAI API as the default when the Codex auth file exists but is unusable", () => {
-    const codexHome = createTempDirectory("jolt-codex-home-");
+    const codexHome = createTempDirectory("metidos-codex-home-");
     writeFileSync(
       join(codexHome, "auth.json"),
       JSON.stringify(
@@ -320,7 +322,7 @@ describe("project procedure configuration helpers", () => {
   });
 
   it("surfaces Codex CLI keyring-login diagnostics in unavailable provider notes", () => {
-    const codexHome = createTempDirectory("jolt-codex-home-");
+    const codexHome = createTempDirectory("metidos-codex-home-");
     process.env.CODEX_HOME = codexHome;
     setPiCodexAuthTestOverrides({
       codexCliStatus: () => ({
@@ -373,7 +375,7 @@ describe("project procedure configuration helpers", () => {
 
   it("rejects unavailable Codex providers before creating threads or cron jobs", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-provider-guard-repo-");
+    const repoPath = createTempDirectory("metidos-provider-guard-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({
@@ -389,7 +391,7 @@ describe("project procedure configuration helpers", () => {
         autoStart: null,
         githubAccess: false,
         input: "hello from unavailable codex",
-        joltAccess: false,
+        metidosAccess: false,
         model: "openai-codex:gpt-5.4",
         projectId: opened.project.id,
         reasoningEffort: "medium",
@@ -402,7 +404,7 @@ describe("project procedure configuration helpers", () => {
       procedures.createThreadProcedure({
         agentsAccess: false,
         githubAccess: false,
-        joltAccess: false,
+        metidosAccess: false,
         model: "openai-codex:gpt-5.4",
         projectId: opened.project.id,
         reasoningEffort: "medium",
@@ -415,7 +417,7 @@ describe("project procedure configuration helpers", () => {
       procedures.newCronProcedure({
         agentsAccess: false,
         githubAccess: false,
-        joltAccess: false,
+        metidosAccess: false,
         model: "openai-codex:gpt-5.4",
         projectId: opened.project.id,
         prompt: "run unavailable codex",
@@ -429,10 +431,10 @@ describe("project procedure configuration helpers", () => {
 
   it("rejects unavailable Codex providers before queued runs or model updates", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-provider-run-guard-repo-");
+    const repoPath = createTempDirectory("metidos-provider-run-guard-repo-");
     initializeGitRepository(repoPath);
 
-    const codexHome = createTempDirectory("jolt-codex-home-");
+    const codexHome = createTempDirectory("metidos-codex-home-");
     writeCodexAuthFile(codexHome);
     process.env.CODEX_HOME = codexHome;
 
@@ -443,7 +445,7 @@ describe("project procedure configuration helpers", () => {
     const codexThread = await procedures.createThreadProcedure({
       agentsAccess: false,
       githubAccess: false,
-      joltAccess: false,
+      metidosAccess: false,
       model: "openai-codex:gpt-5.4",
       projectId: opened.project.id,
       reasoningEffort: "medium",
@@ -453,7 +455,7 @@ describe("project procedure configuration helpers", () => {
     const openaiThread = await procedures.createThreadProcedure({
       agentsAccess: false,
       githubAccess: false,
-      joltAccess: false,
+      metidosAccess: false,
       model: "openai:gpt-5.4",
       projectId: opened.project.id,
       reasoningEffort: "medium",
@@ -463,7 +465,7 @@ describe("project procedure configuration helpers", () => {
     const cronJob = await procedures.newCronProcedure({
       agentsAccess: false,
       githubAccess: false,
-      joltAccess: false,
+      metidosAccess: false,
       model: "openai:gpt-5.4",
       projectId: opened.project.id,
       prompt: "run safely",
@@ -524,7 +526,7 @@ describe("project procedure configuration helpers", () => {
 
   it("rejects an aborted active-worktree update before validation completes", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-active-worktree-repo-");
+    const repoPath = createTempDirectory("metidos-active-worktree-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({
@@ -555,7 +557,9 @@ describe("project procedure configuration helpers", () => {
 
   it("falls back to cached worktrees when foreground git preempts active-worktree validation", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-active-worktree-preempt-repo-");
+    const repoPath = createTempDirectory(
+      "metidos-active-worktree-preempt-repo-",
+    );
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({

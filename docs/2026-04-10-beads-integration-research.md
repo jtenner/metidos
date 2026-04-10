@@ -1,7 +1,7 @@
-# Research: Evaluating Beads For Jolt
+# Research: Evaluating Beads For Metidos
 
 Date: 2026-04-10  
-Repository: `jt-ide`  
+Repository: `metidos`  
 External target: `gastownhall/beads`  
 Upstream snapshot inspected: `main` at `0ed8d0b27161e0ab712cd9b4a9fa27874d229d7a` (2026-04-09) and release `v1.0.0` (published 2026-04-03)
 
@@ -14,7 +14,7 @@ Upstream snapshot inspected: `main` at `0ed8d0b27161e0ab712cd9b4a9fa27874d229d7a
   - talking directly to the Dolt backend in server mode
   - using its Python MCP server
 - A WASM library path is not an upstream-supported integration shape. Embedded mode requires CGO, non-CGO builds only support server mode, and the repo ships no JS/WASM bindings.
-- For `jt-ide`, the best fit is a backend integration that spawns `bd` from Bun and parses JSON. A Go sidecar is the next-best option if a longer-lived API boundary is needed.
+- For `metidos`, the best fit is a backend integration that spawns `bd` from Bun and parses JSON. A Go sidecar is the next-best option if a longer-lived API boundary is needed.
 - The current packaging story is uneven:
   - GitHub release `v1.0.0` exists.
   - PyPI package `beads-mcp` is at `1.0.0`.
@@ -24,16 +24,16 @@ Upstream snapshot inspected: `main` at `0ed8d0b27161e0ab712cd9b4a9fa27874d229d7a
 
 ## Goal
 
-Evaluate whether Jolt can add Beads as a structured task-memory feature, and determine the practical integration shape for a Bun/TypeScript application:
+Evaluate whether Metidos can add Beads as a structured task-memory feature, and determine the practical integration shape for a Bun/TypeScript application:
 
 - what Beads requires
 - whether it is usable programmatically
 - whether it can realistically be compiled to WASM
-- whether Jolt should instead treat it as a dependency and call it via process execution
+- whether Metidos should instead treat it as a dependency and call it via process execution
 
 ## Problem Beads Solves
 
-Beads is trying to solve the same class of problem that Jolt’s thread/session/project model only partially addresses today: persistent long-horizon task memory for agents.
+Beads is trying to solve the same class of problem that Metidos’s thread/session/project model only partially addresses today: persistent long-horizon task memory for agents.
 
 Its core model is:
 
@@ -52,7 +52,7 @@ That makes it potentially useful for:
 
 ## Bottom Line
 
-Beads looks usable for Jolt, but only as a backend-native integration.
+Beads looks usable for Metidos, but only as a backend-native integration.
 
 It does **not** look like a good candidate for:
 
@@ -63,7 +63,7 @@ It does **not** look like a good candidate for:
 It **does** look like a good candidate for:
 
 - a Bun backend adapter that shells out to `bd --json`
-- or a small Go sidecar process that wraps the Go API for Jolt
+- or a small Go sidecar process that wraps the Go API for Metidos
 
 For this repository, the lowest-friction path is process execution from Bun.
 
@@ -87,7 +87,7 @@ For this repository, the lowest-friction path is process execution from Bun.
 - [Release `v1.0.0`](https://github.com/gastownhall/beads/releases/tag/v1.0.0)
 - [PyPI `beads-mcp`](https://pypi.org/project/beads-mcp/)
 
-### Local Jolt sources
+### Local Metidos sources
 
 - [package.json](../package.json)
 - [src/bun/git.ts](../src/bun/git.ts)
@@ -126,7 +126,7 @@ Two modes exist:
 
 Implications:
 
-- using Beads introduces a generated `.beads/` directory inside the project unless Jolt redirects it elsewhere
+- using Beads introduces a generated `.beads/` directory inside the project unless Metidos redirects it elsewhere
 - per this repository’s policy, that generated directory should stay out of version control
 - embedded mode is single-writer and protected with file locking
 - server mode is the multi-writer option
@@ -161,7 +161,7 @@ Evidence:
 - multiple docs and examples recommend `bd ... --json` for integrations
 - the npm package README describes Beads as “agent-friendly” through JSON output
 
-This surface is a good fit for Jolt because this repo already uses subprocess-backed tool adapters:
+This surface is a good fit for Metidos because this repo already uses subprocess-backed tool adapters:
 
 - [src/bun/git.ts](../src/bun/git.ts)
 - [src/bun/pi-github-tools.ts](../src/bun/pi-github-tools.ts)
@@ -170,7 +170,7 @@ This surface is a good fit for Jolt because this repo already uses subprocess-ba
 Practical shape:
 
 ```text
-Jolt Bun backend
+Metidos Bun backend
   -> Bun.spawn(["bd", "...", "--json"])
   -> parse stdout JSON
   -> surface errors/status to the UI
@@ -190,9 +190,9 @@ This means Beads is programmatically embeddable, but primarily for Go.
 
 Practical implication:
 
-- if Jolt builds a Go sidecar, it should expect the legacy `github.com/steveyegge/beads` import path today unless upstream normalizes that module path later
+- if Metidos builds a Go sidecar, it should expect the legacy `github.com/steveyegge/beads` import path today unless upstream normalizes that module path later
 
-For Jolt, this would only be practical through:
+For Metidos, this would only be practical through:
 
 - a small Go helper binary
 - a stdio/JSON-RPC sidecar
@@ -209,7 +209,7 @@ Upstream docs explicitly say:
 
 This is possible, but it is a lower-level integration:
 
-- Jolt would need to understand Beads’ schema and migrations
+- Metidos would need to understand Beads’ schema and migrations
 - it would bypass the higher-level CLI semantics that Beads already stabilizes
 - server mode requires managing `dolt sql-server`
 
@@ -224,7 +224,7 @@ That surface is real, but it is mainly for:
 - MCP-only environments
 - tools like Claude Desktop or Copilot MCP setups
 
-For Jolt, it is probably the wrong level:
+For Metidos, it is probably the wrong level:
 
 - extra process
 - extra protocol layer
@@ -233,7 +233,7 @@ For Jolt, it is probably the wrong level:
 
 ### Current JS / Bun Reality
 
-Beads does **not** currently provide a TS API for Jolt to import.
+Beads does **not** currently provide a TS API for Metidos to import.
 
 The published npm package is a native-binary wrapper:
 
@@ -253,7 +253,7 @@ not:
 
 ### Short answer
 
-I do **not** think WASM is a good integration plan for Jolt.
+I do **not** think WASM is a good integration plan for Metidos.
 
 ### Why
 
@@ -354,11 +354,11 @@ Result:
 
 This is the cleanest path I found for producing a usable Linux binary today.
 
-## Fit For Jolt
+## Fit For Metidos
 
-### 1. Jolt already has the right backend shape
+### 1. Metidos already has the right backend shape
 
-Jolt already shells out to local tools from Bun and normalizes the results. That means a Beads adapter would fit the existing architecture rather than forcing a new runtime model.
+Metidos already shells out to local tools from Bun and normalizes the results. That means a Beads adapter would fit the existing architecture rather than forcing a new runtime model.
 
 This is especially compatible with:
 
@@ -374,7 +374,7 @@ The right separation looks like:
 
 ```text
 React mainview
-  -> Jolt RPC
+  -> Metidos RPC
   -> Bun backend Beads adapter
   -> bd CLI or Go helper
   -> .beads/ storage or Dolt server
@@ -382,7 +382,7 @@ React mainview
 
 ### 3. Generated data needs repo-policy handling
 
-If Jolt creates Beads databases inside worktrees, it will create `.beads/`.
+If Metidos creates Beads databases inside worktrees, it will create `.beads/`.
 
 Per this repo’s instructions, generated files should stay out of version control, so any Beads trial in this repo should ensure:
 
@@ -396,10 +396,10 @@ Per this repo’s instructions, generated files should stay out of version contr
 
 Use Beads as a backend dependency invoked from a process boundary.
 
-For Jolt, the best current plan is:
+For Metidos, the best current plan is:
 
 1. Add a Bun backend adapter that resolves a `bd` executable and always uses `--json`.
-2. Keep the Beads surface behind Jolt RPC instead of exposing it in the browser directly.
+2. Keep the Beads surface behind Metidos RPC instead of exposing it in the browser directly.
 3. Prefer one of these binary supply strategies:
    - operator-installed `bd`
    - app-managed native binary
@@ -417,14 +417,14 @@ Do **not** plan around:
 
 ### Reasonable second step if CLI spawning becomes limiting
 
-If Jolt eventually needs:
+If Metidos eventually needs:
 
 - lower latency
 - connection reuse
 - richer transactions
 - tighter control than CLI flags provide
 
-then the next step should be a small Go sidecar that imports the Beads Go package and exposes a narrow RPC surface to Jolt.
+then the next step should be a small Go sidecar that imports the Beads Go package and exposes a narrow RPC surface to Metidos.
 
 That would still be process-based, but it would avoid repeated CLI startup and JSON command parsing.
 
@@ -445,7 +445,7 @@ The practical options are:
 - direct Dolt/SQL access
 - Python MCP server
 
-For Jolt, CLI + `--json` is the best fit.
+For Metidos, CLI + `--json` is the best fit.
 
 ### Could it be compiled to a WASM library?
 
@@ -453,6 +453,6 @@ Not as a realistic upstream-supported plan. Embedded mode requires CGO, non-CGO 
 
 ### Do we need to add it as a dependency and use it from a process start?
 
-For a Bun/TypeScript app like Jolt: yes, that is the realistic integration model today.
+For a Bun/TypeScript app like Metidos: yes, that is the realistic integration model today.
 
 But I would **not** rely on the currently published npm package alone on Linux. A system-installed or CI-built native binary is a safer plan right now.

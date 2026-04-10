@@ -1,6 +1,6 @@
 /**
  * @file src/bun/project-procedures/pi-session-telemetry.ts
- * @description Maps live Pi session telemetry onto Jolt thread status/detail payloads.
+ * @description Maps live Pi session telemetry onto Metidos thread status/detail payloads.
  */
 
 import type {

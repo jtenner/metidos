@@ -11,7 +11,7 @@ import { materialSymbol } from "./icons";
 export type ThreadAccessValue = {
   agentsAccess: boolean;
   githubAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: boolean;
 };
 
@@ -166,14 +166,14 @@ export function ThreadAccessControl({
             />
             <AccessRow
               accentClassName="accent-[#8ed0ff]"
-              checked={value.joltAccess}
-              description="Allow Jolt tools such as thread, cron, workspace, and vm2 helpers."
+              checked={value.metidosAccess}
+              description="Allow Metidos tools such as thread, cron, workspace, and vm2 helpers."
               disabled={disabled}
-              label="Jolt"
+              label="Metidos"
               onChange={(checked) => {
                 onChange({
                   ...value,
-                  joltAccess: checked,
+                  metidosAccess: checked,
                 });
               }}
               toneClassName=""
@@ -181,7 +181,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#d89256]"
               checked={value.unsafeMode}
-              description="Enable shell access and allow Jolt tools to create unsafe child threads or cron jobs."
+              description="Enable shell access and allow Metidos tools to create unsafe child threads or cron jobs."
               disabled={disabled}
               label="Unsafe"
               onChange={(checked) => {

@@ -1,4 +1,4 @@
-schema = "jolt.task-graph/v2"
+schema = "metidos.task-graph/v2"
 id_prefix = "tg"
 body_format = "markdown"
 strict_tags = false

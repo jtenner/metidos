@@ -783,7 +783,7 @@ function readRpcWebSocketUrl(value: unknown): string | null {
  * @param html - HTML content generated for the test page.
  */
 function readRuntimeConfigFromHtml(html: string): unknown {
-  const match = html.match(/window\.__joltRuntime=(\{.+?\});<\/script>/s);
+  const match = html.match(/window\.__metidosRuntime=(\{.+?\});<\/script>/s);
   if (!match) {
     return null;
   }

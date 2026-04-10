@@ -352,7 +352,7 @@ function unavailableCodexProviderNote(
 ): string {
   switch (codexAuthState.codexCliAuthStatus) {
     case "logged_in_chatgpt":
-      return 'Codex CLI is already signed in with ChatGPT, but Jolt cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and rerun "codex login", or use an existing shared auth.json cache.';
+      return 'Codex CLI is already signed in with ChatGPT, but Metidos cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and rerun "codex login", or use an existing shared auth.json cache.';
     case "logged_in_api_key":
       return 'Codex CLI is signed in with an API key. Use the separate OpenAI API provider, or rerun "codex login" for ChatGPT-plan-backed OpenAI Codex usage.';
     case "unknown":

@@ -1,6 +1,6 @@
 /**
  * @file src/bun/pi-agents-tools.ts
- * @description Pi-native plan and bounded delegation tools for the Jolt runtime.
+ * @description Pi-native plan and bounded delegation tools for the Metidos runtime.
  */
 
 import {

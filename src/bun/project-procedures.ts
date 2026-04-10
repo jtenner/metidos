@@ -70,7 +70,7 @@ import {
   runGitCommand,
 } from "./git";
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
-import type { PiJoltToolHost } from "./pi-jolt-tools";
+import type { PiMetidosToolHost } from "./pi-metidos-tools";
 import {
   buildPiAgentDirectoryPath,
   createPiThreadRuntime,
@@ -836,7 +836,7 @@ function applyActiveThreadRuntimeTelemetry(thread: RpcThread): RpcThread {
 type ThreadAccessControls = {
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: boolean;
 };
 
@@ -856,14 +856,14 @@ function resolveThreadAccessControls(
   input: {
     githubAccess?: boolean | null;
     agentsAccess?: boolean | null;
-    joltAccess?: boolean | null;
+    metidosAccess?: boolean | null;
     unsafeMode?: boolean | null;
   } = {},
 ): ThreadAccessControls {
   return {
     githubAccess: input.githubAccess === true,
     agentsAccess: input.agentsAccess === true,
-    joltAccess: input.joltAccess !== false,
+    metidosAccess: input.metidosAccess !== false,
     unsafeMode: resolveUnsafeMode(input.unsafeMode ?? null),
   };
 }
@@ -880,7 +880,7 @@ async function ensurePiThreadRuntime(
 
   const next = await createPiThreadRuntime(thread, {
     extensionUiBridge: piThreadExtensionUiBridge,
-    joltToolHost: createPiJoltToolHost(),
+    metidosToolHost: createPiMetidosToolHost(),
   });
   piThreadRuntimeMap.set(thread.id, next);
   syncPiThreadSessionState(thread, next);
@@ -905,7 +905,7 @@ function createPiToolRequestContext(
   };
 }
 
-function createPiJoltToolHost(): PiJoltToolHost {
+function createPiMetidosToolHost(): PiMetidosToolHost {
   return {
     createThread: (params) => createThreadProcedure(params),
     focusContext: (params, signal) =>
@@ -2408,7 +2408,7 @@ async function createThreadRecord(
       reasoningEffort,
       githubAccess: access.githubAccess,
       agentsAccess: access.agentsAccess,
-      joltAccess: access.joltAccess,
+      metidosAccess: access.metidosAccess,
       unsafeMode: access.unsafeMode,
       piSessionId: null,
       piSessionFile: null,
@@ -2701,7 +2701,7 @@ export async function requestThreadStartProcedure(
       : null,
     githubAccess: access.githubAccess,
     agentsAccess: access.agentsAccess,
-    joltAccess: access.joltAccess,
+    metidosAccess: access.metidosAccess,
     unsafeMode: access.unsafeMode,
     autoStart: params.autoStart ?? null,
     threadId: null,
@@ -2801,7 +2801,7 @@ export async function newCronProcedure(
       prompt,
       githubAccess: access.githubAccess,
       agentsAccess: access.agentsAccess,
-      joltAccess: access.joltAccess,
+      metidosAccess: access.metidosAccess,
       unsafeMode: access.unsafeMode,
       title,
       description,
@@ -2852,7 +2852,7 @@ export async function updateCronProcedure(
     reasoningEffort?: string;
     githubAccess?: boolean;
     agentsAccess?: boolean;
-    joltAccess?: boolean;
+    metidosAccess?: boolean;
     enabled?: boolean;
     unsafeMode?: boolean;
   } = {};
@@ -2875,8 +2875,8 @@ export async function updateCronProcedure(
     updates.agentsAccess = params.agentsAccess;
   }
 
-  if (typeof params.joltAccess === "boolean") {
-    updates.joltAccess = params.joltAccess;
+  if (typeof params.metidosAccess === "boolean") {
+    updates.metidosAccess = params.metidosAccess;
   }
 
   if (typeof params.schedule !== "undefined") {
@@ -2928,7 +2928,7 @@ export async function updateCronProcedure(
     typeof updates.reasoningEffort === "undefined" &&
     typeof updates.githubAccess === "undefined" &&
     typeof updates.agentsAccess === "undefined" &&
-    typeof updates.joltAccess === "undefined" &&
+    typeof updates.metidosAccess === "undefined" &&
     typeof updates.unsafeMode === "undefined" &&
     typeof updates.enabled === "undefined"
   ) {
@@ -3269,10 +3269,10 @@ export async function updateThreadAccessProcedure(
       typeof params.agentsAccess === "boolean"
         ? params.agentsAccess
         : thread.agentsAccess,
-    joltAccess:
-      typeof params.joltAccess === "boolean"
-        ? params.joltAccess
-        : thread.joltAccess,
+    metidosAccess:
+      typeof params.metidosAccess === "boolean"
+        ? params.metidosAccess
+        : thread.metidosAccess,
     unsafeMode:
       typeof params.unsafeMode === "boolean"
         ? params.unsafeMode
@@ -3282,7 +3282,7 @@ export async function updateThreadAccessProcedure(
   if (
     next.githubAccess === thread.githubAccess &&
     next.agentsAccess === thread.agentsAccess &&
-    next.joltAccess === thread.joltAccess &&
+    next.metidosAccess === thread.metidosAccess &&
     next.unsafeMode === (thread.unsafeMode === 1)
   ) {
     return rpcThreadById(thread.id);

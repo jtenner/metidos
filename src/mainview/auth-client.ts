@@ -5,7 +5,7 @@
 
 import type { AuthPrimaryFactorType } from "../bun/db";
 
-export const AUTH_REQUIRED_EVENT_NAME = "jolt:auth-required";
+export const AUTH_REQUIRED_EVENT_NAME = "metidos:auth-required";
 
 type AuthErrorDetails = Record<string, string | null>;
 
@@ -53,7 +53,7 @@ type AuthErrorResponse = {
 
 declare global {
   interface WindowEventMap {
-    "jolt:auth-required": CustomEvent<{
+    "metidos:auth-required": CustomEvent<{
       reason: string;
     }>;
   }

@@ -11,7 +11,7 @@ import {
 } from "./pi-thread-runtime";
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
@@ -62,8 +62,10 @@ async function loadCronModules() {
 
   closeAppDatabase();
   resetResolvedAppDataDirectory();
-  process.env.JOLT_APP_DATA_DIR = createTempDirectory("jolt-cron-runtime-db-");
-  process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
+  process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
+    "metidos-cron-runtime-db-",
+  );
+  process.env.CODEX_HOME = createTempDirectory("metidos-codex-home-");
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
   const token = Date.now();
@@ -144,7 +146,7 @@ afterEach(async () => {
   projectProcedures?.shutdownProjectPolling();
   await projectProcedures?.shutdownActiveThreadTurns();
   if (typeof process.env.CODEX_HOME !== "string" || !process.env.CODEX_HOME) {
-    process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
+    process.env.CODEX_HOME = createTempDirectory("metidos-codex-home-");
   }
 });
 
@@ -155,9 +157,9 @@ afterAll(async () => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
@@ -185,7 +187,7 @@ describe("sidecar cron runner", () => {
   it("runCronJobById starts a Pi-backed cron thread and records completion", async () => {
     const { cronRunner: runner, projectProcedures: procedures } =
       await loadCronModules();
-    const repoPath = createTempDirectory("jolt-cron-run-now-repo-");
+    const repoPath = createTempDirectory("metidos-cron-run-now-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({
@@ -195,7 +197,7 @@ describe("sidecar cron runner", () => {
     const cronJob = await procedures.newCronProcedure({
       agentsAccess: true,
       githubAccess: false,
-      joltAccess: true,
+      metidosAccess: true,
       model: "gpt-5.4",
       projectId: opened.project.id,
       prompt: "cron run now smoke",
@@ -226,7 +228,7 @@ describe("sidecar cron runner", () => {
     expect(settled.thread.piSessionFile).toBeString();
     expect(settled.thread.piLeafEntryId).toBeString();
     expect(Boolean(settled.thread.agentsAccess)).toBeTrue();
-    expect(Boolean(settled.thread.joltAccess)).toBeTrue();
+    expect(Boolean(settled.thread.metidosAccess)).toBeTrue();
     expect(Boolean(settled.thread.githubAccess)).toBeFalse();
     expect(Boolean(settled.thread.unsafeMode)).toBeFalse();
     expect(lastAssistantMessage?.text).toContain("pi-runtime-probe");
@@ -238,7 +240,7 @@ describe("sidecar cron runner", () => {
   it("runDueCronJobs executes scheduled work through the Pi-backed thread path", async () => {
     const { cronRunner: runner, projectProcedures: procedures } =
       await loadCronModules();
-    const repoPath = createTempDirectory("jolt-cron-scheduled-repo-");
+    const repoPath = createTempDirectory("metidos-cron-scheduled-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({
@@ -247,7 +249,7 @@ describe("sidecar cron runner", () => {
     });
     const cronJob = await procedures.newCronProcedure({
       githubAccess: false,
-      joltAccess: false,
+      metidosAccess: false,
       model: "gpt-5.4",
       projectId: opened.project.id,
       prompt: "scheduled cron smoke",

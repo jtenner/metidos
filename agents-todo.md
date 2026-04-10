@@ -1,6 +1,6 @@
 # Agents Todo
 
-This file is the active execution backlog for Pi-backed follow-up work in `jt-ide`, including Codex usage through Pi's built-in `openai-codex` provider.
+This file is the active execution backlog for Pi-backed follow-up work in `metidos`, including Codex usage through Pi's built-in `openai-codex` provider.
 
 ## Rules
 

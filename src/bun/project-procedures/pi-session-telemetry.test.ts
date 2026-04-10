@@ -156,7 +156,7 @@ function makeThread(input?: Partial<RpcThread>): RpcThread {
     createdAt: "2026-04-09T11:00:00.000Z",
     githubAccess: false,
     id: 12,
-    joltAccess: true,
+    metidosAccess: true,
     lastRunAt: null,
     model: "openai:gpt-5.4",
     piLeafEntryId: null,

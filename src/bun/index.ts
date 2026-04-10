@@ -304,7 +304,7 @@ function resolveServerPort(args: string[], envPort?: string): number {
   const configuredPort = readCliPort(args) ?? envPort ?? DEFAULT_SERVER_PORT;
   if (!isStringInteger(configuredPort)) {
     throw new Error(
-      `Invalid port "${configuredPort}". Expected an integer string from --port, -p, or JOLT_PORT.`,
+      `Invalid port "${configuredPort}". Expected an integer string from --port, -p, or METIDOS_PORT.`,
     );
   }
 
@@ -318,19 +318,37 @@ function resolveServerPort(args: string[], envPort?: string): number {
   return parsedPort;
 }
 
+function readBrandEnvVar(name: string): string | undefined {
+  const canonicalValue = process.env[name]?.trim();
+  if (canonicalValue) {
+    return canonicalValue;
+  }
+
+  const legacyName = name.replace(/^METIDOS_/, "JOLT_");
+  const legacyValue = process.env[legacyName]?.trim();
+  return legacyValue || undefined;
+}
+
+function readBrandEnvFlag(name: string): boolean {
+  return readBrandEnvVar(name) === "1";
+}
+
 const WIPE_USER_DATA_FLAG = "--wipe-user-data";
 const WIPE_USER_DATA_CONFIRMATION = "DELETE";
 
 const SERVER_ARGS = Bun.argv.slice(2);
 const CONFIGURED_SERVER_PORT =
-  readCliPort(SERVER_ARGS) ?? process.env.JOLT_PORT;
-const SERVER_PORT = resolveServerPort(SERVER_ARGS, process.env.JOLT_PORT);
+  readCliPort(SERVER_ARGS) ?? readBrandEnvVar("METIDOS_PORT");
+const SERVER_PORT = resolveServerPort(
+  SERVER_ARGS,
+  readBrandEnvVar("METIDOS_PORT"),
+);
 const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
 const BACKEND_ONLY =
   SERVER_ARGS.includes("--backend-only") ||
-  process.env.JOLT_BACKEND_ONLY === "1";
+  readBrandEnvFlag("METIDOS_BACKEND_ONLY");
 const IS_DEV_SERVER =
-  SERVER_ARGS.includes("--dev") || process.env.JOLT_DEV === "1";
+  SERVER_ARGS.includes("--dev") || readBrandEnvFlag("METIDOS_DEV");
 const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
   forceTls: PUBLIC_TLS_ENABLED,
@@ -340,12 +358,15 @@ const DEV_FLOW_MODE = resolveDevFlowMode({
   isDevServer: IS_DEV_SERVER,
 });
 
-process.env.JOLT_PORT = String(SERVER_PORT);
-process.env.JOLT_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(SERVER_PORT, false);
-process.env.JOLT_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
+process.env.METIDOS_PORT = String(SERVER_PORT);
+process.env.METIDOS_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(
+  SERVER_PORT,
+  false,
+);
+process.env.METIDOS_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
 
 const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
-  process.env.JOLT_ALLOWED_WS_ORIGINS,
+  readBrandEnvVar("METIDOS_ALLOWED_WS_ORIGINS"),
 );
 
 /**
@@ -1406,7 +1427,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
     procedures: getProcedureRuntimeStats(),
     rpcClientCount: rpcClients.size,
     rpcWebSocketUrl:
-      process.env.JOLT_RPC_URL ?? `ws://127.0.0.1:${activeServerPort}/rpc`,
+      process.env.METIDOS_RPC_URL ?? `ws://127.0.0.1:${activeServerPort}/rpc`,
   };
 }
 
@@ -2184,7 +2205,7 @@ async function bootstrap(): Promise<void> {
   }
   if (DEV_FLOW_MODE.authBypass) {
     webServerLogger.warning(
-      "[jolt] JOLT_DEV_BYPASS=1 is active. Auth and RPC login checks are bypassed in dev mode.",
+      "[metidos] METIDOS_DEV_BYPASS=1 is active. Auth and RPC login checks are bypassed in dev mode.",
     );
   }
 
@@ -2705,15 +2726,15 @@ async function bootstrap(): Promise<void> {
     });
     activeServerPort = server.port ?? activeServerPort;
     webServerLogger.warning(
-      `Port ${SERVER_PORT} is already in use; Jolt dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
+      `Port ${SERVER_PORT} is already in use; Metidos dev server fell back to http://localhost:${server.port ?? activeServerPort}.`,
     );
   }
   activeServerPort = server.port ?? activeServerPort;
 
   webServerLogger.info(
     BACKEND_ONLY
-      ? `Jolt RPC backend listening on http://localhost:${server.port}`
-      : `Jolt web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}${TLS_RUNTIME.publicTls ? " with public HTTPS/WSS expected via reverse proxy" : ""}`,
+      ? `Metidos RPC backend listening on http://localhost:${server.port}`
+      : `Metidos web app listening on http://localhost:${server.port}${IS_DEV_SERVER ? " (live reload enabled)" : ""}${TLS_RUNTIME.publicTls ? " with public HTTPS/WSS expected via reverse proxy" : ""}`,
   );
 
   setTimeout(() => {
@@ -2747,7 +2768,7 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
   })()
     .catch((error) => {
       webServerLogger.error({
-        message: "Failed to cleanly shut down Jolt",
+        message: "Failed to cleanly shut down Metidos",
         error: normalizeErrorDescription(error),
       });
     })

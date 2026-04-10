@@ -10,7 +10,7 @@ import { runUntrustedJavaScriptInVm2 } from "./vm2-runner";
 import { makeTempDir } from "./vm2-runner-test-utils";
 
 test("captures console output and returned values", async () => {
-  const worktreePath = makeTempDir("jolt-vm2-runner-console-");
+  const worktreePath = makeTempDir("metidos-vm2-runner-console-");
   try {
     const report = await runUntrustedJavaScriptInVm2({
       code: `

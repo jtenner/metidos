@@ -1,9 +1,9 @@
 # Specification: Minimal Git-Native Task Graph Filesystem
 
 Date: 2026-04-10  
-Repository: `jt-ide`  
+Repository: `metidos`  
 Status: Draft v2  
-Audience: Jolt runtime, Jolt UI, agent tool hosts, repository maintainers
+Audience: Metidos runtime, Metidos UI, agent tool hosts, repository maintainers
 
 ## Summary
 
@@ -22,13 +22,13 @@ The system is intentionally minimal:
 The default root is:
 
 ```text
-.jolt/tasks/
+.metidos/tasks/
 ```
 
 The canonical layout is:
 
 ```text
-.jolt/
+.metidos/
   tasks/
     config.toml
     tags.toml          # optional
@@ -115,11 +115,11 @@ Long descriptions, acceptance criteria, rollout notes, and context belong in `bo
 
 ### 5. No task-specific search protocol
 
-Searching tasks SHOULD happen through ordinary file search over `.jolt/tasks/items/**`.
+Searching tasks SHOULD happen through ordinary file search over `.metidos/tasks/items/**`.
 
 ### 6. No task-specific mutation protocol for ordinary edits
 
-Most task edits SHOULD happen through normal file editing tools constrained to `.jolt/tasks/**`.
+Most task edits SHOULD happen through normal file editing tools constrained to `.metidos/tasks/**`.
 
 ### 7. Keep the special tool surface tiny
 
@@ -177,13 +177,13 @@ The main reason is operational clarity. Agents already know how to search files 
 The default root for a conforming repository is:
 
 ```text
-.jolt/tasks/
+.metidos/tasks/
 ```
 
 Canonical layout:
 
 ```text
-.jolt/
+.metidos/
   tasks/
     config.toml
     tags.toml
@@ -200,27 +200,27 @@ Canonical layout:
 Optional non-canonical cache artifacts MAY exist, for example:
 
 ```text
-.jolt/cache/tasks/...
+.metidos/cache/tasks/...
 ```
 
 Those caches MUST be gitignored and MUST NOT be treated as source of truth.
 
-All canonical files under `.jolt/tasks/` SHOULD be committed unless a repository intentionally chooses to keep the task graph private or branch-local.
+All canonical files under `.metidos/tasks/` SHOULD be committed unless a repository intentionally chooses to keep the task graph private or branch-local.
 
 ### Required Files
 
 | Path | Required | Purpose |
 | --- | --- | --- |
-| `.jolt/tasks/config.toml` | Yes | Repo-level schema and defaults |
-| `.jolt/tasks/items/<task-id>/task.toml` | Yes | Structured task metadata and links |
-| `.jolt/tasks/items/<task-id>/body.md` | Yes | Long-form Markdown body |
+| `.metidos/tasks/config.toml` | Yes | Repo-level schema and defaults |
+| `.metidos/tasks/items/<task-id>/task.toml` | Yes | Structured task metadata and links |
+| `.metidos/tasks/items/<task-id>/body.md` | Yes | Long-form Markdown body |
 
 ### Optional Files
 
 | Path | Optional | Purpose |
 | --- | --- | --- |
-| `.jolt/tasks/tags.toml` | Yes | Registered / recommended tags |
-| `.jolt/tasks/types.toml` | Yes | Registered custom task types |
+| `.metidos/tasks/tags.toml` | Yes | Registered / recommended tags |
+| `.metidos/tasks/types.toml` | Yes | Registered custom task types |
 
 ### Path Rules
 
@@ -237,12 +237,12 @@ That rule matters because:
 
 ## Repository Config
 
-### `.jolt/tasks/config.toml`
+### `.metidos/tasks/config.toml`
 
 Minimal example:
 
 ```toml
-schema = "jolt.task-graph/v2"
+schema = "metidos.task-graph/v2"
 id_prefix = "tg"
 body_format = "markdown"
 strict_tags = false
@@ -258,7 +258,7 @@ priority = "p2"
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `schema` | string | MUST be `jolt.task-graph/v2` |
+| `schema` | string | MUST be `metidos.task-graph/v2` |
 | `id_prefix` | string | Prefix used for generated task IDs |
 | `body_format` | string | MUST be `markdown` in v2 |
 
@@ -310,7 +310,7 @@ ULIDs are recommended because they are:
 Each task lives in:
 
 ```text
-.jolt/tasks/items/<task-id>/
+.metidos/tasks/items/<task-id>/
 ```
 
 Each task directory contains exactly two canonical files in v2:
@@ -323,7 +323,7 @@ Each task directory contains exactly two canonical files in v2:
 Example:
 
 ```toml
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv4e4m0j0s8s8av9drw6m5vw"
 title = "Refactor auth token refresh flow"
 type = "feature"
@@ -332,7 +332,7 @@ priority = "p1"
 severity = "high"
 size = "m"
 created_at = "2026-04-10T15:00:00Z"
-created_by = "jolt"
+created_by = "metidos"
 assignees = ["agent"]
 tags = ["area:auth", "discipline:backend", "release:v0.8"]
 milestone = "v0.8"
@@ -358,7 +358,7 @@ task = "tg-01jv4dn18j9w9w2y9knh7zmx1"
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `schema` | string | MUST be `jolt.task/v2` |
+| `schema` | string | MUST be `metidos.task/v2` |
 | `id` | string | Task ID |
 | `title` | string | Short human-readable title |
 | `type` | string | Task type |
@@ -598,7 +598,7 @@ Examples:
 Repositories MAY register preferred tags:
 
 ```toml
-schema = "jolt.task-tags/v2"
+schema = "metidos.task-tags/v2"
 
 [[tag]]
 name = "area:auth"
@@ -651,8 +651,8 @@ Task search is intentionally not a special protocol.
 
 Implementations SHOULD search these files using existing file search:
 
-- `.jolt/tasks/items/**/task.toml`
-- `.jolt/tasks/items/**/body.md`
+- `.metidos/tasks/items/**/task.toml`
+- `.metidos/tasks/items/**/body.md`
 
 That means:
 
@@ -784,7 +784,7 @@ These SHOULD NOT be dedicated task tools in the default design:
 - task linking
 - tag assignment
 
-Those actions SHOULD happen through normal file search and file edit tools against `.jolt/tasks/**`.
+Those actions SHOULD happen through normal file search and file edit tools against `.metidos/tasks/**`.
 
 ### Recommended dedicated tools
 
@@ -792,7 +792,7 @@ Only these dedicated task tools are recommended by default:
 
 | Tool | Purpose |
 | --- | --- |
-| `init_task_graph` | Scaffold `.jolt/tasks/` |
+| `init_task_graph` | Scaffold `.metidos/tasks/` |
 | `validate_task_graph` | Validate canonical files |
 | `normalize_task_graph` | Rewrite canonical files into stable canonical form |
 
@@ -804,7 +804,7 @@ Recommended host-level policy toggles:
 
 | Toggle | Meaning |
 | --- | --- |
-| `taskGraphFiles` | Existing file search/edit tools may read and write `.jolt/tasks/**` |
+| `taskGraphFiles` | Existing file search/edit tools may read and write `.metidos/tasks/**` |
 | `taskGraphAdmin` | Admin tools `init_task_graph`, `validate_task_graph`, and `normalize_task_graph` may run |
 
 These toggles are runtime policy. They are not stored canonically in the repository task graph.
@@ -835,13 +835,13 @@ Input:
 
 Files touched:
 
-- `.jolt/tasks/config.toml`
+- `.metidos/tasks/config.toml`
 - optional empty `tags.toml`
 - optional empty `types.toml`
 
 Behavior:
 
-- MUST create `.jolt/tasks/` if absent
+- MUST create `.metidos/tasks/` if absent
 - MUST NOT overwrite existing files unless an explicit future force mode is defined
 
 ### 2. `validate_task_graph`
@@ -898,7 +898,7 @@ These are not dedicated tools. They are patterns agents and humans should follow
 
 ### Creating a new task
 
-1. Create a new folder under `.jolt/tasks/items/<new-id>/`
+1. Create a new folder under `.metidos/tasks/items/<new-id>/`
 2. Write `task.toml`
 3. Write `body.md`
 
@@ -937,7 +937,7 @@ task = "tg-01jv4dn18j9w9w2y9knh7zmx1"
 ### Example repository state
 
 ```text
-.jolt/
+.metidos/
   tasks/
     config.toml
     items/
@@ -955,7 +955,7 @@ task = "tg-01jv4dn18j9w9w2y9knh7zmx1"
 ### Example task
 
 ```toml
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv4e4m0j0s8s8av9drw6m5vw"
 title = "Refactor auth token refresh flow"
 type = "feature"
@@ -977,11 +977,11 @@ Interpretation:
 - it belongs under the parent epic `tg-01jv4dn18j9w9w2y9knh7zmx1`
 - it is not ready until blocker `tg-01jv4e87rqv3g2c85gw4w2kq5n` is terminal
 
-## Jolt Integration Notes
+## Metidos Integration Notes
 
 ### Runtime role
 
-Jolt should treat this task graph as:
+Metidos should treat this task graph as:
 
 - repo-native source of truth
 - plain files that travel with commits
@@ -993,7 +993,7 @@ Jolt should treat this task graph as:
 1. Reuse existing file search for discovery.
 2. Reuse existing file read/edit for ordinary task work.
 3. Keep dedicated task tools to `init`, `validate`, and `normalize`.
-4. Constrain generic file edits to `.jolt/tasks/**` when task graph access is enabled.
+4. Constrain generic file edits to `.metidos/tasks/**` when task graph access is enabled.
 5. Optionally maintain an ignored local index for UI speed.
 
 ### Optional local cache
@@ -1001,13 +1001,13 @@ Jolt should treat this task graph as:
 An implementation MAY maintain a derived ignored cache such as:
 
 ```text
-.jolt/cache/tasks/index.sqlite
+.metidos/cache/tasks/index.sqlite
 ```
 
 or
 
 ```text
-.jolt/cache/tasks/index.json
+.metidos/cache/tasks/index.json
 ```
 
 That cache:

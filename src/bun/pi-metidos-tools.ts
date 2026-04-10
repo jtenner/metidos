@@ -1,6 +1,6 @@
 /**
- * @file src/bun/pi-jolt-tools.ts
- * @description Pi-native Jolt tool definitions replacing the Codex MCP sidecar path.
+ * @file src/bun/pi-metidos-tools.ts
+ * @description Pi-native Metidos tool definitions replacing the Codex MCP sidecar path.
  */
 
 import {
@@ -48,21 +48,21 @@ type UpdateThreadToolInput = {
   agentsAccess?: boolean | null | undefined;
   description?: string | null | undefined;
   githubAccess?: boolean | null | undefined;
-  joltAccess?: boolean | null | undefined;
+  metidosAccess?: boolean | null | undefined;
   pinned?: boolean | null | undefined;
   summary?: string | null | undefined;
   title?: string | null | undefined;
   unsafeMode?: boolean | null | undefined;
 };
 
-export type PiJoltToolScope = {
+export type PiMetidosToolScope = {
   allowUnsafeModeEscalation: boolean;
   projectIdContext: number;
   threadIdContext: number;
   worktreePathContext: string;
 };
 
-export type PiJoltToolHost = {
+export type PiMetidosToolHost = {
   createThread: (
     params: AppRPCSchema["requests"]["createThread"]["params"],
   ) => Promise<RpcThreadDetail>;
@@ -107,7 +107,7 @@ const SUPPORTED_MODELS_SENTENCE =
 const UPDATE_THREAD_IGNORED_ACCESS_FIELDS = [
   "githubAccess",
   "agentsAccess",
-  "joltAccess",
+  "metidosAccess",
   "unsafeMode",
 ] as const;
 
@@ -142,10 +142,10 @@ const UpdateThreadToolParameters = Type.Object({
       Type.Null(),
     ]),
   ),
-  joltAccess: Type.Optional(
+  metidosAccess: Type.Optional(
     Type.Union([
       Type.Boolean({
-        description: ignoredUpdateThreadAccessFieldDescription("joltAccess"),
+        description: ignoredUpdateThreadAccessFieldDescription("metidosAccess"),
       }),
       Type.Null(),
     ]),
@@ -213,7 +213,7 @@ const NewCronToolParameters = Type.Object({
   description: Type.Optional(NullableString),
   enabled: Type.Optional(Type.Boolean()),
   githubAccess: Type.Optional(Type.Boolean()),
-  joltAccess: Type.Optional(Type.Boolean()),
+  metidosAccess: Type.Optional(Type.Boolean()),
   model: Type.Optional(Type.String({ minLength: 1 })),
   projectId: Type.Optional(PositiveInteger),
   projectPath: Type.Optional(
@@ -247,7 +247,7 @@ const UpdateCronToolParameters = Type.Object({
   description: Type.Optional(NullableString),
   enabled: Type.Optional(Type.Boolean()),
   githubAccess: Type.Optional(Type.Boolean()),
-  joltAccess: Type.Optional(Type.Boolean()),
+  metidosAccess: Type.Optional(Type.Boolean()),
   model: Type.Optional(Type.String({ minLength: 1 })),
   prompt: Type.Optional(Type.String({ minLength: 1 })),
   reasoningEffort: Type.Optional(ThinkingLevel),
@@ -263,7 +263,7 @@ const NewThreadToolParameters = Type.Object({
     description: "Initial prompt.",
     minLength: 1,
   }),
-  joltAccess: Type.Optional(Type.Boolean()),
+  metidosAccess: Type.Optional(Type.Boolean()),
   model: Type.Optional(Type.String({ minLength: 1 })),
   projectId: Type.Optional(PositiveInteger),
   projectPath: Type.Optional(Type.String({ minLength: 1 })),
@@ -272,7 +272,7 @@ const NewThreadToolParameters = Type.Object({
   worktreePath: Type.Optional(Type.String({ minLength: 1 })),
 });
 
-function canonicalPath(value: string, scope: PiJoltToolScope): string {
+function canonicalPath(value: string, scope: PiMetidosToolScope): string {
   return canonicalizeThreadToolPath(value, {
     baseDirectory: scope.worktreePathContext,
   });
@@ -281,7 +281,7 @@ function canonicalPath(value: string, scope: PiJoltToolScope): string {
 function samePath(
   left: string,
   right: string,
-  scope: PiJoltToolScope,
+  scope: PiMetidosToolScope,
 ): boolean {
   return canonicalPath(left, scope) === canonicalPath(right, scope);
 }
@@ -326,7 +326,7 @@ function normalizeThreadIdInput(
 }
 
 function updateThreadDescription(boundThreadId: number): string {
-  return `Update Jolt thread metadata only. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning would make the thread easier to scan. Never send access-control fields such as githubAccess, agentsAccess, joltAccess, or unsafeMode with this tool; they are legacy compatibility inputs and are ignored from inside a running thread. Bound thread: ${boundThreadId}.`;
+  return `Update Metidos thread metadata only. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning would make the thread easier to scan. Never send access-control fields such as githubAccess, agentsAccess, metidosAccess, or unsafeMode with this tool; they are legacy compatibility inputs and are ignored from inside a running thread. Bound thread: ${boundThreadId}.`;
 }
 
 function ignoredUpdateThreadAccessFieldDescription(fieldName: string): string {
@@ -390,7 +390,7 @@ function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
   return {
     agentsAccess: thread.agentsAccess,
     githubAccess: thread.githubAccess,
-    joltAccess: thread.joltAccess,
+    metidosAccess: thread.metidosAccess,
     pinned: thread.pinnedAt !== null,
     pinnedAt: thread.pinnedAt,
     projectId: thread.projectId,
@@ -453,7 +453,7 @@ function cronJobPayload(cronJob: RpcCronJob) {
     description: cronJob.description,
     enabled: cronJob.enabled,
     githubAccess: cronJob.githubAccess,
-    joltAccess: cronJob.joltAccess,
+    metidosAccess: cronJob.metidosAccess,
     lastRunDate: cronJob.lastRunDate,
     lastRunStatus: cronJob.lastRunStatus,
     nextRunDate: cronJob.nextRunDate,
@@ -552,7 +552,7 @@ function prepareThreadIdAndBooleanArguments<TParams extends TSchema>(
 }
 
 function assertUnsafeModeEscalationAllowed(
-  scope: PiJoltToolScope,
+  scope: PiMetidosToolScope,
   requestedUnsafeMode: boolean | null | undefined,
 ): void {
   if (requestedUnsafeMode === true && !scope.allowUnsafeModeEscalation) {
@@ -564,8 +564,8 @@ function assertUnsafeModeEscalationAllowed(
 
 async function resolveProjectByName(
   projectName: string,
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
 ): Promise<{ project: RpcProject; worktrees: RpcWorktree[] }> {
   const normalizedName = normalizeLookupValue(projectName);
   const looksLikePath =
@@ -615,7 +615,7 @@ async function resolveProjectByName(
 function resolveWorkspaceForProject(
   project: RpcProject,
   worktrees: RpcWorktree[],
-  scope: PiJoltToolScope,
+  scope: PiMetidosToolScope,
   workspaceName?: string | null,
 ): RpcWorktree {
   if (typeof workspaceName !== "string" || !workspaceName.trim()) {
@@ -687,8 +687,8 @@ async function resolveFocusContextTarget(
     threadId?: string | number | null | undefined;
     workspace?: string | null | undefined;
   },
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
 ): Promise<{
   project: RpcProject;
   threadId: number | null;
@@ -765,8 +765,8 @@ async function buildThreadListRows(
     projectName: string;
     workspaceName?: string | null | undefined;
   },
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
 ): Promise<{
   project: RpcProject;
   rows: ListThreadsRow[];
@@ -829,8 +829,8 @@ async function resolveProjectId(
     projectId?: number | null | undefined;
     projectPath?: string | null | undefined;
   },
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
 ): Promise<number> {
   if (typeof params.projectId === "number") {
     return params.projectId;
@@ -853,8 +853,8 @@ async function resolveProjectId(
 
 async function resolveProjectIdForWorktreePath(
   worktreePath: string,
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
   preferredProjectId?: number | null,
 ): Promise<number> {
   if (typeof preferredProjectId === "number") {
@@ -905,8 +905,8 @@ async function resolveWorktreeTarget(
     projectPath?: string | null | undefined;
     worktreePath?: string | null | undefined;
   },
-  host: PiJoltToolHost,
-  scope: PiJoltToolScope,
+  host: PiMetidosToolHost,
+  scope: PiMetidosToolScope,
 ): Promise<{
   projectId: number;
   projectPath: string | null;
@@ -954,9 +954,9 @@ async function resolveWorktreeTarget(
   };
 }
 
-export function createPiJoltTools(
-  scope: PiJoltToolScope,
-  host: PiJoltToolHost,
+export function createPiMetidosTools(
+  scope: PiMetidosToolScope,
+  host: PiMetidosToolHost,
 ): ToolDefinition[] {
   return [
     defineTool({
@@ -971,7 +971,7 @@ export function createPiJoltTools(
           agentsAccess: params.agentsAccess,
           description: params.description,
           githubAccess: params.githubAccess,
-          joltAccess: params.joltAccess,
+          metidosAccess: params.metidosAccess,
           pinned: params.pinned,
           summary: params.summary,
           title: params.title,
@@ -1038,7 +1038,7 @@ export function createPiJoltTools(
           [
             "agentsAccess",
             "githubAccess",
-            "joltAccess",
+            "metidosAccess",
             "pinned",
             "unsafeMode",
           ],
@@ -1047,11 +1047,11 @@ export function createPiJoltTools(
       promptGuidelines: [
         "Use this to rename, summarize, or pin the current thread instead of describing those metadata changes in plain text.",
       ],
-      promptSnippet: "Update Jolt thread title, summary, or pin state",
+      promptSnippet: "Update Metidos thread title, summary, or pin state",
     }),
     defineTool({
       description:
-        "List Jolt threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
+        "List Metidos threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
       execute: async (_toolCallId, params) => {
         const { project, rows, workspace } = await buildThreadListRows(
           {
@@ -1108,7 +1108,7 @@ export function createPiJoltTools(
       promptGuidelines: [
         "Use this before creating or focusing another thread when you need to inspect existing work in the same project.",
       ],
-      promptSnippet: "List Jolt threads in a project or worktree",
+      promptSnippet: "List Metidos threads in a project or worktree",
     }),
     defineTool({
       description:
@@ -1140,11 +1140,11 @@ export function createPiJoltTools(
       promptGuidelines: [
         "Use this only when sandboxed computation or scripted analysis is better than a direct edit, grep, or shell command.",
       ],
-      promptSnippet: "Run sandboxed JavaScript or TypeScript inside Jolt",
+      promptSnippet: "Run sandboxed JavaScript or TypeScript inside Metidos",
     }),
     defineTool({
       description:
-        "Focus the Jolt UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
+        "Focus the Metidos UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
       execute: async (_toolCallId, params, signal) => {
         const target = await resolveFocusContextTarget(
           {
@@ -1187,7 +1187,7 @@ export function createPiJoltTools(
         "Use this when the user explicitly wants the browser UI moved to another project, worktree, or thread.",
       ],
       promptSnippet:
-        "Focus the Jolt UI on another project, worktree, or thread",
+        "Focus the Metidos UI on another project, worktree, or thread",
     }),
     defineTool({
       description: "List all non-deleted cron jobs with latest run metadata.",
@@ -1200,7 +1200,7 @@ export function createPiJoltTools(
       label: "List Cron Jobs",
       name: "list_crons",
       parameters: Type.Object({}),
-      promptSnippet: "List Jolt cron jobs",
+      promptSnippet: "List Metidos cron jobs",
     }),
     defineTool({
       description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. Safe threads must leave unsafeMode off. ${SUPPORTED_MODELS_SENTENCE}`,
@@ -1228,8 +1228,8 @@ export function createPiJoltTools(
           ...(typeof params.githubAccess === "boolean"
             ? { githubAccess: params.githubAccess }
             : {}),
-          ...(typeof params.joltAccess === "boolean"
-            ? { joltAccess: params.joltAccess }
+          ...(typeof params.metidosAccess === "boolean"
+            ? { metidosAccess: params.metidosAccess }
             : {}),
           ...(typeof params.model === "string"
             ? { model: params.model.trim() }
@@ -1263,15 +1263,15 @@ export function createPiJoltTools(
             "agentsAccess",
             "enabled",
             "githubAccess",
-            "joltAccess",
+            "metidosAccess",
             "unsafeMode",
           ],
           ["projectId"],
         ),
       promptGuidelines: [
-        "Use this to define recurring Jolt work instead of describing cron changes abstractly.",
+        "Use this to define recurring Metidos work instead of describing cron changes abstractly.",
       ],
-      promptSnippet: "Create a Jolt cron job for recurring work",
+      promptSnippet: "Create a Metidos cron job for recurring work",
     }),
     defineTool({
       description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. Safe threads cannot turn cron jobs into unsafe jobs. ${SUPPORTED_MODELS_SENTENCE}`,
@@ -1283,7 +1283,7 @@ export function createPiJoltTools(
           params.model === undefined &&
           params.githubAccess === undefined &&
           params.agentsAccess === undefined &&
-          params.joltAccess === undefined &&
+          params.metidosAccess === undefined &&
           params.title === undefined &&
           params.description === undefined &&
           params.unsafeMode === undefined &&
@@ -1310,8 +1310,8 @@ export function createPiJoltTools(
           ...(typeof params.githubAccess === "boolean"
             ? { githubAccess: params.githubAccess }
             : {}),
-          ...(typeof params.joltAccess === "boolean"
-            ? { joltAccess: params.joltAccess }
+          ...(typeof params.metidosAccess === "boolean"
+            ? { metidosAccess: params.metidosAccess }
             : {}),
           ...(typeof params.model === "string"
             ? { model: params.model.trim() }
@@ -1348,15 +1348,15 @@ export function createPiJoltTools(
             "deleted",
             "enabled",
             "githubAccess",
-            "joltAccess",
+            "metidosAccess",
             "unsafeMode",
           ],
           ["cronJobId"],
         ),
-      promptSnippet: "Update or delete a Jolt cron job",
+      promptSnippet: "Update or delete a Metidos cron job",
     }),
     defineTool<typeof NewThreadToolParameters, Record<string, unknown>>({
-      description: `Start a separate Jolt thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Safe threads must leave unsafeMode off. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
+      description: `Start a separate Metidos thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Safe threads must leave unsafeMode off. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
       execute: async (_toolCallId, params) => {
         assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
         const target = await resolveWorktreeTarget(
@@ -1383,7 +1383,7 @@ export function createPiJoltTools(
             autoStart: true,
             githubAccess: params.githubAccess ?? null,
             input: params.input,
-            joltAccess: params.joltAccess ?? null,
+            metidosAccess: params.metidosAccess ?? null,
             model: params.model ?? null,
             projectId: target.projectId,
             reasoningEffort: params.reasoningEffort ?? null,
@@ -1403,8 +1403,8 @@ export function createPiJoltTools(
           ...(typeof params.githubAccess === "boolean"
             ? { githubAccess: params.githubAccess }
             : {}),
-          ...(typeof params.joltAccess === "boolean"
-            ? { joltAccess: params.joltAccess }
+          ...(typeof params.metidosAccess === "boolean"
+            ? { metidosAccess: params.metidosAccess }
             : {}),
           ...(typeof params.model === "string" ? { model: params.model } : {}),
           projectId: target.projectId,
@@ -1436,16 +1436,16 @@ export function createPiJoltTools(
             "agentsAccess",
             "autoStart",
             "githubAccess",
-            "joltAccess",
+            "metidosAccess",
             "unsafeMode",
           ],
           ["projectId"],
         ),
       promptGuidelines: [
-        "Use this when the work should continue in a separate Jolt thread or worktree instead of overloading the current transcript.",
+        "Use this when the work should continue in a separate Metidos thread or worktree instead of overloading the current transcript.",
       ],
       promptSnippet:
-        "Create a new Jolt thread in the current project or worktree",
+        "Create a new Metidos thread in the current project or worktree",
     }),
   ];
 }

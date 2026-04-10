@@ -16,7 +16,7 @@ const THREAD_ID = 17;
 
 describe("createPiThreadEventProjector", () => {
   it("projects assistant thinking and text deltas into reasoning/chat activity writes", () => {
-    const worktreePath = mkdtempSync(join(tmpdir(), "jolt-pi-projection-"));
+    const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
     const projector = createPiThreadEventProjector({
       startedAt: STARTED_AT,
       threadId: THREAD_ID,
@@ -139,7 +139,7 @@ describe("createPiThreadEventProjector", () => {
   });
 
   it("maps bash lifecycle events to command rows and non-file tools to generic tool-call rows", () => {
-    const worktreePath = mkdtempSync(join(tmpdir(), "jolt-pi-projection-"));
+    const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
     const projector = createPiThreadEventProjector({
       startedAt: STARTED_AT,
       threadId: THREAD_ID,
@@ -264,7 +264,7 @@ describe("createPiThreadEventProjector", () => {
   });
 
   it("projects Pi edit completions into both tool-call and file-change rows", () => {
-    const worktreePath = mkdtempSync(join(tmpdir(), "jolt-pi-projection-"));
+    const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
     writeFileSync(join(worktreePath, "README.md"), "before\n");
 
     const projector = createPiThreadEventProjector({
@@ -326,7 +326,7 @@ describe("createPiThreadEventProjector", () => {
   });
 
   it("synthesizes write diffs from the pre-write file contents", () => {
-    const worktreePath = mkdtempSync(join(tmpdir(), "jolt-pi-projection-"));
+    const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
     writeFileSync(join(worktreePath, "README.md"), "before\n");
 
     const projector = createPiThreadEventProjector({

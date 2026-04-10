@@ -1,6 +1,6 @@
 # mainview/app
 
-This folder contains the primary feature modules that render the interactive main interface for the Pi-backed Jolt application. It is where project/thread/chat/workspace state is transformed into visible UI and where UI state transitions are coordinated between desktop and mobile layouts.
+This folder contains the primary feature modules that render the interactive main interface for the Pi-backed Metidos application. It is where project/thread/chat/workspace state is transformed into visible UI and where UI state transitions are coordinated between desktop and mobile layouts.
 
 The modules below are grouped into action panels, data derivation/state, workspace composition, and reusable hooks.
 
@@ -17,7 +17,7 @@ Renders the shared browser prompt dialog used for Pi extension `confirm`, `selec
 
 `settings-panel.tsx`
 Renders the top-right settings trigger and the current provider-auth settings surface.
-It now shows OpenAI Codex auth status, source, detected Codex credential-storage mode, detected Codex CLI login state, refresh, logout, the browser copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI, and recovery guidance for missing, unusable, keyring-only, or headless Codex setups. It now makes the supported path explicit: users run `codex login` themselves, then refresh Jolt status. Keyring-only Codex auth is documented there as unsupported for direct import today.
+It now shows OpenAI Codex auth status, source, detected Codex credential-storage mode, detected Codex CLI login state, refresh, logout, the browser copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI, and recovery guidance for missing, unusable, keyring-only, or headless Codex setups. It now makes the supported path explicit: users run `codex login` themselves, then refresh Metidos status. Keyring-only Codex auth is documented there as unsupported for direct import today.
 
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.

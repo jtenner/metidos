@@ -104,21 +104,21 @@ type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 type RuntimeConfig = InjectedRuntimeConfig;
 
 const THREAD_START_REQUEST_CREATED_EVENT_NAME =
-  "jolt:thread-start-request-created";
+  "metidos:thread-start-request-created";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 const RICH_MARKDOWN_WARMUP_DELAY_MS = 1_500;
 
 declare global {
   interface WindowEventMap {
-    "jolt:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
-    "jolt:thread-extension-ui": CustomEvent<RpcThreadExtensionUiRequest>;
+    "metidos:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
+    "metidos:thread-extension-ui": CustomEvent<RpcThreadExtensionUiRequest>;
   }
 
   interface Window {
-    joltProcedures: ProjectProcedures;
-    __joltAppMountedAt?: number;
-    __joltRuntime?: RuntimeConfig;
+    metidosProcedures: ProjectProcedures;
+    __metidosAppMountedAt?: number;
+    __metidosRuntime?: RuntimeConfig;
   }
 }
 /**
@@ -226,7 +226,7 @@ function readInjectedRuntimeConfig(): RuntimeConfig | null {
 }
 
 const runtimeConfig: RuntimeConfig = readInjectedRuntimeConfig() ??
-  window.__joltRuntime ?? {
+  window.__metidosRuntime ?? {
     devServer: false,
   };
 
@@ -299,7 +299,7 @@ function reloadWindow(reason: string): void {
     return;
   }
 
-  console.info(`[jolt] reloading dev client (${reason})`);
+  console.info(`[metidos] reloading dev client (${reason})`);
   isPageUnloading = true;
   clearDevRecoveryTimer();
   window.location.reload();
@@ -341,7 +341,7 @@ function scheduleDevRecovery(reason: string): void {
   }
 
   devRecoveryScheduled = true;
-  console.info(`[jolt] waiting for dev server restart (${reason})`);
+  console.info(`[metidos] waiting for dev server restart (${reason})`);
   clearDevRecoveryTimer();
   devRecoveryTimer = window.setTimeout(() => {
     void waitForDevServer();
@@ -387,7 +387,7 @@ function scheduleRpcReconnect(reason: string): void {
     RPC_RECONNECT_MAX_DELAY_MS,
   );
   rpcReconnectAttempt += 1;
-  console.info(`[jolt] reconnecting RPC socket in ${delay}ms (${reason})`);
+  console.info(`[metidos] reconnecting RPC socket in ${delay}ms (${reason})`);
   rpcReconnectTimer = window.setTimeout(() => {
     rpcReconnectTimer = null;
     connectRpcSocket("reconnect");
@@ -469,7 +469,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
 
     socket = nextSocket;
     if (reason === "reconnect") {
-      console.info("[jolt] opening replacement RPC socket");
+      console.info("[metidos] opening replacement RPC socket");
     }
 
     nextSocket.addEventListener("open", () => {
@@ -585,7 +585,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
       if (socket !== nextSocket) {
         return;
       }
-      console.error("Jolt RPC socket encountered an error");
+      console.error("Metidos RPC socket encountered an error");
     });
   })().finally(() => {
     rpcSocketConnectPromise = null;
@@ -893,7 +893,7 @@ const procedures: ProjectProcedures = {
   setWorktreePinned: createProcedure("setWorktreePinned"),
 };
 
-window.joltProcedures = procedures;
+window.metidosProcedures = procedures;
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
@@ -914,13 +914,13 @@ if (!appRoot) {
         procedures,
       }),
     );
-    window.__joltAppMountedAt = Date.now();
+    window.__metidosAppMountedAt = Date.now();
     window.setTimeout(() => {
       void loadRichMarkdownModule();
     }, RICH_MARKDOWN_WARMUP_DELAY_MS);
   } catch (error) {
     console.error("Failed to mount auth shell", error);
-    window.__joltAppMountedAt = Number.NaN;
+    window.__metidosAppMountedAt = Number.NaN;
     appRoot.innerHTML =
       '<main style="padding:24px;color:#fff;font-family:Arial, sans-serif;">Failed to initialize App UI. Check console for details.</main>';
   }

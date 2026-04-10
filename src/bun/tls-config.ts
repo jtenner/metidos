@@ -3,7 +3,7 @@
  * @description Module for tls config.
  */
 
-export const TLS_PUBLIC_TRANSPORT_ENV = "JOLT_TLS";
+export const TLS_PUBLIC_TRANSPORT_ENV = "METIDOS_TLS";
 
 export type ResolvedTlsRuntimeConfig = {
   publicHttpProtocol: "http" | "https";
@@ -52,7 +52,10 @@ export function isPublicTlsEnabled(
   if (args.includes("--tls")) {
     return true;
   }
-  return env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1";
+  return (
+    env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1" ||
+    env.JOLT_TLS?.trim() === "1"
+  );
 }
 /**
  * Resolves tls runtime config.

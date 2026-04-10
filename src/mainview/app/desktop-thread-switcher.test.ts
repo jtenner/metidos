@@ -25,7 +25,7 @@ function createThread(
     reasoningEffort: "medium",
     githubAccess: false,
     agentsAccess: false,
-    joltAccess: true,
+    metidosAccess: true,
     unsafeMode: false,
     piSessionId: null,
     piSessionFile: null,

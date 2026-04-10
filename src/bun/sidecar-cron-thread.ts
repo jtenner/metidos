@@ -48,7 +48,7 @@ const workerScope = globalThis as unknown as CronSchedulerWorkerScope;
 let database: Database | null = null;
 let queue: Promise<void> = Promise.resolve();
 const cronJobTitles = new Set<string>();
-const CRON_JOB_TITLE_PREFIX = "jolt-cron-";
+const CRON_JOB_TITLE_PREFIX = "metidos-cron-";
 
 type BunCronRegister = (
   schedule: string,

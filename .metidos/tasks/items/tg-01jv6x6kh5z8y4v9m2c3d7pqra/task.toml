@@ -1,4 +1,4 @@
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"
 title = "Implement git-native task graph admin tooling"
 type = "epic"

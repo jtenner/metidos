@@ -236,7 +236,7 @@ export function generateTotpSecret(byteLength = 20): string {
 
 export function buildTotpUri({
   accountName,
-  issuer = "Jolt",
+  issuer = "Metidos",
   secret,
 }: TotpEnrollmentInput & { secret: string }): string {
   if (!accountName || accountName.trim().length === 0) {

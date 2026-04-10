@@ -263,7 +263,7 @@ export type RpcThreadStartRequest = {
   reasoningEffort: RpcReasoningEffort | null;
   githubAccess: boolean | null;
   agentsAccess: boolean | null;
-  joltAccess: boolean | null;
+  metidosAccess: boolean | null;
   unsafeMode: boolean | null;
   autoStart: boolean | null;
   threadId: number | null;
@@ -507,7 +507,7 @@ export type RpcThread = {
   reasoningEffort: RpcReasoningEffort;
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: boolean;
   piSessionId: string | null;
   piSessionFile: string | null;
@@ -539,7 +539,7 @@ export type RpcCronJob = {
   reasoningEffort: RpcReasoningEffort;
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: boolean;
   lastRunDate: number | null;
   lastRunStatus: RpcCronJobRunStatus | null;
@@ -860,7 +860,7 @@ export type AppRPCSchema = {
         reasoningEffort?: RpcReasoningEffort | null;
         githubAccess?: boolean | null;
         agentsAccess?: boolean | null;
-        joltAccess?: boolean | null;
+        metidosAccess?: boolean | null;
         unsafeMode?: boolean | null;
       };
       response: RpcThreadDetail;
@@ -874,7 +874,7 @@ export type AppRPCSchema = {
         reasoningEffort: RpcReasoningEffort | null;
         githubAccess: boolean | null;
         agentsAccess: boolean | null;
-        joltAccess: boolean | null;
+        metidosAccess: boolean | null;
         unsafeMode: boolean | null;
         autoStart: boolean | null;
       };
@@ -888,7 +888,7 @@ export type AppRPCSchema = {
         prompt: string;
         githubAccess?: boolean;
         agentsAccess?: boolean;
-        joltAccess?: boolean;
+        metidosAccess?: boolean;
         unsafeMode?: boolean;
         model?: string;
         reasoningEffort?: RpcReasoningEffort;
@@ -905,7 +905,7 @@ export type AppRPCSchema = {
         reasoningEffort?: RpcReasoningEffort;
         githubAccess?: boolean;
         agentsAccess?: boolean;
-        joltAccess?: boolean;
+        metidosAccess?: boolean;
         unsafeMode?: boolean;
         schedule?: string;
         prompt?: string;
@@ -951,7 +951,7 @@ export type AppRPCSchema = {
         threadId: number;
         githubAccess?: boolean;
         agentsAccess?: boolean;
-        joltAccess?: boolean;
+        metidosAccess?: boolean;
         unsafeMode?: boolean;
       };
       response: RpcThread;

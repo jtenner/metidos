@@ -7,7 +7,7 @@
 
 ```text
 .
-├─ .jolt/
+├─ .metidos/
 │  └─ tasks/
 │     ├─ config.toml
 │     ├─ items/
@@ -87,8 +87,8 @@
 │  │  ├─ pi-extension-ui.test.ts
 │  │  ├─ pi-extension-ui.ts
 │  │  ├─ pi-rpc-probe-extension.ts
-│  │  ├─ pi-jolt-tools.test.ts
-│  │  ├─ pi-jolt-tools.ts
+│  │  ├─ pi-metidos-tools.test.ts
+│  │  ├─ pi-metidos-tools.ts
 │  │  ├─ pi-runtime-probe.test.ts
 │  │  ├─ pi-runtime-probe.ts
 │  │  ├─ pi-thread-runtime-integration.test.ts

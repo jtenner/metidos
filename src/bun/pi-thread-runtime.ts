@@ -41,7 +41,10 @@ import {
   createPiGitHubTools,
   type PiGitHubToolHost,
 } from "./pi-github-tools";
-import { createPiJoltTools, type PiJoltToolHost } from "./pi-jolt-tools";
+import {
+  createPiMetidosTools,
+  type PiMetidosToolHost,
+} from "./pi-metidos-tools";
 import {
   createPiRuntimeProbeProviderConfig,
   PI_RUNTIME_PROBE_RUNTIME_API_KEY,
@@ -55,6 +58,8 @@ import {
 export const PI_THREAD_AGENT_DIRECTORY_NAME = "pi-agent";
 export const PI_THREAD_SESSIONS_DIRECTORY_NAME = "thread-sessions";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
+  "METIDOS_PI_RUNTIME_TEST_PROVIDER";
+const LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
   "JOLT_PI_RUNTIME_TEST_PROVIDER";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE = "openai-probe";
 
@@ -65,7 +70,7 @@ type PiRuntimeThread = Pick<
   | "agentsAccess"
   | "githubAccess"
   | "id"
-  | "joltAccess"
+  | "metidosAccess"
   | "model"
   | "piSessionFile"
   | "projectId"
@@ -93,11 +98,11 @@ type CreatePiRuntimeOptions = {
   appDataDir?: string;
   extensionUiBridge?: PiThreadExtensionUiBridge;
   githubToolHost?: PiGitHubToolHost;
-  joltToolHost?: PiJoltToolHost;
+  metidosToolHost?: PiMetidosToolHost;
 };
 
 /**
- * Resolve the Jolt-owned Pi agent directory under the app data folder.
+ * Resolve the Metidos-owned Pi agent directory under the app data folder.
  */
 export function buildPiAgentDirectoryPath(appDataDir?: string): string {
   return join(
@@ -138,7 +143,7 @@ export function buildPiThreadToolPolicy(thread: {
       allowBash: true,
       allowUnsafeModeEscalation: true,
       runtimePromptLine:
-        "Unsafe mode is enabled. Bash is available, and Jolt tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
+        "Unsafe mode is enabled. Bash is available, and Metidos tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
     };
   }
 
@@ -164,9 +169,9 @@ function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
       "GitHub-native tools are installed in this runtime: github_repo, github_issue, github_pr, github_pr_checks, and github_pr_diff.",
     );
   }
-  if (thread.joltAccess === true) {
+  if (thread.metidosAccess === true) {
     customToolLines.push(
-      "Jolt-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
+      "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
     );
   }
   return [
@@ -176,7 +181,7 @@ function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
     ...(customToolLines.length > 0
       ? customToolLines
       : [
-          "No GitHub, Jolt, or agent-coordination tools are installed in this runtime. Web search is not installed.",
+          "No GitHub, Metidos, or agent-coordination tools are installed in this runtime. Web search is not installed.",
         ]),
   ].join("\n");
 }
@@ -269,7 +274,9 @@ function applyPiRuntimeTestProviderOverride(
   modelRegistry: ModelRegistry,
 ): void {
   const configuredProvider =
-    process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ?? "";
+    process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
+    process.env[LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
+    "";
   if (configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE) {
     return;
   }
@@ -422,7 +429,7 @@ export async function runPiDelegatedTask(
   options?: {
     appDataDir?: string;
     githubToolHost?: PiGitHubToolHost;
-    joltToolHost?: PiJoltToolHost;
+    metidosToolHost?: PiMetidosToolHost;
     onUpdate?: (partial: PiDelegatedTaskRun) => void;
     signal?: AbortSignal;
   },
@@ -473,29 +480,29 @@ export async function runPiDelegatedTask(
             createPiGitHubCliHost(childThread.worktreePath),
         )
       : [];
-  const joltTools =
-    childThread.joltAccess === true
+  const metidosTools =
+    childThread.metidosAccess === true
       ? (() => {
-          if (!options?.joltToolHost) {
+          if (!options?.metidosToolHost) {
             throw new Error(
-              `Delegated Pi task for thread ${thread.id} requires a Jolt tool host while joltAccess is enabled.`,
+              `Delegated Pi task for thread ${thread.id} requires a Metidos tool host while metidosAccess is enabled.`,
             );
           }
-          return createPiJoltTools(
+          return createPiMetidosTools(
             {
               allowUnsafeModeEscalation: toolPolicy.allowUnsafeModeEscalation,
               projectIdContext: childThread.projectId,
               threadIdContext: childThread.id,
               worktreePathContext: childThread.worktreePath,
             },
-            options.joltToolHost,
+            options.metidosToolHost,
           );
         })()
       : [];
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,
-    customTools: [...githubTools, ...joltTools],
+    customTools: [...githubTools, ...metidosTools],
     cwd: childThread.worktreePath,
     model,
     modelRegistry,
@@ -564,8 +571,8 @@ function createPiAgentsToolHost(
         ...(options?.githubToolHost
           ? { githubToolHost: options.githubToolHost }
           : {}),
-        ...(options?.joltToolHost
-          ? { joltToolHost: options.joltToolHost }
+        ...(options?.metidosToolHost
+          ? { metidosToolHost: options.metidosToolHost }
           : {}),
         ...(onUpdate ? { onUpdate } : {}),
         ...(signal ? { signal } : {}),
@@ -630,22 +637,22 @@ export async function createPiThreadRuntime(
           options?.githubToolHost ?? createPiGitHubCliHost(thread.worktreePath),
         )
       : [];
-  const joltTools =
-    thread.joltAccess === true
+  const metidosTools =
+    thread.metidosAccess === true
       ? (() => {
-          if (!options?.joltToolHost) {
+          if (!options?.metidosToolHost) {
             throw new Error(
-              `Pi runtime for thread ${thread.id} requires a Jolt tool host while joltAccess is enabled.`,
+              `Pi runtime for thread ${thread.id} requires a Metidos tool host while metidosAccess is enabled.`,
             );
           }
-          return createPiJoltTools(
+          return createPiMetidosTools(
             {
               allowUnsafeModeEscalation: toolPolicy.allowUnsafeModeEscalation,
               projectIdContext: thread.projectId,
               threadIdContext: thread.id,
               worktreePathContext: thread.worktreePath,
             },
-            options.joltToolHost,
+            options.metidosToolHost,
           );
         })()
       : [];
@@ -659,7 +666,7 @@ export async function createPiThreadRuntime(
   const { session } = await createAgentSession({
     agentDir: agentDirectory,
     authStorage,
-    customTools: [...githubTools, ...joltTools, ...agentsTools],
+    customTools: [...githubTools, ...metidosTools, ...agentsTools],
     cwd: thread.worktreePath,
     model,
     modelRegistry,

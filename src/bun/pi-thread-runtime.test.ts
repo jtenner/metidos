@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiGitHubToolHost } from "./pi-github-tools";
-import type { PiJoltToolHost } from "./pi-jolt-tools";
+import type { PiMetidosToolHost } from "./pi-metidos-tools";
 import {
   buildPiAgentDirectoryPath,
   buildPiThreadSessionDirectoryPath,
@@ -18,7 +18,7 @@ import {
 
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 const piGitHubToolHostStub: PiGitHubToolHost = {
   getIssue: async () => {
@@ -37,7 +37,7 @@ const piGitHubToolHostStub: PiGitHubToolHost = {
     throw new Error("getRepositoryContext should not run in this test.");
   },
 };
-const piJoltToolHostStub: PiJoltToolHost = {
+const piMetidosToolHostStub: PiMetidosToolHost = {
   createThread: async () => {
     throw new Error("createThread should not run in this test.");
   },
@@ -86,9 +86,9 @@ function collectAssistantText(
 
 afterEach(() => {
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
   if (typeof originalPiRuntimeTestProvider === "string") {
     process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
@@ -122,28 +122,30 @@ test("buildPiThreadToolPolicy disables bash and unsafe child escalation in safe 
     allowBash: true,
     allowUnsafeModeEscalation: true,
     runtimePromptLine:
-      "Unsafe mode is enabled. Bash is available, and Jolt tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
+      "Unsafe mode is enabled. Bash is available, and Metidos tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
   });
 });
 
 test("creates deterministic Pi sessions and resumes them for the same thread", async () => {
-  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
-  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
   const workspaceDir = mkdtempSync(
-    join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
   );
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     process.env.CODEX_HOME = codexHomeDir;
     const safeRuntime = await createPiThreadRuntime(
       {
         agentsAccess: true,
         githubAccess: true,
         id: 17,
-        joltAccess: true,
+        metidosAccess: true,
         model: "gpt-5.4",
         piSessionFile: null,
         projectId: 1,
@@ -155,7 +157,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         appDataDir,
         extensionUiBridge: createPiThreadExtensionUiBridge(),
         githubToolHost: piGitHubToolHostStub,
-        joltToolHost: piJoltToolHostStub,
+        metidosToolHost: piMetidosToolHostStub,
       },
     );
 
@@ -203,7 +205,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         agentsAccess: true,
         githubAccess: true,
         id: 17,
-        joltAccess: true,
+        metidosAccess: true,
         model: "gpt-5.4",
         piSessionFile: null,
         projectId: 1,
@@ -214,7 +216,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       {
         appDataDir,
         githubToolHost: piGitHubToolHostStub,
-        joltToolHost: piJoltToolHostStub,
+        metidosToolHost: piMetidosToolHostStub,
       },
     );
 
@@ -227,7 +229,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         agentsAccess: false,
         githubAccess: false,
         id: 18,
-        joltAccess: false,
+        metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
         projectId: 1,
@@ -267,16 +269,18 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 });
 
 test("keeps the explicit OpenAI Codex provider instead of silently normalizing back to plain OpenAI", async () => {
-  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
-  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
   const workspaceDir = mkdtempSync(
-    join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
   );
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     process.env.CODEX_HOME = codexHomeDir;
 
     const runtime = await createPiThreadRuntime(
@@ -284,7 +288,7 @@ test("keeps the explicit OpenAI Codex provider instead of silently normalizing b
         agentsAccess: false,
         githubAccess: false,
         id: 19,
-        joltAccess: false,
+        metidosAccess: false,
         model: "openai-codex:gpt-5.4",
         piSessionFile: null,
         projectId: 1,
@@ -319,23 +323,25 @@ test("keeps the explicit OpenAI Codex provider instead of silently normalizing b
 });
 
 test("reopens the persisted Pi session file instead of the most recent session", async () => {
-  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
-  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
   const workspaceDir = mkdtempSync(
-    join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
   );
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     process.env.CODEX_HOME = codexHomeDir;
     const initialRuntime = await createPiThreadRuntime(
       {
         agentsAccess: false,
         githubAccess: false,
         id: 21,
-        joltAccess: false,
+        metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
         projectId: 1,
@@ -381,7 +387,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
         agentsAccess: false,
         githubAccess: false,
         id: 21,
-        joltAccess: false,
+        metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: initialSessionFile,
         projectId: 1,
@@ -416,21 +422,21 @@ test("reopens the persisted Pi session file instead of the most recent session",
 });
 
 test("runPiDelegatedTask executes an isolated child session without agent recursion", async () => {
-  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-app-"));
-  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
-  const workspaceDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-ws-"));
+  const appDataDir = mkdtempSync(join(tmpdir(), "metidos-pi-delegate-app-"));
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const workspaceDir = mkdtempSync(join(tmpdir(), "metidos-pi-delegate-ws-"));
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     process.env.CODEX_HOME = codexHomeDir;
     const result = await runPiDelegatedTask(
       {
         agentsAccess: true,
         githubAccess: false,
         id: 23,
-        joltAccess: false,
+        metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
         projectId: 1,

@@ -73,11 +73,11 @@ describe("auth helpers", () => {
     expect(
       buildTotpUri({
         accountName: "alice@example.test",
-        issuer: "Jolt Test",
+        issuer: "Metidos Test",
         secret: "JBSWY3DPEHPK3PXP",
       }),
     ).toBe(
-      "otpauth://totp/Jolt%20Test%3Aalice%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=Jolt%20Test&algorithm=SHA1&digits=6&period=30",
+      "otpauth://totp/Metidos%20Test%3Aalice%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=Metidos%20Test&algorithm=SHA1&digits=6&period=30",
     );
   });
 

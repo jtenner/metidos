@@ -11,7 +11,7 @@ import {
 } from "./pi-thread-runtime";
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
@@ -57,8 +57,10 @@ async function loadProjectProcedures() {
 
   closeAppDatabase();
   resetResolvedAppDataDirectory();
-  process.env.JOLT_APP_DATA_DIR = createTempDirectory("jolt-pi-runtime-db-");
-  process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
+  process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
+    "metidos-pi-runtime-db-",
+  );
+  process.env.CODEX_HOME = createTempDirectory("metidos-codex-home-");
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
   projectProcedures = (await import(
@@ -91,7 +93,7 @@ beforeAll(async () => {
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
   if (typeof process.env.CODEX_HOME !== "string" || !process.env.CODEX_HOME) {
-    process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
+    process.env.CODEX_HOME = createTempDirectory("metidos-codex-home-");
   }
 });
 
@@ -102,9 +104,9 @@ afterAll(async () => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
@@ -131,7 +133,7 @@ afterAll(async () => {
 describe("Pi thread runtime integration", () => {
   it("runs a thread through project procedures and persists the assistant reply", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-pi-runtime-repo-");
+    const repoPath = createTempDirectory("metidos-pi-runtime-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({

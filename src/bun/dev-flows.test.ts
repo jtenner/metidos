@@ -22,7 +22,7 @@ import {
 const tempDirectories = new Set<string>();
 
 function createTempDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-dev-flows-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-dev-flows-"));
   tempDirectories.add(path);
   return path;
 }
@@ -46,7 +46,7 @@ describe("dev flow helpers", () => {
         },
         isDevServer: false,
       }),
-    ).toThrow(`${DEV_AUTH_BYPASS_ENV}=1 requires --dev or JOLT_DEV=1.`);
+    ).toThrow(`${DEV_AUTH_BYPASS_ENV}=1 requires --dev or METIDOS_DEV=1.`);
 
     expect(() =>
       resolveDevFlowMode({
@@ -55,7 +55,7 @@ describe("dev flow helpers", () => {
         },
         isDevServer: false,
       }),
-    ).toThrow(`${DEV_RESET_ENV}=1 requires --dev or JOLT_DEV=1.`);
+    ).toThrow(`${DEV_RESET_ENV}=1 requires --dev or METIDOS_DEV=1.`);
   });
 
   it("resolves explicit dev bypass and reset flags in dev mode", () => {

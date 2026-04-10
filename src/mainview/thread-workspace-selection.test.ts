@@ -42,7 +42,7 @@ function thread(overrides?: Partial<RpcThread>): RpcThread {
     createdAt: "2026-04-08T00:00:00.000Z",
     githubAccess: false,
     id: 7,
-    joltAccess: true,
+    metidosAccess: true,
     lastRunAt: null,
     model: "gpt-5.4",
     pinnedAt: null,

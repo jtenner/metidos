@@ -1,6 +1,9 @@
-# jt-ide
+# Metidos
 
-`jt-ide` is a Bun + React TypeScript application that runs an opinionated local IDE workflow for Codex-backed coding sessions.
+Metidos is a Bun + React TypeScript application that runs an opinionated local IDE workflow for Codex-backed coding sessions.
+
+**Metidos** takes its name from *mētis*: counsel, cunning, skill, and practical wisdom, the craft of choosing the right move at the right time. Inspired by Metis, the Greek figure of strategic intelligence, Metidos is built for developers working across many threads at once: code, tasks, worktrees, diffs, tools, and long-running agent sessions. Its purpose is not to replace judgment, but to sharpen it, keeping complex work coherent, deliberate, and in hand.
+
 It combines:
 
 - a Bun server/process layer (RPC handlers, persistence, polling, Git/Codex sidecar orchestration)
@@ -130,12 +133,15 @@ bun run harness:starvation    # run starvation harness utility
 
 ## Environment and startup flags
 
-- `--port` / `-p` or `JOLT_PORT` for custom server port selection.
-- `--backend-only` or `JOLT_BACKEND_ONLY=1` to restrict backend mode.
-- `--dev` or `JOLT_DEV=1` for development reconnect behavior and refresh hooks.
-- `--tls` or `JOLT_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
+- `--port` / `-p` or `METIDOS_PORT` for custom server port selection.
+- `--backend-only` or `METIDOS_BACKEND_ONLY=1` to restrict backend mode.
+- `--dev` or `METIDOS_DEV=1` for development reconnect behavior and refresh hooks.
+- `--tls` or `METIDOS_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
 - `--wipe-user-data` to confirm, delete the local SQLite database files, and exit before startup.
-- `JOLT_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
+- `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
+- `METIDOS_APP_DATA_DIR` for an explicit per-user application data location.
+
+Canonical environment variables use the `METIDOS_*` prefix. Deprecated `JOLT_*` aliases are still accepted as compatibility fallbacks for startup and existing local installs.
 
 ## Data and performance characteristics
 

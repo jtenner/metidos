@@ -16,7 +16,7 @@ const DEFAULT_BROWSER_PORT_BY_PROTOCOL = {
  */
 
 export const LOOPBACK_HOSTNAME = "127.0.0.1";
-export const RUNTIME_CONFIG_ELEMENT_ID = "jolt-runtime-config";
+export const RUNTIME_CONFIG_ELEMENT_ID = "metidos-runtime-config";
 export type BrowserOriginProtocol = (typeof LOCAL_APP_PROTOCOLS)[number];
 
 export type InjectedRuntimeConfig = {

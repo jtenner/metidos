@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 
 type ProjectProceduresModule = typeof import("./project-procedures");
 
@@ -63,8 +63,8 @@ async function loadProjectProcedures() {
 
   closeAppDatabase();
   resetResolvedAppDataDirectory();
-  process.env.JOLT_APP_DATA_DIR = createTempDirectory(
-    "jolt-thread-metadata-db-",
+  process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
+    "metidos-thread-metadata-db-",
   );
   projectProcedures = (await import(
     `./project-procedures?thread-metadata=${Date.now()}`
@@ -87,9 +87,9 @@ afterAll(async () => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
 
   for (const path of tempDirectories) {
@@ -104,7 +104,7 @@ afterAll(async () => {
 describe("thread metadata procedures", () => {
   it("returns live status summaries for only the requested thread ids", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-thread-status-repo-");
+    const repoPath = createTempDirectory("metidos-thread-status-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({
@@ -138,7 +138,7 @@ describe("thread metadata procedures", () => {
 
   it("preserves unspecified fields and applies combined metadata updates", async () => {
     const procedures = await loadProjectProcedures();
-    const repoPath = createTempDirectory("jolt-thread-metadata-repo-");
+    const repoPath = createTempDirectory("metidos-thread-metadata-repo-");
     initializeGitRepository(repoPath);
 
     const opened = await procedures.openProjectProcedure({

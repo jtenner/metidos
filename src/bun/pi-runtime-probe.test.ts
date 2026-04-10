@@ -12,7 +12,7 @@ import {
 setDefaultTimeout(15_000);
 
 test("Pi Bun SDK probe covers streaming, provider auth, abort, and resume", async () => {
-  const workspaceDir = mkdtempSync(join(tmpdir(), "jolt-pi-bun-sdk-probe-"));
+  const workspaceDir = mkdtempSync(join(tmpdir(), "metidos-pi-bun-sdk-probe-"));
 
   try {
     const result = await runPiBunSdkProbe(workspaceDir);
@@ -25,7 +25,7 @@ test("Pi Bun SDK probe covers streaming, provider auth, abort, and resume", asyn
     expect(result.streamedText).toContain(
       `apiKey=${PI_RUNTIME_PROBE_RUNTIME_API_KEY}`,
     );
-    expect(result.streamedText).toContain(`provider=jolt-pi-probe`);
+    expect(result.streamedText).toContain(`provider=metidos-pi-probe`);
     expect(result.sessionFile).toBeString();
     expect(result.resumedSessionId).toBe(result.sessionId);
     expect(result.resumedMessageCount).toBeGreaterThanOrEqual(2);
@@ -36,7 +36,7 @@ test("Pi Bun SDK probe covers streaming, provider auth, abort, and resume", asyn
 });
 
 test("Pi Node RPC fallback probe covers streaming, provider auth, and abort", async () => {
-  const workspaceDir = mkdtempSync(join(tmpdir(), "jolt-pi-rpc-probe-"));
+  const workspaceDir = mkdtempSync(join(tmpdir(), "metidos-pi-rpc-probe-"));
 
   try {
     const result = await runPiRpcProbe(workspaceDir);
@@ -49,7 +49,7 @@ test("Pi Node RPC fallback probe covers streaming, provider auth, and abort", as
     expect(result.streamedText).toContain(
       `apiKey=${PI_RUNTIME_PROBE_RPC_API_KEY}`,
     );
-    expect(result.streamedText).toContain(`provider=jolt-pi-probe`);
+    expect(result.streamedText).toContain(`provider=metidos-pi-probe`);
     expect(result.abortStopReason).toBe("aborted");
   } finally {
     rmSync(workspaceDir, { recursive: true, force: true });

@@ -166,7 +166,7 @@ async function executeCronJob(
       ),
       githubAccess: cronJob.githubAccess,
       agentsAccess: cronJob.agentsAccess,
-      joltAccess: cronJob.joltAccess,
+      metidosAccess: cronJob.metidosAccess,
       unsafeMode: cronJob.unsafeMode === 1,
     });
     const threadId = threadResult.thread.id;

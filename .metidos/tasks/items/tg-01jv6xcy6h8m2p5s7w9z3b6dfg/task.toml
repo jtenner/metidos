@@ -1,4 +1,4 @@
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv6xcy6h8m2p5s7w9z3b6dfg"
 title = "Add automated coverage for task graph admin tools"
 type = "test"

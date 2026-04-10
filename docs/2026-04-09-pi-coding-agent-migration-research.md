@@ -1,14 +1,14 @@
 # Research: Replacing Codex SDK with Pi Coding Agent
 
 Date: 2026-04-09  
-Repository: `jt-ide`  
+Repository: `metidos`  
 External target researched: `badlogic/pi-mono`, package `packages/coding-agent`, npm package `@mariozechner/pi-coding-agent` version `0.66.1`
 
 ## Goal
 
-Evaluate whether `jt-ide` can replace `@openai/codex-sdk` with Pi while preserving the current product shape:
+Evaluate whether `metidos` can replace `@openai/codex-sdk` with Pi while preserving the current product shape:
 
-- browser-based Jolt UI
+- browser-based Metidos UI
 - Bun backend and RPC layer
 - project/worktree/thread model
 - per-thread access controls
@@ -19,11 +19,11 @@ Evaluate whether `jt-ide` can replace `@openai/codex-sdk` with Pi while preservi
 This document is intentionally detailed. It is meant to function as both:
 
 - a research summary of how Pi works
-- a migration requirements/spec document for moving Jolt off Codex SDK
+- a migration requirements/spec document for moving Metidos off Codex SDK
 
 ## Bottom Line
 
-Pi is a strong fit for the part of Jolt that is currently hardest to own directly:
+Pi is a strong fit for the part of Metidos that is currently hardest to own directly:
 
 - multi-provider model abstraction
 - auth storage and provider login/API key management
@@ -42,13 +42,13 @@ The largest mismatches are structural:
 - Pi explicitly has **no built-in sub-agents**.
 - Pi explicitly has **no built-in plan mode**.
 - Pi explicitly has **no built-in permission popup or Codex-style sandbox mode abstraction**.
-- Jolt currently assumes Codex-specific streamed item types such as `reasoning`, `file_change`, `web_search`, and `mcp_tool_call`.
+- Metidos currently assumes Codex-specific streamed item types such as `reasoning`, `file_change`, `web_search`, and `mcp_tool_call`.
 
 Conclusion:
 
 - If the goal is “one harness that can talk to many endpoints with the same interface”, Pi is a very good candidate.
 - If the goal is “swap one SDK import and keep all current semantics”, Pi is not a trivial swap.
-- The correct migration shape is: **keep Jolt’s application shell, replace the agent runtime with Pi, and port Jolt-specific tools/integrations into Pi extensions or SDK custom tools**.
+- The correct migration shape is: **keep Metidos’s application shell, replace the agent runtime with Pi, and port Metidos-specific tools/integrations into Pi extensions or SDK custom tools**.
 
 ## What Was Researched
 
@@ -86,7 +86,7 @@ Primary external sources read directly from `pi-mono`:
   - [`packages/coding-agent/examples/sdk/`](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/sdk)
   - [`packages/coding-agent/examples/extensions/`](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent/examples/extensions)
 
-### Local Jolt sources
+### Local Metidos sources
 
 Primary local files inspected:
 
@@ -98,7 +98,7 @@ Primary local files inspected:
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
-- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/pi-metidos-tools.ts](../src/bun/pi-metidos-tools.ts)
 - [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
@@ -120,9 +120,9 @@ Pi exposes:
 - RPC mode over JSONL stdin/stdout for subprocess-based integrations
 - JSON event stream mode for simpler machine consumption
 
-This matters because Jolt does **not** need Pi’s TUI to benefit from Pi. Jolt can embed Pi and keep its own React frontend.
+This matters because Metidos does **not** need Pi’s TUI to benefit from Pi. Metidos can embed Pi and keep its own React frontend.
 
-### 2. Pi already solves the “multiple endpoints, same interface” problem better than current Jolt
+### 2. Pi already solves the “multiple endpoints, same interface” problem better than current Metidos
 
 Pi’s model layer already supports:
 
@@ -152,7 +152,7 @@ Relevant built-in/provider docs explicitly cover:
 - Hugging Face
 - local/proxy/OpenAI-compatible endpoints through `models.json`
 
-Current Jolt does not have a general provider abstraction. It hardcodes:
+Current Metidos does not have a general provider abstraction. It hardcodes:
 
 - OpenAI/Codex
 - xAI through provider-specific model-catalog normalization
@@ -175,12 +175,12 @@ Pi provides:
 - usage and cost tracking
 - session runtime replacement APIs
 
-Current Jolt has its own separate thread/session model in SQLite:
+Current Metidos has its own separate thread/session model in SQLite:
 
-- Jolt “threads” are app-level domain entities, not Pi sessions
+- Metidos “threads” are app-level domain entities, not Pi sessions
 - each thread now stores first-class Pi session references; the legacy `codexThreadId` compatibility field was later removed in RM15
-- Jolt stores transformed thread messages for UI rendering
-- Jolt historically inferred compaction behavior from Codex token history, but the active Pi path can replace that with live session compaction data
+- Metidos stores transformed thread messages for UI rendering
+- Metidos historically inferred compaction behavior from Codex token history, but the active Pi path can replace that with live session compaction data
 
 Relevant local files:
 
@@ -213,7 +213,7 @@ Extension/customization surface:
 - register custom providers
 - persist extension state in session data
 
-This is very relevant because Jolt’s current Codex-sidecar MCP tools should not stay as MCP if the goal is to move to Pi completely. They should become:
+This is very relevant because Metidos’s current Codex-sidecar MCP tools should not stay as MCP if the goal is to move to Pi completely. They should become:
 
 - Pi custom tools
 - Pi extension commands
@@ -229,7 +229,7 @@ Pi automatically discovers:
 - themes
 - extension packages from npm/git/local paths
 
-This means current repo-level instruction files remain useful. Pi already has the same general project-instructions concept Jolt currently relies on.
+This means current repo-level instruction files remain useful. Pi already has the same general project-instructions concept Metidos currently relies on.
 
 ### 6. Pi already has compaction and context usage concepts
 
@@ -243,9 +243,9 @@ Pi has:
 - context usage tracking
 - retry behavior
 
-This is cleaner than Jolt’s current Codex-specific telemetry scraping from `~/.codex/sessions`.
+This is cleaner than Metidos’s current Codex-specific telemetry scraping from `~/.codex/sessions`.
 
-## Pi Non-Goals That Matter for Jolt
+## Pi Non-Goals That Matter for Metidos
 
 Pi’s README is unusually explicit about what it does **not** include in the core:
 
@@ -256,11 +256,11 @@ Pi’s README is unusually explicit about what it does **not** include in the co
 - no built-in to-do system
 - no built-in background bash
 
-For Jolt, the most important non-goals are:
+For Metidos, the most important non-goals are:
 
 ### No MCP
 
-Current Jolt agent tooling is implemented as a Codex MCP sidecar:
+Current Metidos agent tooling is implemented as a Codex MCP sidecar:
 
 - the historical `src/bun/codex-sidecar-mcp.ts` bridge, which RM15 later removes
 
@@ -271,24 +271,24 @@ Pi’s philosophy is the opposite:
 - use skills
 - add extensions if you need more behavior
 
-This means a Pi migration should **remove** the Jolt MCP bridge as a runtime dependency for Jolt’s own agent. It should port that behavior into Pi-native tools/extensions instead.
+This means a Pi migration should **remove** the Metidos MCP bridge as a runtime dependency for Metidos’s own agent. It should port that behavior into Pi-native tools/extensions instead.
 
-This is now partially implemented in `jt-ide`. See [JT08 implementation status in `jt-ide`](#jt08-implementation-status-in-jt-ide).
+This is now partially implemented in `metidos`. See [JT08 implementation status in `metidos`](#jt08-implementation-status-in-metidos).
 
 ### No built-in GitHub connector
 
-Current Jolt relies on Codex’s GitHub app/tool surface and threads can toggle that surface on/off:
+Current Metidos relies on Codex’s GitHub app/tool surface and threads can toggle that surface on/off:
 
 - current toggle semantics are documented in [docs/2026-04-07-thread-tool-access-controls.md](./2026-04-07-thread-tool-access-controls.md)
 - backend config wires `apps.github.enabled` in [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 
 Pi does not provide that connector surface.
 
-If Jolt still wants GitHub-specific agent tools after the migration, it must build them itself or adopt a Pi package/extension that does so.
+If Metidos still wants GitHub-specific agent tools after the migration, it must build them itself or adopt a Pi package/extension that does so.
 
 ### No built-in sub-agents or plan mode
 
-Current Jolt has an `Agents` thread access toggle because Codex can expose:
+Current Metidos has an `Agents` thread access toggle because Codex can expose:
 
 - `spawn_agent`
 - `send_input`
@@ -305,7 +305,7 @@ That means parity is possible, but not free and not identical.
 
 ### No built-in Codex-style sandbox policy
 
-Current Jolt relies on Codex thread options:
+Current Metidos relies on Codex thread options:
 
 - `sandboxMode: "workspace-write"` or `"danger-full-access"`
 - `networkAccessEnabled`
@@ -322,7 +322,7 @@ Pi’s built-in tools run on the host environment. Pi expects you to:
 
 This is the single biggest security/semantics gap in the migration.
 
-## Current Codex-Specific Surface In Jolt
+## Current Codex-Specific Surface In Metidos
 
 The current repository is not merely “using Codex for completions”. It is structurally built around Codex runtime behavior.
 
@@ -338,7 +338,7 @@ That file currently owns:
 - `startThread(...)`
 - `resumeThread(...)`
 - `runStreamed(...)`
-- mapping streamed Codex events into Jolt thread messages
+- mapping streamed Codex events into Metidos thread messages
 - per-thread Codex config
 - per-thread app/tool gating
 - sidecar/MCP injection
@@ -363,7 +363,7 @@ See:
 
 ### Event-shape coupling
 
-Jolt’s UI and transformed DB messages depend on Codex item types:
+Metidos’s UI and transformed DB messages depend on Codex item types:
 
 - `agent_message`
 - `reasoning`
@@ -385,7 +385,7 @@ Current access-control semantics are implemented against Codex configuration sur
 
 - GitHub toggle -> `apps.github.enabled`
 - Agents toggle -> Codex feature flags
-- Jolt toggle -> whether the Jolt MCP sidecar is attached
+- Metidos toggle -> whether the Metidos MCP sidecar is attached
 - Unsafe toggle -> Codex sandbox/network mode
 
 See:
@@ -406,39 +406,39 @@ That external-file scraping subsystem becomes obsolete once Codex SDK is removed
 
 The table below answers the practical question:
 
-“If Jolt switches to Pi, what comes for free from Pi, and what still must be implemented by hand?”
+“If Metidos switches to Pi, what comes for free from Pi, and what still must be implemented by hand?”
 
-| Requirement | Current Jolt implementation | Pi status | Custom work still required on top of Pi |
+| Requirement | Current Metidos implementation | Pi status | Custom work still required on top of Pi |
 |---|---|---|---|
 | Multiple providers/endpoints behind one interface | Pi-backed provider catalog in [model-catalog.ts](../src/bun/project-procedures/model-catalog.ts) plus provider-aware browser controls | Native strength | Expose provider auth/availability hints and finish removing Codex-only naming from the remaining runtime/config surfaces |
-| Provider auth storage and login | Mostly delegated to Codex/OpenAI ecosystem; xAI env special-cased | Native strength | Wire Pi `AuthStorage` into Jolt settings/auth UX; decide whether Jolt exposes Pi provider login flows in web UI |
+| Provider auth storage and login | Mostly delegated to Codex/OpenAI ecosystem; xAI env special-cased | Native strength | Wire Pi `AuthStorage` into Metidos settings/auth UX; decide whether Metidos exposes Pi provider login flows in web UI |
 | Embeddable agent runtime | Codex thread objects managed in [project-procedures.ts](../src/bun/project-procedures.ts) | Native strength | Replace Codex thread lifecycle with Pi `AgentSession` or `AgentSessionRuntime`; confirm Bun compatibility or use Node sidecar |
-| Per-thread model selection | Supported today via Jolt DB, provider-qualified model ids, and provider-aware frontend selectors | Supported, but model object shape differs | Remove the remaining Codex-only field names and surface provider auth/availability in settings |
+| Per-thread model selection | Supported today via Metidos DB, provider-qualified model ids, and provider-aware frontend selectors | Supported, but model object shape differs | Remove the remaining Codex-only field names and surface provider auth/availability in settings |
 | Per-thread reasoning control | Current UI now labels this as “thinking level” but persistence still uses `reasoningEffort` | Similar but not identical | Finish any DB/API renames if desired and keep handling models without thinking support |
-| Session persistence and resume | Jolt SQLite thread rows + Codex thread id | Native Pi sessions | Decide whether Jolt stores Pi session file path/id in DB or whether Pi sessions stay entirely internal; likely add `piSessionId`/`piSessionFile` fields |
-| Branch/fork/tree navigation | Jolt has separate app threads; no Pi-style in-thread tree UI | Native Pi feature | Decide whether to expose Pi tree navigation in Jolt UI or ignore it initially; if ignored, still preserve it in session files |
-| Compaction | Current Jolt infers compaction from Codex token drops | Native Pi feature | Replace Codex telemetry scraper with Pi compaction events and context usage; decide how much current “compaction telemetry” UI survives |
-| Streaming events | Explicit Pi event projector now maps `AgentSessionEvent` activity into Jolt message records | Native Pi event stream | Extend the projector for remaining event kinds and keep browser refresh behavior aligned with that adapter |
-| Abort/stop current turn | Current abort controller around Codex run | Native Pi feature | Call `session.abort()` and map abort semantics to current Jolt stopped-state behavior |
+| Session persistence and resume | Metidos SQLite thread rows + Codex thread id | Native Pi sessions | Decide whether Metidos stores Pi session file path/id in DB or whether Pi sessions stay entirely internal; likely add `piSessionId`/`piSessionFile` fields |
+| Branch/fork/tree navigation | Metidos has separate app threads; no Pi-style in-thread tree UI | Native Pi feature | Decide whether to expose Pi tree navigation in Metidos UI or ignore it initially; if ignored, still preserve it in session files |
+| Compaction | Current Metidos infers compaction from Codex token drops | Native Pi feature | Replace Codex telemetry scraper with Pi compaction events and context usage; decide how much current “compaction telemetry” UI survives |
+| Streaming events | Explicit Pi event projector now maps `AgentSessionEvent` activity into Metidos message records | Native Pi event stream | Extend the projector for remaining event kinds and keep browser refresh behavior aligned with that adapter |
+| Abort/stop current turn | Current abort controller around Codex run | Native Pi feature | Call `session.abort()` and map abort semantics to current Metidos stopped-state behavior |
 | Built-in coding tools | Codex built-ins and shell/file behavior | Native Pi feature | Decide which Pi built-ins are enabled by default; adapt transcript rendering to Pi tool result shapes |
-| Jolt project/worktree/thread helper tools | Currently exported through Jolt MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces the old Codex MCP bridge for the Pi path |
+| Metidos project/worktree/thread helper tools | Currently exported through Metidos MCP sidecar | Not native | Rebuild as Pi custom tools/extensions; this replaces the old Codex MCP bridge for the Pi path |
 | GitHub agent tools | Currently from Codex app/plugin surface | Not native | Build or adopt a GitHub Pi extension/package, probably using `gh`, REST, or GraphQL; redefine `githubAccess` semantics |
-| Sub-agents | Minimal Pi-era `delegate_task` helper now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether one-shot bounded delegation is sufficient or whether Jolt later needs persistent child-agent lifecycle, richer fan-out, or human-in-the-loop orchestration |
-| Plan mode | Minimal Pi-era `update_plan` support now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether runtime-only plan state is enough or whether Jolt later needs Pi extension UI widgets, confirmations, and browser-visible plan orchestration |
+| Sub-agents | Minimal Pi-era `delegate_task` helper now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether one-shot bounded delegation is sufficient or whether Metidos later needs persistent child-agent lifecycle, richer fan-out, or human-in-the-loop orchestration |
+| Plan mode | Minimal Pi-era `update_plan` support now available when `agentsAccess` is enabled | Example-level only, not core | Decide whether runtime-only plan state is enough or whether Metidos later needs Pi extension UI widgets, confirmations, and browser-visible plan orchestration |
 | Thread access controls | Current backend maps toggles directly into Codex config | Possible, but custom | Re-implement access gating by controlling Pi active tools/extensions/provider integrations; current toggle names can stay only if semantics are rebuilt |
 | Unsafe mode / sandbox / network policy | Current Codex thread options support real sandbox/network modes | Major gap | Build a safety model: disable tools, override bash/write/edit, run in container, or adopt sandbox extension; current `unsafeMode` cannot be preserved by a simple flag |
-| Reasoning transcript rows | Current UI stores dedicated `reasoning` rows | Partially supported | Convert Pi `thinking_delta` / assistant thinking blocks into Jolt reasoning rows if that UI is still desired |
-| Command transcript rows | Current UI stores dedicated command rows | Supported via Pi `bash` tool | Adapt `tool_execution_*` and bash details into current Jolt command message schema |
-| File-change transcript rows and inline diffs | Current Codex emits `file_change` items | Partial | Pi `edit` returns diff details, but `write` does not; if parity matters, synthesize file-change records from tool results and/or git diffs. `jt-ide` now does this minimal parity work for successful `edit`/`write` completions. |
+| Reasoning transcript rows | Current UI stores dedicated `reasoning` rows | Partially supported | Convert Pi `thinking_delta` / assistant thinking blocks into Metidos reasoning rows if that UI is still desired |
+| Command transcript rows | Current UI stores dedicated command rows | Supported via Pi `bash` tool | Adapt `tool_execution_*` and bash details into current Metidos command message schema |
+| File-change transcript rows and inline diffs | Current Codex emits `file_change` items | Partial | Pi `edit` returns diff details, but `write` does not; if parity matters, synthesize file-change records from tool results and/or git diffs. `metidos` now does this minimal parity work for successful `edit`/`write` completions. |
 | Web-search transcript rows | Current Codex may emit `web_search` items | Not native | Add web-search as a custom Pi tool/skill or drop this transcript kind |
-| Tool-call transcript rows | Current UI stores `tool_call` rows, excluding Jolt MCP calls | Supported generically | Map Pi tool execution lifecycle into Jolt tool-call rows; redesign if current schema is too Codex-specific |
-| Usage/context window telemetry | Current Jolt scrapes Codex session JSONL | Native Pi concepts | Read usage/context from Pi session stats/events instead of scraping external files |
-| Cron jobs that spawn agent work | Current cron scheduler is app-owned and now enters the Pi-backed thread path in `jt-ide` | App-owned today | Keep current cron scheduler, but continue expanding cron coverage around hosted providers, long-running runs, and any scheduler/worker lifecycle edge cases |
-| Local app auth, step-up auth, websocket auth | Jolt-owned auth stack in [auth-service.ts](../src/bun/auth-service.ts) and related files | Unrelated to Pi | Keep as-is; Pi provider auth is separate from Jolt local app auth |
-| Project/worktree model, snapshots, git history, diffs | Jolt-owned RPC domain | Unrelated to Pi | Keep as-is; Pi becomes only the agent runtime inside that shell |
-| React frontend | Jolt-owned mainview app | Unrelated to Pi | Keep UI, but change data models for sessions/models/messages where necessary |
-| Extension/user interaction in custom web UI | Current Jolt controls its own modals and widgets | Supported conceptually by Pi | Implement `session.bindExtensions(...)` UI bindings to React dialogs/widgets/status lines if Pi extensions are used in the browser-hosted flow |
-| AGENTS/skills/prompt templates/packages | Jolt has AGENTS repo instructions today, Codex skill usage in operator environment | Native Pi feature | Decide resource loading strategy, package policy, and whether to reuse existing `.codex/skills` directories via Pi settings |
+| Tool-call transcript rows | Current UI stores `tool_call` rows, excluding Metidos MCP calls | Supported generically | Map Pi tool execution lifecycle into Metidos tool-call rows; redesign if current schema is too Codex-specific |
+| Usage/context window telemetry | Current Metidos scrapes Codex session JSONL | Native Pi concepts | Read usage/context from Pi session stats/events instead of scraping external files |
+| Cron jobs that spawn agent work | Current cron scheduler is app-owned and now enters the Pi-backed thread path in `metidos` | App-owned today | Keep current cron scheduler, but continue expanding cron coverage around hosted providers, long-running runs, and any scheduler/worker lifecycle edge cases |
+| Local app auth, step-up auth, websocket auth | Metidos-owned auth stack in [auth-service.ts](../src/bun/auth-service.ts) and related files | Unrelated to Pi | Keep as-is; Pi provider auth is separate from Metidos local app auth |
+| Project/worktree model, snapshots, git history, diffs | Metidos-owned RPC domain | Unrelated to Pi | Keep as-is; Pi becomes only the agent runtime inside that shell |
+| React frontend | Metidos-owned mainview app | Unrelated to Pi | Keep UI, but change data models for sessions/models/messages where necessary |
+| Extension/user interaction in custom web UI | Current Metidos controls its own modals and widgets | Supported conceptually by Pi | Implement `session.bindExtensions(...)` UI bindings to React dialogs/widgets/status lines if Pi extensions are used in the browser-hosted flow |
+| AGENTS/skills/prompt templates/packages | Metidos has AGENTS repo instructions today, Codex skill usage in operator environment | Native Pi feature | Decide resource loading strategy, package policy, and whether to reuse existing `.codex/skills` directories via Pi settings |
 | Replace Codex-specific code completely | Many backend/frontend files reference Codex concepts | Not automatic | Migrate DB fields, rename UI labels, remove Codex telemetry/config/sidecar code, and update tests |
 
 ## Detailed Workstreams
@@ -449,10 +449,10 @@ The table below answers the practical question:
 
 Use Pi SDK as the primary target:
 
-- embed `createAgentSession()` or `createAgentSessionRuntime()` behind Jolt’s Bun RPC layer
-- keep Jolt’s current browser UI, SQLite, auth, project/worktree model, and websocket architecture
+- embed `createAgentSession()` or `createAgentSessionRuntime()` behind Metidos’s Bun RPC layer
+- keep Metidos’s current browser UI, SQLite, auth, project/worktree model, and websocket architecture
 
-### Validation status in `jt-ide`
+### Validation status in `metidos`
 
 The initial runtime-host spike is now complete inside this repository.
 
@@ -476,7 +476,7 @@ Current decision:
 - use direct Bun SDK embedding as the primary integration target
 - keep the Node Pi RPC sidecar as the fallback path if a provider-specific Bun incompatibility appears later
 
-### RT02 implementation status in `jt-ide`
+### RT02 implementation status in `metidos`
 
 The first real backend replacement slice is now complete in this repository.
 
@@ -489,33 +489,33 @@ Implemented on 2026-04-09 with:
 
 What the current implementation now does:
 
-- creates and resumes Pi sessions behind the existing Jolt thread lifecycle
-- stores Pi sessions under Jolt app data at `.../pi-agent/thread-sessions/thread-<threadId>/`
-- maps Pi assistant text into Jolt `chat` rows
-- maps Pi thinking deltas into Jolt `reasoning` rows
-- maps Pi `bash` executions into Jolt `command` rows
-- maps Pi built-in file/search tool executions into Jolt `tool_call` rows
-- preserves Jolt’s existing start/stop/background-run and websocket status flow
+- creates and resumes Pi sessions behind the existing Metidos thread lifecycle
+- stores Pi sessions under Metidos app data at `.../pi-agent/thread-sessions/thread-<threadId>/`
+- maps Pi assistant text into Metidos `chat` rows
+- maps Pi thinking deltas into Metidos `reasoning` rows
+- maps Pi `bash` executions into Metidos `command` rows
+- maps Pi built-in file/search tool executions into Metidos `tool_call` rows
+- preserves Metidos’s existing start/stop/background-run and websocket status flow
 
 What the current implementation intentionally does not do yet:
 
-- it does not port Jolt MCP tools into Pi
+- it does not port Metidos MCP tools into Pi
 - it does not expose agents/plan-mode parity
 - it does not restore `web_search` parity
-- it does not expose Pi branching/tree controls in the Jolt UI yet
+- it does not expose Pi branching/tree controls in the Metidos UI yet
 
 Current temporary runtime policy:
 
 - `unsafeMode=false` enables Pi built-ins `read`, `ls`, `find`, `grep`, `edit`, and `write`
 - `unsafeMode=false` disables `bash`
-- `unsafeMode=false` keeps Pi Jolt tools bound to safe child resources, so they cannot create unsafe child threads or cron jobs
+- `unsafeMode=false` keeps Pi Metidos tools bound to safe child resources, so they cannot create unsafe child threads or cron jobs
 - all enabled path-based Pi tools are restricted to the bound thread worktree through a Pi tool-call policy hook
 - `unsafeMode=true` enables the same tool surface plus `bash`
-- `unsafeMode=true` allows Pi Jolt tools to create unsafe child threads or cron jobs
+- `unsafeMode=true` allows Pi Metidos tools to create unsafe child threads or cron jobs
 
-This closes the runtime-host unknowns and gives Jolt a real Pi-backed execution path, but it leaves transcript parity, custom tool parity, UI parity, and schema cleanup to later slices.
+This closes the runtime-host unknowns and gives Metidos a real Pi-backed execution path, but it leaves transcript parity, custom tool parity, UI parity, and schema cleanup to later slices.
 
-### DB03 implementation status in `jt-ide`
+### DB03 implementation status in `metidos`
 
 The first persistence-cleanup slice is now complete in this repository.
 
@@ -531,7 +531,7 @@ Implemented on 2026-04-09 with:
 
 What the current implementation now does:
 
-- adds `piSessionId`, `piSessionFile`, and `piLeafEntryId` to persisted Jolt thread rows
+- adds `piSessionId`, `piSessionFile`, and `piLeafEntryId` to persisted Metidos thread rows
 - syncs those fields when a Pi runtime is created or resumed and again after each completed prompt
 - resumes the explicitly stored Pi session file when one exists instead of relying only on “most recent session”
 - exposes the same Pi session identity through RPC thread payloads for later UI work
@@ -539,10 +539,10 @@ What the current implementation now does:
 
 What this still does not do yet:
 
-- it does not expose Pi session branching or tree navigation in the Jolt UI
+- it does not expose Pi session branching or tree navigation in the Metidos UI
 - it does not remove Codex telemetry scraping or the legacy `codexThreadId` column yet, though those were later addressed by TM13 and RM15
 
-### MD04 implementation status in `jt-ide`
+### MD04 implementation status in `metidos`
 
 The first model-catalog replacement slice is now complete in this repository.
 
@@ -568,7 +568,7 @@ What this still does not do yet:
 - it does not expose per-model availability/auth state in the browser UI
 - it does not remove the remaining Codex-only constructor helpers or labels yet
 
-### UI05 implementation status in `jt-ide`
+### UI05 implementation status in `metidos`
 
 The first frontend migration slice is now complete in this repository.
 
@@ -603,7 +603,7 @@ What this still does not do yet:
 - it does not rename the persisted `reasoningEffort` field or remove internal Codex naming yet
 - it does not redesign the settings surface around provider management beyond selector-level metadata
 
-### EV06 implementation status in `jt-ide`
+### EV06 implementation status in `metidos`
 
 The first explicit Pi event-mapping slice is now complete in this repository.
 
@@ -625,9 +625,9 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not add `web_search` parity because Pi still has no built-in web-search tool in this runtime
-- it does not introduce a new live push transport; Jolt still relies on its existing RPC polling/detail refresh loop for browser updates
+- it does not introduce a new live push transport; Metidos still relies on its existing RPC polling/detail refresh loop for browser updates
 
-### TL07 implementation status in `jt-ide`
+### TL07 implementation status in `metidos`
 
 The first transcript-parity cleanup slice is now complete in this repository.
 
@@ -644,7 +644,7 @@ What the current implementation now does:
 - records successful Pi `edit` completions as both the existing `tool_call` row and a dedicated `file_change` row using Pi’s own returned unified diff
 - records successful Pi `write` completions as both the existing `tool_call` row and a dedicated `file_change` row by synthesizing a unified diff from the pre-write file contents plus the final write payload
 - uses worktree-normalized file paths for those synthesized `file_change` rows so existing transcript cards and diff viewers continue to work without frontend changes
-- makes the transcript-parity decision explicit: minimal parity in `jt-ide` means preserving command cards, tool cards, reasoning rows, and successful file-change cards, not recreating every historical Codex item shape
+- makes the transcript-parity decision explicit: minimal parity in `metidos` means preserving command cards, tool cards, reasoning rows, and successful file-change cards, not recreating every historical Codex item shape
 
 What this still does not do yet:
 
@@ -658,16 +658,16 @@ Benefits:
 
 - direct event subscription
 - no subprocess protocol to maintain
-- easier mapping to Jolt run status and DB writes
+- easier mapping to Metidos run status and DB writes
 - easier access to extension/runtime APIs
-- easier to keep Jolt request cancellation semantics
+- easier to keep Metidos request cancellation semantics
 
 ### Bun compatibility risk
 
 Important caveat:
 
 - Pi documents Node/TypeScript embedding and its package declares `node >= 20.6.0`
-- Jolt backend is Bun
+- Metidos backend is Bun
 
 That does **not** mean Pi cannot run under Bun, but it does mean compatibility must be proven before committing to in-process embedding.
 
@@ -689,7 +689,7 @@ This is less elegant than the SDK route, but still far cleaner than staying on C
 
 ### 2. Persistence and Thread Identity
 
-Current Jolt persistence stores:
+Current Metidos persistence stores:
 
 - app thread id
 - thread metadata
@@ -707,13 +707,13 @@ Pi persistence wants:
 
 ### Recommended first migration shape
 
-Keep Jolt threads as the application-level concept and add Pi session identity to them.
+Keep Metidos threads as the application-level concept and add Pi session identity to them.
 
 Suggested DB additions:
 
 - `piSessionId TEXT NULL`
 - `piSessionFile TEXT NULL`
-- possibly `piLeafEntryId TEXT NULL` if Jolt later wants to expose Pi tree navigation exactly
+- possibly `piLeafEntryId TEXT NULL` if Metidos later wants to expose Pi tree navigation exactly
 
 ### Recommended first migration strategy
 
@@ -727,13 +727,13 @@ Reasons:
 
 The pragmatic path is:
 
-- Jolt DB owns app-level thread records
+- Metidos DB owns app-level thread records
 - Pi owns session JSONL files
-- Jolt stores references to those Pi sessions
+- Metidos stores references to those Pi sessions
 
-This is now implemented in `jt-ide` as:
+This is now implemented in `metidos` as:
 
-- Pi-owned session directories under Jolt app data
+- Pi-owned session directories under Metidos app data
 - SQLite still acting as the app-level source of truth for threads/messages/status
 - first-class persisted references to the active Pi session id, session file, and leaf entry on each thread row
 
@@ -741,7 +741,7 @@ Later, if file-backed session storage becomes a problem, revisit deeper customiz
 
 ### 3. Provider/Model UI Migration
 
-Current Jolt model UI assumes:
+Current Metidos model UI assumes:
 
 - a static list returned by backend bootstrap
 - one model id string
@@ -759,17 +759,17 @@ Pi’s actual model identity is richer:
 
 ### Requirement
 
-Jolt should stop treating “model” as a flat string catalog owned by local source code.
+Metidos should stop treating “model” as a flat string catalog owned by local source code.
 
 ### Recommended changes
 
 - replace static model catalog generation with a Pi-backed catalog derived from `ModelRegistry.getAll()` or `getAvailable()`
 - include provider id in the UI and persistence model
 - group models by provider and family
-- map Jolt “reasoning effort” control to Pi “thinking level”
+- map Metidos “reasoning effort” control to Pi “thinking level”
 - decide whether to expose only authenticated models or all known models with availability indicators
 
-This is now partially implemented in `jt-ide` as:
+This is now partially implemented in `metidos` as:
 
 - a Pi-backed backend catalog derived from `ModelRegistry`
 - canonical provider-qualified model ids persisted and surfaced through RPC
@@ -783,9 +783,9 @@ The browser still needs a fuller Pi-native provider/model UX layer.
 - [src/mainview/controls/reasoning-effort-selector.tsx](../src/mainview/controls/reasoning-effort-selector.tsx)
 - [src/mainview/App.tsx](../src/mainview/App.tsx)
 
-### 4. Porting Jolt Tools Out of MCP and Into Pi
+### 4. Porting Metidos Tools Out of MCP and Into Pi
 
-Current Jolt MCP tools include:
+Current Metidos MCP tools include:
 
 - `update_thread`
 - `list_threads`
@@ -806,32 +806,32 @@ Recreate these as Pi custom tools or extension-owned tools.
 
 Likely split:
 
-- `jolt-threads` extension
+- `metidos-threads` extension
   - `new_thread`
   - `update_thread`
   - `list_threads`
   - `set_context`
-- `jolt-cron` extension
+- `metidos-cron` extension
   - `list_crons`
   - `new_cron`
   - `update_cron`
-- `jolt-vm2` extension
+- `metidos-vm2` extension
   - `run_untrusted_js`
 
 ### Why this is better than keeping MCP
 
 - Pi’s own philosophy is extension/tool-first, not MCP-first
-- Jolt no longer needs a second protocol bridge to talk to itself
+- Metidos no longer needs a second protocol bridge to talk to itself
 - thread access control can be implemented by deciding which Pi tools/extensions are active, instead of by injecting an MCP server conditionally
 
-### JT08 implementation status in `jt-ide`
+### JT08 implementation status in `metidos`
 
-The first Jolt-tool porting slice is now complete in this repository.
+The first Metidos-tool porting slice is now complete in this repository.
 
 Implemented on 2026-04-09 with:
 
-- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
-- [src/bun/pi-jolt-tools.test.ts](../src/bun/pi-jolt-tools.test.ts)
+- [src/bun/pi-metidos-tools.ts](../src/bun/pi-metidos-tools.ts)
+- [src/bun/pi-metidos-tools.test.ts](../src/bun/pi-metidos-tools.test.ts)
 - [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
 - [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
@@ -839,7 +839,7 @@ Implemented on 2026-04-09 with:
 What the current implementation now does:
 
 - adds Pi-native custom tools for `update_thread`, `list_threads`, `run_untrusted_js`, `set_context`, `list_crons`, `new_cron`, `update_cron`, and `new_thread`
-- installs that tool pack only when a thread has `joltAccess=true`, so the existing Jolt access toggle now has a real Pi-era meaning
+- installs that tool pack only when a thread has `metidosAccess=true`, so the existing Metidos access toggle now has a real Pi-era meaning
 - routes those Pi tool calls directly into the existing backend procedure layer through an in-process host adapter instead of going through websocket RPC plus a self-hosted MCP sidecar
 - reuses the current scope-enforcement helpers so bound threads cannot escape their current project/worktree when they list threads, move UI context, or create new cron/thread work
 - preserves the current metadata semantics for `update_thread`, including ignoring in-thread access-control changes and routing summary/title normalization through the authoritative backend helper
@@ -849,13 +849,13 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not remove the old Codex MCP bridge yet because the migration path is still incremental at this stage of the plan, though RM15 later deletes it
-- it does not own the agent-coordination surface; those Pi-era tools now live in a separate backend module so the Jolt tool pack can stay focused on app-specific operations
-- it does not package the Jolt tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
+- it does not own the agent-coordination surface; those Pi-era tools now live in a separate backend module so the Metidos tool pack can stay focused on app-specific operations
+- it does not package the Metidos tool surface as multiple Pi extensions yet; the current implementation intentionally keeps the first port in one backend-owned module so the migration can stabilize before extension/UI layering
 - it does not add any new transcript kinds for these tools; they still flow through the existing `tool_call`, `command`, `reasoning`, and `chat` projection model described in [5. Transcript/Event Mapping](#5-transcriptevent-mapping)
 
 ### 5. Transcript/Event Mapping
 
-Current Jolt UI is optimized around Codex-specific rich transcript categories:
+Current Metidos UI is optimized around Codex-specific rich transcript categories:
 
 - chat
 - reasoning
@@ -885,7 +885,7 @@ Instead, build an adapter layer with these goals:
 
 ### Suggested mapping
 
-| Current Jolt kind | Pi source | Notes |
+| Current Metidos kind | Pi source | Notes |
 |---|---|---|
 | `chat` | assistant text updates/completion | straightforward |
 | `reasoning` | assistant thinking deltas/blocks | provider-dependent |
@@ -899,7 +899,7 @@ Instead, build an adapter layer with these goals:
 
 Codex emits first-class `file_change` items. Pi does not.
 
-Pi `edit` does provide unified diff details. Pi `write` does not. Therefore Jolt must choose one of:
+Pi `edit` does provide unified diff details. Pi `write` does not. Therefore Metidos must choose one of:
 
 - accept less rich file-change transcript behavior
 - synthesize diffs for `write`
@@ -907,7 +907,7 @@ Pi `edit` does provide unified diff details. Pi `write` does not. Therefore Jolt
 
 If maintaining the current diff-centric transcript UX matters, this is a real implementation task.
 
-This minimum parity decision is now implemented in `jt-ide`: successful Pi `edit` and `write` calls emit `file_change` rows, while `web_search` and any richer extension-specific transcript kinds remain future work. See [TL07 implementation status in `jt-ide`](#tl07-implementation-status-in-jt-ide).
+This minimum parity decision is now implemented in `metidos`: successful Pi `edit` and `write` calls emit `file_change` rows, while `web_search` and any richer extension-specific transcript kinds remain future work. See [TL07 implementation status in `metidos`](#tl07-implementation-status-in-metidos).
 
 ### 6. Access Controls and Unsafe Mode
 
@@ -915,21 +915,21 @@ This is the hardest behavioral parity area.
 
 ### Current semantics
 
-Current Jolt thread toggles mean:
+Current Metidos thread toggles mean:
 
 - `GitHub`: Codex GitHub connector tools available or unavailable
 - `Agents`: Codex multi-agent/planning tools available or unavailable
-- `Jolt`: Jolt MCP tools available or unavailable
+- `Metidos`: Metidos MCP tools available or unavailable
 - `Unsafe`: Codex sandbox/network policy
 
 ### Pi-compatible reinterpretation
 
 On Pi, these toggles would need to become:
 
-- `GitHub`: whether Jolt enables a GitHub extension/tool pack
-- `Agents`: whether Jolt enables Pi-era coordination tools such as plan updates and bounded delegated helper tasks
-- `Jolt`: whether Jolt enables Jolt-specific tools
-- `Unsafe`: whether Jolt enables a broader host-execution/sandbox-bypass tool policy
+- `GitHub`: whether Metidos enables a GitHub extension/tool pack
+- `Agents`: whether Metidos enables Pi-era coordination tools such as plan updates and bounded delegated helper tasks
+- `Metidos`: whether Metidos enables Metidos-specific tools
+- `Unsafe`: whether Metidos enables a broader host-execution/sandbox-bypass tool policy
 
 ### Critical warning about `unsafeMode`
 
@@ -937,14 +937,14 @@ Today `unsafeMode` has a real runtime meaning through Codex sandboxing.
 
 On Pi, that meaning does not exist automatically.
 
-If Jolt migrates to Pi and leaves tool behavior unchanged, then:
+If Metidos migrates to Pi and leaves tool behavior unchanged, then:
 
 - `unsafeMode=false` would be misleading
 - because Pi’s default tools still operate on the host environment
 
 ### Required decision
 
-Before shipping a Pi migration, define what “safe” means in Jolt without Codex:
+Before shipping a Pi migration, define what “safe” means in Metidos without Codex:
 
 Option A:
 
@@ -974,7 +974,7 @@ Pi examples that are relevant here:
 - `sandbox/`
 - `tool-override.ts`
 
-### SA09 implementation status in `jt-ide`
+### SA09 implementation status in `metidos`
 
 The first explicit Pi-era safety-policy slice is now complete in this repository.
 
@@ -982,8 +982,8 @@ Implemented on 2026-04-09 with:
 
 - [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
 - [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
-- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
-- [src/bun/pi-jolt-tools.test.ts](../src/bun/pi-jolt-tools.test.ts)
+- [src/bun/pi-metidos-tools.ts](../src/bun/pi-metidos-tools.ts)
+- [src/bun/pi-metidos-tools.test.ts](../src/bun/pi-metidos-tools.test.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/db.test.ts](../src/bun/db.test.ts)
 - [src/mainview/controls/thread-access-control.tsx](../src/mainview/controls/thread-access-control.tsx)
@@ -991,9 +991,9 @@ Implemented on 2026-04-09 with:
 What the current implementation now does:
 
 - defines an explicit Pi thread tool policy instead of treating `unsafeMode` as an unspoken side effect
-- keeps safe threads useful for coding by allowing worktree-scoped `read`, `ls`, `find`, `grep`, `edit`, `write`, and any enabled Jolt tools
+- keeps safe threads useful for coding by allowing worktree-scoped `read`, `ls`, `find`, `grep`, `edit`, `write`, and any enabled Metidos tools
 - disables `bash` when `unsafeMode=false`
-- blocks Pi Jolt tools from creating or updating child threads or cron jobs with `unsafeMode=true` when the current thread is safe
+- blocks Pi Metidos tools from creating or updating child threads or cron jobs with `unsafeMode=true` when the current thread is safe
 - allows `bash` plus unsafe child thread/cron creation when `unsafeMode=true`
 - updates persisted unsafe-mode audit entries so they describe Pi-era behavior rather than Codex `danger-full-access` wording
 - updates the browser access-control copy so the visible toggle descriptions match the actual Pi runtime policy
@@ -1007,7 +1007,7 @@ What this still does not do yet:
 
 ### 7. GitHub Integration
 
-Current Jolt’s GitHub behavior is not implemented in this repo. It is inherited from Codex runtime/plugin support and then gated by Jolt thread config.
+Current Metidos’s GitHub behavior is not implemented in this repo. It is inherited from Codex runtime/plugin support and then gated by Metidos thread config.
 
 That means the Pi migration must decide what GitHub means in the post-Codex world.
 
@@ -1022,7 +1022,7 @@ Option A: `gh`-based extension
 Option B: direct REST/GraphQL extension
 
 - more work
-- best parity if Jolt wants structured PR/issue workflows
+- best parity if Metidos wants structured PR/issue workflows
 
 Option C: hybrid
 
@@ -1033,7 +1033,7 @@ Option C: hybrid
 
 If GitHub tools are important to the product, treat this as a first-class workstream, not an afterthought. Without it, the current `GitHub` access toggle loses meaning.
 
-### GH10 implementation status in `jt-ide`
+### GH10 implementation status in `metidos`
 
 The first Pi-era GitHub integration slice is now complete in this repository.
 
@@ -1063,18 +1063,18 @@ What this still does not do yet:
 
 ### 8. Agents and Plan Mode
 
-Pi core does not give Jolt the same multi-agent surface Codex gave it.
+Pi core does not give Metidos the same multi-agent surface Codex gave it.
 
 ### Recommended product decision
 
-Decide whether Jolt actually needs full parity here, or whether “consistency across providers” is more important than preserving the exact old tool names.
+Decide whether Metidos actually needs full parity here, or whether “consistency across providers” is more important than preserving the exact old tool names.
 
 ### Practical recommendation
 
 For a first migration:
 
 - do not attempt exact parity with Codex’s async child-agent lifecycle
-- keep an explicit plan-state tool because `update_plan` maps cleanly to Jolt’s current workflow
+- keep an explicit plan-state tool because `update_plan` maps cleanly to Metidos’s current workflow
 - implement a backend-owned Pi coordination pack first:
   - `update_plan`
   - one-shot delegated helper execution such as `delegate_task`
@@ -1085,11 +1085,11 @@ For a first migration:
 
 Then reinterpret `agentsAccess` as:
 
-- whether Jolt’s Pi-era coordination tools are active for the thread
+- whether Metidos’s Pi-era coordination tools are active for the thread
 
 This is much cheaper than trying to recreate Codex’s exact agent tool contract while still preserving the core “plan and delegate” workflow.
 
-### AG11 implementation status in `jt-ide`
+### AG11 implementation status in `metidos`
 
 The first Pi-era agents-and-plan slice is now complete in this repository.
 
@@ -1106,7 +1106,7 @@ What the current implementation now does:
 - gives `agentsAccess=true` a real Pi-era meaning by installing a backend-owned coordination pack instead of leaving the toggle as placeholder compatibility state
 - keeps `update_plan` as an explicit plan-state tool with ordered step tracking and revisioned updates inside the live runtime
 - adds `delegate_task` as a bounded one-shot helper tool that runs an isolated Pi child session in process instead of depending on Pi’s TUI-oriented example extensions
-- runs delegated helpers under the same workspace binding, model resolution, provider registry, GitHub/Jolt tool access, and safe-vs-unsafe policy as the parent thread
+- runs delegated helpers under the same workspace binding, model resolution, provider registry, GitHub/Metidos tool access, and safe-vs-unsafe policy as the parent thread
 - deliberately excludes agent recursion from delegated helpers by not installing the agent-coordination pack inside child sessions
 - updates the runtime prompt and browser access-control copy so the visible `Agents` toggle now describes plan updates plus delegated helper tasks instead of an undefined Codex-era multi-agent surface
 
@@ -1114,22 +1114,22 @@ What this still does not do yet:
 
 - it does not recreate Codex’s persistent child-agent lifecycle; there is still no Pi-era equivalent of `send_input`, `resume_agent`, `wait_agent`, or `close_agent`
 - it does not ship Pi’s interactive plan-mode UI, confirmation prompts, or widgets; that still belongs to the later browser-extension binding work in [12. Browser UI Bindings for Pi Extensions](#12-browser-ui-bindings-for-pi-extensions)
-- it does not persist plan state as a first-class Jolt record outside the current live runtime; the current implementation treats plan updates as runtime/session-level coordination state
-- it does not answer whether Jolt eventually wants richer fan-out, queued delegation, or human-in-the-loop task orchestration beyond this minimal contract
+- it does not persist plan state as a first-class Metidos record outside the current live runtime; the current implementation treats plan updates as runtime/session-level coordination state
+- it does not answer whether Metidos eventually wants richer fan-out, queued delegation, or human-in-the-loop task orchestration beyond this minimal contract
 
 ### 9. Cron Integration
 
-Jolt cron jobs are already app-owned. That is good news.
+Metidos cron jobs are already app-owned. That is good news.
 
 Current cron behavior:
 
-- Jolt stores cron jobs in SQLite
-- Jolt scheduler starts or requests new threads
+- Metidos stores cron jobs in SQLite
+- Metidos scheduler starts or requests new threads
 - each cron run thread inherits model/access settings
 
 ### Migration implication
 
-Cron should remain largely a Jolt concern.
+Cron should remain largely a Metidos concern.
 
 Only the execution target changes:
 
@@ -1142,7 +1142,7 @@ The larger work is therefore:
 - change thread runtime implementation
 - ensure cron-created threads receive the correct Pi model/provider/tools/extensions/thinking level/safety policy
 
-### CR12 implementation status in `jt-ide`
+### CR12 implementation status in `metidos`
 
 The first Pi-era cron-execution slice is now complete in this repository.
 
@@ -1154,7 +1154,7 @@ Implemented on 2026-04-09 with:
 
 What the current implementation now does:
 
-- keeps the existing Jolt cron scheduler and Bun worker registration model intact instead of replacing cron orchestration wholesale
+- keeps the existing Metidos cron scheduler and Bun worker registration model intact instead of replacing cron orchestration wholesale
 - runs both immediate and scheduled cron fires through the same Pi-backed thread path used by interactive threads by creating a child thread and sending the cron prompt through the normal thread procedures
 - verifies through integration coverage that cron-created threads now persist `piSessionId`, `piSessionFile`, and `piLeafEntryId` rather than only exercising the legacy thread shell
 - records completed cron history after the spawned Pi-backed thread settles, covering both direct `runCronJobById(...)` and scheduled `runDueCronJobs(...)`
@@ -1164,13 +1164,13 @@ What the current implementation now does:
 
 What this still does not do yet:
 
-- it does not add special cron-only Pi behavior; cron runs intentionally inherit the same model resolution, access toggles, and safety policy as ordinary Jolt threads
+- it does not add special cron-only Pi behavior; cron runs intentionally inherit the same model resolution, access toggles, and safety policy as ordinary Metidos threads
 - it does not add hosted-provider stress coverage for long-running cron runs, provider auth expiry, or worker restarts; the new tests still use the probe-backed runtime provider
 - it does not expose richer cron-run telemetry in the UI beyond the existing thread and cron last-run fields; that remains part of the later telemetry slice in [10. Telemetry, Usage, and Compaction UI](#10-telemetry-usage-and-compaction-ui)
 
 ### 10. Telemetry, Usage, and Compaction UI
 
-Before the Pi telemetry slice, Jolt did extra work because Codex SDK did not expose the exact live telemetry Jolt wanted during runs. That is why Jolt read Codex JSONL files from disk.
+Before the Pi telemetry slice, Metidos did extra work because Codex SDK did not expose the exact live telemetry Metidos wanted during runs. That is why Metidos read Codex JSONL files from disk.
 
 With Pi:
 
@@ -1179,7 +1179,7 @@ With Pi:
 - compaction is a first-class concept
 - queue state is first-class
 
-### TM13 implementation status in `jt-ide`
+### TM13 implementation status in `metidos`
 
 The first Pi-era telemetry slice is now complete in this repository.
 
@@ -1203,7 +1203,7 @@ What the current implementation now does:
 What this still does not do yet:
 
 - it does not add new browser chrome for the newly exposed `runStatus.phase` or `runStatus.queue` fields; the existing UI only consumes the refreshed context meter today
-- it does not surface Pi cost totals or cache-write totals because Jolt’s current RPC usage shape still matches the older thread meter contract
+- it does not surface Pi cost totals or cache-write totals because Metidos’s current RPC usage shape still matches the older thread meter contract
 - it does not remove every Codex-era compaction field name from the schema or UI; it reuses the existing `RpcThread.compaction` shape with Pi-backed data so the migration stays incremental
 - it does not solve cron-specific UI telemetry beyond the thread surfaces themselves; cron-specific presentation remains part of later UI work
 
@@ -1217,11 +1217,11 @@ Remaining cleanup after full migration still includes:
 
 ### What still needs custom work
 
-Jolt still needs a small adapter because Pi’s telemetry model is not identical to Jolt’s legacy `RpcThread` contract. TM13 implements that adapter in [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts).
+Metidos still needs a small adapter because Pi’s telemetry model is not identical to Metidos’s legacy `RpcThread` contract. TM13 implements that adapter in [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts).
 
 ### 11. Local Auth and Security Auditing
 
-Current Jolt local auth is completely app-owned:
+Current Metidos local auth is completely app-owned:
 
 - setup/login/logout
 - session cookies
@@ -1229,7 +1229,7 @@ Current Jolt local auth is completely app-owned:
 - step-up auth
 - audit logging
 
-This subsystem should stay Jolt-owned.
+This subsystem should stay Metidos-owned.
 
 Pi provider auth is separate and should not replace it.
 
@@ -1247,7 +1247,7 @@ It only changes how privileged agent actions are executed once the request is au
 
 ### 12. Browser UI Bindings for Pi Extensions
 
-If Jolt uses Pi extensions seriously, it should also plan for Pi extension UI callbacks.
+If Metidos uses Pi extensions seriously, it should also plan for Pi extension UI callbacks.
 
 Pi extensions can ask for:
 
@@ -1261,25 +1261,25 @@ Pi extensions can ask for:
 - title changes
 - editor prefill
 
-This is a strong fit for Jolt’s browser UI, but it is not automatic.
+This is a strong fit for Metidos’s browser UI, but it is not automatic.
 
 ### Requirement
 
-Implement a React-backed UI binding for `session.bindExtensions(...)` so Pi extension UI requests can appear in the existing Jolt frontend.
+Implement a React-backed UI binding for `session.bindExtensions(...)` so Pi extension UI requests can appear in the existing Metidos frontend.
 
 Without this layer:
 
 - extension UI-heavy capabilities will be degraded
 - plan mode or approval flows will be harder to port cleanly
 
-### UX14 implementation status in `jt-ide`
+### UX14 implementation status in `metidos`
 
-This is now implemented in `jt-ide`.
+This is now implemented in `metidos`.
 
 What is now present:
 
-- Bun now binds Pi sessions with `session.bindExtensions(...)` through a Jolt-owned bridge instead of leaving extension UI disconnected.
-- The backend can push Pi extension UI requests over the existing Jolt websocket transport and accept browser responses over typed RPC procedures.
+- Bun now binds Pi sessions with `session.bindExtensions(...)` through a Metidos-owned bridge instead of leaving extension UI disconnected.
+- The backend can push Pi extension UI requests over the existing Metidos websocket transport and accept browser responses over typed RPC procedures.
 - The browser app now handles Pi `confirm`, `select`, `input`, and `editor` prompts with a React dialog.
 - Fire-and-forget Pi UI updates now map into the browser for notifications, status lines, widgets, title overrides, working-message overrides, hidden-thinking labels, and composer text updates.
 - The active chat view now renders extension status pills plus above/below-editor widgets, and the transcript working/thinking labels can be overridden by Pi extension UI calls.
@@ -1287,11 +1287,11 @@ What is now present:
 
 What is still intentionally out of scope:
 
-- Pi TUI-only primitives such as `custom(...)`, custom header/footer components, terminal-input listeners, and custom editor components are still unsupported in Jolt’s browser runtime.
+- Pi TUI-only primitives such as `custom(...)`, custom header/footer components, terminal-input listeners, and custom editor components are still unsupported in Metidos’s browser runtime.
 - There is still no persisted replay/snapshot model for extension UI state across browser reconnects beyond the currently connected live session flow.
-- This slice binds Pi extension UI into Jolt, but it does not by itself remove the remaining Codex-era runtime and dependency surface.
+- This slice binds Pi extension UI into Metidos, but it does not by itself remove the remaining Codex-era runtime and dependency surface.
 
-### RM15 implementation status in `jt-ide`
+### RM15 implementation status in `metidos`
 
 The final Codex-removal slice is now complete in this repository.
 
@@ -1301,7 +1301,7 @@ Implemented on 2026-04-09 with:
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
-- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/pi-metidos-tools.ts](../src/bun/pi-metidos-tools.ts)
 - [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
 - [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 
@@ -1310,7 +1310,7 @@ What the current implementation now does:
 - removes the `@openai/codex-sdk` and `@modelcontextprotocol/sdk` dependencies from the live product
 - deletes the dead Codex constructor bridge, Codex MCP sidecar, and their dedicated tests
 - removes `codexThreadId` from the live thread storage, RPC, and fixture contracts while keeping the existing SQLite column harmlessly ignored on older databases
-- promotes the remaining reusable scope helper to the generic [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts) module so Jolt’s Pi tool packs no longer depend on Codex-named runtime files
+- promotes the remaining reusable scope helper to the generic [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts) module so Metidos’s Pi tool packs no longer depend on Codex-named runtime files
 - updates repo docs and backlog state so Pi is documented as the only active agent harness
 
 What is still intentionally out of scope:
@@ -1320,7 +1320,7 @@ What is still intentionally out of scope:
 
 ## What Pi Saves Us From Building Ourselves
 
-If Jolt adopts Pi, the team does **not** need to hand-build these foundational pieces:
+If Metidos adopts Pi, the team does **not** need to hand-build these foundational pieces:
 
 - generalized provider/model registry
 - OAuth and API-key-backed provider auth store
@@ -1336,16 +1336,16 @@ If Jolt adopts Pi, the team does **not** need to hand-build these foundational p
 
 Those are significant wins.
 
-## What Jolt Still Must Build By Hand Even If It Uses Pi
+## What Metidos Still Must Build By Hand Even If It Uses Pi
 
-These remain Jolt-owned or require explicit custom implementation:
+These remain Metidos-owned or require explicit custom implementation:
 
 - browser UI integration
 - project/worktree/thread domain model
 - SQLite persistence of app-level objects
-- mapping Pi sessions to Jolt threads
+- mapping Pi sessions to Metidos threads
 - GitHub tool surface
-- Jolt-specific tools formerly exposed through MCP
+- Metidos-specific tools formerly exposed through MCP
 - per-thread access-control semantics
 - unsafe/sandbox/network policy semantics
 - cron integration
@@ -1355,16 +1355,16 @@ These remain Jolt-owned or require explicit custom implementation:
 
 This is the critical realism check for the migration.
 
-Pi solves the agent harness problem very well. It does **not** solve Jolt’s product-specific application shell.
+Pi solves the agent harness problem very well. It does **not** solve Metidos’s product-specific application shell.
 
 ## Recommended Migration Architecture
 
 ### Recommended target architecture
 
-1. Keep Jolt as the application shell.
+1. Keep Metidos as the application shell.
 2. Replace the Codex runtime with Pi.
 3. Let Pi own provider/model/auth/session/tool/extension concerns.
-4. Let Jolt continue to own:
+4. Let Metidos continue to own:
    - projects
    - worktrees
    - threads
@@ -1372,23 +1372,23 @@ Pi solves the agent harness problem very well. It does **not** solve Jolt’s pr
    - local auth
    - security policy
    - browser UI
-5. Port Jolt-specific MCP tools into Pi-native tools/extensions.
+5. Port Metidos-specific MCP tools into Pi-native tools/extensions.
 
 ### Architecture sketch
 
-- Jolt Bun backend
+- Metidos Bun backend
   - keeps websocket RPC and app DB
-  - creates/loads Pi sessions per Jolt thread
+  - creates/loads Pi sessions per Metidos thread
   - subscribes to Pi events
-  - persists Jolt-friendly message projections for UI
+  - persists Metidos-friendly message projections for UI
 - Pi runtime
   - owns provider/model/auth selection
   - owns actual agent loop
   - owns built-in tools
-  - hosts Jolt tools through extensions/custom tools
-- Jolt React frontend
+  - hosts Metidos tools through extensions/custom tools
+- Metidos React frontend
   - keeps project/worktree/thread UI
-  - consumes Pi-backed thread state through the same Jolt RPC transport
+  - consumes Pi-backed thread state through the same Metidos RPC transport
 
 ## Recommended Phased Plan
 
@@ -1403,10 +1403,10 @@ Pi solves the agent harness problem very well. It does **not** solve Jolt’s pr
 
 - add a hidden experimental path for one thread using Pi
 - use Pi built-ins only: `read`, `bash`, `edit`, `write`
-- do not port GitHub, Jolt tools, or agents yet
+- do not port GitHub, Metidos tools, or agents yet
 - map chat/command/tool messages only
 
-Current status in `jt-ide`:
+Current status in `metidos`:
 
 - substantially complete
 - the live backend now runs threads through Pi by default
@@ -1434,14 +1434,14 @@ Success criteria:
 - delete Codex session telemetry scraping
 - switch context usage UI to Pi-backed data
 
-### Phase 4: Jolt tools migration
+### Phase 4: Metidos tools migration
 
 - port `new_thread`, `update_thread`, `list_threads`, `set_context`, cron tools, and vm2 runner into Pi extensions/custom tools
 - remove Codex MCP sidecar dependency from the Pi path
 
 ### Phase 5: Access control and safety policy
 
-- redefine or port `GitHub`, `Agents`, `Jolt`, and `Unsafe`
+- redefine or port `GitHub`, `Agents`, `Metidos`, and `Unsafe`
 - implement safe vs unsafe tool policy explicitly
 - decide GitHub tool strategy
 
@@ -1450,7 +1450,7 @@ Success criteria:
 - optional subagent extension
 - optional plan mode extension
 - optional browser UI bindings for extension prompts/widgets
-- optional exposure of Pi tree navigation/forking in Jolt UI
+- optional exposure of Pi tree navigation/forking in Metidos UI
 
 ### Phase 7: Remove Codex code
 
@@ -1463,12 +1463,12 @@ Only after the Pi path reaches acceptable parity:
 
 ## Open Questions That Must Be Answered Before Full Migration
 
-1. Is Bun embedding of Pi SDK reliable enough, or should Jolt standardize on a Node sidecar using Pi RPC?
-2. Does Jolt want exact parity for `Agents`, or is a Pi-native “subagent extension when enabled” model acceptable?
-3. Does Jolt want exact parity for `GitHub`, or is a smaller `gh`-backed tool surface acceptable initially?
+1. Is Bun embedding of Pi SDK reliable enough, or should Metidos standardize on a Node sidecar using Pi RPC?
+2. Does Metidos want exact parity for `Agents`, or is a Pi-native “subagent extension when enabled” model acceptable?
+3. Does Metidos want exact parity for `GitHub`, or is a smaller `gh`-backed tool surface acceptable initially?
 4. What does `unsafeMode=false` mean in a post-Codex world?
-5. Should Jolt expose Pi session branching/tree features, or keep the simpler current thread mental model?
-6. Is it acceptable for Pi to own session files on disk, with Jolt merely storing references?
+5. Should Metidos expose Pi session branching/tree features, or keep the simpler current thread mental model?
+6. Is it acceptable for Pi to own session files on disk, with Metidos merely storing references?
 7. Does the current transcript UI need exact `file_change` cards, or can Pi-native tool rows replace some of that?
 
 ## Recommendation
@@ -1486,9 +1486,9 @@ Pi is poorly matched to the idea of preserving every existing Codex-era runtime 
 
 The migration is worth doing if the team accepts these truths up front:
 
-- Jolt keeps owning the product shell
+- Metidos keeps owning the product shell
 - Pi replaces the agent harness
-- GitHub, Jolt tools, agents, and unsafe-mode semantics must be explicitly rebuilt
+- GitHub, Metidos tools, agents, and unsafe-mode semantics must be explicitly rebuilt
 - the clean migration path is Pi-native tools/extensions, not “Pi plus old MCP plus old Codex assumptions”
 
 ## Source Index
@@ -1500,7 +1500,7 @@ The migration is worth doing if the team accepts these truths up front:
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
 - [src/bun/project-procedures/pi-session-telemetry.ts](../src/bun/project-procedures/pi-session-telemetry.ts)
 - [src/bun/project-procedures/thread-detail.ts](../src/bun/project-procedures/thread-detail.ts)
-- [src/bun/pi-jolt-tools.ts](../src/bun/pi-jolt-tools.ts)
+- [src/bun/pi-metidos-tools.ts](../src/bun/pi-metidos-tools.ts)
 - [src/bun/thread-tool-scope.ts](../src/bun/thread-tool-scope.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)

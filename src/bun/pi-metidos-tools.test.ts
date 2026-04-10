@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  createPiJoltTools,
-  type PiJoltToolHost,
-  type PiJoltToolScope,
-} from "./pi-jolt-tools";
+  createPiMetidosTools,
+  type PiMetidosToolHost,
+  type PiMetidosToolScope,
+} from "./pi-metidos-tools";
 import type {
   RpcContextFocusChanged,
   RpcCronJob,
@@ -17,7 +17,9 @@ import type {
 
 const NOW = "2026-04-09T12:00:00.000Z";
 
-function makeScope(overrides: Partial<PiJoltToolScope> = {}): PiJoltToolScope {
+function makeScope(
+  overrides: Partial<PiMetidosToolScope> = {},
+): PiMetidosToolScope {
   return {
     allowUnsafeModeEscalation: false,
     projectIdContext: 7,
@@ -66,7 +68,7 @@ function makeThread(input?: Partial<RpcThread>): RpcThread {
     createdAt: NOW,
     githubAccess: false,
     id: 11,
-    joltAccess: true,
+    metidosAccess: true,
     lastRunAt: NOW,
     model: "openai:gpt-5.4",
     piLeafEntryId: null,
@@ -110,7 +112,7 @@ function makeCron(input?: Partial<RpcCronJob>): RpcCronJob {
     enabled: 1,
     githubAccess: false,
     id: 3,
-    joltAccess: true,
+    metidosAccess: true,
     lastRunDate: null,
     lastRunStatus: null,
     model: "openai:gpt-5.4",
@@ -136,7 +138,7 @@ function makeThreadStartRequest(
     createdAt: NOW,
     githubAccess: false,
     input: "Do work",
-    joltAccess: true,
+    metidosAccess: true,
     model: null,
     pinned: null,
     pinnedAt: null,
@@ -153,7 +155,9 @@ function makeThreadStartRequest(
   };
 }
 
-function createHost(overrides: Partial<PiJoltToolHost> = {}): PiJoltToolHost {
+function createHost(
+  overrides: Partial<PiMetidosToolHost> = {},
+): PiMetidosToolHost {
   return {
     createThread: async () => makeThreadDetail(),
     focusContext: async () =>
@@ -177,8 +181,12 @@ function createHost(overrides: Partial<PiJoltToolHost> = {}): PiJoltToolHost {
   };
 }
 
-function getTool(scope: PiJoltToolScope, host: PiJoltToolHost, name: string) {
-  const tool = createPiJoltTools(scope, host).find(
+function getTool(
+  scope: PiMetidosToolScope,
+  host: PiMetidosToolHost,
+  name: string,
+) {
+  const tool = createPiMetidosTools(scope, host).find(
     (entry) => entry.name === name,
   );
   if (!tool) {
@@ -188,8 +196,8 @@ function getTool(scope: PiJoltToolScope, host: PiJoltToolHost, name: string) {
 }
 
 async function executeTool(
-  scope: PiJoltToolScope,
-  host: PiJoltToolHost,
+  scope: PiMetidosToolScope,
+  host: PiMetidosToolHost,
   name: string,
   rawArgs: unknown,
 ) {
@@ -221,7 +229,7 @@ function expectDeepEqual(actual: unknown, expected: unknown): void {
   expect(actual).toEqual(expected);
 }
 
-describe("createPiJoltTools", () => {
+describe("createPiMetidosTools", () => {
   it("updates thread metadata while ignoring in-thread access toggles", async () => {
     const scope = makeScope();
     let receivedParams: Record<string, unknown> | null = null;
@@ -395,7 +403,7 @@ describe("createPiJoltTools", () => {
       autoStart: true,
       githubAccess: null,
       input: "Do work",
-      joltAccess: null,
+      metidosAccess: null,
       model: "openai:gpt-5.4",
       projectId: 7,
       reasoningEffort: "high",
@@ -413,7 +421,7 @@ describe("createPiJoltTools", () => {
       githubAccess: false,
       hasUnreadError: null,
       input: "Do work",
-      joltAccess: true,
+      metidosAccess: true,
       lastRunAt: null,
       model: "openai:gpt-5.4",
       pinned: null,

@@ -13,7 +13,7 @@ import { decryptAuthSecret, encryptAuthSecret } from "./auth-secrets";
 const tempDirectories = new Set<string>();
 
 function createTempDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-auth-secret-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-auth-secret-"));
   tempDirectories.add(path);
   return path;
 }

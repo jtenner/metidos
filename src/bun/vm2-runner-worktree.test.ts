@@ -11,8 +11,8 @@ import { runUntrustedJavaScriptInVm2 } from "./vm2-runner";
 import { makeTempDir } from "./vm2-runner-test-utils";
 
 test("blocks writes outside the worktree while allowing in-worktree writes", async () => {
-  const sandboxRoot = makeTempDir("jolt-vm2-runner-worktree-");
-  const outsideRoot = makeTempDir("jolt-vm2-runner-outside-");
+  const sandboxRoot = makeTempDir("metidos-vm2-runner-worktree-");
+  const outsideRoot = makeTempDir("metidos-vm2-runner-outside-");
   const outsideFile = join(outsideRoot, "outside.txt");
   const insideFile = join(sandboxRoot, "inside.txt");
   writeFileSync(outsideFile, "secret");

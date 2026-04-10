@@ -10,7 +10,7 @@ import { runUntrustedJavaScriptInVm2 } from "./vm2-runner";
 import { makeTempDir } from "./vm2-runner-test-utils";
 
 test("exposes Bun and safe built-in modules", async () => {
-  const worktreePath = makeTempDir("jolt-vm2-runner-bun-");
+  const worktreePath = makeTempDir("metidos-vm2-runner-bun-");
   try {
     const report = await runUntrustedJavaScriptInVm2({
       code: `

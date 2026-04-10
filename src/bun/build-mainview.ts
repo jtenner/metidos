@@ -11,7 +11,7 @@ import reactCompiler from "../../bun-plugin-react-compiler";
 const MAINVIEW_ENTRYPOINT = resolve(process.cwd(), "src/mainview/index.ts");
 
 /** Output directory for the built frontend assets consumed by the Bun sidecar. */
-export const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".jolt-build");
+export const MAINVIEW_BUILD_DIR = resolve(process.cwd(), ".metidos-build");
 
 /**
  * Build the mainview frontend bundle and return the emitted `index.js` path.

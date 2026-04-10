@@ -2,7 +2,7 @@
  * @file src/bun/rpc-websocket-auth.ts
  * @description Module for rpc websocket auth.
  *
- * Upgrades are accepted when a valid session cookie (`jolt_session`) is present.
+ * Upgrades are accepted when a valid session cookie (`metidos_session`) is present.
  * A short-lived websocket ticket cookie is an optional authentication hardening path.
  */
 

@@ -1,4 +1,4 @@
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv6x7n4b2d8c5f9h3k6m1pqs"
 title = "Add shared task graph filesystem reader and model"
 type = "feature"

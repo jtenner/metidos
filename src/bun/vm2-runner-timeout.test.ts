@@ -10,7 +10,7 @@ import { runUntrustedJavaScriptInVm2 } from "./vm2-runner";
 import { makeTempDir } from "./vm2-runner-test-utils";
 
 test("times out long-running code", async () => {
-  const worktreePath = makeTempDir("jolt-vm2-runner-timeout-");
+  const worktreePath = makeTempDir("metidos-vm2-runner-timeout-");
   try {
     const report = await runUntrustedJavaScriptInVm2({
       code: "while (true) {}",

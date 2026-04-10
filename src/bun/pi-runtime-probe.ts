@@ -1,7 +1,7 @@
 /**
  * @file src/bun/pi-runtime-probe.ts
  *
- * Runtime probe for evaluating Pi integration paths from Jolt's Bun backend.
+ * Runtime probe for evaluating Pi integration paths from Metidos's Bun backend.
  * It exercises:
  * - direct Bun SDK embedding
  * - persistent session resume
@@ -36,9 +36,9 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 
-export const PI_RUNTIME_PROBE_PROVIDER = "jolt-pi-probe";
+export const PI_RUNTIME_PROBE_PROVIDER = "metidos-pi-probe";
 export const PI_RUNTIME_PROBE_MODEL_ID = "probe-1";
-export const PI_RUNTIME_PROBE_API_KEY_ENV = "JOLT_PI_PROBE_API_KEY";
+export const PI_RUNTIME_PROBE_API_KEY_ENV = "METIDOS_PI_PROBE_API_KEY";
 export const PI_RUNTIME_PROBE_RUNTIME_API_KEY = "sdk-probe-key";
 export const PI_RUNTIME_PROBE_RPC_API_KEY = "rpc-probe-key";
 
@@ -234,7 +234,7 @@ export function createPiRuntimeProbeProviderConfig(
     models: [
       {
         id: PI_RUNTIME_PROBE_MODEL_ID,
-        name: "Jolt Pi Runtime Probe",
+        name: "Metidos Pi Runtime Probe",
         api: PI_RUNTIME_PROBE_API,
         reasoning: false,
         input: ["text"],
@@ -778,7 +778,7 @@ export async function runPiRuntimeProbe(
   workspaceDir?: string,
 ): Promise<PiRuntimeProbeReport> {
   const ownedWorkspace =
-    workspaceDir ?? mkdtempSync(join(tmpdir(), "jolt-pi-runtime-probe-"));
+    workspaceDir ?? mkdtempSync(join(tmpdir(), "metidos-pi-runtime-probe-"));
   try {
     const bunSdk = await runPiBunSdkProbe(join(ownedWorkspace, "bun-sdk"));
     const rpc = await runPiRpcProbe(join(ownedWorkspace, "node-rpc"));

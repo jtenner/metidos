@@ -16,9 +16,9 @@ import type {
 import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-const PROVIDER = "jolt-pi-probe";
+const PROVIDER = "metidos-pi-probe";
 const MODEL_ID = "probe-1";
-const API_KEY_ENV = "JOLT_PI_PROBE_API_KEY";
+const API_KEY_ENV = "METIDOS_PI_PROBE_API_KEY";
 const API = "anthropic-messages";
 const REPLY_PREFIX = "pi-runtime-probe";
 
@@ -120,7 +120,7 @@ export default function piRpcProbeExtension(pi: ExtensionAPI) {
     models: [
       {
         id: MODEL_ID,
-        name: "Jolt Pi Runtime Probe",
+        name: "Metidos Pi Runtime Probe",
         api: API,
         reasoning: false,
         input: ["text"],

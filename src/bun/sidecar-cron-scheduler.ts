@@ -6,7 +6,7 @@
 import { getAppDatabasePath } from "./db";
 import { createSubsystemLogger } from "./logging";
 
-const CRON_SCHEDULER_THREAD_NAME = "jolt-cron-scheduler-thread";
+const CRON_SCHEDULER_THREAD_NAME = "metidos-cron-scheduler-thread";
 const CRON_SCHEDULER_THREAD_URL = new URL(
   "./sidecar-cron-thread.ts",
   import.meta.url,

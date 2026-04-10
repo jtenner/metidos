@@ -11,7 +11,7 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Keeps current Chinese-model families visible in that curated set by exposing direct `Kimi Coding`, `MiniMax`, and `Z.AI` providers and a few current `Qwen` models through `OpenRouter`.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Tracks provider metadata such as xAI routing, current provider availability, and which model ids accept reasoning-effort overrides.
-  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already authenticated but Jolt still cannot import reusable credentials.
+  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already authenticated but Metidos still cannot import reusable credentials.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
 - `provider-auth.ts`
@@ -21,9 +21,9 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Keeps provider-auth status shaping isolated so the browser settings work can consume a stable status/result contract later.
 
 - `pi-session-telemetry.ts`
-  - Projects active Pi session telemetry into Jolt thread payloads without scraping external files.
+  - Projects active Pi session telemetry into Metidos thread payloads without scraping external files.
   - Uses Pi `getContextUsage()` for live context-window hydration, session-branch `compaction` entries for observed compaction history, and runtime queue/streaming state for richer thread status overlays.
-  - Keeps the Pi-to-Jolt telemetry mapping isolated so later UI work can consume new runtime fields without touching the persistence/rendering helpers.
+  - Keeps the Pi-to-Metidos telemetry mapping isolated so later UI work can consume new runtime fields without touching the persistence/rendering helpers.
 
 - `command-normalization.ts`
   - Removes shell-wrapper noise from recorded command activity before it is persisted or shown in the UI.
@@ -42,10 +42,10 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Coalesces in-flight commit-diff reads so duplicate requests share work.
 
 - `pi-event-projection.ts`
-  - Projects Pi `AgentSessionEvent` updates into Jolt thread-activity writes without assuming Codex item types.
+  - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.
   - Tracks assistant thinking/text state, tool-call arguments, pre-write file snapshots, and final usage snapshots across a streamed run.
-  - Synthesizes Jolt `file_change` rows for successful Pi `edit` and `write` calls so transcript diff cards stay useful after the Codex removal.
-  - Keeps the Pi-to-Jolt transcript mapping explicit so later slices can extend remaining tool or custom-extension semantics cleanly.
+  - Synthesizes Metidos `file_change` rows for successful Pi `edit` and `write` calls so transcript diff cards stay useful after the Codex removal.
+  - Keeps the Pi-to-Metidos transcript mapping explicit so later slices can extend remaining tool or custom-extension semantics cleanly.
 
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.

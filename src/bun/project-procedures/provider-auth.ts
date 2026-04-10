@@ -289,7 +289,7 @@ export async function startProviderAuthLogin(
                 authReady.resolve();
                 return attempt.manualCodeDeferred.promise;
               },
-              originator: "jolt",
+              originator: "metidos",
             });
       persistPiOpenAICodexCredential(agentDirectory, credential);
       persistCodexAuthFileCredential(credential);

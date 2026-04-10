@@ -44,11 +44,11 @@ import {
   upsertAuthSettings,
 } from "./db";
 
-const SESSION_COOKIE_NAME = "jolt_session";
+const SESSION_COOKIE_NAME = "metidos_session";
 const SESSION_COOKIE_PATH = "/";
-const WEBSOCKET_TICKET_COOKIE_NAME = "jolt_ws_ticket";
+const WEBSOCKET_TICKET_COOKIE_NAME = "metidos_ws_ticket";
 const WEBSOCKET_TICKET_COOKIE_PATH = "/rpc";
-const DEFAULT_TOTP_ISSUER = "Jolt";
+const DEFAULT_TOTP_ISSUER = "Metidos";
 const LOGIN_LOCKOUT_AFTER_FAILURES = 3;
 const LOGIN_LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
 export const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000;

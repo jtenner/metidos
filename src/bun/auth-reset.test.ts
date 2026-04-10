@@ -38,7 +38,7 @@ function createTestDatabase(): Database {
 }
 
 function createTempDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-auth-reset-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-auth-reset-"));
   tempDirectories.add(path);
   return path;
 }

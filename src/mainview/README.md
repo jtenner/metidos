@@ -1,6 +1,6 @@
 # mainview
 
-This folder contains the browser-facing React UI layer for Jolt’s Pi-backed main application view, including the workspace screen composition, routing-free panel orchestration, and all chat/thread/project interaction surfaces used by the desktop and mobile experiences.
+This folder contains the browser-facing React UI layer for Metidos’s Pi-backed main application view, including the workspace screen composition, routing-free panel orchestration, and all chat/thread/project interaction surfaces used by the desktop and mobile experiences.
 
 Files in this folder are split by responsibility: app bootstrap, global UI styling, and stateful workspace components.
 
@@ -8,7 +8,7 @@ Files in this folder are split by responsibility: app bootstrap, global UI styli
 
 `App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries. It now keeps the source-of-truth project and thread collections in indexed stores so hot mutation paths can update incrementally while memoized ordered arrays remain available for component APIs, and it also owns the browser-side Pi extension UI bridge state for prompts, notifications, widgets, and composer synchronization.
 
-`auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `JOLT_DEV_BYPASS=1` is active.
+`auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path, and now surfaces the explicit dev-bypass state when `METIDOS_DEV_BYPASS=1` is active.
 
 `auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, status polling, and step-up verification.
 
@@ -86,7 +86,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
-`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, refresh/logout controls, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance. It now makes the supported path explicit: users log into Codex through the CLI itself, then refresh Jolt status.
+`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, refresh/logout controls, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance. It now makes the supported path explicit: users log into Codex through the CLI itself, then refresh Metidos status.
 
 `app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 
@@ -116,7 +116,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/chat-composer-control.tsx` renders the message composer and send/compose interactions.
 
-`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, surfaces their billing/policy scope directly in the selector, and marks unauthenticated Codex providers as unavailable with provider notes that can explain when Codex CLI is already signed in but Jolt still lacks reusable credentials.
+`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, surfaces their billing/policy scope directly in the selector, and marks unauthenticated Codex providers as unavailable with provider notes that can explain when Codex CLI is already signed in but Metidos still lacks reusable credentials.
 
 `controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including the billing/policy guidance, active-model scope callouts, and provider-availability metadata shown for OpenAI provider choices.
 
@@ -132,11 +132,11 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/sidebar-section-header.tsx` draws consistent section headers and controls in sidebar cards.
 
-`controls/thread-access-control.tsx` renders the reusable upward-opening dropdown for thread and cron access flags, including GitHub, Agents, Jolt, and Unsafe toggles.
+`controls/thread-access-control.tsx` renders the reusable upward-opening dropdown for thread and cron access flags, including GitHub, Agents, Metidos, and Unsafe toggles.
 
 ## Why this folder exists
 
-`src/mainview` is the boundary between data/services and user-facing UI logic for Jolt’s primary screen. The folder ensures:
+`src/mainview` is the boundary between data/services and user-facing UI logic for Metidos’s primary screen. The folder ensures:
 
 1. All main UI panels are discoverable and co-located.
 2. Feature modules stay decoupled from backend bootstrap (`src/bun`) and from styling/asset-only docs.

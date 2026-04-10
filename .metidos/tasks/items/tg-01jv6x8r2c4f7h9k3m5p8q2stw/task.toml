@@ -1,4 +1,4 @@
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv6x8r2c4f7h9k3m5p8q2stw"
 title = "Implement init_task_graph repository scaffolding"
 type = "feature"

@@ -212,7 +212,7 @@ export type PersistedMainviewState = {
   pendingThreadReasoningEffort: string;
   pendingThreadGithubAccess: boolean;
   pendingThreadAgentsAccess: boolean;
-  pendingThreadJoltAccess: boolean;
+  pendingThreadMetidosAccess: boolean;
   pendingThreadUnsafeMode: boolean;
   chatInput: string;
   sidebarCollapsed: boolean;
@@ -225,7 +225,7 @@ type PersistedMainviewStorageRecord = Omit<
   | "chatInput"
   | "pendingThreadAgentsAccess"
   | "pendingThreadGithubAccess"
-  | "pendingThreadJoltAccess"
+  | "pendingThreadMetidosAccess"
   | "pendingThreadUnsafeMode"
 >;
 
@@ -271,9 +271,9 @@ export type OpenThreadOptions = {
 };
 
 export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
-  "jolt:thread-start-request-created";
-export const CONTEXT_FOCUS_CHANGED_EVENT_NAME = "jolt:context-focus-changed";
-export const THREAD_EXTENSION_UI_EVENT_NAME = "jolt:thread-extension-ui";
+  "metidos:thread-start-request-created";
+export const CONTEXT_FOCUS_CHANGED_EVENT_NAME = "metidos:context-focus-changed";
+export const THREAD_EXTENSION_UI_EVENT_NAME = "metidos:thread-extension-ui";
 /**
  * Delay before firing directory suggestion network calls to avoid noisy typing.
  */
@@ -296,12 +296,14 @@ export const THREAD_STATUS_POLL_INTERVAL_MS = 1_500;
 export const DESKTOP_COMPOSER_MIN_HEIGHT_PX = 96;
 export const MOBILE_COMPOSER_MIN_HEIGHT_PX = 44;
 export const COMPOSER_MAX_HEIGHT_PX = 240;
-export const MAINVIEW_STATE_STORAGE_KEY = "jolt:mainview-state";
+export const MAINVIEW_STATE_STORAGE_KEY = "metidos:mainview-state";
 export const MAINVIEW_STATE_STORAGE_VERSION = 1;
 export const MAINVIEW_STATE_WRITE_DEBOUNCE_MS = 160;
-export const TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
+export const TREE_VIEW_STATE_STORAGE_KEY = "metidos:tree-view-state";
 export const TREE_VIEW_STATE_STORAGE_VERSION = 1;
-export const APP_TITLE = "Jolt";
+export const APP_TITLE = "Metidos";
+const LEGACY_MAINVIEW_STATE_STORAGE_KEY = "jolt:mainview-state";
+const LEGACY_TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
 const GIT_HISTORY_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
@@ -754,7 +756,7 @@ export function defaultPersistedMainviewState(): PersistedMainviewState {
     pendingThreadReasoningEffort: "",
     pendingThreadGithubAccess: false,
     pendingThreadAgentsAccess: false,
-    pendingThreadJoltAccess: true,
+    pendingThreadMetidosAccess: true,
     pendingThreadUnsafeMode: false,
     chatInput: "",
     sidebarCollapsed: false,
@@ -877,7 +879,9 @@ export function readPersistedMainviewState(): PersistedMainviewState {
   }
 
   try {
-    const raw = window.localStorage.getItem(MAINVIEW_STATE_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(MAINVIEW_STATE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_MAINVIEW_STATE_STORAGE_KEY);
     if (!raw) {
       return defaultPersistedMainviewState();
     }
@@ -903,7 +907,7 @@ export function readPersistedMainviewState(): PersistedMainviewState {
           : "",
       pendingThreadGithubAccess: false,
       pendingThreadAgentsAccess: false,
-      pendingThreadJoltAccess: true,
+      pendingThreadMetidosAccess: true,
       // Sensitive local inputs stay memory-only and are intentionally never restored.
       pendingThreadUnsafeMode: false,
       chatInput: "",
@@ -925,7 +929,9 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
   }
 
   try {
-    const raw = window.localStorage.getItem(TREE_VIEW_STATE_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(TREE_VIEW_STATE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_TREE_VIEW_STATE_STORAGE_KEY);
     if (!raw) {
       return defaultPersistedTreeViewState();
     }
@@ -960,7 +966,7 @@ function serializePersistedMainviewState(
     chatInput: _chatInput,
     pendingThreadAgentsAccess: _pendingThreadAgentsAccess,
     pendingThreadGithubAccess: _pendingThreadGithubAccess,
-    pendingThreadJoltAccess: _pendingThreadJoltAccess,
+    pendingThreadMetidosAccess: _pendingThreadMetidosAccess,
     pendingThreadUnsafeMode: _pendingThreadUnsafeMode,
     ...persistedState
   } = state;

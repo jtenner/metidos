@@ -32,7 +32,7 @@ function buildProviderAuthStatus(
     credentialExpiresAt: null,
     lastError: null,
     login: null,
-    piAuthFilePath: "/tmp/jolt/pi-agent/auth.json",
+    piAuthFilePath: "/tmp/metidos/pi-agent/auth.json",
     providerId: "openai-codex",
     providerLabel: "OpenAI Codex",
     source: "none",
@@ -93,7 +93,7 @@ describe("settings panel provider-auth helpers", () => {
       sourceReason: "codex_auth_file_unusable_fell_back_to_pi_auth",
     });
     expect(providerAuthSourceLabel(piFallbackStatus)).toBe(
-      "Jolt Pi auth fallback",
+      "Metidos Pi auth fallback",
     );
     expect(providerAuthSourceDescription(piFallbackStatus)).toContain(
       "fell back",
@@ -225,7 +225,7 @@ describe("settings panel provider-auth helpers", () => {
     ]);
   });
 
-  it("surfaces shared-cache repair steps when Jolt is using Pi auth fallback", () => {
+  it("surfaces shared-cache repair steps when Metidos is using Pi auth fallback", () => {
     const steps = providerAuthRecoverySteps(
       buildProviderAuthStatus({
         codexCliAuthStatus: "logged_in_chatgpt",

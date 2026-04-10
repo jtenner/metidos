@@ -15,7 +15,8 @@ import {
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-const APP_NAME = ".jolt";
+const APP_NAME = ".metidos";
+const LEGACY_APP_NAME = ".jolt";
 /** Database filename under the app data directory. */
 const DB_FILE_NAME = "app.db";
 /** Default thread model used when no explicit model is provided. */
@@ -43,7 +44,7 @@ type ThreadInput = {
   reasoningEffort: string;
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: boolean;
   piSessionId?: string | null;
   piSessionFile?: string | null;
@@ -153,7 +154,7 @@ export type ThreadRecord = {
   reasoningEffort: string;
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: 0 | 1;
   piSessionId: string | null;
   piSessionFile: string | null;
@@ -179,11 +180,11 @@ export type ThreadRecord = {
 
 type ThreadSqlRecord = Omit<
   ThreadRecord,
-  "agentsAccess" | "githubAccess" | "joltAccess"
+  "agentsAccess" | "githubAccess" | "metidosAccess"
 > & {
   agentsAccess: 0 | 1;
   githubAccess: 0 | 1;
-  joltAccess: 0 | 1;
+  metidosAccess: 0 | 1;
 };
 
 /** Public DB shape for thread_messages rows returned from queries. */
@@ -275,7 +276,7 @@ export type CronJobRecord = {
   reasoningEffort: string;
   githubAccess: boolean;
   agentsAccess: boolean;
-  joltAccess: boolean;
+  metidosAccess: boolean;
   unsafeMode: 0 | 1;
   lastRunDate: number | null;
   lastRunStatus: CronJobRunStatus | null;
@@ -305,7 +306,7 @@ type CronJobInput = {
   reasoningEffort: string;
   githubAccess?: boolean | null;
   agentsAccess?: boolean | null;
-  joltAccess?: boolean | null;
+  metidosAccess?: boolean | null;
   unsafeMode?: boolean | null;
   enabled?: boolean | null;
 };
@@ -319,7 +320,7 @@ type CronJobUpdateInput = {
   reasoningEffort?: string;
   githubAccess?: boolean;
   agentsAccess?: boolean;
-  joltAccess?: boolean;
+  metidosAccess?: boolean;
   unsafeMode?: boolean;
   enabled?: boolean;
 };
@@ -333,25 +334,29 @@ type CronJobRunInput = {
 
 type CronJobSqlRecord = Omit<
   CronJobRecord,
-  "agentsAccess" | "githubAccess" | "joltAccess" | "nextRunDate"
+  "agentsAccess" | "githubAccess" | "metidosAccess" | "nextRunDate"
 > & {
   agentsAccess: 0 | 1;
   githubAccess: 0 | 1;
-  joltAccess: 0 | 1;
+  metidosAccess: 0 | 1;
 };
 
-const DEFAULT_APP_DATA_DIR =
-  process.platform === "darwin"
-    ? join(homedir(), "Library", "Application Support", APP_NAME)
+function buildDefaultAppDataDirPath(appName: string): string {
+  return process.platform === "darwin"
+    ? join(homedir(), "Library", "Application Support", appName)
     : process.platform === "win32"
       ? join(
           process.env.APPDATA || join(homedir(), "AppData", "Roaming"),
-          APP_NAME,
+          appName,
         )
       : join(
           process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"),
-          APP_NAME,
+          appName,
         );
+}
+
+const DEFAULT_APP_DATA_DIR = buildDefaultAppDataDirPath(APP_NAME);
+const LEGACY_DEFAULT_APP_DATA_DIR = buildDefaultAppDataDirPath(LEGACY_APP_NAME);
 /** Cached app-data directory path resolved for this process. */
 
 let resolvedAppDataDir: string | null = null;
@@ -388,7 +393,7 @@ function hydrateCronJobFromSqlRow(
     ...cronJob,
     githubAccess: cronJob.githubAccess === 1,
     agentsAccess: cronJob.agentsAccess === 1,
-    joltAccess: cronJob.joltAccess === 1,
+    metidosAccess: cronJob.metidosAccess === 1,
     nextRunDate: includeNextRunDate
       ? computeCronJobNextRunDate(cronJob.schedule)
       : null,
@@ -485,10 +490,18 @@ export function selectWritableAppDataDirectory(options: {
   configuredAppDataDir?: string | null | undefined;
   defaultAppDataDir: string;
   isWritableDirectory?: (path: string) => boolean;
+  legacyDefaultAppDataDir?: string | null | undefined;
 }): string {
   const isWritable = options.isWritableDirectory ?? isWritableDirectory;
+  const preferLegacyDefault =
+    !options.configuredAppDataDir &&
+    typeof options.legacyDefaultAppDataDir === "string" &&
+    options.legacyDefaultAppDataDir.length > 0 &&
+    existsSync(options.legacyDefaultAppDataDir) &&
+    !existsSync(options.defaultAppDataDir);
   const candidates = [
     options.configuredAppDataDir || null,
+    preferLegacyDefault ? options.legacyDefaultAppDataDir || null : null,
     options.defaultAppDataDir,
   ].filter((value): value is string => Boolean(value));
 
@@ -500,13 +513,15 @@ export function selectWritableAppDataDirectory(options: {
   }
 
   const checkedPaths = options.configuredAppDataDir
-    ? `Checked JOLT_APP_DATA_DIR=${options.configuredAppDataDir} and ${options.defaultAppDataDir}.`
-    : `Checked ${options.defaultAppDataDir}.`;
+    ? `Checked METIDOS_APP_DATA_DIR=${options.configuredAppDataDir} and ${options.defaultAppDataDir}.`
+    : typeof options.legacyDefaultAppDataDir === "string"
+      ? `Checked ${options.defaultAppDataDir} and legacy ${options.legacyDefaultAppDataDir}.`
+      : `Checked ${options.defaultAppDataDir}.`;
   throw new Error(
     [
       "Unable to find a writable application data directory.",
       checkedPaths,
-      "Set JOLT_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
+      "Set METIDOS_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
     ].join(" "),
   );
 }
@@ -520,10 +535,13 @@ function resolveAppDataDirectory(): string {
     return resolvedAppDataDir;
   }
 
-  const configuredAppDataDir = process.env.JOLT_APP_DATA_DIR?.trim();
+  const configuredAppDataDir =
+    process.env.METIDOS_APP_DATA_DIR?.trim() ||
+    process.env.JOLT_APP_DATA_DIR?.trim();
   resolvedAppDataDir = selectWritableAppDataDirectory({
     configuredAppDataDir,
     defaultAppDataDir: DEFAULT_APP_DATA_DIR,
+    legacyDefaultAppDataDir: LEGACY_DEFAULT_APP_DATA_DIR,
   });
   return resolvedAppDataDir;
 }
@@ -699,7 +717,7 @@ export function migrateDatabase(db: Database): void {
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
 				github_access INTEGER NOT NULL DEFAULT 0,
 				agents_access INTEGER NOT NULL DEFAULT 0,
-				jolt_access INTEGER NOT NULL DEFAULT 1,
+				metidos_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				pi_session_id TEXT,
 				pi_session_file TEXT,
@@ -723,6 +741,16 @@ export function migrateDatabase(db: Database): void {
 				last_error_message TEXT
 			);
 		`,
+  );
+  const hasLegacyThreadAccessColumn = tableHasColumn(
+    db,
+    "threads",
+    "jolt_access",
+  );
+  const hasMetidosThreadAccessColumn = tableHasColumn(
+    db,
+    "threads",
+    "metidos_access",
   );
   ensureThreadColumn(db, "last_input_tokens", "last_input_tokens INTEGER");
   ensureThreadColumn(
@@ -779,11 +807,22 @@ export function migrateDatabase(db: Database): void {
     "agents_access",
     "agents_access INTEGER NOT NULL DEFAULT 0",
   );
-  ensureThreadColumn(
-    db,
-    "jolt_access",
-    "jolt_access INTEGER NOT NULL DEFAULT 1",
-  );
+  if (!hasMetidosThreadAccessColumn) {
+    ensureThreadColumn(
+      db,
+      "metidos_access",
+      "metidos_access INTEGER NOT NULL DEFAULT 1",
+    );
+  }
+  if (hasLegacyThreadAccessColumn && !hasMetidosThreadAccessColumn) {
+    runStatement(
+      db,
+      `
+			UPDATE threads
+			SET metidos_access = jolt_access
+		`,
+    );
+  }
   ensureThreadColumn(
     db,
     "unsafe_mode",
@@ -838,8 +877,8 @@ export function migrateDatabase(db: Database): void {
     db,
     `
 			UPDATE threads
-			SET jolt_access = 1
-			WHERE jolt_access IS NULL
+			SET metidos_access = 1
+			WHERE metidos_access IS NULL
 		`,
   );
   runStatement(
@@ -1022,7 +1061,7 @@ export function migrateDatabase(db: Database): void {
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
 				github_access INTEGER NOT NULL DEFAULT 0,
 				agents_access INTEGER NOT NULL DEFAULT 0,
-				jolt_access INTEGER NOT NULL DEFAULT 1,
+				metidos_access INTEGER NOT NULL DEFAULT 1,
 				unsafe_mode INTEGER NOT NULL DEFAULT 0,
 				last_run_date INTEGER,
 				last_run_status TEXT CHECK(last_run_status IN ('InProgress', 'Stopped', 'Errored', 'Completed')),
@@ -1032,6 +1071,16 @@ export function migrateDatabase(db: Database): void {
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
 		`,
+  );
+  const hasLegacyCronAccessColumn = tableHasColumn(
+    db,
+    "cron_jobs",
+    "jolt_access",
+  );
+  const hasMetidosCronAccessColumn = tableHasColumn(
+    db,
+    "cron_jobs",
+    "metidos_access",
   );
   runStatement(
     db,
@@ -1069,11 +1118,22 @@ export function migrateDatabase(db: Database): void {
     "agents_access",
     "agents_access INTEGER NOT NULL DEFAULT 0",
   );
-  ensureCronJobColumn(
-    db,
-    "jolt_access",
-    "jolt_access INTEGER NOT NULL DEFAULT 1",
-  );
+  if (!hasMetidosCronAccessColumn) {
+    ensureCronJobColumn(
+      db,
+      "metidos_access",
+      "metidos_access INTEGER NOT NULL DEFAULT 1",
+    );
+  }
+  if (hasLegacyCronAccessColumn && !hasMetidosCronAccessColumn) {
+    runStatement(
+      db,
+      `
+			UPDATE cron_jobs
+			SET metidos_access = jolt_access
+		`,
+    );
+  }
   ensureCronJobColumn(
     db,
     "unsafe_mode",
@@ -1152,8 +1212,8 @@ export function migrateDatabase(db: Database): void {
     `
 			UPDATE cron_jobs
 			SET
-				jolt_access = 1
-			WHERE jolt_access IS NULL
+				metidos_access = 1
+			WHERE metidos_access IS NULL
 		`,
   );
   dedupeActiveCronJobTitles(db);
@@ -2215,7 +2275,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				pi_session_id AS piSessionId,
 				pi_session_file AS piSessionFile,
@@ -2274,7 +2334,7 @@ export function getThreadById(
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				pi_session_id AS piSessionId,
 				pi_session_file AS piSessionFile,
@@ -2309,7 +2369,7 @@ function hydrateThreadFromSqlRow(thread: ThreadSqlRecord): ThreadRecord {
     ...thread,
     githubAccess: thread.githubAccess === 1,
     agentsAccess: thread.agentsAccess === 1,
-    joltAccess: thread.joltAccess === 1,
+    metidosAccess: thread.metidosAccess === 1,
   };
 }
 /**
@@ -2338,7 +2398,7 @@ export function createThread(
 				reasoning_effort,
 				github_access,
 				agents_access,
-				jolt_access,
+				metidos_access,
 				unsafe_mode,
 				pi_session_id,
 				pi_session_file,
@@ -2368,7 +2428,7 @@ export function createThread(
     input.reasoningEffort,
     input.githubAccess ? 1 : 0,
     input.agentsAccess ? 1 : 0,
-    input.joltAccess ? 1 : 0,
+    input.metidosAccess ? 1 : 0,
     input.unsafeMode ? 1 : 0,
     input.piSessionId ?? null,
     input.piSessionFile ?? null,
@@ -2517,7 +2577,7 @@ export function setThreadAccess(
   input: {
     githubAccess: boolean;
     agentsAccess: boolean;
-    joltAccess: boolean;
+    metidosAccess: boolean;
     unsafeMode: boolean;
   },
 ): void {
@@ -2529,14 +2589,14 @@ export function setThreadAccess(
 			SET
 				github_access = ?,
 				agents_access = ?,
-				jolt_access = ?,
+				metidos_access = ?,
 				unsafe_mode = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
     input.githubAccess ? 1 : 0,
     input.agentsAccess ? 1 : 0,
-    input.joltAccess ? 1 : 0,
+    input.metidosAccess ? 1 : 0,
     input.unsafeMode ? 1 : 0,
     threadId,
   );
@@ -3206,7 +3266,7 @@ export function createCronJob(
 				reasoning_effort,
 				github_access,
 				agents_access,
-				jolt_access,
+				metidos_access,
 				unsafe_mode,
 				enabled
 			)
@@ -3236,7 +3296,7 @@ export function createCronJob(
     input.reasoningEffort,
     input.githubAccess === true ? 1 : 0,
     input.agentsAccess === true ? 1 : 0,
-    input.joltAccess === false ? 0 : 1,
+    input.metidosAccess === false ? 0 : 1,
     input.unsafeMode === true ? 1 : 0,
     input.enabled === false ? 0 : 1,
   );
@@ -3270,7 +3330,7 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3313,7 +3373,7 @@ export function getCronJobById(
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3383,9 +3443,9 @@ export function updateCronJob(
     bindings.push(input.agentsAccess ? 1 : 0);
   }
 
-  if (typeof input.joltAccess === "boolean") {
-    updates.push("jolt_access = ?");
-    bindings.push(input.joltAccess ? 1 : 0);
+  if (typeof input.metidosAccess === "boolean") {
+    updates.push("metidos_access = ?");
+    bindings.push(input.metidosAccess ? 1 : 0);
   }
 
   if (typeof input.unsafeMode === "boolean") {
@@ -3439,7 +3499,7 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3576,7 +3636,7 @@ export function claimCronJobsForScheduledRun(
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,
@@ -3625,7 +3685,7 @@ export function claimCronJobForScheduledRunById(
 				reasoning_effort AS reasoningEffort,
 				github_access AS githubAccess,
 				agents_access AS agentsAccess,
-				jolt_access AS joltAccess,
+				metidos_access AS metidosAccess,
 				unsafe_mode AS unsafeMode,
 				last_run_date AS lastRunDate,
 				last_run_status AS lastRunStatus,

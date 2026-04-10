@@ -8,7 +8,7 @@ Create the shared Bun-side model for reading and writing canonical task graph fi
 
 ## Acceptance
 
-- canonical files can be loaded from `.jolt/tasks/`
+- canonical files can be loaded from `.metidos/tasks/`
 - link sections are parsed as task IDs, not filesystem paths
 - parser output is suitable for both validation and normalization work
 - shared helpers make it hard for tool handlers to emit non-canonical files

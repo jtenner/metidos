@@ -1,6 +1,6 @@
 /**
  * @file src/bun/project-procedures/pi-event-projection.ts
- * @description Pi session event projection into Jolt thread-activity writes.
+ * @description Pi session event projection into Metidos thread-activity writes.
  */
 
 import { existsSync, readFileSync } from "node:fs";

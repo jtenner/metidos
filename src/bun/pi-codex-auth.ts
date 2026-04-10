@@ -1,6 +1,6 @@
 /**
  * @file src/bun/pi-codex-auth.ts
- * @description Syncs external Codex auth into Jolt's Pi auth store.
+ * @description Syncs external Codex auth into Metidos's Pi auth store.
  */
 
 import { spawn } from "node:child_process";

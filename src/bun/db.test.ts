@@ -37,10 +37,10 @@ import {
 } from "./db";
 
 const tempDirectories = new Set<string>();
-const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 
 function createTempDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-db-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-db-"));
   tempDirectories.add(path);
   return path;
 }
@@ -50,9 +50,9 @@ afterEach(() => {
   resetResolvedAppDataDirectory();
 
   if (typeof originalAppDataDir === "string") {
-    process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
-    delete process.env.JOLT_APP_DATA_DIR;
+    delete process.env.METIDOS_APP_DATA_DIR;
   }
 
   for (const path of tempDirectories) {
@@ -84,7 +84,7 @@ describe("app database storage", () => {
         isWritableDirectory: () => false,
       }),
     ).toThrow(
-      "Set JOLT_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
+      "Set METIDOS_APP_DATA_DIR to an explicit writable per-user directory if the default location is unavailable.",
     );
   });
 
@@ -95,7 +95,7 @@ describe("app database storage", () => {
 
     const appDataDir = createTempDirectory();
     chmodSync(appDataDir, 0o755);
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
 
     initAppDatabase();
     await encryptAuthSecret("totp-secret", {
@@ -116,7 +116,7 @@ describe("app database storage", () => {
 
   it("deletes the app database files and reopens as an empty database", () => {
     const appDataDir = createTempDirectory();
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
 
     const database = initAppDatabase();
     const databasePath = getAppDatabasePath();
@@ -127,7 +127,7 @@ describe("app database storage", () => {
     createThread(database, {
       agentsAccess: false,
       githubAccess: false,
-      joltAccess: true,
+      metidosAccess: true,
       model: DEFAULT_THREAD_MODEL,
       projectId: project.id,
       reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
@@ -168,7 +168,7 @@ describe("app database storage", () => {
 
   it("persists security audit events for dangerous local actions", () => {
     const appDataDir = createTempDirectory();
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     const database = initAppDatabase();
 
     createSecurityAuditEvent(database, {
@@ -201,7 +201,7 @@ describe("app database storage", () => {
 
   it("persists first-class Pi session identity on thread rows", () => {
     const appDataDir = createTempDirectory();
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     const database = initAppDatabase();
     const project = upsertProject(database, {
       name: "Pi Repo",
@@ -210,7 +210,7 @@ describe("app database storage", () => {
     const thread = createThread(database, {
       agentsAccess: false,
       githubAccess: false,
-      joltAccess: true,
+      metidosAccess: true,
       model: DEFAULT_THREAD_MODEL,
       projectId: project.id,
       reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
@@ -249,7 +249,7 @@ describe("app database storage", () => {
 
   it("hydrates persisted thread access flags as booleans", () => {
     const appDataDir = createTempDirectory();
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
     const database = initAppDatabase();
     const project = upsertProject(database, {
       name: "Flags Repo",
@@ -258,7 +258,7 @@ describe("app database storage", () => {
     const thread = createThread(database, {
       agentsAccess: true,
       githubAccess: false,
-      joltAccess: true,
+      metidosAccess: true,
       model: DEFAULT_THREAD_MODEL,
       projectId: project.id,
       reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
@@ -276,17 +276,17 @@ describe("app database storage", () => {
       expect.objectContaining({
         agentsAccess: true,
         githubAccess: false,
-        joltAccess: true,
+        metidosAccess: true,
       }),
     );
     expect(typeof persistedThread?.agentsAccess).toBe("boolean");
     expect(typeof persistedThread?.githubAccess).toBe("boolean");
-    expect(typeof persistedThread?.joltAccess).toBe("boolean");
+    expect(typeof persistedThread?.metidosAccess).toBe("boolean");
     expect(listedThread).toEqual(
       expect.objectContaining({
         agentsAccess: true,
         githubAccess: false,
-        joltAccess: true,
+        metidosAccess: true,
       }),
     );
   });
@@ -299,7 +299,7 @@ describe("app database storage", () => {
     });
 
     const appDataDir = createTempDirectory();
-    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
 
     const {
       openProjectProcedure,

@@ -97,7 +97,7 @@ export function providerAuthSourceLabel(
     case "codex-file":
       return "~/.codex/auth.json";
     case "pi-auth":
-      return "Jolt Pi auth fallback";
+      return "Metidos Pi auth fallback";
     default:
       return "No active Codex auth";
   }
@@ -155,45 +155,45 @@ export function providerAuthSourceDescription(
 ): string {
   switch (status.sourceReason) {
     case "codex_auth_file_already_current":
-      return "Jolt is using the same Codex credentials already stored in ~/.codex/auth.json.";
+      return "Metidos is using the same Codex credentials already stored in ~/.codex/auth.json.";
     case "synced_from_codex_auth_file":
-      return "Jolt imported the current Codex file credentials into its Pi auth store so Pi sessions can reuse them.";
+      return "Metidos imported the current Codex file credentials into its Pi auth store so Pi sessions can reuse them.";
     case "using_existing_pi_codex_auth":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? "Jolt is using its Pi auth fallback while Codex CLI reports an active ChatGPT login from non-shared storage, so the two tools are authenticated separately. The supported long-term path is still a shared Codex auth.json cache created by Codex CLI itself."
+        ? "Metidos is using its Pi auth fallback while Codex CLI reports an active ChatGPT login from non-shared storage, so the two tools are authenticated separately. The supported long-term path is still a shared Codex auth.json cache created by Codex CLI itself."
         : status.codexCliAuthStatus === "logged_in_api_key"
-          ? "Jolt is using its Pi auth fallback, while Codex CLI is authenticated with an API key instead of ChatGPT-backed Codex auth."
+          ? "Metidos is using its Pi auth fallback, while Codex CLI is authenticated with an API key instead of ChatGPT-backed Codex auth."
           : status.codexCredentialStoreMode === "keyring"
-            ? "Jolt is using its Pi auth fallback because Codex CLI is configured for OS keyring storage, so no shared ~/.codex/auth.json cache is expected."
+            ? "Metidos is using its Pi auth fallback because Codex CLI is configured for OS keyring storage, so no shared ~/.codex/auth.json cache is expected."
             : status.codexCredentialStoreMode === "auto"
-              ? "Jolt is using its Pi auth fallback because Codex CLI is configured for automatic credential storage, which may prefer the OS keyring on this machine."
-              : "Jolt is using its Pi auth fallback because no usable Codex file credentials were found.";
+              ? "Metidos is using its Pi auth fallback because Codex CLI is configured for automatic credential storage, which may prefer the OS keyring on this machine."
+              : "Metidos is using its Pi auth fallback because no usable Codex file credentials were found.";
     case "codex_auth_file_unusable_fell_back_to_pi_auth":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? "The Codex auth file exists but could not be used. Codex CLI still reports an active ChatGPT login, so Jolt fell back to its Pi auth store instead."
-        : "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
+        ? "The Codex auth file exists but could not be used. Codex CLI still reports an active ChatGPT login, so Metidos fell back to its Pi auth store instead."
+        : "The Codex auth file exists but could not be used, so Metidos fell back to its Pi auth store instead.";
     case "codex_auth_file_unusable":
       return 'The Codex auth file exists but is unreadable or incomplete. Re-run "codex login" to replace it, or remove the broken file and try again.';
     case "codex_auth_file_missing":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? 'No ~/.codex/auth.json file was found, but Codex CLI reports an active ChatGPT login. Jolt cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and re-run "codex login" so Jolt can reuse the shared auth file.'
+        ? 'No ~/.codex/auth.json file was found, but Codex CLI reports an active ChatGPT login. Metidos cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and re-run "codex login" so Metidos can reuse the shared auth file.'
         : status.codexCliAuthStatus === "logged_in_api_key"
           ? 'No ~/.codex/auth.json file was found, and Codex CLI reports an API-key login instead of a ChatGPT-backed Codex session. Use the separate OpenAI API provider, or rerun "codex login" for ChatGPT-plan-backed Codex.'
           : status.codexCredentialStoreMode === "keyring"
-            ? 'No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Jolt does not import keyring-backed Codex credentials directly, so switch Codex CLI to file storage and rerun "codex login".'
+            ? 'No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Metidos does not import keyring-backed Codex credentials directly, so switch Codex CLI to file storage and rerun "codex login".'
             : status.codexCredentialStoreMode === "auto"
               ? 'No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Switch Codex CLI to file storage and rerun "codex login".'
-              : 'No ~/.codex/auth.json file was found. Run "codex login" so Codex CLI creates a reusable shared auth file for Jolt.';
+              : 'No ~/.codex/auth.json file was found. Run "codex login" so Codex CLI creates a reusable shared auth file for Metidos.';
     case "no_codex_auth_available":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? "Codex CLI reports an active ChatGPT login, but Jolt does not have reusable Codex credentials configured yet."
+        ? "Codex CLI reports an active ChatGPT login, but Metidos does not have reusable Codex credentials configured yet."
         : status.codexCliAuthStatus === "logged_in_api_key"
-          ? "Codex CLI reports an API-key login, but Jolt does not have reusable OpenAI Codex credentials configured yet."
+          ? "Codex CLI reports an API-key login, but Metidos does not have reusable OpenAI Codex credentials configured yet."
           : "No Codex credentials are configured yet.";
     default:
       return status.source === "none"
         ? "No Codex credentials are configured yet."
-        : "Jolt is using the current provider-auth source for OpenAI Codex.";
+        : "Metidos is using the current provider-auth source for OpenAI Codex.";
   }
 }
 
@@ -253,7 +253,7 @@ export function providerAuthRecoverySteps(
     return [];
   }
 
-  const sharedCacheBody = `If you want Codex CLI and Jolt to share one cache, set cli_auth_credentials_store = "file" in ${status.codexConfigFilePath}, then sign in again so ${status.codexAuthFilePath} exists.`;
+  const sharedCacheBody = `If you want Codex CLI and Metidos to share one cache, set cli_auth_credentials_store = "file" in ${status.codexConfigFilePath}, then sign in again so ${status.codexAuthFilePath} exists.`;
   const headlessBody =
     "For remote or headless hosts, prefer device-code login. If you can complete browser login on another machine, copy the resulting auth.json onto the target host after file-based storage is enabled.";
 
@@ -264,7 +264,7 @@ export function providerAuthRecoverySteps(
         ...(status.codexCliAuthStatus === "logged_in_chatgpt"
           ? [
               {
-                body: "Codex CLI already reports a ChatGPT-backed login, but Jolt cannot reuse that session automatically unless Codex writes a shared auth.json cache.",
+                body: "Codex CLI already reports a ChatGPT-backed login, but Metidos cannot reuse that session automatically unless Codex writes a shared auth.json cache.",
                 title: "Existing Codex CLI login detected",
               },
             ]
@@ -292,7 +292,7 @@ export function providerAuthRecoverySteps(
               ]
             : []),
         {
-          body: 'Use Codex CLI itself to create the shared auth cache Jolt expects. On machines with browser access, run "codex login".',
+          body: 'Use Codex CLI itself to create the shared auth cache Metidos expects. On machines with browser access, run "codex login".',
           code: "codex login",
           title: "Create the shared Codex login",
         },
@@ -327,7 +327,7 @@ export function providerAuthRecoverySteps(
     case "codex_auth_file_unusable_fell_back_to_pi_auth":
       return [
         {
-          body: "Jolt can keep working with its Pi auth fallback, but the Codex CLI cache on disk still needs repair if you want both tools to stay in sync.",
+          body: "Metidos can keep working with its Pi auth fallback, but the Codex CLI cache on disk still needs repair if you want both tools to stay in sync.",
           title: "Current fallback state",
         },
         {
@@ -345,10 +345,10 @@ export function providerAuthRecoverySteps(
         {
           body:
             status.codexCredentialStoreMode === "keyring"
-              ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so no shared auth.json cache is expected. The supported long-term path is still a file-backed Codex login.`
+              ? `Metidos is already authenticated through its Pi fallback, and Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so no shared auth.json cache is expected. The supported long-term path is still a file-backed Codex login.`
               : status.codexCredentialStoreMode === "auto"
-                ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may still be using the OS keyring. The supported long-term path is still a file-backed Codex login.`
-                : "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache. The supported long-term path is still a file-backed Codex login.",
+                ? `Metidos is already authenticated through its Pi fallback, and Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may still be using the OS keyring. The supported long-term path is still a file-backed Codex login.`
+                : "Metidos is already authenticated through its Pi fallback, so new Metidos threads can keep running even though Codex CLI is not sharing a file cache. The supported long-term path is still a file-backed Codex login.",
           title: "Current fallback state",
         },
         {
@@ -562,9 +562,9 @@ export function SettingsPanel({
               <span>Settings</span>
             </div>
             <p className="mt-2 text-xs leading-5 text-[#9fb5c4]">
-              Jolt detects Codex availability here, but the supported login path
-              is still the Codex CLI itself. OpenAI Codex is plan-backed through
-              ChatGPT auth, while OpenAI API stays a separate API-billed
+              Metidos detects Codex availability here, but the supported login
+              path is still the Codex CLI itself. OpenAI Codex is plan-backed
+              through ChatGPT auth, while OpenAI API stays a separate API-billed
               provider.
             </p>
           </div>
@@ -667,8 +667,8 @@ export function SettingsPanel({
                       </div>
                       <div className="mt-1 leading-5 text-[#96b0c4]">
                         These steps mirror the current Codex auth guidance for
-                        file storage and CLI-driven recovery. Jolt does not log
-                        you into Codex on your behalf.
+                        file storage and CLI-driven recovery. Metidos does not
+                        log you into Codex on your behalf.
                       </div>
                     </div>
 
@@ -753,8 +753,9 @@ export function SettingsPanel({
                   Codex availability rule:
                 </span>{" "}
                 `OpenAI Codex` stays unavailable in the selector until Codex CLI
-                has written a usable shared auth file that Jolt can import. If
-                it is unavailable, run `codex login`, then refresh status here.
+                has written a usable shared auth file that Metidos can import.
+                If it is unavailable, run `codex login`, then refresh status
+                here.
               </div>
             </section>
           </div>

@@ -83,7 +83,7 @@ type UseMainviewDerivedStateParams = {
   isUpdatingThreadAccess: boolean;
   pendingThreadGithubAccess: boolean;
   pendingThreadAgentsAccess: boolean;
-  pendingThreadJoltAccess: boolean;
+  pendingThreadMetidosAccess: boolean;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: RpcReasoningEffort;
   pendingThreadUnsafeMode: boolean;
@@ -186,7 +186,7 @@ export function deriveReasoningEffortSelectorDisabled({
  * @param isUpdatingThreadAccess - Boolean flag indicating isUpdatingThreadAccess.
  * @param pendingThreadGithubAccess - pendingThreadGithubAccess argument for useMainviewDerivedState.
  * @param pendingThreadAgentsAccess - pendingThreadAgentsAccess argument for useMainviewDerivedState.
- * @param pendingThreadJoltAccess - pendingThreadJoltAccess argument for useMainviewDerivedState.
+ * @param pendingThreadMetidosAccess - pendingThreadMetidosAccess argument for useMainviewDerivedState.
  * @param pendingThreadModel - pendingThreadModel argument for useMainviewDerivedState.
  * @param pendingThreadReasoningEffort - pendingThreadReasoningEffort argument for useMainviewDerivedState.
  * @param pendingThreadUnsafeMode - pendingThreadUnsafeMode argument for useMainviewDerivedState.
@@ -222,7 +222,7 @@ export function useMainviewDerivedState({
   isUpdatingThreadAccess,
   pendingThreadGithubAccess,
   pendingThreadAgentsAccess,
-  pendingThreadJoltAccess,
+  pendingThreadMetidosAccess,
   pendingThreadModel,
   pendingThreadReasoningEffort,
   pendingThreadUnsafeMode,
@@ -371,12 +371,12 @@ export function useMainviewDerivedState({
     return pendingThreadAgentsAccess;
   }, [pendingThreadAgentsAccess, selectedThread]);
 
-  const activeJoltAccess = useMemo(() => {
+  const activeMetidosAccess = useMemo(() => {
     if (selectedThread) {
-      return selectedThread.joltAccess;
+      return selectedThread.metidosAccess;
     }
-    return pendingThreadJoltAccess;
-  }, [pendingThreadJoltAccess, selectedThread]);
+    return pendingThreadMetidosAccess;
+  }, [pendingThreadMetidosAccess, selectedThread]);
 
   const activeUnsafeMode = useMemo(() => {
     if (selectedThread) {
@@ -730,7 +730,7 @@ export function useMainviewDerivedState({
     activeContextWindowTokens,
     activeGithubAccess,
     activeAgentsAccess,
-    activeJoltAccess,
+    activeMetidosAccess,
     activePollingProjectId,
     activePollingWorktreePath,
     activeReasoningEffort,

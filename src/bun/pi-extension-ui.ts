@@ -1,6 +1,6 @@
 /**
  * @file src/bun/pi-extension-ui.ts
- * @description Pi extension UI bridge for Jolt's browser runtime.
+ * @description Pi extension UI bridge for Metidos's browser runtime.
  */
 
 import type {
@@ -31,7 +31,7 @@ type CreateDialogRequest = {
   prefill?: string;
 };
 
-const UNSUPPORTED_THEME_RESULT = "Theme changes are not supported in Jolt.";
+const UNSUPPORTED_THEME_RESULT = "Theme changes are not supported in Metidos.";
 
 /**
  * Per-process Pi extension UI bridge used by thread runtimes.

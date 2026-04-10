@@ -1,4 +1,4 @@
-schema = "jolt.task/v2"
+schema = "metidos.task/v2"
 id = "tg-01jv6xdz7j9n3q6t8x2a4c7efh"
 title = "Document task graph admin tooling workflow"
 type = "docs"

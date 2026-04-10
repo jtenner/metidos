@@ -1,4 +1,4 @@
-schema = "jolt.task-tags/v2"
+schema = "metidos.task-tags/v2"
 
 [[tag]]
 name = "area:task-graph"
@@ -6,8 +6,8 @@ description = "Git-native task graph work"
 exclusive_group = "area"
 
 [[tag]]
-name = "component:pi-jolt-tools"
-description = "Jolt tool host and tool exposure"
+name = "component:pi-metidos-tools"
+description = "Metidos tool host and tool exposure"
 
 [[tag]]
 name = "component:project-procedures"

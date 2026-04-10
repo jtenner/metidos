@@ -87,8 +87,8 @@ test("parseCodexDeviceAuthOutput extracts the device-auth URL and one-time code 
 });
 
 test("createPiAuthStorage syncs ~/.codex/auth.json into Pi auth and overrides stale Codex credentials", () => {
-  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
-  const codexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const agentDirectory = mkdtempSync(join(tmpdir(), "metidos-pi-auth-agent-"));
+  const codexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
   process.env.CODEX_HOME = codexHome;
 
   const stalePiAccessToken = createJwt({
@@ -173,10 +173,12 @@ test("createPiAuthStorage syncs ~/.codex/auth.json into Pi auth and overrides st
 });
 
 test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is missing or unusable", () => {
-  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
-  const missingCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
-  const invalidCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
-  const incompleteCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const agentDirectory = mkdtempSync(join(tmpdir(), "metidos-pi-auth-agent-"));
+  const missingCodexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const invalidCodexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const incompleteCodexHome = mkdtempSync(
+    join(tmpdir(), "metidos-codex-home-"),
+  );
   const persistedAccessToken = createJwt({
     exp: 1_920_000_000,
   });
@@ -262,9 +264,9 @@ test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is mis
 });
 
 test("createPiAuthStorage exposes the configured Codex credential store mode", () => {
-  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
-  const keyringCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
-  const autoCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const agentDirectory = mkdtempSync(join(tmpdir(), "metidos-pi-auth-agent-"));
+  const keyringCodexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const autoCodexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
 
   try {
     writeCodexConfig(keyringCodexHome, "keyring");
@@ -303,8 +305,8 @@ test("createPiAuthStorage exposes the configured Codex credential store mode", (
 });
 
 test("createPiAuthStorage surfaces non-file Codex CLI login state through the shared auth state", () => {
-  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
-  const codexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const agentDirectory = mkdtempSync(join(tmpdir(), "metidos-pi-auth-agent-"));
+  const codexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
   process.env.CODEX_HOME = codexHome;
 
   try {
@@ -335,9 +337,11 @@ test("createPiAuthStorage surfaces non-file Codex CLI login state through the sh
 });
 
 test("createPiAuthStorage surfaces missing and unusable Codex-file reasons when no Pi fallback exists", () => {
-  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
-  const missingCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
-  const incompleteCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const agentDirectory = mkdtempSync(join(tmpdir(), "metidos-pi-auth-agent-"));
+  const missingCodexHome = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const incompleteCodexHome = mkdtempSync(
+    join(tmpdir(), "metidos-codex-home-"),
+  );
 
   try {
     process.env.CODEX_HOME = missingCodexHome;

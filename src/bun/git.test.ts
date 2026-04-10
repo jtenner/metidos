@@ -19,7 +19,7 @@ import { normalizeGitPath, readWorktreeFileContentPage } from "./git";
 const tempPaths: string[] = [];
 
 function makeTempDir(): string {
-  const path = mkdtempSync(join(tmpdir(), "jolt-git-test-"));
+  const path = mkdtempSync(join(tmpdir(), "metidos-git-test-"));
   tempPaths.push(path);
   return path;
 }

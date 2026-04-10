@@ -8,7 +8,7 @@ type LoggingThreadMessage = {
   payload: LogMessage;
 };
 
-export const TRACE_LOGGING_ENV = "JOLT_TRACE_LOGS";
+export const TRACE_LOGGING_ENV = "METIDOS_TRACE_LOGS";
 
 export type LogLevel = "INFO" | "WARNING" | "ERROR" | "TRACE";
 
@@ -20,7 +20,7 @@ export type LogMessage = {
   source: string;
 };
 
-const LOG_THREAD_NAME = "jolt-logging-thread";
+const LOG_THREAD_NAME = "metidos-logging-thread";
 const LOG_THREAD_URL = new URL("./logging-thread.ts", import.meta.url);
 
 let loggingThread: Worker | null = null;
@@ -29,7 +29,10 @@ let loggingThreadSupported = true;
 export function isTraceLoggingEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return env[TRACE_LOGGING_ENV]?.trim() === "1";
+  return (
+    env[TRACE_LOGGING_ENV]?.trim() === "1" ||
+    env.JOLT_TRACE_LOGS?.trim() === "1"
+  );
 }
 
 export function shouldEmitLogLevel(

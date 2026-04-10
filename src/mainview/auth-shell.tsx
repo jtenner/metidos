@@ -386,7 +386,7 @@ export default function AuthShell({
      * @param event - Auth-required custom event payload.
      */
     const handleAuthRequired = (
-      event: WindowEventMap["jolt:auth-required"],
+      event: WindowEventMap["metidos:auth-required"],
     ): void => {
       setError(event.detail.reason);
       void loadGateState({
@@ -575,7 +575,7 @@ export default function AuthShell({
   if (view === "app" && status?.authenticated) {
     const devBypassMessage = status.configured
       ? "Stored local auth remains configured, but this session is bypassing login checks."
-      : "No local auth is configured right now. Disable JOLT_DEV_BYPASS=1 before validating the real setup/login flow.";
+      : "No local auth is configured right now. Disable METIDOS_DEV_BYPASS=1 before validating the real setup/login flow.";
 
     return (
       <div className="relative h-full">
