@@ -35,7 +35,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Centralizes authoritative thread metadata mutations so the UI and sidecar invalidate caches through the same backend path.
   - Maintains in-memory caches/polling state, manages worktree background refresh loops, and publishes change events to connected clients.
   - Also exposes the Bun-side provider-auth RPC surface for `openai-codex`, returning live auth status plus refreshed model-catalog payloads after login, refresh, and logout transitions.
-  - Rejects unavailable provider-qualified model selections before thread creation, thread-start requests, queued runs, and cron mutations so stale `openai-codex` state cannot silently fail later in the runtime.
+  - Rejects unavailable provider-qualified model selections before thread creation, thread-start requests, queued runs, and cron mutations so missing provider env/login setup fails fast instead of silently failing later in the runtime.
   - Also owns runtime recovery (interrupted turns), startup cache warmup, and runtime stats consumed by overload logging.
 
 - `pi-runtime-probe.ts`
@@ -137,7 +137,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Curates built-in providers down to a recent-release model set so the selector does not expose every historical Pi registry entry by default.
   - Also keeps a small set of current Chinese-model options by exposing first-class `Kimi Coding`, `MiniMax`, and `Z.AI` providers plus current `Qwen` picks through `OpenRouter`.
   - Exposes `openai-codex` as a first-class provider, distinguishes it from `OpenAI API`, and prefers Codex-backed raw GPT defaults only when Codex auth is actually available.
-  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already logged in but Metidos still needs importable or Pi-managed credentials.
+  - Maps each curated provider to its required env or auth inputs so the model catalog can mark missing setup as disabled before runtime.
   - Tracks provider/model metadata such as reasoning support, context-window size, and whether a provider is currently runnable.
   - Provides token-context utilities used for compaction/size logic.
 

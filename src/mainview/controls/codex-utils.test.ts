@@ -166,7 +166,7 @@ describe("stepped codex selector helpers", () => {
         id: "openai-codex:gpt-5.4",
         providerAvailable: false,
         providerAvailabilityNote:
-          'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+          "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
         providerId: "openai-codex",
         providerLabel: "OpenAI Codex",
       }),
@@ -181,7 +181,7 @@ describe("stepped codex selector helpers", () => {
         ],
         providerAvailable: false,
         providerAvailabilityNote:
-          'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+          "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
         providerId: "openai-codex",
         providerLabel: "OpenAI Codex",
       },
@@ -196,7 +196,7 @@ describe("stepped codex selector helpers", () => {
             id: "openai-codex:gpt-5.4",
             providerAvailable: false,
             providerAvailabilityNote:
-              'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+              "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
             providerId: "openai-codex",
             providerLabel: "OpenAI Codex",
           }),
@@ -209,7 +209,7 @@ describe("stepped codex selector helpers", () => {
         "Uses ChatGPT-backed Codex auth. Usage follows ChatGPT workspace permissions, retention, and residency settings.",
       modelLabel: "GPT-5.4",
       providerAvailabilityNote:
-        'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+        "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
       providerAvailable: false,
       providerLabel: "OpenAI Codex",
       summary: "ChatGPT workspace policy",

@@ -26,6 +26,7 @@ type DeviceLoginCredential = {
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
+const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -57,6 +58,7 @@ async function loadProjectProceduresForTest(options: {
   resetResolvedAppDataDirectory();
   process.env.METIDOS_APP_DATA_DIR = options.appDataDir;
   process.env.CODEX_HOME = options.codexHome;
+  process.env.OPENAI_API_KEY = "test-openai-key";
 
   return (await import(
     `../project-procedures?provider-auth-test=${Date.now()}`
@@ -78,6 +80,11 @@ afterEach(async () => {
     process.env.CODEX_HOME = originalCodexHome;
   } else {
     delete process.env.CODEX_HOME;
+  }
+  if (typeof originalOpenAiApiKey === "string") {
+    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+  } else {
+    delete process.env.OPENAI_API_KEY;
   }
 });
 

@@ -23,11 +23,55 @@ import {
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
+const PROVIDER_ENV_DEFAULTS = {
+  ANTHROPIC_API_KEY: "test-anthropic-key",
+  AWS_ACCESS_KEY_ID: "AKIA_TEST_KEY",
+  AWS_REGION: "us-east-1",
+  AWS_SECRET_ACCESS_KEY: "test-bedrock-secret",
+  AZURE_OPENAI_API_KEY: "test-azure-key",
+  AZURE_OPENAI_BASE_URL: "https://example.openai.azure.com",
+  GEMINI_API_KEY: "test-google-key",
+  GOOGLE_CLOUD_API_KEY: "test-vertex-key",
+  GROQ_API_KEY: "test-groq-key",
+  KIMI_API_KEY: "test-kimi-key",
+  MINIMAX_API_KEY: "test-minimax-key",
+  MISTRAL_API_KEY: "test-mistral-key",
+  OPENAI_API_KEY: "test-openai-key",
+  OPENROUTER_API_KEY: "test-openrouter-key",
+  XAI_API_KEY: "test-xai-key",
+  ZAI_API_KEY: "test-zai-key",
+} satisfies Record<string, string>;
+const PROVIDER_ENV_NAMES = [
+  ...Object.keys(PROVIDER_ENV_DEFAULTS),
+  "ANTHROPIC_OAUTH_TOKEN",
+  "AWS_BEARER_TOKEN_BEDROCK",
+  "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+  "AWS_PROFILE",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AZURE_OPENAI_RESOURCE_NAME",
+  "GCLOUD_PROJECT",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "GOOGLE_CLOUD_LOCATION",
+  "GOOGLE_CLOUD_PROJECT",
+] as const;
+const originalProviderEnv = new Map<string, string | undefined>(
+  PROVIDER_ENV_NAMES.map((name) => [name, process.env[name]]),
+);
 
 type ProjectProceduresModule = typeof import("./project-procedures");
 
 let projectProcedures: ProjectProceduresModule | null = null;
 let isolatedCodexHome = "";
+
+function applyDefaultProviderEnv(): void {
+  for (const name of PROVIDER_ENV_NAMES) {
+    delete process.env[name];
+  }
+  for (const [name, value] of Object.entries(PROVIDER_ENV_DEFAULTS)) {
+    process.env[name] = value;
+  }
+}
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -122,6 +166,7 @@ async function loadProjectProcedures() {
 }
 
 beforeAll(async () => {
+  applyDefaultProviderEnv();
   isolatedCodexHome = createTempDirectory("metidos-codex-home-");
   process.env.CODEX_HOME = isolatedCodexHome;
   setPiCodexAuthTestOverrides({
@@ -135,6 +180,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
+  applyDefaultProviderEnv();
   process.env.CODEX_HOME = isolatedCodexHome;
   setPiCodexAuthTestOverrides({
     codexCliStatus: () => ({
@@ -165,6 +211,13 @@ afterAll(async () => {
     process.env.CODEX_HOME = originalCodexHome;
   } else {
     delete process.env.CODEX_HOME;
+  }
+  for (const [name, value] of originalProviderEnv) {
+    if (typeof value === "string") {
+      process.env[name] = value;
+    } else {
+      delete process.env[name];
+    }
   }
 
   resetPiCodexAuthTestOverrides();
@@ -204,7 +257,7 @@ describe("project procedure configuration helpers", () => {
           modelId: "gpt-5.4",
           providerAvailable: false,
           providerAvailabilityNote:
-            'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+            "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
           providerId: "openai-codex",
           providerLabel: "OpenAI Codex",
           supportsReasoningEffort: true,
@@ -261,6 +314,98 @@ describe("project procedure configuration helpers", () => {
     expect(modelIds.has("xai:grok-3-mini")).toBe(false);
   });
 
+  it("marks providers disabled when their required setup env is missing", () => {
+    const scenarios = [
+      {
+        providerId: "amazon-bedrock",
+        unset: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
+        note: "Amazon Bedrock is not setup. Please add your key to the env variable AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (or AWS_PROFILE / AWS_BEARER_TOKEN_BEDROCK).",
+      },
+      {
+        providerId: "anthropic",
+        unset: ["ANTHROPIC_API_KEY"],
+        note: "Anthropic is not setup. Please add your key to the env variable ANTHROPIC_API_KEY.",
+      },
+      {
+        providerId: "azure-openai-responses",
+        unset: ["AZURE_OPENAI_API_KEY"],
+        note: "Azure OpenAI is not setup. Please add your key to the env variable AZURE_OPENAI_API_KEY and AZURE_OPENAI_BASE_URL (or AZURE_OPENAI_RESOURCE_NAME).",
+      },
+      {
+        providerId: "google",
+        unset: ["GEMINI_API_KEY"],
+        note: "Google is not setup. Please add your key to the env variable GEMINI_API_KEY.",
+      },
+      {
+        providerId: "google-vertex",
+        unset: ["GOOGLE_CLOUD_API_KEY"],
+        note: "Google Vertex is not setup. Please add your key to the env variable GOOGLE_CLOUD_API_KEY (or GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION).",
+      },
+      {
+        providerId: "groq",
+        unset: ["GROQ_API_KEY"],
+        note: "Groq is not setup. Please add your key to the env variable GROQ_API_KEY.",
+      },
+      {
+        providerId: "kimi-coding",
+        unset: ["KIMI_API_KEY"],
+        note: "Kimi Coding is not setup. Please add your key to the env variable KIMI_API_KEY.",
+      },
+      {
+        providerId: "minimax",
+        unset: ["MINIMAX_API_KEY"],
+        note: "MiniMax is not setup. Please add your key to the env variable MINIMAX_API_KEY.",
+      },
+      {
+        providerId: "mistral",
+        unset: ["MISTRAL_API_KEY"],
+        note: "Mistral is not setup. Please add your key to the env variable MISTRAL_API_KEY.",
+      },
+      {
+        providerId: "openai",
+        unset: ["OPENAI_API_KEY"],
+        note: "OpenAI API is not setup. Please add your key to the env variable OPENAI_API_KEY.",
+      },
+      {
+        providerId: "openrouter",
+        unset: ["OPENROUTER_API_KEY"],
+        note: "OpenRouter is not setup. Please add your key to the env variable OPENROUTER_API_KEY.",
+      },
+      {
+        providerId: "xai",
+        unset: ["XAI_API_KEY"],
+        note: "xAI is not setup. Please add your key to the env variable XAI_API_KEY.",
+      },
+      {
+        providerId: "zai",
+        unset: ["ZAI_API_KEY"],
+        note: "Z.AI is not setup. Please add your key to the env variable ZAI_API_KEY.",
+      },
+    ] as const;
+
+    for (const scenario of scenarios) {
+      applyDefaultProviderEnv();
+      for (const variableName of scenario.unset) {
+        delete process.env[variableName];
+      }
+
+      const disabledProviderModels = buildModelCatalog().models.filter(
+        (model) => model.providerId === scenario.providerId,
+      );
+
+      expect(disabledProviderModels.length).toBeGreaterThan(0);
+      expect(disabledProviderModels).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            providerAvailabilityNote: scenario.note,
+            providerAvailable: false,
+            providerId: scenario.providerId,
+          }),
+        ]),
+      );
+    }
+  });
+
   it("prefers openai-codex for raw GPT ids when Codex auth is available", () => {
     const codexHome = createTempDirectory("metidos-codex-home-");
     writeCodexAuthFile(codexHome);
@@ -315,13 +460,13 @@ describe("project procedure configuration helpers", () => {
       expect.objectContaining({
         providerAvailable: false,
         providerAvailabilityNote:
-          'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.',
+          "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
       }),
     );
     expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
   });
 
-  it("surfaces Codex CLI keyring-login diagnostics in unavailable provider notes", () => {
+  it("uses file-auth guidance for unavailable Codex providers", () => {
     const codexHome = createTempDirectory("metidos-codex-home-");
     process.env.CODEX_HOME = codexHome;
     setPiCodexAuthTestOverrides({
@@ -339,9 +484,8 @@ describe("project procedure configuration helpers", () => {
     expect(codexModel).toEqual(
       expect.objectContaining({
         providerAvailable: false,
-        providerAvailabilityNote: expect.stringContaining(
-          "Codex CLI is already signed in with ChatGPT",
-        ),
+        providerAvailabilityNote:
+          "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.",
       }),
     );
   });
@@ -383,7 +527,7 @@ describe("project procedure configuration helpers", () => {
       projectPath: repoPath,
     });
     const unavailableMessage =
-      'OpenAI Codex is unavailable for GPT-5.4. Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
+      "OpenAI Codex is unavailable for GPT-5.4. OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.";
 
     await expect(
       procedures.requestThreadStartProcedure({
@@ -478,7 +622,7 @@ describe("project procedure configuration helpers", () => {
     process.env.CODEX_HOME = isolatedCodexHome;
     clearPiAuthFile();
     const unavailableMessage =
-      'OpenAI Codex is unavailable for GPT-5.4. Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
+      "OpenAI Codex is unavailable for GPT-5.4. OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.";
     const beforeFailedSend = await procedures.getThreadProcedure({
       threadId: codexThread.thread.id,
     });

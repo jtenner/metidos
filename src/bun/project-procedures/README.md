@@ -11,7 +11,7 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Keeps current Chinese-model families visible in that curated set by exposing direct `Kimi Coding`, `MiniMax`, and `Z.AI` providers and a few current `Qwen` models through `OpenRouter`.
   - Validates and normalizes selected model/reasoning-effort values so invalid persisted data cannot break runtime behavior.
   - Tracks provider metadata such as xAI routing, current provider availability, and which model ids accept reasoning-effort overrides.
-  - Reuses the shared Codex CLI-status probe so unavailable `OpenAI Codex` rows can explain when Codex CLI is already authenticated but Metidos still cannot import reusable credentials.
+  - Resolves provider availability from the backend environment and Metidos-owned Pi auth store so missing setup is visible before a run starts.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
 - `provider-auth.ts`
@@ -60,7 +60,7 @@ It is organized by concern so each module has a narrow responsibility for data m
 ## Notes
 
 - This module family is the operational core behind `src/bun/project-procedures.ts`.
-- Provider availability is enforced in the procedure layer before thread creation, queued runs, and cron mutations so stale `openai-codex` selections fail fast with actionable errors instead of reaching the runtime.
+- Provider availability is enforced in the procedure layer before thread creation, queued runs, and cron mutations so missing provider env/login setup fails fast with actionable errors instead of reaching the runtime.
 - Files here are intentionally separated to avoid a monolithic RPC implementation and to keep runtime responsibilities testable by boundary:
   - persistence mapping in `thread-detail.ts`
   - metadata normalization in `model-catalog.ts`

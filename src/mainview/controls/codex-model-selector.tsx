@@ -4,6 +4,7 @@
  */
 
 import { type JSX, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   RpcModelOption,
   RpcReasoningEffort,
@@ -36,6 +37,12 @@ type CodexModelSelectorProps = {
 };
 
 type SelectorStep = "provider" | "model" | "reasoning";
+
+type ProviderWarningPopoverState = {
+  note: string;
+  x: number;
+  y: number;
+};
 
 /**
  * Model picker used by chat and cron controls.
@@ -104,6 +111,8 @@ export function CodexModelSelector({
     activeProvider?.providerId ?? null,
   );
   const [pendingModelId, setPendingModelId] = useState<string | null>(null);
+  const [providerWarningPopover, setProviderWarningPopover] =
+    useState<ProviderWarningPopoverState | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -116,6 +125,7 @@ export function CodexModelSelector({
       activeProvider?.providerId ?? providerGroups[0]?.providerId ?? null,
     );
     setPendingModelId(null);
+    setProviderWarningPopover(null);
   }, [activeProvider?.providerId, dropdownOpen, providerGroups]);
 
   useEffect(() => {
@@ -210,294 +220,279 @@ export function CodexModelSelector({
     );
   }
 
+  function showProviderWarningPopover(
+    anchor: HTMLElement,
+    note: string | null | undefined,
+  ): void {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const normalizedNote = note?.trim();
+    if (!normalizedNote) {
+      return;
+    }
+
+    const rect = anchor.getBoundingClientRect();
+    const estimatedWidth = 320;
+    const viewportPadding = 12;
+    const preferredX = rect.right + 12;
+    const fallbackX = rect.left - estimatedWidth - 12;
+    const x =
+      preferredX + estimatedWidth + viewportPadding <= window.innerWidth
+        ? preferredX
+        : Math.max(viewportPadding, fallbackX);
+    const y = Math.min(
+      Math.max(viewportPadding + 24, rect.top + rect.height / 2),
+      window.innerHeight - viewportPadding - 24,
+    );
+
+    setProviderWarningPopover({
+      note: normalizedNote,
+      x,
+      y,
+    });
+  }
+
+  function hideProviderWarningPopover(): void {
+    setProviderWarningPopover(null);
+  }
+
   return (
-    <DropdownControl
-      canOpen={!controlDisabled}
-      disabled={controlDisabled}
-      onOpenChange={setDropdownOpen}
-      renderButton={({ open, toggle }) => (
-        <button
-          type="button"
-          className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
-            variant === "desktop"
-              ? "h-8 gap-2 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
-              : "h-10 gap-2 border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
-          } ${controlDisabled ? "cursor-not-allowed opacity-60" : ""} ${
-            open
-              ? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
-              : ""
-          }`}
-          onClick={toggle}
-          disabled={controlDisabled}
-          aria-expanded={open}
-          aria-haspopup="menu"
-        >
-          <span className="min-w-0 flex flex-1 items-center overflow-hidden">
-            {activeModel && buttonProviderLabel ? (
-              <>
+    <>
+      <DropdownControl
+        canOpen={!controlDisabled}
+        disabled={controlDisabled}
+        onOpenChange={setDropdownOpen}
+        renderButton={({ open, toggle }) => (
+          <button
+            type="button"
+            className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
+              variant === "desktop"
+                ? "h-8 gap-2 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+                : "h-10 gap-2 border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
+            } ${controlDisabled ? "cursor-not-allowed opacity-60" : ""} ${
+              open
+                ? "border-[#9fc1da] shadow-[0_0_0_1px_rgba(159,193,218,0.18)]"
+                : ""
+            }`}
+            onClick={toggle}
+            disabled={controlDisabled}
+            aria-expanded={open}
+            aria-haspopup="menu"
+          >
+            <span className="min-w-0 flex flex-1 items-center overflow-hidden">
+              {activeModel && buttonProviderLabel ? (
+                <>
+                  <span
+                    className={`shrink-0 font-semibold text-[#f2f0ef] ${
+                      variant === "desktop"
+                        ? "text-[12px] leading-none"
+                        : "text-[12px] leading-none"
+                    }`}
+                  >
+                    {buttonProviderLabel}
+                  </span>
+                  <span
+                    className={`min-w-0 truncate text-[#8ea0ad] ${
+                      variant === "desktop"
+                        ? "pl-2 text-[12px] leading-none"
+                        : "pl-2 text-[12px] leading-none"
+                    }`}
+                  >
+                    {buttonModelLabel}
+                  </span>
+                </>
+              ) : (
                 <span
-                  className={`shrink-0 font-semibold text-[#f2f0ef] ${
+                  className={`truncate text-[#f2f0ef] ${
                     variant === "desktop"
                       ? "text-[12px] leading-none"
                       : "text-[12px] leading-none"
                   }`}
                 >
-                  {buttonProviderLabel}
-                </span>
-                <span
-                  className={`min-w-0 truncate text-[#8ea0ad] ${
-                    variant === "desktop"
-                      ? "pl-2 text-[12px] leading-none"
-                      : "pl-2 text-[12px] leading-none"
-                  }`}
-                >
                   {buttonModelLabel}
                 </span>
-              </>
-            ) : (
-              <span
-                className={`truncate text-[#f2f0ef] ${
-                  variant === "desktop"
-                    ? "text-[12px] leading-none"
-                    : "text-[12px] leading-none"
-                }`}
-              >
-                {buttonModelLabel}
-              </span>
-            )}
-          </span>
-          <span className="ml-[10px] flex shrink-0 items-center gap-2">
-            {buttonThinkingLabel ? (
-              <span className="inline-flex shrink-0 border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                {buttonThinkingLabel}
-              </span>
-            ) : null}
-            <span
-              className={`shrink-0 text-[#8f8d8b] ${
-                variant === "desktop"
-                  ? "leading-none"
-                  : "flex h-4 items-center leading-none"
-              }`}
-            >
-              {materialSymbol(
-                open ? "expand_less" : "expand_more",
-                variant === "desktop" ? "text-[13px]" : "text-[16px]",
               )}
             </span>
-          </span>
-        </button>
-      )}
-      renderPanel={({ close }) => (
-        <div className={panelClassName}>
-          <div className="border-b border-[#3c4c58] px-3 py-3">
-            {selectorStep === "provider" ? (
-              <div className="flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
-                {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
-                <input
-                  ref={searchInputRef}
-                  aria-label="Search providers or models"
-                  className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
-                  placeholder="Search providers or models"
-                  value={searchQuery}
-                  onChange={(event) => {
-                    setSearchQuery(event.currentTarget.value);
-                  }}
-                  onKeyDown={(event) => {
-                    event.stopPropagation();
-                  }}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
-                    onClick={() => {
-                      setSearchQuery("");
-                      searchInputRef.current?.focus();
-                    }}
-                    aria-label="Clear selector search"
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </div>
-            ) : selectedProvider ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center text-[#97b5ca] transition-colors hover:bg-[#1e2428] hover:text-[#f2f0ef]"
-                    onClick={handleStepBack}
-                    aria-label="Back to previous selector step"
-                  >
-                    {materialSymbol("arrow_forward", "text-[16px] rotate-180")}
-                  </button>
-                  <div className="text-[12px] font-semibold text-[#f4f8fb]">
-                    {selectedProvider.providerLabel}
-                  </div>
-                </div>
-                {selectorStep === "reasoning" ? null : (
-                  <div className="mt-3 flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
-                    {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
-                    <input
-                      ref={searchInputRef}
-                      aria-label="Search providers or models"
-                      className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
-                      placeholder="Search models"
-                      value={searchQuery}
-                      onChange={(event) => {
-                        setSearchQuery(event.currentTarget.value);
-                      }}
-                      onKeyDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                    />
-                    {searchQuery ? (
-                      <button
-                        type="button"
-                        className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
-                        onClick={() => {
-                          setSearchQuery("");
-                          searchInputRef.current?.focus();
-                        }}
-                        aria-label="Clear selector search"
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </div>
+            <span className="ml-[10px] flex shrink-0 items-center gap-2">
+              {buttonThinkingLabel ? (
+                <span className="inline-flex shrink-0 border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                  {buttonThinkingLabel}
+                </span>
+              ) : null}
+              <span
+                className={`shrink-0 text-[#8f8d8b] ${
+                  variant === "desktop"
+                    ? "leading-none"
+                    : "flex h-4 items-center leading-none"
+                }`}
+              >
+                {materialSymbol(
+                  open ? "expand_less" : "expand_more",
+                  variant === "desktop" ? "text-[13px]" : "text-[16px]",
                 )}
-              </div>
-            ) : null}
-          </div>
-
-          <div
-            className={`py-2 hide-scrollbar ${
-              selectorStep === "model"
-                ? "overflow-visible"
-                : "max-h-80 overflow-y-auto"
-            }`}
-          >
-            {selectorStep === "provider" ? (
-              filteredProviders.length === 0 ? (
-                <div className="px-4 py-4 text-xs text-[#8f9aa2]">
-                  No matching providers.
-                </div>
-              ) : (
-                filteredProviders.map((provider) => {
-                  const selected =
-                    provider.providerId === activeProvider?.providerId;
-                  const scopeInfo = codexProviderScopeInfo(provider.providerId);
-                  const providerAvailable = provider.providerAvailable ?? true;
-                  return (
+              </span>
+            </span>
+          </button>
+        )}
+        renderPanel={({ close }) => (
+          <div className={panelClassName}>
+            <div className="border-b border-[#3c4c58] px-3 py-3">
+              {selectorStep === "provider" ? (
+                <div className="flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
+                  {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
+                  <input
+                    ref={searchInputRef}
+                    aria-label="Search providers or models"
+                    className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
+                    placeholder="Search providers or models"
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.currentTarget.value);
+                    }}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  {searchQuery ? (
                     <button
-                      key={provider.providerId}
                       type="button"
-                      className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
-                        providerAvailable
-                          ? selected
-                            ? "bg-[#28353e] text-[#f8fafc]"
-                            : "text-[#ebf3f8] hover:bg-[#1e2428]"
-                          : selected
-                            ? "bg-[#28353e] text-[#f8fafc]"
-                            : "cursor-not-allowed text-[#8a949b] opacity-75"
-                      }`}
+                      className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
                       onClick={() => {
-                        if (!providerAvailable && !selected) {
-                          return;
-                        }
-                        handleProviderSelect(provider.providerId);
+                        setSearchQuery("");
+                        searchInputRef.current?.focus();
                       }}
-                      disabled={!providerAvailable && !selected}
+                      aria-label="Clear selector search"
                     >
-                      <span
-                        className={`shrink-0 ${
-                          selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
-                        }`}
-                      >
-                        {materialSymbol(
-                          selected ? "check_circle" : "radio_button_unchecked",
-                          "text-[16px]",
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="text-[12px] font-semibold text-[#f4f8fb]">
-                            {provider.providerLabel}
-                          </span>
-                          <span className="shrink-0 text-[11px] text-[#8f9aa2]">
-                            {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
-                          </span>
-                          {scopeInfo ? (
-                            <span className="ml-auto inline-flex shrink-0 border border-[#45606f] bg-[#132129] pl-[10px] pr-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                              {scopeInfo.badge}
-                            </span>
-                          ) : null}
-                        </span>
-                        {!providerAvailable &&
-                        provider.providerAvailabilityNote ? (
-                          <span className="mt-1 block text-[11px] leading-4 text-[#e9c28c]">
-                            {provider.providerAvailabilityNote}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
-                        {materialSymbol("chevron_right", "text-[16px]")}
-                      </span>
+                      ×
                     </button>
-                  );
-                })
-              )
-            ) : selectorStep === "model" ? (
-              !selectedProviderAvailable ? (
-                <div className="px-4 py-4 text-xs leading-5 text-[#cba26c]">
-                  {selectedProviderAvailabilityNote ??
-                    "This provider is unavailable until its auth is configured in Settings."}
+                  ) : null}
                 </div>
-              ) : filteredModels.length === 0 ? (
-                <div className="px-4 py-4 text-xs text-[#8f9aa2]">
-                  No matching models for this provider.
-                </div>
-              ) : (
-                filteredModels.map((model) => {
-                  const selected = model.id === activeModelId;
-                  const supportsReasoningSubmenu =
-                    integratedReasoningEnabled &&
-                    codexModelSupportsThinkingLevel(model);
-                  return (
-                    <div
-                      key={model.id}
-                      className="group/model-submenu relative"
+              ) : selectedProvider ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center text-[#97b5ca] transition-colors hover:bg-[#1e2428] hover:text-[#f2f0ef]"
+                      onClick={handleStepBack}
+                      aria-label="Back to previous selector step"
                     >
+                      {materialSymbol(
+                        "arrow_forward",
+                        "text-[16px] rotate-180",
+                      )}
+                    </button>
+                    <div className="text-[12px] font-semibold text-[#f4f8fb]">
+                      {selectedProvider.providerLabel}
+                    </div>
+                  </div>
+                  {selectorStep === "reasoning" ? null : (
+                    <div className="mt-3 flex items-center gap-2.5 border border-[#3c4c58] bg-[#111213] px-3 py-2">
+                      {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
+                      <input
+                        ref={searchInputRef}
+                        aria-label="Search providers or models"
+                        className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
+                        placeholder="Search models"
+                        value={searchQuery}
+                        onChange={(event) => {
+                          setSearchQuery(event.currentTarget.value);
+                        }}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                      {searchQuery ? (
+                        <button
+                          type="button"
+                          className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
+                          onClick={() => {
+                            setSearchQuery("");
+                            searchInputRef.current?.focus();
+                          }}
+                          aria-label="Clear selector search"
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div
+              className={`py-2 hide-scrollbar ${
+                selectorStep === "model"
+                  ? "overflow-visible"
+                  : "max-h-80 overflow-y-auto"
+              }`}
+            >
+              {selectorStep === "provider" ? (
+                filteredProviders.length === 0 ? (
+                  <div className="px-4 py-4 text-xs text-[#8f9aa2]">
+                    No matching providers.
+                  </div>
+                ) : (
+                  filteredProviders.map((provider) => {
+                    const selected =
+                      provider.providerId === activeProvider?.providerId;
+                    const scopeInfo = codexProviderScopeInfo(
+                      provider.providerId,
+                    );
+                    const providerAvailable =
+                      provider.providerAvailable ?? true;
+                    const providerDisabledNote =
+                      provider.providerAvailabilityNote ?? null;
+                    return (
                       <button
+                        key={provider.providerId}
                         type="button"
                         className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
-                          selected
-                            ? "bg-[#28353e] text-[#f8fafc]"
-                            : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                          providerAvailable
+                            ? selected
+                              ? "bg-[#28353e] text-[#f8fafc]"
+                              : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                            : selected
+                              ? "bg-[#28353e] text-[#f8fafc]"
+                              : "cursor-not-allowed text-[#8a949b] opacity-75"
                         }`}
-                        onMouseEnter={() => {
-                          if (supportsReasoningSubmenu) {
-                            setPendingModelId(model.id);
+                        onClick={() => {
+                          if (!providerAvailable) {
                             return;
                           }
-                          setPendingModelId((current) =>
-                            current === model.id ? null : current,
-                          );
+                          handleProviderSelect(provider.providerId);
                         }}
-                        onFocus={() => {
-                          if (supportsReasoningSubmenu) {
-                            setPendingModelId(model.id);
+                        onMouseEnter={(event) => {
+                          if (!providerAvailable) {
+                            showProviderWarningPopover(
+                              event.currentTarget,
+                              providerDisabledNote,
+                            );
                           }
                         }}
-                        onClick={() => {
-                          handleModelSelect(model, close);
+                        onMouseLeave={() => {
+                          hideProviderWarningPopover();
                         }}
+                        onFocus={(event) => {
+                          if (!providerAvailable) {
+                            showProviderWarningPopover(
+                              event.currentTarget,
+                              providerDisabledNote,
+                            );
+                          }
+                        }}
+                        onBlur={() => {
+                          hideProviderWarningPopover();
+                        }}
+                        aria-disabled={!providerAvailable}
                       >
                         <span
                           className={`shrink-0 ${
@@ -511,101 +506,212 @@ export function CodexModelSelector({
                             "text-[16px]",
                           )}
                         </span>
-                        <span className="min-w-0 flex flex-1 items-center gap-1">
-                          <span className="shrink-0 text-[12px] font-semibold text-[#f4f8fb]">
-                            {codexModelLabel(model)}
+                        <span className="min-w-0 flex flex-1 items-center gap-3">
+                          <span className="min-w-0 flex flex-1 items-center gap-2">
+                            <span className="truncate text-[12px] font-semibold text-[#f4f8fb]">
+                              {provider.providerLabel}
+                            </span>
+                            <span className="shrink-0 text-[11px] text-[#8f9aa2]">
+                              {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
+                            </span>
                           </span>
-                          <span
-                            className={`min-w-0 truncate text-[12px] ${
-                              selected ? "text-[#b7cad8]" : "text-[#8f9aa2]"
-                            }`}
-                          >
-                            {`- ${model.modelId}`}
+                          <span className="ml-auto flex shrink-0 items-center gap-2">
+                            {scopeInfo ? (
+                              <span className="inline-flex shrink-0 border border-[#45606f] bg-[#132129] pl-[10px] pr-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                                {scopeInfo.badge}
+                              </span>
+                            ) : null}
+                            {!providerAvailable ? (
+                              <span className="inline-flex shrink-0 items-center border border-[#7a622c] bg-[#2a2114] px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#f3cf85]">
+                                {materialSymbol("warning", "text-[12px]")}
+                              </span>
+                            ) : null}
                           </span>
                         </span>
-                        {supportsReasoningSubmenu ? (
-                          <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
-                            {materialSymbol("chevron_right", "text-[16px]")}
-                          </span>
-                        ) : null}
+                        <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
+                          {materialSymbol("chevron_right", "text-[16px]")}
+                        </span>
                       </button>
-                      {supportsReasoningSubmenu ? (
-                        <div className="pointer-events-none invisible absolute left-full top-0 z-20 min-w-[12rem] opacity-0 transition-opacity duration-150 group-hover/model-submenu:visible group-hover/model-submenu:pointer-events-auto group-hover/model-submenu:opacity-100 group-focus-within/model-submenu:visible group-focus-within/model-submenu:pointer-events-auto group-focus-within/model-submenu:opacity-100">
-                          <div className="border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-                            {reasoningOptions.map((option) => {
-                              const selectedOption =
-                                option.id === reasoningValue;
-                              return (
-                                <button
-                                  key={option.id}
-                                  type="button"
-                                  className={`block w-full px-3 py-2 text-left transition-colors ${
-                                    selectedOption
-                                      ? "bg-[#28353e] text-[#f8fafc]"
-                                      : "text-[#ebf3f8] hover:bg-[#1e2428]"
-                                  }`}
-                                  onClick={() => {
-                                    handleReasoningSelect(option.id, close);
-                                  }}
-                                >
-                                  <span className="block text-[12px] font-semibold text-inherit">
-                                    {option.label}
-                                  </span>
-                                </button>
-                              );
-                            })}
+                    );
+                  })
+                )
+              ) : selectorStep === "model" ? (
+                !selectedProviderAvailable ? (
+                  <div className="px-4 py-4 text-xs leading-5 text-[#cba26c]">
+                    {selectedProviderAvailabilityNote ??
+                      "This provider is disabled until it is setup."}
+                  </div>
+                ) : filteredModels.length === 0 ? (
+                  <div className="px-4 py-4 text-xs text-[#8f9aa2]">
+                    No matching models for this provider.
+                  </div>
+                ) : (
+                  filteredModels.map((model) => {
+                    const selected = model.id === activeModelId;
+                    const supportsReasoningSubmenu =
+                      integratedReasoningEnabled &&
+                      codexModelSupportsThinkingLevel(model);
+                    return (
+                      <div
+                        key={model.id}
+                        className="group/model-submenu relative"
+                      >
+                        <button
+                          type="button"
+                          className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
+                            selected
+                              ? "bg-[#28353e] text-[#f8fafc]"
+                              : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                          }`}
+                          onMouseEnter={() => {
+                            if (supportsReasoningSubmenu) {
+                              setPendingModelId(model.id);
+                              return;
+                            }
+                            setPendingModelId((current) =>
+                              current === model.id ? null : current,
+                            );
+                          }}
+                          onFocus={() => {
+                            if (supportsReasoningSubmenu) {
+                              setPendingModelId(model.id);
+                            }
+                          }}
+                          onClick={() => {
+                            handleModelSelect(model, close);
+                          }}
+                        >
+                          <span
+                            className={`shrink-0 ${
+                              selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
+                            }`}
+                          >
+                            {materialSymbol(
+                              selected
+                                ? "check_circle"
+                                : "radio_button_unchecked",
+                              "text-[16px]",
+                            )}
+                          </span>
+                          <span className="min-w-0 flex flex-1 items-center gap-1">
+                            <span className="shrink-0 text-[12px] font-semibold text-[#f4f8fb]">
+                              {codexModelLabel(model)}
+                            </span>
+                            <span
+                              className={`min-w-0 truncate text-[12px] ${
+                                selected ? "text-[#b7cad8]" : "text-[#8f9aa2]"
+                              }`}
+                            >
+                              {`- ${model.modelId}`}
+                            </span>
+                          </span>
+                          {supportsReasoningSubmenu ? (
+                            <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
+                              {materialSymbol("chevron_right", "text-[16px]")}
+                            </span>
+                          ) : null}
+                        </button>
+                        {supportsReasoningSubmenu ? (
+                          <div className="pointer-events-none invisible absolute left-full top-0 z-20 min-w-[12rem] opacity-0 transition-opacity duration-150 group-hover/model-submenu:visible group-hover/model-submenu:pointer-events-auto group-hover/model-submenu:opacity-100 group-focus-within/model-submenu:visible group-focus-within/model-submenu:pointer-events-auto group-focus-within/model-submenu:opacity-100">
+                            <div className="border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+                              {reasoningOptions.map((option) => {
+                                const selectedOption =
+                                  option.id === reasoningValue;
+                                return (
+                                  <button
+                                    key={option.id}
+                                    type="button"
+                                    className={`block w-full px-3 py-2 text-left transition-colors ${
+                                      selectedOption
+                                        ? "bg-[#28353e] text-[#f8fafc]"
+                                        : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                                    }`}
+                                    onClick={() => {
+                                      handleReasoningSelect(option.id, close);
+                                    }}
+                                  >
+                                    <span className="block text-[12px] font-semibold text-inherit">
+                                      {option.label}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
-                    </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )
+              ) : pendingModel ? (
+                reasoningOptions.map((option) => {
+                  const selected = option.id === reasoningValue;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
+                        selected
+                          ? "bg-[#28353e] text-[#f8fafc]"
+                          : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                      }`}
+                      onClick={() => {
+                        handleReasoningSelect(option.id, close);
+                      }}
+                    >
+                      <span
+                        className={`shrink-0 ${
+                          selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
+                        }`}
+                      >
+                        {materialSymbol(
+                          selected ? "check_circle" : "radio_button_unchecked",
+                          "text-[16px]",
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
+                          {option.label}
+                        </span>
+                        <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
+                          {`${codexModelLabel(pendingModel)} with ${option.label.toLowerCase()} thinking`}
+                        </span>
+                      </span>
+                    </button>
                   );
                 })
-              )
-            ) : pendingModel ? (
-              reasoningOptions.map((option) => {
-                const selected = option.id === reasoningValue;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
-                      selected
-                        ? "bg-[#28353e] text-[#f8fafc]"
-                        : "text-[#ebf3f8] hover:bg-[#1e2428]"
-                    }`}
-                    onClick={() => {
-                      handleReasoningSelect(option.id, close);
-                    }}
-                  >
-                    <span
-                      className={`shrink-0 ${
-                        selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
-                      }`}
-                    >
-                      {materialSymbol(
-                        selected ? "check_circle" : "radio_button_unchecked",
-                        "text-[16px]",
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
-                        {option.label}
-                      </span>
-                      <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
-                        {`${codexModelLabel(pendingModel)} with ${option.label.toLowerCase()} thinking`}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="px-4 py-4 text-xs text-[#8f9aa2]">
-                Choose a model before selecting a thinking level.
-              </div>
-            )}
+              ) : (
+                <div className="px-4 py-4 text-xs text-[#8f9aa2]">
+                  Choose a model before selecting a thinking level.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    />
+        )}
+      />
+      {providerWarningPopover && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[110] max-w-[20rem] rounded-md border border-[#7a622c] bg-[#2a2114]/96 px-3 py-2 text-xs leading-5 text-[#f3cf85] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+              style={{
+                left: providerWarningPopover.x,
+                top: providerWarningPopover.y,
+                transform: "translateY(-50%)",
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <span className="mt-[1px] shrink-0 text-[#f3cf85]">
+                  {materialSymbol("warning", "text-[14px]")}
+                </span>
+                <span className="break-words">
+                  {providerWarningPopover.note}
+                </span>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

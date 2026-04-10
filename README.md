@@ -21,6 +21,41 @@ The goal is to keep coding sessions, project state, and tool outputs tightly cou
 - Preserve responsive interactions with cancellation, background updates, and resilient reconnects.
 - Create and manage cron jobs from the Cronjobs workspace.
 
+## Getting Started
+
+Configure at least one model provider before opening a thread. Providers that are missing their required setup are shown as disabled in the model selector.
+
+For OpenAI Codex, use the Codex CLI with file-backed auth so Metidos can reuse the shared session:
+
+```bash
+codex login
+```
+
+For API-backed providers, set the env vars for the providers you want to use:
+
+| Provider | Required env vars | Notes |
+|----------|-------------------|-------|
+| OpenAI API | `OPENAI_API_KEY` | Standard OpenAI Platform key. |
+| OpenAI Codex | none | Uses `codex login` with file-backed auth instead of an API key env var. |
+| Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_OAUTH_TOKEN` also works if you already manage Anthropic auth that way. |
+| Google Gemini | `GEMINI_API_KEY` | Used for the `google` provider. |
+| Google Vertex | `GOOGLE_CLOUD_API_KEY` or `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT` + `GOOGLE_CLOUD_LOCATION` | Pi also supports ADC-backed Vertex auth. |
+| Azure OpenAI | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_BASE_URL` or `AZURE_OPENAI_RESOURCE_NAME` | `AZURE_OPENAI_API_VERSION` and `AZURE_OPENAI_DEPLOYMENT_NAME_MAP` are optional. |
+| Amazon Bedrock | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`, or `AWS_PROFILE`, or `AWS_BEARER_TOKEN_BEDROCK` | `AWS_REGION` is usually needed in practice unless your environment already provides it. |
+| Groq | `GROQ_API_KEY` | Used for the `groq` provider. |
+| Kimi Coding | `KIMI_API_KEY` | Used for the `kimi-coding` provider. |
+| MiniMax | `MINIMAX_API_KEY` | Used for the `minimax` provider. |
+| Mistral | `MISTRAL_API_KEY` | Used for the `mistral` provider. |
+| OpenRouter | `OPENROUTER_API_KEY` | Used for the `openrouter` provider. |
+| xAI | `XAI_API_KEY` | Used for the `xai` provider. |
+| Z.AI | `ZAI_API_KEY` | Used for the `zai` provider. |
+
+Start the app:
+
+```bash
+bun run start
+```
+
 ## Big-picture architecture
 
 ```mermaid

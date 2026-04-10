@@ -13,6 +13,7 @@ import {
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
+const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
 
@@ -61,6 +62,7 @@ async function loadProjectProcedures() {
     "metidos-pi-runtime-db-",
   );
   process.env.CODEX_HOME = createTempDirectory("metidos-codex-home-");
+  process.env.OPENAI_API_KEY = "test-openai-key";
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
   projectProcedures = (await import(
@@ -112,6 +114,11 @@ afterAll(async () => {
     process.env.CODEX_HOME = originalCodexHome;
   } else {
     delete process.env.CODEX_HOME;
+  }
+  if (typeof originalOpenAiApiKey === "string") {
+    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+  } else {
+    delete process.env.OPENAI_API_KEY;
   }
 
   if (typeof originalPiRuntimeTestProvider === "string") {

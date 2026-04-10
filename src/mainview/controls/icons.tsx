@@ -36,7 +36,8 @@ export type AppIconName =
   | "shield"
   | "stop"
   | "task_alt"
-  | "terminal";
+  | "terminal"
+  | "warning";
 
 /**
  * Return one or more SVG path/circle elements for a given icon name.
@@ -237,6 +238,20 @@ function renderIconGlyph(
         <>
           <path d="m6.5 8.5 3.5 3.5-3.5 3.5" />
           <path d="M12 15.5h5.5" />
+        </>
+      );
+    case "warning":
+      return (
+        <>
+          <path d="M12 4.75 20 19.25H4z" />
+          <path d="M12 9.25v4.75" />
+          <circle
+            cx="12"
+            cy="16.5"
+            r="0.85"
+            fill="currentColor"
+            stroke="none"
+          />
         </>
       );
   }

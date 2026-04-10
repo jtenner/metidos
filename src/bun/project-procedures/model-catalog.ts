@@ -193,6 +193,117 @@ type ModelCatalogState = {
   models: ModelCatalogEntry[];
 };
 
+type ProviderSetupStatus = {
+  available: boolean;
+  note: string | null;
+};
+
+type ProviderSetupRequirement = {
+  envHint: string;
+  isConfigured: (
+    authStorage: ReturnType<typeof createPiAuthStorage>["authStorage"],
+    env: NodeJS.ProcessEnv,
+  ) => boolean;
+};
+
+const PROVIDER_SETUP_REQUIREMENTS: Partial<
+  Record<string, ProviderSetupRequirement>
+> = {
+  "amazon-bedrock": {
+    envHint:
+      "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (or AWS_PROFILE / AWS_BEARER_TOKEN_BEDROCK)",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "amazon-bedrock") ||
+      hasConfiguredEnvValue(env, "AWS_PROFILE") ||
+      hasConfiguredEnvValue(env, "AWS_BEARER_TOKEN_BEDROCK") ||
+      (hasConfiguredEnvValue(env, "AWS_ACCESS_KEY_ID") &&
+        hasConfiguredEnvValue(env, "AWS_SECRET_ACCESS_KEY")) ||
+      hasConfiguredEnvValue(env, "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") ||
+      hasConfiguredEnvValue(env, "AWS_CONTAINER_CREDENTIALS_FULL_URI") ||
+      hasConfiguredEnvValue(env, "AWS_WEB_IDENTITY_TOKEN_FILE"),
+  },
+  anthropic: {
+    envHint: "ANTHROPIC_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "anthropic") ||
+      hasConfiguredEnvValue(env, "ANTHROPIC_API_KEY") ||
+      hasConfiguredEnvValue(env, "ANTHROPIC_OAUTH_TOKEN"),
+  },
+  "azure-openai-responses": {
+    envHint:
+      "AZURE_OPENAI_API_KEY and AZURE_OPENAI_BASE_URL (or AZURE_OPENAI_RESOURCE_NAME)",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "azure-openai-responses") ||
+      (hasConfiguredEnvValue(env, "AZURE_OPENAI_API_KEY") &&
+        (hasConfiguredEnvValue(env, "AZURE_OPENAI_BASE_URL") ||
+          hasConfiguredEnvValue(env, "AZURE_OPENAI_RESOURCE_NAME"))),
+  },
+  google: {
+    envHint: "GEMINI_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "google") ||
+      hasConfiguredEnvValue(env, "GEMINI_API_KEY"),
+  },
+  "google-vertex": {
+    envHint:
+      "GOOGLE_CLOUD_API_KEY (or GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION)",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "google-vertex") ||
+      hasConfiguredEnvValue(env, "GOOGLE_CLOUD_API_KEY") ||
+      ((hasConfiguredEnvValue(env, "GOOGLE_CLOUD_PROJECT") ||
+        hasConfiguredEnvValue(env, "GCLOUD_PROJECT")) &&
+        hasConfiguredEnvValue(env, "GOOGLE_CLOUD_LOCATION")),
+  },
+  groq: {
+    envHint: "GROQ_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "groq") ||
+      hasConfiguredEnvValue(env, "GROQ_API_KEY"),
+  },
+  "kimi-coding": {
+    envHint: "KIMI_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "kimi-coding") ||
+      hasConfiguredEnvValue(env, "KIMI_API_KEY"),
+  },
+  minimax: {
+    envHint: "MINIMAX_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "minimax") ||
+      hasConfiguredEnvValue(env, "MINIMAX_API_KEY"),
+  },
+  mistral: {
+    envHint: "MISTRAL_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "mistral") ||
+      hasConfiguredEnvValue(env, "MISTRAL_API_KEY"),
+  },
+  openai: {
+    envHint: "OPENAI_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "openai") ||
+      hasConfiguredEnvValue(env, "OPENAI_API_KEY"),
+  },
+  openrouter: {
+    envHint: "OPENROUTER_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "openrouter") ||
+      hasConfiguredEnvValue(env, "OPENROUTER_API_KEY"),
+  },
+  xai: {
+    envHint: "XAI_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "xai") ||
+      hasConfiguredEnvValue(env, "XAI_API_KEY"),
+  },
+  zai: {
+    envHint: "ZAI_API_KEY",
+    isConfigured: (authStorage, env) =>
+      hasStoredProviderCredential(authStorage, "zai") ||
+      hasConfiguredEnvValue(env, "ZAI_API_KEY"),
+  },
+};
+
 /**
  * Available reasoning-effort values mirrored from supported model controls.
  */
@@ -238,6 +349,75 @@ function providerLabel(provider: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function hasConfiguredEnvValue(
+  env: NodeJS.ProcessEnv,
+  variableName: string,
+): boolean {
+  const value = env[variableName];
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasStoredProviderCredential(
+  authStorage: ReturnType<typeof createPiAuthStorage>["authStorage"],
+  providerId: string,
+): boolean {
+  return authStorage.get(providerId) != null;
+}
+
+function providerSetupMessage(provider: string, envHint: string): string {
+  return `${providerLabel(provider)} is not setup. Please add your key to the env variable ${envHint}.`;
+}
+
+function codexProviderSetupMessage(): string {
+  return "OpenAI Codex is not setup. Please use the codex cli to login using 'file' authentication.";
+}
+
+function providerSetupStatus(
+  provider: string,
+  authStorage: ReturnType<typeof createPiAuthStorage>["authStorage"],
+  codexAuthState: ReturnType<typeof createPiAuthStorage>["codexAuthState"],
+  env: NodeJS.ProcessEnv,
+): ProviderSetupStatus {
+  if (provider === "openai-codex") {
+    const available = codexAuthState.source !== "none";
+    return {
+      available,
+      note: available ? null : codexProviderSetupMessage(),
+    };
+  }
+
+  const requirement = PROVIDER_SETUP_REQUIREMENTS[provider];
+  if (!requirement) {
+    return {
+      available: true,
+      note: null,
+    };
+  }
+
+  const available = requirement.isConfigured(authStorage, env);
+  return {
+    available,
+    note: available
+      ? null
+      : providerSetupMessage(provider, requirement.envHint),
+  };
+}
+
+function resolveProviderSetupStatuses(
+  authStorage: ReturnType<typeof createPiAuthStorage>["authStorage"],
+  codexAuthState: ReturnType<typeof createPiAuthStorage>["codexAuthState"],
+  env: NodeJS.ProcessEnv,
+): Map<string, ProviderSetupStatus> {
+  const statuses = new Map<string, ProviderSetupStatus>();
+  for (const provider of BUILT_IN_PROVIDER_ALLOWLIST) {
+    statuses.set(
+      provider,
+      providerSetupStatus(provider, authStorage, codexAuthState, env),
+    );
+  }
+  return statuses;
 }
 
 function providerSortKey(
@@ -311,17 +491,15 @@ function buildModelSummary(model: Model<Api>): string {
 
 function publicCatalogModelOption(
   model: Model<Api>,
-  codexProviderAvailable: boolean,
-  codexProviderAvailabilityNote: string | null,
+  providerStatuses: ReadonlyMap<string, ProviderSetupStatus>,
 ): ModelCatalogEntry {
   const providerName = providerLabel(model.provider);
-  const providerAvailable =
-    model.provider !== "openai-codex" || codexProviderAvailable;
-  const providerAvailabilityNote =
-    model.provider === "openai-codex" && !providerAvailable
-      ? (codexProviderAvailabilityNote ??
-        'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.')
-      : null;
+  const providerStatus = providerStatuses.get(model.provider) ?? {
+    available: true,
+    note: null,
+  };
+  const providerAvailable = providerStatus.available;
+  const providerAvailabilityNote = providerStatus.note;
   return {
     contextWindowTokens: model.contextWindow,
     key: canonicalModelKey(model.provider, model.id),
@@ -347,23 +525,6 @@ function publicCatalogModelOption(
   };
 }
 
-function unavailableCodexProviderNote(
-  codexAuthState: ReturnType<typeof createPiAuthStorage>["codexAuthState"],
-): string {
-  switch (codexAuthState.codexCliAuthStatus) {
-    case "logged_in_chatgpt":
-      return 'Codex CLI is already signed in with ChatGPT, but Metidos cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and rerun "codex login", or use an existing shared auth.json cache.';
-    case "logged_in_api_key":
-      return 'Codex CLI is signed in with an API key. Use the separate OpenAI API provider, or rerun "codex login" for ChatGPT-plan-backed OpenAI Codex usage.';
-    case "unknown":
-      return codexAuthState.codexCliAuthDetail?.trim()
-        ? `Codex CLI reported an unexpected auth state: ${codexAuthState.codexCliAuthDetail}`
-        : 'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
-    default:
-      return 'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
-  }
-}
-
 function buildModelCatalogState(): ModelCatalogState {
   const agentDirectory = join(
     getAppDataDirectoryPath(),
@@ -371,22 +532,18 @@ function buildModelCatalogState(): ModelCatalogState {
   );
   const { authStorage, codexAuthState } = createPiAuthStorage(agentDirectory);
   const preferCodexProvider = codexAuthState.source !== "none";
-  const codexProviderAvailabilityNote = preferCodexProvider
-    ? null
-    : unavailableCodexProviderNote(codexAuthState);
+  const providerStatuses = resolveProviderSetupStatuses(
+    authStorage,
+    codexAuthState,
+    process.env,
+  );
   const entries = ModelRegistry.create(
     authStorage,
     join(agentDirectory, "models.json"),
   )
     .getAll()
     .filter(shouldIncludeModel)
-    .map((model) =>
-      publicCatalogModelOption(
-        model,
-        preferCodexProvider,
-        codexProviderAvailabilityNote,
-      ),
-    )
+    .map((model) => publicCatalogModelOption(model, providerStatuses))
     .sort((left, right) =>
       compareCatalogEntries(left, right, preferCodexProvider),
     );
@@ -416,11 +573,21 @@ function buildModelCatalogState(): ModelCatalogState {
       DEFAULT_THREAD_MODEL,
     ),
   );
-  const defaultModel =
-    preferredDefaultModel ??
-    byLegacyId.get(DEFAULT_THREAD_MODEL) ??
-    byCanonicalKey.get(DEFAULT_THREAD_MODEL) ??
-    entries[0];
+  const firstAvailableModel =
+    entries.find((entry) => entry.providerAvailable) ?? null;
+  const defaultModel = preferredDefaultModel?.providerAvailable
+    ? preferredDefaultModel
+    : ((byLegacyId.get(DEFAULT_THREAD_MODEL)?.providerAvailable
+        ? byLegacyId.get(DEFAULT_THREAD_MODEL)
+        : null) ??
+      (byCanonicalKey.get(DEFAULT_THREAD_MODEL)?.providerAvailable
+        ? byCanonicalKey.get(DEFAULT_THREAD_MODEL)
+        : null) ??
+      firstAvailableModel ??
+      preferredDefaultModel ??
+      byLegacyId.get(DEFAULT_THREAD_MODEL) ??
+      byCanonicalKey.get(DEFAULT_THREAD_MODEL) ??
+      entries[0]);
   if (!defaultModel) {
     throw new Error("Pi model catalog did not resolve a default model.");
   }
