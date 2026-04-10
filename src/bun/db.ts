@@ -177,6 +177,15 @@ export type ThreadRecord = {
   lastErrorMessage: string | null;
 };
 
+type ThreadSqlRecord = Omit<
+  ThreadRecord,
+  "agentsAccess" | "githubAccess" | "joltAccess"
+> & {
+  agentsAccess: 0 | 1;
+  githubAccess: 0 | 1;
+  joltAccess: 0 | 1;
+};
+
 /** Public DB shape for thread_messages rows returned from queries. */
 export type ThreadMessageRecord = {
   id: number;
@@ -2193,8 +2202,8 @@ export function setProjectWorktreePinned(
 
 export function listThreads(database: Database): ThreadRecord[] {
   /** Fetch all threads, prioritized by pin state and recency. */
-  return database
-    .query<ThreadRecord, []>(
+  const rows = database
+    .query<ThreadSqlRecord, []>(
       `
 				SELECT
 					id,
@@ -2238,6 +2247,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 			`,
     )
     .all();
+  return rows.map(hydrateThreadFromSqlRow);
 }
 /**
  * Gets thread by id.
@@ -2251,8 +2261,8 @@ export function getThreadById(
 ): ThreadRecord | null {
   /** Fetch one thread record with token/compaction/error metadata mapped to camelCase. */
 
-  return database
-    .query<ThreadRecord, [number]>(
+  const thread = database
+    .query<ThreadSqlRecord, [number]>(
       `
 				SELECT
 					id,
@@ -2287,10 +2297,20 @@ export function getThreadById(
 						last_error_seen_at AS lastErrorSeenAt,
 						last_error_message AS lastErrorMessage
 				FROM threads
-				WHERE id = ?
+					WHERE id = ?
 			`,
     )
     .get(threadId);
+  return thread ? hydrateThreadFromSqlRow(thread) : null;
+}
+
+function hydrateThreadFromSqlRow(thread: ThreadSqlRecord): ThreadRecord {
+  return {
+    ...thread,
+    githubAccess: thread.githubAccess === 1,
+    agentsAccess: thread.agentsAccess === 1,
+    joltAccess: thread.joltAccess === 1,
+  };
 }
 /**
  * Creates thread.

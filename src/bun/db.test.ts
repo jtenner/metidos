@@ -247,6 +247,50 @@ describe("app database storage", () => {
     );
   });
 
+  it("hydrates persisted thread access flags as booleans", () => {
+    const appDataDir = createTempDirectory();
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Flags Repo",
+      projectPath: join(appDataDir, "project"),
+    });
+    const thread = createThread(database, {
+      agentsAccess: true,
+      githubAccess: false,
+      joltAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Access Flags",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+
+    const persistedThread = getThreadById(database, thread.id);
+    const listedThread = listThreads(database).find(
+      (entry) => entry.id === thread.id,
+    );
+
+    expect(persistedThread).toEqual(
+      expect.objectContaining({
+        agentsAccess: true,
+        githubAccess: false,
+        joltAccess: true,
+      }),
+    );
+    expect(typeof persistedThread?.agentsAccess).toBe("boolean");
+    expect(typeof persistedThread?.githubAccess).toBe("boolean");
+    expect(typeof persistedThread?.joltAccess).toBe("boolean");
+    expect(listedThread).toEqual(
+      expect.objectContaining({
+        agentsAccess: true,
+        githubAccess: false,
+        joltAccess: true,
+      }),
+    );
+  });
+
   it("clears stale active worktree sync paths instead of storing them", async () => {
     const repoPath = createTempDirectory();
     execFileSync("git", ["init"], {
