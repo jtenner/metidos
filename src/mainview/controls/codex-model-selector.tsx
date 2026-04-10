@@ -13,7 +13,6 @@ import {
   codexModelIdentityLabel,
   codexModelLabel,
   codexModelSelectionOutcome,
-  codexModelSelectorLabel,
   codexModelSupportsThinkingLevel,
   codexProviderScopeInfo,
   filterCodexProviderGroups,
@@ -156,21 +155,16 @@ export function CodexModelSelector({
   const selectedProviderAvailabilityNote =
     selectedProvider?.providerAvailabilityNote ?? null;
 
-  const buttonLabel = activeModel
-    ? (activeProvider?.providerLabel ?? codexModelSelectorLabel(activeModel))
+  const buttonProviderLabel = activeProvider?.providerLabel ?? null;
+  const buttonModelLabel = activeModel
+    ? activeModel.label
     : models.length === 0
       ? "Loading models"
       : "Select provider and model";
-  const buttonDetail = activeModel
-    ? [
-        activeModel.label,
-        activeModelSupportsThinking && activeReasoningOption
-          ? `${activeReasoningOption.label} thinking`
-          : null,
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join(" · ")
-    : null;
+  const buttonThinkingLabel =
+    activeModel && activeModelSupportsThinking && activeReasoningOption
+      ? `${activeReasoningOption.label} thinking`
+      : null;
   const panelClassName =
     variant === "desktop"
       ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[24rem] overflow-hidden border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
@@ -235,7 +229,7 @@ export function CodexModelSelector({
           type="button"
           className={`flex w-full items-center overflow-hidden border text-left transition-colors ${
             variant === "desktop"
-              ? "h-7 gap-2 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
+              ? "h-8 gap-2 border-[#3a3a44] bg-[#131313] px-2.5 hover:bg-[#191c1f]"
               : "h-10 gap-2 border-[#424e57] bg-[#1d2022] px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:bg-[#262b2f]"
           } ${controlDisabled ? "cursor-not-allowed opacity-60" : ""} ${
             open
@@ -247,39 +241,58 @@ export function CodexModelSelector({
           aria-expanded={open}
           aria-haspopup="menu"
         >
-          <span className="min-w-0 flex-1 overflow-hidden">
-            <span
-              className={`block truncate font-label font-bold uppercase text-[#f2f0ef] ${
-                variant === "desktop"
-                  ? "text-[10px] leading-none tracking-wider"
-                  : "text-[10px] leading-none tracking-widest"
-              }`}
-            >
-              {buttonLabel}
-            </span>
-            {buttonDetail ? (
+          <span className="min-w-0 flex flex-1 items-center overflow-hidden">
+            {activeModel && buttonProviderLabel ? (
+              <>
+                <span
+                  className={`shrink-0 font-semibold text-[#f2f0ef] ${
+                    variant === "desktop"
+                      ? "text-[12px] leading-none"
+                      : "text-[12px] leading-none"
+                  }`}
+                >
+                  {buttonProviderLabel}
+                </span>
+                <span
+                  className={`min-w-0 truncate text-[#8ea0ad] ${
+                    variant === "desktop"
+                      ? "pl-2 text-[12px] leading-none"
+                      : "pl-2 text-[12px] leading-none"
+                  }`}
+                >
+                  {buttonModelLabel}
+                </span>
+              </>
+            ) : (
               <span
-                className={`block truncate text-[#8ea0ad] ${
+                className={`truncate text-[#f2f0ef] ${
                   variant === "desktop"
-                    ? "pt-0.5 text-[9px] leading-none"
-                    : "pt-1 text-[10px] leading-none"
+                    ? "text-[12px] leading-none"
+                    : "text-[12px] leading-none"
                 }`}
               >
-                {buttonDetail}
+                {buttonModelLabel}
+              </span>
+            )}
+          </span>
+          <span className="ml-[10px] flex shrink-0 items-center gap-2">
+            {buttonThinkingLabel ? (
+              <span className="inline-flex shrink-0 border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                {buttonThinkingLabel}
               </span>
             ) : null}
-          </span>
-          <span
-            className={`shrink-0 text-[#8f8d8b] ${
-              variant === "desktop"
-                ? "leading-none"
-                : "flex h-4 items-center leading-none"
-            }`}
-          >
-            {materialSymbol(
-              open ? "expand_less" : "expand_more",
-              variant === "desktop" ? "text-[13px]" : "text-[16px]",
-            )}
+            <span
+              className={`shrink-0 text-[#8f8d8b] ${
+                variant === "desktop"
+                  ? "leading-none"
+                  : "flex h-4 items-center leading-none"
+              }`}
+            >
+              {materialSymbol(
+                open ? "expand_less" : "expand_more",
+                variant === "desktop" ? "text-[13px]" : "text-[16px]",
+              )}
+            </span>
           </span>
         </button>
       )}
