@@ -381,7 +381,13 @@ export function CodexModelSelector({
             ) : null}
           </div>
 
-          <div className="max-h-80 overflow-y-auto overflow-x-visible py-2 hide-scrollbar">
+          <div
+            className={`py-2 hide-scrollbar ${
+              selectorStep === "model"
+                ? "overflow-visible"
+                : "max-h-80 overflow-y-auto"
+            }`}
+          >
             {selectorStep === "provider" ? (
               filteredProviders.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-[#8f9aa2]">
