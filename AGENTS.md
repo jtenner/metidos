@@ -22,7 +22,9 @@
 ├─ docs/
 │  ├─ 2026-04-07-thread-tool-access-controls.md
 │  ├─ 2026-04-09-codex-via-pi-wiring.md
-│  └─ 2026-04-09-pi-coding-agent-migration-research.md
+│  ├─ 2026-04-09-pi-coding-agent-migration-research.md
+│  ├─ 2026-04-10-beads-integration-research.md
+│  └─ 2026-04-10-git-native-task-graph-spec.md
 ├─ package.json
 ├─ src/
 │  ├─ README.md
