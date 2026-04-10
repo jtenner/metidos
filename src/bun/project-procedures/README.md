@@ -14,6 +14,7 @@ It is organized by concern so each module has a narrow responsibility for data m
 - `provider-auth.ts`
   - Implements the backend-managed `openai-codex` auth state machine used by the Bun RPC layer.
   - Tracks in-flight login attempts, manual-code completion, refresh, and logout behavior while respecting `~/.codex/auth.json` override precedence.
+  - Surfaces the operator-facing missing-versus-unusable Codex-file diagnostics that drive the browser recovery copy.
   - Keeps provider-auth status shaping isolated so the browser settings work can consume a stable status/result contract later.
 
 - `pi-session-telemetry.ts`

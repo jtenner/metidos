@@ -266,6 +266,58 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
   }
 });
 
+test("keeps the explicit OpenAI Codex provider instead of silently normalizing back to plain OpenAI", async () => {
+  const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const workspaceDir = mkdtempSync(
+    join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
+  );
+  process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
+    PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
+
+  try {
+    process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
+
+    const runtime = await createPiThreadRuntime(
+      {
+        agentsAccess: false,
+        githubAccess: false,
+        id: 19,
+        joltAccess: false,
+        model: "openai-codex:gpt-5.4",
+        piSessionFile: null,
+        projectId: 1,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        worktreePath: workspaceDir,
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    expect(runtime.model.provider).toBe("openai-codex");
+    expect(`${runtime.model.provider}:${runtime.model.id}`).toBe(
+      "openai-codex:gpt-5.4",
+    );
+    runtime.session.dispose();
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
 test("reopens the persisted Pi session file instead of the most recent session", async () => {
   const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
   const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));

@@ -86,6 +86,62 @@ afterAll(() => {
 });
 
 describe("provider auth procedures", () => {
+  it("surfaces missing and unusable Codex-file diagnostics through provider-auth status", async () => {
+    const appDataDir = createTempDirectory("jolt-provider-auth-app-");
+    const missingCodexHome = createTempDirectory("jolt-provider-auth-codex-");
+    const unusableCodexHome = createTempDirectory("jolt-provider-auth-codex-");
+
+    const missingProcedures = await loadProjectProceduresForTest({
+      appDataDir,
+      codexHome: missingCodexHome,
+    });
+    const missingStatus =
+      await missingProcedures.getProviderAuthStatusProcedure({
+        providerId: "openai-codex",
+      });
+    expect(missingStatus.provider).toEqual(
+      expect.objectContaining({
+        configured: false,
+        source: "none",
+        sourceReason: "codex_auth_file_missing",
+      }),
+    );
+    expect(missingStatus.modelCatalog.defaultModel).toBe("openai:gpt-5.4");
+
+    writeFileSync(
+      join(unusableCodexHome, "auth.json"),
+      JSON.stringify(
+        {
+          auth_mode: "chatgpt",
+          tokens: {
+            access_token: createJwt({
+              exp: 2_000_000_000,
+            }),
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    const unusableProcedures = await loadProjectProceduresForTest({
+      appDataDir,
+      codexHome: unusableCodexHome,
+    });
+    const unusableStatus =
+      await unusableProcedures.getProviderAuthStatusProcedure({
+        providerId: "openai-codex",
+      });
+    expect(unusableStatus.provider).toEqual(
+      expect.objectContaining({
+        configured: false,
+        source: "none",
+        sourceReason: "codex_auth_file_unusable",
+      }),
+    );
+    expect(unusableStatus.modelCatalog.defaultModel).toBe("openai:gpt-5.4");
+  });
+
   it("starts and completes a backend-managed Codex login and mirrors it into both auth stores", async () => {
     const appDataDir = createTempDirectory("jolt-provider-auth-app-");
     const codexHome = createTempDirectory("jolt-provider-auth-codex-");

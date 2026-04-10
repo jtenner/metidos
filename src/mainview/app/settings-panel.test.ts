@@ -91,6 +91,24 @@ describe("settings panel provider-auth helpers", () => {
     );
   });
 
+  it("includes operator recovery guidance for missing or unusable Codex auth files", () => {
+    expect(
+      providerAuthSourceDescription(
+        buildProviderAuthStatus({
+          sourceReason: "codex_auth_file_missing",
+        }),
+      ),
+    ).toContain("OS keyring storage");
+
+    expect(
+      providerAuthSourceDescription(
+        buildProviderAuthStatus({
+          sourceReason: "codex_auth_file_unusable",
+        }),
+      ),
+    ).toContain("Re-run Codex sign-in");
+  });
+
   it("only polls and accepts manual-code completion while login remains active", () => {
     const pendingLogin = {
       authUrl: "https://auth.example.test",

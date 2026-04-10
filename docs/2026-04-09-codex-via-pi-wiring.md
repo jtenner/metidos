@@ -31,10 +31,12 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
-The remaining work is mostly:
+The planned Codex-via-Pi wiring slices are now complete.
 
-- keyring-gap recovery and fuller operator guidance
-- manual end-to-end verification and operator documentation
+The main remaining caveats are:
+
+- keyring-only Codex setups still need an operator-visible fallback because Jolt can only auto-import `~/.codex/auth.json` when that file exists
+- destructive login/logout verification against a real ChatGPT-plan session should still be done only in an isolated operator environment, not against an active everyday Codex login
 
 ## Why Jolt Should Not Restore The Codex SDK
 
@@ -209,11 +211,11 @@ This is a good foundation for backend-managed provider login, status, and logout
 - copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
 - copy that explains why provider is selected before model
 
-What is still missing is mostly operator polish:
+What remains after the implementation work is operator guidance rather than missing product plumbing:
 
-- end-to-end manual verification coverage
 - clearer recovery guidance for keyring-only or revoked Codex sessions
-- fuller operator documentation for recovery and billing expectations
+- explicit documentation of which parts were verified live on 2026-04-09 and which parts remain covered only by automated tests
+- fuller operator notes for billing and auth-source expectations
 
 ## 4. Jolt's runtime selection now respects Codex billing precedence for overlapping ids
 
@@ -415,6 +417,14 @@ Minimum coverage should include:
 - reasoning-effort controls only appear for models that support them
 - regression tests prove Jolt does not silently bill through plain `openai` when `openai-codex` is intended
 
+Verification status on 2026-04-09:
+
+- Automated coverage now explicitly covers missing Codex-file diagnostics, unusable Codex-file diagnostics, selector reasoning-step behavior, and the no-silent-fallback runtime rule when a thread explicitly selects `openai-codex`.
+- A non-destructive local status/catalog probe was run on 2026-04-09 with a fresh temporary `JOLT_APP_DATA_DIR`. Result: Jolt detected a real `~/.codex/auth.json`, surfaced `source: codex-file`, and promoted the default model to `openai-codex:gpt-5.4`.
+- A live Pi runtime smoke was run on 2026-04-09 against `openai-codex:gpt-5.4-mini` with the prompt `Reply with exactly OK and nothing else.` Result: the runtime returned `OK`.
+- A live end-to-end Jolt thread smoke was run on 2026-04-09 through `openProjectProcedure(...)`, `createThreadProcedure(...)`, and `sendThreadMessageProcedure(...)` against `openai-codex:gpt-5.4-mini`. Result: the thread settled to `idle`, persisted Pi session metadata, and stored the assistant reply `OK`.
+- Destructive login/logout was not manually rerun against the operator's real Codex session. That path is covered by automated tests and should be exercised manually only against an isolated `CODEX_HOME` when release verification requires it.
+
 ## Risks
 
 - Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. The recommended auto-import behavior only works when the Codex file exists, so keyring-backed Codex setups still need a fallback UX.
@@ -537,10 +547,12 @@ Primary files:
 
 ### CD07 - Verify the full Codex path and document operator behavior
 
+Status: completed on 2026-04-09.
+
 Deliverables:
 
 - focused backend and frontend tests
-- manual verification notes for ChatGPT-plan login, logout, and thread execution
+- manual verification notes for auth detection, thread execution, and isolated login/logout guidance
 - selector verification for provider/model/reasoning behavior
 - final doc updates once the path is working
 

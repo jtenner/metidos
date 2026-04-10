@@ -147,6 +147,7 @@ test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is mis
   const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
   const missingCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
   const invalidCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const incompleteCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
   const persistedAccessToken = createJwt({
     exp: 1_920_000_000,
   });
@@ -188,6 +189,29 @@ test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is mis
         source: "pi-auth",
       }),
     );
+
+    writeFileSync(
+      join(incompleteCodexHome, "auth.json"),
+      JSON.stringify(
+        {
+          auth_mode: "chatgpt",
+          tokens: {
+            access_token: persistedAccessToken,
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    process.env.CODEX_HOME = incompleteCodexHome;
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        overrideApplied: false,
+        reason: "codex_auth_file_unusable_fell_back_to_pi_auth",
+        source: "pi-auth",
+      }),
+    );
   } finally {
     rmSync(agentDirectory, {
       force: true,
@@ -198,6 +222,65 @@ test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is mis
       recursive: true,
     });
     rmSync(invalidCodexHome, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(incompleteCodexHome, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("createPiAuthStorage surfaces missing and unusable Codex-file reasons when no Pi fallback exists", () => {
+  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
+  const missingCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const incompleteCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+
+  try {
+    process.env.CODEX_HOME = missingCodexHome;
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        overrideApplied: false,
+        reason: "codex_auth_file_missing",
+        source: "none",
+      }),
+    );
+
+    writeFileSync(
+      join(incompleteCodexHome, "auth.json"),
+      JSON.stringify(
+        {
+          auth_mode: "chatgpt",
+          tokens: {
+            access_token: createJwt({
+              exp: 1_920_000_000,
+            }),
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    process.env.CODEX_HOME = incompleteCodexHome;
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        overrideApplied: false,
+        reason: "codex_auth_file_unusable",
+        source: "none",
+      }),
+    );
+  } finally {
+    rmSync(agentDirectory, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(missingCodexHome, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(incompleteCodexHome, {
       force: true,
       recursive: true,
     });

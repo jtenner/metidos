@@ -332,12 +332,10 @@ export function createPiAuthStorage(agentDirectory: string): {
 
   const codexAuthFileExists = existsSync(codexAuthFilePath);
   let codexCredential: PiOpenAICodexCredential | null = null;
-  let codexAuthFileReadable = false;
   let codexAuthUsable = false;
   if (codexAuthFileExists) {
     try {
       const parsed = JSON.parse(readFileSync(codexAuthFilePath, "utf8"));
-      codexAuthFileReadable = true;
       codexCredential = translateCodexAuthToPiCredential(parsed);
       codexAuthUsable = codexCredential != null;
     } catch {
@@ -377,9 +375,8 @@ export function createPiAuthStorage(agentDirectory: string): {
         codexAuthFilePath,
         overrideApplied: false,
         piAuthFilePath,
-        reason: codexAuthUsable
-          ? "using_existing_pi_codex_auth"
-          : codexAuthFileExists && !codexAuthFileReadable
+        reason:
+          codexAuthFileExists && !codexAuthUsable
             ? "codex_auth_file_unusable_fell_back_to_pi_auth"
             : "using_existing_pi_codex_auth",
         source: "pi-auth",
@@ -394,9 +391,11 @@ export function createPiAuthStorage(agentDirectory: string): {
       overrideApplied: false,
       piAuthFilePath,
       reason:
-        codexAuthFileExists && !codexAuthFileReadable
+        codexAuthFileExists && !codexAuthUsable
           ? "codex_auth_file_unusable"
-          : "no_codex_auth_available",
+          : codexAuthFileExists
+            ? "no_codex_auth_available"
+            : "codex_auth_file_missing",
       source: "none",
     },
   };

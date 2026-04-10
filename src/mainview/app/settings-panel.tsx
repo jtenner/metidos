@@ -114,8 +114,9 @@ export function providerAuthSourceDescription(
     case "codex_auth_file_unusable_fell_back_to_pi_auth":
       return "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
     case "codex_auth_file_unusable":
-      return "The Codex auth file exists but is unreadable or incomplete.";
+      return "The Codex auth file exists but is unreadable or incomplete. Re-run Codex sign-in here to replace it, or remove the broken file and try again.";
     case "codex_auth_file_missing":
+      return "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
     case "no_codex_auth_available":
       return "No Codex credentials are configured yet.";
     default:

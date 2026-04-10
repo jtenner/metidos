@@ -70,7 +70,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Also mirrors backend-managed Codex login and refresh results back into both stores so Jolt's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
 
 - `pi-codex-auth.test.ts`
-  - Focused coverage for Codex auth translation, Codex-file override precedence, and fallback to existing Pi-managed Codex OAuth state.
+  - Focused coverage for Codex auth translation, Codex-file override precedence, fallback to existing Pi-managed Codex OAuth state, and the missing-versus-unusable diagnostics used by the operator UX.
 
 - `project-procedures/provider-auth.ts`
   - Backend-managed provider-auth state machine for Codex-via-Pi support.
@@ -78,7 +78,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
   - Keeps in-flight login prompts and completion state process-local so the later browser UI can layer on top of a stable RPC contract.
 
 - `project-procedures/provider-auth.test.ts`
-  - Focused coverage for the backend `openai-codex` auth procedures, including login start/finish, mirrored persistence into both auth stores, refresh, and logout.
+  - Focused coverage for the backend `openai-codex` auth procedures, including missing/unusable auth-file diagnostics, login start/finish, mirrored persistence into both auth stores, refresh, and logout.
 
 - `pi-extension-ui.ts`
   - Shared Bun-side bridge that turns Pi `ExtensionUIContext` calls into Jolt websocket/RPC traffic.

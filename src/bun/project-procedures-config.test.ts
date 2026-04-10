@@ -200,6 +200,32 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("keeps OpenAI API as the default when the Codex auth file exists but is unusable", () => {
+    const codexHome = createTempDirectory("jolt-codex-home-");
+    writeFileSync(
+      join(codexHome, "auth.json"),
+      JSON.stringify(
+        {
+          auth_mode: "chatgpt",
+          tokens: {
+            access_token: createJwt({
+              exp: 1_950_000_000,
+            }),
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    process.env.CODEX_HOME = codexHome;
+
+    const catalog = buildModelCatalog();
+
+    expect(catalog.defaultModel).toBe("openai:gpt-5.4");
+    expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
+  });
+
   it("canonicalizes legacy raw model ids and alias ids through the Pi catalog", () => {
     expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
     expect(resolveCodexModel("openai:gpt-5.4")).toBe("openai:gpt-5.4");
