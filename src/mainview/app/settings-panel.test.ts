@@ -168,7 +168,7 @@ describe("settings panel provider-auth helpers", () => {
           sourceReason: "codex_auth_file_unusable",
         }),
       ),
-    ).toContain("Re-run Codex sign-in");
+    ).toContain('Re-run "codex login"');
   });
 
   it("surfaces keyring-aware recovery guidance when Codex is configured for OS credential storage", () => {
@@ -188,7 +188,8 @@ describe("settings panel provider-auth helpers", () => {
         title: "Current Codex CLI storage mode",
       }),
       expect.objectContaining({
-        title: "Create a Jolt-managed fallback",
+        code: "codex login",
+        title: "Create the shared Codex login",
       }),
       expect.objectContaining({
         code: 'cli_auth_credentials_store = "file"',
@@ -210,7 +211,8 @@ describe("settings panel provider-auth helpers", () => {
       ),
     ).toEqual([
       expect.objectContaining({
-        title: "Create a Jolt-managed fallback",
+        code: "codex login",
+        title: "Create the shared Codex login",
       }),
       expect.objectContaining({
         code: 'cli_auth_credentials_store = "file"',

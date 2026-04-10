@@ -5566,12 +5566,15 @@ export default function App({
               <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                 {cronCreatorModelScope.badge}
               </span>
-              <span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#dfe9ef]">
-                {cronCreatorModelScope.providerLabel}
+              <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
+                {`Provider: ${cronCreatorModelScope.providerLabel}`}
               </span>
               <span className="text-[10px] font-medium text-[#b1c6d4]">
                 {cronCreatorModelScope.summary}
               </span>
+            </div>
+            <div className="mt-2 font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7ebfb]">
+              {`Model: ${cronCreatorModelScope.modelLabel}`}
             </div>
             <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
               {`New cron runs will create child threads with ${cronCreatorModelScope.providerLabel} for ${cronCreatorModelScope.modelLabel}. ${cronCreatorModelScope.detail}`}

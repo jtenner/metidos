@@ -225,7 +225,7 @@ function publicCatalogModelOption(
   const providerAvailabilityNote =
     model.provider === "openai-codex" && !providerAvailable
       ? (codexProviderAvailabilityNote ??
-        "Requires OpenAI Codex sign-in in Settings.")
+        'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.')
       : null;
   return {
     contextWindowTokens: model.contextWindow,
@@ -257,15 +257,15 @@ function unavailableCodexProviderNote(
 ): string {
   switch (codexAuthState.codexCliAuthStatus) {
     case "logged_in_chatgpt":
-      return "Codex CLI is already signed in with ChatGPT, but Jolt cannot import that session automatically from OS or keyring storage. Start OpenAI Codex sign-in in Settings or switch Codex CLI to file storage.";
+      return 'Codex CLI is already signed in with ChatGPT, but Jolt cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and rerun "codex login", or use an existing shared auth.json cache.';
     case "logged_in_api_key":
-      return "Codex CLI is signed in with an API key. Use the separate OpenAI API provider, or sign in to OpenAI Codex in Settings for ChatGPT-plan usage.";
+      return 'Codex CLI is signed in with an API key. Use the separate OpenAI API provider, or rerun "codex login" for ChatGPT-plan-backed OpenAI Codex usage.';
     case "unknown":
       return codexAuthState.codexCliAuthDetail?.trim()
         ? `Codex CLI reported an unexpected auth state: ${codexAuthState.codexCliAuthDetail}`
-        : "Requires OpenAI Codex sign-in in Settings.";
+        : 'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
     default:
-      return "Requires OpenAI Codex sign-in in Settings.";
+      return 'Requires Codex CLI sign-in via "codex login" with a usable shared auth file.';
   }
 }
 

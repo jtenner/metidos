@@ -1339,12 +1339,15 @@ export function DesktopChatView({
                 <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                   {activeModelScope.badge}
                 </span>
-                <span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#dfe9ef]">
-                  {activeModelScope.providerLabel}
+                <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
+                  {`Provider: ${activeModelScope.providerLabel}`}
                 </span>
                 <span className="text-[10px] font-medium text-[#b1c6d4]">
                   {activeModelScope.summary}
                 </span>
+              </div>
+              <div className="mt-2 font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7ebfb]">
+                {`Model: ${activeModelScope.modelLabel}`}
               </div>
               <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
                 {`This thread will use ${activeModelScope.providerLabel} for ${activeModelScope.modelLabel}. ${activeModelScope.detail}`}
@@ -1578,12 +1581,15 @@ export function MobileChatView({
                     <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                       {activeModelScope.badge}
                     </span>
-                    <span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#dfe9ef]">
-                      {activeModelScope.providerLabel}
+                    <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
+                      {`Provider: ${activeModelScope.providerLabel}`}
                     </span>
                     <span className="text-[10px] font-medium text-[#b1c6d4]">
                       {activeModelScope.summary}
                     </span>
+                  </div>
+                  <div className="mt-2 font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7ebfb]">
+                    {`Model: ${activeModelScope.modelLabel}`}
                   </div>
                   <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
                     {`This thread will use ${activeModelScope.providerLabel} for ${activeModelScope.modelLabel}. ${activeModelScope.detail}`}

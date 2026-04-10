@@ -159,16 +159,20 @@ export function CodexModelSelector({
     selectedProvider?.providerAvailabilityNote ?? null;
 
   const buttonLabel = activeModel
-    ? codexModelSelectorLabel(activeModel)
+    ? (activeProvider?.providerLabel ?? codexModelSelectorLabel(activeModel))
     : models.length === 0
       ? "Loading models"
       : "Select provider and model";
-  const buttonDetail =
-    activeModel && activeModelSupportsThinking && activeReasoningOption
-      ? `${activeReasoningOption.label} thinking`
-      : activeModel
-        ? activeModel.modelId
-        : null;
+  const buttonDetail = activeModel
+    ? [
+        activeModel.label,
+        activeModelSupportsThinking && activeReasoningOption
+          ? `${activeReasoningOption.label} thinking`
+          : null,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" · ")
+    : null;
   const dropdownTitle = activeModel
     ? buttonDetail
       ? `${buttonLabel}. ${buttonDetail}. ${activeModel.summary}`
@@ -336,6 +340,11 @@ export function CodexModelSelector({
                 <div className="mt-1 text-[11px] text-[#d8e4eb]">
                   {stepSubheading()}
                 </div>
+                {selectedProvider ? (
+                  <div className="mt-2 font-label text-[10px] uppercase tracking-[0.16em] text-[#f4f8fb]">
+                    {`Provider: ${selectedProvider.providerLabel}`}
+                  </div>
+                ) : null}
               </div>
             </div>
             {selectorStep === "reasoning" ? null : (
@@ -381,7 +390,10 @@ export function CodexModelSelector({
                   <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                     {selectedProviderScope.badge}
                   </span>
-                  <span className="text-[10px] font-medium text-[#e7f1f7]">
+                  <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
+                    {`Provider: ${selectedProvider?.providerLabel ?? "Unknown"}`}
+                  </span>
+                  <span className="text-[10px] font-medium text-[#c0d3df]">
                     {selectedProviderScope.summary}
                   </span>
                 </div>

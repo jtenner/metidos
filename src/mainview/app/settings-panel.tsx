@@ -16,7 +16,6 @@ import { DropdownControl } from "../controls/dropdown";
 import { materialSymbol } from "../controls/icons";
 
 const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
-const PROVIDER_AUTH_STATUS_POLL_INTERVAL_MS = 1_500;
 
 export type ProviderAuthBusyAction =
   | "complete"
@@ -161,7 +160,7 @@ export function providerAuthSourceDescription(
       return "Jolt imported the current Codex file credentials into its Pi auth store so Pi sessions can reuse them.";
     case "using_existing_pi_codex_auth":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? "Jolt is using its Pi auth fallback while Codex CLI reports an active ChatGPT login from non-shared storage, so the two tools are authenticated separately."
+        ? "Jolt is using its Pi auth fallback while Codex CLI reports an active ChatGPT login from non-shared storage, so the two tools are authenticated separately. The supported long-term path is still a shared Codex auth.json cache created by Codex CLI itself."
         : status.codexCliAuthStatus === "logged_in_api_key"
           ? "Jolt is using its Pi auth fallback, while Codex CLI is authenticated with an API key instead of ChatGPT-backed Codex auth."
           : status.codexCredentialStoreMode === "keyring"
@@ -174,17 +173,17 @@ export function providerAuthSourceDescription(
         ? "The Codex auth file exists but could not be used. Codex CLI still reports an active ChatGPT login, so Jolt fell back to its Pi auth store instead."
         : "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
     case "codex_auth_file_unusable":
-      return "The Codex auth file exists but is unreadable or incomplete. Re-run Codex sign-in here to replace it, or remove the broken file and try again.";
+      return 'The Codex auth file exists but is unreadable or incomplete. Re-run "codex login" to replace it, or remove the broken file and try again.';
     case "codex_auth_file_missing":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
-        ? "No ~/.codex/auth.json file was found, but Codex CLI reports an active ChatGPT login. Jolt cannot import that session automatically from OS or keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+        ? 'No ~/.codex/auth.json file was found, but Codex CLI reports an active ChatGPT login. Jolt cannot import that session automatically from OS or keyring storage. Switch Codex CLI to file storage and re-run "codex login" so Jolt can reuse the shared auth file.'
         : status.codexCliAuthStatus === "logged_in_api_key"
-          ? "No ~/.codex/auth.json file was found, and Codex CLI reports an API-key login instead of a ChatGPT-backed Codex session. Use the separate OpenAI API provider, or start Codex sign-in here."
+          ? 'No ~/.codex/auth.json file was found, and Codex CLI reports an API-key login instead of a ChatGPT-backed Codex session. Use the separate OpenAI API provider, or rerun "codex login" for ChatGPT-plan-backed Codex.'
           : status.codexCredentialStoreMode === "keyring"
-            ? "No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+            ? 'No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Jolt does not import keyring-backed Codex credentials directly, so switch Codex CLI to file storage and rerun "codex login".'
             : status.codexCredentialStoreMode === "auto"
-              ? "No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
-              : "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
+              ? 'No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Switch Codex CLI to file storage and rerun "codex login".'
+              : 'No ~/.codex/auth.json file was found. Run "codex login" so Codex CLI creates a reusable shared auth file for Jolt.';
     case "no_codex_auth_available":
       return status.codexCliAuthStatus === "logged_in_chatgpt"
         ? "Codex CLI reports an active ChatGPT login, but Jolt does not have reusable Codex credentials configured yet."
@@ -265,7 +264,7 @@ export function providerAuthRecoverySteps(
         ...(status.codexCliAuthStatus === "logged_in_chatgpt"
           ? [
               {
-                body: "Codex CLI already reports a ChatGPT-backed login, but Jolt cannot reuse that session automatically unless Codex writes a shared auth.json cache or Jolt performs its own sign-in.",
+                body: "Codex CLI already reports a ChatGPT-backed login, but Jolt cannot reuse that session automatically unless Codex writes a shared auth.json cache.",
                 title: "Existing Codex CLI login detected",
               },
             ]
@@ -293,8 +292,9 @@ export function providerAuthRecoverySteps(
               ]
             : []),
         {
-          body: "Start Codex sign-in here to let Jolt create a Pi-managed fallback even when Codex CLI is using keyring storage.",
-          title: "Create a Jolt-managed fallback",
+          body: 'Use Codex CLI itself to create the shared auth cache Jolt expects. On machines with browser access, run "codex login".',
+          code: "codex login",
+          title: "Create the shared Codex login",
         },
         {
           body: sharedCacheBody,
@@ -310,7 +310,7 @@ export function providerAuthRecoverySteps(
     case "codex_auth_file_unusable":
       return [
         {
-          body: `Re-run Codex sign-in here to replace the unusable cache, or remove the broken file at ${status.codexAuthFilePath} before signing in again.`,
+          body: `Re-run "codex login" to replace the unusable cache, or remove the broken file at ${status.codexAuthFilePath} before signing in again.`,
           title: "Repair the broken cache",
         },
         {
@@ -345,10 +345,10 @@ export function providerAuthRecoverySteps(
         {
           body:
             status.codexCredentialStoreMode === "keyring"
-              ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so no shared auth.json cache is expected.`
+              ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so no shared auth.json cache is expected. The supported long-term path is still a file-backed Codex login.`
               : status.codexCredentialStoreMode === "auto"
-                ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may still be using the OS keyring.`
-                : "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache.",
+                ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may still be using the OS keyring. The supported long-term path is still a file-backed Codex login.`
+                : "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache. The supported long-term path is still a file-backed Codex login.",
           title: "Current fallback state",
         },
         {
@@ -367,9 +367,9 @@ export function providerAuthRecoverySteps(
         ? []
         : [
             {
-              body: "Refresh status first, then retry Codex sign-in here. If the browser callback still fails on a remote host, use device-code login in Codex CLI instead.",
-              code: "codex login --device-auth",
-              title: "Retry the sign-in flow",
+              body: 'Refresh status first, then retry "codex login". If the browser callback still fails on a remote host, use device-code login in Codex CLI instead.',
+              code: "codex login",
+              title: "Retry the Codex CLI login",
             },
           ];
   }
@@ -419,7 +419,6 @@ export function SettingsPanel({
   const [busyAction, setBusyAction] = useState<ProviderAuthBusyAction | null>(
     null,
   );
-  const [manualCode, setManualCode] = useState("");
   const [panelError, setPanelError] = useState("");
   const [providerAuthResult, setProviderAuthResult] =
     useState<RpcProviderAuthResult | null>(null);
@@ -443,9 +442,6 @@ export function SettingsPanel({
       setProviderAuthResult(result);
       onModelCatalogChange(result.modelCatalog);
       setPanelError("");
-      if (!providerAuthNeedsManualCode(result.provider)) {
-        setManualCode("");
-      }
     },
     [onModelCatalogChange],
   );
@@ -498,42 +494,6 @@ export function SettingsPanel({
     [applyProviderAuthResult],
   );
 
-  const handleStartLogin = useCallback(
-    (loginMode: "browser" | "device"): void => {
-      void runProviderAuthAction("login", () =>
-        procedures.startProviderAuthLogin(
-          {
-            loginMode,
-            providerId: OPENAI_CODEX_PROVIDER_ID,
-          },
-          {
-            priority: "foreground",
-          },
-        ),
-      );
-    },
-    [procedures, runProviderAuthAction],
-  );
-
-  const handleCompleteLogin = useCallback((): void => {
-    const loginId = providerAuthResult?.provider.login?.loginId ?? "";
-    if (!loginId) {
-      return;
-    }
-    void runProviderAuthAction("complete", () =>
-      procedures.completeProviderAuthLogin(
-        {
-          loginId,
-          manualCode,
-          providerId: OPENAI_CODEX_PROVIDER_ID,
-        },
-        {
-          priority: "foreground",
-        },
-      ),
-    );
-  }, [manualCode, procedures, providerAuthResult, runProviderAuthAction]);
-
   const handleRefreshAuth = useCallback((): void => {
     void runProviderAuthAction("refresh", () =>
       procedures.refreshProviderAuth(
@@ -569,27 +529,6 @@ export function SettingsPanel({
     });
   }, [loadProviderAuthStatus, open]);
 
-  useEffect(() => {
-    if (
-      !open ||
-      busyAction !== null ||
-      !shouldPollProviderAuth(providerStatus)
-    ) {
-      return;
-    }
-
-    const timerId = window.setInterval(() => {
-      void loadProviderAuthStatus({
-        priority: "background",
-        silent: true,
-      });
-    }, PROVIDER_AUTH_STATUS_POLL_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(timerId);
-    };
-  }, [busyAction, loadProviderAuthStatus, open, providerStatus]);
-
   return (
     <DropdownControl
       onOpenChange={setOpen}
@@ -623,7 +562,8 @@ export function SettingsPanel({
               <span>Settings</span>
             </div>
             <p className="mt-2 text-xs leading-5 text-[#9fb5c4]">
-              Provider auth lives here now. OpenAI Codex is plan-backed through
+              Jolt detects Codex availability here, but the supported login path
+              is still the Codex CLI itself. OpenAI Codex is plan-backed through
               ChatGPT auth, while OpenAI API stays a separate API-billed
               provider.
             </p>
@@ -643,7 +583,8 @@ export function SettingsPanel({
                       <span>OpenAI Codex</span>
                     </div>
                     <p className="mt-2 text-xs leading-5 text-[#9fb5c4]">
-                      Use ChatGPT-plan-backed Codex through Pi. This does not
+                      Use ChatGPT-plan-backed Codex through Pi. Sign in with the
+                      Codex CLI itself, then refresh status here. This does not
                       replace the separate `OpenAI API` provider in the model
                       selector.
                     </p>
@@ -706,74 +647,6 @@ export function SettingsPanel({
                   ) : null}
                 </div>
 
-                {providerStatus?.login &&
-                shouldPollProviderAuth(providerStatus) ? (
-                  <div className="mt-4 space-y-3 rounded-xl border border-[#324c5d] bg-[#132129]/90 px-3 py-3 text-xs text-[#d9e7f1]">
-                    <div className="font-medium text-[#eef7ff]">
-                      {providerStatus.login.instructions ??
-                        "Open the browser flow, then finish sign-in here if Pi asks for a manual code."}
-                    </div>
-
-                    {providerStatus.login.authUrl ? (
-                      <a
-                        className="inline-flex items-center gap-2 rounded-full border border-[#4c6a7f] px-3 py-1.5 text-[11px] font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white"
-                        href={providerStatus.login.authUrl}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        {materialSymbol("arrow_upward", "text-[14px]")}
-                        Continue In Browser
-                      </a>
-                    ) : null}
-
-                    {providerStatus.login.mode === "device" &&
-                    providerStatus.login.deviceCode ? (
-                      <div className="rounded-xl border border-[#496379] bg-[#0f171c] px-3 py-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb5cd]">
-                          Device Code
-                        </div>
-                        <div className="mt-2 font-mono text-lg tracking-[0.18em] text-[#f4f8fb]">
-                          {providerStatus.login.deviceCode}
-                        </div>
-                        <div className="mt-2 text-[11px] leading-5 text-[#9fc0d7]">
-                          Enter this one-time code in the browser after opening
-                          the device-auth link. Jolt will import the resulting
-                          Codex credentials automatically once the CLI flow
-                          finishes.
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {providerAuthNeedsManualCode(providerStatus) ? (
-                      <label className="block space-y-2">
-                        <span className="font-medium text-[#eef7ff]">
-                          {providerStatus.login.prompt ??
-                            "Paste the authorization code or redirect URL."}
-                        </span>
-                        <textarea
-                          aria-label="Codex authorization code"
-                          className="app-scrollbar min-h-[5.5rem] w-full rounded-xl border border-[#3a4b57] bg-[#0f1519] px-3 py-2 text-sm text-[#f4f8fb] placeholder:text-[#6f8797] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7aa5c4]/60"
-                          onChange={(event) => {
-                            setManualCode(event.target.value);
-                          }}
-                          placeholder="Paste the authorization code or full redirect URL."
-                          value={manualCode}
-                        />
-                      </label>
-                    ) : null}
-
-                    {providerStatus.login.progressMessages.length > 0 ? (
-                      <div className="space-y-1 text-[#9fc0d7]">
-                        {providerStatus.login.progressMessages.map(
-                          (message) => (
-                            <div key={message}>{message}</div>
-                          ),
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
                 {providerStatus?.lastError ? (
                   <div className="mt-4 rounded-xl border border-[#6a4b34] bg-[#23170f] px-3 py-2 text-xs leading-5 text-[#f0c7a7]">
                     {providerStatus.lastError}
@@ -794,7 +667,8 @@ export function SettingsPanel({
                       </div>
                       <div className="mt-1 leading-5 text-[#96b0c4]">
                         These steps mirror the current Codex auth guidance for
-                        file storage and headless sign-in recovery.
+                        file storage and CLI-driven recovery. Jolt does not log
+                        you into Codex on your behalf.
                       </div>
                     </div>
 
@@ -822,59 +696,6 @@ export function SettingsPanel({
                 ) : null}
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {!providerStatus?.configured &&
-                  !shouldPollProviderAuth(providerStatus) ? (
-                    <>
-                      <button
-                        className="rounded-full border border-[#45606f] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={busyAction !== null || statusLoading}
-                        onClick={() => {
-                          handleStartLogin("browser");
-                        }}
-                        type="button"
-                      >
-                        {busyAction === "login"
-                          ? "Starting Sign-In..."
-                          : "Start Codex Sign-In"}
-                      </button>
-                      <button
-                        className="rounded-full border border-[#3f5f73] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={
-                          busyAction !== null ||
-                          statusLoading ||
-                          providerStatus?.codexCliAuthStatus === "unavailable"
-                        }
-                        onClick={() => {
-                          handleStartLogin("device");
-                        }}
-                        type="button"
-                      >
-                        {busyAction === "login"
-                          ? "Starting Device Sign-In..."
-                          : "Start Device Sign-In"}
-                      </button>
-                    </>
-                  ) : null}
-
-                  {providerAuthNeedsManualCode(providerStatus) ? (
-                    <button
-                      className="rounded-full border border-[#45606f] px-3 py-1.5 text-xs font-semibold text-[#d7ebfb] transition hover:border-[#7aa5c4] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={
-                        !canCompleteProviderAuthLogin(
-                          providerStatus,
-                          manualCode,
-                          busyAction,
-                        )
-                      }
-                      onClick={handleCompleteLogin}
-                      type="button"
-                    >
-                      {busyAction === "complete"
-                        ? "Completing..."
-                        : "Complete Sign-In"}
-                    </button>
-                  ) : null}
-
                   {providerStatus?.configured ? (
                     <>
                       <button
@@ -926,6 +747,14 @@ export function SettingsPanel({
                 `gpt-5.4` stay unambiguous. `OpenAI Codex` means ChatGPT-plan
                 auth through Pi, while `OpenAI API` stays API-billed even if the
                 model name looks the same.
+              </div>
+              <div className="rounded-2xl border border-[#405462] bg-[#10181d] px-3 py-3 text-xs leading-5 text-[#d7ebfb]">
+                <span className="font-semibold text-[#f4f8fb]">
+                  Codex availability rule:
+                </span>{" "}
+                `OpenAI Codex` stays unavailable in the selector until Codex CLI
+                has written a usable shared auth file that Jolt can import. If
+                it is unavailable, run `codex login`, then refresh status here.
               </div>
             </section>
           </div>

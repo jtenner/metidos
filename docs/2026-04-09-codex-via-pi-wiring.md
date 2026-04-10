@@ -28,11 +28,11 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - imports `~/.codex/auth.json` into Pi's `openai-codex` OAuth shape and treats the Codex file as authoritative when it exists
 - exposes backend RPC procedures for Codex auth status, login start/finish, refresh, and logout
 - mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
-- exposes a browser settings surface for Codex auth state, browser-login progress, device-code login progress, manual-code completion, refresh, and logout
+- exposes a browser settings surface for Codex auth state, CLI-status diagnostics, recovery guidance, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - detects Codex CLI credential storage mode from `config.toml` and shows whether the current machine is configured for `file`, `keyring`, or `auto` storage
 - non-destructively probes `codex login status` so keyring-backed Codex CLI sessions show up as explicit ChatGPT-versus-API-key diagnostics instead of looking like a generic missing-file failure
-- can launch `codex login --device-auth` from the backend, surface the browser URL plus one-time device code in Settings, and automatically import the resulting Codex credential when the CLI flow completes
+- now makes the supported operator path explicit: users log into Codex through the Codex CLI itself, then refresh Jolt status so the selector can enable `OpenAI Codex`
 - intentionally does not import or trust OS-keyring-backed Codex credentials directly, because OpenAI does not document a stable keyring schema or export contract that Jolt can safely mirror
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - repeats the provider billing and policy cue at the chat-send and cron-create surfaces so users see the active scope again before they trigger work
@@ -215,11 +215,11 @@ This is a good foundation for backend-managed provider login, status, and logout
 [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) now consumes that RPC surface and provides:
 
 - provider-status and auth-source visibility for `openai-codex`
-- login/logout actions
-- browser-login progress plus manual-code completion
+- refresh/logout actions
+- CLI-status diagnostics plus recovery guidance
 - copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
 - copy that explains why provider is selected before model
-- recovery steps for keyring-only, broken-cache, and headless-device situations, including file-storage and device-code guidance derived from OpenAI's Codex auth docs
+- recovery steps for keyring-only, broken-cache, and headless-device situations, including file-storage and `codex login` / `codex login --device-auth` guidance derived from OpenAI's Codex auth docs
 
 What remains after the implementation work is operator guidance rather than missing product plumbing:
 
@@ -397,7 +397,7 @@ Current product decision:
 
 - Jolt supports file-backed Codex auth import and backend-driven device-auth recovery
 - Jolt does not support direct import from the OS keyring
-- when Codex is configured for `keyring` or `auto` without a usable `auth.json`, Jolt should diagnose that state clearly and direct the operator toward file storage or a fresh device-auth flow
+- when Codex is configured for `keyring` or `auto` without a usable `auth.json`, Jolt should diagnose that state clearly and direct the operator toward file storage or a fresh CLI-managed login flow
 
 This is still a Pi-native implementation because Jolt is not sharing the Codex file schema directly with Pi. It is importing or mirroring Codex auth into the Pi credential shape while treating the Codex file as authoritative when present.
 
@@ -446,8 +446,6 @@ Verification status on 2026-04-09:
 ## Risks
 
 - Unsupported-keyring risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now detects Codex credential-store mode and probes `codex login status`, but it intentionally does not import OS-keyring-backed credentials directly because OpenAI does not document a stable keyring export contract. File auth and device-auth recovery remain the supported paths.
-- Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
-- Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Jolt now drives `codex login --device-auth` directly for the documented headless path, but Pi's built-in OpenAI Codex docs still do not promise full CLI parity beyond that.
 - Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls, while API-key usage follows API org controls. Jolt must make the chosen auth mode obvious to users.
 - Exact-parity risk. OpenAI publicly documents the Codex auth contract, not every internal desktop-app detail. Jolt can match behavior, but not assume undocumented cache formats or token plumbing are safe to clone.
 
@@ -703,6 +701,10 @@ Primary files:
 ### CD15 - Add backend-driven device-auth login
 
 Status: completed on 2026-04-09.
+
+Current product note:
+
+- the backend bridge exists, but the supported operator path now stays simpler: use Codex CLI itself (`codex login` or `codex login --device-auth`) and then refresh Jolt status
 
 Deliverables:
 
