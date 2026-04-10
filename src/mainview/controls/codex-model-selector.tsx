@@ -378,7 +378,7 @@ export function CodexModelSelector({
                     <button
                       key={provider.providerId}
                       type="button"
-                      className={`flex w-full items-start gap-3 px-3 py-3 text-left transition-colors ${
+                      className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
                         providerAvailable
                           ? selected
                             ? "bg-[#28353e] text-[#f8fafc]"
@@ -396,7 +396,7 @@ export function CodexModelSelector({
                       disabled={!providerAvailable && !selected}
                     >
                       <span
-                        className={`mt-0.5 shrink-0 ${
+                        className={`shrink-0 ${
                           selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
                         }`}
                       >
@@ -406,29 +406,27 @@ export function CodexModelSelector({
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-[12px] font-semibold text-[#f4f8fb]">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-[12px] font-semibold text-[#f4f8fb]">
                             {provider.providerLabel}
                           </span>
-                          <span className="text-[11px] text-[#8f9aa2]">
+                          <span className="shrink-0 text-[11px] text-[#8f9aa2]">
                             {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
                           </span>
-                        </span>
-                        {scopeInfo ? (
-                          <div className="mt-2">
-                            <span className="inline-flex border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                          {scopeInfo ? (
+                            <span className="ml-auto inline-flex shrink-0 border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                               {scopeInfo.badge}
                             </span>
-                          </div>
-                        ) : null}
+                          ) : null}
+                        </span>
                         {!providerAvailable &&
                         provider.providerAvailabilityNote ? (
-                          <span className="mt-2 block text-[11px] leading-4 text-[#e9c28c]">
+                          <span className="mt-1 block text-[11px] leading-4 text-[#e9c28c]">
                             {provider.providerAvailabilityNote}
                           </span>
                         ) : null}
                       </span>
-                      <span className="mt-0.5 flex shrink-0 items-center pl-1 text-[#6f8899]">
+                      <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
                         {materialSymbol("chevron_right", "text-[16px]")}
                       </span>
                     </button>
