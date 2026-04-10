@@ -10,7 +10,6 @@ import type {
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 import {
-  codexModelIdentityLabel,
   codexModelLabel,
   codexModelSelectionOutcome,
   codexModelSupportsThinkingLevel,
@@ -470,7 +469,7 @@ export function CodexModelSelector({
                     <button
                       key={model.id}
                       type="button"
-                      className={`flex w-full items-start gap-3 px-3 py-3 text-left transition-colors ${
+                      className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
                         selected
                           ? "bg-[#28353e] text-[#f8fafc]"
                           : "text-[#ebf3f8] hover:bg-[#1e2428]"
@@ -480,7 +479,7 @@ export function CodexModelSelector({
                       }}
                     >
                       <span
-                        className={`mt-0.5 shrink-0 ${
+                        className={`shrink-0 ${
                           selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
                         }`}
                       >
@@ -489,28 +488,21 @@ export function CodexModelSelector({
                           "text-[16px]",
                         )}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
+                      <span className="min-w-0 flex flex-1 items-center gap-1">
+                        <span className="shrink-0 text-[12px] font-semibold text-[#f4f8fb]">
                           {codexModelLabel(model)}
                         </span>
                         <span
-                          className={`mt-1 block font-mono text-[10px] leading-4 ${
-                            selected ? "text-[#a8c9df]" : "text-[#7790a2]"
+                          className={`min-w-0 truncate text-[12px] ${
+                            selected ? "text-[#b7cad8]" : "text-[#8f9aa2]"
                           }`}
                         >
-                          {codexModelIdentityLabel(model)}
-                        </span>
-                        <span
-                          className={`mt-1 block text-[11px] leading-4 ${
-                            selected ? "text-[#d5e4ef]" : "text-[#a7b7c2]"
-                          }`}
-                        >
-                          {model.summary}
+                          {`- ${model.modelId}`}
                         </span>
                       </span>
                       {integratedReasoningEnabled &&
                       codexModelSupportsThinkingLevel(model) ? (
-                        <span className="mt-0.5 flex shrink-0 items-center pl-1 text-[#6f8899]">
+                        <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
                           {materialSymbol("chevron_right", "text-[16px]")}
                         </span>
                       ) : null}
