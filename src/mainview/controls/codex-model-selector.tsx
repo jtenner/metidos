@@ -340,22 +340,18 @@ export function CodexModelSelector({
                 ) : null}
               </div>
             )}
-            {selectedProviderScope ? (
-              <div className="mt-3 rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                    {selectedProviderScope.badge}
-                  </span>
-                  <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
-                    {`Provider: ${selectedProvider?.providerLabel ?? "Unknown"}`}
-                  </span>
-                  <span className="text-[10px] font-medium text-[#c0d3df]">
-                    {selectedProviderScope.summary}
-                  </span>
+            {selectorStep !== "provider" && selectedProvider ? (
+              <div className="mt-3 border border-[#31414d] bg-[#101416] px-3 py-3">
+                <div className="text-[12px] font-semibold text-[#f4f8fb]">
+                  {selectedProvider.providerLabel}
                 </div>
-                <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
-                  {selectedProviderScope.detail}
-                </div>
+                {selectedProviderScope ? (
+                  <div className="mt-2">
+                    <span className="inline-flex border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                      {selectedProviderScope.badge}
+                    </span>
+                  </div>
+                ) : null}
                 {!selectedProviderAvailable &&
                 selectedProviderAvailabilityNote ? (
                   <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
@@ -410,24 +406,20 @@ export function CodexModelSelector({
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-label text-[10px] font-bold uppercase tracking-wider text-inherit">
-                          {provider.providerLabel}
-                        </span>
-                        <span className="mt-1 block font-mono text-[10px] leading-4 text-[#7ca3bd]">
-                          {provider.providerId}
-                        </span>
-                        <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
-                          {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"} available`}
+                        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                          <span className="text-[12px] font-semibold text-[#f4f8fb]">
+                            {provider.providerLabel}
+                          </span>
+                          <span className="text-[11px] text-[#8f9aa2]">
+                            {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"}`}
+                          </span>
                         </span>
                         {scopeInfo ? (
-                          <>
-                            <span className="mt-2 inline-flex rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                          <div className="mt-2">
+                            <span className="inline-flex border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                               {scopeInfo.badge}
                             </span>
-                            <span className="mt-1 block text-[11px] leading-4 text-[#9cb5c6]">
-                              {scopeInfo.summary}
-                            </span>
-                          </>
+                          </div>
                         ) : null}
                         {!providerAvailable &&
                         provider.providerAvailabilityNote ? (
