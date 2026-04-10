@@ -397,6 +397,15 @@ export type RpcProviderAuthLoginState =
 
 export type RpcProviderAuthSource = "codex-file" | "pi-auth" | "none";
 
+export type RpcProviderAuthSourceReason =
+  | "codex_auth_file_already_current"
+  | "codex_auth_file_missing"
+  | "codex_auth_file_unusable"
+  | "codex_auth_file_unusable_fell_back_to_pi_auth"
+  | "no_codex_auth_available"
+  | "synced_from_codex_auth_file"
+  | "using_existing_pi_codex_auth";
+
 export type RpcProviderAuthLogin = {
   loginId: string;
   state: RpcProviderAuthLoginState;
@@ -414,7 +423,7 @@ export type RpcProviderAuthStatus = {
   providerLabel: string;
   configured: boolean;
   source: RpcProviderAuthSource;
-  sourceReason: string;
+  sourceReason: RpcProviderAuthSourceReason;
   codexAuthFilePath: string;
   piAuthFilePath: string;
   credentialExpiresAt: string | null;

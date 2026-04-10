@@ -32,6 +32,12 @@ type ProviderAuthBadge = {
   tone: ProviderAuthBadgeTone;
 };
 
+export type ProviderAuthRecoveryStep = {
+  body: string;
+  code?: string;
+  title: string;
+};
+
 type SettingsPanelProps = {
   onModelCatalogChange: (modelCatalog: RpcModelCatalog) => void;
   procedures: ProjectProcedures;
@@ -162,6 +168,105 @@ export function providerAuthBadge(
   };
 }
 
+/**
+ * Actionable operator guidance for keyring-only, missing-cache, and headless Codex setups.
+ */
+export function providerAuthRecoverySteps(
+  status: Pick<
+    RpcProviderAuthStatus,
+    "codexAuthFilePath" | "configured" | "lastError" | "source" | "sourceReason"
+  > | null,
+): ProviderAuthRecoveryStep[] {
+  if (!status) {
+    return [];
+  }
+
+  const sharedCacheBody = `If you want Codex CLI and Jolt to share one cache, configure Codex CLI for file-based storage and sign in again so ${status.codexAuthFilePath} exists.`;
+  const headlessBody =
+    "For remote or headless hosts, prefer device-code login. If you can complete browser login on another machine, copy the resulting auth.json onto the target host after file-based storage is enabled.";
+
+  switch (status.sourceReason) {
+    case "codex_auth_file_missing":
+    case "no_codex_auth_available":
+      return [
+        {
+          body: "Start Codex sign-in here to let Jolt create a Pi-managed fallback even when Codex CLI is using keyring storage.",
+          title: "Create a Jolt-managed fallback",
+        },
+        {
+          body: sharedCacheBody,
+          code: 'cli_auth_credentials_store = "file"',
+          title: "Optional shared-file cache",
+        },
+        {
+          body: headlessBody,
+          code: "codex login --device-auth",
+          title: "Headless fallback",
+        },
+      ];
+    case "codex_auth_file_unusable":
+      return [
+        {
+          body: `Re-run Codex sign-in here to replace the unusable cache, or remove the broken file at ${status.codexAuthFilePath} before signing in again.`,
+          title: "Repair the broken cache",
+        },
+        {
+          body: sharedCacheBody,
+          code: 'cli_auth_credentials_store = "file"',
+          title: "Rewrite the shared-file cache",
+        },
+        {
+          body: headlessBody,
+          code: "codex login --device-auth",
+          title: "Headless fallback",
+        },
+      ];
+    case "codex_auth_file_unusable_fell_back_to_pi_auth":
+      return [
+        {
+          body: "Jolt can keep working with its Pi auth fallback, but the Codex CLI cache on disk still needs repair if you want both tools to stay in sync.",
+          title: "Current fallback state",
+        },
+        {
+          body: `Re-run Codex sign-in or remove the broken file at ${status.codexAuthFilePath} so Codex CLI can recreate a usable shared cache.`,
+          title: "Repair the Codex CLI cache",
+        },
+        {
+          body: headlessBody,
+          code: "codex login --device-auth",
+          title: "Headless fallback",
+        },
+      ];
+    case "using_existing_pi_codex_auth":
+      return [
+        {
+          body: "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache.",
+          title: "Current fallback state",
+        },
+        {
+          body: sharedCacheBody,
+          code: 'cli_auth_credentials_store = "file"',
+          title: "Optional shared-file cache",
+        },
+        {
+          body: headlessBody,
+          code: "codex login --device-auth",
+          title: "Headless fallback",
+        },
+      ];
+    default:
+      return status.configured || !status.lastError
+        ? []
+        : [
+            {
+              body: "Refresh status first, then retry Codex sign-in here. If the browser callback still fails on a remote host, use device-code login in Codex CLI instead.",
+              code: "codex login --device-auth",
+              title: "Retry the sign-in flow",
+            },
+          ];
+  }
+}
+
 function providerAuthToneClassName(tone: ProviderAuthBadgeTone): string {
   switch (tone) {
     case "connected":
@@ -223,6 +328,7 @@ export function SettingsPanel({
   const providerExpiry = formatProviderExpiry(
     providerStatus?.credentialExpiresAt ?? null,
   );
+  const recoverySteps = providerAuthRecoverySteps(providerStatus);
 
   const applyProviderAuthResult = useCallback(
     (result: RpcProviderAuthResult): void => {
@@ -531,6 +637,41 @@ export function SettingsPanel({
                 {panelError ? (
                   <div className="mt-4 rounded-xl border border-[#6a4b34] bg-[#23170f] px-3 py-2 text-xs leading-5 text-[#f0c7a7]">
                     {panelError}
+                  </div>
+                ) : null}
+
+                {recoverySteps.length > 0 ? (
+                  <div className="mt-4 space-y-3 rounded-xl border border-[#314454] bg-[#111920]/90 px-3 py-3 text-xs text-[#d4e2eb]">
+                    <div>
+                      <div className="font-medium text-[#eef7ff]">
+                        Recovery Guidance
+                      </div>
+                      <div className="mt-1 leading-5 text-[#96b0c4]">
+                        These steps mirror the current Codex auth guidance for
+                        file storage and headless sign-in recovery.
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {recoverySteps.map((step, index) => (
+                        <div
+                          className="rounded-xl border border-[#263744] bg-[#0d1418]/75 px-3 py-3"
+                          key={`${step.title}-${step.code ?? step.body}`}
+                        >
+                          <div className="font-medium text-[#eef7ff]">
+                            {index + 1}. {step.title}
+                          </div>
+                          <div className="mt-1 leading-5 text-[#9fc0d7]">
+                            {step.body}
+                          </div>
+                          {step.code ? (
+                            <pre className="mt-2 overflow-x-auto rounded-lg border border-[#334857] bg-[#091015] px-3 py-2 text-[11px] leading-5 text-[#d7ebfb]">
+                              <code>{step.code}</code>
+                            </pre>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
 

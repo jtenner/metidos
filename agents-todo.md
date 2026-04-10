@@ -1,6 +1,6 @@
 # Agents Todo
 
-This file is the active execution backlog for Pi-backed follow-up work in `jt-ide`, including restoring Codex usage through Pi's built-in `openai-codex` provider.
+This file is the active execution backlog for Pi-backed follow-up work in `jt-ide`, including Codex usage through Pi's built-in `openai-codex` provider.
 
 ## Rules
 
@@ -10,8 +10,8 @@ This file is the active execution backlog for Pi-backed follow-up work in `jt-id
 
 ## Risks
 
-- Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now explains that state more clearly, but keyring-backed Codex setups still need a fallback operator flow because the automatic import only works when the Codex file exists. See [6. Decide on auth-storage parity](./docs/2026-04-09-codex-via-pi-wiring.md#6-decide-on-auth-storage-parity), [7. Add diagnostics and recovery](./docs/2026-04-09-codex-via-pi-wiring.md#7-add-diagnostics-and-recovery), and [Verification status on 2026-04-09](./docs/2026-04-09-codex-via-pi-wiring.md#8-test-the-full-codex-path).
-- Headless-flow risk. Codex publicly documents device-code authentication and localhost-callback recovery, but Pi's built-in OpenAI Codex docs do not document the same end-user recovery story. Jolt documents the gap and surfaces manual-code completion, but it still should not assume full CLI parity. See [3. Public Codex authentication behavior is documented](./docs/2026-04-09-codex-via-pi-wiring.md#3-public-codex-authentication-behavior-is-documented), [7. Add diagnostics and recovery](./docs/2026-04-09-codex-via-pi-wiring.md#7-add-diagnostics-and-recovery), and [Risks](./docs/2026-04-09-codex-via-pi-wiring.md#risks).
+- Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. Jolt now gives operators explicit recovery steps for file-based storage and Pi fallback, but it still does not read the OS keyring directly. See [6. Decide on auth-storage parity](./docs/2026-04-09-codex-via-pi-wiring.md#6-decide-on-auth-storage-parity), [7. Add diagnostics and recovery](./docs/2026-04-09-codex-via-pi-wiring.md#7-add-diagnostics-and-recovery), and [CD08 - Add keyring and headless recovery guidance](./docs/2026-04-09-codex-via-pi-wiring.md#cd08---add-keyring-and-headless-recovery-guidance).
+- Headless-flow risk. Codex publicly documents device-code authentication and localhost-callback recovery, but Pi's built-in OpenAI Codex docs do not document the same end-user recovery story. Jolt now surfaces device-code guidance in-product, but it still should not assume full CLI parity. See [3. Public Codex authentication behavior is documented](./docs/2026-04-09-codex-via-pi-wiring.md#3-public-codex-authentication-behavior-is-documented), [7. Add diagnostics and recovery](./docs/2026-04-09-codex-via-pi-wiring.md#7-add-diagnostics-and-recovery), and [CD08 - Add keyring and headless recovery guidance](./docs/2026-04-09-codex-via-pi-wiring.md#cd08---add-keyring-and-headless-recovery-guidance).
 - Policy-scope risk. OpenAI documents that ChatGPT-authenticated Codex usage follows ChatGPT workspace controls and retention, while API-key usage follows API org policy instead. Jolt now labels the providers and auth sources, but operators still need to understand which side they selected. See [3. Public Codex authentication behavior is documented](./docs/2026-04-09-codex-via-pi-wiring.md#3-public-codex-authentication-behavior-is-documented), [4. Add browser provider-auth UI](./docs/2026-04-09-codex-via-pi-wiring.md#4-add-browser-provider-auth-ui), and [CD04 - Add browser provider-auth UI](./docs/2026-04-09-codex-via-pi-wiring.md#cd04---add-browser-provider-auth-ui).
 
 ## Blockers

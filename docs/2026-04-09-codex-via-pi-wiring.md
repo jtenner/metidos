@@ -29,6 +29,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - exposes backend RPC procedures for Codex auth status, login start/finish, refresh, and logout
 - mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
+- surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The planned Codex-via-Pi wiring slices are now complete.
@@ -210,10 +211,10 @@ This is a good foundation for backend-managed provider login, status, and logout
 - browser-login progress plus manual-code completion
 - copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
 - copy that explains why provider is selected before model
+- recovery steps for keyring-only, broken-cache, and headless-device situations, including file-storage and device-code guidance derived from OpenAI's Codex auth docs
 
 What remains after the implementation work is operator guidance rather than missing product plumbing:
 
-- clearer recovery guidance for keyring-only or revoked Codex sessions
 - explicit documentation of which parts were verified live on 2026-04-09 and which parts remain covered only by automated tests
 - fuller operator notes for billing and auth-source expectations
 
@@ -555,6 +556,22 @@ Deliverables:
 - manual verification notes for auth detection, thread execution, and isolated login/logout guidance
 - selector verification for provider/model/reasoning behavior
 - final doc updates once the path is working
+
+### CD08 - Add keyring and headless recovery guidance
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- surface actionable browser recovery guidance for missing `~/.codex/auth.json`, broken Codex file caches, Pi-auth fallback, and headless-device situations
+- reference the official Codex guidance for `cli_auth_credentials_store = "file"` and `codex login --device-auth`
+- keep the implementation UI-only so runtime/provider behavior does not change
+
+Primary files:
+
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [src/mainview/app/settings-panel.test.ts](../src/mainview/app/settings-panel.test.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 
 Primary files:
 

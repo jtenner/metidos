@@ -10,6 +10,7 @@ import {
   canCompleteProviderAuthLogin,
   providerAuthBadge,
   providerAuthNeedsManualCode,
+  providerAuthRecoverySteps,
   providerAuthSourceDescription,
   providerAuthSourceLabel,
   shouldPollProviderAuth,
@@ -107,6 +108,64 @@ describe("settings panel provider-auth helpers", () => {
         }),
       ),
     ).toContain("Re-run Codex sign-in");
+  });
+
+  it("builds keyring and headless recovery steps for missing Codex auth files", () => {
+    expect(
+      providerAuthRecoverySteps(
+        buildProviderAuthStatus({
+          sourceReason: "codex_auth_file_missing",
+        }),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        title: "Create a Jolt-managed fallback",
+      }),
+      expect.objectContaining({
+        code: 'cli_auth_credentials_store = "file"',
+        title: "Optional shared-file cache",
+      }),
+      expect.objectContaining({
+        code: "codex login --device-auth",
+        title: "Headless fallback",
+      }),
+    ]);
+  });
+
+  it("surfaces shared-cache repair steps when Jolt is using Pi auth fallback", () => {
+    const steps = providerAuthRecoverySteps(
+      buildProviderAuthStatus({
+        configured: true,
+        source: "pi-auth",
+        sourceReason: "using_existing_pi_codex_auth",
+      }),
+    );
+
+    expect(steps).toEqual([
+      expect.objectContaining({
+        title: "Current fallback state",
+      }),
+      expect.objectContaining({
+        code: 'cli_auth_credentials_store = "file"',
+        title: "Optional shared-file cache",
+      }),
+      expect.objectContaining({
+        code: "codex login --device-auth",
+        title: "Headless fallback",
+      }),
+    ]);
+  });
+
+  it("omits recovery steps when the shared Codex file is already current", () => {
+    expect(
+      providerAuthRecoverySteps(
+        buildProviderAuthStatus({
+          configured: true,
+          source: "codex-file",
+          sourceReason: "codex_auth_file_already_current",
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it("only polls and accepts manual-code completion while login remains active", () => {
