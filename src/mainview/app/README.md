@@ -17,7 +17,7 @@ Renders the shared browser prompt dialog used for Pi extension `confirm`, `selec
 
 `settings-panel.tsx`
 Renders the top-right settings trigger and the current provider-auth settings surface.
-It now shows OpenAI Codex auth status, source, detected Codex credential-storage mode, detected Codex CLI login state, refresh, logout, the browser copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI, and recovery guidance for missing, unusable, keyring-only, or headless Codex setups. It now makes the supported path explicit: users run `codex login` themselves, then refresh Metidos status. Keyring-only Codex auth is documented there as unsupported for direct import today.
+It now keeps that surface intentionally small: one OpenAI Codex card with a status badge plus `Connect`/`Disconnect` and `Refresh Status` buttons. The supported path stays explicit: users run `codex login` themselves, then refresh Metidos status so Metidos can pick up the shared Codex auth file.
 
 `desktop-sidebar.tsx`
 Implements the desktop sidebar shell and its integration points with project/thread workspace surfaces.

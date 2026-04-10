@@ -28,8 +28,7 @@ Metidos now has the minimum backend path needed to make Codex work through Pi wi
 - imports `~/.codex/auth.json` into Pi's `openai-codex` OAuth shape and treats the Codex file as authoritative when it exists
 - exposes backend RPC procedures for Codex auth status, login start/finish, refresh, and logout
 - mirrors backend-managed Codex login and refresh results back into both Metidos's Pi auth store and `~/.codex/auth.json`
-- exposes a browser settings surface for Codex auth state, CLI-status diagnostics, recovery guidance, refresh, and logout
-- surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
+- exposes a browser settings surface for Codex auth state with a minimal OpenAI Codex card, status badge, and `Connect`/`Disconnect` plus `Refresh Status` actions
 - detects Codex CLI credential storage mode from `config.toml` and shows whether the current machine is configured for `file`, `keyring`, or `auto` storage
 - non-destructively probes `codex login status` so keyring-backed Codex CLI sessions show up as explicit ChatGPT-versus-API-key diagnostics instead of looking like a generic missing-file failure
 - now makes the supported operator path explicit: users log into Codex through the Codex CLI itself, then refresh Metidos status so the selector can enable `OpenAI Codex`
@@ -213,12 +212,9 @@ This is a good foundation for backend-managed provider login, status, and logout
 
 [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) now consumes that RPC surface and provides:
 
-- provider-status and auth-source visibility for `openai-codex`
-- refresh/logout actions
-- CLI-status diagnostics plus recovery guidance
-- copy that distinguishes ChatGPT-plan Codex from API-billed OpenAI
-- copy that explains why provider is selected before model
-- recovery steps for keyring-only, broken-cache, and headless-device situations, including file-storage and `codex login` / `codex login --device-auth` guidance derived from OpenAI's Codex auth docs
+- a single OpenAI Codex card with provider-status visibility for `openai-codex`
+- `Connect`/`Disconnect` and `Refresh Status` actions
+- a simplified browser surface that expects users to manage Codex CLI credentials themselves and then refresh Metidos status
 
 What remains after the implementation work is operator guidance rather than missing product plumbing:
 

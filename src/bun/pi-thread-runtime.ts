@@ -28,7 +28,6 @@ import {
 import { getAppDataDirectoryPath, type ThreadRecord } from "./db";
 import {
   createPiAgentsTools,
-  defaultPiAgentThinkingLevel,
   type PiAgentsToolHost,
   type PiAgentsToolScope,
   type PiDelegatedTaskRequest,
@@ -127,12 +126,24 @@ export function buildPiThreadSessionDirectoryPath(
   );
 }
 
-function resolvePiThinkingLevel(
+function isBinaryPiThinkingModel(model: string | null | undefined): boolean {
+  const normalized = model?.trim();
+  if (!normalized?.includes(":")) {
+    return false;
+  }
+  const [provider] = normalized.split(":", 2);
+  return provider === "mistral" || provider === "zai";
+}
+
+export function resolvePiThinkingLevel(
+  model: string | null | undefined,
   reasoningEffort: string | null | undefined,
 ): PiThinkingLevel {
-  return normalizeStoredCodexReasoningEffort(
-    reasoningEffort,
-  ) as PiThinkingLevel;
+  const normalized = normalizeStoredCodexReasoningEffort(reasoningEffort);
+  if (isBinaryPiThinkingModel(model)) {
+    return normalized === "minimal" ? "off" : "high";
+  }
+  return normalized as PiThinkingLevel;
 }
 
 export function buildPiThreadToolPolicy(thread: {
@@ -418,7 +429,10 @@ function extractLatestAssistantText(messages: readonly unknown[]): string {
 
 function createPiAgentsToolScope(thread: PiRuntimeThread): PiAgentsToolScope {
   return {
-    reasoningEffortContext: defaultPiAgentThinkingLevel(thread.reasoningEffort),
+    reasoningEffortContext: resolvePiThinkingLevel(
+      thread.model,
+      thread.reasoningEffort,
+    ),
     threadIdContext: thread.id,
   };
 }
@@ -509,7 +523,10 @@ export async function runPiDelegatedTask(
     resourceLoader,
     sessionManager: SessionManager.inMemory(),
     settingsManager,
-    thinkingLevel: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+    thinkingLevel: resolvePiThinkingLevel(
+      childThread.model,
+      childThread.reasoningEffort,
+    ),
     tools: buildPiTools(childThread.worktreePath, toolPolicy),
   });
 
@@ -526,7 +543,10 @@ export async function runPiDelegatedTask(
       activeToolNames: session.getActiveToolNames(),
       model: `${model.provider}:${model.id}`,
       outputText: delegatedOutputText,
-      reasoningEffort: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+      reasoningEffort: resolvePiThinkingLevel(
+        childThread.model,
+        childThread.reasoningEffort,
+      ),
       sessionId: session.sessionId || null,
     });
   });
@@ -544,7 +564,10 @@ export async function runPiDelegatedTask(
       activeToolNames: session.getActiveToolNames(),
       model: `${model.provider}:${model.id}`,
       outputText,
-      reasoningEffort: defaultPiAgentThinkingLevel(childThread.reasoningEffort),
+      reasoningEffort: resolvePiThinkingLevel(
+        childThread.model,
+        childThread.reasoningEffort,
+      ),
       sessionId: session.sessionId || null,
     } satisfies PiDelegatedTaskRun;
     if (options?.signal?.aborted) {
@@ -673,7 +696,7 @@ export async function createPiThreadRuntime(
     resourceLoader,
     sessionManager,
     settingsManager,
-    thinkingLevel: resolvePiThinkingLevel(thread.reasoningEffort),
+    thinkingLevel: resolvePiThinkingLevel(thread.model, thread.reasoningEffort),
     tools: buildPiTools(thread.worktreePath, toolPolicy),
   });
   if (options?.extensionUiBridge) {

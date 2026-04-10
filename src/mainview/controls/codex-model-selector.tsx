@@ -15,6 +15,7 @@ import {
   codexModelSelectionOutcome,
   codexModelSupportsThinkingLevel,
   codexProviderScopeInfo,
+  codexReasoningPresentation,
   filterCodexProviderGroups,
   filterCodexProviderModels,
   findCodexModel,
@@ -73,11 +74,6 @@ export function CodexModelSelector({
     () => new Map(models.map((model) => [model.id, model] as const)),
     [models],
   );
-  const reasoningOptionById = useMemo(
-    () =>
-      new Map(reasoningOptions.map((option) => [option.id, option] as const)),
-    [reasoningOptions],
-  );
   const activeModel = useMemo(
     () => findCodexModel(models, value),
     [models, value],
@@ -88,11 +84,13 @@ export function CodexModelSelector({
       providerGroups[0] ??
       null)
     : (providerGroups[0] ?? null);
-  const activeReasoningOption =
-    reasoningValue == null
-      ? null
-      : (reasoningOptionById.get(reasoningValue) ?? null);
+  const activeReasoningPresentation = useMemo(
+    () =>
+      codexReasoningPresentation(activeModel, reasoningOptions, reasoningValue),
+    [activeModel, reasoningOptions, reasoningValue],
+  );
   const activeModelSupportsThinking =
+    activeReasoningPresentation.options.length > 0 &&
     codexModelSupportsThinkingLevel(activeModel);
   const integratedReasoningEnabled =
     onChangeReasoningEffort != null &&
@@ -141,6 +139,15 @@ export function CodexModelSelector({
   const pendingModel = pendingModelId
     ? (modelById.get(pendingModelId) ?? activeModel)
     : activeModel;
+  const pendingReasoningPresentation = useMemo(
+    () =>
+      codexReasoningPresentation(
+        pendingModel,
+        reasoningOptions,
+        reasoningValue,
+      ),
+    [pendingModel, reasoningOptions, reasoningValue],
+  );
   const normalizedSearchQuery = normalizeSearchQuery(searchQuery);
   const filteredProviders = useMemo(
     () => filterCodexProviderGroups(providerGroups, normalizedSearchQuery),
@@ -161,8 +168,10 @@ export function CodexModelSelector({
       ? "Loading models"
       : "Select provider and model";
   const buttonThinkingLabel =
-    activeModel && activeModelSupportsThinking && activeReasoningOption
-      ? `${activeReasoningOption.label} thinking`
+    activeModel &&
+    activeModelSupportsThinking &&
+    activeReasoningPresentation.activeOption
+      ? activeReasoningPresentation.activeOption.label
       : null;
   const panelClassName =
     variant === "desktop"
@@ -188,9 +197,16 @@ export function CodexModelSelector({
   }
 
   function handleModelSelect(model: RpcModelOption, close: () => void): void {
+    const reasoningPresentation = codexReasoningPresentation(
+      model,
+      reasoningOptions,
+      reasoningValue,
+    );
     if (
-      codexModelSelectionOutcome(model, integratedReasoningEnabled) ===
-      "reasoning"
+      codexModelSelectionOutcome(
+        model,
+        integratedReasoningEnabled && reasoningPresentation.options.length > 0,
+      ) === "reasoning"
     ) {
       setPendingModelId(model.id);
       return;
@@ -548,9 +564,15 @@ export function CodexModelSelector({
                 ) : (
                   filteredModels.map((model) => {
                     const selected = model.id === activeModelId;
+                    const reasoningPresentation = codexReasoningPresentation(
+                      model,
+                      reasoningOptions,
+                      reasoningValue,
+                    );
                     const supportsReasoningSubmenu =
                       integratedReasoningEnabled &&
-                      codexModelSupportsThinkingLevel(model);
+                      codexModelSupportsThinkingLevel(model) &&
+                      reasoningPresentation.options.length > 0;
                     return (
                       <div
                         key={model.id}
@@ -614,9 +636,10 @@ export function CodexModelSelector({
                         {supportsReasoningSubmenu ? (
                           <div className="pointer-events-none invisible absolute left-full top-0 z-20 min-w-[12rem] opacity-0 transition-opacity duration-150 group-hover/model-submenu:visible group-hover/model-submenu:pointer-events-auto group-hover/model-submenu:opacity-100 group-focus-within/model-submenu:visible group-focus-within/model-submenu:pointer-events-auto group-focus-within/model-submenu:opacity-100">
                             <div className="border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
-                              {reasoningOptions.map((option) => {
+                              {reasoningPresentation.options.map((option) => {
                                 const selectedOption =
-                                  option.id === reasoningValue;
+                                  option.id ===
+                                  reasoningPresentation.activeValue;
                                 return (
                                   <button
                                     key={option.id}
@@ -633,6 +656,9 @@ export function CodexModelSelector({
                                     <span className="block text-[12px] font-semibold text-inherit">
                                       {option.label}
                                     </span>
+                                    <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
+                                      {option.description}
+                                    </span>
                                   </button>
                                 );
                               })}
@@ -644,8 +670,9 @@ export function CodexModelSelector({
                   })
                 )
               ) : pendingModel ? (
-                reasoningOptions.map((option) => {
-                  const selected = option.id === reasoningValue;
+                pendingReasoningPresentation.options.map((option) => {
+                  const selected =
+                    option.id === pendingReasoningPresentation.activeValue;
                   return (
                     <button
                       key={option.id}
@@ -674,7 +701,7 @@ export function CodexModelSelector({
                           {option.label}
                         </span>
                         <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
-                          {`${codexModelLabel(pendingModel)} with ${option.label.toLowerCase()} thinking`}
+                          {option.description}
                         </span>
                       </span>
                     </button>

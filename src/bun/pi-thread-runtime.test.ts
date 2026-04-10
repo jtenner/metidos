@@ -13,6 +13,7 @@ import {
   createPiThreadRuntime,
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
+  resolvePiThinkingLevel,
   runPiDelegatedTask,
 } from "./pi-thread-runtime";
 
@@ -124,6 +125,17 @@ test("buildPiThreadToolPolicy disables bash and unsafe child escalation in safe 
     runtimePromptLine:
       "Unsafe mode is enabled. Bash is available, and Metidos tools may create unsafe child threads or cron jobs. Stay within the workspace unless the user explicitly asks for broader host access.",
   });
+});
+
+test("resolvePiThinkingLevel maps binary providers to Instant versus Thinking", () => {
+  expect(
+    resolvePiThinkingLevel("mistral:magistral-medium-latest", "minimal"),
+  ).toBe("off");
+  expect(
+    resolvePiThinkingLevel("mistral:magistral-medium-latest", "high"),
+  ).toBe("high");
+  expect(resolvePiThinkingLevel("zai:glm-5", "medium")).toBe("high");
+  expect(resolvePiThinkingLevel("openai:gpt-5.4", "minimal")).toBe("minimal");
 });
 
 test("creates deterministic Pi sessions and resumes them for the same thread", async () => {

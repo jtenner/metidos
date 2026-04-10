@@ -33,6 +33,26 @@ export type CodexModelScopeCallout = CodexProviderScopeInfo & {
   providerLabel: string;
 };
 
+export type CodexReasoningOptionDisplay = {
+  description: string;
+  id: RpcReasoningEffort;
+  label: string;
+};
+
+export type CodexReasoningPresentation = {
+  activeOption: CodexReasoningOptionDisplay | null;
+  activeValue: RpcReasoningEffort | null;
+  options: CodexReasoningOptionDisplay[];
+};
+
+const REASONING_EFFORT_ORDER: RpcReasoningEffort[] = [
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+];
+
 /**
  * Group model options by provider identity, preserving first-seen provider order.
  */
@@ -172,6 +192,296 @@ export function codexModelSupportsThinkingLevel(
   model: RpcModelOption | null | undefined,
 ): boolean {
   return model?.supportsReasoningEffort ?? true;
+}
+
+type ReasoningPresentationProfile =
+  | "anthropic-adaptive"
+  | "anthropic-adaptive-xhigh"
+  | "anthropic-budget"
+  | "binary"
+  | "codex-gpt5"
+  | "generic"
+  | "gemini-budget"
+  | "gemini-flash"
+  | "gemini-pro"
+  | "openai-gpt5"
+  | "openai-pro";
+
+function reasoningPresentationProfile(
+  model: RpcModelOption | null | undefined,
+): ReasoningPresentationProfile | null {
+  if (!model?.supportsReasoningEffort) {
+    return null;
+  }
+
+  const providerId = model.providerId.trim();
+  const modelId = model.modelId.toLowerCase();
+
+  if (providerId === "mistral" || providerId === "zai") {
+    return "binary";
+  }
+
+  if (providerId === "openai-codex") {
+    return "codex-gpt5";
+  }
+
+  if (
+    (providerId === "openai" || providerId === "azure-openai-responses") &&
+    modelId.endsWith("-pro")
+  ) {
+    return "openai-pro";
+  }
+
+  if (providerId === "openai" || providerId === "azure-openai-responses") {
+    return "openai-gpt5";
+  }
+
+  if (
+    providerId === "anthropic" ||
+    (providerId === "amazon-bedrock" && modelId.includes("anthropic.claude"))
+  ) {
+    if (modelId.includes("opus-4-6") || modelId.includes("opus-4.6")) {
+      return "anthropic-adaptive-xhigh";
+    }
+    if (modelId.includes("sonnet-4-6") || modelId.includes("sonnet-4.6")) {
+      return "anthropic-adaptive";
+    }
+    return "anthropic-budget";
+  }
+
+  if (providerId === "google" || providerId === "google-vertex") {
+    if (/gemini-3(?:\.\d+)?-pro/.test(modelId)) {
+      return "gemini-pro";
+    }
+    if (/gemini-3(?:\.\d+)?-(flash|flash-lite)/.test(modelId)) {
+      return "gemini-flash";
+    }
+    return "gemini-budget";
+  }
+
+  return "generic";
+}
+
+function allowedReasoningEffortsForModel(
+  model: RpcModelOption | null | undefined,
+): RpcReasoningEffort[] {
+  const profile = reasoningPresentationProfile(model);
+  switch (profile) {
+    case "binary":
+      return ["minimal", "high"];
+    case "openai-pro":
+      return ["medium", "high", "xhigh"];
+    case "openai-gpt5":
+    case "codex-gpt5":
+    case "anthropic-adaptive-xhigh":
+      return ["low", "medium", "high", "xhigh"];
+    case "anthropic-adaptive":
+    case "anthropic-budget":
+    case "gemini-budget":
+    case "gemini-flash":
+    case "generic":
+      return ["minimal", "low", "medium", "high"];
+    case "gemini-pro":
+      return ["low", "high"];
+    default:
+      return [];
+  }
+}
+
+function reasoningEffortRank(effort: RpcReasoningEffort): number {
+  return REASONING_EFFORT_ORDER.indexOf(effort);
+}
+
+function clampReasoningEffortForModel(
+  allowedEfforts: readonly RpcReasoningEffort[],
+  value: RpcReasoningEffort | null | undefined,
+): RpcReasoningEffort | null {
+  if (allowedEfforts.length === 0 || !value) {
+    return null;
+  }
+  if (allowedEfforts.includes(value)) {
+    return value;
+  }
+
+  const requestedRank = reasoningEffortRank(value);
+  for (const effort of allowedEfforts) {
+    if (reasoningEffortRank(effort) >= requestedRank) {
+      return effort;
+    }
+  }
+  return allowedEfforts[allowedEfforts.length - 1] ?? null;
+}
+
+function reasoningOptionDescription(
+  profile: ReasoningPresentationProfile,
+  effort: RpcReasoningEffort,
+): string {
+  switch (profile) {
+    case "binary":
+      return effort === "minimal"
+        ? "Thinking is off."
+        : "Reasoning mode is on.";
+    case "openai-pro":
+      switch (effort) {
+        case "medium":
+          return "Lowest reasoning level available on this model.";
+        case "high":
+          return "High reasoning effort for harder tasks.";
+        case "xhigh":
+          return "Maximum reasoning effort available on this model.";
+        default:
+          return "Reasoning effort available on this model.";
+      }
+    case "openai-gpt5":
+      switch (effort) {
+        case "low":
+          return "Lower reasoning effort for faster responses.";
+        case "medium":
+          return "Balanced reasoning depth for most work.";
+        case "high":
+          return "Deeper reasoning for harder tasks.";
+        case "xhigh":
+          return "Maximum reasoning depth available on this model.";
+        default:
+          return "Reasoning effort available on this model.";
+      }
+    case "codex-gpt5":
+      switch (effort) {
+        case "low":
+          return "Faster coding pass with lighter reasoning.";
+        case "medium":
+          return "Balanced coding reasoning for most tasks.";
+        case "high":
+          return "Deeper coding reasoning for harder tasks.";
+        case "xhigh":
+          return "Maximum coding reasoning available on this model.";
+        default:
+          return "Coding reasoning available on this model.";
+      }
+    case "anthropic-adaptive":
+    case "anthropic-adaptive-xhigh":
+      switch (effort) {
+        case "low":
+          return "Low effort for faster responses.";
+        case "medium":
+          return "Balanced effort for most work.";
+        case "high":
+          return "High effort for the strongest default performance.";
+        case "xhigh":
+          return "Maximum effort available on this model.";
+        default:
+          return "Adaptive effort available on this model.";
+      }
+    case "anthropic-budget":
+      switch (effort) {
+        case "minimal":
+          return "Smallest thinking budget.";
+        case "low":
+          return "Low thinking budget.";
+        case "medium":
+          return "Balanced thinking budget.";
+        case "high":
+          return "Largest thinking budget.";
+        default:
+          return "Thinking budget preset for this model.";
+      }
+    case "gemini-pro":
+      return effort === "low"
+        ? "Low thinking level."
+        : "High dynamic thinking level.";
+    case "gemini-flash":
+      switch (effort) {
+        case "minimal":
+          return "Closest to instant, but not fully off.";
+        case "low":
+          return "Low thinking level.";
+        case "medium":
+          return "Balanced thinking level.";
+        case "high":
+          return "High thinking level.";
+        default:
+          return "Thinking level available on this model.";
+      }
+    case "gemini-budget":
+      switch (effort) {
+        case "minimal":
+          return "Small thinking budget.";
+        case "low":
+          return "Low thinking budget.";
+        case "medium":
+          return "Balanced thinking budget.";
+        case "high":
+          return "Largest thinking budget.";
+        default:
+          return "Thinking budget preset for this model.";
+      }
+    case "generic":
+      switch (effort) {
+        case "minimal":
+          return "Least thinking.";
+        case "low":
+          return "Lower thinking.";
+        case "medium":
+          return "Balanced thinking.";
+        case "high":
+          return "Deeper thinking.";
+        default:
+          return "Thinking level available on this model.";
+      }
+    default:
+      return "Thinking level available on this model.";
+  }
+}
+
+function reasoningOptionLabel(
+  profile: ReasoningPresentationProfile,
+  option: RpcReasoningEffortOption,
+): string {
+  if (profile === "binary") {
+    return option.id === "minimal" ? "Instant" : "Thinking";
+  }
+  return option.label;
+}
+
+export function codexReasoningPresentation(
+  model: RpcModelOption | null | undefined,
+  options: RpcReasoningEffortOption[],
+  value: RpcReasoningEffort | null | undefined,
+): CodexReasoningPresentation {
+  const profile = reasoningPresentationProfile(model);
+  if (!profile) {
+    return {
+      activeOption: null,
+      activeValue: null,
+      options: [],
+    };
+  }
+
+  const allowedEfforts = allowedReasoningEffortsForModel(model);
+  const displayOptions = allowedEfforts
+    .map((effort) => {
+      const option = options.find((entry) => entry.id === effort);
+      if (!option) {
+        return null;
+      }
+      return {
+        description: reasoningOptionDescription(profile, option.id),
+        id: option.id,
+        label: reasoningOptionLabel(profile, option),
+      } satisfies CodexReasoningOptionDisplay;
+    })
+    .filter((option) => option != null);
+  const activeValue = clampReasoningEffortForModel(allowedEfforts, value);
+  const activeOption =
+    activeValue == null
+      ? null
+      : (displayOptions.find((option) => option.id === activeValue) ?? null);
+
+  return {
+    activeOption,
+    activeValue,
+    options: displayOptions,
+  };
 }
 
 /**

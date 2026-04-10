@@ -9,6 +9,7 @@ import {
   codexModelScopeCallout,
   codexModelSelectionOutcome,
   codexProviderScopeInfo,
+  codexReasoningPresentation,
   filterCodexProviderGroups,
   filterCodexProviderModels,
   groupCodexProviders,
@@ -214,5 +215,126 @@ describe("stepped codex selector helpers", () => {
       providerLabel: "OpenAI Codex",
       summary: "ChatGPT workspace policy",
     });
+  });
+
+  it("shows OpenAI GPT-5 models with low-through-xhigh reasoning labels", () => {
+    const presentation = codexReasoningPresentation(
+      OPENAI_API_MODEL,
+      [
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium" },
+        { id: "high", label: "High" },
+        { id: "xhigh", label: "Extra High" },
+      ],
+      "minimal",
+    );
+
+    expect(presentation.activeValue).toBe("low");
+    expect(presentation.options.map((option) => option.id)).toEqual([
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(presentation.options[0]).toEqual({
+      description: "Lower reasoning effort for faster responses.",
+      id: "low",
+      label: "Low",
+    });
+  });
+
+  it("clamps OpenAI pro models to medium-through-xhigh", () => {
+    const presentation = codexReasoningPresentation(
+      modelOption({
+        id: "openai:gpt-5.2-pro",
+        label: "GPT-5.2 Pro",
+        modelId: "gpt-5.2-pro",
+        providerId: "openai",
+        providerLabel: "OpenAI API",
+      }),
+      [
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium" },
+        { id: "high", label: "High" },
+        { id: "xhigh", label: "Extra High" },
+      ],
+      "low",
+    );
+
+    expect(presentation.activeValue).toBe("medium");
+    expect(presentation.options.map((option) => option.id)).toEqual([
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+  });
+
+  it("shows Gemini 3.1 Pro as a low-versus-high selector", () => {
+    const presentation = codexReasoningPresentation(
+      modelOption({
+        group: "Google",
+        id: "google:gemini-3.1-pro-preview",
+        label: "Gemini 3.1 Pro Preview",
+        modelId: "gemini-3.1-pro-preview",
+        providerId: "google",
+        providerLabel: "Google",
+      }),
+      [
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium" },
+        { id: "high", label: "High" },
+        { id: "xhigh", label: "Extra High" },
+      ],
+      "medium",
+    );
+
+    expect(presentation.activeValue).toBe("high");
+    expect(presentation.options.map((option) => option.id)).toEqual([
+      "low",
+      "high",
+    ]);
+    expect(presentation.options[1]).toEqual({
+      description: "High dynamic thinking level.",
+      id: "high",
+      label: "High",
+    });
+  });
+
+  it("shows binary thinking models as Instant versus Thinking", () => {
+    const presentation = codexReasoningPresentation(
+      modelOption({
+        group: "Mistral",
+        id: "mistral:magistral-medium-latest",
+        label: "Magistral Medium (latest)",
+        modelId: "magistral-medium-latest",
+        providerId: "mistral",
+        providerLabel: "Mistral",
+      }),
+      [
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium" },
+        { id: "high", label: "High" },
+        { id: "xhigh", label: "Extra High" },
+      ],
+      "medium",
+    );
+
+    expect(presentation.activeValue).toBe("high");
+    expect(presentation.options).toEqual([
+      {
+        description: "Thinking is off.",
+        id: "minimal",
+        label: "Instant",
+      },
+      {
+        description: "Reasoning mode is on.",
+        id: "high",
+        label: "Thinking",
+      },
+    ]);
   });
 });

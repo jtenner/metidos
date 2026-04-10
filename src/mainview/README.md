@@ -86,7 +86,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
 
-`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts the browser-side OpenAI Codex provider-auth surface, including status, detected Codex credential-storage mode, Codex CLI login-state diagnostics, refresh/logout controls, recovery guidance for missing, unusable, keyring-only, or headless Codex setups, and provider-versus-model routing guidance. It now makes the supported path explicit: users log into Codex through the CLI itself, then refresh Metidos status.
+`app/settings-panel.tsx` renders the top-right settings popover shell and now hosts a minimal OpenAI Codex auth card with a status badge, `Connect`/`Disconnect`, and `Refresh Status`. The supported path stays explicit: users run `codex login` themselves, then refresh Metidos status so the shared Codex auth file can be detected.
 
 `app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
 
