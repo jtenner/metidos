@@ -140,6 +140,8 @@ describe("project procedure configuration helpers", () => {
           id: "openai:gpt-5.4",
           label: "GPT-5.4",
           modelId: "gpt-5.4",
+          providerAvailable: true,
+          providerAvailabilityNote: null,
           providerId: "openai",
           providerLabel: "OpenAI API",
           supportsReasoningEffort: true,
@@ -149,6 +151,9 @@ describe("project procedure configuration helpers", () => {
           id: "openai-codex:gpt-5.4",
           label: "GPT-5.4",
           modelId: "gpt-5.4",
+          providerAvailable: false,
+          providerAvailabilityNote:
+            "Requires OpenAI Codex sign-in in Settings.",
           providerId: "openai-codex",
           providerLabel: "OpenAI Codex",
           supportsReasoningEffort: true,
@@ -191,8 +196,17 @@ describe("project procedure configuration helpers", () => {
     process.env.CODEX_HOME = codexHome;
 
     const catalog = buildModelCatalog();
+    const codexModel = catalog.models.find(
+      (model) => model.id === "openai-codex:gpt-5.4",
+    );
 
     expect(catalog.defaultModel).toBe("openai-codex:gpt-5.4");
+    expect(codexModel).toEqual(
+      expect.objectContaining({
+        providerAvailable: true,
+        providerAvailabilityNote: null,
+      }),
+    );
     expect(resolveCodexModel("gpt-5.4")).toBe("openai-codex:gpt-5.4");
     expect(resolveCodexModel("openai:gpt-5.4")).toBe("openai:gpt-5.4");
     expect(resolveCodexModel("openai-codex:gpt-5.4")).toBe(
@@ -221,8 +235,17 @@ describe("project procedure configuration helpers", () => {
     process.env.CODEX_HOME = codexHome;
 
     const catalog = buildModelCatalog();
+    const codexModel = catalog.models.find(
+      (model) => model.id === "openai-codex:gpt-5.4",
+    );
 
     expect(catalog.defaultModel).toBe("openai:gpt-5.4");
+    expect(codexModel).toEqual(
+      expect.objectContaining({
+        providerAvailable: false,
+        providerAvailabilityNote: "Requires OpenAI Codex sign-in in Settings.",
+      }),
+    );
     expect(resolveCodexModel("gpt-5.4")).toBe("openai:gpt-5.4");
   });
 

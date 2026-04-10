@@ -12,6 +12,8 @@ import { matchesSearchQuery } from "./search-utils";
 
 export type CodexProviderGroup = {
   models: RpcModelOption[];
+  providerAvailable: boolean;
+  providerAvailabilityNote: string | null;
   providerId: string;
   providerLabel: string;
 };
@@ -34,12 +36,16 @@ export function groupCodexProviders(
     string,
     {
       models: RpcModelOption[];
+      providerAvailable: boolean;
+      providerAvailabilityNote: string | null;
       providerLabel: string;
     }
   >();
   for (const model of models) {
     const current = grouped.get(model.providerId) ?? {
       models: [],
+      providerAvailable: model.providerAvailable ?? true,
+      providerAvailabilityNote: model.providerAvailabilityNote ?? null,
       providerLabel: model.providerLabel || model.group,
     };
     current.models.push(model);
@@ -47,6 +53,8 @@ export function groupCodexProviders(
   }
   return [...grouped.entries()].map(([providerId, entry]) => ({
     models: entry.models,
+    providerAvailable: entry.providerAvailable,
+    providerAvailabilityNote: entry.providerAvailabilityNote,
     providerId,
     providerLabel: entry.providerLabel,
   }));

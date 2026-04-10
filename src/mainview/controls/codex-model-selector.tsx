@@ -154,6 +154,9 @@ export function CodexModelSelector({
   const selectedProviderScope = codexProviderScopeInfo(
     selectedProvider?.providerId ?? null,
   );
+  const selectedProviderAvailable = selectedProvider?.providerAvailable ?? true;
+  const selectedProviderAvailabilityNote =
+    selectedProvider?.providerAvailabilityNote ?? null;
 
   const buttonLabel = activeModel
     ? codexModelSelectorLabel(activeModel)
@@ -242,7 +245,9 @@ export function CodexModelSelector({
         return "Start by choosing the endpoint family.";
       case "model":
         return selectedProvider
-          ? `${selectedProvider.providerLabel} models`
+          ? selectedProviderAvailable
+            ? `${selectedProvider.providerLabel} models`
+            : `${selectedProvider.providerLabel} is unavailable until sign-in`
           : "Choose a provider first.";
       case "reasoning":
         return pendingModel
@@ -383,6 +388,12 @@ export function CodexModelSelector({
                 <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
                   {selectedProviderScope.detail}
                 </div>
+                {!selectedProviderAvailable &&
+                selectedProviderAvailabilityNote ? (
+                  <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
+                    {selectedProviderAvailabilityNote}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -398,18 +409,27 @@ export function CodexModelSelector({
                   const selected =
                     provider.providerId === activeProvider?.providerId;
                   const scopeInfo = codexProviderScopeInfo(provider.providerId);
+                  const providerAvailable = provider.providerAvailable ?? true;
                   return (
                     <button
                       key={provider.providerId}
                       type="button"
                       className={`flex w-full items-start gap-3 px-3 py-3 text-left transition-colors ${
-                        selected
-                          ? "bg-[#28353e] text-[#f8fafc]"
-                          : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                        providerAvailable
+                          ? selected
+                            ? "bg-[#28353e] text-[#f8fafc]"
+                            : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                          : selected
+                            ? "bg-[#28353e] text-[#f8fafc]"
+                            : "cursor-not-allowed text-[#8a949b] opacity-75"
                       }`}
                       onClick={() => {
+                        if (!providerAvailable && !selected) {
+                          return;
+                        }
                         handleProviderSelect(provider.providerId);
                       }}
+                      disabled={!providerAvailable && !selected}
                     >
                       <span
                         className={`mt-0.5 shrink-0 ${
@@ -441,6 +461,12 @@ export function CodexModelSelector({
                             </span>
                           </>
                         ) : null}
+                        {!providerAvailable &&
+                        provider.providerAvailabilityNote ? (
+                          <span className="mt-2 block text-[11px] leading-4 text-[#e9c28c]">
+                            {provider.providerAvailabilityNote}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="mt-0.5 flex shrink-0 items-center pl-1 text-[#6f8899]">
                         {materialSymbol("chevron_right", "text-[16px]")}
@@ -450,7 +476,12 @@ export function CodexModelSelector({
                 })
               )
             ) : selectorStep === "model" ? (
-              filteredModels.length === 0 ? (
+              !selectedProviderAvailable ? (
+                <div className="px-4 py-4 text-xs leading-5 text-[#cba26c]">
+                  {selectedProviderAvailabilityNote ??
+                    "This provider is unavailable until its auth is configured in Settings."}
+                </div>
+              ) : filteredModels.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-[#8f9aa2]">
                   No matching models for this provider.
                 </div>

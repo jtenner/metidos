@@ -210,8 +210,17 @@ function buildModelSummary(model: Model<Api>): string {
   ].join(" ");
 }
 
-function publicCatalogModelOption(model: Model<Api>): ModelCatalogEntry {
+function publicCatalogModelOption(
+  model: Model<Api>,
+  codexProviderAvailable: boolean,
+): ModelCatalogEntry {
   const providerName = providerLabel(model.provider);
+  const providerAvailable =
+    model.provider !== "openai-codex" || codexProviderAvailable;
+  const providerAvailabilityNote =
+    model.provider === "openai-codex" && !providerAvailable
+      ? "Requires OpenAI Codex sign-in in Settings."
+      : null;
   return {
     contextWindowTokens: model.contextWindow,
     key: canonicalModelKey(model.provider, model.id),
@@ -223,6 +232,8 @@ function publicCatalogModelOption(model: Model<Api>): ModelCatalogEntry {
       id: canonicalModelKey(model.provider, model.id),
       label: model.name,
       modelId: model.id,
+      providerAvailable,
+      providerAvailabilityNote,
       providerId: model.provider,
       providerLabel: providerName,
       summary: buildModelSummary(model),
@@ -246,7 +257,7 @@ function buildModelCatalogState(): ModelCatalogState {
   )
     .getAll()
     .filter(shouldIncludeModel)
-    .map(publicCatalogModelOption)
+    .map((model) => publicCatalogModelOption(model, preferCodexProvider))
     .sort((left, right) =>
       compareCatalogEntries(left, right, preferCodexProvider),
     );

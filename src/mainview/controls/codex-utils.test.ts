@@ -22,6 +22,8 @@ function modelOption(overrides: Partial<RpcModelOption> = {}): RpcModelOption {
     id: "openai:gpt-5.4",
     label: "GPT-5.4",
     modelId: "gpt-5.4",
+    providerAvailable: true,
+    providerAvailabilityNote: null,
     providerId: "openai",
     providerLabel: "OpenAI API",
     summary: "Provider: OpenAI API. Supports thinking level control.",
@@ -59,11 +61,15 @@ describe("stepped codex selector helpers", () => {
     expect(groupCodexProviders(MODELS)).toEqual([
       {
         models: [OPENAI_API_MODEL, OPENAI_API_NO_REASONING_MODEL],
+        providerAvailable: true,
+        providerAvailabilityNote: null,
         providerId: "openai",
         providerLabel: "OpenAI API",
       },
       {
         models: [OPENAI_CODEX_MODEL],
+        providerAvailable: true,
+        providerAvailabilityNote: null,
         providerId: "openai-codex",
         providerLabel: "OpenAI Codex",
       },
@@ -125,5 +131,31 @@ describe("stepped codex selector helpers", () => {
       summary: "ChatGPT workspace policy",
     });
     expect(codexProviderScopeInfo("anthropic")).toBeNull();
+  });
+
+  it("preserves provider availability metadata when grouping provider rows", () => {
+    const providers = groupCodexProviders([
+      modelOption({
+        id: "openai-codex:gpt-5.4",
+        providerAvailable: false,
+        providerAvailabilityNote: "Requires OpenAI Codex sign-in in Settings.",
+        providerId: "openai-codex",
+        providerLabel: "OpenAI Codex",
+      }),
+    ]);
+
+    expect(providers).toEqual([
+      {
+        models: [
+          expect.objectContaining({
+            id: "openai-codex:gpt-5.4",
+          }),
+        ],
+        providerAvailable: false,
+        providerAvailabilityNote: "Requires OpenAI Codex sign-in in Settings.",
+        providerId: "openai-codex",
+        providerLabel: "OpenAI Codex",
+      },
+    ]);
   });
 });

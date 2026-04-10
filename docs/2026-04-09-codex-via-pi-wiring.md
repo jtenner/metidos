@@ -31,6 +31,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
+- surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The planned Codex-via-Pi wiring slices are now complete.
@@ -589,6 +590,23 @@ Primary files:
 - [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
 - [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
 - [src/mainview/controls/codex-utils.test.ts](../src/mainview/controls/codex-utils.test.ts)
+
+### CD10 - Surface unavailable Codex providers in the selector
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- surface provider availability for `OpenAI Codex` in the model catalog payload
+- mark unauthenticated Codex provider rows as unavailable in the selector instead of presenting them like ready-to-run choices
+- block new model selection for unavailable Codex providers while keeping persisted provider-qualified ids and runtime routing unchanged
+
+Primary files:
+
+- [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
+- [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
 
 ## Recommendation
 

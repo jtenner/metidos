@@ -359,6 +359,8 @@ export type RpcModelOption = {
   id: string;
   providerId: string;
   providerLabel: string;
+  providerAvailable?: boolean;
+  providerAvailabilityNote?: string | null;
   modelId: string;
   label: string;
   group: string;
