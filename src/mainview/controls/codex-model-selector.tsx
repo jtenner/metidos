@@ -26,7 +26,6 @@ import { materialSymbol } from "./icons";
 import { normalizeSearchQuery } from "./search-utils";
 
 type CodexModelSelectorProps = {
-  appTitle?: string;
   disabled: boolean;
   models: RpcModelOption[];
   onChange: (value: string) => void;
@@ -45,7 +44,6 @@ type SelectorStep = "provider" | "model" | "reasoning";
  * Guides selection through explicit provider, model, and optional thinking-level steps.
  */
 export function CodexModelSelector({
-  appTitle = "Jolt",
   disabled,
   models,
   onChange,
@@ -173,11 +171,6 @@ export function CodexModelSelector({
         .filter((value): value is string => Boolean(value))
         .join(" · ")
     : null;
-  const dropdownTitle = activeModel
-    ? buttonDetail
-      ? `${buttonLabel}. ${buttonDetail}. ${activeModel.summary}`
-      : `${buttonLabel}. ${activeModel.summary}`
-    : `${appTitle} model`;
   const panelClassName =
     variant === "desktop"
       ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[20rem] overflow-hidden border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
@@ -237,7 +230,6 @@ export function CodexModelSelector({
       canOpen={!controlDisabled}
       disabled={controlDisabled}
       onOpenChange={setDropdownOpen}
-      title={dropdownTitle}
       renderButton={({ open, toggle }) => (
         <button
           type="button"
@@ -315,6 +307,7 @@ export function CodexModelSelector({
                 {materialSymbol("search", "text-[15px] text-[#98b9d0]")}
                 <input
                   ref={searchInputRef}
+                  aria-label="Search providers or models"
                   className="min-w-0 flex-1 bg-transparent text-[11px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
                   placeholder={
                     selectorStep === "provider"

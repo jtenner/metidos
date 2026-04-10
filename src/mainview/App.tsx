@@ -5549,7 +5549,6 @@ export default function App({
           Model
         </div>
         <CodexModelSelector
-          appTitle="Cron"
           disabled={isCreatingCronJob}
           models={codexModels}
           onChange={setCronCreatorModel}
