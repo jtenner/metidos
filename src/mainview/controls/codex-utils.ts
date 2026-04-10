@@ -8,6 +8,43 @@ import type {
   RpcReasoningEffort,
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
+import { matchesSearchQuery } from "./search-utils";
+
+export type CodexProviderGroup = {
+  models: RpcModelOption[];
+  providerId: string;
+  providerLabel: string;
+};
+
+export type CodexModelSelectionOutcome = "commit" | "reasoning";
+
+/**
+ * Group model options by provider identity, preserving first-seen provider order.
+ */
+export function groupCodexProviders(
+  models: RpcModelOption[],
+): CodexProviderGroup[] {
+  const grouped = new Map<
+    string,
+    {
+      models: RpcModelOption[];
+      providerLabel: string;
+    }
+  >();
+  for (const model of models) {
+    const current = grouped.get(model.providerId) ?? {
+      models: [],
+      providerLabel: model.providerLabel || model.group,
+    };
+    current.models.push(model);
+    grouped.set(model.providerId, current);
+  }
+  return [...grouped.entries()].map(([providerId, entry]) => ({
+    models: entry.models,
+    providerId,
+    providerLabel: entry.providerLabel,
+  }));
+}
 
 /**
  * Group model options by `model.group`, preserving insertion order across groups.
@@ -18,17 +55,9 @@ import type {
 export function groupCodexModels(
   models: RpcModelOption[],
 ): Array<{ group: string; models: RpcModelOption[] }> {
-  const grouped = new Map<string, RpcModelOption[]>();
-  for (const model of models) {
-    // Reuse the existing array for each group to avoid unnecessary allocations.
-    const entries = grouped.get(model.group) ?? [];
-    entries.push(model);
-    grouped.set(model.group, entries);
-  }
-  // Convert back to an array so callers can map over grouped sections directly.
-  return [...grouped.entries()].map(([group, entries]) => ({
-    group,
-    models: entries,
+  return groupCodexProviders(models).map((provider) => ({
+    group: provider.providerLabel,
+    models: provider.models,
   }));
 }
 
@@ -68,6 +97,64 @@ export function codexModelSupportsThinkingLevel(
   model: RpcModelOption | null | undefined,
 ): boolean {
   return model?.supportsReasoningEffort ?? true;
+}
+
+/**
+ * Filter provider groups by provider identity or contained model metadata.
+ */
+export function filterCodexProviderGroups(
+  providers: CodexProviderGroup[],
+  normalizedSearchQuery: string,
+): CodexProviderGroup[] {
+  return providers.filter((provider) =>
+    matchesSearchQuery(
+      normalizedSearchQuery,
+      provider.providerId,
+      provider.providerLabel,
+      ...provider.models.flatMap((model) => [
+        model.id,
+        model.label,
+        model.modelId,
+        model.summary,
+      ]),
+    ),
+  );
+}
+
+/**
+ * Filter a provider's models by model/provider metadata.
+ */
+export function filterCodexProviderModels(
+  provider: CodexProviderGroup | null | undefined,
+  normalizedSearchQuery: string,
+): RpcModelOption[] {
+  if (!provider) {
+    return [];
+  }
+  return provider.models.filter((model) =>
+    matchesSearchQuery(
+      normalizedSearchQuery,
+      model.id,
+      model.label,
+      model.summary,
+      model.group,
+      model.providerId,
+      model.providerLabel,
+      model.modelId,
+    ),
+  );
+}
+
+/**
+ * Decide whether a selected model should commit immediately or advance to thinking-level selection.
+ */
+export function codexModelSelectionOutcome(
+  model: RpcModelOption,
+  integratedReasoningEnabled: boolean,
+): CodexModelSelectionOutcome {
+  return integratedReasoningEnabled && codexModelSupportsThinkingLevel(model)
+    ? "reasoning"
+    : "commit";
 }
 
 /**

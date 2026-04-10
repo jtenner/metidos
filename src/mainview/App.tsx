@@ -135,7 +135,6 @@ import {
   findReasoningEffortOption,
 } from "./controls/codex-utils";
 import { brandBoltIcon, materialSymbol } from "./controls/icons";
-import { ReasoningEffortSelector } from "./controls/reasoning-effort-selector";
 import {
   ThreadAccessControl,
   type ThreadAccessValue,
@@ -5501,7 +5500,7 @@ export default function App({
   const renderCronCreatorModelControls = (
     variant: "desktop" | "mobile",
   ): JSX.Element => (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className="space-y-1">
       <div className="space-y-1">
         <div
           className={`font-label text-[10px] uppercase tracking-[0.16em] ${
@@ -5515,28 +5514,14 @@ export default function App({
           disabled={isCreatingCronJob}
           models={codexModels}
           onChange={setCronCreatorModel}
+          onChangeReasoningEffort={setCronCreatorReasoningEffortValue}
           reasoningDisabled={cronThinkingLevelDisabled}
           reasoningOptions={reasoningEfforts}
-          onChangeReasoningEffort={setCronCreatorReasoningEffortValue}
           reasoningValue={cronCreatorReasoningEffort}
           value={cronCreatorModelValue}
           variant={variant}
         />
       </div>
-      {variant === "desktop" ? (
-        <div className="space-y-1">
-          <div className="font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
-            Thinking level
-          </div>
-          <ReasoningEffortSelector
-            disabled={cronThinkingLevelDisabled}
-            onChange={setCronCreatorReasoningEffort}
-            options={reasoningEfforts}
-            value={cronCreatorReasoningEffort}
-            variant={variant}
-          />
-        </div>
-      ) : null}
     </div>
   );
 

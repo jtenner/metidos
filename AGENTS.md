@@ -185,6 +185,7 @@
 │     │  ├─ README.md
 │     │  ├─ chat-composer-control.tsx
 │     │  ├─ codex-model-selector.tsx
+│     │  ├─ codex-utils.test.ts
 │     │  ├─ codex-utils.ts
 │     │  ├─ dropdown.tsx
 │     │  ├─ icons.tsx

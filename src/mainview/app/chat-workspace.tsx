@@ -29,7 +29,6 @@ import type {
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
-import { ReasoningEffortSelector } from "../controls/reasoning-effort-selector";
 import {
   ThreadAccessControl,
   type ThreadAccessValue,
@@ -1295,21 +1294,16 @@ export function DesktopChatView({
             <ExtensionWidgetStack widgets={extensionWidgetsAbove} />
           ) : null}
           <div className="flex items-center gap-2 border-b border-[#484848]/10 p-2">
-            <div className="min-w-[15rem] max-w-[22rem]">
+            <div className="min-w-[20rem] max-w-[28rem]">
               <CodexModelSelector
                 models={codexModels}
                 value={activeCodexModel}
                 disabled={modelSelectorDisabled}
                 onChange={onChangeModel}
-                variant="desktop"
-              />
-            </div>
-            <div className="min-w-[7.5rem] max-w-[8.5rem]">
-              <ReasoningEffortSelector
-                options={reasoningEfforts}
-                value={activeReasoningEffort}
-                disabled={reasoningEffortSelectorDisabled}
-                onChange={onChangeReasoningEffort}
+                onChangeReasoningEffort={onChangeReasoningEffort}
+                reasoningDisabled={reasoningEffortSelectorDisabled}
+                reasoningOptions={reasoningEfforts}
+                reasoningValue={activeReasoningEffort}
                 variant="desktop"
               />
             </div>

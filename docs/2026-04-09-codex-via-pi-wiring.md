@@ -30,7 +30,6 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 
 The remaining work is mostly:
 
-- hierarchical selector semantics
 - backend/browser auth UI and diagnostics
 - browser-visible login/logout state
 - keyring-gap recovery and fuller operator guidance
@@ -63,6 +62,8 @@ Restoring the Codex SDK only makes sense if Jolt decides it needs exact Codex CL
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 - [src/bun/db.ts](../src/bun/db.ts)
+- [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
 - [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
 - [agents-todo.md](../agents-todo.md)
 
@@ -176,7 +177,7 @@ Pi does not publicly document Codex-style keyring storage or built-in managed-lo
 - browser/model-catalog consumers can see `openai-codex:*`
 - overlapping ids such as `gpt-5.4` stay distinct in catalog payloads
 - raw GPT ids normalize toward `openai-codex` when plan-backed Codex auth is available and toward `openai` otherwise
-- the flat picker is less ambiguous than before, but the provider-first selector is still not implemented
+- the browser selector can now walk `Provider -> Model -> Reasoning effort` instead of collapsing those choices into one flat model list
 
 ## 2. Jolt already keeps Pi auth and model files under app data
 
@@ -249,7 +250,6 @@ Jolt can reuse from Pi:
 
 Jolt must implement:
 
-- hierarchical selector semantics
 - RPC data shape or client-side derivation that can drive the three-step flow
 - unambiguous persistence rules so `openai:gpt-5.4` and `openai-codex:gpt-5.4` never collapse together
 
@@ -401,7 +401,6 @@ Minimum coverage should include:
 
 ## Risks
 
-- Selector-ambiguity risk. The catalog now distinguishes `OpenAI API` and `OpenAI Codex`, but the browser picker is still a flat control instead of the planned `Provider -> Model -> Reasoning effort` flow.
 - Keyring-gap risk. OpenAI documents that Codex may use OS keyring storage instead of `~/.codex/auth.json`. The recommended auto-import behavior only works when the Codex file exists, so keyring-backed Codex setups still need a fallback UX.
 - Browser-login risk. Pi's OAuth flow is backend-only. Jolt must build the browser-visible orchestration itself.
 - Headless-flow risk. Codex publicly documents device-code auth and localhost-callback recovery. Pi's built-in OpenAI Codex docs do not promise the same end-user recovery story.
@@ -432,6 +431,8 @@ Primary files:
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 
 ### CD02 - Build the three-level model selector
+
+Status: completed on 2026-04-09.
 
 Deliverables:
 
