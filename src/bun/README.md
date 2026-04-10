@@ -68,6 +68,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-codex-auth.ts`
   - Shared auth-bridge helper for Codex-via-Pi support.
   - Imports `~/.codex/auth.json` into Jolt's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
+  - Detects Codex CLI credential storage mode from `config.toml` so Jolt can distinguish file-cache, keyring, and auto-storage setups when `auth.json` is missing.
   - Also mirrors backend-managed Codex login and refresh results back into both stores so Jolt's explicit auth flows do not get overridden by stale Codex-file state on the next runtime or catalog read.
 
 - `pi-codex-auth.test.ts`
@@ -76,6 +77,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `project-procedures/provider-auth.ts`
   - Backend-managed provider-auth state machine for Codex-via-Pi support.
   - Implements `openai-codex` auth status reads plus login start/finish, refresh, and logout orchestration on top of the shared auth-file bridge.
+  - Surfaces the detected Codex config path and credential-storage mode so the browser can give precise keyring-versus-file recovery guidance.
   - Keeps in-flight login prompts and completion state process-local so the later browser UI can layer on top of a stable RPC contract.
 
 - `project-procedures/provider-auth.test.ts`

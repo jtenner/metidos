@@ -151,6 +151,8 @@ function buildProviderAuthStatus(
         ? oauthCredential.accountId
         : null,
     codexAuthFilePath: codexAuthState.codexAuthFilePath,
+    codexConfigFilePath: codexAuthState.codexConfigFilePath,
+    codexCredentialStoreMode: codexAuthState.credentialStoreMode,
     configured: oauthCredential != null,
     credentialExpiresAt:
       oauthCredential && Number.isFinite(oauthCredential.expires)

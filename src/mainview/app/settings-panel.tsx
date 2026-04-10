@@ -105,10 +105,31 @@ export function providerAuthSourceLabel(
 }
 
 /**
+ * User-facing label for the Codex CLI credential storage mode.
+ */
+export function providerAuthCredentialStoreLabel(
+  status: Pick<RpcProviderAuthStatus, "codexCredentialStoreMode">,
+): string {
+  switch (status.codexCredentialStoreMode) {
+    case "file":
+      return "File cache";
+    case "keyring":
+      return "OS keyring";
+    case "auto":
+      return "Automatic";
+    default:
+      return "Codex default";
+  }
+}
+
+/**
  * User-facing explanation for the effective provider-auth source/reason.
  */
 export function providerAuthSourceDescription(
-  status: Pick<RpcProviderAuthStatus, "source" | "sourceReason">,
+  status: Pick<
+    RpcProviderAuthStatus,
+    "codexCredentialStoreMode" | "source" | "sourceReason"
+  >,
 ): string {
   switch (status.sourceReason) {
     case "codex_auth_file_already_current":
@@ -116,13 +137,21 @@ export function providerAuthSourceDescription(
     case "synced_from_codex_auth_file":
       return "Jolt imported the current Codex file credentials into its Pi auth store so Pi sessions can reuse them.";
     case "using_existing_pi_codex_auth":
-      return "Jolt is using its Pi auth fallback because no usable Codex file credentials were found.";
+      return status.codexCredentialStoreMode === "keyring"
+        ? "Jolt is using its Pi auth fallback because Codex CLI is configured for OS keyring storage, so no shared ~/.codex/auth.json cache is expected."
+        : status.codexCredentialStoreMode === "auto"
+          ? "Jolt is using its Pi auth fallback because Codex CLI is configured for automatic credential storage, which may prefer the OS keyring on this machine."
+          : "Jolt is using its Pi auth fallback because no usable Codex file credentials were found.";
     case "codex_auth_file_unusable_fell_back_to_pi_auth":
       return "The Codex auth file exists but could not be used, so Jolt fell back to its Pi auth store instead.";
     case "codex_auth_file_unusable":
       return "The Codex auth file exists but is unreadable or incomplete. Re-run Codex sign-in here to replace it, or remove the broken file and try again.";
     case "codex_auth_file_missing":
-      return "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
+      return status.codexCredentialStoreMode === "keyring"
+        ? "No ~/.codex/auth.json file was found because Codex CLI is configured for OS keyring storage. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+        : status.codexCredentialStoreMode === "auto"
+          ? "No ~/.codex/auth.json file was found. Codex CLI is configured for automatic credential storage, which may have chosen the OS keyring on this machine. Start Codex sign-in here so Jolt can create a Pi-managed fallback, or switch Codex CLI to file storage."
+          : "No ~/.codex/auth.json file was found. If Codex is using OS keyring storage instead, start Codex sign-in here so Jolt can create a Pi-managed fallback.";
     case "no_codex_auth_available":
       return "No Codex credentials are configured yet.";
     default:
@@ -174,14 +203,20 @@ export function providerAuthBadge(
 export function providerAuthRecoverySteps(
   status: Pick<
     RpcProviderAuthStatus,
-    "codexAuthFilePath" | "configured" | "lastError" | "source" | "sourceReason"
+    | "codexAuthFilePath"
+    | "codexConfigFilePath"
+    | "codexCredentialStoreMode"
+    | "configured"
+    | "lastError"
+    | "source"
+    | "sourceReason"
   > | null,
 ): ProviderAuthRecoveryStep[] {
   if (!status) {
     return [];
   }
 
-  const sharedCacheBody = `If you want Codex CLI and Jolt to share one cache, configure Codex CLI for file-based storage and sign in again so ${status.codexAuthFilePath} exists.`;
+  const sharedCacheBody = `If you want Codex CLI and Jolt to share one cache, set cli_auth_credentials_store = "file" in ${status.codexConfigFilePath}, then sign in again so ${status.codexAuthFilePath} exists.`;
   const headlessBody =
     "For remote or headless hosts, prefer device-code login. If you can complete browser login on another machine, copy the resulting auth.json onto the target host after file-based storage is enabled.";
 
@@ -189,6 +224,21 @@ export function providerAuthRecoverySteps(
     case "codex_auth_file_missing":
     case "no_codex_auth_available":
       return [
+        ...(status.codexCredentialStoreMode === "keyring"
+          ? [
+              {
+                body: `Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so a shared ${status.codexAuthFilePath} cache is not expected until you switch storage modes.`,
+                title: "Current Codex CLI storage mode",
+              },
+            ]
+          : status.codexCredentialStoreMode === "auto"
+            ? [
+                {
+                  body: `Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may be using the OS keyring instead of ${status.codexAuthFilePath}.`,
+                  title: "Current Codex CLI storage mode",
+                },
+              ]
+            : []),
         {
           body: "Start Codex sign-in here to let Jolt create a Pi-managed fallback even when Codex CLI is using keyring storage.",
           title: "Create a Jolt-managed fallback",
@@ -240,7 +290,12 @@ export function providerAuthRecoverySteps(
     case "using_existing_pi_codex_auth":
       return [
         {
-          body: "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache.",
+          body:
+            status.codexCredentialStoreMode === "keyring"
+              ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for OS keyring storage in ${status.codexConfigFilePath}, so no shared auth.json cache is expected.`
+              : status.codexCredentialStoreMode === "auto"
+                ? `Jolt is already authenticated through its Pi fallback, and Codex CLI is configured for automatic credential storage in ${status.codexConfigFilePath}, so this machine may still be using the OS keyring.`
+                : "Jolt is already authenticated through its Pi fallback, so new Jolt threads can keep running even though Codex CLI is not sharing a file cache.",
           title: "Current fallback state",
         },
         {
@@ -559,6 +614,14 @@ export function SettingsPanel({
                     {providerStatus
                       ? providerAuthSourceDescription(providerStatus)
                       : "Reading the active provider-auth source."}
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-[#7ea2b8]">Credential storage</span>
+                    <span className="max-w-[13rem] text-right text-[#f4f8fb]">
+                      {providerStatus
+                        ? providerAuthCredentialStoreLabel(providerStatus)
+                        : "Loading..."}
+                    </span>
                   </div>
                   {providerExpiry ? (
                     <div className="flex items-start justify-between gap-3">

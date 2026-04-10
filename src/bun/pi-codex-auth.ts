@@ -22,6 +22,7 @@ import { AuthStorage } from "@mariozechner/pi-coding-agent";
 
 export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 const AUTH_FILE_NAME = "auth.json";
+const CONFIG_FILE_NAME = "config.toml";
 const DEFAULT_CODEX_HOME_DIRECTORY = ".codex";
 
 type CodexAuthJson = {
@@ -34,6 +35,7 @@ type CodexAuthJson = {
 };
 
 export type PiCodexAuthSource = "codex-file" | "pi-auth" | "none";
+export type PiCodexCredentialStoreMode = "auto" | "file" | "keyring";
 
 export type PiCodexAuthReason =
   | "codex_auth_file_already_current"
@@ -46,6 +48,8 @@ export type PiCodexAuthReason =
 
 export type PiCodexAuthState = {
   codexAuthFilePath: string;
+  codexConfigFilePath: string;
+  credentialStoreMode: PiCodexCredentialStoreMode | null;
   overrideApplied: boolean;
   piAuthFilePath: string;
   reason: PiCodexAuthReason;
@@ -201,8 +205,35 @@ export function resolveCodexAuthFilePath(): string {
   return join(resolveCodexHomeDirectoryPath(), AUTH_FILE_NAME);
 }
 
+export function resolveCodexConfigFilePath(): string {
+  return join(resolveCodexHomeDirectoryPath(), CONFIG_FILE_NAME);
+}
+
 export function resolvePiAuthFilePath(agentDirectory: string): string {
   return join(agentDirectory, AUTH_FILE_NAME);
+}
+
+export function readCodexCredentialStoreMode(
+  configFilePath: string = resolveCodexConfigFilePath(),
+): PiCodexCredentialStoreMode | null {
+  if (!existsSync(configFilePath)) {
+    return null;
+  }
+  try {
+    const configText = readFileSync(configFilePath, "utf8");
+    const match = configText.match(
+      /^\s*cli_auth_credentials_store\s*=\s*"(file|keyring|auto)"\s*$/mu,
+    );
+    if (!match) {
+      return null;
+    }
+    const mode = match[1];
+    return mode === "file" || mode === "keyring" || mode === "auto"
+      ? mode
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export function persistPiOpenAICodexCredential(
@@ -328,6 +359,8 @@ export function createPiAuthStorage(agentDirectory: string): {
 
   const piAuthFilePath = resolvePiAuthFilePath(agentDirectory);
   const codexAuthFilePath = resolveCodexAuthFilePath();
+  const codexConfigFilePath = resolveCodexConfigFilePath();
+  const credentialStoreMode = readCodexCredentialStoreMode(codexConfigFilePath);
   const authStorage = AuthStorage.create(piAuthFilePath);
 
   const codexAuthFileExists = existsSync(codexAuthFilePath);
@@ -356,6 +389,8 @@ export function createPiAuthStorage(agentDirectory: string): {
       authStorage,
       codexAuthState: {
         codexAuthFilePath,
+        codexConfigFilePath,
+        credentialStoreMode,
         overrideApplied,
         piAuthFilePath,
         reason: overrideApplied
@@ -373,6 +408,8 @@ export function createPiAuthStorage(agentDirectory: string): {
       authStorage,
       codexAuthState: {
         codexAuthFilePath,
+        codexConfigFilePath,
+        credentialStoreMode,
         overrideApplied: false,
         piAuthFilePath,
         reason:
@@ -388,6 +425,8 @@ export function createPiAuthStorage(agentDirectory: string): {
     authStorage,
     codexAuthState: {
       codexAuthFilePath,
+      codexConfigFilePath,
+      credentialStoreMode,
       overrideApplied: false,
       piAuthFilePath,
       reason:

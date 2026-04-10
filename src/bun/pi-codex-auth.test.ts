@@ -26,6 +26,17 @@ function createJwt(payload: Record<string, unknown>): string {
   ].join(".");
 }
 
+function writeCodexConfig(
+  codexHome: string,
+  credentialStoreMode: "auto" | "file" | "keyring",
+): void {
+  writeFileSync(
+    join(codexHome, "config.toml"),
+    `cli_auth_credentials_store = "${credentialStoreMode}"\n`,
+    "utf8",
+  );
+}
+
 afterEach(() => {
   if (typeof originalCodexHome === "string") {
     process.env.CODEX_HOME = originalCodexHome;
@@ -226,6 +237,47 @@ test("createPiAuthStorage falls back to Pi Codex auth when the Codex file is mis
       recursive: true,
     });
     rmSync(incompleteCodexHome, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("createPiAuthStorage exposes the configured Codex credential store mode", () => {
+  const agentDirectory = mkdtempSync(join(tmpdir(), "jolt-pi-auth-agent-"));
+  const keyringCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+  const autoCodexHome = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
+
+  try {
+    writeCodexConfig(keyringCodexHome, "keyring");
+    process.env.CODEX_HOME = keyringCodexHome;
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        codexConfigFilePath: join(keyringCodexHome, "config.toml"),
+        credentialStoreMode: "keyring",
+        reason: "codex_auth_file_missing",
+      }),
+    );
+
+    writeCodexConfig(autoCodexHome, "auto");
+    process.env.CODEX_HOME = autoCodexHome;
+    expect(createPiAuthStorage(agentDirectory).codexAuthState).toEqual(
+      expect.objectContaining({
+        codexConfigFilePath: join(autoCodexHome, "config.toml"),
+        credentialStoreMode: "auto",
+        reason: "codex_auth_file_missing",
+      }),
+    );
+  } finally {
+    rmSync(agentDirectory, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(keyringCodexHome, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(autoCodexHome, {
       force: true,
       recursive: true,
     });

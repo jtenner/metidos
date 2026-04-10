@@ -398,6 +398,7 @@ export type RpcProviderAuthLoginState =
   | "cancelled";
 
 export type RpcProviderAuthSource = "codex-file" | "pi-auth" | "none";
+export type RpcProviderAuthCredentialStoreMode = "auto" | "file" | "keyring";
 
 export type RpcProviderAuthSourceReason =
   | "codex_auth_file_already_current"
@@ -427,6 +428,8 @@ export type RpcProviderAuthStatus = {
   source: RpcProviderAuthSource;
   sourceReason: RpcProviderAuthSourceReason;
   codexAuthFilePath: string;
+  codexConfigFilePath: string;
+  codexCredentialStoreMode: RpcProviderAuthCredentialStoreMode | null;
   piAuthFilePath: string;
   credentialExpiresAt: string | null;
   accountId: string | null;

@@ -91,6 +91,12 @@ describe("provider auth procedures", () => {
     const missingCodexHome = createTempDirectory("jolt-provider-auth-codex-");
     const unusableCodexHome = createTempDirectory("jolt-provider-auth-codex-");
 
+    writeFileSync(
+      join(missingCodexHome, "config.toml"),
+      'cli_auth_credentials_store = "keyring"\n',
+      "utf8",
+    );
+
     const missingProcedures = await loadProjectProceduresForTest({
       appDataDir,
       codexHome: missingCodexHome,
@@ -101,6 +107,8 @@ describe("provider auth procedures", () => {
       });
     expect(missingStatus.provider).toEqual(
       expect.objectContaining({
+        codexConfigFilePath: join(missingCodexHome, "config.toml"),
+        codexCredentialStoreMode: "keyring",
         configured: false,
         source: "none",
         sourceReason: "codex_auth_file_missing",

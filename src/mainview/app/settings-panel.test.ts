@@ -9,6 +9,7 @@ import type { RpcProviderAuthStatus } from "../../bun/rpc-schema";
 import {
   canCompleteProviderAuthLogin,
   providerAuthBadge,
+  providerAuthCredentialStoreLabel,
   providerAuthNeedsManualCode,
   providerAuthRecoverySteps,
   providerAuthSourceDescription,
@@ -22,6 +23,8 @@ function buildProviderAuthStatus(
   return {
     accountId: null,
     codexAuthFilePath: "/tmp/.codex/auth.json",
+    codexConfigFilePath: "/tmp/.codex/config.toml",
+    codexCredentialStoreMode: null,
     configured: false,
     credentialExpiresAt: null,
     lastError: null,
@@ -92,14 +95,42 @@ describe("settings panel provider-auth helpers", () => {
     );
   });
 
+  it("maps credential-store modes into user-facing labels", () => {
+    expect(
+      providerAuthCredentialStoreLabel(
+        buildProviderAuthStatus({
+          codexCredentialStoreMode: "keyring",
+        }),
+      ),
+    ).toBe("OS keyring");
+    expect(
+      providerAuthCredentialStoreLabel(
+        buildProviderAuthStatus({
+          codexCredentialStoreMode: "auto",
+        }),
+      ),
+    ).toBe("Automatic");
+    expect(
+      providerAuthCredentialStoreLabel(
+        buildProviderAuthStatus({
+          codexCredentialStoreMode: "file",
+        }),
+      ),
+    ).toBe("File cache");
+    expect(providerAuthCredentialStoreLabel(buildProviderAuthStatus())).toBe(
+      "Codex default",
+    );
+  });
+
   it("includes operator recovery guidance for missing or unusable Codex auth files", () => {
     expect(
       providerAuthSourceDescription(
         buildProviderAuthStatus({
+          codexCredentialStoreMode: "keyring",
           sourceReason: "codex_auth_file_missing",
         }),
       ),
-    ).toContain("OS keyring storage");
+    ).toContain("configured for OS keyring storage");
 
     expect(
       providerAuthSourceDescription(
@@ -108,6 +139,32 @@ describe("settings panel provider-auth helpers", () => {
         }),
       ),
     ).toContain("Re-run Codex sign-in");
+  });
+
+  it("surfaces keyring-aware recovery guidance when Codex is configured for OS credential storage", () => {
+    expect(
+      providerAuthRecoverySteps(
+        buildProviderAuthStatus({
+          codexCredentialStoreMode: "keyring",
+          sourceReason: "codex_auth_file_missing",
+        }),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        title: "Current Codex CLI storage mode",
+      }),
+      expect.objectContaining({
+        title: "Create a Jolt-managed fallback",
+      }),
+      expect.objectContaining({
+        code: 'cli_auth_credentials_store = "file"',
+        title: "Optional shared-file cache",
+      }),
+      expect.objectContaining({
+        code: "codex login --device-auth",
+        title: "Headless fallback",
+      }),
+    ]);
   });
 
   it("builds keyring and headless recovery steps for missing Codex auth files", () => {
@@ -135,6 +192,7 @@ describe("settings panel provider-auth helpers", () => {
   it("surfaces shared-cache repair steps when Jolt is using Pi auth fallback", () => {
     const steps = providerAuthRecoverySteps(
       buildProviderAuthStatus({
+        codexCredentialStoreMode: "auto",
         configured: true,
         source: "pi-auth",
         sourceReason: "using_existing_pi_codex_auth",

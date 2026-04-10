@@ -30,6 +30,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
+- detects Codex CLI credential storage mode from `config.toml` and shows whether the current machine is configured for `file`, `keyring`, or `auto` storage
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - repeats the provider billing and policy cue at the chat-send and cron-create surfaces so users see the active scope again before they trigger work
 - surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers
@@ -427,6 +428,7 @@ Verification status on 2026-04-09:
 - Automated coverage now explicitly covers missing Codex-file diagnostics, unusable Codex-file diagnostics, selector reasoning-step behavior, and the no-silent-fallback runtime rule when a thread explicitly selects `openai-codex`.
 - Automated coverage now also proves unavailable `openai-codex` selections are rejected before thread-start requests, thread creation, queued sends, thread-model changes, and cron create/update mutations.
 - Automated coverage now proves the active-model provider-scope callout resolves correctly for both `openai` and `openai-codex`, including unavailable Codex selections.
+- Automated coverage now proves backend provider-auth status and settings-panel helpers distinguish Codex `keyring`, `file`, and `auto` credential-storage modes from `config.toml`.
 - A non-destructive local status/catalog probe was run on 2026-04-09 with a fresh temporary `JOLT_APP_DATA_DIR`. Result: Jolt detected a real `~/.codex/auth.json`, surfaced `source: codex-file`, and promoted the default model to `openai-codex:gpt-5.4`.
 - A live Pi runtime smoke was run on 2026-04-09 against `openai-codex:gpt-5.4-mini` with the prompt `Reply with exactly OK and nothing else.` Result: the runtime returned `OK`.
 - A live end-to-end Jolt thread smoke was run on 2026-04-09 through `openProjectProcedure(...)`, `createThreadProcedure(...)`, and `sendThreadMessageProcedure(...)` against `openai-codex:gpt-5.4-mini`. Result: the thread settled to `idle`, persisted Pi session metadata, and stored the assistant reply `OK`.
@@ -646,6 +648,26 @@ Primary files:
 - [src/mainview/controls/codex-utils.test.ts](../src/mainview/controls/codex-utils.test.ts)
 - [src/mainview/app/chat-workspace.tsx](../src/mainview/app/chat-workspace.tsx)
 - [src/mainview/App.tsx](../src/mainview/App.tsx)
+
+### CD13 - Detect Codex credential storage mode
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- inspect Codex `config.toml` under `CODEX_HOME` to detect `cli_auth_credentials_store`
+- surface the detected `file`, `keyring`, or `auto` mode through the backend provider-auth status contract
+- show the detected storage mode and keyring-aware recovery copy in Settings so missing `auth.json` states stop looking ambiguous
+
+Primary files:
+
+- [src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts)
+- [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts)
+- [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
+- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
+- [src/bun/pi-codex-auth.test.ts](../src/bun/pi-codex-auth.test.ts)
+- [src/bun/project-procedures/provider-auth.test.ts](../src/bun/project-procedures/provider-auth.test.ts)
+- [src/mainview/app/settings-panel.test.ts](../src/mainview/app/settings-panel.test.ts)
 
 ## Recommendation
 
