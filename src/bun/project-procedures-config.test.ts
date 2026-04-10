@@ -213,6 +213,16 @@ describe("project procedure configuration helpers", () => {
           providerId: "anthropic",
         }),
         expect.objectContaining({
+          group: "Kimi Coding",
+          id: "kimi-coding:k2p5",
+          providerId: "kimi-coding",
+        }),
+        expect.objectContaining({
+          group: "Z.AI",
+          id: "zai:glm-5.1",
+          providerId: "zai",
+        }),
+        expect.objectContaining({
           group: "xAI",
           id: expect.stringMatching(/^xai:/u),
           providerId: "xai",
@@ -229,11 +239,23 @@ describe("project procedure configuration helpers", () => {
       catalog.models.filter((model) => model.providerId === "anthropic"),
     ).toHaveLength(5);
     expect(
+      catalog.models.filter((model) => model.providerId === "kimi-coding"),
+    ).toHaveLength(2);
+    expect(
+      catalog.models.filter((model) => model.providerId === "minimax"),
+    ).toHaveLength(2);
+    expect(
       catalog.models.filter((model) => model.providerId === "openrouter"),
-    ).toHaveLength(8);
+    ).toHaveLength(5);
+    expect(
+      catalog.models.filter((model) => model.providerId === "zai"),
+    ).toHaveLength(5);
     expect(modelIds.has("anthropic:claude-opus-4-1")).toBe(false);
     expect(modelIds.has("openai:gpt-4.1")).toBe(false);
     expect(modelIds.has("google:gemini-1.5-pro")).toBe(false);
+    expect(modelIds.has("openrouter:qwen/qwen3.6-plus")).toBe(true);
+    expect(modelIds.has("zai:glm-5.1")).toBe(true);
+    expect(modelIds.has("kimi-coding:k2p5")).toBe(true);
     expect(modelIds.has("xai:grok-3-mini")).toBe(false);
   });
 
