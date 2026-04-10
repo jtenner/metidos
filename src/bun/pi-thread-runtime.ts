@@ -8,7 +8,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import {
   type AgentSession,
-  AuthStorage,
+  type AuthStorage,
   type CreateAgentSessionOptions,
   createAgentSession,
   createBashTool,
@@ -34,6 +34,7 @@ import {
   type PiDelegatedTaskRequest,
   type PiDelegatedTaskRun,
 } from "./pi-agents-tools";
+import { createPiAuthStorage } from "./pi-codex-auth";
 import type { PiThreadExtensionUiBridge } from "./pi-extension-ui";
 import {
   createPiGitHubCliHost,
@@ -311,7 +312,7 @@ function createPiModelRegistry(agentDirectory: string): {
   authStorage: AuthStorage;
   modelRegistry: ModelRegistry;
 } {
-  const authStorage = AuthStorage.create(join(agentDirectory, "auth.json"));
+  const { authStorage } = createPiAuthStorage(agentDirectory);
   const modelRegistry = ModelRegistry.create(
     authStorage,
     join(agentDirectory, "models.json"),
@@ -329,20 +330,13 @@ function resolvePiModel(
 ): Model<Api> {
   const normalizedModel = codexModelApiId(thread.model);
   const primaryProvider = codexModelProvider(thread.model);
-  const providerCandidates =
-    primaryProvider === "openai"
-      ? ["openai", "openai-codex"]
-      : [primaryProvider];
-
-  for (const provider of providerCandidates) {
-    const model = modelRegistry.find(provider, normalizedModel);
-    if (model) {
-      return model;
-    }
+  const model = modelRegistry.find(primaryProvider, normalizedModel);
+  if (model) {
+    return model;
   }
 
   throw new Error(
-    `Pi runtime could not resolve model ${normalizedModel} from providers ${providerCandidates.join(", ")}.`,
+    `Pi runtime could not resolve model ${normalizedModel} from provider ${primaryProvider}.`,
   );
 }
 

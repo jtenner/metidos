@@ -12,6 +12,7 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalCodexHome = process.env.CODEX_HOME;
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
 
@@ -62,6 +63,7 @@ async function loadCronModules() {
   closeAppDatabase();
   resetResolvedAppDataDirectory();
   process.env.JOLT_APP_DATA_DIR = createTempDirectory("jolt-cron-runtime-db-");
+  process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
   const token = Date.now();
@@ -141,6 +143,9 @@ beforeAll(async () => {
 afterEach(async () => {
   projectProcedures?.shutdownProjectPolling();
   await projectProcedures?.shutdownActiveThreadTurns();
+  if (typeof process.env.CODEX_HOME !== "string" || !process.env.CODEX_HOME) {
+    process.env.CODEX_HOME = createTempDirectory("jolt-codex-home-");
+  }
 });
 
 afterAll(async () => {
@@ -153,6 +158,11 @@ afterAll(async () => {
     process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
   } else {
     delete process.env.JOLT_APP_DATA_DIR;
+  }
+  if (typeof originalCodexHome === "string") {
+    process.env.CODEX_HOME = originalCodexHome;
+  } else {
+    delete process.env.CODEX_HOME;
   }
 
   if (typeof originalPiRuntimeTestProvider === "string") {

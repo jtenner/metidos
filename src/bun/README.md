@@ -50,6 +50,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `pi-thread-runtime.ts`
   - Jolt-owned Pi runtime adapter for per-thread execution.
   - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Jolt app data.
+  - Treats provider-qualified model ids as authoritative at runtime so `openai-codex` stays distinct from plain `openai` for overlapping GPT model ids.
   - Defines the current Pi-era safe-vs-unsafe policy: safe threads keep worktree-scoped file/search/edit/write tools but lose `bash`, while unsafe threads also gain `bash` and may request unsafe child threads or cron jobs.
   - Installs the Pi-native GitHub tool pack when `githubAccess` is enabled for the thread, binding those tools to the GitHub repository that owns the current worktree.
   - Installs the Pi-native agents pack when `agentsAccess` is enabled, exposing `update_plan` plus a bounded `delegate_task` helper instead of Codex’s full child-agent lifecycle.
@@ -61,6 +62,13 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 
 - `pi-thread-runtime.test.ts`
   - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, and delegated child-session execution.
+
+- `pi-codex-auth.ts`
+  - Shared auth-bridge helper for Codex-via-Pi support.
+  - Imports `~/.codex/auth.json` into Jolt's Pi `auth.json`, treats the Codex file as authoritative for `openai-codex` when present, and falls back to Pi-managed OAuth state only when the Codex file is absent or unusable.
+
+- `pi-codex-auth.test.ts`
+  - Focused coverage for Codex auth translation, Codex-file override precedence, and fallback to existing Pi-managed Codex OAuth state.
 
 - `pi-extension-ui.ts`
   - Shared Bun-side bridge that turns Pi `ExtensionUIContext` calls into Jolt websocket/RPC traffic.
@@ -111,6 +119,7 @@ This directory hosts the Bun-side runtime for Jolt: process entrypoints, RPC ser
 - `project-procedures/model-catalog.ts`
   - Houses the Pi-backed model catalog used by model pickers, validation, and provider resolution.
   - Builds a normalized multi-provider catalog from Pi `ModelRegistry`, emits canonical `provider:modelId` keys, and preserves legacy raw-id fallback for older thread rows.
+  - Exposes `openai-codex` as a first-class provider, distinguishes it from `OpenAI API`, and prefers Codex-backed raw GPT defaults only when Codex auth is actually available.
   - Tracks provider/model metadata such as reasoning support and context-window size.
   - Provides token-context utilities used for compaction/size logic.
 

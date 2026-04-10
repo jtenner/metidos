@@ -19,6 +19,7 @@ import {
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalCodexHome = process.env.CODEX_HOME;
 const piGitHubToolHostStub: PiGitHubToolHost = {
   getIssue: async () => {
     throw new Error("getIssue should not run in this test.");
@@ -95,6 +96,11 @@ afterEach(() => {
   } else {
     delete process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
   }
+  if (typeof originalCodexHome === "string") {
+    process.env.CODEX_HOME = originalCodexHome;
+  } else {
+    delete process.env.CODEX_HOME;
+  }
 });
 
 test("buildPiThreadToolPolicy disables bash and unsafe child escalation in safe mode", () => {
@@ -122,6 +128,7 @@ test("buildPiThreadToolPolicy disables bash and unsafe child escalation in safe 
 
 test("creates deterministic Pi sessions and resumes them for the same thread", async () => {
   const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
   const workspaceDir = mkdtempSync(
     join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
   );
@@ -130,6 +137,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
   try {
     process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
     const safeRuntime = await createPiThreadRuntime(
       {
         agentsAccess: true,
@@ -247,6 +255,10 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       force: true,
       recursive: true,
     });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
     rmSync(workspaceDir, {
       force: true,
       recursive: true,
@@ -256,6 +268,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
 
 test("reopens the persisted Pi session file instead of the most recent session", async () => {
   const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-thread-runtime-app-"));
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
   const workspaceDir = mkdtempSync(
     join(tmpdir(), "jolt-pi-thread-runtime-ws-"),
   );
@@ -264,6 +277,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
 
   try {
     process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
     const initialRuntime = await createPiThreadRuntime(
       {
         agentsAccess: false,
@@ -338,6 +352,10 @@ test("reopens the persisted Pi session file instead of the most recent session",
       force: true,
       recursive: true,
     });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
     rmSync(workspaceDir, {
       force: true,
       recursive: true,
@@ -347,12 +365,14 @@ test("reopens the persisted Pi session file instead of the most recent session",
 
 test("runPiDelegatedTask executes an isolated child session without agent recursion", async () => {
   const appDataDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-app-"));
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "jolt-codex-home-"));
   const workspaceDir = mkdtempSync(join(tmpdir(), "jolt-pi-delegate-ws-"));
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
     PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
 
   try {
     process.env.JOLT_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
     const result = await runPiDelegatedTask(
       {
         agentsAccess: true,
@@ -389,6 +409,10 @@ test("runPiDelegatedTask executes an isolated child session without agent recurs
     ]);
   } finally {
     rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHomeDir, {
       force: true,
       recursive: true,
     });

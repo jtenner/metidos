@@ -6,13 +6,14 @@
 import { join } from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { getProviders } from "@mariozechner/pi-ai";
-import { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { ModelRegistry } from "@mariozechner/pi-coding-agent";
 
 import {
   DEFAULT_THREAD_MODEL,
   DEFAULT_THREAD_REASONING_EFFORT,
   getAppDataDirectoryPath,
 } from "../db";
+import { createPiAuthStorage } from "../pi-codex-auth";
 import type {
   RpcModelCatalog,
   RpcModelOption,
@@ -33,6 +34,7 @@ const BUILT_IN_PROVIDER_ALLOWLIST = new Set([
   "groq",
   "mistral",
   "openai",
+  "openai-codex",
   "openrouter",
   "xai",
 ]);
@@ -44,12 +46,12 @@ const PROVIDER_LABEL_OVERRIDES: Record<string, string> = {
   "google-vertex": "Google Vertex",
   groq: "Groq",
   mistral: "Mistral",
-  openai: "OpenAI",
+  openai: "OpenAI API",
+  "openai-codex": "OpenAI Codex",
   openrouter: "OpenRouter",
   xai: "xAI",
 };
 const PROVIDER_ORDER = [
-  "openai",
   "xai",
   "anthropic",
   "google",
@@ -129,8 +131,6 @@ const reasoningEffortOptionMap = new Map(
   REASONING_EFFORT_OPTIONS.map((option) => [option.id, option]),
 );
 
-let cachedModelCatalogState: ModelCatalogState | null = null;
-
 function canonicalModelKey(provider: string, modelId: string): string {
   return `${provider}:${modelId}`;
 }
@@ -148,9 +148,18 @@ function providerLabel(provider: string): string {
     .join(" ");
 }
 
-function providerSortKey(provider: string): [number, string] {
+function providerSortKey(
+  provider: string,
+  preferCodexProvider: boolean,
+): [number, string] {
+  if (provider === "openai-codex") {
+    return [preferCodexProvider ? 0 : 1, provider];
+  }
+  if (provider === "openai") {
+    return [preferCodexProvider ? 1 : 0, provider];
+  }
   return [
-    PROVIDER_ORDER_INDEX.get(provider) ?? PROVIDER_ORDER.length,
+    (PROVIDER_ORDER_INDEX.get(provider) ?? PROVIDER_ORDER.length) + 2,
     provider,
   ];
 }
@@ -165,10 +174,15 @@ function shouldIncludeModel(model: Model<Api>): boolean {
 function compareCatalogEntries(
   left: ModelCatalogEntry,
   right: ModelCatalogEntry,
+  preferCodexProvider: boolean,
 ): number {
-  const [leftProviderRank, leftProviderName] = providerSortKey(left.provider);
+  const [leftProviderRank, leftProviderName] = providerSortKey(
+    left.provider,
+    preferCodexProvider,
+  );
   const [rightProviderRank, rightProviderName] = providerSortKey(
     right.provider,
+    preferCodexProvider,
   );
   if (leftProviderRank !== rightProviderRank) {
     return leftProviderRank - rightProviderRank;
@@ -219,21 +233,23 @@ function publicCatalogModelOption(model: Model<Api>): ModelCatalogEntry {
   };
 }
 
-function createModelRegistry(): ModelRegistry {
+function buildModelCatalogState(): ModelCatalogState {
   const agentDirectory = join(
     getAppDataDirectoryPath(),
     PI_AGENT_DIRECTORY_NAME,
   );
-  const authStorage = AuthStorage.create(join(agentDirectory, "auth.json"));
-  return ModelRegistry.create(authStorage, join(agentDirectory, "models.json"));
-}
-
-function buildModelCatalogState(): ModelCatalogState {
-  const entries = createModelRegistry()
+  const { authStorage, codexAuthState } = createPiAuthStorage(agentDirectory);
+  const preferCodexProvider = codexAuthState.source !== "none";
+  const entries = ModelRegistry.create(
+    authStorage,
+    join(agentDirectory, "models.json"),
+  )
     .getAll()
     .filter(shouldIncludeModel)
     .map(publicCatalogModelOption)
-    .sort(compareCatalogEntries);
+    .sort((left, right) =>
+      compareCatalogEntries(left, right, preferCodexProvider),
+    );
   if (entries.length === 0) {
     throw new Error("Pi model registry did not expose any catalog entries.");
   }
@@ -254,7 +270,14 @@ function buildModelCatalogState(): ModelCatalogState {
     }
   }
 
+  const preferredDefaultModel = byCanonicalKey.get(
+    canonicalModelKey(
+      preferCodexProvider ? "openai-codex" : "openai",
+      DEFAULT_THREAD_MODEL,
+    ),
+  );
   const defaultModel =
+    preferredDefaultModel ??
     byLegacyId.get(DEFAULT_THREAD_MODEL) ??
     byCanonicalKey.get(DEFAULT_THREAD_MODEL) ??
     entries[0];
@@ -271,11 +294,7 @@ function buildModelCatalogState(): ModelCatalogState {
 }
 
 function getModelCatalogState(): ModelCatalogState {
-  if (cachedModelCatalogState) {
-    return cachedModelCatalogState;
-  }
-  cachedModelCatalogState = buildModelCatalogState();
-  return cachedModelCatalogState;
+  return buildModelCatalogState();
 }
 
 function findCatalogModelEntry(

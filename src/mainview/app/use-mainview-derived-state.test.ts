@@ -56,13 +56,13 @@ function modelOption(overrides: Partial<RpcModelOption> = {}): RpcModelOption {
   return {
     contextWindowTokens: 400_000,
     deprecated: false,
-    group: "OpenAI",
+    group: "OpenAI API",
     id: "openai:gpt-5.4",
     label: "GPT-5.4",
     modelId: "gpt-5.4",
     providerId: "openai",
-    providerLabel: "OpenAI",
-    summary: "Provider: OpenAI. Supports thinking level control.",
+    providerLabel: "OpenAI API",
+    summary: "Provider: OpenAI API. Supports thinking level control.",
     supportsReasoningEffort: true,
     ...overrides,
   };

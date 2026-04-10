@@ -5,7 +5,7 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,10 +18,12 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.JOLT_APP_DATA_DIR;
+const originalCodexHome = process.env.CODEX_HOME;
 
 type ProjectProceduresModule = typeof import("./project-procedures");
 
 let projectProcedures: ProjectProceduresModule | null = null;
+let isolatedCodexHome = "";
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -53,6 +55,22 @@ function initializeGitRepository(path: string): void {
   });
 }
 
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, "utf8")
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+function createJwt(payload: Record<string, unknown>): string {
+  return [
+    encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" })),
+    encodeBase64Url(JSON.stringify(payload)),
+    "signature",
+  ].join(".");
+}
+
 async function loadProjectProcedures() {
   if (projectProcedures) {
     return projectProcedures;
@@ -68,11 +86,20 @@ async function loadProjectProcedures() {
 }
 
 beforeAll(async () => {
+  isolatedCodexHome = createTempDirectory("jolt-codex-home-");
+  process.env.CODEX_HOME = isolatedCodexHome;
   await loadProjectProcedures();
 });
 
 afterEach(() => {
   projectProcedures?.shutdownProjectPolling();
+  process.env.CODEX_HOME = isolatedCodexHome;
+  const piAuthPath = process.env.JOLT_APP_DATA_DIR
+    ? join(process.env.JOLT_APP_DATA_DIR, "pi-agent", "auth.json")
+    : null;
+  if (piAuthPath && existsSync(piAuthPath)) {
+    writeFileSync(piAuthPath, "{}", "utf8");
+  }
 });
 
 afterAll(async () => {
@@ -85,6 +112,11 @@ afterAll(async () => {
     process.env.JOLT_APP_DATA_DIR = originalAppDataDir;
   } else {
     delete process.env.JOLT_APP_DATA_DIR;
+  }
+  if (typeof originalCodexHome === "string") {
+    process.env.CODEX_HOME = originalCodexHome;
+  } else {
+    delete process.env.CODEX_HOME;
   }
 
   for (const path of tempDirectories) {
@@ -104,12 +136,21 @@ describe("project procedure configuration helpers", () => {
     expect(catalog.models).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          group: "OpenAI",
+          group: "OpenAI API",
           id: "openai:gpt-5.4",
           label: "GPT-5.4",
           modelId: "gpt-5.4",
           providerId: "openai",
-          providerLabel: "OpenAI",
+          providerLabel: "OpenAI API",
+          supportsReasoningEffort: true,
+        }),
+        expect.objectContaining({
+          group: "OpenAI Codex",
+          id: "openai-codex:gpt-5.4",
+          label: "GPT-5.4",
+          modelId: "gpt-5.4",
+          providerId: "openai-codex",
+          providerLabel: "OpenAI Codex",
           supportsReasoningEffort: true,
         }),
         expect.objectContaining({
@@ -123,6 +164,39 @@ describe("project procedure configuration helpers", () => {
           providerId: "xai",
         }),
       ]),
+    );
+  });
+
+  it("prefers openai-codex for raw GPT ids when Codex auth is available", () => {
+    const codexHome = createTempDirectory("jolt-codex-home-");
+    const accessToken = createJwt({
+      exp: 1_950_000_000,
+    });
+    writeFileSync(
+      join(codexHome, "auth.json"),
+      JSON.stringify(
+        {
+          auth_mode: "chatgpt",
+          tokens: {
+            access_token: accessToken,
+            account_id: "acct_live",
+            refresh_token: "refresh_live",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    process.env.CODEX_HOME = codexHome;
+
+    const catalog = buildModelCatalog();
+
+    expect(catalog.defaultModel).toBe("openai-codex:gpt-5.4");
+    expect(resolveCodexModel("gpt-5.4")).toBe("openai-codex:gpt-5.4");
+    expect(resolveCodexModel("openai:gpt-5.4")).toBe("openai:gpt-5.4");
+    expect(resolveCodexModel("openai-codex:gpt-5.4")).toBe(
+      "openai-codex:gpt-5.4",
     );
   });
 
