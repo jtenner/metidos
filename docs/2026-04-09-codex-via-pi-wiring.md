@@ -26,12 +26,14 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - labels `openai` and `openai-codex` as separate providers (`OpenAI API` and `OpenAI Codex`)
 - prefers `openai-codex` for overlapping raw GPT ids such as `gpt-5.4` when ChatGPT-backed Codex auth is available
 - imports `~/.codex/auth.json` into Pi's `openai-codex` OAuth shape and treats the Codex file as authoritative when it exists
+- exposes backend RPC procedures for Codex auth status, login start/finish, refresh, and logout
+- mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The remaining work is mostly:
 
-- backend/browser auth UI and diagnostics
 - browser-visible login/logout state
+- browser auth orchestration and diagnostics
 - keyring-gap recovery and fuller operator guidance
 
 ## Why Jolt Should Not Restore The Codex SDK
@@ -58,6 +60,7 @@ Restoring the Codex SDK only makes sense if Jolt decides it needs exact Codex CL
 
 - [src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts)
 - [src/bun/project-procedures/model-catalog.ts](../src/bun/project-procedures/model-catalog.ts)
+- [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts)
 - [src/bun/pi-thread-runtime.ts](../src/bun/pi-thread-runtime.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
@@ -188,14 +191,21 @@ Both the model catalog and the runtime create Pi storage under the Jolt app-data
 
 This is a good foundation for backend-managed provider login, status, and logout.
 
-## 3. Jolt now mirrors Codex file auth into Pi auth, but it still has no provider-auth RPC or UI
+## 3. Jolt now mirrors Codex file auth into Pi auth and exposes backend provider-auth RPC, but it still has no browser UI
 
-[src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts) now imports `~/.codex/auth.json` into Jolt's Pi auth store and gives that file precedence over stale Pi-managed `openai-codex` OAuth state. What is still missing is the browser-visible auth layer:
+[src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts) now imports `~/.codex/auth.json` into Jolt's Pi auth store, gives that file precedence over stale Pi-managed `openai-codex` OAuth state, and can mirror backend-managed login or refresh results back into both stores. The backend also now exposes dedicated provider-auth orchestration through [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts), [src/bun/project-procedures.ts](../src/bun/project-procedures.ts), and [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts):
 
-- no RPC shape for provider auth status
-- no procedure to start or finish provider login
-- no provider logout procedure
-- no browser settings UI for provider auth
+- provider-auth status/read API
+- login start/finish orchestration
+- refresh
+- logout
+- refreshed model-catalog payloads returned alongside provider-auth status so the browser can react to Codex availability changes without guessing
+
+What is still missing is the browser-visible auth layer:
+
+- no settings-panel UI for provider auth
+- no browser state machine around auth progress and failure
+- no browser copy yet for ChatGPT-plan Codex versus API-billed OpenAI
 
 [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx) is still a placeholder shell, which makes it the obvious landing zone for this work.
 
@@ -450,6 +460,8 @@ Primary files:
 
 ### CD03 - Add backend `openai-codex` auth procedures
 
+Status: completed on 2026-04-09.
+
 Deliverables:
 
 - provider-auth status/read API
@@ -461,7 +473,9 @@ Deliverables:
 
 Primary files:
 
+- [src/bun/project-procedures/provider-auth.ts](../src/bun/project-procedures/provider-auth.ts)
 - [src/bun/project-procedures.ts](../src/bun/project-procedures.ts)
+- [src/bun/pi-codex-auth.ts](../src/bun/pi-codex-auth.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 - [src/bun/index.ts](../src/bun/index.ts)
 

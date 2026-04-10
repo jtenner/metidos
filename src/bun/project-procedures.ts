@@ -72,6 +72,7 @@ import {
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiJoltToolHost } from "./pi-jolt-tools";
 import {
+  buildPiAgentDirectoryPath,
   createPiThreadRuntime,
   type PiThreadRuntime,
 } from "./pi-thread-runtime";
@@ -107,6 +108,13 @@ import {
   buildPiRuntimeCompaction,
   buildPiRuntimeUsage,
 } from "./project-procedures/pi-session-telemetry";
+import {
+  completeProviderAuthLogin,
+  getProviderAuthStatus,
+  logoutProviderAuth,
+  refreshProviderAuth,
+  startProviderAuthLogin,
+} from "./project-procedures/provider-auth";
 import {
   awaitAbortableResult,
   createAbortError,
@@ -146,6 +154,7 @@ import type {
   RpcOpenWorktreesBatchResultItem,
   RpcProject,
   RpcProjectWorktreesResult,
+  RpcProviderAuthResult,
   RpcReasoningEffort,
   RpcRequestContext,
   RpcRequestPriority,
@@ -370,6 +379,62 @@ export async function getModelCatalogProcedure(
   _params?: AppRPCSchema["requests"]["getModelCatalog"]["params"],
 ): Promise<RpcModelCatalog> {
   return buildModelCatalog();
+}
+
+function buildProviderAuthResult(providerId: string): RpcProviderAuthResult {
+  return {
+    modelCatalog: buildModelCatalog(),
+    provider: getProviderAuthStatus(buildPiAgentDirectoryPath(), providerId),
+  };
+}
+
+/**
+ * RPC procedure: read the current backend-managed provider-auth state.
+ */
+export async function getProviderAuthStatusProcedure(
+  params: AppRPCSchema["requests"]["getProviderAuthStatus"]["params"],
+): Promise<RpcProviderAuthResult> {
+  return buildProviderAuthResult(params.providerId);
+}
+
+/**
+ * RPC procedure: start a backend-managed provider login flow.
+ */
+export async function startProviderAuthLoginProcedure(
+  params: AppRPCSchema["requests"]["startProviderAuthLogin"]["params"],
+): Promise<RpcProviderAuthResult> {
+  await startProviderAuthLogin(buildPiAgentDirectoryPath(), params.providerId);
+  return buildProviderAuthResult(params.providerId);
+}
+
+/**
+ * RPC procedure: complete a provider login flow after browser redirect or manual code paste.
+ */
+export async function completeProviderAuthLoginProcedure(
+  params: AppRPCSchema["requests"]["completeProviderAuthLogin"]["params"],
+): Promise<RpcProviderAuthResult> {
+  await completeProviderAuthLogin(buildPiAgentDirectoryPath(), params);
+  return buildProviderAuthResult(params.providerId);
+}
+
+/**
+ * RPC procedure: refresh provider credentials and return the resulting availability state.
+ */
+export async function refreshProviderAuthProcedure(
+  params: AppRPCSchema["requests"]["refreshProviderAuth"]["params"],
+): Promise<RpcProviderAuthResult> {
+  await refreshProviderAuth(buildPiAgentDirectoryPath(), params.providerId);
+  return buildProviderAuthResult(params.providerId);
+}
+
+/**
+ * RPC procedure: clear stored provider credentials and return the resulting availability state.
+ */
+export async function logoutProviderAuthProcedure(
+  params: AppRPCSchema["requests"]["logoutProviderAuth"]["params"],
+): Promise<RpcProviderAuthResult> {
+  await logoutProviderAuth(buildPiAgentDirectoryPath(), params.providerId);
+  return buildProviderAuthResult(params.providerId);
 }
 
 /**

@@ -11,6 +11,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Tracks provider metadata such as xAI routing and which model ids accept reasoning-effort overrides.
   - Provides context-window and compaction-trigger helpers used when estimating token budgets.
 
+- `provider-auth.ts`
+  - Implements the backend-managed `openai-codex` auth state machine used by the Bun RPC layer.
+  - Tracks in-flight login attempts, manual-code completion, refresh, and logout behavior while respecting `~/.codex/auth.json` override precedence.
+  - Keeps provider-auth status shaping isolated so the browser settings work can consume a stable status/result contract later.
+
 - `pi-session-telemetry.ts`
   - Projects active Pi session telemetry into Jolt thread payloads without scraping external files.
   - Uses Pi `getContextUsage()` for live context-window hydration, session-branch `compaction` entries for observed compaction history, and runtime queue/streaming state for richer thread status overlays.

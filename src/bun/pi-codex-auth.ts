@@ -3,12 +3,24 @@
  * @description Syncs external Codex auth into Jolt's Pi auth store.
  */
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import {
+  loginOpenAICodex as loginOpenAICodexWithPiOAuth,
+  type OAuthCredentials,
+  type OAuthLoginCallbacks,
+  refreshOpenAICodexToken as refreshOpenAICodexTokenWithPiOAuth,
+} from "@mariozechner/pi-ai/oauth";
 import { AuthStorage } from "@mariozechner/pi-coding-agent";
 
-const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
+export const OPENAI_CODEX_PROVIDER_ID = "openai-codex";
 const AUTH_FILE_NAME = "auth.json";
 const DEFAULT_CODEX_HOME_DIRECTORY = ".codex";
 
@@ -47,9 +59,22 @@ export type PiOpenAICodexCredential = {
   refresh: string;
 };
 
+type CodexAuthJsonRecord = Record<string, unknown>;
+
 type PersistedPiOpenAICodexCredential = PiOpenAICodexCredential & {
   type: "oauth";
 };
+
+type OpenAICodexLoginOptions = OAuthLoginCallbacks & {
+  originator?: string;
+};
+
+type PiCodexAuthTestOverrides = {
+  login?: (options: OpenAICodexLoginOptions) => Promise<OAuthCredentials>;
+  refresh?: (refreshToken: string) => Promise<OAuthCredentials>;
+};
+
+let piCodexAuthTestOverrides: PiCodexAuthTestOverrides | null = null;
 
 function decodeBase64Url(segment: string): string | null {
   const normalized = segment.replaceAll("-", "+").replaceAll("_", "/");
@@ -109,6 +134,60 @@ function persistedCredentialsEqual(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function normalizeOAuthCredential(
+  credential: OAuthCredentials,
+): PiOpenAICodexCredential {
+  const access =
+    typeof credential.access === "string" ? credential.access.trim() : "";
+  const refresh =
+    typeof credential.refresh === "string" ? credential.refresh.trim() : "";
+  const expires =
+    typeof credential.expires === "number" &&
+    Number.isFinite(credential.expires)
+      ? credential.expires
+      : NaN;
+  const accountId =
+    typeof credential.accountId === "string" ? credential.accountId.trim() : "";
+
+  if (!access || !refresh || !Number.isFinite(expires)) {
+    throw new Error("OpenAI Codex OAuth returned unusable credentials.");
+  }
+
+  return {
+    access,
+    ...(accountId ? { accountId } : {}),
+    expires,
+    refresh,
+  };
+}
+
+function ensureParentDirectory(path: string): void {
+  mkdirSync(dirname(path), {
+    mode: 0o700,
+    recursive: true,
+  });
+}
+
+function readJsonRecord(path: string): CodexAuthJsonRecord {
+  if (!existsSync(path)) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as CodexAuthJsonRecord)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeJsonRecord(path: string, record: CodexAuthJsonRecord): void {
+  ensureParentDirectory(path);
+  writeFileSync(path, JSON.stringify(record, null, 2), "utf8");
+  chmodSync(path, 0o600);
+}
+
 export function resolveCodexHomeDirectoryPath(): string {
   const configuredCodexHome = process.env.CODEX_HOME?.trim();
   return resolve(
@@ -124,6 +203,82 @@ export function resolveCodexAuthFilePath(): string {
 
 export function resolvePiAuthFilePath(agentDirectory: string): string {
   return join(agentDirectory, AUTH_FILE_NAME);
+}
+
+export function persistPiOpenAICodexCredential(
+  agentDirectory: string,
+  credential: PiOpenAICodexCredential,
+): void {
+  const authStorage = AuthStorage.create(resolvePiAuthFilePath(agentDirectory));
+  authStorage.set(OPENAI_CODEX_PROVIDER_ID, persistedCredential(credential));
+}
+
+export function clearPiOpenAICodexCredential(agentDirectory: string): void {
+  const authStorage = AuthStorage.create(resolvePiAuthFilePath(agentDirectory));
+  authStorage.remove(OPENAI_CODEX_PROVIDER_ID);
+}
+
+export function persistCodexAuthFileCredential(
+  credential: PiOpenAICodexCredential,
+): void {
+  const authFilePath = resolveCodexAuthFilePath();
+  const existing = readJsonRecord(authFilePath);
+  const existingTokens =
+    existing.tokens &&
+    typeof existing.tokens === "object" &&
+    !Array.isArray(existing.tokens)
+      ? (existing.tokens as Record<string, unknown>)
+      : {};
+
+  writeJsonRecord(authFilePath, {
+    ...existing,
+    auth_mode: "chatgpt",
+    tokens: {
+      ...existingTokens,
+      access_token: credential.access,
+      ...(credential.accountId ? { account_id: credential.accountId } : {}),
+      refresh_token: credential.refresh,
+    },
+  });
+}
+
+export function clearCodexAuthFileCredential(): void {
+  const authFilePath = resolveCodexAuthFilePath();
+  if (!existsSync(authFilePath)) {
+    return;
+  }
+
+  const existing = readJsonRecord(authFilePath);
+  delete existing.auth_mode;
+  delete existing.tokens;
+  writeJsonRecord(authFilePath, existing);
+}
+
+export async function loginPiOpenAICodex(
+  options: OpenAICodexLoginOptions,
+): Promise<PiOpenAICodexCredential> {
+  const login = piCodexAuthTestOverrides?.login ?? loginOpenAICodexWithPiOAuth;
+  const credential = await login(options);
+  return normalizeOAuthCredential(credential);
+}
+
+export async function refreshPiOpenAICodexCredential(
+  refreshToken: string,
+): Promise<PiOpenAICodexCredential> {
+  const refresh =
+    piCodexAuthTestOverrides?.refresh ?? refreshOpenAICodexTokenWithPiOAuth;
+  const credential = await refresh(refreshToken);
+  return normalizeOAuthCredential(credential);
+}
+
+export function setPiCodexAuthTestOverrides(
+  overrides: PiCodexAuthTestOverrides,
+): void {
+  piCodexAuthTestOverrides = overrides;
+}
+
+export function resetPiCodexAuthTestOverrides(): void {
+  piCodexAuthTestOverrides = null;
 }
 
 export function translateCodexAuthToPiCredential(
@@ -175,11 +330,14 @@ export function createPiAuthStorage(agentDirectory: string): {
   const codexAuthFilePath = resolveCodexAuthFilePath();
   const authStorage = AuthStorage.create(piAuthFilePath);
 
+  const codexAuthFileExists = existsSync(codexAuthFilePath);
   let codexCredential: PiOpenAICodexCredential | null = null;
+  let codexAuthFileReadable = false;
   let codexAuthUsable = false;
-  if (existsSync(codexAuthFilePath)) {
+  if (codexAuthFileExists) {
     try {
       const parsed = JSON.parse(readFileSync(codexAuthFilePath, "utf8"));
+      codexAuthFileReadable = true;
       codexCredential = translateCodexAuthToPiCredential(parsed);
       codexAuthUsable = codexCredential != null;
     } catch {
@@ -221,7 +379,7 @@ export function createPiAuthStorage(agentDirectory: string): {
         piAuthFilePath,
         reason: codexAuthUsable
           ? "using_existing_pi_codex_auth"
-          : existsSync(codexAuthFilePath)
+          : codexAuthFileExists && !codexAuthFileReadable
             ? "codex_auth_file_unusable_fell_back_to_pi_auth"
             : "using_existing_pi_codex_auth",
         source: "pi-auth",
@@ -235,9 +393,10 @@ export function createPiAuthStorage(agentDirectory: string): {
       codexAuthFilePath,
       overrideApplied: false,
       piAuthFilePath,
-      reason: existsSync(codexAuthFilePath)
-        ? "codex_auth_file_unusable"
-        : "no_codex_auth_available",
+      reason:
+        codexAuthFileExists && !codexAuthFileReadable
+          ? "codex_auth_file_unusable"
+          : "no_codex_auth_available",
       source: "none",
     },
   };

@@ -387,6 +387,47 @@ export type RpcModelCatalog = {
   reasoningEfforts: RpcReasoningEffortOption[];
 };
 
+export type RpcProviderAuthLoginState =
+  | "awaiting_browser"
+  | "awaiting_code"
+  | "completing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type RpcProviderAuthSource = "codex-file" | "pi-auth" | "none";
+
+export type RpcProviderAuthLogin = {
+  loginId: string;
+  state: RpcProviderAuthLoginState;
+  authUrl: string | null;
+  instructions: string | null;
+  prompt: string | null;
+  progressMessages: string[];
+  error: string | null;
+  startedAt: string;
+  updatedAt: string;
+};
+
+export type RpcProviderAuthStatus = {
+  providerId: string;
+  providerLabel: string;
+  configured: boolean;
+  source: RpcProviderAuthSource;
+  sourceReason: string;
+  codexAuthFilePath: string;
+  piAuthFilePath: string;
+  credentialExpiresAt: string | null;
+  accountId: string | null;
+  lastError: string | null;
+  login: RpcProviderAuthLogin | null;
+};
+
+export type RpcProviderAuthResult = {
+  modelCatalog: RpcModelCatalog;
+  provider: RpcProviderAuthStatus;
+};
+
 export type RpcAppBootstrapResult = {
   homeDirectory: RpcHomeDirectoryResult;
   modelCatalog: RpcModelCatalog;
@@ -613,6 +654,38 @@ export type AppRPCSchema = {
     getModelCatalog: {
       params: undefined;
       response: RpcModelCatalog;
+    };
+    getProviderAuthStatus: {
+      params: {
+        providerId: string;
+      };
+      response: RpcProviderAuthResult;
+    };
+    startProviderAuthLogin: {
+      params: {
+        providerId: string;
+      };
+      response: RpcProviderAuthResult;
+    };
+    completeProviderAuthLogin: {
+      params: {
+        providerId: string;
+        loginId: string;
+        manualCode?: string | null;
+      };
+      response: RpcProviderAuthResult;
+    };
+    refreshProviderAuth: {
+      params: {
+        providerId: string;
+      };
+      response: RpcProviderAuthResult;
+    };
+    logoutProviderAuth: {
+      params: {
+        providerId: string;
+      };
+      response: RpcProviderAuthResult;
     };
     getAppBootstrap: {
       params: RpcAppBootstrapHint | undefined;
@@ -925,6 +998,26 @@ export interface ProjectProcedures {
   getModelCatalog: RpcProcedureCall<
     AppRPCSchema["requests"]["getModelCatalog"]["params"],
     AppRPCSchema["requests"]["getModelCatalog"]["response"]
+  >;
+  getProviderAuthStatus: RpcProcedureCall<
+    AppRPCSchema["requests"]["getProviderAuthStatus"]["params"],
+    AppRPCSchema["requests"]["getProviderAuthStatus"]["response"]
+  >;
+  startProviderAuthLogin: RpcProcedureCall<
+    AppRPCSchema["requests"]["startProviderAuthLogin"]["params"],
+    AppRPCSchema["requests"]["startProviderAuthLogin"]["response"]
+  >;
+  completeProviderAuthLogin: RpcProcedureCall<
+    AppRPCSchema["requests"]["completeProviderAuthLogin"]["params"],
+    AppRPCSchema["requests"]["completeProviderAuthLogin"]["response"]
+  >;
+  refreshProviderAuth: RpcProcedureCall<
+    AppRPCSchema["requests"]["refreshProviderAuth"]["params"],
+    AppRPCSchema["requests"]["refreshProviderAuth"]["response"]
+  >;
+  logoutProviderAuth: RpcProcedureCall<
+    AppRPCSchema["requests"]["logoutProviderAuth"]["params"],
+    AppRPCSchema["requests"]["logoutProviderAuth"]["response"]
   >;
   getAppBootstrap: RpcProcedureCall<
     AppRPCSchema["requests"]["getAppBootstrap"]["params"],

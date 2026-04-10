@@ -68,6 +68,8 @@
 │  │  │  ├─ command-normalization.test.ts
 │  │  │  ├─ command-normalization.ts
 │  │  │  ├─ model-catalog.ts
+│  │  │  ├─ provider-auth.test.ts
+│  │  │  ├─ provider-auth.ts
 │  │  │  ├─ directory-suggestions.ts
 │  │  │  ├─ git-history.ts
 │  │  │  ├─ pi-event-projection.test.ts
