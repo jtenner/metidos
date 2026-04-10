@@ -330,7 +330,7 @@ export function CodexModelSelector({
                 ) : null}
               </div>
             ) : selectedProvider ? (
-              <div className="border border-[#31414d] bg-[#101416] px-3 py-3">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
