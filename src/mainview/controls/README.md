@@ -12,10 +12,10 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
 - `codex-model-selector.tsx`
   - Implements the model picker UI (desktop + mobile variants) for provider-aware Pi model selection.
   - Walks selection through `Provider -> Model -> Thinking level`, keeping `OpenAI API` and `OpenAI Codex` distinct even when they expose the same GPT ids.
-  - Supports search filtering at the provider and model steps and only shows the thinking-level step when the chosen model supports it.
+  - Supports search filtering at the provider and model steps, surfaces provider billing/policy scope for `OpenAI API` versus `OpenAI Codex`, and only shows the thinking-level step when the chosen model supports it.
 - `codex-utils.ts`
   - Helper utilities for model/thinking UI wiring.
-  - Groups model options by provider, filters stepped selector lists, formats provider-aware labels (including deprecation marking), and resolves selected IDs to model/effort records.
+  - Groups model options by provider, filters stepped selector lists, formats provider-aware labels (including deprecation marking), exposes provider-scope guidance, and resolves selected IDs to model/effort records.
 - `dropdown.tsx`
   - Provides a reusable render-prop dropdown primitive used across control UIs.
   - Manages open/close state, outside-click and Escape-key dismissal, and open-state callbacks for parent integrations.

@@ -18,6 +18,12 @@ export type CodexProviderGroup = {
 
 export type CodexModelSelectionOutcome = "commit" | "reasoning";
 
+export type CodexProviderScopeInfo = {
+  badge: string;
+  detail: string;
+  summary: string;
+};
+
 /**
  * Group model options by provider identity, preserving first-seen provider order.
  */
@@ -74,6 +80,32 @@ export function codexModelLabel(model: RpcModelOption): string {
  */
 export function codexModelProviderLabel(model: RpcModelOption): string {
   return model.providerLabel || model.group;
+}
+
+/**
+ * User-facing billing/policy guidance for providers where scope ambiguity matters.
+ */
+export function codexProviderScopeInfo(
+  providerId: string | null | undefined,
+): CodexProviderScopeInfo | null {
+  switch (providerId?.trim()) {
+    case "openai-codex":
+      return {
+        badge: "ChatGPT plan",
+        detail:
+          "Uses ChatGPT-backed Codex auth. Usage follows ChatGPT workspace permissions, retention, and residency settings.",
+        summary: "ChatGPT workspace policy",
+      };
+    case "openai":
+      return {
+        badge: "API billed",
+        detail:
+          "Uses OpenAI API credentials. Usage follows your API organization billing, retention, and data-sharing settings.",
+        summary: "API org policy",
+      };
+    default:
+      return null;
+  }
 }
 
 /**

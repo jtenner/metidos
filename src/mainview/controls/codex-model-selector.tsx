@@ -15,6 +15,7 @@ import {
   codexModelSelectionOutcome,
   codexModelSelectorLabel,
   codexModelSupportsThinkingLevel,
+  codexProviderScopeInfo,
   filterCodexProviderGroups,
   filterCodexProviderModels,
   findCodexModel,
@@ -149,6 +150,9 @@ export function CodexModelSelector({
   const filteredModels = useMemo(
     () => filterCodexProviderModels(selectedProvider, normalizedSearchQuery),
     [normalizedSearchQuery, selectedProvider],
+  );
+  const selectedProviderScope = codexProviderScopeInfo(
+    selectedProvider?.providerId ?? null,
   );
 
   const buttonLabel = activeModel
@@ -366,6 +370,21 @@ export function CodexModelSelector({
                 ) : null}
               </div>
             )}
+            {selectedProviderScope ? (
+              <div className="mt-3 rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                    {selectedProviderScope.badge}
+                  </span>
+                  <span className="text-[10px] font-medium text-[#e7f1f7]">
+                    {selectedProviderScope.summary}
+                  </span>
+                </div>
+                <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
+                  {selectedProviderScope.detail}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
@@ -378,6 +397,7 @@ export function CodexModelSelector({
                 filteredProviders.map((provider) => {
                   const selected =
                     provider.providerId === activeProvider?.providerId;
+                  const scopeInfo = codexProviderScopeInfo(provider.providerId);
                   return (
                     <button
                       key={provider.providerId}
@@ -411,6 +431,16 @@ export function CodexModelSelector({
                         <span className="mt-1 block text-[11px] leading-4 text-[#a7b7c2]">
                           {`${provider.models.length} model${provider.models.length === 1 ? "" : "s"} available`}
                         </span>
+                        {scopeInfo ? (
+                          <>
+                            <span className="mt-2 inline-flex rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                              {scopeInfo.badge}
+                            </span>
+                            <span className="mt-1 block text-[11px] leading-4 text-[#9cb5c6]">
+                              {scopeInfo.summary}
+                            </span>
+                          </>
+                        ) : null}
                       </span>
                       <span className="mt-0.5 flex shrink-0 items-center pl-1 text-[#6f8899]">
                         {materialSymbol("chevron_right", "text-[16px]")}

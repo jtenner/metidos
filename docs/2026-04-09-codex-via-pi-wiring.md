@@ -30,6 +30,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - mirrors backend-managed Codex login and refresh results back into both Jolt's Pi auth store and `~/.codex/auth.json`
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
+- surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
 
 The planned Codex-via-Pi wiring slices are now complete.
@@ -216,7 +217,7 @@ This is a good foundation for backend-managed provider login, status, and logout
 What remains after the implementation work is operator guidance rather than missing product plumbing:
 
 - explicit documentation of which parts were verified live on 2026-04-09 and which parts remain covered only by automated tests
-- fuller operator notes for billing and auth-source expectations
+- fuller operator notes for auth-source expectations outside the selector and settings surfaces
 
 ## 4. Jolt's runtime selection now respects Codex billing precedence for overlapping ids
 
@@ -573,12 +574,21 @@ Primary files:
 - [src/mainview/app/settings-panel.test.ts](../src/mainview/app/settings-panel.test.ts)
 - [src/bun/rpc-schema.ts](../src/bun/rpc-schema.ts)
 
+### CD09 - Expose provider billing and policy scope in the selector
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- surface provider-scope guidance at selection time for `OpenAI Codex` versus `OpenAI API`
+- make the billing/policy difference visible in both the provider list and the currently active provider step
+- keep the implementation UI-only so persisted model ids and runtime routing remain unchanged
+
 Primary files:
 
-- [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
-- [src/bun/pi-thread-runtime.test.ts](../src/bun/pi-thread-runtime.test.ts)
-- [src/mainview/app/settings-panel.tsx](../src/mainview/app/settings-panel.tsx)
 - [src/mainview/controls/codex-model-selector.tsx](../src/mainview/controls/codex-model-selector.tsx)
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+- [src/mainview/controls/codex-utils.test.ts](../src/mainview/controls/codex-utils.test.ts)
 
 ## Recommendation
 

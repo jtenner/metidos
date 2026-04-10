@@ -7,6 +7,7 @@ import { describe, expect, it } from "bun:test";
 import type { RpcModelOption } from "../../bun/rpc-schema";
 import {
   codexModelSelectionOutcome,
+  codexProviderScopeInfo,
   filterCodexProviderGroups,
   filterCodexProviderModels,
   groupCodexProviders,
@@ -108,5 +109,21 @@ describe("stepped codex selector helpers", () => {
     expect(codexModelSelectionOutcome(OPENAI_CODEX_MODEL, false)).toBe(
       "commit",
     );
+  });
+
+  it("surfaces billing and policy guidance for OpenAI API versus OpenAI Codex", () => {
+    expect(codexProviderScopeInfo("openai")).toEqual({
+      badge: "API billed",
+      detail:
+        "Uses OpenAI API credentials. Usage follows your API organization billing, retention, and data-sharing settings.",
+      summary: "API org policy",
+    });
+    expect(codexProviderScopeInfo("openai-codex")).toEqual({
+      badge: "ChatGPT plan",
+      detail:
+        "Uses ChatGPT-backed Codex auth. Usage follows ChatGPT workspace permissions, retention, and residency settings.",
+      summary: "ChatGPT workspace policy",
+    });
+    expect(codexProviderScopeInfo("anthropic")).toBeNull();
   });
 });

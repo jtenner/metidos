@@ -114,9 +114,9 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/chat-composer-control.tsx` renders the message composer and send/compose interactions.
 
-`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeping `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow.
+`controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, and surfaces their billing/policy scope directly in the selector.
 
-`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls.
+`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including the billing/policy guidance shown for OpenAI provider choices.
 
 `controls/dropdown.tsx` is the shared dropdown primitive used by action and selection controls.
 
