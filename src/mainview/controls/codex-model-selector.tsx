@@ -103,9 +103,7 @@ export function CodexModelSelector({
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     activeProvider?.providerId ?? null,
   );
-  const [pendingModelId, setPendingModelId] = useState<string | null>(
-    activeModel?.id ?? null,
-  );
+  const [pendingModelId, setPendingModelId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -117,7 +115,7 @@ export function CodexModelSelector({
     setSelectedProviderId(
       activeProvider?.providerId ?? providerGroups[0]?.providerId ?? null,
     );
-    setPendingModelId(activeModel?.id ?? null);
+    setPendingModelId(null);
   }, [
     activeModel?.id,
     activeProvider?.providerId,
@@ -163,8 +161,8 @@ export function CodexModelSelector({
       : null;
   const panelClassName =
     variant === "desktop"
-      ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[24rem] overflow-hidden border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
-      : "absolute left-0 right-0 bottom-[calc(100%+0.5rem)] z-50 overflow-hidden border border-[#445058] bg-[#171b1d] shadow-[0_18px_38px_rgba(0,0,0,0.42)]";
+      ? "absolute left-0 bottom-[calc(100%+0.5rem)] z-40 w-[24rem] overflow-visible border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]"
+      : "absolute left-0 right-0 bottom-[calc(100%+0.5rem)] z-50 overflow-visible border border-[#445058] bg-[#171b1d] shadow-[0_18px_38px_rgba(0,0,0,0.42)]";
 
   function resetSearchForNextStep(nextStep: SelectorStep): void {
     setSearchQuery("");
@@ -172,6 +170,7 @@ export function CodexModelSelector({
   }
 
   function handleProviderSelect(providerId: string): void {
+    setPendingModelId(null);
     setSelectedProviderId(providerId);
     resetSearchForNextStep("model");
   }
@@ -184,14 +183,14 @@ export function CodexModelSelector({
   }
 
   function handleModelSelect(model: RpcModelOption, close: () => void): void {
-    setPendingModelId(model.id);
     if (
       codexModelSelectionOutcome(model, integratedReasoningEnabled) ===
       "reasoning"
     ) {
-      resetSearchForNextStep("reasoning");
+      setPendingModelId(model.id);
       return;
     }
+    setPendingModelId(null);
     commitModelAndClose(model, close);
   }
 
@@ -210,6 +209,7 @@ export function CodexModelSelector({
 
   function handleStepBack(): void {
     setSearchQuery("");
+    setPendingModelId(null);
     setSelectorStep((currentStep) =>
       currentStep === "reasoning" ? "model" : "provider",
     );
@@ -381,7 +381,7 @@ export function CodexModelSelector({
             ) : null}
           </div>
 
-          <div className="max-h-80 overflow-y-auto py-2 hide-scrollbar">
+          <div className="max-h-80 overflow-y-auto overflow-x-visible py-2 hide-scrollbar">
             {selectorStep === "provider" ? (
               filteredProviders.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-[#8f9aa2]">
@@ -465,48 +465,121 @@ export function CodexModelSelector({
               ) : (
                 filteredModels.map((model) => {
                   const selected = model.id === activeModelId;
+                  const reasoningSubmenuOpen =
+                    pendingModelId === model.id &&
+                    integratedReasoningEnabled &&
+                    codexModelSupportsThinkingLevel(model);
                   return (
-                    <button
+                    <div
                       key={model.id}
-                      type="button"
-                      className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
-                        selected
-                          ? "bg-[#28353e] text-[#f8fafc]"
-                          : "text-[#ebf3f8] hover:bg-[#1e2428]"
-                      }`}
-                      onClick={() => {
-                        handleModelSelect(model, close);
+                      className="relative"
+                      onMouseEnter={() => {
+                        if (
+                          integratedReasoningEnabled &&
+                          codexModelSupportsThinkingLevel(model)
+                        ) {
+                          setPendingModelId(model.id);
+                          return;
+                        }
+                        setPendingModelId((current) =>
+                          current === model.id ? null : current,
+                        );
+                      }}
+                      onMouseLeave={() => {
+                        setPendingModelId((current) =>
+                          current === model.id ? null : current,
+                        );
+                      }}
+                      onFocus={() => {
+                        if (
+                          integratedReasoningEnabled &&
+                          codexModelSupportsThinkingLevel(model)
+                        ) {
+                          setPendingModelId(model.id);
+                        }
+                      }}
+                      onBlur={(event) => {
+                        if (
+                          event.relatedTarget &&
+                          event.currentTarget.contains(
+                            event.relatedTarget as Node,
+                          )
+                        ) {
+                          return;
+                        }
+                        setPendingModelId((current) =>
+                          current === model.id ? null : current,
+                        );
                       }}
                     >
-                      <span
-                        className={`shrink-0 ${
-                          selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
+                      <button
+                        type="button"
+                        className={`flex w-full items-center gap-3 px-3 py-px text-left transition-colors ${
+                          selected
+                            ? "bg-[#28353e] text-[#f8fafc]"
+                            : "text-[#ebf3f8] hover:bg-[#1e2428]"
                         }`}
+                        onClick={() => {
+                          handleModelSelect(model, close);
+                        }}
                       >
-                        {materialSymbol(
-                          selected ? "check_circle" : "radio_button_unchecked",
-                          "text-[16px]",
-                        )}
-                      </span>
-                      <span className="min-w-0 flex flex-1 items-center gap-1">
-                        <span className="shrink-0 text-[12px] font-semibold text-[#f4f8fb]">
-                          {codexModelLabel(model)}
-                        </span>
                         <span
-                          className={`min-w-0 truncate text-[12px] ${
-                            selected ? "text-[#b7cad8]" : "text-[#8f9aa2]"
+                          className={`shrink-0 ${
+                            selected ? "text-[#bdd5e6]" : "text-[#5e676e]"
                           }`}
                         >
-                          {`- ${model.modelId}`}
+                          {materialSymbol(
+                            selected
+                              ? "check_circle"
+                              : "radio_button_unchecked",
+                            "text-[16px]",
+                          )}
                         </span>
-                      </span>
-                      {integratedReasoningEnabled &&
-                      codexModelSupportsThinkingLevel(model) ? (
-                        <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
-                          {materialSymbol("chevron_right", "text-[16px]")}
+                        <span className="min-w-0 flex flex-1 items-center gap-1">
+                          <span className="shrink-0 text-[12px] font-semibold text-[#f4f8fb]">
+                            {codexModelLabel(model)}
+                          </span>
+                          <span
+                            className={`min-w-0 truncate text-[12px] ${
+                              selected ? "text-[#b7cad8]" : "text-[#8f9aa2]"
+                            }`}
+                          >
+                            {`- ${model.modelId}`}
+                          </span>
                         </span>
+                        {integratedReasoningEnabled &&
+                        codexModelSupportsThinkingLevel(model) ? (
+                          <span className="flex shrink-0 items-center pl-1 text-[#6f8899]">
+                            {materialSymbol("chevron_right", "text-[16px]")}
+                          </span>
+                        ) : null}
+                      </button>
+                      {reasoningSubmenuOpen ? (
+                        <div className="absolute top-0 left-full z-20 ml-2 min-w-[12rem] border border-[#3c4c58] bg-[#15191b] shadow-[0_18px_38px_rgba(0,0,0,0.42)]">
+                          {reasoningOptions.map((option) => {
+                            const selectedOption = option.id === reasoningValue;
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className={`block w-full px-3 py-2 text-left transition-colors ${
+                                  selectedOption
+                                    ? "bg-[#28353e] text-[#f8fafc]"
+                                    : "text-[#ebf3f8] hover:bg-[#1e2428]"
+                                }`}
+                                onClick={() => {
+                                  handleReasoningSelect(option.id, close);
+                                }}
+                              >
+                                <span className="block text-[12px] font-semibold text-inherit">
+                                  {option.label}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       ) : null}
-                    </button>
+                    </div>
                   );
                 })
               )
