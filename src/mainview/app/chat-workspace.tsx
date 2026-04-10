@@ -28,7 +28,6 @@ import type {
 } from "../../bun/rpc-schema";
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
-import { codexModelScopeCallout } from "../controls/codex-utils";
 import { brandBoltIcon, materialSymbol } from "../controls/icons";
 import {
   ThreadAccessControl,
@@ -1255,11 +1254,6 @@ export function DesktopChatView({
   threadAccessControlDisabled,
   threadAccessValue,
 }: DesktopChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
-  const activeModelScope = useMemo(
-    () => codexModelScopeCallout(codexModels, activeCodexModel),
-    [activeCodexModel, codexModels],
-  );
-
   // Header is passed as topContent into virtualized transcript for stable positioning.
   const headerContent = (
     <div className="mx-auto w-full max-w-4xl pb-12">
@@ -1331,33 +1325,6 @@ export function DesktopChatView({
           {modelControlError ? (
             <div className="mt-2 text-xs text-[#ff6e84]">
               {modelControlError}
-            </div>
-          ) : null}
-          {activeModelScope ? (
-            <div className="mt-2 rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                  {activeModelScope.badge}
-                </span>
-                <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
-                  {`Provider: ${activeModelScope.providerLabel}`}
-                </span>
-                <span className="text-[10px] font-medium text-[#b1c6d4]">
-                  {activeModelScope.summary}
-                </span>
-              </div>
-              <div className="mt-2 font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7ebfb]">
-                {`Model: ${activeModelScope.modelLabel}`}
-              </div>
-              <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
-                {`This thread will use ${activeModelScope.providerLabel} for ${activeModelScope.modelLabel}. ${activeModelScope.detail}`}
-              </div>
-              {!activeModelScope.providerAvailable &&
-              activeModelScope.providerAvailabilityNote ? (
-                <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
-                  {activeModelScope.providerAvailabilityNote}
-                </div>
-              ) : null}
             </div>
           ) : null}
           {reasoningEffortControlError ? (
@@ -1457,10 +1424,6 @@ export function MobileChatView({
   threadAccessControlDisabled,
   threadAccessValue,
 }: MobileChatViewProps & { messages: VisibleMessage[] }): JSX.Element {
-  const activeModelScope = useMemo(
-    () => codexModelScopeCallout(codexModels, activeCodexModel),
-    [activeCodexModel, codexModels],
-  );
   const footerRef = useRef<HTMLElement | null>(null);
   const [composerInsetPx, setComposerInsetPx] = useState(
     MOBILE_CHAT_COMPOSER_FALLBACK_INSET_PX,
@@ -1573,33 +1536,6 @@ export function MobileChatView({
               {extensionStatusEntries.length > 0 ? (
                 <div className="mt-2">
                   <ExtensionStatusPills entries={extensionStatusEntries} />
-                </div>
-              ) : null}
-              {activeModelScope ? (
-                <div className="mt-2 rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
-                      {activeModelScope.badge}
-                    </span>
-                    <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
-                      {`Provider: ${activeModelScope.providerLabel}`}
-                    </span>
-                    <span className="text-[10px] font-medium text-[#b1c6d4]">
-                      {activeModelScope.summary}
-                    </span>
-                  </div>
-                  <div className="mt-2 font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7ebfb]">
-                    {`Model: ${activeModelScope.modelLabel}`}
-                  </div>
-                  <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
-                    {`This thread will use ${activeModelScope.providerLabel} for ${activeModelScope.modelLabel}. ${activeModelScope.detail}`}
-                  </div>
-                  {!activeModelScope.providerAvailable &&
-                  activeModelScope.providerAvailabilityNote ? (
-                    <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
-                      {activeModelScope.providerAvailabilityNote}
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
             </div>
