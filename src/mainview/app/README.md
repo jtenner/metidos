@@ -47,7 +47,7 @@ Defines the thread row component (`ThreadList`) and shared thread-listing prop s
 Hosts the active workspace panel shell and swaps between available workspace modes.
 
 `chat-workspace.tsx`
-Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization, cached row-height reuse for unchanged rows, and browser-visible Pi extension status/widget surfaces around the composer.
+Implements chat rendering and input flows with separate `DesktopChatView` and `MobileChatView` entry points for adaptive behavior, including grouped transcript virtualization, cached row-height reuse for unchanged rows, browser-visible Pi extension status/widget surfaces around the composer, and the active provider billing/policy callout shown immediately before send.
 
 `diff-workspace.tsx`
 Builds and renders the diff tree/panel view, including helpers like `emptyDiffFilePatchState` and `buildDiffFileTree`, and now reuses shared parsed-diff state so large patches can prepare off the main thread.

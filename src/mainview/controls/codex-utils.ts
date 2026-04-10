@@ -26,6 +26,13 @@ export type CodexProviderScopeInfo = {
   summary: string;
 };
 
+export type CodexModelScopeCallout = CodexProviderScopeInfo & {
+  modelLabel: string;
+  providerAvailabilityNote: string | null;
+  providerAvailable: boolean;
+  providerLabel: string;
+};
+
 /**
  * Group model options by provider identity, preserving first-seen provider order.
  */
@@ -114,6 +121,34 @@ export function codexProviderScopeInfo(
     default:
       return null;
   }
+}
+
+/**
+ * Resolve the active provider billing/policy callout for a selected model id.
+ * Returns `null` for providers where the distinction is not user-facing.
+ */
+export function codexModelScopeCallout(
+  models: RpcModelOption[],
+  modelId: string | null | undefined,
+): CodexModelScopeCallout | null {
+  if (typeof modelId !== "string" || !modelId.trim()) {
+    return null;
+  }
+  const model = findCodexModel(models, modelId);
+  if (!model) {
+    return null;
+  }
+  const scope = codexProviderScopeInfo(model.providerId);
+  if (!scope) {
+    return null;
+  }
+  return {
+    ...scope,
+    modelLabel: codexModelLabel(model),
+    providerAvailabilityNote: model.providerAvailabilityNote ?? null,
+    providerAvailable: model.providerAvailable ?? true,
+    providerLabel: codexModelProviderLabel(model),
+  };
 }
 
 /**

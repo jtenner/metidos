@@ -6,6 +6,7 @@
 import { describe, expect, it } from "bun:test";
 import type { RpcModelOption } from "../../bun/rpc-schema";
 import {
+  codexModelScopeCallout,
   codexModelSelectionOutcome,
   codexProviderScopeInfo,
   filterCodexProviderGroups,
@@ -133,6 +134,32 @@ describe("stepped codex selector helpers", () => {
     expect(codexProviderScopeInfo("anthropic")).toBeNull();
   });
 
+  it("resolves the active-model billing and policy callout from a selected model id", () => {
+    expect(codexModelScopeCallout(MODELS, "openai:gpt-5.4")).toEqual({
+      badge: "API billed",
+      detail:
+        "Uses OpenAI API credentials. Usage follows your API organization billing, retention, and data-sharing settings.",
+      modelLabel: "GPT-5.4",
+      providerAvailabilityNote: null,
+      providerAvailable: true,
+      providerLabel: "OpenAI API",
+      summary: "API org policy",
+    });
+    expect(codexModelScopeCallout(MODELS, "openai-codex:gpt-5.4")).toEqual({
+      badge: "ChatGPT plan",
+      detail:
+        "Uses ChatGPT-backed Codex auth. Usage follows ChatGPT workspace permissions, retention, and residency settings.",
+      modelLabel: "GPT-5.4",
+      providerAvailabilityNote: null,
+      providerAvailable: true,
+      providerLabel: "OpenAI Codex",
+      summary: "ChatGPT workspace policy",
+    });
+    expect(codexModelScopeCallout(MODELS, "anthropic:claude-sonnet-4")).toBe(
+      null,
+    );
+  });
+
   it("preserves provider availability metadata when grouping provider rows", () => {
     const providers = groupCodexProviders([
       modelOption({
@@ -157,5 +184,32 @@ describe("stepped codex selector helpers", () => {
         providerLabel: "OpenAI Codex",
       },
     ]);
+  });
+
+  it("includes unavailable-provider diagnostics in the active-model callout", () => {
+    expect(
+      codexModelScopeCallout(
+        [
+          modelOption({
+            id: "openai-codex:gpt-5.4",
+            providerAvailable: false,
+            providerAvailabilityNote:
+              "Requires OpenAI Codex sign-in in Settings.",
+            providerId: "openai-codex",
+            providerLabel: "OpenAI Codex",
+          }),
+        ],
+        "openai-codex:gpt-5.4",
+      ),
+    ).toEqual({
+      badge: "ChatGPT plan",
+      detail:
+        "Uses ChatGPT-backed Codex auth. Usage follows ChatGPT workspace permissions, retention, and residency settings.",
+      modelLabel: "GPT-5.4",
+      providerAvailabilityNote: "Requires OpenAI Codex sign-in in Settings.",
+      providerAvailable: false,
+      providerLabel: "OpenAI Codex",
+      summary: "ChatGPT workspace policy",
+    });
   });
 });

@@ -130,6 +130,7 @@ import {
 } from "./controls/chat-composer-control";
 import { CodexModelSelector } from "./controls/codex-model-selector";
 import {
+  codexModelScopeCallout,
   codexModelSelectorLabel,
   codexModelSupportsThinkingLevel,
   findCodexModel,
@@ -5519,6 +5520,10 @@ export default function App({
     codexModels,
     cronCreatorModelValue,
   );
+  const cronCreatorModelScope = codexModelScopeCallout(
+    codexModels,
+    cronCreatorModelValue,
+  );
   const cronThinkingLevelDisabled =
     isCreatingCronJob ||
     !codexModelSupportsThinkingLevel(cronCreatorModelOption);
@@ -5555,6 +5560,30 @@ export default function App({
           value={cronCreatorModelValue}
           variant={variant}
         />
+        {cronCreatorModelScope ? (
+          <div className="rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+                {cronCreatorModelScope.badge}
+              </span>
+              <span className="font-label text-[10px] uppercase tracking-[0.16em] text-[#dfe9ef]">
+                {cronCreatorModelScope.providerLabel}
+              </span>
+              <span className="text-[10px] font-medium text-[#b1c6d4]">
+                {cronCreatorModelScope.summary}
+              </span>
+            </div>
+            <div className="mt-2 text-[11px] leading-4 text-[#9cb5c6]">
+              {`New cron runs will create child threads with ${cronCreatorModelScope.providerLabel} for ${cronCreatorModelScope.modelLabel}. ${cronCreatorModelScope.detail}`}
+            </div>
+            {!cronCreatorModelScope.providerAvailable &&
+            cronCreatorModelScope.providerAvailabilityNote ? (
+              <div className="mt-2 text-[11px] leading-4 text-[#e9c28c]">
+                {cronCreatorModelScope.providerAvailabilityNote}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

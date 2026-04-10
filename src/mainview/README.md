@@ -44,7 +44,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/action-menus.tsx` defines context/action menus for project and thread operations.
 
-`app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile, coordinates composer + message flow, and now caches transcript row measurements so unchanged virtualized rows can reuse prior heights across ordinary rerenders.
+`app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile, coordinates composer + message flow, now caches transcript row measurements so unchanged virtualized rows can reuse prior heights across ordinary rerenders, and surfaces the active provider billing/policy scope directly under the composer model selector before send.
 
 `app/thread-extension-ui-dialog.tsx` renders the shared Pi extension prompt dialog used for browser-backed confirm/select/input/editor requests.
 
@@ -116,7 +116,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `controls/codex-model-selector.tsx` now drives `Provider -> Model -> Thinking level` selection for chat and cron routing, keeps `OpenAI API` and `OpenAI Codex` distinct throughout the browser flow, surfaces their billing/policy scope directly in the selector, and marks unauthenticated Codex providers as unavailable.
 
-`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including the billing/policy guidance and provider-availability metadata shown for OpenAI provider choices.
+`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including the billing/policy guidance, active-model scope callouts, and provider-availability metadata shown for OpenAI provider choices.
 
 `controls/dropdown.tsx` is the shared dropdown primitive used by action and selection controls.
 

@@ -15,7 +15,7 @@ Each file is designed to be imported by `src/mainview/app/*` screens and keeps i
   - Supports search filtering at the provider and model steps, surfaces provider billing/policy scope for `OpenAI API` versus `OpenAI Codex`, marks unauthenticated Codex providers as unavailable, and only shows the thinking-level step when the chosen model supports it.
 - `codex-utils.ts`
   - Helper utilities for model/thinking UI wiring.
-  - Groups model options by provider, preserves provider availability metadata, filters stepped selector lists, formats provider-aware labels (including deprecation marking), exposes provider-scope guidance, and resolves selected IDs to model/effort records.
+  - Groups model options by provider, preserves provider availability metadata, filters stepped selector lists, formats provider-aware labels (including deprecation marking), exposes provider-scope guidance, derives active-model scope callouts for composer/cron surfaces, and resolves selected IDs to model/effort records.
 - `dropdown.tsx`
   - Provides a reusable render-prop dropdown primitive used across control UIs.
   - Manages open/close state, outside-click and Escape-key dismissal, and open-state callbacks for parent integrations.

@@ -31,6 +31,7 @@ Jolt now has the minimum backend path needed to make Codex work through Pi witho
 - exposes a browser settings surface for Codex auth state, login progress, manual-code completion, refresh, and logout
 - surfaces actionable recovery guidance in the browser for keyring-only, missing-cache, broken-cache, and headless Codex setups
 - surfaces billing and policy-scope guidance directly in the provider/model selector when users choose between `OpenAI Codex` and `OpenAI API`
+- repeats the provider billing and policy cue at the chat-send and cron-create surfaces so users see the active scope again before they trigger work
 - surfaces Codex provider availability directly in the selector so unauthenticated `OpenAI Codex` choices are marked unavailable instead of looking equivalent to ready-to-run providers
 - rejects unavailable `openai-codex` selections before thread creation, queued runs, thread-model changes, or cron mutations so stale auth state fails fast with actionable errors
 - stops the runtime from silently trying plain `openai` first when the resolved provider is `openai-codex`
@@ -425,6 +426,7 @@ Verification status on 2026-04-09:
 
 - Automated coverage now explicitly covers missing Codex-file diagnostics, unusable Codex-file diagnostics, selector reasoning-step behavior, and the no-silent-fallback runtime rule when a thread explicitly selects `openai-codex`.
 - Automated coverage now also proves unavailable `openai-codex` selections are rejected before thread-start requests, thread creation, queued sends, thread-model changes, and cron create/update mutations.
+- Automated coverage now proves the active-model provider-scope callout resolves correctly for both `openai` and `openai-codex`, including unavailable Codex selections.
 - A non-destructive local status/catalog probe was run on 2026-04-09 with a fresh temporary `JOLT_APP_DATA_DIR`. Result: Jolt detected a real `~/.codex/auth.json`, surfaced `source: codex-file`, and promoted the default model to `openai-codex:gpt-5.4`.
 - A live Pi runtime smoke was run on 2026-04-09 against `openai-codex:gpt-5.4-mini` with the prompt `Reply with exactly OK and nothing else.` Result: the runtime returned `OK`.
 - A live end-to-end Jolt thread smoke was run on 2026-04-09 through `openProjectProcedure(...)`, `createThreadProcedure(...)`, and `sendThreadMessageProcedure(...)` against `openai-codex:gpt-5.4-mini`. Result: the thread settled to `idle`, persisted Pi session metadata, and stored the assistant reply `OK`.
@@ -627,6 +629,23 @@ Primary files:
 - [src/bun/project-procedures-config.test.ts](../src/bun/project-procedures-config.test.ts)
 - [src/bun/README.md](../src/bun/README.md)
 - [src/bun/project-procedures/README.md](../src/bun/project-procedures/README.md)
+
+### CD12 - Surface provider scope at the action point
+
+Status: completed on 2026-04-09.
+
+Deliverables:
+
+- repeat the active provider billing/policy cue directly under the chat composer model selector so thread sends show their effective scope at the point of action
+- repeat the same cue in the cron editor so scheduled work shows whether it will run under `OpenAI Codex` or `OpenAI API`
+- keep the content driven by the shared provider/model metadata helper so selector, composer, and cron surfaces stay consistent
+
+Primary files:
+
+- [src/mainview/controls/codex-utils.ts](../src/mainview/controls/codex-utils.ts)
+- [src/mainview/controls/codex-utils.test.ts](../src/mainview/controls/codex-utils.test.ts)
+- [src/mainview/app/chat-workspace.tsx](../src/mainview/app/chat-workspace.tsx)
+- [src/mainview/App.tsx](../src/mainview/App.tsx)
 
 ## Recommendation
 
