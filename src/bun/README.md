@@ -234,13 +234,14 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `sidecar-cron-runner.ts`
   - Executes cron rows by creating Metidos child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
+  - Applies a bounded scheduler-fired launch cap so bursts of due cron jobs do not spawn unlimited child-thread starts at once, while leaving manual `runCronJobById()` behavior direct and predictable.
   - Records cron run history, updates last-run metadata, and waits for the spawned thread to settle before marking completion, stop, or error state.
   - Opens its SQLite handle with the same WAL-mode runtime pragmas as the main app so cron reads and writes participate in the same concurrency expectations.
-  - Also exposes a small execution-host seam so runtime integration can be tested without changing the production scheduler path.
+  - Also exposes a small execution-host seam plus limiter stats helper so runtime integration and queue-pressure behavior can be tested without changing the production scheduler path.
 
 - `sidecar-cron-runner.test.ts`
   - Integration coverage for immediate and scheduled cron execution through the Pi-backed thread path.
-  - Verifies that cron-created threads persist Pi session identity and that cron rows record completed runs.
+  - Verifies that cron-created threads persist Pi session identity, that cron rows record completed runs, and that the scheduled-launch limiter exposes active versus pending queue pressure under bursty schedule fires.
 
 - `sidecar-cron-scheduler.ts`
   - Main-process wrapper around the cron worker thread.

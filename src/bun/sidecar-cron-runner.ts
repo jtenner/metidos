@@ -22,12 +22,26 @@ import {
   sendThreadMessageProcedure,
 } from "./project-procedures";
 import { normalizeStoredCodexReasoningEffort } from "./project-procedures/model-catalog";
+import { createAsyncConcurrencyLimit } from "./project-procedures/shared";
 import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 
 /** Poll interval used while waiting for the cron-spawned thread to finish. */
 const THREAD_POLL_INTERVAL_MS = 500;
 /** Maximum elapsed time allowed for one cron invocation before marking it errored. */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
+/** Conservative launch cap for scheduler-fired cron work so bursts do not spawn unlimited threads at once. */
+const SCHEDULED_CRON_EXECUTION_CONCURRENCY = 2;
+const scheduledCronExecutionLimit = createAsyncConcurrencyLimit(
+  SCHEDULED_CRON_EXECUTION_CONCURRENCY,
+);
+
+export function getScheduledCronExecutionLimitStats(): {
+  activeCount: number;
+  maxConcurrent: number;
+  pendingCount: number;
+} {
+  return scheduledCronExecutionLimit.stats();
+}
 
 function openCronDatabase(): Database {
   const database = new Database(getAppDatabasePath());
@@ -150,11 +164,11 @@ const defaultCronThreadExecutionHost: CronThreadExecutionHost = {
  * The default host flows through the same Pi-backed thread runtime used by interactive threads.
  */
 async function executeCronJob(
-  database: Database,
   cronJob: CronJobRecord,
   scheduledTime: number,
   host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<CronJobExecution | null> {
+  const database = openCronDatabase();
   const cronJobId = cronJob.id;
   let runId: number | null = null;
 
@@ -206,11 +220,13 @@ async function executeCronJob(
       `Cron job ${cronJobId} failed with error: ${error instanceof Error ? error.message : String(error)}`,
     );
     return null;
+  } finally {
+    database.close(false);
   }
 }
 
 /**
- * Claim due cron rows for this fire and execute them sequentially.
+ * Claim due cron rows for this fire and execute them through the shared scheduled-work limiter.
  */
 export async function runDueCronJobs(
   schedule: string,
@@ -218,22 +234,26 @@ export async function runDueCronJobs(
   host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<void> {
   const database = openCronDatabase();
+  let jobs: CronJobRecord[] = [];
   try {
-    const jobs = claimCronJobsForScheduledRun(
-      database,
-      schedule,
-      scheduledTime,
-    );
-    if (!jobs.length) {
-      return;
-    }
-
-    for (const job of jobs) {
-      await executeCronJob(database, job, scheduledTime, host);
-    }
+    jobs = claimCronJobsForScheduledRun(database, schedule, scheduledTime);
   } finally {
     database.close(false);
   }
+  if (!jobs.length) {
+    return;
+  }
+
+  await Promise.all(
+    jobs.map((job) =>
+      scheduledCronExecutionLimit.run(
+        () => executeCronJob(job, scheduledTime, host),
+        {
+          abortMessage: `Scheduled cron job ${job.id} execution was aborted.`,
+        },
+      ),
+    ),
+  );
 }
 
 /**
@@ -245,30 +265,22 @@ export async function runCronJobById(
   host: CronThreadExecutionHost = defaultCronThreadExecutionHost,
 ): Promise<number | null> {
   const database = openCronDatabase();
+  let jobs: CronJobRecord[] = [];
   try {
-    const jobs = claimCronJobForScheduledRunById(
-      database,
-      cronJobId,
-      scheduledTime,
-    );
-    if (!jobs.length) {
-      return null;
-    }
-    let runThreadId: number | null = null;
-
-    for (const job of jobs) {
-      const execution = await executeCronJob(
-        database,
-        job,
-        scheduledTime,
-        host,
-      );
-      if (runThreadId === null && execution !== null) {
-        runThreadId = execution.threadId;
-      }
-    }
-    return runThreadId;
+    jobs = claimCronJobForScheduledRunById(database, cronJobId, scheduledTime);
   } finally {
     database.close(false);
   }
+  if (!jobs.length) {
+    return null;
+  }
+  let runThreadId: number | null = null;
+
+  for (const job of jobs) {
+    const execution = await executeCronJob(job, scheduledTime, host);
+    if (runThreadId === null && execution !== null) {
+      runThreadId = execution.threadId;
+    }
+  }
+  return runThreadId;
 }

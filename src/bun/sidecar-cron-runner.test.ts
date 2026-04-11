@@ -4,11 +4,21 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
+import {
+  closeAppDatabase,
+  createCronJob,
+  createThread,
+  initAppDatabase,
+  listCronJobRuns,
+  resetResolvedAppDataDirectory,
+  upsertProject,
+} from "./db";
 import {
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
 } from "./pi-thread-runtime";
+import type { RpcThreadDetail } from "./rpc-schema";
+import type { CronThreadExecutionHost } from "./sidecar-cron-runner";
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
@@ -138,6 +148,88 @@ async function waitForNewThreadId(
   }
 
   throw new Error("Timed out waiting for a cron-created thread.");
+}
+
+function createDeferredPromise<T>(): {
+  promise: Promise<T>;
+  reject: (reason?: unknown) => void;
+  resolve: (value: T | PromiseLike<T>) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return {
+    promise,
+    reject,
+    resolve,
+  };
+}
+
+function buildFakeThreadDetail(options: {
+  projectId: number;
+  startedAt: string | null;
+  threadId: number;
+  worktreePath: string;
+}): RpcThreadDetail {
+  const updatedAt = options.startedAt ?? "2026-04-11T12:00:00.000Z";
+  return {
+    messages: [],
+    nextCursor: null,
+    thread: {
+      agentsAccess: false,
+      compaction: {
+        estimatedTriggerSource: "heuristic",
+        estimatedTriggerTokens: 0,
+        inferredCount: 0,
+        lastInferredAfterInputTokens: null,
+        lastInferredAt: null,
+        lastInferredBeforeInputTokens: null,
+        maxObservedInputTokens: null,
+      },
+      createdAt: updatedAt,
+      githubAccess: false,
+      id: options.threadId,
+      lastRunAt: null,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      piLeafEntryId: null,
+      piSessionFile: null,
+      piSessionId: null,
+      pinnedAt: null,
+      projectId: options.projectId,
+      reasoningEffort: "medium",
+      runStatus: {
+        error: null,
+        hasUnreadError: false,
+        startedAt: options.startedAt,
+        state: options.startedAt ? "working" : "idle",
+        updatedAt,
+      },
+      summary: null,
+      title: `Cron Thread ${options.threadId}`,
+      unsafeMode: false,
+      updatedAt,
+      usage: null,
+      worktreePath: options.worktreePath,
+    },
+  };
+}
+
+async function waitForCondition(
+  description: string,
+  predicate: () => boolean,
+): Promise<void> {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Error(`Timed out waiting for ${description}.`);
 }
 
 beforeAll(async () => {
@@ -299,5 +391,136 @@ describe("sidecar cron runner", () => {
     expect(lastAssistantMessage?.text).toContain("scheduled cron smoke");
     expect(completedCron.lastRunStatus).toBe("Completed");
     expect(completedCron.lastRunDate).toBe(scheduledTime);
+  });
+
+  it("caps scheduled cron launches and exposes pending queue stats", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-limit-repo-");
+    const project = upsertProject(database, {
+      name: "Cron Limit Repo",
+      projectPath: repoPath,
+    });
+    const schedule = `limit-${Date.now()}`;
+    const cronJobs = [0, 1, 2].map((index) =>
+      createCronJob(database, {
+        agentsAccess: false,
+        description: `queue test ${index}`,
+        enabled: true,
+        githubAccess: false,
+        metidosAccess: true,
+        model: "gpt-5.4",
+        projectId: project.id,
+        prompt: `queued cron ${index}`,
+        reasoningEffort: "medium",
+        schedule,
+        title: `Queued Cron ${Date.now()}-${index}`,
+        unsafeMode: false,
+        worktreePath: repoPath,
+      }),
+    );
+
+    const limiterStats = runner.getScheduledCronExecutionLimitStats();
+    const inFlightSends: Array<ReturnType<typeof createDeferredPromise<void>>> =
+      [];
+    const threadContext = new Map<
+      number,
+      {
+        projectId: number;
+        worktreePath: string;
+      }
+    >();
+    let activeSendCount = 0;
+    let peakSendCount = 0;
+    let sendCallCount = 0;
+
+    const host: CronThreadExecutionHost = {
+      async createThread(params) {
+        const thread = createThread(database, {
+          agentsAccess: params.agentsAccess ?? false,
+          githubAccess: params.githubAccess ?? false,
+          metidosAccess: params.metidosAccess ?? true,
+          model: params.model ?? "gpt-5.4",
+          piLeafEntryId: null,
+          piSessionFile: null,
+          piSessionId: null,
+          projectId: params.projectId,
+          reasoningEffort: params.reasoningEffort ?? "medium",
+          title: `Queued Cron Thread ${Date.now()}`,
+          unsafeMode: params.unsafeMode ?? false,
+          worktreePath: params.worktreePath,
+        });
+        threadContext.set(thread.id, {
+          projectId: params.projectId,
+          worktreePath: params.worktreePath,
+        });
+        return buildFakeThreadDetail({
+          projectId: params.projectId,
+          startedAt: null,
+          threadId: thread.id,
+          worktreePath: params.worktreePath,
+        });
+      },
+      async sendThreadMessage(params) {
+        const context = threadContext.get(params.threadId);
+        if (!context) {
+          throw new Error(
+            `Missing fake thread context for ${params.threadId}.`,
+          );
+        }
+        sendCallCount += 1;
+        activeSendCount += 1;
+        peakSendCount = Math.max(peakSendCount, activeSendCount);
+        const deferred = createDeferredPromise<void>();
+        inFlightSends.push(deferred);
+        await deferred.promise;
+        activeSendCount = Math.max(0, activeSendCount - 1);
+        return buildFakeThreadDetail({
+          projectId: context.projectId,
+          startedAt: `2026-04-11T12:00:0${sendCallCount}.000Z`,
+          threadId: params.threadId,
+          worktreePath: context.worktreePath,
+        });
+      },
+    };
+
+    const scheduledTime = Date.now();
+    const runPromise = runner.runDueCronJobs(schedule, scheduledTime, host);
+
+    await waitForCondition("cron launch limiter saturation", () => {
+      const stats = runner.getScheduledCronExecutionLimitStats();
+      return (
+        stats.activeCount === limiterStats.maxConcurrent &&
+        stats.pendingCount === 1 &&
+        sendCallCount === limiterStats.maxConcurrent
+      );
+    });
+
+    expect(peakSendCount).toBe(limiterStats.maxConcurrent);
+    expect(runner.getScheduledCronExecutionLimitStats()).toEqual({
+      activeCount: limiterStats.maxConcurrent,
+      maxConcurrent: limiterStats.maxConcurrent,
+      pendingCount: 1,
+    });
+
+    inFlightSends[0]?.resolve(undefined);
+    await waitForCondition(
+      "queued cron launch to begin",
+      () => sendCallCount === 3,
+    );
+    expect(peakSendCount).toBe(limiterStats.maxConcurrent);
+
+    for (const pending of inFlightSends) {
+      pending.resolve(undefined);
+    }
+    await runPromise;
+    await waitForCondition("cron launch limiter drain", () => {
+      const stats = runner.getScheduledCronExecutionLimitStats();
+      return stats.activeCount === 0 && stats.pendingCount === 0;
+    });
+
+    for (const cronJob of cronJobs) {
+      expect(listCronJobRuns(database, cronJob.id)).toHaveLength(1);
+    }
   });
 });
