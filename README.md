@@ -84,7 +84,7 @@ flowchart TD
    - `bun run start:tls` starts the same single-port server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
      Point both `/` and `/rpc` at the same backend upstream, and preserve `X-Forwarded-Host` plus `X-Forwarded-Proto` so websocket origin checks see the browser origin.
    - The server builds/serves the mainview bundle and exposes:
-     - HTTP static handlers for app assets (`index.html`, css, fonts)
+     - HTTP static handlers for app assets, with `index.html` served as `no-store` and versioned frontend assets under `/assets/mainview/<version>/...`
      - `ws://.../rpc` on loopback, with `wss://.../rpc` expected only through a TLS-terminating reverse proxy
      - The frontend obtains a short-lived `/auth/ws-ticket` and connects with `?ticket=...` plus authenticated session context.
      - event-driven push updates for tasks/history changes
@@ -142,7 +142,7 @@ Threads and worktrees are coordinated through procedures in `src/bun/project-pro
 - `src/mainview` is the browser app layer.
   - `App.tsx` is the app shell and composition root.
   - `index.ts` owns transport initialization and RPC client wiring.
-  - `index.html` and `index.css` are the app entry and style container.
+  - `index.html` is the HTML entry template and `index.css` is the generated style container; the server injects the current versioned `/assets/mainview/<version>` root into the HTML at response time.
   - `src/mainview/app/*` contains screen sections, panels, hooks, and message rendering.
   - `src/mainview/controls/*` contains reusable controls (selects, composer, icons, search, dropdown primitives).
 - `src/bun` is the server/process layer.
@@ -179,7 +179,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--wipe-user-data` to confirm, delete the local SQLite database files, and exit before startup.
 - `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 - `METIDOS_APP_DATA_DIR` for an explicit per-user application data location.
-- `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve `/index.js.map` for non-dev builds when you need production bundle debugging.
+- `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve the versioned mainview sourcemap path (for example `/assets/mainview/<version>/index.js.map`) for non-dev builds when you need production bundle debugging.
 
 Canonical environment variables use the `METIDOS_*` prefix. Deprecated `JOLT_*` aliases are still accepted as compatibility fallbacks for startup and existing local installs.
 

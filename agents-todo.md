@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT04.2] Cacheable asset-serving path - Serve built frontend assets from a small explicit asset path with better cache semantics while preserving bootstrap correctness.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT04` / `OPT04.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.5, 7.1.
-
 - [OPT04.3] Optional build splitting - Enable chunk-capable frontend output only if post-`OPT04.1` and `OPT04.2` measurements still justify the added build complexity.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT04` / `OPT04.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.5, 7.1.
 

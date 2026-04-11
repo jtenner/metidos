@@ -47,6 +47,13 @@ import {
 import { getGitSchedulerStats } from "./git";
 import { createSubsystemLogger, type LogDescription } from "./logging";
 import {
+  applyMainviewAssetRoot,
+  buildMainviewAssetSnapshot,
+  IMMUTABLE_MAINVIEW_ASSET_CACHE_CONTROL,
+  MAINVIEW_ASSET_ROUTE_PREFIX,
+  resolveVersionedMainviewAssetRequest,
+} from "./mainview-assets";
+import {
   closeProjectProcedure,
   closeWorktreeProcedure,
   completeProviderAuthLoginProcedure,
@@ -576,6 +583,17 @@ let peakPendingRpcRequestCount = 0;
 let lastEventLoopLagMs = 0;
 let peakEventLoopLagMs = 0;
 let lastOverloadLogAt = 0;
+
+function getCurrentMainviewAssetSnapshot() {
+  return buildMainviewAssetSnapshot({
+    bundlePath: mainviewBundlePath,
+    bundleSourceMapPath: mainviewBundleSourceMapPath,
+    cssPath: MAINVIEW_CSS_PATH,
+    firaCodeFontPath: FIRA_CODE_VARIABLE_FONT_PATH,
+    interLatinFontPath: INTER_VARIABLE_FONT_LATIN_PATH,
+    interLatinExtFontPath: INTER_VARIABLE_FONT_LATIN_EXT_PATH,
+  });
+}
 /**
  * Builds response headers.
  * @param contentType - MIME type applied to response headers.
@@ -585,9 +603,12 @@ let lastOverloadLogAt = 0;
 function buildResponseHeaders(
   contentType: string,
   headers?: HeadersInit,
+  options?: {
+    cacheControl?: string;
+  },
 ): Headers {
   const responseHeaders = new Headers(headers);
-  responseHeaders.set("cache-control", "no-store");
+  responseHeaders.set("cache-control", options?.cacheControl ?? "no-store");
   responseHeaders.set("content-type", contentType);
   return applySecurityHeaders(responseHeaders);
 }
@@ -629,13 +650,19 @@ function jsonResponse(
 }
 
 /**
- * Build a file-backed HTTP response with explicit no-cache header.
+ * Build a file-backed HTTP response with explicit cache policy.
  * @param path - Filesystem path.
  * @param contentType - MIME type string returned for response serialization.
  */
-function fileResponse(path: string, contentType: string): Response {
+function fileResponse(
+  path: string,
+  contentType: string,
+  options?: {
+    cacheControl?: string;
+  },
+): Response {
   return new Response(Bun.file(path), {
-    headers: buildResponseHeaders(contentType),
+    headers: buildResponseHeaders(contentType, undefined, options),
   });
 }
 
@@ -1552,10 +1579,15 @@ async function htmlResponse(): Promise<Response> {
       : {}),
   };
   const runtimeConfigElement = buildRuntimeConfigElement(runtimeConfig);
+  const assetSnapshot = getCurrentMainviewAssetSnapshot();
   const template = await Bun.file(MAINVIEW_HTML_PATH).text();
-  const html = template.includes("</head>")
-    ? template.replace("</head>", `${runtimeConfigElement}\n\t</head>`)
-    : `${runtimeConfigElement}\n${template}`;
+  const htmlTemplate = applyMainviewAssetRoot(
+    template,
+    assetSnapshot.assetRoot,
+  );
+  const html = htmlTemplate.includes("</head>")
+    ? htmlTemplate.replace("</head>", `${runtimeConfigElement}\n\t</head>`)
+    : `${runtimeConfigElement}\n${htmlTemplate}`;
 
   return stringResponse(html, "text/html; charset=utf-8");
 }
@@ -2490,9 +2522,35 @@ async function bootstrap(): Promise<void> {
         return htmlResponse();
       }
 
+      if (
+        !BACKEND_ONLY &&
+        pathname.startsWith(`${MAINVIEW_ASSET_ROUTE_PREFIX}/`)
+      ) {
+        const assetSnapshot = getCurrentMainviewAssetSnapshot();
+        const versionedAsset = resolveVersionedMainviewAssetRequest(
+          pathname,
+          assetSnapshot,
+        );
+        if (versionedAsset) {
+          webServerLogger.trace({
+            message: "Serving versioned mainview asset",
+            pathname,
+            source,
+            requestId: requestId ?? null,
+          });
+          return fileResponse(
+            versionedAsset.filePath,
+            versionedAsset.contentType,
+            {
+              cacheControl: IMMUTABLE_MAINVIEW_ASSET_CACHE_CONTROL,
+            },
+          );
+        }
+      }
+
       if (!BACKEND_ONLY && pathname === "/index.css") {
         webServerLogger.trace({
-          message: "Serving mainview css",
+          message: "Serving mainview css compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
@@ -2502,7 +2560,7 @@ async function bootstrap(): Promise<void> {
 
       if (!BACKEND_ONLY && pathname === "/index.js") {
         webServerLogger.trace({
-          message: "Serving mainview bundle",
+          message: "Serving mainview bundle compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
@@ -2519,7 +2577,7 @@ async function bootstrap(): Promise<void> {
         mainviewBundleSourceMapPath
       ) {
         webServerLogger.trace({
-          message: "Serving mainview source map",
+          message: "Serving mainview source-map compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
@@ -2532,7 +2590,7 @@ async function bootstrap(): Promise<void> {
 
       if (!BACKEND_ONLY && pathname === "/fonts/fira-code-vf.woff2") {
         webServerLogger.trace({
-          message: "Serving font asset",
+          message: "Serving font compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
@@ -2545,7 +2603,7 @@ async function bootstrap(): Promise<void> {
         pathname === "/fonts/inter-latin-wght-normal.woff2"
       ) {
         webServerLogger.trace({
-          message: "Serving font asset",
+          message: "Serving font compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
@@ -2558,7 +2616,7 @@ async function bootstrap(): Promise<void> {
         pathname === "/fonts/inter-latin-ext-wght-normal.woff2"
       ) {
         webServerLogger.trace({
-          message: "Serving font asset",
+          message: "Serving font compatibility asset",
           pathname,
           source,
           requestId: requestId ?? null,
