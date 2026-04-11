@@ -923,12 +923,8 @@ export function CommandExecutionMessage({
       >
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 text-sm font-bold tracking-tight text-[#f2f0ef]">
-              Tool
-            </span>
-            <span className="shrink-0 text-sm text-[#7b8992]">-</span>
-            <span className="shrink-0 font-mono text-sm text-[#f2f0ef]">
-              bash
+            <span className="shrink-0 font-label text-[10px] uppercase tracking-widest text-accent">
+              CMD
             </span>
             <div className="group/command-preview min-w-0 flex-1">
               {hasOutput ? (
