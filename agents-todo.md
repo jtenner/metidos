@@ -15,7 +15,7 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Risks
 
-- Optimization slices must stay measurement-led. `OPT01.3` should use the shared runtime collector and harness reporting baseline before speculative follow-on slices are pulled forward.
+- Optimization slices must stay measurement-led. Refresh or compare against the recorded OPT01 baseline before pulling speculative follow-on slices forward.
 - `OPT04.3` and `OPT05.3` are intentionally conditional; they should not be started unless earlier slices show continuing payoff.
 - Expanding this backlog beyond the original Pi/Codex-only scope means each optimization slice must keep explicit document references so its justification stays auditable.
 
@@ -24,9 +24,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 - None for the currently accepted optimization backlog.
 
 ## Todo Items
-
-- [OPT01.3] First baseline write-up - Record one repeatable baseline run and document how future before/after comparisons should be made.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT01` / `OPT01.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§6.2, 7.2.
 
 - [OPT02.1] Enable conservative WAL-mode tuning - Turn on safe SQLite runtime pragmas and validate normal app, cron, and cleanup behavior under WAL mode.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT02` / `OPT02.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§4.1, 4.2.
