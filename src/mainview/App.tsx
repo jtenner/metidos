@@ -23,7 +23,6 @@ import type {
   RpcProject,
   RpcReasoningEffort,
   RpcReasoningEffortOption,
-  RpcRequestPriority,
   RpcThread,
   RpcThreadDetail,
   RpcThreadExtensionUiRequest,
@@ -46,7 +45,6 @@ import {
   deriveDesktopThreadSwitcherSections,
 } from "./app/desktop-thread-switcher";
 import { DiffWorkspace } from "./app/diff-workspace";
-import { subscribeToWorktreeGitHistoryChanged } from "./app/invalidation-events";
 import { GitHistoryDiffModal } from "./app/message-ui";
 import { SettingsPanel } from "./app/settings-panel";
 import { SidebarContent } from "./app/sidebar-content";
@@ -58,9 +56,7 @@ import {
 } from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
-  appendGitHistoryPage,
   awaitAbortableResult,
-  buildProjectWorktreeIndex,
   CONTEXT_FOCUS_CHANGED_EVENT_NAME,
   clampProjectMenuCoordinate,
   createAbortError,
@@ -72,19 +68,11 @@ import {
   emptyThreadStore,
   formatDirectoryPathForInput,
   formatPathForDisplay,
-  GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
-  GIT_HISTORY_PAGE_SIZE,
-  GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
-  type GitHistoryDiffCacheEntry,
-  type GitHistoryModalState,
-  gitHistoryDiffCacheKey,
   isAbortError,
   isCodexReasoningEffort,
   MAINVIEW_STATE_STORAGE_VERSION,
   MAINVIEW_STATE_WRITE_DEBOUNCE_MS,
-  mergeResetGitHistory,
   type OpenThreadOptions,
-  type PendingSharedRequest,
   type PersistedMainviewState,
   type ProjectActionMenuState,
   type ProjectNodeState,
@@ -96,7 +84,6 @@ import {
   primaryWorktreePath,
   projectStateWorktrees,
   projectStoreItems,
-  readLruValue,
   readPersistedMainviewState,
   removeThreadFromStore,
   serializeOpenWorktrees,
@@ -115,12 +102,13 @@ import {
   withAcknowledgedUnreadThreadDetail,
   worktreeKey,
   worktreeThreadPopoverAnchorId,
-  writeLruValue,
   writePersistedMainviewState,
 } from "./app/state";
 import { ThreadExtensionUiDialog } from "./app/thread-extension-ui-dialog";
 import { useAddProjectForm } from "./app/use-add-project-form";
+import { useGitHistoryController } from "./app/use-git-history-controller";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
+import { useProjectWorktreeController } from "./app/use-project-worktree-controller";
 import { ThreadStatusController } from "./app/use-thread-status-controller";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
 import { stepUpAuth } from "./auth-client";
@@ -141,9 +129,10 @@ import {
   ThreadAccessControl,
   type ThreadAccessValue,
 } from "./controls/thread-access-control";
-import { runRollbackSafeProjectClose } from "./project-close";
-import { createProjectLifecycleRequestTracker } from "./project-lifecycle";
-import { shouldRefreshProjectActionMenuWorktrees } from "./project-worktree-refresh";
+import {
+  buildLoadedProjectWorktreesState,
+  shouldRefreshProjectActionMenuWorktrees,
+} from "./project-worktree-refresh";
 import { isStepUpRequiredError } from "./rpc-errors";
 import {
   closeProjectsForStartupRestore,
@@ -167,10 +156,7 @@ import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
-import {
-  derivePrimaryViewForPinnedThreadOpen,
-  deriveSelectedThreadWorkspaceTarget,
-} from "./thread-workspace-selection";
+import { derivePrimaryViewForPinnedThreadOpen } from "./thread-workspace-selection";
 
 /**
  * Merges thread message history.
@@ -348,11 +334,6 @@ type AppProps = {
   procedures: ProjectProcedures;
 };
 
-type ProjectWorktreeRequestCacheEntry = {
-  lifecycleRequestId: number;
-  promise: Promise<RpcWorktree[]>;
-};
-
 /**
  * App-level sizing and interaction constants for responsive layout decisions.
  */
@@ -472,31 +453,6 @@ function areWorktreeSnapshotsEquivalent(
   );
 }
 
-/**
- * Builds loaded project worktrees state.
- * @param worktrees - worktrees value.
- * @param loadedAtMs - loadedAtMs value.
- */
-
-function buildLoadedProjectWorktreesState(
-  worktrees: RpcWorktree[],
-  loadedAtMs: number = Date.now(),
-): Pick<
-  ProjectNodeState,
-  | "error"
-  | "loadingWorktrees"
-  | "worktreeByPath"
-  | "worktreePaths"
-  | "worktreesLoadedAt"
-> {
-  return {
-    ...buildProjectWorktreeIndex(worktrees),
-    worktreesLoadedAt: loadedAtMs,
-    loadingWorktrees: false,
-    error: "",
-  };
-}
-
 declare global {
   interface Window {
     __metidosAppMountedAt?: number;
@@ -550,8 +506,6 @@ export default function App({
   const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
   const [gitHistoryLoadingMore, setGitHistoryLoadingMore] = useState(false);
   const [gitHistoryError, setGitHistoryError] = useState("");
-  const [gitHistoryModal, setGitHistoryModal] =
-    useState<GitHistoryModalState | null>(null);
   const [codexModels, setCodexModels] = useState<RpcModelOption[]>([]);
   const [reasoningEfforts, setReasoningEfforts] = useState<
     RpcReasoningEffortOption[]
@@ -751,8 +705,6 @@ export default function App({
     ((authorized: boolean) => void) | null
   >(null);
   const projectActionMenuRequestId = useRef(0);
-  const gitHistoryRequestIdRef = useRef(0);
-  const gitHistoryAbortControllerRef = useRef<AbortController | null>(null);
   const persistedMainviewStateWriteTimeoutRef = useRef<number | null>(null);
   const pendingPersistedMainviewStateRef =
     useRef<PersistedMainviewState | null>(null);
@@ -860,11 +812,6 @@ export default function App({
     visibleMessageCacheRef.current.clear();
   }, [selectedThreadId]);
 
-  const gitHistoryDiffRequestIdRef = useRef(0);
-  const gitHistoryDiffAbortControllerRef = useRef<AbortController | null>(null);
-  const gitHistoryLoadMoreAbortControllerRef = useRef<AbortController | null>(
-    null,
-  );
   const cronJobsRequestIdRef = useRef(0);
   const cronJobsAbortControllerRef = useRef<AbortController | null>(null);
   // Request/caching refs below track in-flight RPCs by key so refreshes can be
@@ -874,20 +821,6 @@ export default function App({
   );
   const threadOpenRequestIdRef = useRef(0);
   const threadOpenAbortControllerRef = useRef<AbortController | null>(null);
-  const gitHistoryLoadingMoreRef = useRef(false);
-  const projectWorktreeRequestCacheRef = useRef(
-    new Map<number, ProjectWorktreeRequestCacheEntry>(),
-  );
-  const gitHistoryDiffCacheRef = useRef(
-    new Map<string, GitHistoryDiffCacheEntry>(),
-  );
-  const gitHistoryDiffRequestCacheRef = useRef(
-    new Map<string, PendingSharedRequest<GitHistoryDiffCacheEntry>>(),
-  );
-  const gitHistoryCacheRef = useRef(
-    new Map<string, RpcWorktreeGitHistoryResult>(),
-  );
-  const skipFreshGitHistoryRefreshRef = useRef(new Set<string>());
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const selectedThreadHistoryCursorRef = useRef<number | null>(null);
@@ -906,18 +839,12 @@ export default function App({
   const threadErrorSeenRequestCacheRef = useRef(
     new Map<number, Promise<RpcThreadDetail>>(),
   );
-  const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
   const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
-  const gitHistoryRefreshedThreadIdRef = useRef<number | null>(null);
   const threadHistoryBackfillAbortControllerRef =
     useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
     new Map<number, RpcThreadRunStatus["state"]>(),
-  );
-  const projectLifecycleRequestTracker = useMemo(
-    () => createProjectLifecycleRequestTracker(),
-    [],
   );
   const getProjectState = useCallback(
     (projectId: number): ProjectNodeState =>
@@ -1035,6 +962,27 @@ export default function App({
     supportsTildePath,
     threadActionMenu,
     threads,
+  });
+
+  const {
+    closeGitHistoryModal,
+    gitHistoryModal,
+    loadMoreGitHistory,
+    openGitHistoryDiff,
+    primeGitHistoryResult,
+  } = useGitHistoryController({
+    activeSelectedWorktreePath,
+    gitHistory,
+    gitHistoryLoading,
+    gitHistoryLoadingMore,
+    procedures,
+    selectedProject,
+    selectedThread,
+    sessionStateReady,
+    setGitHistory,
+    setGitHistoryError,
+    setGitHistoryLoading,
+    setGitHistoryLoadingMore,
   });
 
   const activeThreadAccessValue: ThreadAccessValue = {
@@ -1445,224 +1393,6 @@ export default function App({
     sidebarCollapsed,
   ]);
 
-  const abortGitHistoryDiffRequest = useCallback((reason: string) => {
-    const controller = gitHistoryDiffAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    gitHistoryDiffAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
-
-  const closeGitHistoryModal = useCallback(() => {
-    gitHistoryDiffRequestIdRef.current += 1;
-    abortGitHistoryDiffRequest("Commit diff request was cleared.");
-    setGitHistoryModal(null);
-  }, [abortGitHistoryDiffRequest]);
-
-  const loadGitHistoryDiff = useCallback(
-    async (
-      projectId: number,
-      worktreePath: string,
-      entry: RpcGitHistoryEntry,
-      options?: {
-        priority?: RpcRequestPriority;
-        signal?: AbortSignal;
-      },
-    ): Promise<GitHistoryDiffCacheEntry> => {
-      const cacheKey = gitHistoryDiffCacheKey(
-        projectId,
-        worktreePath,
-        entry.hash,
-      );
-      const cached = readLruValue(gitHistoryDiffCacheRef.current, cacheKey);
-      if (cached) {
-        return Promise.resolve(cached);
-      }
-
-      const pending = gitHistoryDiffRequestCacheRef.current.get(cacheKey);
-      if (pending) {
-        pending.waiterCount += 1;
-        try {
-          return await awaitAbortableResult(
-            pending.promise,
-            options?.signal,
-            "Commit diff read was aborted.",
-          );
-        } finally {
-          pending.waiterCount = Math.max(0, pending.waiterCount - 1);
-          if (
-            pending.waiterCount === 0 &&
-            gitHistoryDiffRequestCacheRef.current.get(cacheKey) === pending
-          ) {
-            pending.controller.abort(
-              createAbortError(null, "Commit diff read was aborted."),
-            );
-          }
-        }
-      }
-
-      const controller = new AbortController();
-      const pendingRequest: PendingSharedRequest<GitHistoryDiffCacheEntry> = {
-        controller,
-        promise: Promise.resolve(null as never),
-        waiterCount: 1,
-      };
-      const request = procedures
-        .getWorktreeGitCommitDiff(
-          {
-            projectId,
-            worktreePath,
-            commitHash: entry.hash,
-          },
-          {
-            priority: options?.priority ?? "foreground",
-            signal: controller.signal,
-          },
-        )
-        .then((result) => {
-          const nextValue = {
-            commit: result.commit,
-            diffText: result.diffText,
-          };
-          writeLruValue(
-            gitHistoryDiffCacheRef.current,
-            cacheKey,
-            nextValue,
-            GIT_HISTORY_DIFF_CACHE_MAX_ENTRIES,
-          );
-          return nextValue;
-        })
-        .finally(() => {
-          if (
-            gitHistoryDiffRequestCacheRef.current.get(cacheKey) ===
-            pendingRequest
-          ) {
-            gitHistoryDiffRequestCacheRef.current.delete(cacheKey);
-          }
-        });
-      pendingRequest.promise = request;
-      gitHistoryDiffRequestCacheRef.current.set(cacheKey, pendingRequest);
-
-      try {
-        return await awaitAbortableResult(
-          request,
-          options?.signal,
-          "Commit diff read was aborted.",
-        );
-      } finally {
-        pendingRequest.waiterCount = Math.max(
-          0,
-          pendingRequest.waiterCount - 1,
-        );
-        if (
-          pendingRequest.waiterCount === 0 &&
-          gitHistoryDiffRequestCacheRef.current.get(cacheKey) === pendingRequest
-        ) {
-          controller.abort(
-            createAbortError(null, "Commit diff read was aborted."),
-          );
-        }
-      }
-    },
-    [procedures],
-  );
-
-  const openGitHistoryDiff = useCallback(
-    async (entry: RpcGitHistoryEntry) => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-
-      const projectId = selectedProject.id;
-      const worktreePath = activeSelectedWorktreePath;
-      const cacheKey = gitHistoryDiffCacheKey(
-        projectId,
-        worktreePath,
-        entry.hash,
-      );
-      const cached = readLruValue(gitHistoryDiffCacheRef.current, cacheKey);
-      const requestId = gitHistoryDiffRequestIdRef.current + 1;
-      gitHistoryDiffRequestIdRef.current = requestId;
-      abortGitHistoryDiffRequest("Commit diff request was superseded.");
-
-      setGitHistoryModal({
-        projectId,
-        worktreePath,
-        entry: cached?.commit ?? entry,
-        diffText: cached?.diffText ?? "",
-        loading: !cached,
-        error: "",
-      });
-
-      if (cached) {
-        return;
-      }
-
-      const controller = new AbortController();
-      gitHistoryDiffAbortControllerRef.current = controller;
-      try {
-        const result = await loadGitHistoryDiff(
-          projectId,
-          worktreePath,
-          entry,
-          {
-            priority: "foreground",
-            signal: controller.signal,
-          },
-        );
-        if (gitHistoryDiffRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        setGitHistoryModal((current) =>
-          current &&
-          current.projectId === projectId &&
-          current.worktreePath === worktreePath &&
-          current.entry.hash === entry.hash
-            ? {
-                ...current,
-                entry: result.commit,
-                diffText: result.diffText,
-                loading: false,
-                error: "",
-              }
-            : current,
-        );
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (gitHistoryDiffRequestIdRef.current !== requestId) {
-          return;
-        }
-        setGitHistoryModal((current) =>
-          current &&
-          current.projectId === projectId &&
-          current.worktreePath === worktreePath &&
-          current.entry.hash === entry.hash
-            ? {
-                ...current,
-                loading: false,
-                error: error instanceof Error ? error.message : String(error),
-              }
-            : current,
-        );
-      } finally {
-        if (gitHistoryDiffAbortControllerRef.current === controller) {
-          gitHistoryDiffAbortControllerRef.current = null;
-        }
-      }
-    },
-    [
-      abortGitHistoryDiffRequest,
-      activeSelectedWorktreePath,
-      loadGitHistoryDiff,
-      selectedProject,
-    ],
-  );
-
   const setProjectState = useCallback(
     (projectId: number, update: Partial<ProjectNodeState>): void => {
       setProjectStates((prev) => {
@@ -1674,26 +1404,6 @@ export default function App({
           ...update,
         };
         return next;
-      });
-    },
-    [],
-  );
-
-  const updateProjectState = useCallback(
-    (
-      projectId: number,
-      updater: (current: ProjectNodeState) => ProjectNodeState,
-    ): void => {
-      setProjectStates((prev) => {
-        const current = prev[projectId] ?? defaultProjectState();
-        const nextProjectState = updater(current);
-        if (nextProjectState === current) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [projectId]: nextProjectState,
-        } satisfies ProjectStateMap;
       });
     },
     [],
@@ -1838,140 +1548,28 @@ export default function App({
     setSelectedWorktreePath(thread.worktreePath);
   }, []);
 
-  const beginWorktreeToggleRequest = useCallback(
-    (projectId: number, worktreePath: string) => {
-      const key = worktreeKey(projectId, worktreePath);
-      const nextRequestId =
-        (worktreeToggleRequestIdRef.current.get(key) ?? 0) + 1;
-      worktreeToggleRequestIdRef.current.set(key, nextRequestId);
-      return {
-        key,
-        requestId: nextRequestId,
-      };
-    },
-    [],
-  );
-
-  const isCurrentWorktreeToggleRequest = useCallback(
-    (key: string, requestId: number): boolean =>
-      worktreeToggleRequestIdRef.current.get(key) === requestId,
-    [],
-  );
-
-  const finishWorktreeToggleRequest = useCallback(
-    (key: string, requestId: number): void => {
-      if (worktreeToggleRequestIdRef.current.get(key) === requestId) {
-        worktreeToggleRequestIdRef.current.delete(key);
-      }
-    },
-    [],
-  );
-
-  const clearProjectWorktreeToggleRequests = useCallback(
-    (projectId: number) => {
-      const keyPrefix = `${projectId}::`;
-      for (const key of [...worktreeToggleRequestIdRef.current.keys()]) {
-        if (key.startsWith(keyPrefix)) {
-          worktreeToggleRequestIdRef.current.delete(key);
-        }
-      }
-    },
-    [],
-  );
-
-  const beginProjectLifecycleRequest = useCallback(
-    (projectId: number) => {
-      projectWorktreeRequestCacheRef.current.delete(projectId);
-      return projectLifecycleRequestTracker.begin(projectId);
-    },
-    [projectLifecycleRequestTracker],
-  );
-
-  const snapshotProjectLifecycleRequest = useCallback(
-    (projectId: number) => projectLifecycleRequestTracker.snapshot(projectId),
-    [projectLifecycleRequestTracker],
-  );
-
-  const requestProjectWorktrees = useCallback(
-    async (projectId: number): Promise<RpcWorktree[]> => {
-      const lifecycleRequest = snapshotProjectLifecycleRequest(projectId);
-      const existing = projectWorktreeRequestCacheRef.current.get(projectId);
-      if (
-        existing &&
-        existing.lifecycleRequestId === lifecycleRequest.requestId
-      ) {
-        return existing.promise;
-      }
-
-      const requestEntry: ProjectWorktreeRequestCacheEntry = {
-        lifecycleRequestId: lifecycleRequest.requestId,
-        promise: procedures
-          .listProjectWorktrees({ projectId })
-          .then((result) => {
-            if (!lifecycleRequest.isCurrent()) {
-              return result.worktrees;
-            }
-            setProjectState(
-              projectId,
-              buildLoadedProjectWorktreesState(result.worktrees),
-            );
-            return result.worktrees;
-          })
-          .catch((error) => {
-            if (lifecycleRequest.isCurrent()) {
-              setProjectState(projectId, {
-                loadingWorktrees: false,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-            throw error;
-          })
-          .finally(() => {
-            if (
-              projectWorktreeRequestCacheRef.current.get(projectId) ===
-              requestEntry
-            ) {
-              projectWorktreeRequestCacheRef.current.delete(projectId);
-            }
-          }),
-      };
-      projectWorktreeRequestCacheRef.current.set(projectId, requestEntry);
-      return requestEntry.promise;
-    },
-    [procedures, setProjectState, snapshotProjectLifecycleRequest],
-  );
-
-  const loadProjectWorktrees = useCallback(
-    async (
-      projectId: number,
-      options?: {
-        backgroundRefresh?: boolean;
-        preferCached?: boolean;
-      },
-    ): Promise<RpcWorktree[]> => {
-      const current = getProjectState(projectId);
-      const currentWorktrees = projectStateWorktrees(current);
-      if ((options?.preferCached ?? true) && currentWorktrees.length > 0) {
-        setProjectState(projectId, {
-          loadingWorktrees: false,
-          error: "",
-        });
-        if (options?.backgroundRefresh) {
-          void requestProjectWorktrees(projectId).catch(() => {
-            // Keep rendering the cached worktree list if the background refresh fails.
-          });
-        }
-        return currentWorktrees;
-      }
-
-      setProjectState(projectId, {
-        loadingWorktrees: true,
-        error: "",
-      });
-      return requestProjectWorktrees(projectId);
-    },
-    [getProjectState, requestProjectWorktrees, setProjectState],
-  );
+  const { ensureWorktreeOpen, loadProjectWorktrees, refreshProject } =
+    useProjectWorktreeController({
+      activeSelectedWorktreePath,
+      getProjectState,
+      getWorktreeState,
+      primeGitHistoryResult,
+      procedures,
+      selectProject,
+      selectedProject,
+      selectedProjectId,
+      selectedProjectIdRef,
+      selectedThread,
+      selectedThreadIdRef,
+      selectedWorktreePathRef,
+      sessionStateReady,
+      setProjectState,
+      setSelectedWorktreePath,
+      setThreadsError,
+      setWorktreeState,
+      setWorktreeStates,
+      upsertProject,
+    });
 
   const createThreadForWorktree = useCallback(
     async (
@@ -2100,20 +1698,6 @@ export default function App({
     setSelectedDiffFilePath,
     setWorktreeState,
   });
-
-  const abortGitHistoryRequests = useCallback((reason: string) => {
-    const historyController = gitHistoryAbortControllerRef.current;
-    if (historyController) {
-      gitHistoryAbortControllerRef.current = null;
-      historyController.abort(createAbortError(null, reason));
-    }
-
-    const loadMoreController = gitHistoryLoadMoreAbortControllerRef.current;
-    if (loadMoreController) {
-      gitHistoryLoadMoreAbortControllerRef.current = null;
-      loadMoreController.abort(createAbortError(null, reason));
-    }
-  }, []);
 
   const abortCronJobsRequest = useCallback((reason: string) => {
     const controller = cronJobsAbortControllerRef.current;
@@ -2300,214 +1884,6 @@ export default function App({
     },
     [procedures, removeThread],
   );
-
-  const cacheGitHistoryResult = useCallback(
-    (history: RpcWorktreeGitHistoryResult) => {
-      writeLruValue(
-        gitHistoryCacheRef.current,
-        worktreeKey(history.projectId, history.worktreePath),
-        history,
-        GIT_HISTORY_RESULT_CACHE_MAX_ENTRIES,
-      );
-    },
-    [],
-  );
-
-  const primeGitHistoryResult = useCallback(
-    (history: RpcWorktreeGitHistoryResult) => {
-      cacheGitHistoryResult(history);
-      skipFreshGitHistoryRefreshRef.current.add(
-        worktreeKey(history.projectId, history.worktreePath),
-      );
-    },
-    [cacheGitHistoryResult],
-  );
-
-  const loadGitHistory = useCallback(
-    async (
-      projectId: number,
-      worktreePath: string,
-      options?: {
-        silent?: boolean;
-        preferCached?: boolean;
-        skipRefreshWhenCached?: boolean;
-      },
-    ): Promise<void> => {
-      const requestId = ++gitHistoryRequestIdRef.current;
-      abortGitHistoryRequests("Git history request was superseded.");
-      const cacheKey = worktreeKey(projectId, worktreePath);
-      const cachedHistory = readLruValue(gitHistoryCacheRef.current, cacheKey);
-      const serveCachedHistory = Boolean(
-        options?.preferCached && cachedHistory,
-      );
-      const skipRefreshWhenCached = Boolean(
-        serveCachedHistory && options?.skipRefreshWhenCached,
-      );
-      const silentRefresh = options?.silent || serveCachedHistory;
-      if (serveCachedHistory && cachedHistory) {
-        setGitHistory(cachedHistory);
-        setGitHistoryLoading(false);
-        setGitHistoryLoadingMore(false);
-        gitHistoryLoadingMoreRef.current = false;
-        setGitHistoryError("");
-      }
-      if (skipRefreshWhenCached) {
-        gitHistoryAbortControllerRef.current = null;
-        return;
-      }
-
-      const controller = new AbortController();
-      gitHistoryAbortControllerRef.current = controller;
-      if (!silentRefresh) {
-        setGitHistoryLoading(true);
-        setGitHistoryError("");
-      }
-
-      try {
-        const result = await procedures.listWorktreeGitHistory(
-          {
-            projectId,
-            worktreePath,
-            offset: 0,
-            limit: GIT_HISTORY_PAGE_SIZE,
-          },
-          {
-            priority: silentRefresh ? "default" : "foreground",
-            signal: controller.signal,
-          },
-        );
-        if (gitHistoryRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        const nextHistory = mergeResetGitHistory(cachedHistory, result);
-        setGitHistory(nextHistory);
-        cacheGitHistoryResult(nextHistory);
-        setGitHistoryError("");
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (gitHistoryRequestIdRef.current !== requestId) {
-          return;
-        }
-        if (!silentRefresh && !cachedHistory) {
-          setGitHistory(null);
-          setGitHistoryError(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      } finally {
-        if (gitHistoryAbortControllerRef.current === controller) {
-          gitHistoryAbortControllerRef.current = null;
-        }
-        if (gitHistoryRequestIdRef.current === requestId) {
-          setGitHistoryLoading(false);
-          setGitHistoryLoadingMore(false);
-          gitHistoryLoadingMoreRef.current = false;
-        }
-      }
-    },
-    [abortGitHistoryRequests, cacheGitHistoryResult, procedures],
-  );
-
-  const loadMoreGitHistory = useCallback(async (): Promise<void> => {
-    if (
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      !gitHistory ||
-      gitHistory.nextOffset === null ||
-      gitHistoryLoading ||
-      gitHistoryLoadingMore ||
-      gitHistoryLoadingMoreRef.current
-    ) {
-      return;
-    }
-
-    const requestId = gitHistoryRequestIdRef.current;
-    const nextOffset = gitHistory.nextOffset;
-    const expectedHeadHash = gitHistory.headHash;
-    const expectedBranch = gitHistory.branch;
-    const controller = new AbortController();
-    if (gitHistoryLoadMoreAbortControllerRef.current) {
-      gitHistoryLoadMoreAbortControllerRef.current.abort(
-        createAbortError(
-          null,
-          "Git history pagination request was superseded.",
-        ),
-      );
-    }
-    gitHistoryLoadMoreAbortControllerRef.current = controller;
-
-    gitHistoryLoadingMoreRef.current = true;
-    setGitHistoryLoadingMore(true);
-
-    try {
-      const result = await procedures.listWorktreeGitHistory(
-        {
-          projectId: selectedProject.id,
-          worktreePath: activeSelectedWorktreePath,
-          offset: nextOffset,
-          limit: GIT_HISTORY_PAGE_SIZE,
-        },
-        {
-          priority: "foreground",
-          signal: controller.signal,
-        },
-      );
-      if (gitHistoryRequestIdRef.current !== requestId) {
-        return;
-      }
-
-      if (
-        result.headHash !== expectedHeadHash ||
-        result.branch !== expectedBranch
-      ) {
-        void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
-          silent: true,
-        });
-        return;
-      }
-
-      const nextHistory = appendGitHistoryPage(gitHistory, result);
-      setGitHistory((current) =>
-        current &&
-        current.projectId === nextHistory.projectId &&
-        current.worktreePath === nextHistory.worktreePath
-          ? nextHistory
-          : current,
-      );
-      cacheGitHistoryResult(nextHistory);
-      setGitHistoryError("");
-    } catch (error) {
-      if (isAbortError(error)) {
-        return;
-      }
-      if (gitHistoryRequestIdRef.current !== requestId) {
-        return;
-      }
-      setGitHistoryError(
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      if (gitHistoryLoadMoreAbortControllerRef.current === controller) {
-        gitHistoryLoadMoreAbortControllerRef.current = null;
-      }
-      if (gitHistoryRequestIdRef.current === requestId) {
-        setGitHistoryLoadingMore(false);
-        gitHistoryLoadingMoreRef.current = false;
-      }
-    }
-  }, [
-    activeSelectedWorktreePath,
-    cacheGitHistoryResult,
-    gitHistory,
-    gitHistoryLoading,
-    gitHistoryLoadingMore,
-    loadGitHistory,
-    procedures,
-    selectedProject,
-  ]);
 
   const applyOptimisticThreadErrorSeen = useCallback((thread: RpcThread) => {
     if (!optimisticallyAcknowledgedThreadIdsRef.current.has(thread.id)) {
@@ -3803,87 +3179,6 @@ export default function App({
   }, [selectedThread]);
 
   useEffect(() => {
-    if (!sessionStateReady) {
-      return;
-    }
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      gitHistoryRequestIdRef.current += 1;
-      abortGitHistoryRequests("Git history request was cleared.");
-      setGitHistory(null);
-      setGitHistoryLoading(false);
-      setGitHistoryLoadingMore(false);
-      gitHistoryLoadingMoreRef.current = false;
-      setGitHistoryError("");
-      return;
-    }
-    const cacheKey = worktreeKey(
-      selectedProject.id,
-      activeSelectedWorktreePath,
-    );
-    void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
-      preferCached: true,
-      skipRefreshWhenCached:
-        skipFreshGitHistoryRefreshRef.current.delete(cacheKey),
-    });
-  }, [
-    activeSelectedWorktreePath,
-    abortGitHistoryRequests,
-    loadGitHistory,
-    sessionStateReady,
-    selectedProject,
-  ]);
-
-  useEffect(() => {
-    if (!sessionStateReady) {
-      return;
-    }
-    if (!selectedThread) {
-      gitHistoryRefreshedThreadIdRef.current = null;
-      return;
-    }
-    if (
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      selectedThread.projectId !== selectedProject.id ||
-      selectedThread.worktreePath !== activeSelectedWorktreePath
-    ) {
-      return;
-    }
-    if (gitHistoryRefreshedThreadIdRef.current === selectedThread.id) {
-      return;
-    }
-
-    gitHistoryRefreshedThreadIdRef.current = selectedThread.id;
-    void loadGitHistory(selectedProject.id, activeSelectedWorktreePath, {
-      preferCached: true,
-    });
-  }, [
-    activeSelectedWorktreePath,
-    loadGitHistory,
-    selectedProject,
-    selectedThread,
-    sessionStateReady,
-  ]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToWorktreeGitHistoryChanged((payload) => {
-      if (!selectedProject || !activeSelectedWorktreePath) {
-        return;
-      }
-      if (
-        payload.projectId !== selectedProject.id ||
-        payload.worktreePath !== activeSelectedWorktreePath
-      ) {
-        return;
-      }
-      void loadGitHistory(payload.projectId, payload.worktreePath, {
-        silent: true,
-      });
-    });
-    return unsubscribe;
-  }, [activeSelectedWorktreePath, loadGitHistory, selectedProject]);
-
-  useEffect(() => {
     /**
      * Handles thread start request created.
      * @param event - event value.
@@ -3916,55 +3211,6 @@ export default function App({
       );
     };
   }, []);
-
-  useEffect(() => {
-    if (!gitHistoryModal) {
-      return;
-    }
-    if (
-      !selectedProject ||
-      !activeSelectedWorktreePath ||
-      gitHistoryModal.projectId !== selectedProject.id ||
-      gitHistoryModal.worktreePath !== activeSelectedWorktreePath
-    ) {
-      closeGitHistoryModal();
-    }
-  }, [
-    activeSelectedWorktreePath,
-    closeGitHistoryModal,
-    gitHistoryModal,
-    selectedProject,
-  ]);
-
-  useEffect(
-    () => () => {
-      gitHistoryDiffRequestIdRef.current += 1;
-      abortGitHistoryDiffRequest("Commit diff request was cleared.");
-    },
-    [abortGitHistoryDiffRequest],
-  );
-
-  useEffect(() => {
-    if (!gitHistoryModal) {
-      return;
-    }
-
-    /**
-     * Handles key down.
-     * @param event - event value.
-     */
-
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeGitHistoryModal();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeGitHistoryModal, gitHistoryModal]);
 
   useEffect(() => {
     if (
@@ -4115,10 +3361,9 @@ export default function App({
 
   useEffect(() => {
     return () => {
-      abortGitHistoryRequests("Git history request was canceled.");
       abortCronJobsRequest("Cron job request was canceled.");
     };
-  }, [abortCronJobsRequest, abortGitHistoryRequests]);
+  }, [abortCronJobsRequest]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
@@ -4295,196 +3540,6 @@ export default function App({
     [openGitHistoryDiff],
   );
 
-  const refreshProject = useCallback(
-    async (project: RpcProject, expanded: boolean) => {
-      const lifecycleRequest = beginProjectLifecycleRequest(project.id);
-      const current = getProjectState(project.id);
-      const hasCachedWorktrees = projectStateWorktrees(current).length > 0;
-      if (expanded) {
-        setProjectTreeOpen(project.path, true);
-      }
-      setProjectState(project.id, {
-        loadingWorktrees: expanded && !hasCachedWorktrees,
-        error: "",
-      });
-
-      if (!expanded) {
-        await runRollbackSafeProjectClose({
-          closeProject: async () => {
-            await procedures.closeProject({ projectId: project.id });
-          },
-          commitLocalClose: () => {
-            if (!lifecycleRequest.isCurrent()) {
-              return;
-            }
-            clearProjectWorktreeToggleRequests(project.id);
-            setWorktreeStates((prev) => {
-              const next = { ...prev } as WorktreeStateMap;
-              const keyPrefix = `${project.id}::`;
-              for (const key of Object.keys(next)) {
-                if (key.startsWith(keyPrefix)) {
-                  delete next[key];
-                }
-              }
-              return next;
-            });
-            setProjectState(project.id, {
-              openWorktrees: new Set(),
-              loadingWorktrees: false,
-              error: "",
-            });
-            upsertProject({
-              ...project,
-              isOpen: 0,
-            });
-            setProjectTreeOpen(project.path, false);
-            if (selectedProjectIdRef.current === project.id) {
-              selectedWorktreePathRef.current = project.path;
-              setSelectedWorktreePath(project.path);
-            }
-          },
-          onCloseError: (error) => {
-            if (!lifecycleRequest.isCurrent()) {
-              return;
-            }
-            setProjectState(project.id, {
-              loadingWorktrees: false,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          },
-        });
-        return;
-      }
-
-      if (hasCachedWorktrees) {
-        if (!selectedProjectId) {
-          selectProject(project);
-        }
-        void procedures
-          .openProject({
-            projectPath: project.path,
-            name: project.name,
-          })
-          .then((result) => {
-            if (!lifecycleRequest.isCurrent()) {
-              return;
-            }
-            upsertProject(result.project);
-            setProjectState(
-              project.id,
-              buildLoadedProjectWorktreesState(result.worktrees),
-            );
-          })
-          .catch((error) => {
-            if (!lifecycleRequest.isCurrent()) {
-              return;
-            }
-            setProjectState(project.id, {
-              loadingWorktrees: false,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        return;
-      }
-
-      try {
-        const result = await procedures.openProject({
-          projectPath: project.path,
-          name: project.name,
-        });
-        if (!lifecycleRequest.isCurrent()) {
-          return;
-        }
-        upsertProject(result.project);
-        setProjectState(
-          project.id,
-          buildLoadedProjectWorktreesState(result.worktrees),
-        );
-        if (!selectedProjectId) {
-          selectProject(project);
-        }
-      } catch (error) {
-        if (!lifecycleRequest.isCurrent()) {
-          return;
-        }
-        setProjectState(project.id, {
-          loadingWorktrees: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    },
-    [
-      beginProjectLifecycleRequest,
-      clearProjectWorktreeToggleRequests,
-      getProjectState,
-      setProjectState,
-      procedures,
-      selectedProjectId,
-      selectProject,
-      upsertProject,
-    ],
-  );
-
-  const ensureWorktreeOpen = useCallback(
-    async (projectId: number, worktreePath: string) => {
-      const target = getWorktreeState(projectId, worktreePath);
-      if (target.loading || target.opened) {
-        return;
-      }
-
-      const { key, requestId } = beginWorktreeToggleRequest(
-        projectId,
-        worktreePath,
-      );
-      setWorktreeState(projectId, worktreePath, {
-        loading: true,
-        error: "",
-      });
-
-      try {
-        const result = await procedures.openWorktree({
-          projectId,
-          worktreePath,
-        });
-        if (!isCurrentWorktreeToggleRequest(key, requestId)) {
-          return;
-        }
-        primeGitHistoryResult(result.history);
-        setWorktreeState(projectId, worktreePath, {
-          loading: false,
-          opened: true,
-          snapshot: result.worktree,
-          error: "",
-        });
-        updateProjectState(projectId, (current) => ({
-          ...current,
-          loadingWorktrees: false,
-          openWorktrees: new Set([...current.openWorktrees, worktreePath]),
-        }));
-      } catch (error) {
-        if (!isCurrentWorktreeToggleRequest(key, requestId)) {
-          return;
-        }
-        setWorktreeState(projectId, worktreePath, {
-          loading: false,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      } finally {
-        finishWorktreeToggleRequest(key, requestId);
-      }
-    },
-    [
-      beginWorktreeToggleRequest,
-      getWorktreeState,
-      finishWorktreeToggleRequest,
-      isCurrentWorktreeToggleRequest,
-      primeGitHistoryResult,
-      procedures,
-      setWorktreeState,
-      updateProjectState,
-    ],
-  );
-
   useEffect(() => {
     /**
      * Handles context focus changed.
@@ -4579,76 +3634,6 @@ export default function App({
       syncSelectedWorktreeThread,
     ],
   );
-
-  useEffect(() => {
-    const targetWorkspace = deriveSelectedThreadWorkspaceTarget({
-      activeSelectedWorktreePath,
-      selectedProject,
-      selectedThread,
-      sessionStateReady,
-    });
-    if (!targetWorkspace) {
-      return;
-    }
-
-    const target = getWorktreeState(
-      targetWorkspace.projectId,
-      targetWorkspace.worktreePath,
-    );
-    if (target.loading || target.opened) {
-      return;
-    }
-
-    void (async () => {
-      if (!targetWorkspace.projectOpen) {
-        try {
-          const openedProject = await procedures.openProject(
-            {
-              projectPath: targetWorkspace.projectPath,
-              name: targetWorkspace.projectName,
-            },
-            {
-              priority: "foreground",
-            },
-          );
-          if (selectedThreadIdRef.current !== targetWorkspace.threadId) {
-            return;
-          }
-          upsertProject(openedProject.project);
-          setProjectState(
-            openedProject.project.id,
-            buildLoadedProjectWorktreesState(openedProject.worktrees),
-          );
-        } catch (error) {
-          if (selectedThreadIdRef.current === targetWorkspace.threadId) {
-            setThreadsError(
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-          return;
-        }
-      }
-
-      if (selectedThreadIdRef.current !== targetWorkspace.threadId) {
-        return;
-      }
-
-      await ensureWorktreeOpen(
-        targetWorkspace.projectId,
-        targetWorkspace.worktreePath,
-      );
-    })();
-  }, [
-    activeSelectedWorktreePath,
-    ensureWorktreeOpen,
-    getWorktreeState,
-    procedures,
-    sessionStateReady,
-    selectedProject,
-    selectedThread,
-    setProjectState,
-    upsertProject,
-  ]);
 
   const postMessage = useCallback(() => {
     const text = readChatComposerDraft(initialMainviewState.chatInput).trim();

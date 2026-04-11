@@ -107,6 +107,12 @@ Combines backend and runtime state into memoized derived props used by workspace
 `use-thread-status-controller.ts`
 Hosts the memoized thread-status polling and selected-thread refresh controller extracted from `App.tsx`. It owns the working-thread poll loop, visibility-triggered refreshes, and selected-thread detail refresh decisions so unrelated shell state changes do not keep rerunning that controller path when its narrow prop set is unchanged.
 
+`use-project-worktree-controller.ts`
+Owns project/worktree listing refresh, project open/close rollback-safe transitions, worktree-open orchestration, and selected-thread workspace hydration when the selected thread points at a project/worktree that is not yet opened in the shell.
+
+`use-git-history-controller.ts`
+Owns git-history refresh, cached first-page reuse, pagination, invalidation-triggered reloads, and commit-diff modal loading so that history orchestration no longer lives inline inside `App.tsx`.
+
 `use-thread-previews.ts`
 Owns the shared hover/focus preview behavior for thread rows, including summary/error popover state, positioning, and stale-hide protection when pointer movement crosses rows quickly.
 

@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT03.2] Extract project/worktree and git-history controllers - Pull worktree-open, refresh, and history orchestration out of `App.tsx` and narrow the prop surfaces passed into panels.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT03` / `OPT03.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.1, 2.3.
-
 - [OPT03.3] Targeted derived-state and memo cleanup - Split only the hottest derived-state helpers and add memo or `useDeferredValue` changes where profiling shows benefit.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT03` / `OPT03.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.1, 2.3.
 

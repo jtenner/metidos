@@ -3,9 +3,46 @@
  * @description Module for project worktree refresh.
  */
 
-import { type ProjectNodeState, projectStateWorktreeCount } from "./app/state";
+import type { RpcWorktree } from "../bun/rpc-schema";
+import {
+  buildProjectWorktreeIndex,
+  type ProjectNodeState,
+  projectStateWorktreeCount,
+  projectStateWorktrees,
+} from "./app/state";
 
 export const PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS = 12_000;
+
+export function buildLoadedProjectWorktreesState(
+  worktrees: RpcWorktree[],
+  loadedAtMs: number = Date.now(),
+): Pick<
+  ProjectNodeState,
+  | "error"
+  | "loadingWorktrees"
+  | "worktreeByPath"
+  | "worktreePaths"
+  | "worktreesLoadedAt"
+> {
+  return {
+    ...buildProjectWorktreeIndex(worktrees),
+    worktreesLoadedAt: loadedAtMs,
+    loadingWorktrees: false,
+    error: "",
+  };
+}
+
+export function shouldUseCachedProjectWorktrees(
+  projectState: ProjectNodeState,
+  options?: {
+    preferCached?: boolean;
+  },
+): boolean {
+  return (
+    (options?.preferCached ?? true) &&
+    projectStateWorktrees(projectState).length > 0
+  );
+}
 
 /**
  * Skip project-action-menu background refreshes when cached worktrees are still

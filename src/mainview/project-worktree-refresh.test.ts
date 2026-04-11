@@ -8,8 +8,10 @@ import { describe, expect, it } from "bun:test";
 import type { RpcWorktree } from "../bun/rpc-schema";
 import { buildProjectWorktreeIndex, type ProjectNodeState } from "./app/state";
 import {
+  buildLoadedProjectWorktreesState,
   PROJECT_ACTION_MENU_WORKTREE_REFRESH_STALE_MS,
   shouldRefreshProjectActionMenuWorktrees,
+  shouldUseCachedProjectWorktrees,
 } from "./project-worktree-refresh";
 
 /**
@@ -44,6 +46,36 @@ function projectState(overrides?: Partial<ProjectNodeState>): ProjectNodeState {
 }
 
 describe("project worktree refresh helpers", () => {
+  it("builds a loaded worktree snapshot with timestamps and cleared loading state", () => {
+    expect(buildLoadedProjectWorktreesState([worktree()], 1234)).toEqual({
+      ...buildProjectWorktreeIndex([worktree()]),
+      error: "",
+      loadingWorktrees: false,
+      worktreesLoadedAt: 1234,
+    });
+  });
+
+  it("uses cached worktrees only when preferred and present", () => {
+    expect(
+      shouldUseCachedProjectWorktrees(
+        projectState({
+          ...buildProjectWorktreeIndex([worktree()]),
+        }),
+      ),
+    ).toBeTrue();
+    expect(
+      shouldUseCachedProjectWorktrees(
+        projectState({
+          ...buildProjectWorktreeIndex([worktree()]),
+        }),
+        {
+          preferCached: false,
+        },
+      ),
+    ).toBeFalse();
+    expect(shouldUseCachedProjectWorktrees(projectState())).toBeFalse();
+  });
+
   it("skips project-action-menu refreshes for recent cached worktrees", () => {
     expect(
       shouldRefreshProjectActionMenuWorktrees(
