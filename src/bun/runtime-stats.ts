@@ -84,14 +84,31 @@ export type RuntimeStatsSnapshot = {
   };
 };
 
+export type RankedRpcPayloadRuntimeStats = {
+  calls: number;
+  method: string;
+  requestBytes: number;
+  responseBytes: number;
+};
+
+export type RankedWebSocketPushPayloadRuntimeStats = {
+  deliveredClients: number;
+  droppedClients: number;
+  messages: number;
+  payloadBytes: number;
+  type: string;
+};
+
 export type RuntimeStatsSummary = {
   gitCache: RuntimeStatsSnapshot["gitCache"];
   rpc: RuntimeStatsRpcTotals & {
     methodCount: number;
+    topResponseBytesMethods: RankedRpcPayloadRuntimeStats[];
   };
   sqliteRetry: SqliteRetryRuntimeStats;
   startedAt: string;
   websocketPush: RuntimeStatsWebSocketTotals & {
+    topPayloadBytesTypes: RankedWebSocketPushPayloadRuntimeStats[];
     typeCount: number;
   };
 };
@@ -187,6 +204,8 @@ function createEmptyRuntimeStatsState(now = new Date()): RuntimeStatsState {
   };
 }
 
+const RUNTIME_STATS_TOP_ENTRY_LIMIT = 5;
+
 let runtimeStatsState = createEmptyRuntimeStatsState();
 
 function ensureRpcMethodRuntimeStats(
@@ -229,6 +248,51 @@ function cloneMapRecord<Value extends Record<string, number>>(
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, value]) => [key, { ...value }]),
   );
+}
+
+function summarizeTopRpcResponseBytesMethods(
+  map: Map<string, RpcMethodRuntimeStats>,
+): RankedRpcPayloadRuntimeStats[] {
+  return [...map.entries()]
+    .sort(([leftMethod, left], [rightMethod, right]) => {
+      if (right.responseBytes !== left.responseBytes) {
+        return right.responseBytes - left.responseBytes;
+      }
+      if (right.calls !== left.calls) {
+        return right.calls - left.calls;
+      }
+      return leftMethod.localeCompare(rightMethod);
+    })
+    .slice(0, RUNTIME_STATS_TOP_ENTRY_LIMIT)
+    .map(([method, stats]) => ({
+      calls: stats.calls,
+      method,
+      requestBytes: stats.requestBytes,
+      responseBytes: stats.responseBytes,
+    }));
+}
+
+function summarizeTopWebSocketPushPayloadTypes(
+  map: Map<string, WebSocketPushRuntimeStats>,
+): RankedWebSocketPushPayloadRuntimeStats[] {
+  return [...map.entries()]
+    .sort(([leftType, left], [rightType, right]) => {
+      if (right.payloadBytes !== left.payloadBytes) {
+        return right.payloadBytes - left.payloadBytes;
+      }
+      if (right.messages !== left.messages) {
+        return right.messages - left.messages;
+      }
+      return leftType.localeCompare(rightType);
+    })
+    .slice(0, RUNTIME_STATS_TOP_ENTRY_LIMIT)
+    .map(([type, stats]) => ({
+      deliveredClients: stats.deliveredClients,
+      droppedClients: stats.droppedClients,
+      messages: stats.messages,
+      payloadBytes: stats.payloadBytes,
+      type,
+    }));
 }
 
 function recordRpcOutcome(
@@ -425,6 +489,9 @@ export function getRuntimeStatsSummary(): RuntimeStatsSummary {
     rpc: {
       ...runtimeStatsState.rpcTotals,
       methodCount: runtimeStatsState.rpcByMethod.size,
+      topResponseBytesMethods: summarizeTopRpcResponseBytesMethods(
+        runtimeStatsState.rpcByMethod,
+      ),
     },
     sqliteRetry: {
       ...runtimeStatsState.sqliteRetry,
@@ -432,6 +499,9 @@ export function getRuntimeStatsSummary(): RuntimeStatsSummary {
     startedAt: runtimeStatsState.startedAt,
     websocketPush: {
       ...runtimeStatsState.websocketPushTotals,
+      topPayloadBytesTypes: summarizeTopWebSocketPushPayloadTypes(
+        runtimeStatsState.websocketPushByType,
+      ),
       typeCount: runtimeStatsState.websocketPushByType.size,
     },
   };

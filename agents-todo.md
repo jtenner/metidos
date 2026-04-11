@@ -28,9 +28,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 - [OPT04.3] Optional build splitting - Enable chunk-capable frontend output only if post-`OPT04.1` and `OPT04.2` measurements still justify the added build complexity.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT04` / `OPT04.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.5, 7.1.
 
-- [OPT05.1] RPC payload measurement - Add coarse response and websocket-push payload accounting so the noisiest transport paths can be ranked before changing protocol behavior.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT05` / `OPT05.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§3.2, 2.6, 6.2.
-
 - [OPT05.2] Thread-status refresh dedupe - Reduce redundant `listThreadStatuses` and selected-detail refresh work while preserving visibility and selected-thread correctness.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT05` / `OPT05.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§3.2, 2.6.
 

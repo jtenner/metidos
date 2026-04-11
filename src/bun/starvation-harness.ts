@@ -970,6 +970,36 @@ function formatMemoryUsage(
   ].join(", ");
 }
 
+function formatTopRpcResponseBytesMethods(
+  topMethods: RuntimeDiagnosticsSnapshot["runtimeStatsSummary"]["rpc"]["topResponseBytesMethods"],
+): string | null {
+  if (topMethods.length === 0) {
+    return null;
+  }
+
+  return topMethods
+    .map(
+      (entry) =>
+        `${entry.method}=${formatBytes(entry.responseBytes)} (${entry.calls} call${entry.calls === 1 ? "" : "s"})`,
+    )
+    .join(", ");
+}
+
+function formatTopWebSocketPushPayloadTypes(
+  topTypes: RuntimeDiagnosticsSnapshot["runtimeStatsSummary"]["websocketPush"]["topPayloadBytesTypes"],
+): string | null {
+  if (topTypes.length === 0) {
+    return null;
+  }
+
+  return topTypes
+    .map(
+      (entry) =>
+        `${entry.type}=${formatBytes(entry.payloadBytes)} (${entry.messages} msg${entry.messages === 1 ? "" : "s"})`,
+    )
+    .join(", ");
+}
+
 /**
  * Compose default websocket URL from port.
  * @param port - HTTP server port used by the harness.
@@ -1263,6 +1293,18 @@ function printHarnessReport(
   console.log(
     `  websocket pushes: messages=${runtimeStatsSummary.websocketPush.messages} types=${runtimeStatsSummary.websocketPush.typeCount} deliveredClients=${runtimeStatsSummary.websocketPush.deliveredClients} droppedClients=${runtimeStatsSummary.websocketPush.droppedClients} bytes=${formatBytes(runtimeStatsSummary.websocketPush.payloadBytes)}`,
   );
+  const topRpcResponseBytesMethods = formatTopRpcResponseBytesMethods(
+    runtimeStatsSummary.rpc.topResponseBytesMethods,
+  );
+  if (topRpcResponseBytesMethods) {
+    console.log(`  top rpc response bytes: ${topRpcResponseBytesMethods}`);
+  }
+  const topWebSocketPushPayloadTypes = formatTopWebSocketPushPayloadTypes(
+    runtimeStatsSummary.websocketPush.topPayloadBytesTypes,
+  );
+  if (topWebSocketPushPayloadTypes) {
+    console.log(`  top websocket push bytes: ${topWebSocketPushPayloadTypes}`);
+  }
   console.log(
     `  sqlite retry: loopsWithRetry=${runtimeStatsSummary.sqliteRetry.loopsWithRetry} totalRetries=${runtimeStatsSummary.sqliteRetry.totalRetries} exhausted=${runtimeStatsSummary.sqliteRetry.exhaustedLoops} peakRetryCount=${runtimeStatsSummary.sqliteRetry.peakRetryCount} totalBackoff=${formatDuration(runtimeStatsSummary.sqliteRetry.totalBackoffMs)}`,
   );

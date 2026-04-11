@@ -36,6 +36,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `runtime-stats.ts`
   - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, and selected cache hit/miss counters.
+  - Summarizes the heaviest RPC response methods and websocket push types by serialized bytes so transport follow-up work can target measured hot paths instead of guessing.
   - Keeps optimization telemetry cheap, resettable, and numeric so later benchmark and diagnostics work can build on one shared source of truth.
 
 - `project-procedures.ts`
@@ -273,7 +274,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `starvation-harness.ts`
   - Optional benchmarking harness to exercise startup, HTTP, and RPC behavior under worker concurrency.
-  - Produces timing summaries, latency percentiles, runtime-stats snapshots, and memory snapshots to help validate race/pressure behavior in development and CI-like scenarios.
+  - Produces timing summaries, latency percentiles, runtime-stats snapshots, memory snapshots, and top-byte transport rankings to help validate race/pressure behavior in development and CI-like scenarios.
 
 ## Notes
 

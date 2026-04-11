@@ -81,6 +81,32 @@ describe("runtime stats collector", () => {
 
     const summary = getRuntimeStatsSummary();
     expect(summary.rpc.methodCount).toBe(4);
+    expect(summary.rpc.topResponseBytesMethods).toEqual([
+      {
+        calls: 1,
+        method: "listThreads",
+        requestBytes: 120,
+        responseBytes: 480,
+      },
+      {
+        calls: 1,
+        method: "getThread",
+        requestBytes: 64,
+        responseBytes: 42,
+      },
+      {
+        calls: 1,
+        method: "openWorktree",
+        requestBytes: 33,
+        responseBytes: 15,
+      },
+      {
+        calls: 1,
+        method: "sendThreadMessage",
+        requestBytes: 81,
+        responseBytes: 0,
+      },
+    ]);
   });
 
   it("aggregates websocket push payloads and delivery counts by type", () => {
@@ -117,6 +143,22 @@ describe("runtime stats collector", () => {
 
     const summary = getRuntimeStatsSummary();
     expect(summary.websocketPush.typeCount).toBe(2);
+    expect(summary.websocketPush.topPayloadBytesTypes).toEqual([
+      {
+        deliveredClients: 4,
+        droppedClients: 1,
+        messages: 2,
+        payloadBytes: 172,
+        type: "git-history-changed",
+      },
+      {
+        deliveredClients: 2,
+        droppedClients: 0,
+        messages: 1,
+        payloadBytes: 80,
+        type: "thread-extension-ui",
+      },
+    ]);
   });
 
   it("tracks sqlite retry loops including exhaustion in snapshots and summary", () => {

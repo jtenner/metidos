@@ -120,6 +120,14 @@ function buildDiagnosticsSnapshot(
         responseBytes: 200,
         succeeded: 2,
         timedOut: 0,
+        topResponseBytesMethods: [
+          {
+            calls: 2,
+            method: "openWorktree",
+            requestBytes: 100,
+            responseBytes: 200,
+          },
+        ],
         totalDurationMs: 26,
       },
       sqliteRetry: {
@@ -135,6 +143,15 @@ function buildDiagnosticsSnapshot(
         droppedClients: 0,
         messages: 1,
         payloadBytes: 128,
+        topPayloadBytesTypes: [
+          {
+            deliveredClients: 2,
+            droppedClients: 0,
+            messages: 1,
+            payloadBytes: 128,
+            type: "git-history-changed",
+          },
+        ],
         typeCount: 1,
       },
     },
