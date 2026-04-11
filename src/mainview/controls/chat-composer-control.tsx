@@ -193,10 +193,10 @@ export function ChatComposerControl({
   // for mouse/keyboard desktop usage vs touch-optimized mobile UX.
   if (variant === "desktop") {
     return (
-      <div className="relative flex items-end gap-4 rounded-sm border border-[#2b2b2b] bg-[#262626] p-4">
+      <div className="relative flex items-end gap-4 rounded-sm border border-border-default bg-surface-3 p-4">
         <textarea
           ref={textareaRef}
-          className="flex-1 resize-none overflow-y-auto border-none bg-transparent px-2 font-body text-sm leading-6 placeholder:text-[#adabaa]/50 focus:ring-0"
+          className="flex-1 resize-none overflow-y-auto border-none bg-transparent px-2 font-body text-sm leading-6 placeholder:text-text-faint/50 focus:ring-0"
           placeholder={placeholder}
           rows={3}
           style={{
@@ -212,8 +212,8 @@ export function ChatComposerControl({
           type="submit"
           className={`flex h-10 w-10 items-center justify-center transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
             isWorking
-              ? "bg-[#4b2028] text-[#ffd4da]"
-              : "bg-[#bdd5e6] text-[#2e526b]"
+              ? "bg-danger-surface text-danger-text"
+              : "bg-accent-strong text-surface-3"
           }`}
           disabled={actionDisabled}
           aria-label={actionLabel}
@@ -226,10 +226,10 @@ export function ChatComposerControl({
   }
 
   return (
-    <div className="relative flex items-end gap-2 bg-[#181b1e] px-2 py-2">
+    <div className="relative flex items-end gap-2 bg-surface-2 px-2 py-2">
       <textarea
         ref={textareaRef}
-        className="min-h-0 flex-grow resize-none overflow-y-auto border border-[#333c43] bg-[#1e2123] px-3 py-2 text-sm leading-6 text-[#ffffff] placeholder:text-[#adabaa]/50 focus:border-[#9fc1da] focus:outline-none"
+        className="min-h-0 flex-grow resize-none overflow-y-auto border border-border-default bg-surface-3 px-3 py-2 text-sm leading-6 text-text-primary placeholder:text-text-faint/50 focus:border-focus-ring focus:outline-none"
         placeholder={placeholder}
         rows={1}
         style={{
@@ -244,8 +244,8 @@ export function ChatComposerControl({
       <button
         className={`flex items-center justify-center p-2 shadow-lg transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
           isWorking
-            ? "bg-[#4b2028] text-[#ffd4da]"
-            : "bg-gradient-to-tr from-[#bdd5e6] to-[#adcbe0] text-[#224259]"
+            ? "bg-danger-surface text-danger-text"
+            : "bg-gradient-to-tr from-accent-strong to-accent text-surface-3"
         }`}
         type="submit"
         disabled={actionDisabled}

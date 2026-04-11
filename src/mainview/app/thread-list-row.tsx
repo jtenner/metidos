@@ -188,7 +188,7 @@ export const ThreadList = memo(function ThreadList({
           <div
             id={errorPreviewPopoverId}
             role="note"
-            className="pointer-events-none fixed z-[110] max-w-[22rem] border border-[#7a2030] bg-[#341019]/96 px-3 py-2 text-xs leading-5 text-[#ffb1bf] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm"
+            className="pointer-events-none fixed z-[110] max-w-[22rem] border border-danger-border bg-danger-surface/96 px-3 py-2 text-xs leading-5 text-danger-text shadow-[var(--color-shadow-overlay)] backdrop-blur-sm"
             style={{
               left: errorPreviewPopover.x,
               top: errorPreviewPopover.y,
@@ -204,19 +204,19 @@ export const ThreadList = memo(function ThreadList({
           <div
             id={threadSummaryPopoverId}
             role="note"
-            className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-[#31404a] bg-[#13191d]/96 px-3 py-3 text-xs leading-5 text-[#d6e7f2] shadow-[0_18px_42px_rgba(0,0,0,0.56)] backdrop-blur-sm md:block"
+            className="pointer-events-none fixed z-[108] hidden max-w-[22rem] border border-border-default bg-surface-overlay/96 px-3 py-3 text-xs leading-5 text-text-secondary shadow-[var(--color-shadow-overlay)] backdrop-blur-sm md:block"
             style={{
               left: threadSummaryPopover.x,
               top: threadSummaryPopover.y,
             }}
           >
-            <div className="mb-1 font-label text-[9px] uppercase tracking-[0.16em] text-[#8fb5cd]">
+            <div className="mb-1 font-label text-[9px] uppercase tracking-widest text-accent">
               Thread Summary
             </div>
-            <div className="mb-2 text-sm font-semibold text-[#f2f0ef]">
+            <div className="mb-2 text-sm font-semibold text-text-primary">
               {threadSummaryPopover.title}
             </div>
-            <div className="whitespace-pre-wrap break-words text-[#bfd1dc]">
+            <div className="whitespace-pre-wrap break-words text-text-secondary">
               {threadSummaryPopover.summary}
             </div>
           </div>
@@ -350,7 +350,7 @@ const ThreadListRow = memo(function ThreadListRow({
     <span className="inline-flex items-center gap-1">
       <span
         aria-hidden="true"
-        className="text-[12px] leading-none text-[#a7b5be]"
+        className="text-[12px] leading-none text-text-muted"
       >
         ⎇
       </span>
@@ -359,14 +359,14 @@ const ThreadListRow = memo(function ThreadListRow({
   );
   const secondaryLabel = (
     <>
-      <span className="text-[#7d8992]">{threadTimestampLabel}</span>
+      <span className="text-text-muted">{threadTimestampLabel}</span>
       {threadStatusLabel || showLocation ? (
         <>
-          <span className="text-[#66737c]"> · </span>
-          <span className="text-[#88939b]">
+          <span className="text-text-faint"> · </span>
+          <span className="text-text-secondary">
             {threadStatusLabel}
             {threadStatusLabel && showLocation ? (
-              <span className="text-[#66737c]"> · </span>
+              <span className="text-text-faint"> · </span>
             ) : null}
             {showLocation ? (
               <>
@@ -389,8 +389,8 @@ const ThreadListRow = memo(function ThreadListRow({
       aria-label={threadAriaLabel}
       className={`w-full px-3 py-2 text-left transition-colors ${
         isActive
-          ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
-          : "text-[#d7d7d7] hover:bg-[#171a1b]"
+          ? "bg-surface-2 text-text-primary shadow-[inset_3px_0_0_0_var(--color-accent-emphasis)]"
+          : "text-text-secondary hover:bg-surface-1"
       }`}
       {...threadPreviewHandlers}
       onContextMenu={(event) => {
@@ -416,8 +416,8 @@ const ThreadListRow = memo(function ThreadListRow({
         <span
           className={`relative flex h-7 w-7 shrink-0 items-center justify-center ${
             isActive
-              ? "bg-[#1f313c] text-[#bdd5e6]"
-              : "bg-[#151a1c] text-[#8ca6b9]"
+              ? "bg-surface-2 text-accent-strong"
+              : "bg-surface-3 text-accent"
           }`}
         >
           {materialSymbol("chat_bubble", "text-[14px]")}
@@ -425,11 +425,11 @@ const ThreadListRow = memo(function ThreadListRow({
             <span
               aria-hidden="true"
               className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border ${
-                isActive ? "border-[#1f313c]" : "border-[#151a1c]"
+                isActive ? "border-surface-2" : "border-surface-3"
               } ${
                 activityIndicator === "completed"
-                  ? "bg-[#5df28b]"
-                  : "bg-[#4aa8ff]"
+                  ? "bg-success-text"
+                  : "bg-accent"
               }`}
             />
           ) : null}
@@ -438,20 +438,20 @@ const ThreadListRow = memo(function ThreadListRow({
           <div className="truncate text-[14px] font-medium leading-4">
             {thread.title}
           </div>
-          <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
+          <div className="mt-0.5 truncate text-[10px] text-text-muted">
             {secondaryLabel}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 pl-2">
           {threadPinned ? (
             <span className="pointer-events-none">
-              {materialSymbol("push_pin", "text-[14px] text-[#dfebf3]", {
+              {materialSymbol("push_pin", "text-[14px] text-text-secondary", {
                 filled: true,
               })}
             </span>
           ) : null}
           {hasUnreadError ? (
-            <span className="border border-[#7a2030] bg-[#381018] px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-[0.16em] text-[#ff8698]">
+            <span className="border border-danger-border bg-danger-surface px-2 py-0.5 font-label text-[9px] font-bold uppercase tracking-widest text-danger-text">
               Unread
             </span>
           ) : null}
