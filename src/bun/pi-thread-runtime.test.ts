@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
+import { resetResolvedAppDataDirectory } from "./db";
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiGitHubToolHost } from "./pi-github-tools";
 import type { PiMetidosToolHost } from "./pi-metidos-tools";
@@ -11,11 +12,14 @@ import {
   buildPiThreadSessionDirectoryPath,
   buildPiThreadToolPolicy,
   createPiThreadRuntime,
+  PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE,
   PI_THREAD_RUNTIME_TEST_PROVIDER_ENV,
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
   resolvePiThinkingLevel,
   runPiDelegatedTask,
 } from "./pi-thread-runtime";
+import { buildModelCatalog } from "./project-procedures/model-catalog";
+import { buildPiModelsJsonPath } from "./project-procedures/ollama-provider-config";
 
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
@@ -65,6 +69,29 @@ const piMetidosToolHostStub: PiMetidosToolHost = {
     throw new Error("updateThreadMetadata should not run in this test.");
   },
 };
+const EXPECTED_SAFE_RUNTIME_TOOL_NAMES: string[] = [
+  "read",
+  "ls",
+  "find",
+  "grep",
+  "edit",
+  "write",
+  "github_repo",
+  "github_issue",
+  "github_pr",
+  "github_pr_checks",
+  "github_pr_diff",
+  "update_thread",
+  "list_threads",
+  "run_untrusted_js",
+  "set_context",
+  "list_crons",
+  "new_cron",
+  "update_cron",
+  "new_thread",
+  "update_plan",
+  "delegate_task",
+];
 
 function collectAssistantText(
   runtime: Awaited<ReturnType<typeof createPiThreadRuntime>>,
@@ -85,7 +112,47 @@ function collectAssistantText(
   };
 }
 
+function extractProbeField(
+  reply: string,
+  fieldName: "promptTools" | "tools",
+): string {
+  const match = reply.match(new RegExp(`\\b${fieldName}=([^\\s]+)`, "u"));
+  return match?.[1] ?? "";
+}
+
+function writeOllamaModelsJson(appDataDir: string): void {
+  const modelsJsonPath = buildPiModelsJsonPath(appDataDir);
+  mkdirSync(dirname(modelsJsonPath), { recursive: true });
+  writeFileSync(
+    modelsJsonPath,
+    JSON.stringify(
+      {
+        providers: {
+          ollama: {
+            api: "openai-completions",
+            apiKey: "ollama",
+            baseUrl: "http://localhost:11434/v1",
+            compat: {
+              supportsDeveloperRole: false,
+              supportsReasoningEffort: false,
+            },
+            models: [
+              {
+                id: "qwen2.5-coder:7b",
+              },
+            ],
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
 afterEach(() => {
+  resetResolvedAppDataDirectory();
   if (typeof originalAppDataDir === "string") {
     process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
   } else {
@@ -176,29 +243,9 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
     expect(safeRuntime.sessionDirectory).toBe(
       buildPiThreadSessionDirectoryPath(17, appDataDir),
     );
-    expect(safeRuntime.session.getActiveToolNames()).toEqual([
-      "read",
-      "ls",
-      "find",
-      "grep",
-      "edit",
-      "write",
-      "github_repo",
-      "github_issue",
-      "github_pr",
-      "github_pr_checks",
-      "github_pr_diff",
-      "update_thread",
-      "list_threads",
-      "run_untrusted_js",
-      "set_context",
-      "list_crons",
-      "new_cron",
-      "update_cron",
-      "new_thread",
-      "update_plan",
-      "delegate_task",
-    ]);
+    expect(safeRuntime.session.getActiveToolNames()).toEqual(
+      EXPECTED_SAFE_RUNTIME_TOOL_NAMES,
+    );
     expect(safeRuntime.session.extensionRunner).toBeDefined();
 
     const streamed = collectAssistantText(safeRuntime);
@@ -264,6 +311,104 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "write",
     ]);
     unsafeRuntime.session.dispose();
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("every provider runtime exposes Metidos, GitHub, and agent tools to the model context", async () => {
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const workspaceDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
+  );
+  process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
+    PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE;
+
+  try {
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
+    writeOllamaModelsJson(appDataDir);
+    resetResolvedAppDataDirectory();
+
+    const sampleModelByProvider = new Map<string, string>();
+    for (const model of buildModelCatalog().models) {
+      if (model.id === "ollama:__setup__") {
+        continue;
+      }
+      if (!sampleModelByProvider.has(model.providerId)) {
+        sampleModelByProvider.set(model.providerId, model.id);
+      }
+    }
+
+    expect(sampleModelByProvider.has("ollama")).toBeTrue();
+    expect(sampleModelByProvider.has("openai")).toBeTrue();
+    expect(sampleModelByProvider.has("openai-codex")).toBeTrue();
+
+    let threadId = 10_000;
+    for (const modelId of sampleModelByProvider.values()) {
+      const runtime = await createPiThreadRuntime(
+        {
+          agentsAccess: true,
+          githubAccess: true,
+          id: threadId,
+          metidosAccess: true,
+          model: modelId,
+          piSessionFile: null,
+          projectId: 1,
+          reasoningEffort: "medium",
+          unsafeMode: 0,
+          worktreePath: workspaceDir,
+        },
+        {
+          appDataDir,
+          githubToolHost: piGitHubToolHostStub,
+          metidosToolHost: piMetidosToolHostStub,
+        },
+      );
+
+      try {
+        expect(runtime.session.getActiveToolNames()).toEqual(
+          EXPECTED_SAFE_RUNTIME_TOOL_NAMES,
+        );
+        expect(runtime.session.systemPrompt).toContain(
+          "Agent coordination tools are installed in this runtime: update_plan and delegate_task.",
+        );
+        expect(runtime.session.systemPrompt).toContain(
+          "GitHub-native tools are installed in this runtime: github_repo, github_issue, github_pr, github_pr_checks, and github_pr_diff.",
+        );
+        expect(runtime.session.systemPrompt).toContain(
+          "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
+        );
+
+        const streamed = collectAssistantText(runtime);
+        await runtime.session.prompt("provider-tool-visibility-check");
+        streamed.unsubscribe();
+
+        expect(
+          new Set(extractProbeField(streamed.getText(), "tools").split(",")),
+        ).toEqual(new Set(EXPECTED_SAFE_RUNTIME_TOOL_NAMES));
+        expect(extractProbeField(streamed.getText(), "promptTools")).toBe(
+          "agents,github,metidos",
+        );
+      } finally {
+        runtime.session.dispose();
+      }
+      threadId += 1;
+    }
   } finally {
     rmSync(appDataDir, {
       force: true,

@@ -21,6 +21,7 @@ import {
   DefaultResourceLoader,
   type ExtensionFactory,
   ModelRegistry,
+  type ProviderConfig,
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
@@ -61,6 +62,12 @@ export const PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
 const LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
   "JOLT_PI_RUNTIME_TEST_PROVIDER";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE = "openai-probe";
+export const PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE =
+  "all-providers-probe";
+
+type PiRuntimeProbeProviderModel = NonNullable<
+  ProviderConfig["models"]
+>[number];
 
 type PiThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -288,7 +295,10 @@ function applyPiRuntimeTestProviderOverride(
     process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
     process.env[LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
     "";
-  if (configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE) {
+  if (
+    configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE &&
+    configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE
+  ) {
     return;
   }
 
@@ -308,22 +318,84 @@ function applyPiRuntimeTestProviderOverride(
       "Pi runtime probe provider did not expose a complete provider configuration.",
     );
   }
+  const probeApi = probeProviderConfig.api;
+  const probeApiKey = probeProviderConfig.apiKey;
+  const probeAuthHeader = probeProviderConfig.authHeader;
+  const probeBaseUrl = probeProviderConfig.baseUrl;
+  const probeStreamSimple = probeProviderConfig.streamSimple;
 
-  modelRegistry.registerProvider("openai", {
-    api: probeProviderConfig.api,
-    apiKey: probeProviderConfig.apiKey,
-    authHeader: probeProviderConfig.authHeader,
-    baseUrl: probeProviderConfig.baseUrl,
-    models: [
-      {
-        ...probeModel,
-        id: "gpt-5.4",
-        name: "Probe GPT-5.4",
+  const registerProbeProvider = (
+    providerName: string,
+    models: PiRuntimeProbeProviderModel[],
+  ): void => {
+    modelRegistry.registerProvider(providerName, {
+      api: probeApi,
+      apiKey: probeApiKey,
+      authHeader: probeAuthHeader,
+      baseUrl: probeBaseUrl,
+      models,
+      streamSimple: probeStreamSimple,
+    });
+    authStorage.setRuntimeApiKey(
+      providerName,
+      PI_RUNTIME_PROBE_RUNTIME_API_KEY,
+    );
+  };
+
+  if (
+    configuredProvider === PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE
+  ) {
+    const modelsByProvider = new Map<string, PiRuntimeProbeProviderModel[]>();
+    for (const model of modelRegistry.getAll()) {
+      const providerModels = modelsByProvider.get(model.provider) ?? [];
+      providerModels.push({
+        id: model.id,
+        ...(model.compat
+          ? {
+              compat: structuredClone(model.compat),
+            }
+          : {}),
+        contextWindow: model.contextWindow ?? 128_000,
+        cost: model.cost ?? {
+          cacheRead: 0,
+          cacheWrite: 0,
+          input: 0,
+          output: 0,
+        },
+        input: model.input ?? ["text"],
+        maxTokens: model.maxTokens ?? 16_384,
+        name: model.name ?? `Probe ${model.provider}/${model.id}`,
+        reasoning: model.reasoning ?? false,
+      });
+      modelsByProvider.set(model.provider, providerModels);
+    }
+    for (const [providerName, models] of modelsByProvider) {
+      registerProbeProvider(providerName, models);
+    }
+    return;
+  }
+
+  registerProbeProvider("openai", [
+    {
+      id: "gpt-5.4",
+      ...(probeModel.compat
+        ? {
+            compat: structuredClone(probeModel.compat),
+          }
+        : {}),
+      contextWindow: probeModel.contextWindow ?? 8_192,
+      cost: probeModel.cost ?? {
+        cacheRead: 0,
+        cacheWrite: 0,
+        input: 0,
+        output: 0,
       },
-    ],
-    streamSimple: probeProviderConfig.streamSimple,
-  });
-  authStorage.setRuntimeApiKey("openai", PI_RUNTIME_PROBE_RUNTIME_API_KEY);
+      input: probeModel.input ?? ["text"],
+      maxTokens: probeModel.maxTokens ?? 1_024,
+      name: "Probe GPT-5.4",
+      reasoning: probeModel.reasoning ?? false,
+    },
+  ]);
 }
 
 function createPiModelRegistry(agentDirectory: string): {

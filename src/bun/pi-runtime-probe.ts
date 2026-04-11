@@ -210,6 +210,34 @@ function extractLastUserText(context: Context): string {
   return textParts.join(" ") || "empty-user-message";
 }
 
+function summarizeContextTools(context: Context): string {
+  const toolNames = (context.tools ?? [])
+    .map((tool) => tool.name.trim())
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+  return toolNames.length > 0 ? toolNames.join(",") : "none";
+}
+
+function summarizePromptToolFamilies(context: Context): string {
+  const systemPrompt = context.systemPrompt ?? "";
+  const visibleToolFamilies = [
+    systemPrompt.includes(
+      "Agent coordination tools are installed in this runtime",
+    )
+      ? "agents"
+      : null,
+    systemPrompt.includes("GitHub-native tools are installed in this runtime")
+      ? "github"
+      : null,
+    systemPrompt.includes("Metidos-native tools are installed in this runtime")
+      ? "metidos"
+      : null,
+  ].filter((value): value is string => value !== null);
+  return visibleToolFamilies.length > 0
+    ? visibleToolFamilies.join(",")
+    : "none";
+}
+
 function createProbeReply(
   model: Model<string>,
   context: Context,
@@ -218,7 +246,9 @@ function createProbeReply(
   const apiKey = options?.apiKey ?? "missing";
   const authorization = options?.headers?.Authorization ?? "missing";
   const lastUserText = extractLastUserText(context);
-  return `${PI_RUNTIME_PROBE_REPLY_PREFIX} provider=${model.provider} model=${model.id} apiKey=${apiKey} auth=${authorization} prompt=${lastUserText}`;
+  const tools = summarizeContextTools(context);
+  const promptTools = summarizePromptToolFamilies(context);
+  return `${PI_RUNTIME_PROBE_REPLY_PREFIX} provider=${model.provider} model=${model.id} apiKey=${apiKey} auth=${authorization} tools=${tools} promptTools=${promptTools} prompt=${lastUserText}`;
 }
 
 export function createPiRuntimeProbeProviderConfig(
