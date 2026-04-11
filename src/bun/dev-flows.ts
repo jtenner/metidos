@@ -5,6 +5,7 @@
 
 import { deleteAuthSecretKey, getAuthSecretKeyPath } from "./auth-secrets";
 import { type AppDataPathOptions, deleteAppDatabaseFiles } from "./db";
+import { deleteRuntimeStatsSidecarDatabaseFiles } from "./runtime-stats-sidecar";
 
 export const DEV_AUTH_BYPASS_ENV = "METIDOS_DEV_BYPASS";
 export const DEV_RESET_ENV = "METIDOS_DEV_RESET";
@@ -102,7 +103,10 @@ export function issueDevWebSocketTicket(
 export function resetLocalAppState(
   options: ResetLocalAppStateOptions = {},
 ): string[] {
-  const deletedPaths = deleteAppDatabaseFiles(options);
+  const deletedPaths = [
+    ...deleteAppDatabaseFiles(options),
+    ...deleteRuntimeStatsSidecarDatabaseFiles(options),
+  ];
 
   if (deleteAuthSecretKey(options)) {
     deletedPaths.push(getAuthSecretKeyPath(options));

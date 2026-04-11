@@ -18,6 +18,7 @@ import {
   resetLocalAppState,
   resolveDevFlowMode,
 } from "./dev-flows";
+import { getRuntimeStatsSidecarDatabasePath } from "./runtime-stats-sidecar";
 
 const tempDirectories = new Set<string>();
 
@@ -73,7 +74,7 @@ describe("dev flow helpers", () => {
     });
   });
 
-  it("removes the sqlite database, journals, and auth key during a dev reset", async () => {
+  it("removes the sqlite databases, journals, and auth key during a dev reset", async () => {
     const appDataDir = createTempDirectory();
     const databasePath = getAppDatabasePath({
       appDataDir,
@@ -82,8 +83,17 @@ describe("dev flow helpers", () => {
     migrateDatabase(database);
     database.close(false);
 
+    const telemetryDatabasePath = getRuntimeStatsSidecarDatabasePath({
+      appDataDir,
+    });
+    const telemetryDatabase = new Database(telemetryDatabasePath);
+    telemetryDatabase.run("CREATE TABLE test_entries (id INTEGER PRIMARY KEY)");
+    telemetryDatabase.close(false);
+
     writeFileSync(`${databasePath}-shm`, "");
     writeFileSync(`${databasePath}-wal`, "");
+    writeFileSync(`${telemetryDatabasePath}-shm`, "");
+    writeFileSync(`${telemetryDatabasePath}-wal`, "");
     await encryptAuthSecret("totp-secret", {
       appDataDir,
     });
@@ -101,11 +111,17 @@ describe("dev flow helpers", () => {
         databasePath,
         `${databasePath}-shm`,
         `${databasePath}-wal`,
+        telemetryDatabasePath,
+        `${telemetryDatabasePath}-shm`,
+        `${telemetryDatabasePath}-wal`,
       ]),
     );
     expect(existsSync(databasePath)).toBeFalse();
     expect(existsSync(`${databasePath}-shm`)).toBeFalse();
     expect(existsSync(`${databasePath}-wal`)).toBeFalse();
+    expect(existsSync(`${telemetryDatabasePath}`)).toBeFalse();
+    expect(existsSync(`${telemetryDatabasePath}-shm`)).toBeFalse();
+    expect(existsSync(`${telemetryDatabasePath}-wal`)).toBeFalse();
     expect(existsSync(authSecretPath)).toBeFalse();
   });
 

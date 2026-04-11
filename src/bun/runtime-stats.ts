@@ -128,6 +128,28 @@ export type RuntimeDiagnosticsSnapshot = {
   runtimeStatsSummary: RuntimeStatsSummary;
 };
 
+export function readProcessMemoryUsageSnapshot(): ProcessMemoryUsageSnapshot {
+  const memory = process.memoryUsage();
+  return {
+    arrayBuffers: memory.arrayBuffers,
+    external: memory.external,
+    heapTotal: memory.heapTotal,
+    heapUsed: memory.heapUsed,
+    rss: memory.rss,
+  };
+}
+
+export function buildRuntimeDiagnosticsSnapshot(
+  collectedAt = new Date().toISOString(),
+): RuntimeDiagnosticsSnapshot {
+  return {
+    collectedAt,
+    memoryUsage: readProcessMemoryUsageSnapshot(),
+    runtimeStats: getRuntimeStatsSnapshot(),
+    runtimeStatsSummary: getRuntimeStatsSummary(),
+  };
+}
+
 export type RpcMeasurementToken = {
   method: RpcMethodName | (string & {});
   startedAtMs: number;

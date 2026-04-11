@@ -132,9 +132,8 @@ import {
   type RpcWebSocketSocketData,
 } from "./rpc-websocket-auth";
 import {
-  getRuntimeStatsSnapshot,
+  buildRuntimeDiagnosticsSnapshot,
   getRuntimeStatsSummary,
-  type ProcessMemoryUsageSnapshot,
   type RpcMeasurementToken,
   recordRpcCanceled,
   recordRpcFailed,
@@ -144,6 +143,12 @@ import {
   recordWebSocketPush,
   resetRuntimeStats,
 } from "./runtime-stats";
+import {
+  deleteRuntimeStatsSidecarDatabaseFiles,
+  type RuntimeStatsSidecar,
+  startRuntimeStatsSidecar,
+  TRACK_TELEMETRY_FLAG,
+} from "./runtime-stats-sidecar";
 import {
   applySecurityHeaders,
   buildLivenessPayload,
@@ -375,6 +380,7 @@ const BACKEND_ONLY =
   readBrandEnvFlag("METIDOS_BACKEND_ONLY");
 const IS_DEV_SERVER =
   SERVER_ARGS.includes("--dev") || readBrandEnvFlag("METIDOS_DEV");
+const TRACK_RUNTIME_TELEMETRY = SERVER_ARGS.includes(TRACK_TELEMETRY_FLAG);
 const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
   forceTls: PUBLIC_TLS_ENABLED,
@@ -414,7 +420,7 @@ async function runUserDataWipeCli(): Promise<boolean> {
     const confirmation = (
       await readlineInterface.question(
         [
-          `This will permanently delete all local user data stored in ${databasePath}.`,
+          `This will permanently delete all local user data stored in ${databasePath} and the optional runtime telemetry sidecar database in the same app-data directory.`,
           `Type "${WIPE_USER_DATA_CONFIRMATION}" to continue: `,
         ].join("\n"),
       )
@@ -427,11 +433,16 @@ async function runUserDataWipeCli(): Promise<boolean> {
       return false;
     }
 
-    const deletedPaths = deleteAppDatabaseFiles();
+    const deletedPaths = [
+      ...deleteAppDatabaseFiles(),
+      ...deleteRuntimeStatsSidecarDatabaseFiles(),
+    ];
     if (deletedPaths.length === 0) {
-      console.log(`No database files were present at ${databasePath}.`);
+      console.log(
+        `No local data files were present at ${databasePath} or its telemetry sidecar location.`,
+      );
     } else {
-      console.log(`Deleted database files: ${deletedPaths.join(", ")}`);
+      console.log(`Deleted local data files: ${deletedPaths.join(", ")}`);
     }
 
     return true;
@@ -578,6 +589,7 @@ let devMainviewPollTimer: ReturnType<typeof setInterval> | null = null;
 let pendingMainviewReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let mainviewFileStamps = new Map<string, number>();
 let overloadMonitorTimer: ReturnType<typeof setInterval> | null = null;
+let runtimeStatsSidecar: RuntimeStatsSidecar | null = null;
 let pendingRpcRequestCount = 0;
 let peakPendingRpcRequestCount = 0;
 let lastEventLoopLagMs = 0;
@@ -672,26 +684,6 @@ function currentNowMs(): number {
 
 function utf8ByteLength(text: string): number {
   return Buffer.byteLength(text, "utf8");
-}
-
-function readProcessMemoryUsageSnapshot(): ProcessMemoryUsageSnapshot {
-  const memory = process.memoryUsage();
-  return {
-    arrayBuffers: memory.arrayBuffers,
-    external: memory.external,
-    heapTotal: memory.heapTotal,
-    heapUsed: memory.heapUsed,
-    rss: memory.rss,
-  };
-}
-
-function buildRuntimeDiagnosticsSnapshot() {
-  return {
-    collectedAt: new Date().toISOString(),
-    memoryUsage: readProcessMemoryUsageSnapshot(),
-    runtimeStats: getRuntimeStatsSnapshot(),
-    runtimeStatsSummary: getRuntimeStatsSummary(),
-  };
 }
 
 class RequestValidationError extends Error {
@@ -2345,6 +2337,11 @@ async function bootstrap(): Promise<void> {
   }
 
   initAppDatabase();
+  if (TRACK_RUNTIME_TELEMETRY) {
+    runtimeStatsSidecar = startRuntimeStatsSidecar({
+      logger: webServerLogger,
+    });
+  }
   recoverInterruptedThreadTurnsOnStartup();
   startCronScheduler();
   if (!BACKEND_ONLY) {
@@ -3019,6 +3016,9 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
     shutdownProjectPolling();
     await stopCronScheduler();
     await shutdownActiveThreadTurns();
+    await runtimeStatsSidecar?.close();
+    runtimeStatsSidecar = null;
+    closeAppDatabase();
   })()
     .catch((error) => {
       webServerLogger.error({

@@ -6,8 +6,8 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `index.ts`
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
-  - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
-  - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files and exiting before server bootstrap.
+  - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`, `--track-telemetry`) and builds the shared runtime configuration.
+  - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files plus the optional telemetry sidecar database and exiting before server bootstrap.
   - Exposes loopback HTTP routes for mainview assets, serving versioned frontend assets under `/assets/mainview/<version>/...` with immutable cache headers while keeping HTML bootstrap responses `no-store`, plus compatibility root asset aliases and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
@@ -38,6 +38,12 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, and selected cache hit/miss counters.
   - Summarizes the heaviest RPC response methods and websocket push types by serialized bytes so transport follow-up work can target measured hot paths instead of guessing.
   - Keeps optimization telemetry cheap, resettable, and numeric so later benchmark and diagnostics work can build on one shared source of truth.
+  - Also exports the shared runtime-diagnostics snapshot builder used by the health endpoint, the starvation harness, and the optional sidecar sink.
+
+- `runtime-stats-sidecar.ts`
+  - Optional `--track-telemetry` sink that periodically snapshots the in-memory runtime diagnostics and flushes them in batches into a separate SQLite sidecar database.
+  - Stores coarse snapshot totals plus per-RPC-method and per-websocket-push-type counters without adding writes to the hot request path or the main app database.
+  - Also exposes maintenance helpers for finding and deleting the sidecar DB files when a local reset or wipe is requested.
 
 - `project-procedures.ts`
   - Exposes all RPC procedure implementations consumed by the frontend.
@@ -131,7 +137,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `db.ts`
   - Defines and initializes the local SQLite schema + all persistence operations.
-  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
+  - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and thread usage telemetry.
   - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) as the authoritative runtime identity for active agent sessions.
   - Applies the shared SQLite runtime pragmas used by the main app and cron-sidecar connections, including WAL-mode journaling and the standard busy-timeout setting.
   - Keeps the hottest project/thread listing reads aligned with explicit SQLite indexes so project ordering no longer needs a temp sort and thread ordering can use an expression index that matches the pinned-first recency order.

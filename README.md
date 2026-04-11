@@ -176,7 +176,8 @@ bun run harness:starvation    # run starvation harness utility
 - `--backend-only` or `METIDOS_BACKEND_ONLY=1` to restrict backend mode.
 - `--dev` or `METIDOS_DEV=1` for development reconnect behavior and refresh hooks.
 - `--tls` or `METIDOS_TLS=1` when browser-facing traffic is behind a TLS-terminating reverse proxy.
-- `--wipe-user-data` to confirm, delete the local SQLite database files, and exit before startup.
+- `--track-telemetry` to persist periodic runtime-stat snapshots into a separate sidecar SQLite database under the app-data directory.
+- `--wipe-user-data` to confirm, delete the local SQLite database files (including the telemetry sidecar DB when present), and exit before startup.
 - `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 - `METIDOS_APP_DATA_DIR` for an explicit per-user application data location.
 - `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve the versioned mainview sourcemap path (for example `/assets/mainview/<version>/index.js.map`) for non-dev builds when you need production bundle debugging.
