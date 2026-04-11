@@ -69,12 +69,12 @@ export const PinnedThreadsPanel = memo(function PinnedThreadsPanel({
               worktreeByProjectAndPath={worktreeByProjectAndPath}
             />
           ) : (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
+            <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
               Pin threads to keep quick access shortcuts here.
             </div>
           )}
           {threadsError ? (
-            <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+            <div className="bg-danger-surface px-3 py-2 text-xs text-danger-text">
               {threadsError}
             </div>
           ) : null}

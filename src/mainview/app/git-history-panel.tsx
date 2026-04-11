@@ -110,15 +110,15 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
       {gitHistoryOpen ? (
         <div className="mt-3 space-y-1.5">
           {!selectedProject || !activeSelectedWorktreePath ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
+            <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
               Select a project worktree first.
             </div>
           ) : gitHistoryLoading ? (
-            <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
+            <div className="bg-surface-2 px-3 py-2.5 text-xs text-text-secondary">
               Loading git history...
             </div>
           ) : gitHistoryError && filteredGitHistoryEntries.length === 0 ? (
-            <div className="bg-[#2c1117] px-3 py-2.5 text-xs text-[#ff9db0]">
+            <div className="bg-danger-surface px-3 py-2.5 text-xs text-danger-text">
               {gitHistoryError}
             </div>
           ) : filteredGitHistoryEntries.length > 0 ? (
@@ -142,7 +142,7 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                     <button
                       type="button"
                       key={entry.hash}
-                      className="w-full px-3 py-2 text-left transition-colors hover:bg-[#171a1b]"
+                      className="w-full px-3 py-2 text-left transition-colors hover:bg-surface-2"
                       style={{ height: `${GIT_HISTORY_ROW_HEIGHT_PX}px` }}
                       onClick={() => {
                         // Open only the selected commit diff.
@@ -150,17 +150,17 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                       }}
                     >
                       <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-[#151a1c] text-[#8ca6b9]">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-surface-3 text-accent">
                           {materialSymbol("history", "text-[14px]")}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div
-                            className="truncate text-[14px] leading-4 text-[#f2f0ef]"
+                            className="truncate text-[14px] leading-4 text-text-primary"
                             title={entry.subject}
                           >
                             {entry.subject}
                           </div>
-                          <div className="mt-0.5 truncate text-[10px] text-[#8f9aa2]">
+                          <div className="mt-0.5 truncate text-[10px] text-text-muted">
                             {formatGitHistoryTimestamp(entry.committedAt)} · #
                             {entry.shortHash}
                           </div>
@@ -180,22 +180,22 @@ export const GitHistoryPanel = memo(function GitHistoryPanel({
                 ) : null}
               </div>
               {gitHistoryLoadingMore ? (
-                <div className="px-1 text-[11px] text-[#8f9aa2]">
+                <div className="px-1 text-[11px] text-text-muted">
                   Loading more commits...
                 </div>
               ) : null}
               {gitHistoryError ? (
-                <div className="bg-[#2c1117] px-3 py-2 text-[11px] text-[#ff9db0]">
+                <div className="bg-danger-surface px-3 py-2 text-[11px] text-danger-text">
                   {gitHistoryError}
                 </div>
               ) : null}
             </div>
           ) : gitHistoryLoadingMore ? (
-            <div className="bg-[#151b20] px-3 py-2.5 text-xs text-[#d4e4ef]">
+            <div className="bg-surface-2 px-3 py-2.5 text-xs text-text-secondary">
               Loading more git history...
             </div>
           ) : (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
+            <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
               No commits found for this worktree yet.
             </div>
           )}

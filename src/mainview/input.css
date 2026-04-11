@@ -1,4 +1,44 @@
 @import "tailwindcss";
+
+@theme {
+  --color-bg-app: #0e0f10;
+  --color-bg-canvas: #111315;
+  --color-surface-1: #15191c;
+  --color-surface-2: #1a1f24;
+  --color-surface-3: #20272d;
+  --color-surface-overlay: rgb(17 21 24 / 0.96);
+  --color-border-subtle: #263038;
+  --color-border-default: #2f3b43;
+  --color-border-strong: #3a4a55;
+  --color-text-primary: #f2f0ef;
+  --color-text-secondary: #cfdae2;
+  --color-text-muted: #93a1ab;
+  --color-text-faint: #74818a;
+  --color-accent: #8fb5cd;
+  --color-accent-strong: #bdd5e6;
+  --color-accent-emphasis: #7aa5c4;
+  --color-accent-surface: #18222a;
+  --color-focus-ring: #9fc1da;
+  --color-danger-text: #ffb1bf;
+  --color-danger-border: #7a2030;
+  --color-danger-surface: #2b1118;
+  --color-warning-text: #f2d79b;
+  --color-warning-border: #6d5930;
+  --color-warning-surface: #261f12;
+  --color-success-text: #9fe2b1;
+  --color-success-border: #215233;
+  --color-success-surface: #112118;
+  --color-shadow-overlay: 0 18px 42px rgb(0 0 0 / 0.56);
+  --color-shadow-subtle: 0 8px 18px rgb(0 0 0 / 0.28);
+  --radius-sm: 0px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
 @source "../**/*.{html,js,jsx,ts,tsx}";
 
 html,
@@ -9,18 +49,18 @@ body,
 
 body {
   margin: 0;
-  background: #0e0e0e;
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  background: var(--color-bg-app);
+  font-family: var(--font-sans);
   overflow: hidden;
 }
 
 :root {
   --app-scrollbar-size: 10px;
-  --app-scrollbar-track: #131a1f;
+  --app-scrollbar-track: var(--color-surface-1);
   --app-scrollbar-thumb-color: #51616c;
-  --app-scrollbar-thumb-start: #7aa5c4;
+  --app-scrollbar-thumb-start: var(--color-accent-emphasis);
   --app-scrollbar-thumb-end: #51616c;
-  --app-scrollbar-thumb-hover-start: #98b9d0;
+  --app-scrollbar-thumb-hover-start: var(--color-accent);
   --app-scrollbar-thumb-hover-end: #657886;
 }
 
@@ -58,7 +98,7 @@ body {
 }
 
 .glass-panel {
-  background: rgba(38, 38, 38, 0.7);
+  background: var(--color-surface-overlay);
   backdrop-filter: blur(20px);
 }
 
@@ -106,20 +146,14 @@ body {
   background: var(--app-scrollbar-track);
 }
 
-.font-headline {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-}
-.font-body {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-}
+.font-headline,
+.font-body,
 .font-label {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .font-mono {
-  font-family:
-    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
 }
 
 .message-markdown {
@@ -180,7 +214,7 @@ body {
 }
 
 .message-markdown li::marker {
-  color: #d5e4ef;
+  color: var(--color-text-secondary);
 }
 
 .message-markdown li + li {
@@ -192,24 +226,26 @@ body {
 }
 
 .message-markdown blockquote {
-  border-left: 2px solid rgba(153, 190, 217, 0.45);
+  border-left: 2px solid
+    color-mix(in srgb, var(--color-accent) 45%, transparent);
   padding-left: 0.9rem;
-  color: #d1dce3;
+  color: var(--color-text-secondary);
 }
 
 .message-markdown hr {
   border: 0;
-  border-top: 1px solid rgba(72, 72, 72, 0.75);
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-border-default) 75%, transparent);
 }
 
 .message-markdown img {
   max-width: 100%;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
 }
 
 .message-markdown input[type="checkbox"] {
   margin-right: 0.5rem;
-  accent-color: #bdd5e6;
+  accent-color: var(--color-accent-strong);
 }
 
 .message-markdown-table {
@@ -221,14 +257,15 @@ body {
 
 .message-markdown-table th,
 .message-markdown-table td {
-  border: 1px solid rgba(72, 72, 72, 0.85);
+  border: 1px solid
+    color-mix(in srgb, var(--color-border-default) 85%, transparent);
   padding: 0.55rem 0.7rem;
   text-align: left;
   vertical-align: top;
 }
 
 .message-markdown-table th {
-  background: rgba(31, 32, 32, 0.9);
-  color: #f2f0ef;
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
   font-weight: 700;
 }

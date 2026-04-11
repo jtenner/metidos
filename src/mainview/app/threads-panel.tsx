@@ -92,11 +92,11 @@ export const ThreadsPanel = memo(function ThreadsPanel({
         <div className="mt-3 space-y-1">
           {/* Threads list is shown only when a project and worktree are selected. */}
           {!selectedProject || !activeSelectedWorktreePath ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
+            <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
               Select a project worktree first.
             </div>
           ) : filteredVisibleThreads.length === 0 ? (
-            <div className="bg-[#151515] px-3 py-2.5 text-xs text-[#8f8d8b]">
+            <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
               {normalizedSidebarSearchQuery
                 ? "No matching threads in this worktree."
                 : `No threads in this worktree yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`}
@@ -123,7 +123,7 @@ export const ThreadsPanel = memo(function ThreadsPanel({
           )}
           {/* Keep error messaging visible beneath the list so list context remains visible. */}
           {threadsError ? (
-            <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
+            <div className="bg-danger-surface px-3 py-2 text-xs text-danger-text">
               {threadsError}
             </div>
           ) : null}

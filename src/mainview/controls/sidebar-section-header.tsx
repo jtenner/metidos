@@ -40,10 +40,10 @@ export function SidebarSectionHeader({
         onClick={onToggle}
         aria-expanded={open}
       >
-        <span className="min-w-0 font-label text-[11px] font-bold uppercase tracking-[0.24em] text-[#8ca6b9]">
+        <span className="min-w-0 font-label text-[11px] font-bold uppercase tracking-widest text-accent">
           {title}
         </span>
-        <span className="ml-auto shrink-0 text-[#62737e] transition-colors group-hover:text-[#bdd5e6]">
+        <span className="ml-auto shrink-0 text-text-faint transition-colors group-hover:text-accent-strong">
           {/* Flip icon to reflect current expand/collapse state. */}
           {materialSymbol(
             open ? "expand_more" : "chevron_right",
