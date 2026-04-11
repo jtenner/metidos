@@ -17,7 +17,7 @@
   - `.metidos/tasks/items/`
     One directory per task item in the task graph.
   - `.tasks/`
-    Repository-local process docs for commits, research, and contributor workflow.
+    Repository-local process docs for commits, research, styling, and contributor workflow.
   - `docs/`
     Architecture notes, migration write-ups, and longer-form design research.
   - `src/`

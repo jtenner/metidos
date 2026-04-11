@@ -12,3 +12,6 @@ It contains short operational documents that should be consulted before making c
 - `research.md`
   - Documentation standards and expectations for adding new design/feature/architecture notes.
   - Gives content structure guidance for new docs: summary + detailed sections, and quality expectations for migration/new-feature/design/API/architecture writeups.
+- `style.md`
+  - Main UI style guide and styling cleanup proposal for `src/mainview/`.
+  - Defines the desired visual language, semantic token direction, component rules, migration priorities, and the explicit ban on introducing new card-based UI patterns.
