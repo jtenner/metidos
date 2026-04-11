@@ -12,8 +12,10 @@ import {
   upsertThreadList,
 } from "./app/state";
 import {
+  listWorkingThreadIds,
   mergeThreadStatusSummaries,
   resolveThreadStatusRefreshOutcome,
+  shouldRefreshSelectedThreadDetail,
 } from "./thread-status-refresh";
 
 /**
@@ -35,10 +37,14 @@ function sortableThread(
   threadId: number,
   updatedAt: string,
   pinnedAt: string | null = null,
+  runState: RpcThread["runStatus"]["state"] = "idle",
 ): RpcThread {
   return {
     id: threadId,
     pinnedAt,
+    runStatus: {
+      state: runState,
+    },
     updatedAt,
   } as unknown as RpcThread;
 }
@@ -55,6 +61,49 @@ function threadDetail(threadId: number): RpcThreadDetail {
 }
 
 describe("thread status refresh helpers", () => {
+  it("lists only working thread ids in order", () => {
+    expect(
+      listWorkingThreadIds([
+        sortableThread(3, "2026-04-04T12:00:00.000Z", null, "working"),
+        sortableThread(7, "2026-04-04T11:00:00.000Z"),
+        sortableThread(9, "2026-04-04T10:00:00.000Z", null, "working"),
+      ]),
+    ).toEqual([3, 9]);
+  });
+
+  it("refreshes selected detail for working and terminal state transitions only", () => {
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        previousSelectedRunState: "idle",
+        selectedSummaryRunState: "working",
+      }),
+    ).toBeTrue();
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        previousSelectedRunState: "working",
+        selectedSummaryRunState: "idle",
+      }),
+    ).toBeTrue();
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        previousSelectedRunState: "idle",
+        selectedSummaryRunState: "failed",
+      }),
+    ).toBeTrue();
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        previousSelectedRunState: "failed",
+        selectedSummaryRunState: "failed",
+      }),
+    ).toBeFalse();
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        previousSelectedRunState: "stopped",
+        selectedSummaryRunState: "stopped",
+      }),
+    ).toBeFalse();
+  });
+
   it("merges polled thread statuses into the existing thread list", () => {
     const currentThreadStore = createThreadStore([
       thread(3),

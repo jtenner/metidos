@@ -103,7 +103,6 @@ import {
   sortThreads,
   THREAD_EXTENSION_UI_EVENT_NAME,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
-  THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
   type ThreadStore,
   threadStoreItems,
@@ -122,6 +121,7 @@ import {
 import { ThreadExtensionUiDialog } from "./app/thread-extension-ui-dialog";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
+import { ThreadStatusController } from "./app/use-thread-status-controller";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
 import { stepUpAuth } from "./auth-client";
 import {
@@ -167,10 +167,6 @@ import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
-import {
-  mergeThreadStatusSummaries,
-  resolveThreadStatusRefreshOutcome,
-} from "./thread-status-refresh";
 import {
   derivePrimaryViewForPinnedThreadOpen,
   deriveSelectedThreadWorkspaceTarget,
@@ -898,9 +894,6 @@ export default function App({
   const visibleMessageCacheRef = useRef(
     new Map<string, VisibleMessageCacheEntry>(),
   );
-  const previousSelectedThreadIdRef = useRef<number | null>(
-    initialMainviewState.selectedThreadId,
-  );
   const selectedProjectIdRef = useRef<number | null>(
     initialMainviewState.selectedProjectId,
   );
@@ -916,14 +909,12 @@ export default function App({
   const worktreeToggleRequestIdRef = useRef(new Map<string, number>());
   const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
   const gitHistoryRefreshedThreadIdRef = useRef<number | null>(null);
-  const threadStatusPollInFlightRef = useRef(false);
   const threadHistoryBackfillAbortControllerRef =
     useRef<AbortController | null>(null);
   const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
     new Map<number, RpcThreadRunStatus["state"]>(),
   );
-  const previousDocumentVisibilityRef = useRef(isDocumentVisible);
   const projectLifecycleRequestTracker = useMemo(
     () => createProjectLifecycleRequestTracker(),
     [],
@@ -2654,101 +2645,6 @@ export default function App({
     ],
   );
 
-  const refreshThreadStatuses = useCallback(
-    async (threadIds: number[]) => {
-      if (threadIds.length === 0) {
-        return;
-      }
-
-      const activeSelectedThreadId = selectedThreadIdRef.current;
-      const loadedThreadStatuses = applyOptimisticThreadErrorSeenToList(
-        await procedures.listThreadStatuses({ threadIds }),
-      );
-      const selectedSummary =
-        activeSelectedThreadId === null
-          ? null
-          : (loadedThreadStatuses.find(
-              (thread) => thread.id === activeSelectedThreadId,
-            ) ?? null);
-
-      if (!selectedSummary) {
-        setThreadStore((currentThreadStore) =>
-          mergeThreadStatusSummaries({
-            currentThreadStore,
-            loadedThreadStatuses,
-          }),
-        );
-        return;
-      }
-
-      const shouldRefreshSelectedDetail =
-        selectedSummary.runStatus.state === "working" ||
-        selectedThreadRunStateRef.current === "working" ||
-        (selectedSummary.runStatus.state === "failed" &&
-          selectedThreadRunStateRef.current !== "failed") ||
-        (selectedSummary.runStatus.state === "stopped" &&
-          selectedThreadRunStateRef.current !== "stopped");
-
-      if (!shouldRefreshSelectedDetail) {
-        selectedThreadRunStateRef.current = selectedSummary.runStatus.state;
-        setThreadStore((currentThreadStore) =>
-          mergeThreadStatusSummaries({
-            currentThreadStore,
-            loadedThreadStatuses,
-          }),
-        );
-        return;
-      }
-
-      try {
-        const detail = prepareOpenedThreadDetail(
-          await procedures.getThread({
-            threadId: selectedSummary.id,
-          }),
-        );
-        const selectedThreadIdForCommit = selectedThreadIdRef.current;
-        setThreadStore(
-          (currentThreadStore) =>
-            resolveThreadStatusRefreshOutcome({
-              currentThreadStore,
-              detail,
-              loadedThreadStatuses,
-              selectedSummaryThreadId: selectedSummary.id,
-              selectedThreadId: selectedThreadIdForCommit,
-            }).nextThreadStore,
-        );
-        if (selectedThreadIdForCommit !== selectedSummary.id) {
-          return;
-        }
-        selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-        mergeSelectedThreadMessageHistory(detail);
-      } catch (error) {
-        const selectedThreadIdForCommit = selectedThreadIdRef.current;
-        setThreadStore(
-          (currentThreadStore) =>
-            resolveThreadStatusRefreshOutcome({
-              currentThreadStore,
-              detail: null,
-              loadedThreadStatuses,
-              selectedSummaryThreadId: selectedSummary.id,
-              selectedThreadId: selectedThreadIdForCommit,
-            }).nextThreadStore,
-        );
-        console.error(
-          `Failed to refresh selected thread detail for ${selectedSummary.id}`,
-          error,
-        );
-        return;
-      }
-    },
-    [
-      applyOptimisticThreadErrorSeenToList,
-      mergeSelectedThreadMessageHistory,
-      prepareOpenedThreadDetail,
-      procedures,
-    ],
-  );
-
   const applyOpenedThreadDetail = useCallback(
     (detail: RpcThreadDetail) => {
       upsertThread(detail.thread);
@@ -3743,15 +3639,6 @@ export default function App({
   }, [closeThreadActionMenu, threadActionMenu, threadActionMenuThread]);
 
   useEffect(() => {
-    const previousThreadId = previousSelectedThreadIdRef.current;
-    selectedThreadIdRef.current = selectedThreadId;
-    if (previousThreadId !== null && previousThreadId !== selectedThreadId) {
-      void discardThreadIfEmpty(previousThreadId);
-    }
-    previousSelectedThreadIdRef.current = selectedThreadId;
-  }, [discardThreadIfEmpty, selectedThreadId]);
-
-  useEffect(() => {
     selectedProjectIdRef.current = selectedProjectId;
   }, [selectedProjectId]);
 
@@ -3769,37 +3656,6 @@ export default function App({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
-
-  const polledThreadIds = useMemo(
-    () =>
-      threads
-        .filter((thread) => thread.runStatus.state === "working")
-        .map((thread) => thread.id),
-    [threads],
-  );
-
-  useEffect(() => {
-    const wasVisible = previousDocumentVisibilityRef.current;
-    previousDocumentVisibilityRef.current = isDocumentVisible;
-    if (!isDocumentVisible || wasVisible || polledThreadIds.length === 0) {
-      return;
-    }
-    if (threadStatusPollInFlightRef.current) {
-      return;
-    }
-
-    threadStatusPollInFlightRef.current = true;
-    void refreshThreadStatuses(polledThreadIds)
-      .catch((error) => {
-        console.error(
-          "Failed to refresh thread statuses after document became visible",
-          error,
-        );
-      })
-      .finally(() => {
-        threadStatusPollInFlightRef.current = false;
-      });
-  }, [isDocumentVisible, polledThreadIds, refreshThreadStatuses]);
 
   useEffect(() => {
     activeWorktreeSyncAbortControllerRef.current?.abort(
@@ -4236,43 +4092,6 @@ export default function App({
 
     setMobileNavigationIndicator("none");
   }, [mobileProjectListOpen]);
-
-  useEffect(() => {
-    if (polledThreadIds.length === 0) {
-      if (threads.length === 0) {
-        selectedThreadRunStateRef.current = "idle";
-      }
-      return;
-    }
-
-    let cancelled = false;
-    const poll = async () => {
-      if (threadStatusPollInFlightRef.current) {
-        return;
-      }
-
-      threadStatusPollInFlightRef.current = true;
-      try {
-        await refreshThreadStatuses(polledThreadIds);
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to poll thread statuses", error);
-        }
-      } finally {
-        threadStatusPollInFlightRef.current = false;
-      }
-    };
-
-    void poll();
-    const timer = window.setInterval(() => {
-      void poll();
-    }, THREAD_STATUS_POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [polledThreadIds, refreshThreadStatuses, threads.length]);
 
   useEffect(() => {
     if (!homeDirectory) {
@@ -5592,6 +5411,21 @@ export default function App({
 
   return (
     <div className="h-screen overflow-hidden bg-[#0e0e0e] text-[#ffffff]">
+      <ThreadStatusController
+        applyOptimisticThreadErrorSeenToList={
+          applyOptimisticThreadErrorSeenToList
+        }
+        discardThreadIfEmpty={discardThreadIfEmpty}
+        isDocumentVisible={isDocumentVisible}
+        mergeSelectedThreadMessageHistory={mergeSelectedThreadMessageHistory}
+        prepareOpenedThreadDetail={prepareOpenedThreadDetail}
+        procedures={procedures}
+        selectedThreadId={selectedThreadId}
+        selectedThreadIdRef={selectedThreadIdRef}
+        selectedThreadRunStateRef={selectedThreadRunStateRef}
+        setThreadStore={setThreadStore}
+        threads={threads}
+      />
       <div className="hidden h-full md:flex md:flex-col">
         <header className="flex justify-between items-center w-full px-6 h-14 bg-[#131313] border-b border-[#262626] z-50">
           <div className="flex items-center gap-8">

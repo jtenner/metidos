@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT03.1] Extract thread-status and selected-thread controller - Move polling and selected-thread refresh logic out of `App.tsx` to reduce state fan-out and sharpen hot render boundaries.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT03` / `OPT03.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.1, 2.3.
-
 - [OPT03.2] Extract project/worktree and git-history controllers - Pull worktree-open, refresh, and history orchestration out of `App.tsx` and narrow the prop surfaces passed into panels.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT03` / `OPT03.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.1, 2.3.
 

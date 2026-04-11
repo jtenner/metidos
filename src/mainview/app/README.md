@@ -104,6 +104,9 @@ Central shared types/constants for mainview logic. Includes domain types for thr
 `use-mainview-derived-state.ts`
 Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including ordered projections over the indexed project/worktree store shape and preformatted worktree display paths reused across hot sidebar renders.
 
+`use-thread-status-controller.ts`
+Hosts the memoized thread-status polling and selected-thread refresh controller extracted from `App.tsx`. It owns the working-thread poll loop, visibility-triggered refreshes, and selected-thread detail refresh decisions so unrelated shell state changes do not keep rerunning that controller path when its narrow prop set is unchanged.
+
 `use-thread-previews.ts`
 Owns the shared hover/focus preview behavior for thread rows, including summary/error popover state, positioning, and stale-hide protection when pointer movement crosses rows quickly.
 

@@ -3,7 +3,11 @@
  * @description Module for thread status refresh.
  */
 
-import type { RpcThread, RpcThreadDetail } from "../bun/rpc-schema";
+import type {
+  RpcThread,
+  RpcThreadDetail,
+  RpcThreadRunStatus,
+} from "../bun/rpc-schema";
 import { type ThreadStore, upsertThreadStore } from "./app/state";
 
 export type ThreadStatusRefreshOutcome = {
@@ -15,6 +19,26 @@ type MergeThreadStatusSummariesOptions = {
   currentThreadStore: ThreadStore;
   loadedThreadStatuses: RpcThread[];
 };
+
+export function listWorkingThreadIds(threads: RpcThread[]): number[] {
+  return threads
+    .filter((thread) => thread.runStatus.state === "working")
+    .map((thread) => thread.id);
+}
+
+export function shouldRefreshSelectedThreadDetail(options: {
+  previousSelectedRunState: RpcThreadRunStatus["state"];
+  selectedSummaryRunState: RpcThreadRunStatus["state"];
+}): boolean {
+  return (
+    options.selectedSummaryRunState === "working" ||
+    options.previousSelectedRunState === "working" ||
+    (options.selectedSummaryRunState === "failed" &&
+      options.previousSelectedRunState !== "failed") ||
+    (options.selectedSummaryRunState === "stopped" &&
+      options.previousSelectedRunState !== "stopped")
+  );
+}
 /**
  * Merges thread status summaries.
  * @param options - Configuration options used by this operation.
