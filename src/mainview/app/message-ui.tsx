@@ -46,11 +46,11 @@ const DIFF_LINE_ESTIMATE_PX = 24;
 const DIFF_VIRTUALIZATION_OVERSCAN = 20;
 const MIN_VIRTUALIZED_DIFF_LINES = 400;
 const MARKDOWN_LINK_CLASS_NAME =
-  "text-[#c6dae9] underline decoration-[#7aa5c4] underline-offset-2 transition-colors hover:text-[#e3edf5]";
+  "text-text-secondary underline decoration-accent underline-offset-2 transition-colors hover:text-text-primary";
 const COPY_BUTTON_CLASS_NAME =
-  "inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]";
+  "inline-flex items-center gap-1 rounded border border-border-subtle bg-surface-1 px-2 py-1 text-[10px] font-medium tracking-wide text-accent transition-colors hover:border-border-default hover:bg-surface-2 hover:text-text-secondary";
 const INLINE_COMMAND_COPY_BUTTON_CLASS_NAME =
-  "inline-flex items-center gap-1 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[9px] font-medium tracking-wide text-[#98b3c7] transition-colors hover:border-[#4c606f] hover:bg-[#1c2730] hover:text-[#c7d7e2]";
+  "inline-flex items-center gap-1 rounded border border-border-subtle bg-surface-1 px-2 py-1 text-[9px] font-medium tracking-wide text-accent transition-colors hover:border-border-default hover:bg-surface-2 hover:text-text-secondary";
 const COMMAND_PREVIEW_BORDER_PX = 1;
 const COMMAND_PREVIEW_PADDING_X_PX = 12;
 const COMMAND_PREVIEW_PADDING_Y_PX = 12;
@@ -91,7 +91,7 @@ const PlainTextMessage = memo(function PlainTextMessage({
 
 function PreparingLargeMarkdownMessage(): JSX.Element {
   return (
-    <div className="border border-[#283239] bg-[#151b20] px-3 py-3 text-sm text-[#d4e4ef]">
+    <div className="border border-border-default bg-surface-2 px-3 py-3 text-sm text-text-secondary">
       Preparing formatted response...
     </div>
   );
@@ -343,7 +343,7 @@ function AssistantMessageCopyButton({
       </button>
       {showCopied ? (
         <span
-          className={`pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded border border-[#2f3d45] bg-[#11161b] px-2 py-1 text-[10px] whitespace-nowrap text-[#9fd0f2] transition-opacity duration-450 ${
+          className={`pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded border border-border-subtle bg-surface-1 px-2 py-1 text-[10px] whitespace-nowrap text-accent transition-opacity duration-450 ${
             isCopyPopoverFading ? "opacity-0" : "opacity-100"
           }`}
         >
@@ -356,8 +356,13 @@ function AssistantMessageCopyButton({
 
 export function ProcessingMessage(): JSX.Element {
   return (
-    <div className="inline-flex items-center gap-3 border border-[#31404a] bg-[#182025] px-3 py-2 text-sm text-[#dfebf3]">
-      <BeatLoader color="#bdd5e6" margin={1} size={5} speedMultiplier={0.85} />
+    <div className="inline-flex items-center gap-3 border border-border-default bg-surface-2 px-3 py-2 text-sm text-text-secondary">
+      <BeatLoader
+        color="var(--color-accent-strong)"
+        margin={1}
+        size={5}
+        speedMultiplier={0.85}
+      />
       <span>Processing</span>
     </div>
   );
@@ -369,7 +374,7 @@ export function ProcessingMessage(): JSX.Element {
  */
 export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
   return (
-    <div className="border border-[#5c2030] bg-[#2c1117] px-3 py-3 text-sm text-[#ff9db0]">
+    <div className="border border-danger-border bg-danger-surface px-3 py-3 text-sm text-danger-text">
       {text}
     </div>
   );
@@ -381,7 +386,7 @@ export function ChatErrorMessage({ text }: { text: string }): JSX.Element {
  */
 export function ChatNoticeMessage({ text }: { text: string }): JSX.Element {
   return (
-    <div className="border border-[#6d5930] bg-[#261f12] px-3 py-3 text-sm text-[#f2d79b]">
+    <div className="border border-warning-border bg-warning-surface px-3 py-3 text-sm text-warning-text">
       {text}
     </div>
   );
@@ -465,21 +470,21 @@ function errorItemStateLabel(
  */
 function diffLineClassName(kind: DiffLineKind): string {
   if (kind === "meta") {
-    return "bg-[#0f1418] text-[#8aa6ba]";
+    return "bg-surface-1 text-text-muted";
   }
   if (kind === "file") {
-    return "bg-[#12191e] text-[#b7d0e1]";
+    return "bg-surface-2 text-text-secondary";
   }
   if (kind === "hunk") {
-    return "bg-[#182229] text-[#f0d79a]";
+    return "bg-surface-3 text-warning-text";
   }
   if (kind === "add") {
-    return "bg-[#112118] text-[#9fe2b1]";
+    return "bg-success-surface text-success-text";
   }
   if (kind === "remove") {
-    return "bg-[#27141a] text-[#ffb1bf]";
+    return "bg-danger-surface text-danger-text";
   }
-  return "text-[#c9d2d8]";
+  return "text-text-primary";
 }
 
 /**

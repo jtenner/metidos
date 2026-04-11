@@ -48,7 +48,7 @@ export function DesktopSidebar({
 
   return (
     <aside
-      className={`relative min-h-0 shrink-0 overflow-visible border-r border-[#262626] bg-[#131313] transition-[width] duration-300 ${
+      className={`relative min-h-0 shrink-0 overflow-visible border-r border-border-subtle bg-bg-canvas transition-[width] duration-300 ${
         collapsed ? "w-14" : "w-[21rem]"
       }`}
       style={{
@@ -76,12 +76,12 @@ export function DesktopSidebar({
           <button
             type="button"
             aria-label="Expand sidebar"
-            className="flex h-9 w-9 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#bdd5e6] transition-colors hover:bg-[#212b31]"
+            className="flex h-9 w-9 items-center justify-center border border-border-default bg-surface-2 text-accent transition-colors hover:bg-surface-3"
             onClick={expandSidebar}
           >
             {materialSymbol("chevron_right", "text-[18px]")}
           </button>
-          <div className="flex h-9 w-9 items-center justify-center bg-[#1b2a34] text-[#7aa5c4]">
+          <div className="flex h-9 w-9 items-center justify-center bg-surface-2 text-accent-strong">
             {materialSymbol("folder", "text-[18px]")}
           </div>
         </div>
