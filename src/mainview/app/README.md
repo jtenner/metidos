@@ -101,8 +101,11 @@ Owns persisted open/closed state for sidebar panels and exposes toggle/read hook
 `state.ts`
 Central shared types/constants for mainview logic. Includes domain types for threads/projects/worktrees, persisted state schemas, indexed project/thread stores plus indexed per-project worktree helpers, cache constants, formatting helpers, error/preview helpers, and utility operations for sorting/upserting state and persisting UI settings.
 
+`mainview-derived-selectors.ts`
+Hosts the extracted pure selectors behind `use-mainview-derived-state.ts`, especially the hot sidebar-search and ordered-thread partition helpers. This keeps the expensive project/worktree search indexes testable outside React and makes the memo boundaries explicit: materialize project worktrees once, build display-path maps once, build search text indexes only while a deferred sidebar search is active, and partition already-ordered thread-store rows without re-sorting them.
+
 `use-mainview-derived-state.ts`
-Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including ordered projections over the indexed project/worktree store shape and preformatted worktree display paths reused across hot sidebar renders.
+Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including ordered projections over the indexed project/worktree store shape, deferred sidebar-search filtering, and preformatted worktree display paths reused across hot sidebar renders.
 
 `use-thread-status-controller.ts`
 Hosts the memoized thread-status polling and selected-thread refresh controller extracted from `App.tsx`. It owns the working-thread poll loop, visibility-triggered refreshes, and selected-thread detail refresh decisions so unrelated shell state changes do not keep rerunning that controller path when its narrow prop set is unchanged.

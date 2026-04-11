@@ -1248,6 +1248,31 @@ export function formatGitHistoryTimestamp(value: string): string {
 export function sortThreads(items: RpcThread[]): RpcThread[] {
   return [...items].sort(compareThreadsByRecency);
 }
+
+/**
+ * Partitions an already-recency-ordered thread list into pinned and unpinned arrays.
+ */
+export function partitionOrderedThreadsByPinnedState(items: RpcThread[]): {
+  readonly activeThreads: RpcThread[];
+  readonly pinnedThreads: RpcThread[];
+} {
+  const pinnedThreads: RpcThread[] = [];
+  const activeThreads: RpcThread[] = [];
+
+  for (const thread of items) {
+    if (thread.pinnedAt !== null) {
+      pinnedThreads.push(thread);
+      continue;
+    }
+
+    activeThreads.push(thread);
+  }
+
+  return {
+    activeThreads,
+    pinnedThreads,
+  };
+}
 /**
  * Finds thread insertion index.
  * @param items - items value.

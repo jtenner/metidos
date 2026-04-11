@@ -3,37 +3,42 @@
  * @description Module for use mainview derived state.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type {
   RpcModelOption,
   RpcProject,
   RpcReasoningEffort,
   RpcReasoningEffortOption,
   RpcThread,
-  RpcThreadRunStatus,
-  RpcWorktree,
   RpcWorktreeGitHistoryResult,
 } from "../../bun/rpc-schema";
-import {
-  codexModelSupportsThinkingLevel,
-  findCodexModel,
-} from "../controls/codex-utils";
-import {
-  buildNormalizedSearchText,
-  matchesNormalizedSearchText,
-  normalizeSearchQuery,
-} from "../controls/search-utils";
+import { findCodexModel } from "../controls/codex-utils";
+import { normalizeSearchQuery } from "../controls/search-utils";
 import { buildDiffFileTree } from "./diff-workspace";
+import {
+  buildProjectWorktreeDerivedMaps,
+  buildSidebarProjectSearchIndexes,
+  deriveActiveContextUsage,
+  deriveProjectWorktreesById,
+  deriveReasoningEffortSelectorDisabled,
+  dismissibleThreadStatusKey,
+  filterProjectsBySidebarSearch,
+} from "./mainview-derived-selectors";
 import {
   findPrimaryWorktree,
   formatPathForDisplay,
   orderProjectWorktrees,
   type ProjectActionMenuState,
   type ProjectNodeState,
+  partitionOrderedThreadsByPinnedState,
   primaryWorktreePath,
-  projectStateWorktrees,
   shortName,
-  sortThreads,
   type ThreadActionMenuState,
   threadRunStatus,
   type WorktreeNodeState,
@@ -41,24 +46,11 @@ import {
   worktreeKey,
 } from "./state";
 
-/**
- * Creates a stable key for a dismissible thread status.
- * Returns null for statuses that should not be tracked as dismissible.
- */
-function dismissibleThreadStatusKey(
-  runStatus: RpcThreadRunStatus,
-): string | null {
-  const hasDismissibleStatus =
-    runStatus.hasUnreadError ||
-    runStatus.state === "failed" ||
-    runStatus.state === "stopped";
-  const updatedAt = runStatus.updatedAt?.trim() ?? "";
-  if (!hasDismissibleStatus || !updatedAt) {
-    return null;
-  }
-
-  return `${runStatus.state}:${updatedAt}:${runStatus.error ?? ""}`;
-}
+export {
+  deriveActiveContextUsage,
+  deriveReasoningEffortSelectorDisabled,
+  deriveWorktreeDisplayPathByKey,
+} from "./mainview-derived-selectors";
 
 /** Parameters required by {@link useMainviewDerivedState}. */
 type UseMainviewDerivedStateParams = {
@@ -100,72 +92,9 @@ type UseMainviewDerivedStateParams = {
   threads: RpcThread[];
 };
 
-/**
- * Computes derived mainview state and memoized selectors from raw state inputs.
- */
-export function deriveWorktreeDisplayPathByKey(
-  projects: RpcProject[],
-  getProjectWorktrees: (projectId: number) => RpcWorktree[],
-  homeDirectory: string,
-  supportsTildePath: boolean,
-): ReadonlyMap<string, string> {
-  const next = new Map<string, string>();
+const EMPTY_PROJECT_SEARCH_TEXT_BY_ID = new Map<number, string>();
+const EMPTY_WORKTREE_SEARCH_TEXT_BY_KEY = new Map<string, string>();
 
-  for (const project of projects) {
-    for (const worktree of getProjectWorktrees(project.id)) {
-      next.set(
-        worktreeKey(project.id, worktree.path),
-        formatPathForDisplay(worktree.path, homeDirectory, supportsTildePath),
-      );
-    }
-  }
-
-  return next;
-}
-
-export function deriveActiveContextUsage(
-  selectedThread: RpcThread | null,
-  activeCodexModelOption: RpcModelOption | null,
-): {
-  contextWindowTokens: number;
-  inputTokens: number;
-} {
-  return {
-    inputTokens: selectedThread?.usage?.inputTokens ?? 0,
-    contextWindowTokens:
-      selectedThread?.usage?.contextWindowTokens ??
-      activeCodexModelOption?.contextWindowTokens ??
-      400_000,
-  };
-}
-
-export function deriveReasoningEffortSelectorDisabled({
-  activeCodexModelOption,
-  isCreatingThread,
-  isSending,
-  isThreadLoading,
-  isUpdatingThreadReasoningEffort,
-  reasoningEfforts,
-  selectedThreadIsWorking,
-}: {
-  activeCodexModelOption: RpcModelOption | null;
-  isCreatingThread: boolean;
-  isSending: boolean;
-  isThreadLoading: boolean;
-  isUpdatingThreadReasoningEffort: boolean;
-  reasoningEfforts: RpcReasoningEffortOption[];
-  selectedThreadIsWorking: boolean;
-}): boolean {
-  return (
-    reasoningEfforts.length === 0 ||
-    !codexModelSupportsThinkingLevel(activeCodexModelOption) ||
-    isCreatingThread ||
-    isThreadLoading ||
-    isSending ||
-    isUpdatingThreadReasoningEffort ||
-    selectedThreadIsWorking
-  );
-}
 /**
  * Provides hook behavior for MainviewDerivedState.
  * @param chatError - chatError argument for useMainviewDerivedState.
@@ -241,6 +170,7 @@ export function useMainviewDerivedState({
   const [dismissedThreadStatusKeys, setDismissedThreadStatusKeys] = useState<
     Record<number, string>
   >({});
+  const deferredSidebarSearchQuery = useDeferredValue(sidebarSearchQuery);
   const projectById = useMemo(
     () => new Map(projects.map((project) => [project.id, project] as const)),
     [projects],
@@ -249,62 +179,48 @@ export function useMainviewDerivedState({
     () => new Map(threads.map((thread) => [thread.id, thread] as const)),
     [threads],
   );
-  const worktreeByProjectAndPath = useMemo(() => {
-    const next = new Map<string, RpcWorktree>();
-    for (const project of projects) {
-      for (const worktree of projectStateWorktrees(
-        getProjectState(project.id),
-      )) {
-        next.set(worktreeKey(project.id, worktree.path), worktree);
-      }
-    }
-    return next;
-  }, [getProjectState, projects]);
-  const projectSearchTextById = useMemo(() => {
-    const next = new Map<number, string>();
-    for (const project of projects) {
-      next.set(
-        project.id,
-        buildNormalizedSearchText(
-          project.name,
-          project.path,
-          formatPathForDisplay(project.path, homeDirectory, supportsTildePath),
-        ),
-      );
-    }
-    return next;
-  }, [homeDirectory, projects, supportsTildePath]);
-  const worktreeDisplayPathByKey = useMemo(
-    () =>
-      deriveWorktreeDisplayPathByKey(
-        projects,
-        (projectId) => projectStateWorktrees(getProjectState(projectId)),
-        homeDirectory,
-        supportsTildePath,
-      ),
-    [getProjectState, homeDirectory, projects, supportsTildePath],
+  const projectWorktreesById = useMemo(
+    () => deriveProjectWorktreesById(projects, getProjectState),
+    [getProjectState, projects],
   );
-  const worktreeSearchTextByKey = useMemo(() => {
-    const next = new Map<string, string>();
-    for (const project of projects) {
-      for (const worktree of projectStateWorktrees(
-        getProjectState(project.id),
-      )) {
-        const key = worktreeKey(project.id, worktree.path);
-        next.set(
-          key,
-          buildNormalizedSearchText(
-            project.name,
-            worktree.branch,
-            worktree.path,
-            shortName(worktree.path),
-            worktreeDisplayPathByKey.get(key) ?? worktree.path,
-          ),
-        );
-      }
+  const { worktreeByProjectAndPath, worktreeDisplayPathByKey } = useMemo(
+    () =>
+      buildProjectWorktreeDerivedMaps({
+        homeDirectory,
+        projectWorktreesById,
+        projects,
+        supportsTildePath,
+      }),
+    [homeDirectory, projectWorktreesById, projects, supportsTildePath],
+  );
+  const normalizedSidebarSearchQuery = useMemo(
+    // Defer the heavy sidebar search projections so typing stays responsive.
+    () => normalizeSearchQuery(deferredSidebarSearchQuery),
+    [deferredSidebarSearchQuery],
+  );
+  const { projectSearchTextById, worktreeSearchTextByKey } = useMemo(() => {
+    if (!normalizedSidebarSearchQuery) {
+      return {
+        projectSearchTextById: EMPTY_PROJECT_SEARCH_TEXT_BY_ID,
+        worktreeSearchTextByKey: EMPTY_WORKTREE_SEARCH_TEXT_BY_KEY,
+      };
     }
-    return next;
-  }, [getProjectState, projects, worktreeDisplayPathByKey]);
+
+    return buildSidebarProjectSearchIndexes({
+      homeDirectory,
+      projectWorktreesById,
+      projects,
+      supportsTildePath,
+      worktreeDisplayPathByKey,
+    });
+  }, [
+    homeDirectory,
+    normalizedSidebarSearchQuery,
+    projectWorktreesById,
+    projects,
+    supportsTildePath,
+    worktreeDisplayPathByKey,
+  ]);
 
   const selectedProject = useMemo(() => {
     // Resolve the selected project by ID from the full project list.
@@ -501,15 +417,16 @@ export function useMainviewDerivedState({
   }, [threadActionMenu, threadById]);
 
   const selectedProjectWorktrees = useMemo(() => {
-    // Worktrees are sourced from project state cache, then ordered for UI display.
+    // Worktrees are sourced from the memoized project-worktree snapshot,
+    // then ordered for UI display only for the selected project.
     if (!selectedProject) {
       return [];
     }
     return orderProjectWorktrees(
       selectedProject,
-      projectStateWorktrees(getProjectState(selectedProject.id)),
+      projectWorktreesById.get(selectedProject.id) ?? [],
     );
-  }, [getProjectState, selectedProject]);
+  }, [projectWorktreesById, selectedProject]);
 
   const activeSelectedWorktreePath = useMemo(() => {
     // Prefer the thread-specific worktree when valid; fall back to explicit selection.
@@ -650,69 +567,34 @@ export function useMainviewDerivedState({
         )
     : "No worktree selected";
 
-  const normalizedSidebarSearchQuery = useMemo(
-    // Normalize once so every query check uses a canonicalized token stream.
-    () => normalizeSearchQuery(sidebarSearchQuery),
-    [sidebarSearchQuery],
+  const filteredProjects = useMemo(
+    () =>
+      filterProjectsBySidebarSearch({
+        normalizedSidebarSearchQuery,
+        projectSearchTextById,
+        projectWorktreesById,
+        projects,
+        worktreeSearchTextByKey,
+      }),
+    [
+      normalizedSidebarSearchQuery,
+      projectSearchTextById,
+      projectWorktreesById,
+      projects,
+      worktreeSearchTextByKey,
+    ],
   );
 
-  const filteredProjects = useMemo(() => {
-    // Match against project metadata and each worktree's display fields.
-    if (!normalizedSidebarSearchQuery) {
-      return projects;
-    }
+  const {
+    activeThreads: filteredWorkspaceActiveThreads,
+    pinnedThreads: filteredWorkspacePinnedThreads,
+  } = useMemo(
+    // threadStoreItems() already preserves recency order, so just partition.
+    () => partitionOrderedThreadsByPinnedState(threads),
+    [threads],
+  );
 
-    return projects.filter((project) => {
-      const projectState = getProjectState(project.id);
-      const matchingWorktree = projectStateWorktrees(projectState).some(
-        (worktree) =>
-          matchesNormalizedSearchText(
-            normalizedSidebarSearchQuery,
-            worktreeSearchTextByKey.get(
-              worktreeKey(project.id, worktree.path),
-            ) ?? "",
-          ),
-      );
-
-      return (
-        matchesNormalizedSearchText(
-          normalizedSidebarSearchQuery,
-          projectSearchTextById.get(project.id) ?? "",
-        ) || matchingWorktree
-      );
-    });
-  }, [
-    getProjectState,
-    normalizedSidebarSearchQuery,
-    projectSearchTextById,
-    projects,
-    worktreeSearchTextByKey,
-  ]);
-
-  const { filteredWorkspaceActiveThreads, filteredWorkspacePinnedThreads } =
-    useMemo(() => {
-      // Sort once for stable recency ordering, then partition into pinned/recent lists.
-      const sortedThreads = sortThreads(threads);
-      const pinnedThreads: RpcThread[] = [];
-      const activeThreads: RpcThread[] = [];
-
-      for (const thread of sortedThreads) {
-        if (thread.pinnedAt !== null) {
-          pinnedThreads.push(thread);
-          continue;
-        }
-        activeThreads.push(thread);
-      }
-
-      return {
-        filteredWorkspaceActiveThreads: activeThreads,
-        filteredWorkspacePinnedThreads: pinnedThreads,
-      };
-    }, [threads]);
-
-  const filteredGitHistoryEntries = useMemo(() => {
-    return gitHistory?.entries ?? [];
-  }, [gitHistory]);
+  const filteredGitHistoryEntries = gitHistory?.entries ?? [];
 
   const isActiveWorktree = useCallback(
     // Re-used across lists/items to consistently highlight active worktree.

@@ -10,6 +10,7 @@ import {
   buildProjectWorktreeIndex,
   createProjectStore,
   createThreadStore,
+  partitionOrderedThreadsByPinnedState,
   projectStateWorktrees,
   projectStoreItems,
   threadStoreItems,
@@ -118,6 +119,25 @@ describe("thread store helpers", () => {
     expect(threadStoreItems(nextStore).map((entry) => entry.id)).toEqual([
       3, 1, 2,
     ]);
+  });
+
+  it("partitions already ordered thread-store rows without resorting them", () => {
+    const orderedThreads = threadStoreItems(
+      createThreadStore([
+        thread(2, "2026-04-04T11:00:00.000Z"),
+        thread(1, "2026-04-04T12:00:00.000Z", "2026-04-04T12:15:00.000Z"),
+        thread(3, "2026-04-04T10:00:00.000Z", "2026-04-04T12:10:00.000Z"),
+        thread(4, "2026-04-04T09:00:00.000Z"),
+      ]),
+    );
+
+    expect(orderedThreads.map((entry) => entry.id)).toEqual([1, 3, 2, 4]);
+
+    const { activeThreads, pinnedThreads } =
+      partitionOrderedThreadsByPinnedState(orderedThreads);
+
+    expect(pinnedThreads.map((entry) => entry.id)).toEqual([1, 3]);
+    expect(activeThreads.map((entry) => entry.id)).toEqual([2, 4]);
   });
 });
 
