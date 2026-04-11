@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT02.1] Enable conservative WAL-mode tuning - Turn on safe SQLite runtime pragmas and validate normal app, cron, and cleanup behavior under WAL mode.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT02` / `OPT02.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§4.1, 4.2.
-
 - [OPT02.2] Query-plan audit and missing composite indexes - Measure hot read plans and add only the indexes that materially improve `projects`, `threads`, and selected message reads.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT02` / `OPT02.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§4.1, 4.2.
 

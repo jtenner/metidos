@@ -3,6 +3,7 @@
  * @description Test file for db.
  */
 
+import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
@@ -18,6 +19,8 @@ import { join } from "node:path";
 
 import { encryptAuthSecret, getAuthSecretKeyPath } from "./auth-secrets";
 import {
+  APP_DATABASE_JOURNAL_MODE,
+  applyAppDatabasePragmas,
   closeAppDatabase,
   createSecurityAuditEvent,
   createThread,
@@ -31,6 +34,7 @@ import {
   listSecurityAuditEvents,
   listThreads,
   resetResolvedAppDataDirectory,
+  SQL_BUSY_TIMEOUT_MS,
   selectWritableAppDataDirectory,
   updateThreadPiSessionState,
   upsertProject,
@@ -43,6 +47,27 @@ function createTempDirectory(): string {
   const path = mkdtempSync(join(tmpdir(), "metidos-db-"));
   tempDirectories.add(path);
   return path;
+}
+
+function readJournalMode(database: Database): string {
+  return (
+    database.query<{ journal_mode: string }, []>("PRAGMA journal_mode").get()
+      ?.journal_mode ?? ""
+  );
+}
+
+function readSynchronousMode(database: Database): number {
+  return (
+    database.query<{ synchronous: number }, []>("PRAGMA synchronous").get()
+      ?.synchronous ?? -1
+  );
+}
+
+function readBusyTimeout(database: Database): number {
+  return (
+    database.query<{ timeout: number }, []>("PRAGMA busy_timeout").get()
+      ?.timeout ?? -1
+  );
 }
 
 afterEach(() => {
@@ -112,6 +137,119 @@ describe("app database storage", () => {
     expect(statSync(appDataDir).mode & 0o777).toBe(0o700);
     expect(statSync(databasePath).mode & 0o777).toBe(0o600);
     expect(statSync(authSecretPath).mode & 0o777).toBe(0o600);
+  });
+
+  it("keeps the bun:test process on rollback-journal mode while preserving shared busy-timeout pragmas", () => {
+    const appDataDir = createTempDirectory();
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+
+    const database = initAppDatabase();
+    const databasePath = getAppDatabasePath();
+
+    expect(readJournalMode(database)).toBe("delete");
+    expect(readSynchronousMode(database)).toBe(2);
+    expect(readBusyTimeout(database)).toBe(SQL_BUSY_TIMEOUT_MS);
+
+    const secondary = new Database(databasePath);
+    try {
+      applyAppDatabasePragmas(secondary, {
+        busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
+      });
+      expect(readJournalMode(secondary)).toBe("delete");
+      expect(readSynchronousMode(secondary)).toBe(2);
+      expect(readBusyTimeout(secondary)).toBe(SQL_BUSY_TIMEOUT_MS);
+    } finally {
+      secondary.close(false);
+    }
+  });
+
+  it("validates wal-mode pragmas and reader-writer concurrency in a child process", () => {
+    const childSource = String.raw`
+      import { Database } from "bun:sqlite";
+      import { mkdtempSync, rmSync } from "node:fs";
+      import { tmpdir } from "node:os";
+      import { join } from "node:path";
+      import {
+        APP_DATABASE_JOURNAL_MODE,
+        SQL_BUSY_TIMEOUT_MS,
+        applyAppDatabasePragmas,
+      } from "./src/bun/db";
+
+      function readJournalMode(database) {
+        return database.query("PRAGMA journal_mode").get()?.journal_mode ?? "";
+      }
+      function readSynchronous(database) {
+        return database.query("PRAGMA synchronous").get()?.synchronous ?? -1;
+      }
+      const appDataDir = mkdtempSync(join(tmpdir(), "metidos-db-child-"));
+      const databasePath = join(appDataDir, "child.db");
+      try {
+        const setup = new Database(databasePath);
+        applyAppDatabasePragmas(setup, { busyTimeoutMs: SQL_BUSY_TIMEOUT_MS });
+        setup.run("CREATE TABLE test_rows (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
+        setup.run("INSERT INTO test_rows (value) VALUES ('before')");
+        setup.close(false);
+
+        const reader = new Database(databasePath);
+        const writer = new Database(databasePath);
+        applyAppDatabasePragmas(reader, { busyTimeoutMs: SQL_BUSY_TIMEOUT_MS });
+        applyAppDatabasePragmas(writer, { busyTimeoutMs: SQL_BUSY_TIMEOUT_MS });
+        reader.run("BEGIN");
+        reader.query("SELECT COUNT(*) AS count FROM test_rows").get();
+        const startedAt = performance.now();
+        writer.run("BEGIN IMMEDIATE");
+        writer.run("UPDATE test_rows SET value = 'after' WHERE id = 1");
+        writer.run("COMMIT");
+        const durationMs = Math.max(0, performance.now() - startedAt);
+        reader.run("COMMIT");
+        const finalValue =
+          writer.query("SELECT value FROM test_rows WHERE id = 1").get()?.value ??
+          null;
+        reader.close(false);
+        writer.close(false);
+
+        const verification = new Database(databasePath);
+        applyAppDatabasePragmas(verification, {
+          busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
+        });
+        const journalMode = readJournalMode(verification);
+        const synchronous = readSynchronous(verification);
+        verification.close(false);
+
+        console.log(JSON.stringify({
+          durationMs,
+          finalValue,
+          journalMode,
+          synchronous,
+          targetJournalMode: APP_DATABASE_JOURNAL_MODE,
+        }));
+      } finally {
+        rmSync(appDataDir, { force: true, recursive: true });
+      }
+    `;
+
+    const stdout = execFileSync("bun", ["-e", childSource], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NODE_ENV: "development",
+      },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const result = JSON.parse(stdout.trim()) as {
+      durationMs: number;
+      finalValue: string | null;
+      journalMode: string;
+      synchronous: number;
+      targetJournalMode: string;
+    };
+
+    expect(result.targetJournalMode).toBe(APP_DATABASE_JOURNAL_MODE);
+    expect(result.journalMode).toBe(APP_DATABASE_JOURNAL_MODE);
+    expect(result.synchronous).toBe(1);
+    expect(result.finalValue).toBe("after");
+    expect(result.durationMs).toBeLessThan(1000);
   });
 
   it("deletes the app database files and reopens as an empty database", () => {

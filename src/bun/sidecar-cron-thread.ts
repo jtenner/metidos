@@ -6,7 +6,12 @@
 import { Database } from "bun:sqlite";
 
 import type { CronJobRecord } from "./db";
-import { getCronJobById, listActiveCronJobs } from "./db";
+import {
+  applyAppDatabasePragmas,
+  getCronJobById,
+  listActiveCronJobs,
+  SQL_BUSY_TIMEOUT_MS,
+} from "./db";
 import { runCronJobById, runDueCronJobs } from "./sidecar-cron-runner";
 
 type StartCronSchedulerThread = {
@@ -217,7 +222,9 @@ async function start(message: StartCronSchedulerThread): Promise<void> {
   await unregisterAllCronJobs();
   await closeDatabase();
   database = new Database(message.dbPath);
-  database.run("PRAGMA foreign_keys = ON");
+  applyAppDatabasePragmas(database, {
+    busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
+  });
   await registerCronJobs();
 }
 

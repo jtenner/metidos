@@ -127,6 +127,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Defines and initializes the local SQLite schema + all persistence operations.
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
   - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) as the authoritative runtime identity for active agent sessions.
+  - Applies the shared SQLite runtime pragmas used by the main app and cron-sidecar connections, including WAL-mode journaling and the standard busy-timeout setting.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
   - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 
@@ -220,6 +221,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `sidecar-cron-runner.ts`
   - Executes cron rows by creating Metidos child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
   - Records cron run history, updates last-run metadata, and waits for the spawned thread to settle before marking completion, stop, or error state.
+  - Opens its SQLite handle with the same WAL-mode runtime pragmas as the main app so cron reads and writes participate in the same concurrency expectations.
   - Also exposes a small execution-host seam so runtime integration can be tested without changing the production scheduler path.
 
 - `sidecar-cron-runner.test.ts`

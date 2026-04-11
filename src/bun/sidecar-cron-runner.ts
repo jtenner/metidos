@@ -5,6 +5,7 @@
 
 import { Database } from "bun:sqlite";
 import {
+  applyAppDatabasePragmas,
   type CronJobRecord,
   type CronJobRunStatus,
   claimCronJobForScheduledRunById,
@@ -12,6 +13,7 @@ import {
   createCronJobRun,
   getAppDatabasePath,
   getThreadById,
+  SQL_BUSY_TIMEOUT_MS,
   updateCronJobLastRun,
   updateCronJobRunStatus,
 } from "./db";
@@ -26,12 +28,12 @@ import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
 const THREAD_POLL_INTERVAL_MS = 500;
 /** Maximum elapsed time allowed for one cron invocation before marking it errored. */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
-const SQL_BUSY_TIMEOUT_MS = 2500;
 
 function openCronDatabase(): Database {
   const database = new Database(getAppDatabasePath());
-  database.run("PRAGMA foreign_keys = ON");
-  database.run(`PRAGMA busy_timeout = ${SQL_BUSY_TIMEOUT_MS}`);
+  applyAppDatabasePragmas(database, {
+    busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
+  });
   return database;
 }
 

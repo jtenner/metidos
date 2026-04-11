@@ -28,7 +28,13 @@ export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
 
 let appDatabase: Database | null = null;
 /** Default SQLite lock-retry timeout for write contention handling. */
-const SQL_BUSY_TIMEOUT_MS = 2500;
+export const SQL_BUSY_TIMEOUT_MS = 2500;
+/** Preferred SQLite journal mode for the multi-connection Metidos runtime. */
+export const APP_DATABASE_JOURNAL_MODE = "wal";
+/** Preferred SQLite synchronous mode paired with WAL in the Metidos runtime. */
+export const APP_DATABASE_SYNCHRONOUS = "NORMAL";
+const TEST_APP_DATABASE_JOURNAL_MODE = "delete";
+const TEST_APP_DATABASE_SYNCHRONOUS = "FULL";
 
 type ProjectInput = {
   projectPath: string;
@@ -1305,6 +1311,49 @@ export function deleteAppDatabaseFiles(options?: AppDataPathOptions): string[] {
  * Applies migrations to repair/upgrade user data stores in place.
  */
 
+export function resolveAppDatabaseRuntimePragmas(
+  env: NodeJS.ProcessEnv = process.env,
+): {
+  journalMode: string;
+  synchronous: string;
+} {
+  // Bun 1.3.12 currently crashes at bun:test process teardown after large suites
+  // open many WAL-mode handles. Keep the real runtime on WAL, but leave the test
+  // process on rollback-journal mode and validate WAL behavior in focused child
+  // process checks and benchmark docs instead.
+  if (env.NODE_ENV === "test") {
+    return {
+      journalMode: TEST_APP_DATABASE_JOURNAL_MODE,
+      synchronous: TEST_APP_DATABASE_SYNCHRONOUS,
+    };
+  }
+
+  return {
+    journalMode: APP_DATABASE_JOURNAL_MODE,
+    synchronous: APP_DATABASE_SYNCHRONOUS,
+  };
+}
+
+export function applyAppDatabasePragmas(
+  database: Database,
+  options?: {
+    busyTimeoutMs?: number | null;
+    journalMode?: string | null;
+    synchronous?: string | null;
+  },
+): void {
+  const pragmas = resolveAppDatabaseRuntimePragmas();
+  const journalMode = options?.journalMode ?? pragmas.journalMode;
+  const synchronous = options?.synchronous ?? pragmas.synchronous;
+
+  runStatement(database, "PRAGMA foreign_keys = ON");
+  if (typeof options?.busyTimeoutMs === "number") {
+    runStatement(database, `PRAGMA busy_timeout = ${options.busyTimeoutMs}`);
+  }
+  runStatement(database, `PRAGMA journal_mode = ${journalMode.toUpperCase()}`);
+  runStatement(database, `PRAGMA synchronous = ${synchronous}`);
+}
+
 export function initAppDatabase(): Database {
   if (appDatabase) {
     return appDatabase;
@@ -1315,8 +1364,9 @@ export function initAppDatabase(): Database {
   ensureAppDirectory(appDataPath);
 
   const db = new Database(dbPath);
-  runStatement(db, "PRAGMA foreign_keys = ON");
-  runStatement(db, `PRAGMA busy_timeout = ${SQL_BUSY_TIMEOUT_MS}`);
+  applyAppDatabasePragmas(db, {
+    busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
+  });
   migrateDatabase(db);
   applyAppDatabasePermissions(dbPath);
   appDatabase = db;
