@@ -643,16 +643,16 @@ export function ToolCallMessage({
     <>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-sm font-bold tracking-tight text-[#f2f0ef]">
+          <span className="shrink-0 font-label text-[10px] uppercase tracking-widest text-accent">
             Tool
           </span>
-          <span className="shrink-0 text-sm text-[#7b8992]">-</span>
-          <span className="shrink-0 font-mono text-sm text-[#f2f0ef]">
+          <span className="shrink-0 text-sm text-text-muted">-</span>
+          <span className="shrink-0 font-mono text-sm text-text-primary">
             {tool}
           </span>
           {presentation.preview ? (
             <span
-              className="min-w-0 flex-1 truncate font-mono text-sm text-[#8f9aa2]"
+              className="min-w-0 flex-1 truncate font-mono text-sm text-text-muted"
               title={presentation.preview}
             >
               {presentation.preview}
@@ -660,15 +660,15 @@ export function ToolCallMessage({
           ) : null}
         </div>
         {server !== "pi" ? (
-          <div className="mt-1 text-[11px] text-[#8f9aa2]">{server}</div>
+          <div className="mt-1 text-[11px] text-text-muted">{server}</div>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <div className="border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+        <div className="border border-border-default bg-surface-2 px-2 py-1 text-[10px] uppercase tracking-widest text-accent">
           {toolCallStateLabel(state)}
         </div>
         {hasDetails ? (
-          <span className="text-[#8ca6b9]">
+          <span className="text-accent">
             {materialSymbol(
               isExpanded ? "expand_less" : "expand_more",
               "text-base",
@@ -703,20 +703,20 @@ export function ToolCallMessage({
         <div className="space-y-3 px-4 pb-4" id={detailsRegionId}>
           {hasArguments ? (
             <div className="space-y-2">
-              <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+              <div className="font-label text-[10px] uppercase tracking-widest text-accent">
                 Arguments
               </div>
-              <pre className="app-scrollbar max-h-[12rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+              <pre className="app-scrollbar max-h-[12rem] overflow-auto border border-border-subtle bg-surface-1 px-3 py-3 text-[11px] leading-5 text-text-secondary whitespace-pre-wrap font-mono">
                 {argumentsText}
               </pre>
             </div>
           ) : null}
           {hasOutput ? (
             <div className="space-y-2">
-              <div className="font-label text-[10px] uppercase tracking-widest text-[#8ca6b9]">
+              <div className="font-label text-[10px] uppercase tracking-widest text-accent">
                 {presentation.outputLabel}
               </div>
-              <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-[#252f36] bg-[#0f1316] px-3 py-3 text-[11px] leading-5 text-[#d4dde4] whitespace-pre-wrap">
+              <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-border-subtle bg-surface-1 px-3 py-3 text-[11px] leading-5 text-text-secondary whitespace-pre-wrap font-mono">
                 {output}
               </pre>
             </div>
@@ -741,15 +741,17 @@ export function WebSearchMessage({
 }): JSX.Element {
   // Search result card is lightweight; only query and lifecycle state are surfaced.
   return (
-    <div className="space-y-3 border border-[#2c353c] bg-[#13181b] p-4">
+    <div className="space-y-3 border border-border-default bg-surface-1 p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]">
+          <div className="font-label text-[10px] uppercase tracking-widest text-accent">
             Web Search
           </div>
-          <div className="mt-1 text-sm leading-6 text-[#f2f0ef]">{query}</div>
+          <div className="mt-1 text-sm leading-6 text-text-primary">
+            {query}
+          </div>
         </div>
-        <div className="shrink-0 border border-[#31404a] bg-[#182025] px-2 py-1 text-[10px] uppercase tracking-widest text-[#cfe0eb]">
+        <div className="shrink-0 border border-border-default bg-surface-2 px-2 py-1 text-[10px] uppercase tracking-widest text-accent">
           {webSearchStateLabel(state)}
         </div>
       </div>
@@ -771,18 +773,18 @@ export function ErrorItemMessage({
 }): JSX.Element {
   // Generic inline error item used for non-blocking notices from backend execution.
   return (
-    <div className="space-y-3 border border-[#6d5930] bg-[#261f12] p-4">
+    <div className="space-y-3 border border-warning-border bg-warning-surface p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="font-label text-[10px] uppercase tracking-widest text-[#f2d79b]">
+          <div className="font-label text-[10px] uppercase tracking-widest text-warning-text">
             Error
           </div>
         </div>
-        <div className="shrink-0 border border-[#8f7341] bg-[#342914] px-2 py-1 text-[10px] uppercase tracking-widest text-[#f2d79b]">
+        <div className="shrink-0 border border-warning-border bg-warning-surface px-2 py-1 text-[10px] uppercase tracking-widest text-warning-text">
           {errorItemStateLabel(state)}
         </div>
       </div>
-      <div className="text-sm leading-6 text-[#f2d79b]">{text}</div>
+      <div className="text-sm leading-6 text-warning-text">{text}</div>
     </div>
   );
 }
