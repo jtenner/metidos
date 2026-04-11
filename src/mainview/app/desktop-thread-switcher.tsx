@@ -295,7 +295,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
       ref={popoverRef}
       aria-labelledby={labelId}
       aria-modal="false"
-      className="fixed z-[85] flex select-none flex-col overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+      className="fixed z-[85] flex select-none flex-col overflow-hidden border border-border-default bg-surface-overlay/96 shadow-[var(--color-shadow-overlay)] backdrop-blur-xl"
       id={DESKTOP_THREAD_SWITCHER_POPOVER_ID}
       role="dialog"
       style={{
@@ -305,30 +305,30 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
         width: position.width,
       }}
     >
-      <div className="space-y-3 border-b border-[#2b343b] bg-[#181f24] px-3 py-3">
+      <div className="space-y-3 border-b border-border-default bg-surface-2 px-3 py-3">
         <div className="min-w-0">
           <div
-            className="font-label text-[10px] uppercase tracking-widest text-[#98b9d0]"
+            className="font-label text-[10px] uppercase tracking-widest text-accent"
             id={labelId}
           >
             Threads
           </div>
-          <div className="truncate text-sm font-semibold text-[#f2f0ef]">
+          <div className="truncate text-sm font-semibold text-text-primary">
             {worktreeLabel}
           </div>
-          <div className="truncate text-[11px] text-[#8f9aa2]">
+          <div className="truncate text-[11px] text-text-muted">
             {project?.name ?? "Current project"} · {worktreeSubtitle}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex min-w-0 flex-1 items-center gap-2 border border-[#2f3b43] bg-[#101214] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+          <label className="flex min-w-0 flex-1 items-center gap-2 border border-border-default bg-surface-1 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             <span className="sr-only">Search threads</span>
-            {materialSymbol("search", "text-[16px] text-[#98b9d0]")}
+            {materialSymbol("search", "text-[16px] text-accent")}
             <input
               ref={searchInputRef}
               autoCapitalize="none"
               autoCorrect="off"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint"
               onChange={(event) => {
                 onSearchQueryChange(event.currentTarget.value);
               }}
@@ -339,7 +339,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
             {searchQuery ? (
               <button
                 type="button"
-                className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
+                className="flex h-5 w-5 items-center justify-center text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary"
                 onClick={() => {
                   onSearchQueryChange("");
                 }}
@@ -351,7 +351,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
           </label>
           <button
             type="button"
-            className="shrink-0 border border-[#bdd5e6] bg-[#bdd5e6] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-widest text-[#2e526b] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="shrink-0 border border-accent-strong bg-accent-strong px-3 py-2 font-label text-[10px] font-bold uppercase tracking-widest text-surface-3 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onCreateThread}
             disabled={isCreatingThread}
           >
@@ -361,7 +361,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
       </div>
       <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
         {!hasThreads ? (
-          <div className="px-3 py-3 text-xs text-[#8f8d8b]">
+          <div className="px-3 py-3 text-xs text-text-muted">
             {searchQuery
               ? "No matching threads in this worktree."
               : isCreatingThread
@@ -372,7 +372,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
           <div className="space-y-3 py-1">
             {sections.pinnedThreads.length > 0 ? (
               <div className="space-y-1">
-                <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
+                <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-widest text-accent">
                   Pinned
                 </div>
                 <ThreadList
@@ -397,7 +397,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
             ) : null}
             {sections.recentThreads.length > 0 ? (
               <div className="space-y-1">
-                <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-[0.18em] text-[#8ca6b9]">
+                <div className="px-3 pb-1 font-label text-[9px] uppercase tracking-widest text-accent">
                   Recent
                 </div>
                 <ThreadList
@@ -424,7 +424,7 @@ export const DesktopThreadSwitcher = memo(function DesktopThreadSwitcher({
         )}
       </div>
       {threadsError ? (
-        <div className="border-t border-[#3a2230] bg-[#27151d] px-3 py-2 text-xs text-[#ff9db0]">
+        <div className="border-t border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text">
           {threadsError}
         </div>
       ) : null}
