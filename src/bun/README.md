@@ -8,7 +8,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
   - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files and exiting before server bootstrap.
-  - Exposes loopback HTTP routes for mainview assets, runtime health snapshots at `/health/runtime-stats`, and websocket RPC at `/rpc`.
+  - Exposes loopback HTTP routes for mainview assets, including `/index.js.map` only when the current build emitted a sourcemap, runtime health snapshots at `/health/runtime-stats`, and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
   - Backing entrypoint for the default `bun start` and `bun start:tls` scripts.
@@ -20,6 +20,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `build-mainview.ts`
   - Centralized Bun bundling entry for the React frontend.
   - Invokes `Bun.build` with the React compiler plugin and writes output to `.metidos-build/index.js`.
+  - Resolves explicit development-versus-production build behavior: development keeps sourcemaps on and skips minification, while production minifies by default and emits sourcemaps only when `METIDOS_MAINVIEW_SOURCEMAP=1` or `--sourcemap` is supplied.
   - Provides deterministic bundling and surfaceable build errors used by dev/runtime flows.
 
 - `logging.ts`

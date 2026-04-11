@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT04.1] Production minify and sourcemap gating - Add explicit dev/prod bundle behavior so production stops always emitting unminified JS with sourcemaps.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT04` / `OPT04.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.5, 7.1.
-
 - [OPT04.2] Cacheable asset-serving path - Serve built frontend assets from a small explicit asset path with better cache semantics while preserving bootstrap correctness.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT04` / `OPT04.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.5, 7.1.
 

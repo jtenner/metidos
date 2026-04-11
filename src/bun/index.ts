@@ -28,7 +28,11 @@ import {
   stepUpSession,
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
-import { buildMainviewBundle, MAINVIEW_BUILD_DIR } from "./build-mainview";
+import {
+  buildMainviewBundle,
+  MAINVIEW_BUILD_DIR,
+  type MainviewBuildResult,
+} from "./build-mainview";
 import {
   closeAppDatabase,
   deleteAppDatabaseFiles,
@@ -560,7 +564,8 @@ const pendingRpcRequestsByClient = new WeakMap<
 const pendingMainviewChanges = new Set<string>();
 
 let mainviewBundlePath = resolve(MAINVIEW_BUILD_DIR, "index.js");
-let mainviewBuildPromise: Promise<string> | null = null;
+let mainviewBundleSourceMapPath: string | null = null;
+let mainviewBuildPromise: Promise<MainviewBuildResult> | null = null;
 let mainviewRebuildQueued = false;
 let devMainviewPollTimer: ReturnType<typeof setInterval> | null = null;
 let pendingMainviewReloadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1907,7 +1912,7 @@ function toRpcAbortMessage(
  * Queue/reuse rebuilds for mainview bundle so rapid file edits only rebuild once.
  */
 
-function queueMainviewBundleBuild(): Promise<string> {
+function queueMainviewBundleBuild(): Promise<MainviewBuildResult> {
   if (mainviewBuildPromise) {
     mainviewRebuildQueued = true;
     return mainviewBuildPromise;
@@ -1915,12 +1920,18 @@ function queueMainviewBundleBuild(): Promise<string> {
 
   mainviewBuildPromise = (async () => {
     try {
+      let buildResult: MainviewBuildResult;
       do {
         mainviewRebuildQueued = false;
-        mainviewBundlePath = await buildMainviewBundle();
+        buildResult = await buildMainviewBundle({
+          env: process.env,
+          mode: IS_DEV_SERVER ? "development" : "production",
+        });
+        mainviewBundlePath = buildResult.bundlePath;
+        mainviewBundleSourceMapPath = buildResult.sourceMapPath;
       } while (mainviewRebuildQueued);
 
-      return mainviewBundlePath;
+      return buildResult;
     } finally {
       mainviewBuildPromise = null;
     }
@@ -2499,6 +2510,23 @@ async function bootstrap(): Promise<void> {
         return fileResponse(
           mainviewBundlePath,
           "application/javascript; charset=utf-8",
+        );
+      }
+
+      if (
+        !BACKEND_ONLY &&
+        pathname === "/index.js.map" &&
+        mainviewBundleSourceMapPath
+      ) {
+        webServerLogger.trace({
+          message: "Serving mainview source map",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
+        return fileResponse(
+          mainviewBundleSourceMapPath,
+          "application/json; charset=utf-8",
         );
       }
 

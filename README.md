@@ -162,7 +162,8 @@ Useful scripts from `package.json`:
 bun run start                 # build CSS + run server
 bun run start:tls             # build CSS + run server in reverse-proxy TLS mode
 bun run dev                   # build CSS + run main dev server with CSS watch
-bun run build:dev             # install + build mainview bundle
+bun run build:dev             # install + build unminified mainview bundle with sourcemaps
+bun run build:prod            # install + build minified mainview bundle (no sourcemap by default)
 bun run validate              # biome format check + typecheck
 bun run format                # auto-format with biome
 bun run typecheck             # TypeScript check
@@ -178,6 +179,7 @@ bun run harness:starvation    # run starvation harness utility
 - `--wipe-user-data` to confirm, delete the local SQLite database files, and exit before startup.
 - `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 - `METIDOS_APP_DATA_DIR` for an explicit per-user application data location.
+- `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve `/index.js.map` for non-dev builds when you need production bundle debugging.
 
 Canonical environment variables use the `METIDOS_*` prefix. Deprecated `JOLT_*` aliases are still accepted as compatibility fallbacks for startup and existing local installs.
 

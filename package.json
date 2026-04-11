@@ -16,7 +16,8 @@
     "harness:starvation": "bun run src/bun/starvation-harness.ts",
     "typecheck": "bunx tsgo --noEmit",
     "validate": "bunx biome check biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json && bun run typecheck && bun run test",
-    "build:dev": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts",
+    "build:dev": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts --dev",
+    "build:prod": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts --production",
     "format": "bunx biome format biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json --write"
   },
   "dependencies": {
