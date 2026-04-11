@@ -1012,29 +1012,20 @@ export function CommandExecutionMessage({
  */
 export function ReasoningMessage({
   label = "Thinking",
-  state,
   text,
 }: {
   label?: string;
-  state: "in_progress" | "completed" | "stopped";
   text: string;
 }): JSX.Element {
-  // Assistant internal thinking payloads are shown with a compact status pill.
+  // Render internal reasoning with the same markdown path as assistant messages.
   return (
     <div className="border border-[#2a3339] bg-[#11171a] px-4 py-3">
-      <div className="flex items-center justify-between gap-4">
-        <div className="font-label text-[10px] uppercase tracking-widest text-[#8fb5cd]">
-          {label}
-        </div>
-        <div className="text-[10px] uppercase tracking-widest text-[#70808c]">
-          {state === "completed"
-            ? "Complete"
-            : state === "stopped"
-              ? "Stopped"
-              : "Working"}
-        </div>
+      <div className="font-label text-[10px] uppercase tracking-widest text-[#8fb5cd]">
+        {label}
       </div>
-      <div className="mt-2 text-sm leading-6 text-[#d6e7f2]">{text}</div>
+      <div className="mt-2 text-sm leading-6 text-[#d6e7f2]">
+        <MarkdownMessage text={text} />
+      </div>
     </div>
   );
 }

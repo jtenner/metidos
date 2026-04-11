@@ -950,7 +950,6 @@ const ChatTranscript = memo(function ChatTranscript({
         return (
           <ReasoningMessage
             label={extensionHiddenThinkingLabel ?? "Thinking"}
-            state={message.state}
             text={message.text}
           />
         );
