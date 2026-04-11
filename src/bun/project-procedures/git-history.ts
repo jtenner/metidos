@@ -18,6 +18,16 @@ import type {
   RpcWorktreeGitHistorySummary,
 } from "../rpc-schema";
 import {
+  recordGitCommitDiffCacheHit,
+  recordGitCommitDiffCacheMiss,
+  recordGitCommitDiffPendingReuse,
+  recordGitCommitDiffStore,
+  recordGitHistoryCacheFetch,
+  recordGitHistoryCachePreemption,
+  recordGitHistoryCachePrefetchWait,
+  recordGitHistoryCacheRangeHit,
+} from "../runtime-stats";
+import {
   awaitAbortableResult,
   createAbortError,
   readLruValue,
@@ -152,6 +162,11 @@ export async function fillGitHistoryCache(
   options?: GitCommandPriority | GitCommandOptions,
 ): Promise<void> {
   const normalizedOptions = normalizeGitCommandOptions(options);
+  if (hasGitHistoryCacheRange(worktreeState, offset, limit)) {
+    recordGitHistoryCacheRangeHit();
+    return;
+  }
+
   while (
     !hasGitHistoryCacheRange(worktreeState, offset, limit) &&
     worktreeState.historyNextOffset !== null
@@ -166,6 +181,7 @@ export async function fillGitHistoryCache(
       normalizedOptions.priority === "foreground" &&
       currentPrefetch.priority === "background"
     ) {
+      recordGitHistoryCachePreemption();
       abortGitHistoryPrefetch(
         worktreeState,
         `Foreground git history request replaced background warming for ${worktreePath}.`,
@@ -173,6 +189,7 @@ export async function fillGitHistoryCache(
       continue;
     }
     if (currentPrefetch) {
+      recordGitHistoryCachePrefetchWait();
       await awaitAbortableResult(
         currentPrefetch.promise,
         normalizedOptions.signal,
@@ -187,6 +204,7 @@ export async function fillGitHistoryCache(
       GIT_HISTORY_PREFETCH_CHUNK_SIZE,
       offset + limit - fetchOffset,
     );
+    recordGitHistoryCacheFetch();
     const controller = new AbortController();
     const prefetch: PendingGitHistoryPrefetch = {
       controller,
@@ -283,11 +301,13 @@ export async function getCachedGitCommitDiffResult(
   const cacheKey = gitCommitDiffCacheKey(worktreePath, commitHash);
   const cached = readLruValue(options.gitCommitDiffCache, cacheKey);
   if (cached) {
+    recordGitCommitDiffCacheHit();
     return cached;
   }
 
   const pending = options.gitCommitDiffRequestCache.get(cacheKey);
   if (pending) {
+    recordGitCommitDiffPendingReuse();
     pending.waiterCount += 1;
     try {
       return await awaitAbortableResult(
@@ -308,6 +328,7 @@ export async function getCachedGitCommitDiffResult(
     }
   }
 
+  recordGitCommitDiffCacheMiss();
   const controller = new AbortController();
   const pendingRequest: PendingGitCommitDiffRequest = {
     controller,
@@ -325,6 +346,7 @@ export async function getCachedGitCommitDiffResult(
         result,
         options.maxEntries,
       );
+      recordGitCommitDiffStore();
       return result;
     })
     .finally(() => {

@@ -121,6 +121,16 @@ import {
   type RpcWebSocketSocketData,
 } from "./rpc-websocket-auth";
 import {
+  getRuntimeStatsSummary,
+  type RpcMeasurementToken,
+  recordRpcCanceled,
+  recordRpcFailed,
+  recordRpcStarted,
+  recordRpcSucceeded,
+  recordRpcTimedOut,
+  recordWebSocketPush,
+} from "./runtime-stats";
+import {
   applySecurityHeaders,
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
@@ -623,6 +633,10 @@ function fileResponse(path: string, contentType: string): Response {
 
 function currentNowMs(): number {
   return Date.now();
+}
+
+function utf8ByteLength(text: string): number {
+  return Buffer.byteLength(text, "utf8");
 }
 
 class RequestValidationError extends Error {
@@ -1414,6 +1428,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
   procedures: ReturnType<typeof getProcedureRuntimeStats>;
   rpcClientCount: number;
   rpcWebSocketUrl: string;
+  runtimeStats: ReturnType<typeof getRuntimeStatsSummary>;
 } {
   return {
     backendOnly: BACKEND_ONLY,
@@ -1433,6 +1448,7 @@ function buildServerHealthSnapshot(activeServerPort: number): {
     rpcClientCount: rpcClients.size,
     rpcWebSocketUrl:
       process.env.METIDOS_RPC_URL ?? `ws://127.0.0.1:${activeServerPort}/rpc`,
+    runtimeStats: getRuntimeStatsSummary(),
   };
 }
 
@@ -1904,13 +1920,23 @@ function broadcastReload(reason: string): void {
     reason,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  let deliveredClients = 0;
+  let droppedClients = 0;
   for (const client of rpcClients) {
     try {
       client.send(raw);
+      deliveredClients += 1;
     } catch {
       rpcClients.delete(client);
+      droppedClients += 1;
     }
   }
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: payload.type,
+  });
 }
 
 /**
@@ -1931,13 +1957,23 @@ function broadcastGitHistoryChanged(
     worktreePath,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  let deliveredClients = 0;
+  let droppedClients = 0;
   for (const client of rpcClients) {
     try {
       client.send(raw);
+      deliveredClients += 1;
     } catch {
       rpcClients.delete(client);
+      droppedClients += 1;
     }
   }
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: payload.type,
+  });
 }
 
 /**
@@ -1954,13 +1990,23 @@ function broadcastContextFocusChanged(payload: RpcContextFocusChanged): void {
     ...payload,
   };
   const raw = JSON.stringify(message satisfies RpcSocketMessage);
+  let deliveredClients = 0;
+  let droppedClients = 0;
   for (const client of rpcClients) {
     try {
       client.send(raw);
+      deliveredClients += 1;
     } catch {
       rpcClients.delete(client);
+      droppedClients += 1;
     }
   }
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: message.type,
+  });
 }
 
 /**
@@ -1979,13 +2025,23 @@ function broadcastThreadStartRequestCreated(
     ...request,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  let deliveredClients = 0;
+  let droppedClients = 0;
   for (const client of rpcClients) {
     try {
       client.send(raw);
+      deliveredClients += 1;
     } catch {
       rpcClients.delete(client);
+      droppedClients += 1;
     }
   }
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: payload.type,
+  });
 }
 
 function broadcastThreadExtensionUiRequest(
@@ -2000,16 +2056,24 @@ function broadcastThreadExtensionUiRequest(
     event,
   };
   const raw = JSON.stringify(payload satisfies RpcSocketMessage);
-  let delivered = false;
+  let deliveredClients = 0;
+  let droppedClients = 0;
   for (const client of rpcClients) {
     try {
       client.send(raw);
-      delivered = true;
+      deliveredClients += 1;
     } catch {
       rpcClients.delete(client);
+      droppedClients += 1;
     }
   }
-  return delivered;
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: payload.type,
+  });
+  return deliveredClients > 0;
 }
 /**
  * Normalizes watch filename.
@@ -2531,6 +2595,31 @@ async function bootstrap(): Promise<void> {
             sessionId: ws.data.sessionId,
             messageByteLength,
           });
+          let rpcMeasurement: RpcMeasurementToken | null = null;
+          let rpcMeasurementFinished = false;
+          const finalizeRpcMeasurement = (
+            outcome: "canceled" | "failed" | "succeeded" | "timedOut",
+            responseBytes = 0,
+          ): void => {
+            if (!rpcMeasurement || rpcMeasurementFinished) {
+              return;
+            }
+            rpcMeasurementFinished = true;
+            switch (outcome) {
+              case "canceled":
+                recordRpcCanceled(rpcMeasurement);
+                return;
+              case "failed":
+                recordRpcFailed(rpcMeasurement, responseBytes);
+                return;
+              case "succeeded":
+                recordRpcSucceeded(rpcMeasurement, responseBytes);
+                return;
+              case "timedOut":
+                recordRpcTimedOut(rpcMeasurement, responseBytes);
+                return;
+            }
+          };
           try {
             // Each websocket message is treated as either cancel or request and resolved independently.
             const message = parseRpcClientMessage(payload);
@@ -2547,6 +2636,10 @@ async function bootstrap(): Promise<void> {
 
             const request = message;
             requestId = request.id;
+            rpcMeasurement = recordRpcStarted(
+              request.method,
+              utf8ByteLength(payload),
+            );
             webServerLogger.trace({
               message: "RPC request processing started",
               requestId: request.id,
@@ -2616,6 +2709,7 @@ async function bootstrap(): Promise<void> {
                 signal,
               );
               if (pending.canceledByClient || signal.aborted) {
+                finalizeRpcMeasurement("canceled");
                 return;
               }
 
@@ -2625,7 +2719,11 @@ async function bootstrap(): Promise<void> {
                 result,
                 type: "response",
               };
-              ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+              const rawResponse = JSON.stringify(
+                response satisfies RpcSocketMessage,
+              );
+              ws.send(rawResponse);
+              finalizeRpcMeasurement("succeeded", utf8ByteLength(rawResponse));
               webServerLogger.trace({
                 message: "RPC request completed",
                 requestId: request.id,
@@ -2636,6 +2734,7 @@ async function bootstrap(): Promise<void> {
               });
             } catch (error) {
               if (pending.canceledByClient) {
+                finalizeRpcMeasurement("canceled");
                 return;
               }
 
@@ -2666,7 +2765,14 @@ async function bootstrap(): Promise<void> {
                   : buildRpcErrorPayload(error)),
                 type: "response",
               };
-              ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+              const rawResponse = JSON.stringify(
+                response satisfies RpcSocketMessage,
+              );
+              finalizeRpcMeasurement(
+                isTimeout ? "timedOut" : "failed",
+                utf8ByteLength(rawResponse),
+              );
+              ws.send(rawResponse);
             } finally {
               if (pendingRequests.get(request.id) === pending) {
                 pendingRequests.delete(request.id);
@@ -2702,7 +2808,11 @@ async function bootstrap(): Promise<void> {
               ...buildRpcErrorPayload(error),
               type: "response",
             };
-            ws.send(JSON.stringify(response satisfies RpcSocketMessage));
+            const rawResponse = JSON.stringify(
+              response satisfies RpcSocketMessage,
+            );
+            finalizeRpcMeasurement("failed", utf8ByteLength(rawResponse));
+            ws.send(rawResponse);
           }
         })();
       },

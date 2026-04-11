@@ -179,6 +179,7 @@ import type {
   RpcWorktreeGitHistorySummary,
   RpcWorktreeSnapshot,
 } from "./rpc-schema";
+import { recordSqliteRetryLoop } from "./runtime-stats";
 import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
 
 /**
@@ -1978,14 +1979,37 @@ async function waitForNextRetryDelay(delayMs: number): Promise<void> {
 }
 
 async function withSqliteRetry<T>(action: () => T | Promise<T>): Promise<T> {
+  let retryCount = 0;
+  let totalBackoffMs = 0;
+
   for (let attempt = 1; attempt <= SQLITE_LOCK_RETRY_ATTEMPTS; attempt += 1) {
     try {
-      return await action();
+      const result = await action();
+      if (retryCount > 0) {
+        recordSqliteRetryLoop({
+          exhausted: false,
+          retryCount,
+          totalBackoffMs,
+        });
+      }
+      return result;
     } catch (error) {
-      if (!isSqliteLockError(error) || attempt === SQLITE_LOCK_RETRY_ATTEMPTS) {
+      if (!isSqliteLockError(error)) {
         throw error;
       }
-      await waitForNextRetryDelay(computeSqliteRetryDelayMs(attempt));
+      if (attempt === SQLITE_LOCK_RETRY_ATTEMPTS) {
+        recordSqliteRetryLoop({
+          exhausted: true,
+          retryCount,
+          totalBackoffMs,
+        });
+        throw error;
+      }
+
+      retryCount += 1;
+      const delayMs = computeSqliteRetryDelayMs(attempt);
+      totalBackoffMs += delayMs;
+      await waitForNextRetryDelay(delayMs);
     }
   }
 

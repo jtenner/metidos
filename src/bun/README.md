@@ -29,6 +29,10 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `logging-thread.ts`
   - Worker thread that serializes structured log entries onto stderr without blocking the main runtime loop.
 
+- `runtime-stats.ts`
+  - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, and selected cache hit/miss counters.
+  - Keeps optimization telemetry cheap, resettable, and numeric so later benchmark and diagnostics work can build on one shared source of truth.
+
 - `project-procedures.ts`
   - Exposes all RPC procedure implementations consumed by the frontend.
   - Coordinates projects, worktrees, threads, file content reads/diffs, git history, and thread lifecycle operations.
