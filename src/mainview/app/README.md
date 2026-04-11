@@ -108,7 +108,7 @@ Hosts the extracted pure selectors behind `use-mainview-derived-state.ts`, espec
 Combines backend and runtime state into memoized derived props used by workspace and sidebar components, including ordered projections over the indexed project/worktree store shape, deferred sidebar-search filtering, and preformatted worktree display paths reused across hot sidebar renders.
 
 `use-thread-status-controller.ts`
-Hosts the memoized thread-status polling and selected-thread refresh controller extracted from `App.tsx`. It owns the working-thread poll loop, visibility-triggered refreshes, and selected-thread detail refresh decisions so unrelated shell state changes do not keep rerunning that controller path when its narrow prop set is unchanged.
+Hosts the memoized thread-status polling and selected-thread refresh controller extracted from `App.tsx`. It owns the working-thread poll loop, visibility-triggered refreshes, shared in-flight `listThreadStatuses(...)` refresh reuse, and selected-thread detail refresh decisions so unrelated shell state changes do not keep rerunning that controller path when its narrow prop set is unchanged.
 
 `use-project-worktree-controller.ts`
 Owns project/worktree listing refresh, project open/close rollback-safe transitions, worktree-open orchestration, and selected-thread workspace hydration when the selected thread points at a project/worktree that is not yet opened in the shell.

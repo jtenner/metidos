@@ -20,8 +20,11 @@ import type {
   RpcThreadRunStatus,
 } from "../../bun/rpc-schema";
 import {
+  buildSelectedThreadDetailRefreshKey,
+  buildThreadStatusRequestKey,
   listWorkingThreadIds,
   mergeThreadStatusSummaries,
+  resolveQueuedThreadStatusRefreshRequest,
   resolveThreadStatusRefreshOutcome,
   shouldRefreshSelectedThreadDetail,
 } from "../thread-status-refresh";
@@ -40,6 +43,7 @@ export type ThreadStatusControllerProps = {
   prepareOpenedThreadDetail: (detail: RpcThreadDetail) => RpcThreadDetail;
   procedures: ThreadStatusControllerProcedures;
   selectedThreadId: number | null;
+  selectedThreadDetailRefreshKeyRef: MutableRefObject<string | null>;
   selectedThreadIdRef: MutableRefObject<number | null>;
   selectedThreadRunStateRef: MutableRefObject<RpcThreadRunStatus["state"]>;
   setThreadStore: Dispatch<SetStateAction<ThreadStore>>;
@@ -53,7 +57,9 @@ export function useThreadStatusController(
     options.selectedThreadId,
   );
   const previousDocumentVisibilityRef = useRef(options.isDocumentVisible);
-  const threadStatusPollInFlightRef = useRef(false);
+  const activeThreadStatusRefreshKeyRef = useRef<string | null>(null);
+  const queuedThreadStatusRefreshIdsRef = useRef<number[] | null>(null);
+  const threadStatusRefreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const polledThreadIds = useMemo(
     () => listWorkingThreadIds(options.threads),
@@ -87,9 +93,14 @@ export function useThreadStatusController(
         return;
       }
 
+      const selectedSummaryDetailRefreshKey =
+        buildSelectedThreadDetailRefreshKey(selectedSummary);
       if (
         !shouldRefreshSelectedThreadDetail({
+          lastLoadedSelectedDetailRefreshKey:
+            options.selectedThreadDetailRefreshKeyRef.current,
           previousSelectedRunState: options.selectedThreadRunStateRef.current,
+          selectedSummaryDetailRefreshKey,
           selectedSummaryRunState: selectedSummary.runStatus.state,
         })
       ) {
@@ -124,6 +135,8 @@ export function useThreadStatusController(
         if (selectedThreadIdForCommit !== selectedSummary.id) {
           return;
         }
+        options.selectedThreadDetailRefreshKeyRef.current =
+          buildSelectedThreadDetailRefreshKey(detail.thread);
         options.selectedThreadRunStateRef.current =
           detail.thread.runStatus.state;
         options.mergeSelectedThreadMessageHistory(detail);
@@ -150,6 +163,7 @@ export function useThreadStatusController(
       options.mergeSelectedThreadMessageHistory,
       options.prepareOpenedThreadDetail,
       options.procedures,
+      options.selectedThreadDetailRefreshKeyRef,
       options.selectedThreadIdRef,
       options.selectedThreadRunStateRef,
       options.setThreadStore,
@@ -164,19 +178,50 @@ export function useThreadStatusController(
         shouldLogError?: () => boolean;
       },
     ) => {
-      if (threadStatusPollInFlightRef.current) {
+      const requestKey = buildThreadStatusRequestKey(threadIds);
+      const activeRequest = threadStatusRefreshPromiseRef.current;
+      if (activeRequest) {
+        if (activeThreadStatusRefreshKeyRef.current !== requestKey) {
+          queuedThreadStatusRefreshIdsRef.current = threadIds;
+        }
+        try {
+          await activeRequest;
+        } catch {
+          // The owning refresh request already logged the failure.
+        }
         return;
       }
 
-      threadStatusPollInFlightRef.current = true;
+      activeThreadStatusRefreshKeyRef.current = requestKey;
+      const refreshPromise = (async () => {
+        let nextThreadIds: number[] | null = threadIds;
+        while (nextThreadIds && nextThreadIds.length > 0) {
+          const completedThreadIds = nextThreadIds;
+          queuedThreadStatusRefreshIdsRef.current = null;
+          await refreshThreadStatuses(completedThreadIds);
+          nextThreadIds = resolveQueuedThreadStatusRefreshRequest({
+            completedThreadIds,
+            queuedThreadIds: queuedThreadStatusRefreshIdsRef.current,
+          });
+          activeThreadStatusRefreshKeyRef.current = nextThreadIds
+            ? buildThreadStatusRequestKey(nextThreadIds)
+            : null;
+        }
+      })();
+      threadStatusRefreshPromiseRef.current = refreshPromise;
+
       try {
-        await refreshThreadStatuses(threadIds);
+        await refreshPromise;
       } catch (error) {
         if (options?.shouldLogError?.() ?? true) {
           console.error(errorMessage, error);
         }
       } finally {
-        threadStatusPollInFlightRef.current = false;
+        if (threadStatusRefreshPromiseRef.current === refreshPromise) {
+          threadStatusRefreshPromiseRef.current = null;
+          activeThreadStatusRefreshKeyRef.current = null;
+          queuedThreadStatusRefreshIdsRef.current = null;
+        }
       }
     },
     [refreshThreadStatuses],
@@ -185,6 +230,9 @@ export function useThreadStatusController(
   useEffect(() => {
     const previousThreadId = previousSelectedThreadIdRef.current;
     options.selectedThreadIdRef.current = options.selectedThreadId;
+    if (previousThreadId !== options.selectedThreadId) {
+      options.selectedThreadDetailRefreshKeyRef.current = null;
+    }
     if (
       previousThreadId !== null &&
       previousThreadId !== options.selectedThreadId
@@ -194,6 +242,7 @@ export function useThreadStatusController(
     previousSelectedThreadIdRef.current = options.selectedThreadId;
   }, [
     options.discardThreadIfEmpty,
+    options.selectedThreadDetailRefreshKeyRef,
     options.selectedThreadId,
     options.selectedThreadIdRef,
   ]);

@@ -12,8 +12,11 @@ import {
   upsertThreadList,
 } from "./app/state";
 import {
+  buildSelectedThreadDetailRefreshKey,
+  buildThreadStatusRequestKey,
   listWorkingThreadIds,
   mergeThreadStatusSummaries,
+  resolveQueuedThreadStatusRefreshRequest,
   resolveThreadStatusRefreshOutcome,
   shouldRefreshSelectedThreadDetail,
 } from "./thread-status-refresh";
@@ -75,33 +78,69 @@ describe("thread status refresh helpers", () => {
     expect(
       shouldRefreshSelectedThreadDetail({
         previousSelectedRunState: "idle",
+        selectedSummaryDetailRefreshKey: "7:working-a:working:working-a",
         selectedSummaryRunState: "working",
       }),
     ).toBeTrue();
     expect(
       shouldRefreshSelectedThreadDetail({
         previousSelectedRunState: "working",
+        selectedSummaryDetailRefreshKey: "7:idle-b:idle:idle-b",
         selectedSummaryRunState: "idle",
       }),
     ).toBeTrue();
     expect(
       shouldRefreshSelectedThreadDetail({
         previousSelectedRunState: "idle",
+        selectedSummaryDetailRefreshKey: "7:failed-c:failed:failed-c",
         selectedSummaryRunState: "failed",
       }),
     ).toBeTrue();
     expect(
       shouldRefreshSelectedThreadDetail({
         previousSelectedRunState: "failed",
+        selectedSummaryDetailRefreshKey: "7:failed-c:failed:failed-c",
         selectedSummaryRunState: "failed",
       }),
     ).toBeFalse();
     expect(
       shouldRefreshSelectedThreadDetail({
         previousSelectedRunState: "stopped",
+        selectedSummaryDetailRefreshKey: "7:stopped-d:stopped:stopped-d",
         selectedSummaryRunState: "stopped",
       }),
     ).toBeFalse();
+  });
+
+  it("skips selected detail refresh when the latest loaded detail already matches the summary", () => {
+    const refreshKey = buildSelectedThreadDetailRefreshKey(
+      sortableThread(7, "2026-04-04T12:00:00.000Z", null, "working"),
+    );
+
+    expect(
+      shouldRefreshSelectedThreadDetail({
+        lastLoadedSelectedDetailRefreshKey: refreshKey,
+        previousSelectedRunState: "working",
+        selectedSummaryDetailRefreshKey: refreshKey,
+        selectedSummaryRunState: "working",
+      }),
+    ).toBeFalse();
+  });
+
+  it("builds stable thread-status request keys and only reruns queued refreshes when ids changed", () => {
+    expect(buildThreadStatusRequestKey([3, 9])).toBe("3,9");
+    expect(
+      resolveQueuedThreadStatusRefreshRequest({
+        completedThreadIds: [3, 9],
+        queuedThreadIds: [3, 9],
+      }),
+    ).toBeNull();
+    expect(
+      resolveQueuedThreadStatusRefreshRequest({
+        completedThreadIds: [3, 9],
+        queuedThreadIds: [3, 11],
+      }),
+    ).toEqual([3, 11]);
   });
 
   it("merges polled thread statuses into the existing thread list", () => {

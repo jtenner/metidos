@@ -26,17 +26,62 @@ export function listWorkingThreadIds(threads: RpcThread[]): number[] {
     .map((thread) => thread.id);
 }
 
+export function buildThreadStatusRequestKey(threadIds: number[]): string {
+  return threadIds.join(",");
+}
+
+export function resolveQueuedThreadStatusRefreshRequest(options: {
+  completedThreadIds: number[];
+  queuedThreadIds: number[] | null;
+}): number[] | null {
+  if (!options.queuedThreadIds || options.queuedThreadIds.length === 0) {
+    return null;
+  }
+
+  return buildThreadStatusRequestKey(options.completedThreadIds) ===
+    buildThreadStatusRequestKey(options.queuedThreadIds)
+    ? null
+    : options.queuedThreadIds;
+}
+
+export function buildSelectedThreadDetailRefreshKey(
+  thread: Pick<RpcThread, "id" | "updatedAt" | "runStatus"> | null,
+): string | null {
+  if (!thread) {
+    return null;
+  }
+
+  return [
+    thread.id,
+    thread.updatedAt,
+    thread.runStatus.state,
+    thread.runStatus.updatedAt ?? "",
+  ].join(":");
+}
+
 export function shouldRefreshSelectedThreadDetail(options: {
+  lastLoadedSelectedDetailRefreshKey?: string | null;
   previousSelectedRunState: RpcThreadRunStatus["state"];
+  selectedSummaryDetailRefreshKey?: string | null;
   selectedSummaryRunState: RpcThreadRunStatus["state"];
 }): boolean {
-  return (
+  const requiresDetailRefresh =
     options.selectedSummaryRunState === "working" ||
     options.previousSelectedRunState === "working" ||
     (options.selectedSummaryRunState === "failed" &&
       options.previousSelectedRunState !== "failed") ||
     (options.selectedSummaryRunState === "stopped" &&
-      options.previousSelectedRunState !== "stopped")
+      options.previousSelectedRunState !== "stopped");
+
+  if (!requiresDetailRefresh) {
+    return false;
+  }
+
+  return (
+    options.selectedSummaryDetailRefreshKey === null ||
+    options.selectedSummaryDetailRefreshKey === undefined ||
+    options.selectedSummaryDetailRefreshKey !==
+      options.lastLoadedSelectedDetailRefreshKey
   );
 }
 /**

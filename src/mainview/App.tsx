@@ -156,6 +156,7 @@ import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
+import { buildSelectedThreadDetailRefreshKey } from "./thread-status-refresh";
 import { derivePrimaryViewForPinnedThreadOpen } from "./thread-workspace-selection";
 
 /**
@@ -835,6 +836,7 @@ export default function App({
   );
   const threadCreationInFlightCountRef = useRef(0);
   const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
+  const selectedThreadDetailRefreshKeyRef = useRef<string | null>(null);
   const optimisticallyAcknowledgedThreadIdsRef = useRef(new Set<number>());
   const threadErrorSeenRequestCacheRef = useRef(
     new Map<number, Promise<RpcThreadDetail>>(),
@@ -1842,6 +1844,8 @@ export default function App({
 
   const replaceSelectedThreadMessageHistory = useCallback(
     (detail: RpcThreadDetail) => {
+      selectedThreadDetailRefreshKeyRef.current =
+        buildSelectedThreadDetailRefreshKey(detail.thread);
       setThreadMessages(detail.messages);
       startThreadHistoryBackfill(detail.thread.id, detail.nextCursor);
     },
@@ -1850,6 +1854,8 @@ export default function App({
 
   const mergeSelectedThreadMessageHistory = useCallback(
     (detail: RpcThreadDetail) => {
+      selectedThreadDetailRefreshKeyRef.current =
+        buildSelectedThreadDetailRefreshKey(detail.thread);
       setThreadMessages((current) =>
         mergeThreadMessageHistory(current, detail.messages),
       );
@@ -1868,6 +1874,7 @@ export default function App({
     setIsThreadLoading(false);
     selectedThreadIdRef.current = null;
     selectedThreadRunStateRef.current = "idle";
+    selectedThreadDetailRefreshKeyRef.current = null;
   }, [abortThreadHistoryBackfill, abortThreadOpenRequest]);
 
   const discardThreadIfEmpty = useCallback(
@@ -2158,6 +2165,7 @@ export default function App({
       selectedThreadIdRef.current = threadId;
       selectedThreadRunStateRef.current =
         optimisticThread?.runStatus.state ?? "idle";
+      selectedThreadDetailRefreshKeyRef.current = null;
       setThreadMessages([]);
       if (optimisticThread) {
         syncThreadContext(optimisticThread);
@@ -4406,6 +4414,7 @@ export default function App({
         prepareOpenedThreadDetail={prepareOpenedThreadDetail}
         procedures={procedures}
         selectedThreadId={selectedThreadId}
+        selectedThreadDetailRefreshKeyRef={selectedThreadDetailRefreshKeyRef}
         selectedThreadIdRef={selectedThreadIdRef}
         selectedThreadRunStateRef={selectedThreadRunStateRef}
         setThreadStore={setThreadStore}
