@@ -919,8 +919,22 @@ export function migrateDatabase(db: Database): void {
   runStatement(
     db,
     `
-			CREATE INDEX IF NOT EXISTS idx_threads_updated_at
-			ON threads(updated_at DESC, id DESC);
+			CREATE INDEX IF NOT EXISTS idx_projects_last_opened_at_name
+			ON projects(last_opened_at DESC, name ASC);
+		`,
+  );
+  runStatement(db, `DROP INDEX IF EXISTS idx_threads_updated_at`);
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_threads_listing_order
+			ON threads(
+				(pinned_at IS NULL),
+				pinned_at DESC,
+				updated_at DESC,
+				created_at DESC,
+				id DESC
+			);
 		`,
   );
   runStatement(
@@ -2349,7 +2363,7 @@ export function listThreads(database: Database): ThreadRecord[] {
 						last_error_message AS lastErrorMessage
 				FROM threads
 				ORDER BY
-					CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END ASC,
+					(pinned_at IS NULL) ASC,
 					pinned_at DESC,
 					updated_at DESC,
 					created_at DESC,

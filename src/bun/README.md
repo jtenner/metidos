@@ -128,6 +128,8 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Stores projects, worktrees, threads, messages, auth state, session rows, websocket tickets, security audit events, and usage telemetry.
   - Thread rows now persist first-class Pi session references (`piSessionId`, `piSessionFile`, `piLeafEntryId`) as the authoritative runtime identity for active agent sessions.
   - Applies the shared SQLite runtime pragmas used by the main app and cron-sidecar connections, including WAL-mode journaling and the standard busy-timeout setting.
+  - Keeps the hottest project/thread listing reads aligned with explicit SQLite indexes so project ordering no longer needs a temp sort and thread ordering can use an expression index that matches the pinned-first recency order.
+  - Reuses the existing thread-message indexes for paged message reads and activity-item lookups instead of adding speculative extra message indexes.
   - Handles migrations/defaults, typed record types, owner-only file permissions, and path selection for the controlled per-user app data location.
   - Exposes destructive maintenance helpers for clearing the local database files when a full reset is requested.
 

@@ -24,6 +24,7 @@ import {
   closeAppDatabase,
   createSecurityAuditEvent,
   createThread,
+  createThreadMessage,
   DEFAULT_THREAD_MODEL,
   DEFAULT_THREAD_REASONING_EFFORT,
   deleteAppDatabaseFiles,
@@ -33,6 +34,7 @@ import {
   listProjects,
   listSecurityAuditEvents,
   listThreads,
+  migrateDatabase,
   resetResolvedAppDataDirectory,
   SQL_BUSY_TIMEOUT_MS,
   selectWritableAppDataDirectory,
@@ -68,6 +70,93 @@ function readBusyTimeout(database: Database): number {
     database.query<{ timeout: number }, []>("PRAGMA busy_timeout").get()
       ?.timeout ?? -1
   );
+}
+
+function explainQueryPlan(
+  database: Database,
+  sql: string,
+  params: Array<number | string> = [],
+): string[] {
+  return database
+    .query(`EXPLAIN QUERY PLAN ${sql}`)
+    .all(...params)
+    .map((row) => String((row as { detail?: unknown }).detail ?? ""));
+}
+
+function createQueryPlanAuditDatabase(): {
+  database: Database;
+  primaryThreadId: number;
+} {
+  const database = new Database(":memory:");
+  migrateDatabase(database);
+
+  let primaryThreadId: number | null = null;
+  for (let projectIndex = 0; projectIndex < 12; projectIndex += 1) {
+    const project = upsertProject(database, {
+      name: `Project ${String(projectIndex).padStart(2, "0")}`,
+      projectPath: `/tmp/query-plan-project-${projectIndex}`,
+    });
+    if (projectIndex % 4 === 0) {
+      database.run("UPDATE projects SET is_open = 0 WHERE id = ?", [
+        project.id,
+      ]);
+    }
+    database.run(
+      "UPDATE projects SET last_opened_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ? || ' seconds'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ? || ' seconds') WHERE id = ?",
+      [String(-projectIndex * 60), String(-projectIndex * 60), project.id],
+    );
+
+    for (let threadIndex = 0; threadIndex < 18; threadIndex += 1) {
+      const thread = createThread(database, {
+        agentsAccess: false,
+        githubAccess: false,
+        metidosAccess: true,
+        model: DEFAULT_THREAD_MODEL,
+        projectId: project.id,
+        reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+        title: `Thread ${projectIndex}-${threadIndex}`,
+        unsafeMode: false,
+        worktreePath: project.path,
+      });
+      primaryThreadId ??= thread.id;
+      if (threadIndex % 5 === 0) {
+        database.run(
+          "UPDATE threads SET pinned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ? || ' seconds') WHERE id = ?",
+          [String(-(projectIndex * 18 + threadIndex)), thread.id],
+        );
+      }
+      database.run(
+        "UPDATE threads SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ? || ' seconds'), created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ? || ' seconds') WHERE id = ?",
+        [
+          String(-(projectIndex * 18 + threadIndex)),
+          String(-(projectIndex * 18 + threadIndex + 30)),
+          thread.id,
+        ],
+      );
+      for (let messageIndex = 0; messageIndex < 4; messageIndex += 1) {
+        createThreadMessage(database, {
+          role: messageIndex % 2 === 0 ? "user" : "assistant",
+          text: `Message ${messageIndex}`,
+          threadId: thread.id,
+        });
+      }
+    }
+  }
+
+  if (primaryThreadId === null) {
+    throw new Error("Expected query-plan audit seed data to create a thread");
+  }
+
+  database.run(
+    "INSERT INTO thread_messages (thread_id, role, kind, item_id, text, state, payload_json, created_at, updated_at) VALUES (?, 'assistant', 'tool_call', 'activity-item', 'Activity', NULL, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+    [primaryThreadId],
+  );
+  database.run("ANALYZE");
+
+  return {
+    database,
+    primaryThreadId,
+  };
 }
 
 afterEach(() => {
@@ -164,7 +253,7 @@ describe("app database storage", () => {
   });
 
   it("validates wal-mode pragmas and reader-writer concurrency in a child process", () => {
-    const childSource = String.raw`
+    const childSource = `
       import { Database } from "bun:sqlite";
       import { mkdtempSync, rmSync } from "node:fs";
       import { tmpdir } from "node:os";
@@ -250,6 +339,243 @@ describe("app database storage", () => {
     expect(result.synchronous).toBe(1);
     expect(result.finalValue).toBe("after");
     expect(result.durationMs).toBeLessThan(1000);
+  });
+
+  it("uses query-plan-aligned indexes for project and thread listings without adding new thread-message indexes", () => {
+    const { database, primaryThreadId } = createQueryPlanAuditDatabase();
+
+    try {
+      const listProjectsPlan = explainQueryPlan(
+        database,
+        `
+          SELECT
+            id,
+            path,
+            name,
+            git_remote AS gitRemote,
+            is_open AS isOpen,
+            created_at AS createdAt,
+            updated_at AS updatedAt,
+            last_opened_at AS lastOpenedAt
+          FROM projects
+          ORDER BY last_opened_at DESC, name ASC
+        `,
+      );
+      expect(listProjectsPlan).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("idx_projects_last_opened_at_name"),
+        ]),
+      );
+      expect(
+        listProjectsPlan.some((detail) => detail.includes("USE TEMP B-TREE")),
+      ).toBeFalse();
+
+      const listOpenProjectsPlan = explainQueryPlan(
+        database,
+        `
+          SELECT
+            id,
+            path,
+            name,
+            git_remote AS gitRemote,
+            is_open AS isOpen,
+            created_at AS createdAt,
+            updated_at AS updatedAt,
+            last_opened_at AS lastOpenedAt
+          FROM projects
+          WHERE is_open = 1
+          ORDER BY last_opened_at DESC
+        `,
+      );
+      expect(listOpenProjectsPlan).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("idx_projects_last_opened_at_name"),
+        ]),
+      );
+      expect(
+        listOpenProjectsPlan.some((detail) =>
+          detail.includes("USE TEMP B-TREE"),
+        ),
+      ).toBeFalse();
+
+      const listThreadsPlan = explainQueryPlan(
+        database,
+        `
+          SELECT
+            id,
+            project_id AS projectId,
+            worktree_path AS worktreePath,
+            title,
+            summary,
+            model,
+            reasoning_effort AS reasoningEffort,
+            github_access AS githubAccess,
+            agents_access AS agentsAccess,
+            metidos_access AS metidosAccess,
+            unsafe_mode AS unsafeMode,
+            pi_session_id AS piSessionId,
+            pi_session_file AS piSessionFile,
+            pi_leaf_entry_id AS piLeafEntryId,
+            pinned_at AS pinnedAt,
+            created_at AS createdAt,
+            updated_at AS updatedAt,
+            last_run_at AS lastRunAt,
+            last_input_tokens AS lastInputTokens,
+            last_cached_input_tokens AS lastCachedInputTokens,
+            last_output_tokens AS lastOutputTokens,
+            max_input_tokens AS maxInputTokens,
+            estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+            compaction_count AS compactionCount,
+            last_compaction_at AS lastCompactionAt,
+            last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+            last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+            active_turn_started_at AS activeTurnStartedAt,
+            last_error_at AS lastErrorAt,
+            last_error_seen_at AS lastErrorSeenAt,
+            last_error_message AS lastErrorMessage
+          FROM threads
+          ORDER BY
+            (pinned_at IS NULL) ASC,
+            pinned_at DESC,
+            updated_at DESC,
+            created_at DESC,
+            id DESC
+        `,
+      );
+      expect(listThreadsPlan).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("idx_threads_listing_order"),
+        ]),
+      );
+      expect(
+        listThreadsPlan.some((detail) => detail.includes("USE TEMP B-TREE")),
+      ).toBeFalse();
+
+      const listThreadMessagesPagePlan = explainQueryPlan(
+        database,
+        `
+          SELECT
+            id,
+            thread_id AS threadId,
+            role,
+            kind,
+            item_id AS itemId,
+            text,
+            state,
+            payload_json AS payloadJson,
+            created_at AS createdAt,
+            COALESCE(updated_at, created_at) AS updatedAt
+          FROM thread_messages
+          WHERE thread_id = ?
+          ORDER BY id DESC
+          LIMIT ?
+        `,
+        [primaryThreadId, 101],
+      );
+      expect(listThreadMessagesPagePlan).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("idx_thread_messages_thread_id"),
+        ]),
+      );
+
+      const threadActivityLookupPlan = explainQueryPlan(
+        database,
+        `
+          SELECT id
+          FROM thread_messages
+          WHERE thread_id = ? AND item_id = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [primaryThreadId, "activity-item"],
+      );
+      expect(threadActivityLookupPlan).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("idx_thread_messages_thread_item_id"),
+        ]),
+      );
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("keeps pinned threads ahead of unpinned threads while preserving recency inside each group", () => {
+    const appDataDir = createTempDirectory();
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Ordered Threads",
+      projectPath: join(appDataDir, "ordered-project"),
+    });
+    const pinnedOlder = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Pinned Older",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+    const pinnedNewer = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Pinned Newer",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+    const unpinnedNewer = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Unpinned Newer",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+    const unpinnedOlder = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Unpinned Older",
+      unsafeMode: false,
+      worktreePath: project.path,
+    });
+
+    database.run(
+      "UPDATE threads SET pinned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-20 seconds'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-20 seconds') WHERE id = ?",
+      [pinnedOlder.id],
+    );
+    database.run(
+      "UPDATE threads SET pinned_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 seconds'), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-5 seconds') WHERE id = ?",
+      [pinnedNewer.id],
+    );
+    database.run(
+      "UPDATE threads SET pinned_at = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 seconds') WHERE id = ?",
+      [unpinnedNewer.id],
+    );
+    database.run(
+      "UPDATE threads SET pinned_at = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-40 seconds') WHERE id = ?",
+      [unpinnedOlder.id],
+    );
+
+    expect(listThreads(database).map((thread) => thread.id)).toEqual([
+      pinnedNewer.id,
+      pinnedOlder.id,
+      unpinnedNewer.id,
+      unpinnedOlder.id,
+    ]);
   });
 
   it("deletes the app database files and reopens as an empty database", () => {
