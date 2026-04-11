@@ -11,6 +11,7 @@ import type {
   RpcRequestPriority,
   RpcWorktree,
 } from "./rpc-schema";
+import type { RuntimeDiagnosticsSnapshot } from "./runtime-stats";
 
 /**
  * Names of RPC methods available to the harness.
@@ -22,10 +23,11 @@ type RpcMethodName = keyof AppRPCSchema["requests"];
  * Parsed command-line options and effective configuration for a run.
  */
 
-type HarnessOptions = {
+export type HarnessOptions = {
   durationMs: number;
   help: boolean;
   httpBudgetMs: number;
+  json: boolean;
   port: number;
   projectId: number | null;
   projectPath: string;
@@ -50,16 +52,61 @@ type HttpTimedResult = TimedResult & {
   url: string;
 };
 
-type StartupSummary = {
+export type StartupSummary = {
   http: HttpTimedResult[];
   rpc: TimedResult[];
   totalDurationMs: number;
 };
 
-type PressureSummary = {
+export type TimingDistribution = {
+  count: number;
+  maxMs: number | null;
+  meanMs: number | null;
+  minMs: number | null;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  p99Ms: number | null;
+};
+
+export type PressureSummary = {
   abortedCount: number;
   completedCount: number;
   failedCount: number;
+  failureCountByLabel: Record<string, number>;
+  timingsByLabel: Record<string, number[]>;
+};
+
+export type HarnessReport = {
+  budgets: {
+    httpBudgetMs: number;
+    rpcBudgetMs: number;
+    startupBudgetMs: number;
+  };
+  diagnostics: {
+    afterPressure: RuntimeDiagnosticsSnapshot;
+    afterWarmup: RuntimeDiagnosticsSnapshot;
+    beforeWarmup: RuntimeDiagnosticsSnapshot;
+  };
+  latency: {
+    pressureRpcByLabel: Record<string, TimingDistribution>;
+    startupHttpByLabel: Record<string, TimingDistribution>;
+    startupRpcByLabel: Record<string, TimingDistribution>;
+  };
+  pass: boolean;
+  pressure: {
+    abortedCount: number;
+    completedCount: number;
+    failedCount: number;
+    failureCountByLabel: Record<string, number>;
+  };
+  startup: StartupSummary;
+  target: {
+    projectId: number;
+    projectName: string;
+    publicUrl: string;
+    rpcUrl: string;
+    worktreePath: string;
+  };
 };
 
 /**
@@ -254,11 +301,12 @@ class RpcHarnessClient {
  * @param argv - CLI arguments passed to the harness command parser.
  */
 
-function parseArgs(argv: string[]): HarnessOptions {
+export function parseArgs(argv: string[]): HarnessOptions {
   const options: HarnessOptions = {
     durationMs: DEFAULT_DURATION_MS,
     help: false,
     httpBudgetMs: DEFAULT_HTTP_BUDGET_MS,
+    json: false,
     port: DEFAULT_PORT,
     projectId: null,
     projectPath: process.cwd(),
@@ -296,6 +344,9 @@ function parseArgs(argv: string[]): HarnessOptions {
     switch (flag) {
       case "--help":
         options.help = true;
+        break;
+      case "--json":
+        options.json = true;
         break;
       case "--port":
         options.port = parseIntegerOption(flag, readValue(), 1, 65_535);
@@ -377,6 +428,7 @@ Options:
   --http-budget-ms <ms>         Per-endpoint HTTP latency budget. Default: ${DEFAULT_HTTP_BUDGET_MS}
   --rpc-budget-ms <ms>          Per-request RPC latency budget. Default: ${DEFAULT_RPC_BUDGET_MS}
   --startup-budget-ms <ms>      Total startup budget. Default: ${DEFAULT_STARTUP_BUDGET_MS}
+  --json                        Emit a structured JSON report instead of plain text.
   --help                        Show this help text.
 `);
 }
@@ -400,22 +452,6 @@ function isAbortError(error: unknown): boolean {
     error instanceof Error &&
     (error.name === "AbortError" || error.name === "TimeoutError")
   );
-}
-
-/**
- * Measure duration of an async callback.
- */
-
-async function timed<T>(
-  _label: string,
-  callback: () => Promise<T>,
-): Promise<{ durationMs: number; value: T }> {
-  const startedAt = performance.now();
-  const value = await callback();
-  return {
-    durationMs: Math.max(0, performance.now() - startedAt),
-    value,
-  };
 }
 
 /**
@@ -482,14 +518,13 @@ async function measureRpc<K extends RpcMethodName>(
   result: AppRPCSchema["requests"][K]["response"] | null;
   timing: TimedResult;
 }> {
+  const startedAt = performance.now();
   try {
-    const { durationMs, value } = await timed(label, () =>
-      client.call(method, params, options),
-    );
+    const result = await client.call(method, params, options);
     return {
-      result: value,
+      result,
       timing: {
-        durationMs,
+        durationMs: Math.max(0, performance.now() - startedAt),
         label,
         ok: true,
         status: "ok",
@@ -499,7 +534,7 @@ async function measureRpc<K extends RpcMethodName>(
     return {
       result: null,
       timing: {
-        durationMs: 0,
+        durationMs: Math.max(0, performance.now() - startedAt),
         label,
         ok: false,
         status: toErrorLabel(error),
@@ -584,11 +619,15 @@ async function runPressureWorker(
     abortedCount: 0,
     completedCount: 0,
     failedCount: 0,
+    failureCountByLabel: {},
+    timingsByLabel: {},
   };
 
   while (!stopSignal.aborted) {
     try {
-      const opened = await client.call(
+      const opened = await measureRpc(
+        client,
+        "openWorktree",
         "openWorktree",
         {
           projectId: context.project.id,
@@ -599,11 +638,26 @@ async function runPressureWorker(
           timeoutMs: options.rpcBudgetMs,
         },
       );
-      if (opened.history.entries[0]) {
-        await client.call(
+      if (!opened.timing.ok || !opened.result) {
+        summary.failedCount += 1;
+        summary.failureCountByLabel.openWorktree =
+          (summary.failureCountByLabel.openWorktree ?? 0) + 1;
+        continue;
+      }
+      appendDurationSample(
+        summary.timingsByLabel,
+        "openWorktree",
+        opened.timing.durationMs,
+      );
+
+      const firstCommit = opened.result.history.entries[0] ?? null;
+      if (firstCommit) {
+        const diff = await measureRpc(
+          client,
+          "getWorktreeGitCommitDiff",
           "getWorktreeGitCommitDiff",
           {
-            commitHash: opened.history.entries[0].hash,
+            commitHash: firstCommit.hash,
             projectId: context.project.id,
             worktreePath: context.worktree.path,
           },
@@ -612,8 +666,22 @@ async function runPressureWorker(
             timeoutMs: options.rpcBudgetMs,
           },
         );
+        if (!diff.timing.ok) {
+          summary.failedCount += 1;
+          summary.failureCountByLabel.getWorktreeGitCommitDiff =
+            (summary.failureCountByLabel.getWorktreeGitCommitDiff ?? 0) + 1;
+          continue;
+        }
+        appendDurationSample(
+          summary.timingsByLabel,
+          "getWorktreeGitCommitDiff",
+          diff.timing.durationMs,
+        );
       }
-      await client.call(
+
+      const history = await measureRpc(
+        client,
+        "listWorktreeGitHistory",
         "listWorktreeGitHistory",
         {
           limit: 20,
@@ -624,6 +692,17 @@ async function runPressureWorker(
           priority: "background",
           timeoutMs: options.rpcBudgetMs,
         },
+      );
+      if (!history.timing.ok) {
+        summary.failedCount += 1;
+        summary.failureCountByLabel.listWorktreeGitHistory =
+          (summary.failureCountByLabel.listWorktreeGitHistory ?? 0) + 1;
+        continue;
+      }
+      appendDurationSample(
+        summary.timingsByLabel,
+        "listWorktreeGitHistory",
+        history.timing.durationMs,
       );
       summary.completedCount += 1;
     } catch (error) {
@@ -754,6 +833,143 @@ function toErrorLabel(error: unknown): string {
   return String(error);
 }
 
+function runtimeStatsUrlFromBaseUrl(baseUrl: string): string {
+  return `${baseUrl}/health/runtime-stats`;
+}
+
+async function readRuntimeDiagnostics(
+  baseUrl: string,
+  timeoutMs: number,
+  options?: {
+    reset?: boolean;
+  },
+): Promise<RuntimeDiagnosticsSnapshot> {
+  const reset = options?.reset === true;
+  const url = reset
+    ? `${runtimeStatsUrlFromBaseUrl(baseUrl)}/reset`
+    : runtimeStatsUrlFromBaseUrl(baseUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(
+      new Error(`Runtime diagnostics request timed out for ${url}`),
+    );
+  }, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      method: reset ? "POST" : "GET",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Runtime diagnostics request failed with status ${response.status} for ${url}.`,
+      );
+    }
+
+    return (await response.json()) as RuntimeDiagnosticsSnapshot;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function percentileValue(samples: number[], percentile: number): number | null {
+  if (samples.length === 0) {
+    return null;
+  }
+
+  const sorted = [...samples].sort((left, right) => left - right);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil(percentile * sorted.length) - 1),
+  );
+  return sorted[index] ?? null;
+}
+
+export function summarizeDurationSamples(
+  samples: number[],
+): TimingDistribution {
+  if (samples.length === 0) {
+    return {
+      count: 0,
+      maxMs: null,
+      meanMs: null,
+      minMs: null,
+      p50Ms: null,
+      p95Ms: null,
+      p99Ms: null,
+    };
+  }
+
+  const sorted = [...samples].sort((left, right) => left - right);
+  const total = sorted.reduce((sum, current) => sum + current, 0);
+  return {
+    count: sorted.length,
+    maxMs: sorted.at(-1) ?? null,
+    meanMs: total / sorted.length,
+    minMs: sorted[0] ?? null,
+    p50Ms: percentileValue(sorted, 0.5),
+    p95Ms: percentileValue(sorted, 0.95),
+    p99Ms: percentileValue(sorted, 0.99),
+  };
+}
+
+function appendDurationSample(
+  record: Record<string, number[]>,
+  label: string,
+  durationMs: number,
+): void {
+  const samples = record[label] ?? [];
+  samples.push(durationMs);
+  record[label] = samples;
+}
+
+function summarizeDurationRecord(
+  record: Record<string, number[]>,
+): Record<string, TimingDistribution> {
+  return Object.fromEntries(
+    Object.entries(record)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([label, samples]) => [label, summarizeDurationSamples(samples)]),
+  );
+}
+
+function summarizeTimedResultsByLabel(
+  results: TimedResult[],
+): Record<string, TimingDistribution> {
+  const samplesByLabel: Record<string, number[]> = {};
+  for (const result of results) {
+    appendDurationSample(samplesByLabel, result.label, result.durationMs);
+  }
+  return summarizeDurationRecord(samplesByLabel);
+}
+
+function formatDuration(value: number | null): string {
+  return value === null ? "n/a" : `${value.toFixed(1)}ms`;
+}
+
+function formatBytes(bytes: number): string {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Math.max(0, bytes);
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatMemoryUsage(
+  memoryUsage: RuntimeDiagnosticsSnapshot["memoryUsage"],
+): string {
+  return [
+    `rss ${formatBytes(memoryUsage.rss)}`,
+    `heapUsed ${formatBytes(memoryUsage.heapUsed)}`,
+    `heapTotal ${formatBytes(memoryUsage.heapTotal)}`,
+    `external ${formatBytes(memoryUsage.external)}`,
+  ].join(", ");
+}
+
 /**
  * Compose default websocket URL from port.
  * @param port - HTTP server port used by the harness.
@@ -853,61 +1069,208 @@ async function resolveRpcUrl(
  * Combine per-worker pressure counts.
  * @param results - Per-run results collected during the test.
  */
-function summarizePressure(results: PressureSummary[]): PressureSummary {
-  return results.reduce(
-    (summary, current) => ({
-      abortedCount: summary.abortedCount + current.abortedCount,
-      completedCount: summary.completedCount + current.completedCount,
-      failedCount: summary.failedCount + current.failedCount,
-    }),
-    {
-      abortedCount: 0,
-      completedCount: 0,
-      failedCount: 0,
-    } satisfies PressureSummary,
+export function summarizePressure(results: PressureSummary[]): PressureSummary {
+  const summary: PressureSummary = {
+    abortedCount: 0,
+    completedCount: 0,
+    failedCount: 0,
+    failureCountByLabel: {},
+    timingsByLabel: {},
+  };
+
+  for (const current of results) {
+    summary.abortedCount += current.abortedCount;
+    summary.completedCount += current.completedCount;
+    summary.failedCount += current.failedCount;
+
+    for (const [label, count] of Object.entries(current.failureCountByLabel)) {
+      summary.failureCountByLabel[label] =
+        (summary.failureCountByLabel[label] ?? 0) + count;
+    }
+    for (const [label, samples] of Object.entries(current.timingsByLabel)) {
+      for (const durationMs of samples) {
+        appendDurationSample(summary.timingsByLabel, label, durationMs);
+      }
+    }
+  }
+
+  return summary;
+}
+
+function sortNumberRecord(
+  record: Record<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
   );
 }
 
-/**
- * Print structured startup and pressure summary lines to stdout.
- */
+export function buildHarnessReport(options: {
+  baseUrl: string;
+  context: HarnessContext;
+  diagnostics: {
+    afterPressure: RuntimeDiagnosticsSnapshot;
+    afterWarmup: RuntimeDiagnosticsSnapshot;
+    beforeWarmup: RuntimeDiagnosticsSnapshot;
+  };
+  pass: boolean;
+  pressure: PressureSummary;
+  rpcUrl: string;
+  startup: StartupSummary;
+  startupBudgets: {
+    httpBudgetMs: number;
+    rpcBudgetMs: number;
+    startupBudgetMs: number;
+  };
+}): HarnessReport {
+  return {
+    budgets: {
+      ...options.startupBudgets,
+    },
+    diagnostics: options.diagnostics,
+    latency: {
+      pressureRpcByLabel: summarizeDurationRecord(
+        options.pressure.timingsByLabel,
+      ),
+      startupHttpByLabel: summarizeTimedResultsByLabel(options.startup.http),
+      startupRpcByLabel: summarizeTimedResultsByLabel(options.startup.rpc),
+    },
+    pass: options.pass,
+    pressure: {
+      abortedCount: options.pressure.abortedCount,
+      completedCount: options.pressure.completedCount,
+      failedCount: options.pressure.failedCount,
+      failureCountByLabel: sortNumberRecord(
+        options.pressure.failureCountByLabel,
+      ),
+    },
+    startup: options.startup,
+    target: {
+      projectId: options.context.project.id,
+      projectName: options.context.project.name,
+      publicUrl: options.baseUrl,
+      rpcUrl: options.rpcUrl,
+      worktreePath: options.context.worktree.path,
+    },
+  };
+}
 
-function printStartupSummary(
-  startup: StartupSummary,
-  pressure: PressureSummary,
-  context: HarnessContext,
-  options: HarnessOptions,
-  baseUrl: string,
-  rpcUrl: string,
+function printTimingDistributionSection(
+  title: string,
+  distributions: Record<string, TimingDistribution>,
 ): void {
+  console.log(title);
+  const entries = Object.entries(distributions);
+  if (entries.length === 0) {
+    console.log("  (no samples)");
+    console.log("");
+    return;
+  }
+
+  for (const [label, distribution] of entries) {
+    console.log(
+      `  ${label}: n=${distribution.count} min=${formatDuration(distribution.minMs)} p50=${formatDuration(distribution.p50Ms)} p95=${formatDuration(distribution.p95Ms)} p99=${formatDuration(distribution.p99Ms)} max=${formatDuration(distribution.maxMs)} mean=${formatDuration(distribution.meanMs)}`,
+    );
+  }
+  console.log("");
+}
+
+function printHarnessReport(
+  report: HarnessReport,
+  options: HarnessOptions,
+): void {
+  if (options.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+
   console.log("Target");
-  console.log(`  public: ${baseUrl}`);
-  console.log(`  rpc: ${rpcUrl}`);
-  console.log(`  project: ${context.project.name} (#${context.project.id})`);
-  console.log(`  worktree: ${context.worktree.path}`);
-  console.log("");
-  console.log("HTTP");
-  for (const result of startup.http) {
-    console.log(
-      `  ${result.label}: ${result.durationMs.toFixed(1)}ms (${result.status})`,
-    );
-  }
-  console.log("");
-  console.log("RPC");
-  for (const result of startup.rpc) {
-    console.log(
-      `  ${result.label}: ${result.durationMs.toFixed(1)}ms (${result.status})`,
-    );
-  }
-  console.log("");
-  console.log("Pressure");
-  console.log(`  workers: ${options.workers}`);
-  console.log(`  completed loops: ${pressure.completedCount}`);
-  console.log(`  aborted loops: ${pressure.abortedCount}`);
-  console.log(`  failed loops: ${pressure.failedCount}`);
-  console.log("");
+  console.log(`  public: ${report.target.publicUrl}`);
+  console.log(`  rpc: ${report.target.rpcUrl}`);
   console.log(
-    `Startup total: ${startup.totalDurationMs.toFixed(1)}ms (budget ${options.startupBudgetMs}ms)`,
+    `  project: ${report.target.projectName} (#${report.target.projectId})`,
+  );
+  console.log(`  worktree: ${report.target.worktreePath}`);
+  console.log("");
+
+  console.log("Startup HTTP");
+  for (const result of report.startup.http) {
+    console.log(
+      `  ${result.label}: ${result.durationMs.toFixed(1)}ms (${result.status})`,
+    );
+  }
+  console.log("");
+
+  console.log("Startup RPC");
+  for (const result of report.startup.rpc) {
+    console.log(
+      `  ${result.label}: ${result.durationMs.toFixed(1)}ms (${result.status})`,
+    );
+  }
+  console.log("");
+
+  console.log("Pressure");
+  console.log(`  completed loops: ${report.pressure.completedCount}`);
+  console.log(`  aborted loops: ${report.pressure.abortedCount}`);
+  console.log(`  failed loops: ${report.pressure.failedCount}`);
+  if (Object.keys(report.pressure.failureCountByLabel).length > 0) {
+    console.log("  failures by label:");
+    for (const [label, count] of Object.entries(
+      report.pressure.failureCountByLabel,
+    )) {
+      console.log(`    ${label}: ${count}`);
+    }
+  }
+  console.log("");
+
+  console.log(
+    `Startup total: ${report.startup.totalDurationMs.toFixed(1)}ms (budget ${report.budgets.startupBudgetMs}ms)`,
+  );
+  console.log(`Pass: ${report.pass ? "yes" : "no"}`);
+  console.log("");
+
+  printTimingDistributionSection(
+    "Startup HTTP percentiles",
+    report.latency.startupHttpByLabel,
+  );
+  printTimingDistributionSection(
+    "Startup RPC percentiles",
+    report.latency.startupRpcByLabel,
+  );
+  printTimingDistributionSection(
+    "Pressure RPC percentiles",
+    report.latency.pressureRpcByLabel,
+  );
+
+  console.log("Memory snapshots");
+  console.log(
+    `  before warmup: ${formatMemoryUsage(report.diagnostics.beforeWarmup.memoryUsage)}`,
+  );
+  console.log(
+    `  after warmup: ${formatMemoryUsage(report.diagnostics.afterWarmup.memoryUsage)}`,
+  );
+  console.log(
+    `  after pressure: ${formatMemoryUsage(report.diagnostics.afterPressure.memoryUsage)}`,
+  );
+  console.log("");
+
+  const runtimeStatsSummary =
+    report.diagnostics.afterPressure.runtimeStatsSummary;
+  console.log("Runtime stats summary");
+  console.log(
+    `  rpc: calls=${runtimeStatsSummary.rpc.calls} succeeded=${runtimeStatsSummary.rpc.succeeded} failed=${runtimeStatsSummary.rpc.failed} timedOut=${runtimeStatsSummary.rpc.timedOut} canceled=${runtimeStatsSummary.rpc.canceled} methods=${runtimeStatsSummary.rpc.methodCount} requestBytes=${formatBytes(runtimeStatsSummary.rpc.requestBytes)} responseBytes=${formatBytes(runtimeStatsSummary.rpc.responseBytes)} peak=${formatDuration(runtimeStatsSummary.rpc.peakDurationMs)}`,
+  );
+  console.log(
+    `  websocket pushes: messages=${runtimeStatsSummary.websocketPush.messages} types=${runtimeStatsSummary.websocketPush.typeCount} deliveredClients=${runtimeStatsSummary.websocketPush.deliveredClients} droppedClients=${runtimeStatsSummary.websocketPush.droppedClients} bytes=${formatBytes(runtimeStatsSummary.websocketPush.payloadBytes)}`,
+  );
+  console.log(
+    `  sqlite retry: loopsWithRetry=${runtimeStatsSummary.sqliteRetry.loopsWithRetry} totalRetries=${runtimeStatsSummary.sqliteRetry.totalRetries} exhausted=${runtimeStatsSummary.sqliteRetry.exhaustedLoops} peakRetryCount=${runtimeStatsSummary.sqliteRetry.peakRetryCount} totalBackoff=${formatDuration(runtimeStatsSummary.sqliteRetry.totalBackoffMs)}`,
+  );
+  console.log(
+    `  git history cache: rangeHits=${runtimeStatsSummary.gitCache.historyPage.cacheRangeHit} fetches=${runtimeStatsSummary.gitCache.historyPage.fetches} prefetchWaits=${runtimeStatsSummary.gitCache.historyPage.prefetchWaits} preemptions=${runtimeStatsSummary.gitCache.historyPage.preemptions}`,
+  );
+  console.log(
+    `  git commit diff cache: hits=${runtimeStatsSummary.gitCache.commitDiff.hits} misses=${runtimeStatsSummary.gitCache.commitDiff.misses} pendingReuse=${runtimeStatsSummary.gitCache.commitDiff.pendingReuse} stores=${runtimeStatsSummary.gitCache.commitDiff.stores}`,
   );
 }
 
@@ -948,6 +1311,13 @@ async function main(): Promise<void> {
 
   try {
     const context = await ensureHarnessContext(controlClient, options);
+    const beforeWarmup = await readRuntimeDiagnostics(
+      baseUrl,
+      options.httpBudgetMs,
+      {
+        reset: true,
+      },
+    );
 
     const pressureWorkers = Array.from({ length: options.workers }, () =>
       runPressureWorker(
@@ -960,6 +1330,10 @@ async function main(): Promise<void> {
     if (options.warmupMs > 0) {
       await sleep(options.warmupMs);
     }
+    const afterWarmup = await readRuntimeDiagnostics(
+      baseUrl,
+      options.httpBudgetMs,
+    );
 
     const startup = await measureStartupSequence(
       startupClient,
@@ -969,11 +1343,34 @@ async function main(): Promise<void> {
     );
     stopPressureController.abort();
     const pressure = summarizePressure(await Promise.all(pressureWorkers));
-    printStartupSummary(startup, pressure, context, options, baseUrl, rpcUrl);
+    const afterPressure = await readRuntimeDiagnostics(
+      baseUrl,
+      options.httpBudgetMs,
+    );
+    const pass = didStartupPass(startup, options);
+    const report = buildHarnessReport({
+      baseUrl,
+      context,
+      diagnostics: {
+        afterPressure,
+        afterWarmup,
+        beforeWarmup,
+      },
+      pass,
+      pressure,
+      rpcUrl,
+      startup,
+      startupBudgets: {
+        httpBudgetMs: options.httpBudgetMs,
+        rpcBudgetMs: options.rpcBudgetMs,
+        startupBudgetMs: options.startupBudgetMs,
+      },
+    });
+    printHarnessReport(report, options);
 
     await cleanupHarness(controlClient, context);
 
-    if (!didStartupPass(startup, options)) {
+    if (!pass) {
       process.exitCode = 1;
     }
   } finally {
@@ -984,4 +1381,6 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}

@@ -121,7 +121,9 @@ import {
   type RpcWebSocketSocketData,
 } from "./rpc-websocket-auth";
 import {
+  getRuntimeStatsSnapshot,
   getRuntimeStatsSummary,
+  type ProcessMemoryUsageSnapshot,
   type RpcMeasurementToken,
   recordRpcCanceled,
   recordRpcFailed,
@@ -129,6 +131,7 @@ import {
   recordRpcSucceeded,
   recordRpcTimedOut,
   recordWebSocketPush,
+  resetRuntimeStats,
 } from "./runtime-stats";
 import {
   applySecurityHeaders,
@@ -637,6 +640,26 @@ function currentNowMs(): number {
 
 function utf8ByteLength(text: string): number {
   return Buffer.byteLength(text, "utf8");
+}
+
+function readProcessMemoryUsageSnapshot(): ProcessMemoryUsageSnapshot {
+  const memory = process.memoryUsage();
+  return {
+    arrayBuffers: memory.arrayBuffers,
+    external: memory.external,
+    heapTotal: memory.heapTotal,
+    heapUsed: memory.heapUsed,
+    rss: memory.rss,
+  };
+}
+
+function buildRuntimeDiagnosticsSnapshot() {
+  return {
+    collectedAt: new Date().toISOString(),
+    memoryUsage: readProcessMemoryUsageSnapshot(),
+    runtimeStats: getRuntimeStatsSnapshot(),
+    runtimeStatsSummary: getRuntimeStatsSummary(),
+  };
 }
 
 class RequestValidationError extends Error {
@@ -2526,6 +2549,36 @@ async function bootstrap(): Promise<void> {
           JSON.stringify(buildLivenessPayload(true)),
           "application/json; charset=utf-8",
         );
+      }
+
+      if (pathname === "/health/runtime-stats") {
+        webServerLogger.trace({
+          message: "Serving runtime stats health endpoint",
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
+        return jsonResponse(buildRuntimeDiagnosticsSnapshot());
+      }
+
+      if (pathname === "/health/runtime-stats/reset") {
+        webServerLogger.trace({
+          message: "Resetting runtime stats through health endpoint",
+          method: request.method,
+          pathname,
+          source,
+          requestId: requestId ?? null,
+        });
+        if (request.method !== "POST") {
+          return stringResponse(
+            "Method not allowed",
+            "text/plain; charset=utf-8",
+            405,
+          );
+        }
+
+        resetRuntimeStats();
+        return jsonResponse(buildRuntimeDiagnosticsSnapshot());
       }
 
       webServerLogger.warning({

@@ -8,7 +8,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Bootstraps the unified Bun backend (`Bun.serve`) and owns most long-lived server behavior.
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`) and builds the shared runtime configuration.
   - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files and exiting before server bootstrap.
-  - Exposes loopback HTTP routes for mainview assets and websocket RPC at `/rpc`.
+  - Exposes loopback HTTP routes for mainview assets, runtime health snapshots at `/health/runtime-stats`, and websocket RPC at `/rpc`.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
   - Backing entrypoint for the default `bun start` and `bun start:tls` scripts.
@@ -264,7 +264,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `starvation-harness.ts`
   - Optional benchmarking harness to exercise startup, HTTP, and RPC behavior under worker concurrency.
-  - Produces timing summaries and can help validate race/pressure behavior in development and CI-like scenarios.
+  - Produces timing summaries, latency percentiles, runtime-stats snapshots, and memory snapshots to help validate race/pressure behavior in development and CI-like scenarios.
 
 ## Notes
 

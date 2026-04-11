@@ -96,6 +96,21 @@ export type RuntimeStatsSummary = {
   };
 };
 
+export type ProcessMemoryUsageSnapshot = {
+  arrayBuffers: number;
+  external: number;
+  heapTotal: number;
+  heapUsed: number;
+  rss: number;
+};
+
+export type RuntimeDiagnosticsSnapshot = {
+  collectedAt: string;
+  memoryUsage: ProcessMemoryUsageSnapshot;
+  runtimeStats: RuntimeStatsSnapshot;
+  runtimeStatsSummary: RuntimeStatsSummary;
+};
+
 export type RpcMeasurementToken = {
   method: RpcMethodName | (string & {});
   startedAtMs: number;

@@ -15,7 +15,7 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Risks
 
-- Optimization slices must stay measurement-led. `OPT01.2` and `OPT01.3` should build on the shared runtime collector baseline before speculative follow-on slices are pulled forward.
+- Optimization slices must stay measurement-led. `OPT01.3` should use the shared runtime collector and harness reporting baseline before speculative follow-on slices are pulled forward.
 - `OPT04.3` and `OPT05.3` are intentionally conditional; they should not be started unless earlier slices show continuing payoff.
 - Expanding this backlog beyond the original Pi/Codex-only scope means each optimization slice must keep explicit document references so its justification stays auditable.
 
@@ -24,9 +24,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 - None for the currently accepted optimization backlog.
 
 ## Todo Items
-
-- [OPT01.2] Harness percentile and memory reporting - Extend the starvation harness with p50/p95/p99 output, memory snapshots, and JSON-friendly reporting.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT01` / `OPT01.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§6.2, 7.2.
 
 - [OPT01.3] First baseline write-up - Record one repeatable baseline run and document how future before/after comparisons should be made.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT01` / `OPT01.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§6.2, 7.2.
