@@ -119,7 +119,7 @@ describe("runtime stats collector", () => {
     expect(summary.websocketPush.typeCount).toBe(2);
   });
 
-  it("tracks sqlite retry loops including exhaustion", () => {
+  it("tracks sqlite retry loops including exhaustion in snapshots and summary", () => {
     recordSqliteRetryLoop({
       exhausted: false,
       retryCount: 2,
@@ -131,14 +131,19 @@ describe("runtime stats collector", () => {
       totalBackoffMs: 620,
     });
 
-    const snapshot = getRuntimeStatsSnapshot();
-    expect(snapshot.sqliteRetry).toEqual({
+    const expectedRetryStats = {
       exhaustedLoops: 1,
       loopsWithRetry: 2,
       peakRetryCount: 5,
       totalBackoffMs: 695,
       totalRetries: 7,
-    });
+    };
+
+    const snapshot = getRuntimeStatsSnapshot();
+    expect(snapshot.sqliteRetry).toEqual(expectedRetryStats);
+
+    const summary = getRuntimeStatsSummary();
+    expect(summary.sqliteRetry).toEqual(expectedRetryStats);
   });
 
   it("tracks git cache hit and miss counters", () => {

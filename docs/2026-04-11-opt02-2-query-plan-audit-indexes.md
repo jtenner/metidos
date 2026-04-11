@@ -274,4 +274,4 @@ It turns the planning document’s “query-plan audit and missing composite ind
 - preserve message-read restraint,
 - document the read/write tradeoff clearly.
 
-That leaves the next DB slice (`OPT02.3`) free to focus on retry metrics rather than reopening the index conversation without new evidence.
+That completes the remaining measured DB tuning work that was still justified in the current backlog without inventing broader speculative database changes.

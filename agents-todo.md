@@ -25,9 +25,6 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 
 ## Todo Items
 
-- [OPT02.3] SQLite retry metrics - Count lock retries and retry exhaustion, then surface those numbers through the runtime stats path.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT02` / `OPT02.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§4.1, 4.2.
-
 - [OPT03.1] Extract thread-status and selected-thread controller - Move polling and selected-thread refresh logic out of `App.tsx` to reduce state fan-out and sharpen hot render boundaries.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT03` / `OPT03.1`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§2.1, 2.3.
 
