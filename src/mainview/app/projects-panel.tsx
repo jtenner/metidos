@@ -152,8 +152,8 @@ function ProjectWorktreeRow({
         type="button"
         className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors ${
           activeWorktree
-            ? "bg-[#1c2529] text-[#f2f0ef] shadow-[inset_2px_0_0_0_#7aa5c4]"
-            : "text-[#cfd1d4] hover:bg-[#14181a]"
+            ? "bg-surface-2 text-text-primary shadow-[inset_2px_0_0_0_var(--color-accent-emphasis)]"
+            : "text-text-secondary hover:bg-surface-1"
         } ${showThreadSwitcherButton ? "pr-16" : "pr-10"}`}
         onClick={() => {
           onProjectWorktreeClick(project, worktree.path);
@@ -162,8 +162,8 @@ function ProjectWorktreeRow({
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center ${
             activeWorktree
-              ? "bg-[#24333b] text-[#bdd5e6]"
-              : "bg-[#14181a] text-[#8ca6b9]"
+              ? "bg-surface-3 text-accent-strong"
+              : "bg-surface-2 text-accent"
           }`}
         >
           {materialSymbol(

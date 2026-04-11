@@ -34,10 +34,10 @@ export function SidebarSearchControl({
   return (
     <label className="block">
       <span className="sr-only">Search projects and worktrees</span>
-      <div className="flex items-center gap-2 border border-[#2c363c] bg-[#101214] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-        {materialSymbol("search", "text-[16px] text-[#98b9d0]")}
+      <div className="flex items-center gap-2 border border-border-default bg-surface-1 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+        {materialSymbol("search", "text-[16px] text-accent")}
         <input
-          className="min-w-0 flex-1 select-text bg-transparent text-[13px] text-[#f2f0ef] outline-none placeholder:text-[#727e86]"
+          className="min-w-0 flex-1 select-text bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint"
           placeholder="Search projects and worktrees..."
           value={value}
           onChange={onChange}
@@ -49,7 +49,7 @@ export function SidebarSearchControl({
         {value ? (
           <button
             type="button"
-            className="flex h-5 w-5 items-center justify-center text-[#8f8d8b] transition-colors hover:bg-[#1d2226] hover:text-[#f2f0ef]"
+            className="flex h-5 w-5 items-center justify-center text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary"
             onClick={onClear}
             aria-label="Clear sidebar search"
           >

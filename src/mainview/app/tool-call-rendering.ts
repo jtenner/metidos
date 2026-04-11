@@ -83,6 +83,8 @@ function toolOutputLabel(tool: string): string {
     case "find":
     case "grep":
       return "Matches";
+    case "bash":
+      return "Command";
     case "edit":
     case "write":
       return "Result";
