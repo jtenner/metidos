@@ -13,7 +13,7 @@ export const TASK_GRAPH_ITEMS_DIRECTORY_NAME = "items";
 export const TASK_GRAPH_TASK_FILENAME = "task.toml";
 export const TASK_GRAPH_BODY_FILENAME = "body.md";
 
-const TASK_GRAPH_MULTI_LINK_SECTION_ORDER = [
+export const TASK_GRAPH_MULTI_LINK_SECTION_NAMES = [
   "blockers",
   "caused_by",
   "docs_for",
@@ -346,7 +346,7 @@ function parseTaskGraphLinks(
     tests_for: [],
   };
 
-  for (const sectionName of TASK_GRAPH_MULTI_LINK_SECTION_ORDER) {
+  for (const sectionName of TASK_GRAPH_MULTI_LINK_SECTION_NAMES) {
     const section = optionalRecordField(document, sectionName, filePath);
     links[sectionName] = section
       ? optionalStringArrayField(section, "tasks", filePath)
@@ -356,6 +356,46 @@ function parseTaskGraphLinks(
   const parent = optionalRecordField(document, "parent", filePath);
   links.parent = parent ? requireStringField(parent, "task", filePath) : null;
   return links;
+}
+
+export function parseTaskGraphConfigText(
+  documentText: string,
+  filePath: string,
+): TaskGraphConfig {
+  return parseTaskGraphConfig(
+    parseTomlDocument(documentText, filePath),
+    filePath,
+  );
+}
+
+export function parseTaskGraphTagRegistryText(
+  documentText: string,
+  filePath: string,
+): TaskGraphTagRegistry {
+  return parseTaskGraphTagRegistry(
+    parseTomlDocument(documentText, filePath),
+    filePath,
+  );
+}
+
+export function parseTaskGraphTypeRegistryText(
+  documentText: string,
+  filePath: string,
+): TaskGraphTypeRegistry {
+  return parseTaskGraphTypeRegistry(
+    parseTomlDocument(documentText, filePath),
+    filePath,
+  );
+}
+
+export function parseTaskGraphTaskText(
+  documentText: string,
+  filePath: string,
+): TaskGraphTask {
+  return parseTaskGraphTask(
+    parseTomlDocument(documentText, filePath),
+    filePath,
+  );
 }
 
 function parseTaskGraphTask(
@@ -627,7 +667,7 @@ export function serializeTaskGraphTaskToml(task: TaskGraphTask): string {
   }
 
   const linkTableLines: string[] = [];
-  for (const sectionName of TASK_GRAPH_MULTI_LINK_SECTION_ORDER) {
+  for (const sectionName of TASK_GRAPH_MULTI_LINK_SECTION_NAMES) {
     const values = canonicalizeSortedStringArray(task.links[sectionName]);
     if (values.length === 0) {
       continue;

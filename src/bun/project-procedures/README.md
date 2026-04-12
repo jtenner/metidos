@@ -47,6 +47,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Emits canonical `task.toml`, `config.toml`, `tags.toml`, and `types.toml` text so later init/validate/normalize tooling can share one formatting layer.
   - Now also scaffolds the minimal `.metidos/tasks/` layout for `init_task_graph`, including default config creation, optional empty registry seeding, and created-versus-existing status reporting without clobbering existing canonical files.
 
+- `task-graph-validation.ts`
+  - Structured validator for canonical `.metidos/tasks/` repositories.
+  - Reuses the shared task-graph parsers to report machine-readable error and warning findings with task ids, file paths, and field context.
+  - Supports validating either the whole graph or a requested task-id subset while still resolving links against the full repository graph.
+
 - `pi-event-projection.ts`
   - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.
   - Tracks assistant thinking/text state, tool-call arguments, pre-write file snapshots, and final usage snapshots across a streamed run.
