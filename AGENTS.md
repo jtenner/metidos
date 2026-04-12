@@ -1,6 +1,7 @@
 # AGENTS
 
 - Follow the repository commit process documented in `.tasks/commit.md`.
+- Follow all style guidelines in `.tasks/style.md`.
 - Always add generated files to `.gitignore` and keep them out of version control.
 - New RPC features should include measurable telemetry hooks or counters where practical so performance-impacting additions can be observed in runtime stats instead of guessed at later.
 
