@@ -489,9 +489,9 @@ function buildRpcSocketDataFromSession(
 }
 
 const rpcHandlers: RpcRequestHandlerMap = {
-  getHomeDirectory: () => getHomeDirectoryProcedure(),
-  listDirectorySuggestions: (params) =>
-    listDirectorySuggestionsProcedure(params),
+  getHomeDirectory: (_params, context) => getHomeDirectoryProcedure(context),
+  listDirectorySuggestions: (params, context) =>
+    listDirectorySuggestionsProcedure(params, context),
   getModelCatalog: (params) => getModelCatalogProcedure(params),
   getProviderAuthStatus: (params, context) =>
     getProviderAuthStatusProcedure(params, context),

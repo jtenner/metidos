@@ -6,7 +6,7 @@
 import { statSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 /**
  * Read and promote an LRU cache entry to most-recent.
@@ -268,24 +268,54 @@ export function createAsyncConcurrencyLimit(maxConcurrent: number): {
 /**
  * Expand `~` to home directory for non-Windows inputs.
  */
-export function expandHomeShorthandPath(value: string): string {
-  if (process.platform === "win32") {
+export function expandHomeShorthandPath(
+  value: string,
+  options?: {
+    homeDirectory?: string;
+    supportsTildePath?: boolean;
+  },
+): string {
+  const supportsTildePath =
+    options?.supportsTildePath ?? process.platform !== "win32";
+  if (!supportsTildePath) {
     return value;
   }
+  const homeDirectory = options?.homeDirectory ?? homedir();
   if (value === "~") {
-    return homedir();
+    return homeDirectory;
   }
   if (value.startsWith("~/")) {
-    return resolve(homedir(), value.slice(2));
+    return resolve(homeDirectory, value.slice(2));
   }
   return value;
 }
 
 /**
- * Normalize path through home expansion and resolution.
+ * Normalize path through optional home expansion and resolution.
  */
-export function normalizePath(value: string): string {
-  return resolve(expandHomeShorthandPath(value));
+export function normalizePath(
+  value: string,
+  options?: {
+    homeDirectory?: string;
+    supportsTildePath?: boolean;
+  },
+): string {
+  return resolve(expandHomeShorthandPath(value, options));
+}
+
+/**
+ * True when `path` is equal to or contained under `root`.
+ */
+export function pathIsWithinRoot(root: string, path: string): boolean {
+  const relativePath = relative(resolve(root), resolve(path));
+  if (!relativePath) {
+    return true;
+  }
+  if (isAbsolute(relativePath)) {
+    return false;
+  }
+  const [firstSegment = ""] = relativePath.split(/[\\/]+/);
+  return firstSegment !== "..";
 }
 
 /**

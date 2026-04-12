@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -19,8 +20,10 @@ import { generateTotpCode } from "./auth";
 import { prepareTotpEnrollment, setupAuth } from "./auth-service";
 import {
   closeAppDatabase,
+  createUser,
   initAppDatabase,
   resetResolvedAppDataDirectory,
+  upsertProject,
 } from "./db";
 import {
   resetPiCodexAuthTestOverrides,
@@ -94,6 +97,33 @@ function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
   tempDirectories.add(path);
   return path;
+}
+
+function createUniqueUsername(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createRpcContext(options: {
+  isAdmin?: boolean;
+  userId?: number | null;
+  username?: string | null;
+}) {
+  return {
+    auth: {
+      authBypass: false,
+      isAdmin: options.isAdmin ?? false,
+      sessionId:
+        typeof options.userId === "number" ? `session-${options.userId}` : null,
+      userId:
+        typeof options.userId === "number"
+          ? options.userId
+          : (null as number | null),
+      username: options.username ?? null,
+    },
+    priority: "foreground" as const,
+    signal: new AbortController().signal,
+    timeoutMs: null,
+  };
 }
 
 function initializeGitRepository(path: string): void {
@@ -962,6 +992,221 @@ describe("project procedure configuration helpers", () => {
           username: "bob",
         }),
       ]),
+    );
+  });
+
+  it("returns a private workspace home and scoped directory suggestions for regular users", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const username = createUniqueUsername("bob");
+    const user = createUser(database, {
+      isAdmin: false,
+      username,
+    });
+    const userContext = createRpcContext({
+      isAdmin: false,
+      userId: user.id,
+      username: user.username,
+    });
+    const userWorkspaceHome = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "users",
+      user.username,
+    );
+    const visibleDirectory = join(userWorkspaceHome, "repo-a");
+    const secondVisibleDirectory = join(userWorkspaceHome, "repo-b");
+    const outsideDirectory = createTempDirectory(
+      "metidos-private-home-outside-",
+    );
+
+    mkdirSync(visibleDirectory, {
+      recursive: true,
+    });
+    mkdirSync(secondVisibleDirectory, {
+      recursive: true,
+    });
+
+    await expect(
+      procedures.getHomeDirectoryProcedure(userContext),
+    ).resolves.toEqual({
+      homeDirectory: userWorkspaceHome,
+      supportsTildePath: true,
+    });
+    await expect(
+      procedures.listDirectorySuggestionsProcedure(
+        {
+          query: "~/",
+        },
+        userContext,
+      ),
+    ).resolves.toEqual({
+      directories: expect.arrayContaining([
+        visibleDirectory,
+        secondVisibleDirectory,
+      ]),
+    });
+    await expect(
+      procedures.listDirectorySuggestionsProcedure(
+        {
+          query: `${outsideDirectory}/`,
+        },
+        userContext,
+      ),
+    ).resolves.toEqual({
+      directories: [],
+    });
+  });
+
+  it("opens only workspaces inside the regular user's private root", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const username = createUniqueUsername("carol");
+    const user = createUser(database, {
+      isAdmin: false,
+      username,
+    });
+    const userContext = createRpcContext({
+      isAdmin: false,
+      userId: user.id,
+      username: user.username,
+    });
+    const userWorkspaceHome = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "users",
+      user.username,
+    );
+    const visibleRepoPath = join(userWorkspaceHome, "repo-a");
+    const outsideRepoPath = createTempDirectory(
+      "metidos-private-open-outside-",
+    );
+
+    mkdirSync(visibleRepoPath, {
+      recursive: true,
+    });
+    initializeGitRepository(visibleRepoPath);
+    initializeGitRepository(outsideRepoPath);
+
+    await expect(
+      procedures.openProjectProcedure(
+        {
+          name: "Scoped Repo",
+          projectPath: "~/repo-a",
+        },
+        userContext,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        project: expect.objectContaining({
+          ownerUserId: user.id,
+          path: visibleRepoPath,
+        }),
+        worktrees: [expect.objectContaining({ path: visibleRepoPath })],
+      }),
+    );
+    await expect(
+      procedures.openProjectProcedure(
+        {
+          name: "Outside Repo",
+          projectPath: outsideRepoPath,
+        },
+        userContext,
+      ),
+    ).rejects.toThrow("Regular users can only access workspaces inside ~/.");
+  });
+
+  it("hides stale out-of-scope projects and worktrees for regular users", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const username = createUniqueUsername("dave");
+    const user = createUser(database, {
+      isAdmin: false,
+      username,
+    });
+    const userContext = createRpcContext({
+      isAdmin: false,
+      userId: user.id,
+      username: user.username,
+    });
+    const userWorkspaceHome = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "users",
+      user.username,
+    );
+    const visibleRepoPath = join(userWorkspaceHome, "repo-a");
+    const outsideRepoPath = createTempDirectory(
+      "metidos-private-filter-outside-",
+    );
+    const hiddenWorktreeParent = createTempDirectory(
+      "metidos-private-filter-worktree-",
+    );
+    const hiddenWorktreePath = join(hiddenWorktreeParent, "repo-a-feature");
+
+    mkdirSync(visibleRepoPath, {
+      recursive: true,
+    });
+    initializeGitRepository(visibleRepoPath);
+    initializeGitRepository(outsideRepoPath);
+    execFileSync(
+      "git",
+      ["worktree", "add", "-b", "feature-hidden", hiddenWorktreePath],
+      {
+        cwd: visibleRepoPath,
+        stdio: "ignore",
+      },
+    );
+    upsertProject(database, {
+      name: "Outside Repo",
+      ownerUserId: user.id,
+      projectPath: outsideRepoPath,
+    });
+
+    const opened = await procedures.openProjectProcedure(
+      {
+        name: "Scoped Repo",
+        projectPath: visibleRepoPath,
+      },
+      userContext,
+    );
+
+    expect(opened.worktrees.map((worktree) => worktree.path)).toEqual([
+      visibleRepoPath,
+    ]);
+    await expect(
+      procedures.listProjectWorktreesProcedure(
+        {
+          includeHidden: true,
+          projectId: opened.project.id,
+        },
+        userContext,
+      ),
+    ).resolves.toEqual({
+      hiddenWorktrees: [],
+      project: expect.objectContaining({
+        id: opened.project.id,
+      }),
+      worktrees: [expect.objectContaining({ path: visibleRepoPath })],
+    });
+
+    const listedProjects = await procedures.listProjectsProcedure(
+      undefined,
+      userContext,
+    );
+    expect(listedProjects.map((project) => project.path)).toContain(
+      visibleRepoPath,
+    );
+    expect(listedProjects.map((project) => project.path)).not.toContain(
+      outsideRepoPath,
+    );
+
+    const bootstrap = await procedures.getAppBootstrapProcedure(
+      undefined,
+      userContext,
+    );
+    expect(bootstrap.projects.map((project) => project.path)).toContain(
+      visibleRepoPath,
+    );
+    expect(bootstrap.projects.map((project) => project.path)).not.toContain(
+      outsideRepoPath,
     );
   });
 

@@ -8,7 +8,9 @@ import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 
 import {
+  expandHomeShorthandPath,
   lruEntriesNewestFirst,
+  pathIsWithinRoot,
   readLruValue,
   safeIsDirectory,
   writeLruValue,
@@ -44,26 +46,31 @@ let directorySuggestionRefreshTimer: ReturnType<typeof setInterval> | null =
  * - a directory to inspect
  * - optional name prefix to filter within that directory
  */
-function parseDirectorySuggestionQuery(query: string): {
+function parseDirectorySuggestionQuery(
+  query: string,
+  options?: {
+    homeDirectory?: string;
+    supportsTildePath?: boolean;
+  },
+): {
   searchDirectory: string;
   namePrefix: string;
 } {
-  if (process.platform !== "win32" && (query === "~" || query === "~/")) {
+  const homeDirectory = options?.homeDirectory ?? homedir();
+  const supportsTildePath =
+    options?.supportsTildePath ?? process.platform !== "win32";
+  if (supportsTildePath && (query === "~" || query === "~/")) {
     return {
-      searchDirectory: homedir(),
+      searchDirectory: homeDirectory,
       namePrefix: "",
     };
   }
 
   const hasTrailingSeparator = /[\\/]$/.test(query);
-  const expandedQuery =
-    process.platform === "win32"
-      ? query
-      : query === "~"
-        ? homedir()
-        : query.startsWith("~/")
-          ? resolve(homedir(), query.slice(2))
-          : query;
+  const expandedQuery = expandHomeShorthandPath(query, {
+    homeDirectory,
+    supportsTildePath,
+  });
   if (hasTrailingSeparator) {
     return {
       searchDirectory: resolve(expandedQuery),
@@ -219,15 +226,30 @@ export function warmDirectorySuggestionCache(): void {
  * Return absolute directory path suggestions for autocomplete:
  * parse + validate query, refresh cache as needed, filter by prefix.
  */
-export function listDirectorySuggestions(query: string): string[] {
+export function listDirectorySuggestions(
+  query: string,
+  options?: {
+    homeDirectory?: string;
+    rootDirectory?: string | null;
+    supportsTildePath?: boolean;
+  },
+): string[] {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
     return [];
   }
 
-  const { searchDirectory, namePrefix } =
-    parseDirectorySuggestionQuery(trimmedQuery);
+  const { searchDirectory, namePrefix } = parseDirectorySuggestionQuery(
+    trimmedQuery,
+    options,
+  );
   if (!safeIsDirectory(searchDirectory)) {
+    return [];
+  }
+  if (
+    options?.rootDirectory &&
+    !pathIsWithinRoot(options.rootDirectory, searchDirectory)
+  ) {
     return [];
   }
 
@@ -235,6 +257,13 @@ export function listDirectorySuggestions(query: string): string[] {
     const normalizedPrefix = namePrefix.toLocaleLowerCase();
     return readDirectorySuggestionEntries(searchDirectory)
       .filter((entry) => {
+        const nextPath = resolve(searchDirectory, entry);
+        if (
+          options?.rootDirectory &&
+          !pathIsWithinRoot(options.rootDirectory, nextPath)
+        ) {
+          return false;
+        }
         if (
           normalizedPrefix &&
           !entry.toLocaleLowerCase().startsWith(normalizedPrefix)

@@ -3,7 +3,7 @@
  * @description Module for project procedures.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
@@ -24,6 +24,7 @@ import {
   deleteProject,
   deleteThread,
   ensureProjectWorktreeVisible,
+  getAppDataDirectoryPath,
   getCronJobById,
   getCronJobByIdForUser,
   getProject,
@@ -138,6 +139,7 @@ import {
   createAsyncConcurrencyLimit,
   isAbortError,
   normalizePath,
+  pathIsWithinRoot,
   readLruValue,
   safeIsDirectory,
   throwIfAborted,
@@ -236,25 +238,189 @@ function requireUnsafeModeAllowed(context?: RpcRequestContext): void {
   );
 }
 
+type WorkspacePathScope = {
+  homeDirectory: string;
+  restrictedRoot: string | null;
+  supportsTildePath: boolean;
+};
+
+const RESTRICTED_WORKSPACE_ERROR_MESSAGE =
+  "Regular users can only access workspaces inside ~/.";
+
+function defaultWorkspaceSupportsTildePath(): boolean {
+  return process.platform === "darwin" || process.platform === "linux";
+}
+
+function normalizeWorkspaceUsernameSegment(username: string): string {
+  const normalizedUsername = username.trim();
+  if (
+    !normalizedUsername ||
+    normalizedUsername === "." ||
+    normalizedUsername === ".." ||
+    /[\\/]/u.test(normalizedUsername) ||
+    /[:*?"<>|]/u.test(normalizedUsername)
+  ) {
+    throw new Error(
+      "The current account username cannot be mapped to a private workspace home.",
+    );
+  }
+  return normalizedUsername;
+}
+
+function restrictedWorkspacePathScope(username: string): WorkspacePathScope {
+  const homeDirectory = resolve(
+    getAppDataDirectoryPath(),
+    "users",
+    normalizeWorkspaceUsernameSegment(username),
+  );
+  mkdirSync(homeDirectory, {
+    recursive: true,
+  });
+  return {
+    homeDirectory,
+    restrictedRoot: homeDirectory,
+    supportsTildePath: true,
+  };
+}
+
+function adminWorkspacePathScope(): WorkspacePathScope {
+  return {
+    homeDirectory: homedir(),
+    restrictedRoot: null,
+    supportsTildePath: defaultWorkspaceSupportsTildePath(),
+  };
+}
+
+function workspacePathScopeForContext(
+  context?: RpcRequestContext,
+): WorkspacePathScope {
+  if (isAdminContext(context)) {
+    return adminWorkspacePathScope();
+  }
+
+  const username = context?.auth.username?.trim();
+  if (!username) {
+    return adminWorkspacePathScope();
+  }
+
+  return restrictedWorkspacePathScope(username);
+}
+
+function workspacePathScopeForProject(
+  project: Pick<ProjectRecord, "ownerUserId">,
+): WorkspacePathScope {
+  const ownerUser = getUserById(db, project.ownerUserId);
+  if (!ownerUser || ownerUser.isAdmin) {
+    return adminWorkspacePathScope();
+  }
+  return restrictedWorkspacePathScope(ownerUser.username);
+}
+
+function normalizeRequestedWorkspacePath(
+  value: string,
+  context?: RpcRequestContext,
+): string {
+  const scope = workspacePathScopeForContext(context);
+  return normalizePath(value, {
+    homeDirectory: scope.homeDirectory,
+    supportsTildePath: scope.supportsTildePath,
+  });
+}
+
+function formatWorkspacePathForUser(
+  path: string,
+  scope: WorkspacePathScope,
+): string {
+  const normalizedPath = resolve(path);
+  if (!scope.supportsTildePath || !scope.restrictedRoot) {
+    return normalizedPath;
+  }
+  if (!pathIsWithinRoot(scope.restrictedRoot, normalizedPath)) {
+    return normalizedPath;
+  }
+
+  const suffix = normalizedPath.slice(scope.restrictedRoot.length);
+  return suffix ? `~${suffix}` : "~";
+}
+
+function isWorkspacePathAllowed(
+  path: string,
+  scope: WorkspacePathScope,
+): boolean {
+  const normalizedPath = resolve(path);
+  if (!scope.restrictedRoot) {
+    return true;
+  }
+  if (!pathIsWithinRoot(scope.restrictedRoot, normalizedPath)) {
+    return false;
+  }
+  if (!existsSync(normalizedPath)) {
+    return true;
+  }
+
+  try {
+    return pathIsWithinRoot(scope.restrictedRoot, realpathSync(normalizedPath));
+  } catch {
+    return false;
+  }
+}
+
+function assertWorkspacePathAllowed(
+  path: string,
+  scope: WorkspacePathScope,
+): void {
+  if (isWorkspacePathAllowed(path, scope)) {
+    return;
+  }
+  throw new Error(RESTRICTED_WORKSPACE_ERROR_MESSAGE);
+}
+
+function projectIsVisibleToContext(
+  project: ProjectRecord,
+  context?: RpcRequestContext,
+): boolean {
+  if (!context || isAdminContext(context)) {
+    return true;
+  }
+  return isWorkspacePathAllowed(
+    project.path,
+    workspacePathScopeForProject(project),
+  );
+}
+
 function visibleProjects(context?: RpcRequestContext): ProjectRecord[] {
   const userId = authUserId(context);
-  return typeof userId === "number"
-    ? listProjectsForUser(db, userId)
-    : listProjects(db);
+  const projects =
+    typeof userId === "number"
+      ? listProjectsForUser(db, userId)
+      : listProjects(db);
+  return projects.filter((project) =>
+    projectIsVisibleToContext(project, context),
+  );
 }
 
 function visibleThreads(context?: RpcRequestContext): ThreadRecord[] {
   const userId = authUserId(context);
-  return typeof userId === "number"
-    ? listThreadsForUser(db, userId)
-    : listThreads(db);
+  const visibleProjectIds = new Set(
+    visibleProjects(context).map((project) => project.id),
+  );
+  const threads =
+    typeof userId === "number"
+      ? listThreadsForUser(db, userId)
+      : listThreads(db);
+  return threads.filter((thread) => visibleProjectIds.has(thread.projectId));
 }
 
 function visibleCronJobs(context?: RpcRequestContext): CronJobRecord[] {
   const userId = authUserId(context);
-  return typeof userId === "number"
-    ? listCronJobsForUser(db, userId)
-    : listCronJobs(db);
+  const visibleProjectIds = new Set(
+    visibleProjects(context).map((project) => project.id),
+  );
+  const cronJobs =
+    typeof userId === "number"
+      ? listCronJobsForUser(db, userId)
+      : listCronJobs(db);
+  return cronJobs.filter((cronJob) => visibleProjectIds.has(cronJob.projectId));
 }
 
 function toRpcManagedUser(user: UserSetupRecord): RpcManagedUser {
@@ -269,15 +435,17 @@ function toRpcManagedUser(user: UserSetupRecord): RpcManagedUser {
 }
 
 /**
- * RPC procedure: returns OS home directory and whether shell-like `~` expansion
- * is supported on this platform.
+ * RPC procedure: returns the caller's effective workspace home directory and
+ * whether shell-like `~` expansion is supported for that scope.
  */
 
-export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResult> {
+export async function getHomeDirectoryProcedure(
+  context?: RpcRequestContext,
+): Promise<RpcHomeDirectoryResult> {
+  const scope = workspacePathScopeForContext(context);
   return {
-    homeDirectory: homedir(),
-    supportsTildePath:
-      process.platform === "darwin" || process.platform === "linux",
+    homeDirectory: scope.homeDirectory,
+    supportsTildePath: scope.supportsTildePath,
   };
 }
 
@@ -608,7 +776,7 @@ export async function getAppBootstrapProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcAppBootstrapResult> {
   const [homeDirectory, modelCatalog] = await Promise.all([
-    getHomeDirectoryProcedure(),
+    getHomeDirectoryProcedure(context),
     getModelCatalogProcedure(),
   ]);
   const threads = visibleThreads(context);
@@ -1161,6 +1329,7 @@ function threadById(
   if (!thread) {
     throw new Error(`Thread not found: ${threadId}`);
   }
+  projectByIdForPath(thread.projectId, context);
   return thread;
 }
 /**
@@ -1620,9 +1789,15 @@ async function readProjectWorktreeListing(
 
 export async function listDirectorySuggestionsProcedure(
   params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]> {
+  const scope = workspacePathScopeForContext(context);
   return {
-    directories: listDirectorySuggestions(params.query),
+    directories: listDirectorySuggestions(params.query, {
+      homeDirectory: scope.homeDirectory,
+      rootDirectory: scope.restrictedRoot,
+      supportsTildePath: scope.supportsTildePath,
+    }),
   };
 }
 /**
@@ -1630,12 +1805,16 @@ export async function listDirectorySuggestionsProcedure(
  * @param projectPath - projectPath path used by assertProjectDirectory.
  */
 
-function assertProjectDirectory(projectPath: string): void {
+function assertProjectDirectory(
+  projectPath: string,
+  scope: WorkspacePathScope,
+): void {
+  const displayPath = formatWorkspacePathForUser(projectPath, scope);
   if (!existsSync(projectPath)) {
-    throw new Error(`Project path does not exist: ${projectPath}`);
+    throw new Error(`Project path does not exist: ${displayPath}`);
   }
   if (!safeIsDirectory(projectPath)) {
-    throw new Error(`Project path must be a directory: ${projectPath}`);
+    throw new Error(`Project path must be a directory: ${displayPath}`);
   }
 }
 /**
@@ -2097,6 +2276,29 @@ function splitProjectWorktreesForVisibility(
     worktrees: visibleWorktrees,
   };
 }
+
+function filterProjectWorktreesForAccess(
+  projectId: number | undefined,
+  worktrees: RpcWorktree[],
+): RpcWorktree[] {
+  if (typeof projectId !== "number") {
+    return worktrees;
+  }
+
+  const project = getProjectById(db, projectId);
+  if (!project) {
+    return worktrees;
+  }
+
+  const scope = workspacePathScopeForProject(project);
+  if (!scope.restrictedRoot) {
+    return worktrees;
+  }
+
+  return worktrees.filter((worktree) =>
+    isWorkspacePathAllowed(worktree.path, scope),
+  );
+}
 /**
  * Lists fresh project worktrees.
  * @param projectPath - projectPath path used by listFreshProjectWorktrees.
@@ -2109,7 +2311,10 @@ async function listFreshProjectWorktreeListing(
   projectId?: number,
   options?: ProjectWorktreeReadOptions,
 ): Promise<ProjectWorktreeListing> {
-  const worktrees = await listGitWorktreesForProjectPath(projectPath, options);
+  const worktrees = filterProjectWorktreesForAccess(
+    projectId,
+    await listGitWorktreesForProjectPath(projectPath, options),
+  );
   if (typeof projectId !== "number") {
     return {
       hiddenWorktrees: [],
@@ -2575,7 +2780,7 @@ function projectByIdForPath(
     typeof userId === "number"
       ? getProjectByIdForUser(db, userId, projectId)
       : getProjectById(db, projectId);
-  if (!project) {
+  if (!project || !projectIsVisibleToContext(project, context)) {
     throw new Error(`Project not currently tracked: ${projectId}`);
   }
   return project;
@@ -2589,9 +2794,14 @@ function cronJobById(
   },
 ): CronJobRecord | null {
   const userId = authUserId(context);
-  return typeof userId === "number"
-    ? getCronJobByIdForUser(db, userId, cronJobId, options)
-    : getCronJobById(db, cronJobId, options);
+  const cronJob =
+    typeof userId === "number"
+      ? getCronJobByIdForUser(db, userId, cronJobId, options)
+      : getCronJobById(db, cronJobId, options);
+  if (cronJob) {
+    projectByIdForPath(cronJob.projectId, context);
+  }
+  return cronJob;
 }
 /**
  * Finds project worktree.
@@ -2629,8 +2839,9 @@ async function assertProjectWorktree(
 ): Promise<RpcWorktree> {
   const worktree = await findProjectWorktree(project, worktreePath, options);
   if (!worktree) {
+    const scope = workspacePathScopeForProject(project);
     throw new Error(
-      `Worktree not found for project ${project.path}: ${worktreePath}`,
+      `Worktree not found for project ${formatWorkspacePathForUser(project.path, scope)}: ${formatWorkspacePathForUser(worktreePath, scope)}`,
     );
   }
   return worktree;
@@ -2676,8 +2887,9 @@ async function ensureTrackedProjectWorktree(
     return refreshed;
   }
 
+  const scope = workspacePathScopeForProject(project);
   throw new Error(
-    `Worktree not found for project ${project.path}: ${worktreePath}`,
+    `Worktree not found for project ${formatWorkspacePathForUser(project.path, scope)}: ${formatWorkspacePathForUser(worktreePath, scope)}`,
   );
 }
 /**
@@ -2782,8 +2994,13 @@ async function openProjectWithGitOptions(
   requestGitOptions?: GitCommandOptions,
   context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
-  const projectPath = normalizePath(params.projectPath);
-  assertProjectDirectory(projectPath);
+  const workspaceScope = workspacePathScopeForContext(context);
+  const projectPath = normalizeRequestedWorkspacePath(
+    params.projectPath,
+    context,
+  );
+  assertWorkspacePathAllowed(projectPath, workspaceScope);
+  assertProjectDirectory(projectPath, workspaceScope);
   const userId = authUserId(context);
   const existingProject =
     typeof userId === "number"
@@ -2820,7 +3037,7 @@ async function openProjectWithGitOptions(
     } else {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
+        `Project folder must be a git repository root or worktree: ${formatWorkspacePathForUser(projectPath, workspaceScope)}${message ? ` (${message})` : ""}`,
       );
     }
   }
@@ -2926,14 +3143,18 @@ export async function createWorktreeProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcCreateWorktreeResult> {
   const project = projectByIdForPath(params.projectId, context);
+  const projectScope = workspacePathScopeForProject(project);
   const worktreeName = params.name.trim();
   if (!worktreeName) {
     throw new Error("Worktree name is required.");
   }
 
   const worktreePath = worktreePathFromName(project.path, worktreeName);
+  assertWorkspacePathAllowed(worktreePath, projectScope);
   if (existsSync(worktreePath)) {
-    throw new Error(`Worktree path already exists: ${worktreePath}`);
+    throw new Error(
+      `Worktree path already exists: ${formatWorkspacePathForUser(worktreePath, projectScope)}`,
+    );
   }
 
   await runGitCommand(project.path, [
@@ -2966,7 +3187,10 @@ export async function setWorktreePinnedProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
   const project = projectByIdForPath(params.projectId, context);
-  const worktreePath = normalizePath(params.worktreePath);
+  const worktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
   });
@@ -2994,7 +3218,10 @@ export async function createThreadProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
   const project = projectByIdForPath(params.projectId, context);
-  const worktreePath = normalizePath(params.worktreePath);
+  const worktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
   const access = resolveThreadAccessControls(params, context);
@@ -3025,7 +3252,10 @@ export async function requestThreadStartProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcThreadStartRequest> {
   const project = projectByIdForPath(params.projectId, context);
-  const worktreePath = normalizePath(params.worktreePath);
+  const worktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   const input = params.input.trim();
   if (!input) {
     throw new Error("Thread input is required.");
@@ -3113,7 +3343,10 @@ export async function newCronProcedure(
   context?: RpcRequestContext,
 ): Promise<RpcCronJob> {
   const project = projectByIdForPath(params.projectId, context);
-  const worktreePath = normalizePath(params.worktreePath);
+  const worktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
   });
@@ -3791,7 +4024,10 @@ async function openWorktreeWithGitOptions(
 ): Promise<RpcOpenWorktreeResult> {
   const project = projectByIdForPath(params.projectId, context);
   const state = ensureProjectPoller(project);
-  const worktreePath = normalizePath(params.worktreePath);
+  const worktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   await assertProjectWorktree(project, worktreePath, {
     ...requestGitOptions,
     includeHidden: true,
@@ -3810,8 +4046,9 @@ async function openWorktreeWithGitOptions(
   );
 
   if (!trackedProjectWorktree(state, worktreePath)) {
+    const scope = workspacePathScopeForProject(project);
     throw new Error(
-      `Worktree not found for project ${project.path}: ${worktreePath}`,
+      `Worktree not found for project ${formatWorkspacePathForUser(project.path, scope)}: ${formatWorkspacePathForUser(worktreePath, scope)}`,
     );
   }
 
@@ -3905,7 +4142,10 @@ export async function getWorktreeSnapshotProcedure(
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
-    const worktreePath = normalizePath(params.worktreePath);
+    const worktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
     });
@@ -3931,7 +4171,10 @@ export async function readWorktreeFileContentPageProcedure(
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
-    const worktreePath = normalizePath(params.worktreePath);
+    const worktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
     });
@@ -3965,7 +4208,10 @@ export async function readWorktreeFileDiffProcedure(
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
-    const worktreePath = normalizePath(params.worktreePath);
+    const worktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
     });
@@ -3998,7 +4244,10 @@ export async function listWorktreeGitHistoryProcedure(
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId, context);
-    const worktreePath = normalizePath(params.worktreePath);
+    const worktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     const offset =
       Number.isInteger(params.offset) && typeof params.offset === "number"
         ? Math.max(params.offset, 0)
@@ -4128,7 +4377,10 @@ export async function getWorktreeGitCommitDiffProcedure(
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const project = projectByIdForPath(params.projectId, context);
-    const worktreePath = normalizePath(params.worktreePath);
+    const worktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     if (!findKnownProjectWorktree(project.id, worktreePath)) {
       await assertProjectWorktree(project, worktreePath, requestGitOptions);
     }
@@ -4174,7 +4426,7 @@ export async function setActiveWorktreeProcedure(
 
   const requestedProjectId = hasProjectId ? params.projectId : null;
   const requestedWorktreePath = hasWorktreePath
-    ? normalizePath(params.worktreePath ?? "")
+    ? normalizeRequestedWorkspacePath(params.worktreePath ?? "", context)
     : null;
   throwIfAborted(context?.signal, "Active worktree update was aborted.");
   let projectId: number | null = null;
@@ -4268,7 +4520,10 @@ export async function focusContextProcedure(
     );
     throwIfAborted(context?.signal, "Context focus was aborted.");
 
-    const normalizedWorktreePath = normalizePath(params.worktreePath);
+    const normalizedWorktreePath = normalizeRequestedWorkspacePath(
+      params.worktreePath,
+      context,
+    );
     const openedWorktree = await awaitAbortableResult(
       openWorktreeWithGitOptions(
         {
@@ -4357,19 +4612,22 @@ export async function closeWorktreeProcedure(
 ): Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]> {
   projectByIdForPath(params.projectId, context);
   const state = projectPollMap.get(params.projectId);
+  const normalizedWorktreePath = normalizeRequestedWorkspacePath(
+    params.worktreePath,
+    context,
+  );
   if (state) {
-    const normalizedPath = normalizePath(params.worktreePath);
-    if (state.activeWorktreePath === normalizedPath) {
+    if (state.activeWorktreePath === normalizedWorktreePath) {
       state.activeWorktreePath = null;
     }
-    stopWorktreePolling(state, normalizedPath);
+    stopWorktreePolling(state, normalizedWorktreePath);
     syncProjectRefreshPolling(state);
   }
 
   return {
     success: true,
     projectId: params.projectId,
-    worktreePath: normalizePath(params.worktreePath),
+    worktreePath: normalizedWorktreePath,
   };
 }
 /**
