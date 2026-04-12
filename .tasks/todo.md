@@ -328,6 +328,8 @@ The v2 spec recommends only three dedicated admin tools:
 
 After inspecting this repo, those names appear in design docs and in task descriptions, but not in the current source tree as implemented runtime tools yet. For now, task graph maintenance is primarily manual file editing against `.metidos/tasks/**`, following the canonical format above.
 
+The shared filesystem reader and canonical writer for those files now lives in `src/bun/project-procedures/task-graph-filesystem.ts`. Future admin tooling should build on that module rather than reparsing `.metidos/tasks/**` ad hoc.
+
 Once admin tooling exists, the intended split is:
 
 - use normal file edits for routine task creation and updates

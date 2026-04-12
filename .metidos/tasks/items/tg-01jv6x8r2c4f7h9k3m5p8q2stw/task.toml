@@ -11,8 +11,5 @@ assignees = ["agent"]
 tags = ["area:task-graph", "component:project-procedures", "discipline:backend"]
 milestone = "task-graph-admin-v1"
 
-[blockers]
-tasks = ["tg-01jv6x7n4b2d8c5f9h3k6m1pqs"]
-
 [parent]
 task = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"

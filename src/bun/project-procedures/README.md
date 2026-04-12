@@ -41,6 +41,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Supports background prefetch and foreground escalation, with abortable fills to avoid blocking UI-critical paths.
   - Coalesces in-flight commit-diff reads so duplicate requests share work.
 
+- `task-graph-filesystem.ts`
+  - Shared filesystem reader and canonical writer for the git-native task graph under `.metidos/tasks/`.
+  - Loads repo config, optional tag/type registries, and per-task `task.toml` plus `body.md` files into a spec-aligned model with file-path metadata.
+  - Emits canonical `task.toml`, `config.toml`, `tags.toml`, and `types.toml` text so later init/validate/normalize tooling can share one formatting layer.
+
 - `pi-event-projection.ts`
   - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.
   - Tracks assistant thinking/text state, tool-call arguments, pre-write file snapshots, and final usage snapshots across a streamed run.
