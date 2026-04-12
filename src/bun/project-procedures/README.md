@@ -52,6 +52,11 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Reuses the shared task-graph parsers to report machine-readable error and warning findings with task ids, file paths, and field context.
   - Supports validating either the whole graph or a requested task-id subset while still resolving links against the full repository graph.
 
+- `task-graph-normalization.ts`
+  - Canonical normalizer for `.metidos/tasks/` files that rewrites only files whose canonical output actually changed.
+  - Sorts and de-duplicates known task arrays, normalizes body text line endings, and supports task-id subset runs for targeted cleanup.
+  - Preserves unknown-but-valid TOML keys and tables while reordering the known task-graph fields into canonical sections.
+
 - `pi-event-projection.ts`
   - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.
   - Tracks assistant thinking/text state, tool-call arguments, pre-write file snapshots, and final usage snapshots across a streamed run.

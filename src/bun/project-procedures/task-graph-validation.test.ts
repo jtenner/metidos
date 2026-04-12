@@ -126,7 +126,7 @@ describe("task graph validation", () => {
 
     const epicId = "tg-01jv6x6kh5z8y4v9m2c3d7pqra";
     const docsId = "tg-01jv6x9u3d5g8j2m4q6s9v2xzb";
-    const testId = "tg-01jv6xav4f6j9m3q5t7w9y2bcd";
+    const testId = "tg-01jv6xaw4f6j9m3q5t7w9y2bcd";
     const invalidShapeId = "tg-01jv6xbw5g7k1n4r6v8x2z5cde";
     const duplicateId = "tg-01jv6xcy6h8m2p5s7w9z3b6dfg";
     const missingBodyId = "tg-01jv6xdz7j9n3q6t8x2a4c7efh";

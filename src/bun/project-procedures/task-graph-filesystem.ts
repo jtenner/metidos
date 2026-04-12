@@ -149,7 +149,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function parseTomlDocument(
+export function parseTaskGraphTomlDocumentText(
   documentText: string,
   filePath: string,
 ): Record<string, unknown> {
@@ -363,7 +363,7 @@ export function parseTaskGraphConfigText(
   filePath: string,
 ): TaskGraphConfig {
   return parseTaskGraphConfig(
-    parseTomlDocument(documentText, filePath),
+    parseTaskGraphTomlDocumentText(documentText, filePath),
     filePath,
   );
 }
@@ -373,7 +373,7 @@ export function parseTaskGraphTagRegistryText(
   filePath: string,
 ): TaskGraphTagRegistry {
   return parseTaskGraphTagRegistry(
-    parseTomlDocument(documentText, filePath),
+    parseTaskGraphTomlDocumentText(documentText, filePath),
     filePath,
   );
 }
@@ -383,7 +383,7 @@ export function parseTaskGraphTypeRegistryText(
   filePath: string,
 ): TaskGraphTypeRegistry {
   return parseTaskGraphTypeRegistry(
-    parseTomlDocument(documentText, filePath),
+    parseTaskGraphTomlDocumentText(documentText, filePath),
     filePath,
   );
 }
@@ -393,7 +393,7 @@ export function parseTaskGraphTaskText(
   filePath: string,
 ): TaskGraphTask {
   return parseTaskGraphTask(
-    parseTomlDocument(documentText, filePath),
+    parseTaskGraphTomlDocumentText(documentText, filePath),
     filePath,
   );
 }
@@ -427,7 +427,10 @@ async function readOptionalTomlFile<T>(
 ): Promise<T | null> {
   try {
     const documentText = await readFile(filePath, "utf8");
-    return parser(parseTomlDocument(documentText, filePath), filePath);
+    return parser(
+      parseTaskGraphTomlDocumentText(documentText, filePath),
+      filePath,
+    );
   } catch (error) {
     if (
       error instanceof Error &&
@@ -458,7 +461,7 @@ export async function loadTaskGraphTaskFile(
       task_toml: taskTomlPath,
     },
     task: parseTaskGraphTask(
-      parseTomlDocument(taskTomlText, taskTomlPath),
+      parseTaskGraphTomlDocumentText(taskTomlText, taskTomlPath),
       taskTomlPath,
     ),
   };
@@ -487,7 +490,7 @@ export async function loadTaskGraphFilesystem(
   tasks.sort((left, right) => left.task.id.localeCompare(right.task.id));
   return {
     config: parseTaskGraphConfig(
-      parseTomlDocument(configText, configPath),
+      parseTaskGraphTomlDocumentText(configText, configPath),
       configPath,
     ),
     paths: {
@@ -529,7 +532,7 @@ function formatTomlStringArray(values: readonly string[]): string {
   return `[${values.map((value) => formatTomlString(value)).join(", ")}]`;
 }
 
-function normalizeTextFile(text: string): string {
+export function normalizeTaskGraphTextFile(text: string): string {
   const normalized = text.replace(/\r\n?/gu, "\n");
   if (!normalized) {
     return "";
@@ -701,7 +704,7 @@ async function writeTextFileIfChanged(
   filePath: string,
   nextText: string,
 ): Promise<boolean> {
-  const normalizedText = normalizeTextFile(nextText);
+  const normalizedText = normalizeTaskGraphTextFile(nextText);
   let currentText: string | null = null;
   try {
     currentText = await readFile(filePath, "utf8");
@@ -774,7 +777,7 @@ async function writeTextFileIfMissing(
   }
 
   await mkdir(dirname(resolvedPath), { recursive: true });
-  await writeFile(resolvedPath, normalizeTextFile(nextText), {
+  await writeFile(resolvedPath, normalizeTaskGraphTextFile(nextText), {
     encoding: "utf8",
     flag: "wx",
   });

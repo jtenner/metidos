@@ -11,8 +11,5 @@ assignees = ["agent"]
 tags = ["area:task-graph", "component:pi-metidos-tools", "component:rpc-schema", "discipline:backend"]
 milestone = "task-graph-admin-v1"
 
-[blockers]
-tasks = ["tg-01jv6xav4f6j9m3q5t7w9y2bcd"]
-
 [parent]
 task = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"

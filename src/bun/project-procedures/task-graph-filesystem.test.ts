@@ -67,9 +67,22 @@ describe("task graph filesystem model", () => {
 
     const task = graph.tasks_by_id.get("tg-01jv6xbw5g7k1n4r6v8x2z5cde");
     expect(task?.task.links.parent).toBe("tg-01jv6x6kh5z8y4v9m2c3d7pqra");
-    expect(task?.task.links.blockers.length).toBeGreaterThan(0);
     expect(
-      task?.task.links.blockers.every((taskId) => taskId.startsWith("tg-")),
+      graph.tasks.every((taskFile) =>
+        [
+          ...taskFile.task.links.blockers,
+          ...taskFile.task.links.caused_by,
+          ...taskFile.task.links.docs_for,
+          ...taskFile.task.links.duplicates,
+          ...taskFile.task.links.implements,
+          ...taskFile.task.links.mitigates,
+          ...taskFile.task.links.references,
+          ...taskFile.task.links.related,
+          ...taskFile.task.links.supersedes,
+          ...taskFile.task.links.tests_for,
+          ...(taskFile.task.links.parent ? [taskFile.task.links.parent] : []),
+        ].every((taskId) => taskId.startsWith("tg-")),
+      ),
     ).toBeTrue();
   });
 
