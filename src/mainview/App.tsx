@@ -91,6 +91,7 @@ import {
   THREAD_EXTENSION_UI_EVENT_NAME,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
   THREAD_STATUS_CHANGED_EVENT_NAME,
+  THREAD_STATUS_POLL_INTERVAL_MS,
   type ThreadActionMenuState,
   type ThreadStore,
   threadStoreItems,
@@ -105,6 +106,7 @@ import {
   worktreeThreadPopoverAnchorId,
   writePersistedMainviewState,
 } from "./app/state";
+import { deriveSafeChildAccessDefaults } from "./app/thread-access-defaults";
 import { ThreadExtensionUiDialog } from "./app/thread-extension-ui-dialog";
 import { useAddProjectForm } from "./app/use-add-project-form";
 import { useGitHistoryController } from "./app/use-git-history-controller";
@@ -1614,10 +1616,10 @@ export default function App({
               model: activeCodexModel || defaultCodexModel || null,
               reasoningEffort:
                 activeReasoningEffort || defaultCodexReasoningEffort || null,
-              githubAccess: activeGithubAccess,
-              agentsAccess: activeAgentsAccess,
-              metidosAccess: activeMetidosAccess,
-              unsafeMode: activeUnsafeMode,
+              githubAccess: safeChildAccessDefaults.githubAccess,
+              agentsAccess: safeChildAccessDefaults.agentsAccess,
+              metidosAccess: safeChildAccessDefaults.metidosAccess,
+              unsafeMode: safeChildAccessDefaults.unsafeMode,
             }),
         );
         if (!detail) {
@@ -1675,15 +1677,12 @@ export default function App({
     [
       activeCodexModel,
       activeReasoningEffort,
-      activeAgentsAccess,
-      activeGithubAccess,
-      activeMetidosAccess,
-      activeUnsafeMode,
       defaultCodexModel,
       defaultCodexReasoningEffort,
       executeWithStepUp,
       loadProjectWorktrees,
       procedures,
+      safeChildAccessDefaults,
       syncThreadContext,
       upsertThread,
     ],
@@ -3483,6 +3482,21 @@ export default function App({
     };
   }, [abortCronJobsRequest]);
 
+  useEffect(() => {
+    if (primaryView !== "cronjobs" || !isDocumentVisible) {
+      return;
+    }
+
+    void loadCronJobs();
+    const timer = window.setInterval(() => {
+      void loadCronJobs();
+    }, THREAD_STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isDocumentVisible, loadCronJobs, primaryView]);
+
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
       setModelControlError("");
@@ -4210,24 +4224,21 @@ export default function App({
     setCronEditSchedule("");
     setCronEditPrompt("");
     setCronEditEnabled(true);
-    setCronEditGithubAccess(activeGithubAccess);
-    setCronEditAgentsAccess(activeAgentsAccess);
-    setCronEditMetidosAccess(activeMetidosAccess);
-    setCronEditUnsafeMode(activeUnsafeMode);
+    setCronEditGithubAccess(safeChildAccessDefaults.githubAccess);
+    setCronEditAgentsAccess(safeChildAccessDefaults.agentsAccess);
+    setCronEditMetidosAccess(safeChildAccessDefaults.metidosAccess);
+    setCronEditUnsafeMode(safeChildAccessDefaults.unsafeMode);
     setCronCreatorModel(activeCodexModel || defaultCodexModel || "");
     setCronCreatorReasoningEffort(
       activeReasoningEffort || defaultCodexReasoningEffort,
     );
     setCronCreatorError("");
   }, [
-    activeAgentsAccess,
     activeCodexModel,
-    activeGithubAccess,
-    activeMetidosAccess,
     activeReasoningEffort,
-    activeUnsafeMode,
     defaultCodexModel,
     defaultCodexReasoningEffort,
+    safeChildAccessDefaults,
   ]);
 
   const openCronCreator = useCallback(

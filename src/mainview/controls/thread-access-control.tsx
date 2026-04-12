@@ -183,7 +183,7 @@ export function ThreadAccessControl({
             <AccessRow
               accentClassName="accent-[#d89256]"
               checked={value.unsafeMode}
-              description="Enable shell access and allow Metidos tools to create unsafe child threads or cron jobs."
+              description="Opt in to shell access and allow Metidos tools to create unsafe child threads or cron jobs. Leave this off unless you intentionally need broader execution."
               disabled={disabled || unsafeModeDisabled}
               label="Unsafe"
               onChange={(checked) => {
