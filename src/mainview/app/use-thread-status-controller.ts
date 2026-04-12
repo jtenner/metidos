@@ -28,12 +28,18 @@ import {
   resolveThreadStatusRefreshOutcome,
   shouldRefreshSelectedThreadDetail,
 } from "../thread-status-refresh";
-import { THREAD_STATUS_POLL_INTERVAL_MS, type ThreadStore } from "./state";
+import {
+  createThreadStore,
+  THREAD_STATUS_POLL_INTERVAL_MS,
+  type ThreadStore,
+} from "./state";
 
 type ThreadStatusControllerProcedures = Pick<
   ProjectProcedures,
-  "getThread" | "listThreadStatuses"
+  "getThread" | "listThreadStatuses" | "listThreads"
 >;
+
+const THREAD_DISCOVERY_POLL_INTERVAL_MS = 5_000;
 
 export type ThreadStatusControllerProps = {
   applyOptimisticThreadErrorSeenToList: (threads: RpcThread[]) => RpcThread[];
@@ -297,6 +303,111 @@ export function useThreadStatusController(
     options.threads.length,
     polledThreadIds,
     pollThreadStatuses,
+  ]);
+
+  useEffect(() => {
+    if (!options.isDocumentVisible) {
+      return;
+    }
+
+    let cancelled = false;
+    const pollThreadList = async () => {
+      try {
+        const activeSelectedThreadId = options.selectedThreadIdRef.current;
+        const loadedThreads = options.applyOptimisticThreadErrorSeenToList(
+          await options.procedures.listThreads(),
+        );
+        const selectedSummary =
+          activeSelectedThreadId === null
+            ? null
+            : (loadedThreads.find(
+                (thread) => thread.id === activeSelectedThreadId,
+              ) ?? null);
+
+        if (!selectedSummary) {
+          options.setThreadStore(() => createThreadStore(loadedThreads));
+          if (loadedThreads.length === 0) {
+            options.selectedThreadRunStateRef.current = "idle";
+          }
+          return;
+        }
+
+        const selectedSummaryDetailRefreshKey =
+          buildSelectedThreadDetailRefreshKey(selectedSummary);
+        if (
+          !shouldRefreshSelectedThreadDetail({
+            lastLoadedSelectedDetailRefreshKey:
+              options.selectedThreadDetailRefreshKeyRef.current,
+            previousSelectedRunState: options.selectedThreadRunStateRef.current,
+            selectedSummaryDetailRefreshKey,
+            selectedSummaryRunState: selectedSummary.runStatus.state,
+          })
+        ) {
+          options.selectedThreadRunStateRef.current =
+            selectedSummary.runStatus.state;
+          options.setThreadStore(() => createThreadStore(loadedThreads));
+          return;
+        }
+
+        try {
+          const detail = options.prepareOpenedThreadDetail(
+            await options.procedures.getThread({
+              threadId: selectedSummary.id,
+            }),
+          );
+          const selectedThreadIdForCommit = options.selectedThreadIdRef.current;
+          const nextThreadStore = createThreadStore(loadedThreads);
+          options.setThreadStore(() =>
+            selectedThreadIdForCommit === selectedSummary.id
+              ? resolveThreadStatusRefreshOutcome({
+                  currentThreadStore: nextThreadStore,
+                  detail,
+                  loadedThreadStatuses: loadedThreads,
+                  selectedSummaryThreadId: selectedSummary.id,
+                  selectedThreadId: selectedThreadIdForCommit,
+                }).nextThreadStore
+              : nextThreadStore,
+          );
+          if (selectedThreadIdForCommit !== selectedSummary.id) {
+            return;
+          }
+          options.selectedThreadDetailRefreshKeyRef.current =
+            buildSelectedThreadDetailRefreshKey(detail.thread);
+          options.selectedThreadRunStateRef.current =
+            detail.thread.runStatus.state;
+          options.mergeSelectedThreadMessageHistory(detail);
+        } catch (error) {
+          options.setThreadStore(() => createThreadStore(loadedThreads));
+          if (!cancelled) {
+            console.error("Failed to refresh thread list", error);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to discover external thread updates", error);
+        }
+      }
+    };
+
+    void pollThreadList();
+    const timer = window.setInterval(() => {
+      void pollThreadList();
+    }, THREAD_DISCOVERY_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    options.applyOptimisticThreadErrorSeenToList,
+    options.isDocumentVisible,
+    options.mergeSelectedThreadMessageHistory,
+    options.prepareOpenedThreadDetail,
+    options.procedures,
+    options.selectedThreadDetailRefreshKeyRef,
+    options.selectedThreadIdRef,
+    options.selectedThreadRunStateRef,
+    options.setThreadStore,
   ]);
 }
 

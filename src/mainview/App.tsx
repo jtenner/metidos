@@ -1004,6 +1004,9 @@ export default function App({
     metidosAccess: activeMetidosAccess,
     unsafeMode: activeUnsafeMode,
   };
+  const safeChildAccessDefaults = deriveSafeChildAccessDefaults(
+    activeThreadAccessValue,
+  );
   const activeThreadExtensionUiState = useMemo(
     () => readThreadExtensionUiState(threadExtensionUiStore, selectedThreadId),
     [selectedThreadId, threadExtensionUiStore],
