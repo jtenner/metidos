@@ -11,9 +11,6 @@ assignees = ["agent"]
 tags = ["area:agent-runtime", "component:vm2-runner", "discipline:backend", "source:audit-2026-04-12", "theme:security"]
 milestone = "audit-remediation-2026-04"
 
-[blockers]
-tasks = ["tg-01kp16yacxrj57cqpteejaj5hs"]
-
 [mitigates]
 tasks = ["tg-01kp16yack3jpt1nhwyz2x36c8", "tg-01kp16yacnvg0vqfesjce7t9z5"]
 

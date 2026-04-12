@@ -108,6 +108,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
 - Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, and Pi compatibility.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
+- The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 
 ## Recommendations
 - **Priority**: Split monoliths; default safe threads + explicit unsafe UX; add all missing telemetry hooks/counters for tools/VM2/unsafe/cron; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
