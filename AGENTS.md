@@ -2,7 +2,8 @@
 
 - Follow the repository commit process documented in `.tasks/commit.md`.
 - Follow all style guidelines in `.tasks/style.md`.
-- Always add generated files to `.gitignore` and keep them out of version control.
+- Always add generated or derived files to `.gitignore` and keep them out of version control.
+- Treat `.metidos/tasks/` as canonical repository data, not generated output. Keep task-graph caches and other derived artifacts out of version control, but commit the canonical task graph itself.
 - New RPC features should include measurable telemetry hooks or counters where practical so performance-impacting additions can be observed in runtime stats instead of guessed at later.
 
 - Current repository folder map:
@@ -18,7 +19,7 @@
   - `.metidos/tasks/items/`
     One directory per task item in the task graph.
   - `.tasks/`
-    Repository-local process docs for commits, research, styling, and contributor workflow.
+    Repository-local process docs for commits, research, styling, task-graph workflow, and contributor guidance.
   - `docs/`
     Architecture notes, migration write-ups, and longer-form design research.
   - `src/`

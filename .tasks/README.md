@@ -15,3 +15,6 @@ It contains short operational documents that should be consulted before making c
 - `style.md`
   - Main UI style guide and styling cleanup proposal for `src/mainview/`.
   - Defines the desired visual language, semantic token direction, component rules, migration priorities, and the explicit ban on introducing new card-based UI patterns.
+- `todo.md`
+  - Maintainer guide for the canonical `.metidos/tasks/` task graph.
+  - Describes the on-disk format, current repo conventions, and the normal file-based workflow for creating and updating tasks.
