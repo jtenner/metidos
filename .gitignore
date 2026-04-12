@@ -46,6 +46,7 @@ coverage/
 .nyc_output/
 playwright-report/
 playwright/.cache/
+# Derived Metidos cache state only. Keep canonical task-graph files under .metidos/tasks/ tracked.
 .metidos/cache/
 
 # Local environment files

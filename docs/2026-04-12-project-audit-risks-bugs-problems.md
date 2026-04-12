@@ -68,8 +68,9 @@ All static checks pass and tests are comprehensive (including deep security, san
 
 ### Low / Observational
 7. **Task Graph and Generated Files**
-   - `.metidos/tasks/` (config.toml, items/, tags.toml) is committed to VCS. AGENTS.md explicitly says "Always add generated files to `.gitignore`".
-   - `.metidos-build/` is ignored (good). Risk of bloating repo or committing transient task data/sensitive summaries.
+   - `.metidos/tasks/` (config.toml, items/, tags.toml) is canonical repository data and is committed to VCS.
+   - `.metidos/cache/` and `.metidos-build/` are derived artifacts and should stay ignored.
+   - Contributor guidance now states that the general generated-file rule does not apply to the canonical task graph.
 
 8. **Future-Dated Artifacts and Test Data**
    - All docs/, audit logs, and simulated current date use 2026-04-*. May indicate mocked time in test env.
@@ -99,19 +100,20 @@ All static checks pass and tests are comprehensive (including deep security, san
 8. Security surface (strong scoping/audits/headers but residual from unsafe/VM2/keyfile/tool breadth; no vuln scanning in validate).
 
 **Low/Observational**:
-9. .metidos/ committed (vs AGENTS.md); 2026 dates (time skew?); abundant warnings/edges (no TODOs good); single-process limits; large test surface (387 passing but maintenance heavy); Git/fs/ command normalization solid but complex.
+9. `.metidos/` mixes canonical task-graph data with derived local artifacts, so the repo policy has to keep that distinction explicit; 2026 dates (time skew?); abundant warnings/edges (no TODOs good); single-process limits; large test surface (387 passing but maintenance heavy); Git/fs/command normalization solid but complex.
 10. Positives: Clean code/lint/TS, exhaustive tests (auth, scope, VM escapes, lockouts, Pi, normalization, derived state), parameterized DB, constant-time verifies, strong bounds/telemetry foundation, React Compiler.
 
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks capture the main clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, Pi compatibility, and task-graph policy clarity.
+- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, and Pi compatibility.
+- The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 
 ## Recommendations
 - **Priority**: Split monoliths; default safe threads + explicit unsafe UX; add all missing telemetry hooks/counters for tools/VM2/unsafe/cron; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
 - **Perf/Obs**: Finish OPT roadmap with production telemetry; load test agent tool usage.
-- **Maintenance**: Align .metidos with AGENTS.md/gitignore; keep this doc updated as single source; follow .tasks/commit.md strictly for changes. Refactor tools to modular files.
+- **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
 - **Next**: Production build/load test with heavy unsafe/agent workloads; Pi SDK compatibility audit; track telemetry for high-risk paths.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

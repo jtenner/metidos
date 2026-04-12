@@ -4,6 +4,12 @@ This repository treats `.metidos/tasks/` as canonical, repo-owned source of trut
 
 This guide is based on the live task graph in `.metidos/tasks/` and the v2 spec in `docs/2026-04-10-git-native-task-graph-spec.md`.
 
+Quick rule:
+
+- commit `.metidos/tasks/**`
+- ignore `.metidos/cache/**` and other generated artifacts
+- do not apply the general "ignore generated files" rule to the canonical task graph
+
 ## Current Layout
 
 ```text

@@ -2,8 +2,8 @@
 
 - Follow the repository commit process documented in `.tasks/commit.md`.
 - Follow all style guidelines in `.tasks/style.md`.
-- Always add generated or derived files to `.gitignore` and keep them out of version control.
-- Treat `.metidos/tasks/` as canonical repository data, not generated output. Keep task-graph caches and other derived artifacts out of version control, but commit the canonical task graph itself.
+- Always add generated or derived files to `.gitignore` and keep them out of version control, except for canonical repository data such as `.metidos/tasks/**`.
+- Treat `.metidos/tasks/` as canonical repository data, not generated output. Commit `.metidos/tasks/**`; keep `.metidos/cache/**` and other derived artifacts out of version control.
 - New RPC features should include measurable telemetry hooks or counters where practical so performance-impacting additions can be observed in runtime stats instead of guessed at later.
 
 - Current repository folder map:

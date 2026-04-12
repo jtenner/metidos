@@ -17,4 +17,5 @@ It contains short operational documents that should be consulted before making c
   - Defines the desired visual language, semantic token direction, component rules, migration priorities, and the explicit ban on introducing new card-based UI patterns.
 - `todo.md`
   - Maintainer guide for the canonical `.metidos/tasks/` task graph.
+  - Clarifies that `.metidos/tasks/**` is committed source of truth while `.metidos/cache/**` stays derived and gitignored.
   - Describes the on-disk format, current repo conventions, and the normal file-based workflow for creating and updating tasks.
