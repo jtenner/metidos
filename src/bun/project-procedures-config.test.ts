@@ -1311,6 +1311,60 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("publishes thread status changes while a run starts and settles", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("metidos-thread-status-events-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Thread Status Events Repo",
+      projectPath: repoPath,
+    });
+    const created = await procedures.createThreadProcedure({
+      projectId: opened.project.id,
+      worktreePath: repoPath,
+      model: "gpt-5.4",
+      reasoningEffort: "medium",
+      unsafeMode: false,
+    });
+
+    const seenStates: string[] = [];
+    procedures.setThreadStatusChangeListener((thread) => {
+      if (thread.id === created.thread.id) {
+        seenStates.push(thread.runStatus.state);
+      }
+    });
+
+    try {
+      const started = await procedures.sendThreadMessageProcedure({
+        threadId: created.thread.id,
+        input: "thread status change smoke",
+      });
+      expect(started.thread.runStatus.state).toBe("working");
+
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        const detail = await procedures.getThreadProcedure({
+          threadId: created.thread.id,
+        });
+        if (detail.thread.runStatus.state !== "working") {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      expect(seenStates).toContain("working");
+      expect(
+        seenStates.some(
+          (state) =>
+            state === "idle" || state === "failed" || state === "stopped",
+        ),
+      ).toBeTrue();
+    } finally {
+      procedures.setThreadStatusChangeListener(null);
+    }
+  });
+
   it("fails empty assistant completions instead of fabricating a reply", async () => {
     const procedures = await loadProjectProcedures();
 

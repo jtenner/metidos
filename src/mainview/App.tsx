@@ -90,6 +90,7 @@ import {
   sortThreads,
   THREAD_EXTENSION_UI_EVENT_NAME,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
+  THREAD_STATUS_CHANGED_EVENT_NAME,
   type ThreadActionMenuState,
   type ThreadStore,
   threadStoreItems,
@@ -3305,6 +3306,23 @@ export default function App({
       window.removeEventListener(
         THREAD_START_REQUEST_CREATED_EVENT_NAME,
         handleThreadStartRequestCreated,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleThreadStatusChanged = (event: CustomEvent<RpcThread>) => {
+      setThreadStore((current) => upsertThreadStore(current, event.detail));
+    };
+
+    window.addEventListener(
+      THREAD_STATUS_CHANGED_EVENT_NAME,
+      handleThreadStatusChanged,
+    );
+    return () => {
+      window.removeEventListener(
+        THREAD_STATUS_CHANGED_EVENT_NAME,
+        handleThreadStatusChanged,
       );
     };
   }, []);

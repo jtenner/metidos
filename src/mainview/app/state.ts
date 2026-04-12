@@ -272,6 +272,7 @@ export type OpenThreadOptions = {
 
 export const THREAD_START_REQUEST_CREATED_EVENT_NAME =
   "metidos:thread-start-request-created";
+export const THREAD_STATUS_CHANGED_EVENT_NAME = "metidos:thread-status-changed";
 export const CONTEXT_FOCUS_CHANGED_EVENT_NAME = "metidos:context-focus-changed";
 export const THREAD_EXTENSION_UI_EVENT_NAME = "metidos:thread-extension-ui";
 /**

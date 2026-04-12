@@ -898,6 +898,7 @@ let peakThreadActivityPersistenceDurationMs = 0;
 let worktreeGitHistoryChangeListener:
   | ((projectId: number, worktreePath: string) => void)
   | null = null;
+let threadStatusChangeListener: ((thread: RpcThread) => void) | null = null;
 let threadExtensionUiMessageListener:
   | ((request: RpcThreadExtensionUiRequest) => boolean)
   | null = null;
@@ -1135,12 +1136,25 @@ function clearProjectThreadRuntimeState(projectId: number): void {
  * @param status - New run status to persist for the thread.
  */
 
+function notifyThreadStatusChanged(threadId: number): void {
+  if (!threadStatusChangeListener) {
+    return;
+  }
+
+  try {
+    threadStatusChangeListener(rpcThreadById(threadId));
+  } catch (error) {
+    console.error(`Failed to publish thread status for ${threadId}`, error);
+  }
+}
+
 function setThreadRunStatus(
   threadId: number,
   status: RpcThreadRunStatus,
 ): void {
   threadRunStatusMap.set(threadId, status);
   invalidateThreadDetailCache(threadId);
+  notifyThreadStatusChanged(threadId);
 }
 
 function touchWorkingThreadRunStatus(threadId: number): void {
@@ -1513,6 +1527,8 @@ function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
   return `${startedAt}:${itemId}`;
 }
 
+const THREAD_FINAL_EVENT_GRACE_MS = 50;
+
 export function missingAssistantResponseErrorMessage(
   model: string | null | undefined,
 ): string {
@@ -1596,16 +1612,42 @@ async function runThreadMessageInBackground(
     };
     controller.signal.addEventListener("abort", abortPiRuntime, { once: true });
 
+    let promptError: unknown = null;
     try {
       await runtime.session.prompt(input);
+    } catch (error) {
+      promptError = error;
     } finally {
+      const settleDeadline = Date.now() + THREAD_FINAL_EVENT_GRACE_MS;
+      let waitingForTrailingAssistantEvent = true;
+      while (waitingForTrailingAssistantEvent) {
+        await Promise.resolve();
+        await eventProcessingChain;
+        if (promptError) {
+          break;
+        }
+        const trailingAssistantMessage = [...runtime.session.messages]
+          .reverse()
+          .find((message) => message.role === "assistant");
+        const trailingAssistantText = (
+          lastAssistantText ||
+          extractPiAssistantMessageText(trailingAssistantMessage).trim()
+        ).trim();
+        if (trailingAssistantText || Date.now() >= settleDeadline) {
+          waitingForTrailingAssistantEvent = false;
+          continue;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
       controller.signal.removeEventListener("abort", abortPiRuntime);
       unsubscribe();
     }
 
-    await eventProcessingChain;
     if (eventProcessingError) {
       throw eventProcessingError;
+    }
+    if (promptError) {
+      throw promptError;
     }
     await bufferedActivityWriter.flushAll();
 
@@ -4786,6 +4828,12 @@ export function setWorktreeGitHistoryChangeListener(
   listener: ((projectId: number, worktreePath: string) => void) | null,
 ): void {
   worktreeGitHistoryChangeListener = listener;
+}
+
+export function setThreadStatusChangeListener(
+  listener: ((thread: RpcThread) => void) | null,
+): void {
+  threadStatusChangeListener = listener;
 }
 
 export function setThreadExtensionUiMessageListener(

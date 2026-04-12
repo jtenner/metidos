@@ -13,6 +13,7 @@ import type {
   RpcContextFocusChanged,
   RpcProcedureCallOptions,
   RpcRequestPriority,
+  RpcThread,
   RpcThreadExtensionUiRequest,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
@@ -26,6 +27,7 @@ import { loadRichMarkdownModule } from "./app/message-markdown-loader";
 import {
   CONTEXT_FOCUS_CHANGED_EVENT_NAME,
   THREAD_EXTENSION_UI_EVENT_NAME,
+  THREAD_STATUS_CHANGED_EVENT_NAME,
 } from "./app/state";
 import { dispatchAuthRequired } from "./auth-client";
 import AuthShell from "./auth-shell";
@@ -92,13 +94,19 @@ type RpcThreadExtensionUiMessage = {
   event: RpcThreadExtensionUiRequest;
 };
 
+type RpcThreadStatusChangedMessage = {
+  type: "thread-status-changed";
+  thread: RpcThread;
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage
-  | RpcThreadExtensionUiMessage;
+  | RpcThreadExtensionUiMessage
+  | RpcThreadStatusChangedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -113,6 +121,7 @@ const RICH_MARKDOWN_WARMUP_DELAY_MS = 1_500;
 declare global {
   interface WindowEventMap {
     "metidos:thread-start-request-created": CustomEvent<RpcThreadStartRequest>;
+    "metidos:thread-status-changed": CustomEvent<RpcThread>;
     "metidos:thread-extension-ui": CustomEvent<RpcThreadExtensionUiRequest>;
   }
 
@@ -531,6 +540,14 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
               detail: payload.event,
             },
           ),
+        );
+        return;
+      }
+      if (payload.type === "thread-status-changed") {
+        window.dispatchEvent(
+          new CustomEvent<RpcThread>(THREAD_STATUS_CHANGED_EVENT_NAME, {
+            detail: payload.thread,
+          }),
         );
         return;
       }

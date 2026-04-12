@@ -102,6 +102,7 @@ import {
   setActiveWorktreeProcedure,
   setThreadExtensionUiMessageListener,
   setThreadPinnedProcedure,
+  setThreadStatusChangeListener,
   setWorktreeGitHistoryChangeListener,
   setWorktreePinnedProcedure,
   shutdownActiveThreadTurns,
@@ -126,6 +127,7 @@ import type {
   RpcContextFocusChanged,
   RpcRequestContext,
   RpcRequestPriority,
+  RpcThread,
   RpcThreadExtensionUiRequest,
   RpcThreadStartRequest,
   RpcWorktreeGitHistoryChanged,
@@ -263,13 +265,19 @@ type RpcThreadExtensionUiMessage = {
   event: RpcThreadExtensionUiRequest;
 };
 
+type RpcThreadStatusChangedMessage = {
+  type: "thread-status-changed";
+  thread: RpcThread;
+};
+
 type RpcSocketMessage =
   | RpcResponseMessage
   | RpcReloadMessage
   | RpcGitHistoryChangedMessage
   | RpcContextFocusChangedMessage
   | RpcThreadStartRequestCreatedMessage
-  | RpcThreadExtensionUiMessage;
+  | RpcThreadExtensionUiMessage
+  | RpcThreadStatusChangedMessage;
 
 type RpcClientMessage = RpcRequestMessage | RpcCancelMessage;
 
@@ -2123,6 +2131,35 @@ function broadcastThreadStartRequestCreated(
   });
 }
 
+function broadcastThreadStatusChanged(thread: RpcThread): void {
+  if (rpcClients.size === 0) {
+    return;
+  }
+
+  const payload: RpcThreadStatusChangedMessage = {
+    type: "thread-status-changed",
+    thread,
+  };
+  const raw = JSON.stringify(payload satisfies RpcSocketMessage);
+  let deliveredClients = 0;
+  let droppedClients = 0;
+  for (const client of rpcClients) {
+    try {
+      client.send(raw);
+      deliveredClients += 1;
+    } catch {
+      rpcClients.delete(client);
+      droppedClients += 1;
+    }
+  }
+  recordWebSocketPush({
+    deliveredClients,
+    droppedClients,
+    payloadBytes: utf8ByteLength(raw),
+    type: payload.type,
+  });
+}
+
 function broadcastThreadExtensionUiRequest(
   event: RpcThreadExtensionUiRequest,
 ): boolean {
@@ -2372,6 +2409,9 @@ async function bootstrap(): Promise<void> {
   startProcedureCacheMaintenance();
   setWorktreeGitHistoryChangeListener((projectId, worktreePath) => {
     broadcastGitHistoryChanged(projectId, worktreePath);
+  });
+  setThreadStatusChangeListener((thread) => {
+    broadcastThreadStatusChanged(thread);
   });
   setThreadExtensionUiMessageListener((request) =>
     broadcastThreadExtensionUiRequest(request),
@@ -3054,6 +3094,7 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
       overloadMonitorTimer = null;
     }
     setWorktreeGitHistoryChangeListener(null);
+    setThreadStatusChangeListener(null);
     setThreadExtensionUiMessageListener(null);
     shutdownProcedureCacheMaintenance();
     shutdownProjectPolling();
