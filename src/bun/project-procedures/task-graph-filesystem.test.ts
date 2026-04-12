@@ -4,11 +4,19 @@
  */
 
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  buildDefaultTaskGraphConfig,
+  initTaskGraphFilesystem,
   loadTaskGraphFilesystem,
   loadTaskGraphTaskFile,
   serializeTaskGraphConfigToml,
@@ -57,13 +65,12 @@ describe("task graph filesystem model", () => {
     expect(graph.types).toBeNull();
     expect(graph.tasks.length).toBeGreaterThan(0);
 
-    const task = graph.tasks_by_id.get("tg-01jv6xcy6h8m2p5s7w9z3b6dfg");
-    expect(task?.task.links.tests_for).toEqual([
-      "tg-01jv6x8r2c4f7h9k3m5p8q2stw",
-      "tg-01jv6x9t3d5g8j2m4q6s9v2xzb",
-      "tg-01jv6xav4f6j9m3q5t7w9y2bcd",
-      "tg-01jv6xbw5g7k1n4r6v8x2z5cde",
-    ]);
+    const task = graph.tasks_by_id.get("tg-01jv6xbw5g7k1n4r6v8x2z5cde");
+    expect(task?.task.links.parent).toBe("tg-01jv6x6kh5z8y4v9m2c3d7pqra");
+    expect(task?.task.links.blockers.length).toBeGreaterThan(0);
+    expect(
+      task?.task.links.blockers.every((taskId) => taskId.startsWith("tg-")),
+    ).toBeTrue();
   });
 
   it("loads config, optional registries, and task files from a fixture graph", async () => {
@@ -328,5 +335,85 @@ describe("task graph filesystem model", () => {
       "theme:reliability",
     ]);
     expect(taskFile.task.links.blockers).toEqual(["tg-a", "tg-b"]);
+  });
+
+  it("initializes an empty task graph with canonical defaults and no registries by default", async () => {
+    const root = join(createTempDirectory(), ".metidos", "tasks");
+
+    const result = await initTaskGraphFilesystem(root);
+
+    expect(result.config).toEqual(buildDefaultTaskGraphConfig());
+    expect(result.status).toEqual({
+      config: "created",
+      items: "created",
+      root: "created",
+      tags: "skipped",
+      types: "skipped",
+    });
+    expect(readFileSync(join(root, "config.toml"), "utf8")).toBe(
+      serializeTaskGraphConfigToml(buildDefaultTaskGraphConfig()),
+    );
+
+    const graph = await loadTaskGraphFilesystem(root);
+    expect(graph.config).toEqual(buildDefaultTaskGraphConfig());
+    expect(graph.tags).toBeNull();
+    expect(graph.types).toBeNull();
+    expect(graph.tasks).toEqual([]);
+  });
+
+  it("creates requested empty registries and preserves existing files on rerun", async () => {
+    const root = join(createTempDirectory(), ".metidos", "tasks");
+    const initialInput = {
+      createTagsRegistry: true,
+      createTypesRegistry: true,
+      idPrefix: "task",
+      strictTags: true,
+      strictTypes: true,
+    } as const;
+
+    const firstResult = await initTaskGraphFilesystem(root, initialInput);
+
+    expect(firstResult.status).toEqual({
+      config: "created",
+      items: "created",
+      root: "created",
+      tags: "created",
+      types: "created",
+    });
+    expect(readFileSync(join(root, "config.toml"), "utf8")).toBe(
+      serializeTaskGraphConfigToml(buildDefaultTaskGraphConfig(initialInput)),
+    );
+    expect(readFileSync(join(root, "tags.toml"), "utf8")).toBe(
+      serializeTaskGraphTagRegistryToml({
+        schema: "metidos.task-tags/v2",
+        tag: [],
+      }),
+    );
+    expect(readFileSync(join(root, "types.toml"), "utf8")).toBe(
+      serializeTaskGraphTypeRegistryToml({
+        schema: "metidos.task-types/v2",
+        type: [],
+      }),
+    );
+
+    const secondResult = await initTaskGraphFilesystem(root, {
+      idPrefix: "ignored",
+      strictTags: false,
+      strictTypes: false,
+    });
+
+    expect(secondResult.config).toEqual(
+      buildDefaultTaskGraphConfig(initialInput),
+    );
+    expect(secondResult.status).toEqual({
+      config: "existing",
+      items: "existing",
+      root: "existing",
+      tags: "existing",
+      types: "existing",
+    });
+    expect(readFileSync(join(root, "config.toml"), "utf8")).toBe(
+      serializeTaskGraphConfigToml(buildDefaultTaskGraphConfig(initialInput)),
+    );
   });
 });

@@ -12,7 +12,7 @@ tags = ["area:task-graph", "component:pi-metidos-tools", "component:rpc-schema",
 milestone = "task-graph-admin-v1"
 
 [blockers]
-tasks = ["tg-01jv6x8r2c4f7h9k3m5p8q2stw", "tg-01jv6x9t3d5g8j2m4q6s9v2xzb", "tg-01jv6xav4f6j9m3q5t7w9y2bcd"]
+tasks = ["tg-01jv6x9t3d5g8j2m4q6s9v2xzb", "tg-01jv6xav4f6j9m3q5t7w9y2bcd"]
 
 [parent]
 task = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"

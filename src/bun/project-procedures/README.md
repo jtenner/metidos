@@ -45,6 +45,7 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Shared filesystem reader and canonical writer for the git-native task graph under `.metidos/tasks/`.
   - Loads repo config, optional tag/type registries, and per-task `task.toml` plus `body.md` files into a spec-aligned model with file-path metadata.
   - Emits canonical `task.toml`, `config.toml`, `tags.toml`, and `types.toml` text so later init/validate/normalize tooling can share one formatting layer.
+  - Now also scaffolds the minimal `.metidos/tasks/` layout for `init_task_graph`, including default config creation, optional empty registry seeding, and created-versus-existing status reporting without clobbering existing canonical files.
 
 - `pi-event-projection.ts`
   - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.

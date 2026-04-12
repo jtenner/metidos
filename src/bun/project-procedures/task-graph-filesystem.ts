@@ -3,7 +3,7 @@
  * @description Shared reader and canonical writer helpers for the git-native task graph.
  */
 
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 export const TASK_GRAPH_CONFIG_FILENAME = "config.toml";
@@ -115,6 +115,34 @@ export type LoadedTaskGraphFilesystem = {
   tasks: TaskGraphTaskFile[];
   tasks_by_id: Map<string, TaskGraphTaskFile>;
   types: TaskGraphTypeRegistry | null;
+};
+
+export type InitTaskGraphFilesystemInput = {
+  createTagsRegistry?: boolean;
+  createTypesRegistry?: boolean;
+  idPrefix?: string;
+  strictTags?: boolean;
+  strictTypes?: boolean;
+};
+
+export type TaskGraphInitializationStatus = "created" | "existing" | "skipped";
+
+export type InitTaskGraphFilesystemResult = {
+  config: TaskGraphConfig;
+  paths: {
+    config: string;
+    items: string;
+    root: string;
+    tags: string | null;
+    types: string | null;
+  };
+  status: {
+    config: Exclude<TaskGraphInitializationStatus, "skipped">;
+    items: Exclude<TaskGraphInitializationStatus, "skipped">;
+    root: Exclude<TaskGraphInitializationStatus, "skipped">;
+    tags: TaskGraphInitializationStatus;
+    types: TaskGraphInitializationStatus;
+  };
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -469,6 +497,37 @@ function normalizeTextFile(text: string): string {
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
+export function buildDefaultTaskGraphConfig(
+  input: InitTaskGraphFilesystemInput = {},
+): TaskGraphConfig {
+  return {
+    body_format: "markdown",
+    defaults: {
+      priority: "p2",
+      status: "open",
+      type: "task",
+    },
+    id_prefix: input.idPrefix ?? "tg",
+    schema: "metidos.task-graph/v2",
+    strict_tags: input.strictTags ?? false,
+    strict_types: input.strictTypes ?? false,
+  };
+}
+
+function buildEmptyTaskGraphTagRegistry(): TaskGraphTagRegistry {
+  return {
+    schema: "metidos.task-tags/v2",
+    tag: [],
+  };
+}
+
+function buildEmptyTaskGraphTypeRegistry(): TaskGraphTypeRegistry {
+  return {
+    schema: "metidos.task-types/v2",
+    type: [],
+  };
+}
+
 export function serializeTaskGraphConfigToml(config: TaskGraphConfig): string {
   const lines = [
     `schema = ${formatTomlString(config.schema)}`,
@@ -623,6 +682,131 @@ async function writeTextFileIfChanged(
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, normalizedText, "utf8");
   return true;
+}
+
+async function ensureDirectoryExists(
+  directoryPath: string,
+): Promise<Exclude<TaskGraphInitializationStatus, "skipped">> {
+  const resolvedPath = resolve(directoryPath);
+  try {
+    const currentStats = await stat(resolvedPath);
+    if (!currentStats.isDirectory()) {
+      throw new Error(`${resolvedPath}: expected a directory.`);
+    }
+    return "existing";
+  } catch (error) {
+    if (
+      !(
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+      )
+    ) {
+      throw error;
+    }
+  }
+
+  await mkdir(resolvedPath, { recursive: true });
+  return "created";
+}
+
+async function writeTextFileIfMissing(
+  filePath: string,
+  nextText: string,
+): Promise<Exclude<TaskGraphInitializationStatus, "skipped">> {
+  const resolvedPath = resolve(filePath);
+  try {
+    const currentStats = await stat(resolvedPath);
+    if (!currentStats.isFile()) {
+      throw new Error(`${resolvedPath}: expected a file.`);
+    }
+    return "existing";
+  } catch (error) {
+    if (
+      !(
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+      )
+    ) {
+      throw error;
+    }
+  }
+
+  await mkdir(dirname(resolvedPath), { recursive: true });
+  await writeFile(resolvedPath, normalizeTextFile(nextText), {
+    encoding: "utf8",
+    flag: "wx",
+  });
+  return "created";
+}
+
+async function detectOptionalFileStatus(
+  filePath: string,
+): Promise<TaskGraphInitializationStatus> {
+  const resolvedPath = resolve(filePath);
+  try {
+    const currentStats = await stat(resolvedPath);
+    if (!currentStats.isFile()) {
+      throw new Error(`${resolvedPath}: expected a file.`);
+    }
+    return "existing";
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return "skipped";
+    }
+    throw error;
+  }
+}
+
+export async function initTaskGraphFilesystem(
+  rootPath: string,
+  input: InitTaskGraphFilesystemInput = {},
+): Promise<InitTaskGraphFilesystemResult> {
+  const root = resolve(rootPath);
+  const configPath = join(root, TASK_GRAPH_CONFIG_FILENAME);
+  const itemsPath = join(root, TASK_GRAPH_ITEMS_DIRECTORY_NAME);
+  const tagsPath = join(root, TASK_GRAPH_TAGS_FILENAME);
+  const typesPath = join(root, TASK_GRAPH_TYPES_FILENAME);
+
+  const rootStatus = await ensureDirectoryExists(root);
+  const itemsStatus = await ensureDirectoryExists(itemsPath);
+  const configStatus = await writeTextFileIfMissing(
+    configPath,
+    serializeTaskGraphConfigToml(buildDefaultTaskGraphConfig(input)),
+  );
+
+  const tagsStatus =
+    input.createTagsRegistry === true
+      ? await writeTextFileIfMissing(
+          tagsPath,
+          serializeTaskGraphTagRegistryToml(buildEmptyTaskGraphTagRegistry()),
+        )
+      : await detectOptionalFileStatus(tagsPath);
+  const typesStatus =
+    input.createTypesRegistry === true
+      ? await writeTextFileIfMissing(
+          typesPath,
+          serializeTaskGraphTypeRegistryToml(buildEmptyTaskGraphTypeRegistry()),
+        )
+      : await detectOptionalFileStatus(typesPath);
+
+  const graph = await loadTaskGraphFilesystem(root);
+  return {
+    config: graph.config,
+    paths: graph.paths,
+    status: {
+      config: configStatus,
+      items: itemsStatus,
+      root: rootStatus,
+      tags: tagsStatus,
+      types: typesStatus,
+    },
+  };
 }
 
 export async function writeTaskGraphTaskFile(
