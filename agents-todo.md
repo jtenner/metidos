@@ -31,5 +31,3 @@ This file is the active execution backlog for Pi-backed follow-up work in `metid
 - [OPT05.3] Targeted status and invalidation batching - Batch only the event streams proven noisy by `OPT05.1` instead of redesigning the full websocket protocol.
   Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT05` / `OPT05.3`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§3.2, 2.6.
 
-- [OPT06.2] Cron duration and saturation telemetry - Record cron run duration, active or pending counts, and saturation events to decide whether deeper scheduler changes are warranted.
-  Reference: [docs/2026-04-11-optimization-execution-proposal.md](./docs/2026-04-11-optimization-execution-proposal.md), `OPT06` / `OPT06.2`; [docs/optimization-proposals.md](./docs/optimization-proposals.md) §§3.3, 6.2.

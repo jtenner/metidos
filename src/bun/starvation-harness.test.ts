@@ -29,6 +29,21 @@ function buildDiagnosticsSnapshot(
       rss,
     },
     runtimeStats: {
+      cron: {
+        activeRuns: 0,
+        completedRuns: 1,
+        erroredRuns: 0,
+        lastDurationMs: 120,
+        peakActiveRuns: 1,
+        peakDurationMs: 120,
+        peakPendingRuns: 0,
+        pendingRuns: 0,
+        saturationEvents: 0,
+        startedRuns: 1,
+        stoppedRuns: 0,
+        timedOutRuns: 0,
+        totalDurationMs: 120,
+      },
       gitCache: {
         commitDiff: {
           hits: 2,
@@ -96,6 +111,21 @@ function buildDiagnosticsSnapshot(
       },
     },
     runtimeStatsSummary: {
+      cron: {
+        activeRuns: 0,
+        completedRuns: 1,
+        erroredRuns: 0,
+        lastDurationMs: 120,
+        peakActiveRuns: 1,
+        peakDurationMs: 120,
+        peakPendingRuns: 0,
+        pendingRuns: 0,
+        saturationEvents: 0,
+        startedRuns: 1,
+        stoppedRuns: 0,
+        timedOutRuns: 0,
+        totalDurationMs: 120,
+      },
       gitCache: {
         commitDiff: {
           hits: 2,

@@ -3,6 +3,7 @@
  * @description Lightweight process-local runtime statistics collector.
  */
 
+import type { CronJobRunStatus } from "./db";
 import type { AppRPCSchema } from "./rpc-schema";
 
 type RpcMethodName = keyof AppRPCSchema["requests"];
@@ -67,7 +68,24 @@ export type GitCommitDiffCacheRuntimeStats = {
   stores: number;
 };
 
+export type CronRuntimeStats = {
+  activeRuns: number;
+  completedRuns: number;
+  erroredRuns: number;
+  lastDurationMs: number;
+  peakActiveRuns: number;
+  peakDurationMs: number;
+  peakPendingRuns: number;
+  pendingRuns: number;
+  saturationEvents: number;
+  startedRuns: number;
+  stoppedRuns: number;
+  timedOutRuns: number;
+  totalDurationMs: number;
+};
+
 export type RuntimeStatsSnapshot = {
+  cron: CronRuntimeStats;
   gitCache: {
     commitDiff: GitCommitDiffCacheRuntimeStats;
     historyPage: GitHistoryPageCacheRuntimeStats;
@@ -100,6 +118,7 @@ export type RankedWebSocketPushPayloadRuntimeStats = {
 };
 
 export type RuntimeStatsSummary = {
+  cron: CronRuntimeStats;
   gitCache: RuntimeStatsSnapshot["gitCache"];
   rpc: RuntimeStatsRpcTotals & {
     methodCount: number;
@@ -155,7 +174,12 @@ export type RpcMeasurementToken = {
   startedAtMs: number;
 };
 
+export type CronRunMeasurementToken = {
+  startedAtMs: number;
+};
+
 type RuntimeStatsState = {
+  cron: CronRuntimeStats;
   gitCache: RuntimeStatsSnapshot["gitCache"];
   rpcByMethod: Map<string, RpcMethodRuntimeStats>;
   rpcTotals: RuntimeStatsRpcTotals;
@@ -182,6 +206,21 @@ function createEmptyRpcMethodRuntimeStats(): RpcMethodRuntimeStats {
 
 function createEmptyRuntimeStatsState(now = new Date()): RuntimeStatsState {
   return {
+    cron: {
+      activeRuns: 0,
+      completedRuns: 0,
+      erroredRuns: 0,
+      lastDurationMs: 0,
+      peakActiveRuns: 0,
+      peakDurationMs: 0,
+      peakPendingRuns: 0,
+      pendingRuns: 0,
+      saturationEvents: 0,
+      startedRuns: 0,
+      stoppedRuns: 0,
+      timedOutRuns: 0,
+      totalDurationMs: 0,
+    },
     gitCache: {
       commitDiff: {
         hits: 0,
@@ -317,6 +356,28 @@ function summarizeTopWebSocketPushPayloadTypes(
     }));
 }
 
+function updateCronPressureState(options: {
+  activeRuns?: number | null;
+  pendingRuns?: number | null;
+}): void {
+  if (typeof options.activeRuns === "number") {
+    const activeRuns = Math.max(0, Math.trunc(options.activeRuns));
+    runtimeStatsState.cron.activeRuns = activeRuns;
+    runtimeStatsState.cron.peakActiveRuns = Math.max(
+      runtimeStatsState.cron.peakActiveRuns,
+      activeRuns,
+    );
+  }
+  if (typeof options.pendingRuns === "number") {
+    const pendingRuns = Math.max(0, Math.trunc(options.pendingRuns));
+    runtimeStatsState.cron.pendingRuns = pendingRuns;
+    runtimeStatsState.cron.peakPendingRuns = Math.max(
+      runtimeStatsState.cron.peakPendingRuns,
+      pendingRuns,
+    );
+  }
+}
+
 function recordRpcOutcome(
   token: RpcMeasurementToken,
   outcome: "canceled" | "failed" | "succeeded" | "timedOut",
@@ -418,6 +479,71 @@ export function recordWebSocketPush(options: {
   runtimeStatsState.websocketPushTotals.payloadBytes += options.payloadBytes;
 }
 
+export function recordCronRunQueued(pendingRuns: number): void {
+  runtimeStatsState.cron.saturationEvents += 1;
+  updateCronPressureState({
+    pendingRuns,
+  });
+}
+
+export function recordCronPendingRuns(pendingRuns: number): void {
+  updateCronPressureState({
+    pendingRuns,
+  });
+}
+
+export function recordCronRunStarted(options?: {
+  activeRuns?: number | null;
+  pendingRuns?: number | null;
+}): CronRunMeasurementToken {
+  runtimeStatsState.cron.startedRuns += 1;
+  updateCronPressureState({
+    activeRuns: options?.activeRuns ?? null,
+    pendingRuns: options?.pendingRuns ?? null,
+  });
+  return {
+    startedAtMs: performance.now(),
+  };
+}
+
+export function recordCronRunFinished(
+  token: CronRunMeasurementToken,
+  options: {
+    activeRuns?: number | null;
+    pendingRuns?: number | null;
+    status: CronJobRunStatus;
+    timedOut?: boolean | null;
+  },
+): void {
+  const durationMs = Math.max(0, performance.now() - token.startedAtMs);
+  runtimeStatsState.cron.lastDurationMs = durationMs;
+  runtimeStatsState.cron.totalDurationMs += durationMs;
+  runtimeStatsState.cron.peakDurationMs = Math.max(
+    runtimeStatsState.cron.peakDurationMs,
+    durationMs,
+  );
+  updateCronPressureState({
+    activeRuns: options.activeRuns ?? null,
+    pendingRuns: options.pendingRuns ?? null,
+  });
+  if (options.timedOut === true) {
+    runtimeStatsState.cron.timedOutRuns += 1;
+  }
+  switch (options.status) {
+    case "Completed":
+      runtimeStatsState.cron.completedRuns += 1;
+      return;
+    case "Stopped":
+      runtimeStatsState.cron.stoppedRuns += 1;
+      return;
+    case "Errored":
+      runtimeStatsState.cron.erroredRuns += 1;
+      return;
+    case "InProgress":
+      return;
+  }
+}
+
 export function recordSqliteRetryLoop(options: {
   exhausted: boolean;
   retryCount: number;
@@ -471,6 +597,9 @@ export function recordGitCommitDiffStore(): void {
 
 export function getRuntimeStatsSnapshot(): RuntimeStatsSnapshot {
   return {
+    cron: {
+      ...runtimeStatsState.cron,
+    },
     gitCache: {
       commitDiff: {
         ...runtimeStatsState.gitCache.commitDiff,
@@ -500,6 +629,9 @@ export function getRuntimeStatsSnapshot(): RuntimeStatsSnapshot {
 
 export function getRuntimeStatsSummary(): RuntimeStatsSummary {
   return {
+    cron: {
+      ...runtimeStatsState.cron,
+    },
     gitCache: {
       commitDiff: {
         ...runtimeStatsState.gitCache.commitDiff,

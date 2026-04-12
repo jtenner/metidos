@@ -48,6 +48,21 @@ function createRuntimeDiagnosticsSnapshot(
       rss: 9_000 + ordinal,
     },
     runtimeStats: {
+      cron: {
+        activeRuns: ordinal,
+        completedRuns: ordinal + 1,
+        erroredRuns: ordinal + 2,
+        lastDurationMs: ordinal + 3,
+        peakActiveRuns: ordinal + 4,
+        peakDurationMs: ordinal + 5,
+        peakPendingRuns: ordinal + 6,
+        pendingRuns: ordinal + 7,
+        saturationEvents: ordinal + 8,
+        startedRuns: ordinal + 9,
+        stoppedRuns: ordinal + 10,
+        timedOutRuns: ordinal + 11,
+        totalDurationMs: ordinal + 12,
+      },
       gitCache: {
         commitDiff: {
           hits: ordinal,
@@ -115,6 +130,21 @@ function createRuntimeDiagnosticsSnapshot(
       },
     },
     runtimeStatsSummary: {
+      cron: {
+        activeRuns: ordinal,
+        completedRuns: ordinal + 1,
+        erroredRuns: ordinal + 2,
+        lastDurationMs: ordinal + 3,
+        peakActiveRuns: ordinal + 4,
+        peakDurationMs: ordinal + 5,
+        peakPendingRuns: ordinal + 6,
+        pendingRuns: ordinal + 7,
+        saturationEvents: ordinal + 8,
+        startedRuns: ordinal + 9,
+        stoppedRuns: ordinal + 10,
+        timedOutRuns: ordinal + 11,
+        totalDurationMs: ordinal + 12,
+      },
       gitCache: {
         commitDiff: {
           hits: ordinal,
@@ -221,6 +251,7 @@ describe("runtime stats sidecar", () => {
         .query<
           {
             collectedAt: string;
+            cronPeakActiveRuns: number;
             rpcCalls: number;
             responseBytes: number;
             websocketMessages: number;
@@ -230,6 +261,7 @@ describe("runtime stats sidecar", () => {
           `
             SELECT
               collected_at AS collectedAt,
+              cron_peak_active_runs AS cronPeakActiveRuns,
               rpc_calls AS rpcCalls,
               rpc_response_bytes AS responseBytes,
               websocket_messages AS websocketMessages
@@ -241,6 +273,7 @@ describe("runtime stats sidecar", () => {
         .get();
       expect(latestSnapshot).toEqual({
         collectedAt: "2026-04-11T12:00:02.000Z",
+        cronPeakActiveRuns: 6,
         rpcCalls: 3,
         responseBytes: 202,
         websocketMessages: 4,

@@ -18,6 +18,7 @@ import {
   PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE,
 } from "./pi-thread-runtime";
 import type { RpcThreadDetail } from "./rpc-schema";
+import { getRuntimeStatsSummary, resetRuntimeStats } from "./runtime-stats";
 import type { CronThreadExecutionHost } from "./sidecar-cron-runner";
 
 const tempDirectories = new Set<string>();
@@ -395,6 +396,7 @@ describe("sidecar cron runner", () => {
 
   it("caps scheduled cron launches and exposes pending queue stats", async () => {
     const { cronRunner: runner } = await loadCronModules();
+    resetRuntimeStats();
     const database = initAppDatabase();
     const repoPath = createTempDirectory("metidos-cron-limit-repo-");
     const project = upsertProject(database, {
@@ -522,5 +524,24 @@ describe("sidecar cron runner", () => {
     for (const cronJob of cronJobs) {
       expect(listCronJobRuns(database, cronJob.id)).toHaveLength(1);
     }
+
+    expect(getRuntimeStatsSummary().cron).toMatchObject({
+      activeRuns: 0,
+      completedRuns: 3,
+      erroredRuns: 0,
+      peakActiveRuns: limiterStats.maxConcurrent,
+      peakPendingRuns: 1,
+      pendingRuns: 0,
+      saturationEvents: 1,
+      startedRuns: 3,
+      stoppedRuns: 0,
+      timedOutRuns: 0,
+    });
+    expect(
+      getRuntimeStatsSummary().cron.totalDurationMs,
+    ).toBeGreaterThanOrEqual(0);
+    expect(getRuntimeStatsSummary().cron.peakDurationMs).toBeGreaterThanOrEqual(
+      getRuntimeStatsSummary().cron.lastDurationMs,
+    );
   });
 });

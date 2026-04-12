@@ -10,7 +10,7 @@ When enabled, Metidos now persists the existing process-local runtime diagnostic
 
 The sidecar sink is intentionally designed around the existing in-memory `runtime-stats.ts` collector:
 
-- request and websocket hot paths still update only cheap in-memory counters,
+- request, websocket, and cron telemetry hot paths still update only cheap in-memory counters,
 - the server periodically snapshots those counters,
 - snapshots are buffered in memory,
 - buffered snapshots are flushed to the sidecar SQLite database in **batched transactions**.
@@ -121,6 +121,7 @@ Each row stores:
 - memory usage snapshot,
 - RPC totals,
 - websocket push totals,
+- cron active/pending counts plus run-duration and saturation totals,
 - SQLite retry totals,
 - git-history and commit-diff cache totals.
 

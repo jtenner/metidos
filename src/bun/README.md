@@ -35,14 +35,14 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Worker thread that serializes structured log entries onto stderr without blocking the main runtime loop.
 
 - `runtime-stats.ts`
-  - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, and selected cache hit/miss counters.
+  - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, cron duration and queue-pressure counters, and selected cache hit/miss counters.
   - Summarizes the heaviest RPC response methods and websocket push types by serialized bytes so transport follow-up work can target measured hot paths instead of guessing.
   - Keeps optimization telemetry cheap, resettable, and numeric so later benchmark and diagnostics work can build on one shared source of truth.
   - Also exports the shared runtime-diagnostics snapshot builder used by the health endpoint, the starvation harness, and the optional sidecar sink.
 
 - `runtime-stats-sidecar.ts`
   - Optional `--track-telemetry` sink that periodically snapshots the in-memory runtime diagnostics and flushes them in batches into a separate SQLite sidecar database.
-  - Stores coarse snapshot totals plus per-RPC-method and per-websocket-push-type counters without adding writes to the hot request path or the main app database.
+  - Stores coarse snapshot totals plus per-RPC-method, per-websocket-push-type, and cron queue/duration counters without adding writes to the hot request path or the main app database.
   - Also exposes maintenance helpers for finding and deleting the sidecar DB files when a local reset or wipe is requested.
 
 - `project-procedures.ts`
@@ -236,12 +236,13 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Executes cron rows by creating Metidos child threads and sending the cron prompt through the same Pi-backed thread runtime used for interactive work.
   - Applies a bounded scheduler-fired launch cap so bursts of due cron jobs do not spawn unlimited child-thread starts at once, while leaving manual `runCronJobById()` behavior direct and predictable.
   - Records cron run history, updates last-run metadata, and waits for the spawned thread to settle before marking completion, stop, or error state.
+  - Emits runtime telemetry for cron active-run counts, pending scheduled launches, saturation events, timeouts, and run-duration totals so later scheduler work stays measurement-led.
   - Opens its SQLite handle with the same WAL-mode runtime pragmas as the main app so cron reads and writes participate in the same concurrency expectations.
   - Also exposes a small execution-host seam plus limiter stats helper so runtime integration and queue-pressure behavior can be tested without changing the production scheduler path.
 
 - `sidecar-cron-runner.test.ts`
   - Integration coverage for immediate and scheduled cron execution through the Pi-backed thread path.
-  - Verifies that cron-created threads persist Pi session identity, that cron rows record completed runs, and that the scheduled-launch limiter exposes active versus pending queue pressure under bursty schedule fires.
+  - Verifies that cron-created threads persist Pi session identity, that cron rows record completed runs, and that the scheduled-launch limiter plus cron runtime telemetry expose active versus pending queue pressure under bursty schedule fires.
 
 - `sidecar-cron-scheduler.ts`
   - Main-process wrapper around the cron worker thread.

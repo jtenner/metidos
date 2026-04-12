@@ -79,6 +79,29 @@ function applyRuntimeStatsSidecarPermissions(databasePath: string): void {
   }
 }
 
+function tableHasColumn(
+  database: Database,
+  tableName: string,
+  columnName: string,
+): boolean {
+  return database
+    .query<{ name: string }, []>(`PRAGMA table_info(${tableName})`)
+    .all()
+    .some((column) => column.name === columnName);
+}
+
+function ensureRuntimeStatsSnapshotColumn(
+  database: Database,
+  columnName: string,
+  columnDefinition: string,
+): void {
+  if (!tableHasColumn(database, "runtime_stats_snapshots", columnName)) {
+    database.run(
+      `ALTER TABLE runtime_stats_snapshots ADD COLUMN ${columnDefinition}`,
+    );
+  }
+}
+
 export function getRuntimeStatsSidecarDatabasePath(
   options?: AppDataPathOptions,
 ): string {
@@ -151,9 +174,87 @@ function migrateRuntimeStatsSidecarDatabase(database: Database): void {
       git_commit_diff_hits INTEGER NOT NULL,
       git_commit_diff_misses INTEGER NOT NULL,
       git_commit_diff_pending_reuse INTEGER NOT NULL,
-      git_commit_diff_stores INTEGER NOT NULL
+      git_commit_diff_stores INTEGER NOT NULL,
+      cron_active_runs INTEGER NOT NULL DEFAULT 0,
+      cron_peak_active_runs INTEGER NOT NULL DEFAULT 0,
+      cron_pending_runs INTEGER NOT NULL DEFAULT 0,
+      cron_peak_pending_runs INTEGER NOT NULL DEFAULT 0,
+      cron_saturation_events INTEGER NOT NULL DEFAULT 0,
+      cron_started_runs INTEGER NOT NULL DEFAULT 0,
+      cron_completed_runs INTEGER NOT NULL DEFAULT 0,
+      cron_stopped_runs INTEGER NOT NULL DEFAULT 0,
+      cron_errored_runs INTEGER NOT NULL DEFAULT 0,
+      cron_timed_out_runs INTEGER NOT NULL DEFAULT 0,
+      cron_last_duration_ms REAL NOT NULL DEFAULT 0,
+      cron_peak_duration_ms REAL NOT NULL DEFAULT 0,
+      cron_total_duration_ms REAL NOT NULL DEFAULT 0
     )
   `);
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_active_runs",
+    "cron_active_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_peak_active_runs",
+    "cron_peak_active_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_pending_runs",
+    "cron_pending_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_peak_pending_runs",
+    "cron_peak_pending_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_saturation_events",
+    "cron_saturation_events INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_started_runs",
+    "cron_started_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_completed_runs",
+    "cron_completed_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_stopped_runs",
+    "cron_stopped_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_errored_runs",
+    "cron_errored_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_timed_out_runs",
+    "cron_timed_out_runs INTEGER NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_last_duration_ms",
+    "cron_last_duration_ms REAL NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_peak_duration_ms",
+    "cron_peak_duration_ms REAL NOT NULL DEFAULT 0",
+  );
+  ensureRuntimeStatsSnapshotColumn(
+    database,
+    "cron_total_duration_ms",
+    "cron_total_duration_ms REAL NOT NULL DEFAULT 0",
+  );
   database.run(`
     CREATE INDEX IF NOT EXISTS idx_runtime_stats_snapshots_collected_at
     ON runtime_stats_snapshots(collected_at DESC, id DESC)
@@ -242,8 +343,21 @@ function writeRuntimeStatsSnapshotBatch(
       git_commit_diff_hits,
       git_commit_diff_misses,
       git_commit_diff_pending_reuse,
-      git_commit_diff_stores
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      git_commit_diff_stores,
+      cron_active_runs,
+      cron_peak_active_runs,
+      cron_pending_runs,
+      cron_peak_pending_runs,
+      cron_saturation_events,
+      cron_started_runs,
+      cron_completed_runs,
+      cron_stopped_runs,
+      cron_errored_runs,
+      cron_timed_out_runs,
+      cron_last_duration_ms,
+      cron_peak_duration_ms,
+      cron_total_duration_ms
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertRpcMethod = database.query(`
     INSERT INTO runtime_stats_rpc_method_snapshots (
@@ -312,6 +426,19 @@ function writeRuntimeStatsSnapshotBatch(
           snapshot.runtimeStatsSummary.gitCache.commitDiff.misses,
           snapshot.runtimeStatsSummary.gitCache.commitDiff.pendingReuse,
           snapshot.runtimeStatsSummary.gitCache.commitDiff.stores,
+          snapshot.runtimeStatsSummary.cron.activeRuns,
+          snapshot.runtimeStatsSummary.cron.peakActiveRuns,
+          snapshot.runtimeStatsSummary.cron.pendingRuns,
+          snapshot.runtimeStatsSummary.cron.peakPendingRuns,
+          snapshot.runtimeStatsSummary.cron.saturationEvents,
+          snapshot.runtimeStatsSummary.cron.startedRuns,
+          snapshot.runtimeStatsSummary.cron.completedRuns,
+          snapshot.runtimeStatsSummary.cron.stoppedRuns,
+          snapshot.runtimeStatsSummary.cron.erroredRuns,
+          snapshot.runtimeStatsSummary.cron.timedOutRuns,
+          snapshot.runtimeStatsSummary.cron.lastDurationMs,
+          snapshot.runtimeStatsSummary.cron.peakDurationMs,
+          snapshot.runtimeStatsSummary.cron.totalDurationMs,
         );
         const snapshotId = Number(insertResult.lastInsertRowid);
 

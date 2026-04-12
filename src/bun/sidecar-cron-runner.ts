@@ -24,6 +24,13 @@ import {
 import { normalizeStoredCodexReasoningEffort } from "./project-procedures/model-catalog";
 import { createAsyncConcurrencyLimit } from "./project-procedures/shared";
 import { isStoppedThreadMessage } from "./project-procedures/thread-detail";
+import {
+  type CronRunMeasurementToken,
+  recordCronPendingRuns,
+  recordCronRunFinished,
+  recordCronRunQueued,
+  recordCronRunStarted,
+} from "./runtime-stats";
 
 /** Poll interval used while waiting for the cron-spawned thread to finish. */
 const THREAD_POLL_INTERVAL_MS = 500;
@@ -34,6 +41,8 @@ const SCHEDULED_CRON_EXECUTION_CONCURRENCY = 2;
 const scheduledCronExecutionLimit = createAsyncConcurrencyLimit(
   SCHEDULED_CRON_EXECUTION_CONCURRENCY,
 );
+let activeCronRunCount = 0;
+let pendingScheduledCronLaunchCount = 0;
 
 export function getScheduledCronExecutionLimitStats(): {
   activeCount: number;
@@ -41,6 +50,38 @@ export function getScheduledCronExecutionLimitStats(): {
   pendingCount: number;
 } {
   return scheduledCronExecutionLimit.stats();
+}
+
+function decrementPendingScheduledCronLaunchCount(): void {
+  pendingScheduledCronLaunchCount = Math.max(
+    0,
+    pendingScheduledCronLaunchCount - 1,
+  );
+  recordCronPendingRuns(pendingScheduledCronLaunchCount);
+}
+
+function startCronRunMeasurement(): CronRunMeasurementToken {
+  activeCronRunCount += 1;
+  return recordCronRunStarted({
+    activeRuns: activeCronRunCount,
+    pendingRuns: pendingScheduledCronLaunchCount,
+  });
+}
+
+function finishCronRunMeasurement(
+  token: CronRunMeasurementToken,
+  options: {
+    status: CronJobRunStatus;
+    timedOut: boolean;
+  },
+): void {
+  activeCronRunCount = Math.max(0, activeCronRunCount - 1);
+  recordCronRunFinished(token, {
+    activeRuns: activeCronRunCount,
+    pendingRuns: pendingScheduledCronLaunchCount,
+    status: options.status,
+    timedOut: options.timedOut,
+  });
 }
 
 function openCronDatabase(): Database {
@@ -73,12 +114,18 @@ async function waitForThreadRunCompletion(
   database: Database,
   runStartedAt: string | null,
   deadlineMs: number,
-): Promise<CronJobRunStatus> {
+): Promise<{
+  status: CronJobRunStatus;
+  timedOut: boolean;
+}> {
   const runStartedAtMs = parseThreadDate(runStartedAt) ?? Date.now();
   while (Date.now() <= deadlineMs) {
     const thread = getThreadById(database, threadId);
     if (!thread) {
-      return "Errored";
+      return {
+        status: "Errored",
+        timedOut: false,
+      };
     }
 
     if (thread.activeTurnStartedAt === null) {
@@ -93,14 +140,26 @@ async function waitForThreadRunCompletion(
           thread.lastErrorMessage &&
           isStoppedThreadMessage(thread.lastErrorMessage)
         ) {
-          return "Stopped";
+          return {
+            status: "Stopped",
+            timedOut: false,
+          };
         }
-        return "Errored";
+        return {
+          status: "Errored",
+          timedOut: false,
+        };
       }
       if (typeof lastRunAtMs === "number" && lastRunAtMs >= runStartedAtMs) {
-        return "Completed";
+        return {
+          status: "Completed",
+          timedOut: false,
+        };
       }
-      return "Completed";
+      return {
+        status: "Completed",
+        timedOut: false,
+      };
     }
 
     await new Promise((resolve) =>
@@ -108,7 +167,10 @@ async function waitForThreadRunCompletion(
     );
   }
 
-  return "Errored";
+  return {
+    status: "Errored",
+    timedOut: true,
+  };
 }
 
 /**
@@ -118,21 +180,27 @@ async function monitorCronJobRun(
   cronJobId: number,
   runId: number,
   threadId: number,
+  runMeasurement: CronRunMeasurementToken,
   runStartedAt: string | null,
   scheduledTime: number,
 ): Promise<void> {
   const database = openCronDatabase();
+  let status: CronJobRunStatus = "Errored";
+  let timedOut = false;
   try {
-    const status = await waitForThreadRunCompletion(
+    const completion = await waitForThreadRunCompletion(
       threadId,
       database,
       runStartedAt,
       Date.now() + RUN_TIMEOUT_MS,
     );
+    status = completion.status;
+    timedOut = completion.timedOut;
     updateCronJobRunStatus(database, runId, status);
     updateCronJobLastRun(database, cronJobId, scheduledTime, status);
   } catch (error) {
-    const status = "Errored" as const;
+    status = "Errored";
+    timedOut = false;
     updateCronJobRunStatus(database, runId, status);
     updateCronJobLastRun(database, cronJobId, scheduledTime, status);
     console.error(
@@ -140,6 +208,10 @@ async function monitorCronJobRun(
     );
   } finally {
     database.close(false);
+    finishCronRunMeasurement(runMeasurement, {
+      status,
+      timedOut,
+    });
   }
 }
 
@@ -171,6 +243,7 @@ async function executeCronJob(
   const database = openCronDatabase();
   const cronJobId = cronJob.id;
   let runId: number | null = null;
+  const runMeasurement = startCronRunMeasurement();
 
   try {
     const threadResult = await host.createThread({
@@ -202,6 +275,7 @@ async function executeCronJob(
       cronJobId,
       run.id,
       threadId,
+      runMeasurement,
       execution.thread.runStatus.startedAt,
       scheduledTime,
     );
@@ -219,10 +293,42 @@ async function executeCronJob(
     console.error(
       `Cron job ${cronJobId} failed with error: ${error instanceof Error ? error.message : String(error)}`,
     );
+    finishCronRunMeasurement(runMeasurement, {
+      status,
+      timedOut: false,
+    });
     return null;
   } finally {
     database.close(false);
   }
+}
+
+async function runScheduledCronJob(
+  cronJob: CronJobRecord,
+  scheduledTime: number,
+  host: CronThreadExecutionHost,
+): Promise<CronJobExecution | null> {
+  const limiterStats = scheduledCronExecutionLimit.stats();
+  const queuedByLimiter =
+    limiterStats.activeCount >= limiterStats.maxConcurrent ||
+    limiterStats.pendingCount > 0;
+
+  if (queuedByLimiter) {
+    pendingScheduledCronLaunchCount += 1;
+    recordCronRunQueued(pendingScheduledCronLaunchCount);
+  }
+
+  return scheduledCronExecutionLimit.run(
+    async () => {
+      if (queuedByLimiter) {
+        decrementPendingScheduledCronLaunchCount();
+      }
+      return executeCronJob(cronJob, scheduledTime, host);
+    },
+    {
+      abortMessage: `Scheduled cron job ${cronJob.id} execution was aborted.`,
+    },
+  );
 }
 
 /**
@@ -245,14 +351,7 @@ export async function runDueCronJobs(
   }
 
   await Promise.all(
-    jobs.map((job) =>
-      scheduledCronExecutionLimit.run(
-        () => executeCronJob(job, scheduledTime, host),
-        {
-          abortMessage: `Scheduled cron job ${job.id} execution was aborted.`,
-        },
-      ),
-    ),
+    jobs.map((job) => runScheduledCronJob(job, scheduledTime, host)),
   );
 }
 

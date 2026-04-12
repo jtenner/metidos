@@ -8,6 +8,10 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import {
   getRuntimeStatsSnapshot,
   getRuntimeStatsSummary,
+  recordCronPendingRuns,
+  recordCronRunFinished,
+  recordCronRunQueued,
+  recordCronRunStarted,
   recordGitCommitDiffCacheHit,
   recordGitCommitDiffCacheMiss,
   recordGitCommitDiffPendingReuse,
@@ -214,6 +218,57 @@ describe("runtime stats collector", () => {
     });
   });
 
+  it("tracks cron run duration, queue pressure, and timeout counters", async () => {
+    recordCronRunQueued(1);
+
+    const firstRun = recordCronRunStarted({
+      activeRuns: 1,
+      pendingRuns: 1,
+    });
+    const secondRun = recordCronRunStarted({
+      activeRuns: 2,
+      pendingRuns: 0,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    recordCronRunFinished(firstRun, {
+      activeRuns: 1,
+      pendingRuns: 0,
+      status: "Completed",
+      timedOut: false,
+    });
+    recordCronPendingRuns(0);
+
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    recordCronRunFinished(secondRun, {
+      activeRuns: 0,
+      pendingRuns: 0,
+      status: "Errored",
+      timedOut: true,
+    });
+
+    const snapshot = getRuntimeStatsSnapshot();
+    expect(snapshot.cron).toMatchObject({
+      activeRuns: 0,
+      completedRuns: 1,
+      erroredRuns: 1,
+      peakActiveRuns: 2,
+      peakPendingRuns: 1,
+      pendingRuns: 0,
+      saturationEvents: 1,
+      startedRuns: 2,
+      stoppedRuns: 0,
+      timedOutRuns: 1,
+    });
+    expect(snapshot.cron.totalDurationMs).toBeGreaterThanOrEqual(0);
+    expect(snapshot.cron.peakDurationMs).toBeGreaterThanOrEqual(
+      snapshot.cron.lastDurationMs,
+    );
+
+    const summary = getRuntimeStatsSummary();
+    expect(summary.cron).toEqual(snapshot.cron);
+  });
+
   it("reset clears counters and refreshes the startedAt timestamp", async () => {
     const token = recordRpcStarted("listThreads", 12);
     recordRpcSucceeded(token, 24);
@@ -228,5 +283,6 @@ describe("runtime stats collector", () => {
     expect(afterReset.websocketPush.totals.messages).toBe(0);
     expect(afterReset.sqliteRetry.totalRetries).toBe(0);
     expect(afterReset.gitCache.historyPage.fetches).toBe(0);
+    expect(afterReset.cron.startedRuns).toBe(0);
   });
 });

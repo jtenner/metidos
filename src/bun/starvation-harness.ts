@@ -1306,6 +1306,9 @@ function printHarnessReport(
     console.log(`  top websocket push bytes: ${topWebSocketPushPayloadTypes}`);
   }
   console.log(
+    `  cron: active=${runtimeStatsSummary.cron.activeRuns} peakActive=${runtimeStatsSummary.cron.peakActiveRuns} pending=${runtimeStatsSummary.cron.pendingRuns} peakPending=${runtimeStatsSummary.cron.peakPendingRuns} started=${runtimeStatsSummary.cron.startedRuns} completed=${runtimeStatsSummary.cron.completedRuns} stopped=${runtimeStatsSummary.cron.stoppedRuns} errored=${runtimeStatsSummary.cron.erroredRuns} timedOut=${runtimeStatsSummary.cron.timedOutRuns} saturation=${runtimeStatsSummary.cron.saturationEvents} totalDuration=${formatDuration(runtimeStatsSummary.cron.totalDurationMs)} peakDuration=${formatDuration(runtimeStatsSummary.cron.peakDurationMs)}`,
+  );
+  console.log(
     `  sqlite retry: loopsWithRetry=${runtimeStatsSummary.sqliteRetry.loopsWithRetry} totalRetries=${runtimeStatsSummary.sqliteRetry.totalRetries} exhausted=${runtimeStatsSummary.sqliteRetry.exhaustedLoops} peakRetryCount=${runtimeStatsSummary.sqliteRetry.peakRetryCount} totalBackoff=${formatDuration(runtimeStatsSummary.sqliteRetry.totalBackoffMs)}`,
   );
   console.log(
