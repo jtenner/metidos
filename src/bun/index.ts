@@ -175,6 +175,8 @@ const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
+const MAINVIEW_CROWN_PATH = resolve(process.cwd(), "src/mainview/crown.png");
+const MAINVIEW_LOGO_PATH = resolve(process.cwd(), "src/mainview/logo.png");
 const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
   process.cwd(),
   "node_modules/firacode/distr/woff2/FiraCode-VF.woff2",
@@ -598,12 +600,14 @@ let lastOverloadLogAt = 0;
 
 function getCurrentMainviewAssetSnapshot() {
   return buildMainviewAssetSnapshot({
+    crownPath: MAINVIEW_CROWN_PATH,
     bundlePath: mainviewBundlePath,
     bundleSourceMapPath: mainviewBundleSourceMapPath,
     cssPath: MAINVIEW_CSS_PATH,
     firaCodeFontPath: FIRA_CODE_VARIABLE_FONT_PATH,
     interLatinFontPath: INTER_VARIABLE_FONT_LATIN_PATH,
     interLatinExtFontPath: INTER_VARIABLE_FONT_LATIN_EXT_PATH,
+    logoPath: MAINVIEW_LOGO_PATH,
   });
 }
 /**

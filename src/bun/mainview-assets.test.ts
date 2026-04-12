@@ -16,12 +16,14 @@ import {
 } from "./mainview-assets";
 
 const TEST_BUILD_OPTIONS = {
+  crownPath: "/tmp/mainview/crown.png",
   bundlePath: "/tmp/mainview/index.js",
   bundleSourceMapPath: "/tmp/mainview/index.js.map",
   cssPath: "/tmp/mainview/index.css",
   firaCodeFontPath: "/tmp/fonts/fira-code-vf.woff2",
   interLatinFontPath: "/tmp/fonts/inter-latin-wght-normal.woff2",
   interLatinExtFontPath: "/tmp/fonts/inter-latin-ext-wght-normal.woff2",
+  logoPath: "/tmp/mainview/logo.png",
 };
 
 function mockStatFactory(
@@ -87,6 +89,7 @@ describe("mainview asset helpers", () => {
         bundleSourceMapPath: null,
       },
       mockStatFactory({
+        "/tmp/mainview/crown.png": { mtimeMs: 900, size: 90 },
         "/tmp/mainview/index.css": { mtimeMs: 1000, size: 100 },
         "/tmp/mainview/index.js": { mtimeMs: 2000, size: 200 },
         "/tmp/fonts/fira-code-vf.woff2": { mtimeMs: 3000, size: 300 },
@@ -98,12 +101,15 @@ describe("mainview asset helpers", () => {
           mtimeMs: 5000,
           size: 500,
         },
+        "/tmp/mainview/logo.png": { mtimeMs: 6000, size: 600 },
       }),
     );
 
     expect(snapshot.assetRoot).toStartWith(`${MAINVIEW_ASSET_ROUTE_PREFIX}/`);
+    expect(snapshot.assetsByRelativePath.has("crown.png")).toBeTrue();
     expect(snapshot.assetsByRelativePath.has("index.js")).toBeTrue();
     expect(snapshot.assetsByRelativePath.has("index.css")).toBeTrue();
+    expect(snapshot.assetsByRelativePath.has("logo.png")).toBeTrue();
     expect(snapshot.assetsByRelativePath.has("index.js.map")).toBeFalse();
   });
 
@@ -111,6 +117,7 @@ describe("mainview asset helpers", () => {
     const snapshot = buildMainviewAssetSnapshot(
       TEST_BUILD_OPTIONS,
       mockStatFactory({
+        "/tmp/mainview/crown.png": { mtimeMs: 900, size: 90 },
         "/tmp/mainview/index.css": { mtimeMs: 1000, size: 100 },
         "/tmp/mainview/index.js": { mtimeMs: 2000, size: 200 },
         "/tmp/mainview/index.js.map": { mtimeMs: 2500, size: 250 },
@@ -123,6 +130,7 @@ describe("mainview asset helpers", () => {
           mtimeMs: 5000,
           size: 500,
         },
+        "/tmp/mainview/logo.png": { mtimeMs: 6000, size: 600 },
       }),
     );
 

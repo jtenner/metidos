@@ -29,6 +29,7 @@ import {
 } from "./app/state";
 import { dispatchAuthRequired } from "./auth-client";
 import AuthShell from "./auth-shell";
+import { installBrandFavicon } from "./controls/brand-logo";
 import {
   isAuthRequiredRpcError,
   normalizeRpcErrorDetails,
@@ -231,6 +232,7 @@ const runtimeConfig: RuntimeConfig = readInjectedRuntimeConfig() ??
   };
 
 installSafePerformanceMeasure();
+installBrandFavicon();
 
 const socketProtocol =
   runtimeConfig.preferTls || window.location.protocol === "https:"

@@ -17,7 +17,8 @@ import {
 } from "react";
 import { BeatLoader } from "react-spinners";
 
-import { brandBoltIcon, materialSymbol } from "../controls/icons";
+import { brandLogoIcon } from "../controls/brand-logo";
+import { materialSymbol } from "../controls/icons";
 import type { DiffLineKind } from "./diff-parsing";
 import {
   type DiffParseSnapshot,
@@ -1253,8 +1254,8 @@ export function DesktopMessageGroups({
               className="group flex w-full min-w-0 items-start gap-6"
               key={group.key}
             >
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
-                {brandBoltIcon("text-sm text-[#224259]")}
+              <div className="mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#10161d]">
+                {brandLogoIcon("h-full w-full")}
               </div>
               <div className="min-w-0 flex-1 space-y-4">
                 <div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#bdd5e6]">
@@ -1333,7 +1334,7 @@ export function MobileMessageGroups({
               key={group.key}
             >
               <div className="flex items-center gap-2 px-1 text-[#bdd5e6]">
-                {brandBoltIcon("text-sm")}
+                {brandLogoIcon("h-4 w-4")}
                 <span className="text-[10px] font-label font-bold uppercase tracking-wider">
                   {APP_TITLE}
                 </span>

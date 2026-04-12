@@ -112,6 +112,7 @@ import { useProjectWorktreeController } from "./app/use-project-worktree-control
 import { ThreadStatusController } from "./app/use-thread-status-controller";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
 import { stepUpAuth } from "./auth-client";
+import { brandLogoIcon } from "./controls/brand-logo";
 import {
   readChatComposerDraft,
   setChatComposerDraft,
@@ -124,7 +125,7 @@ import {
   findCodexModel,
   findReasoningEffortOption,
 } from "./controls/codex-utils";
-import { brandBoltIcon, materialSymbol } from "./controls/icons";
+import { materialSymbol } from "./controls/icons";
 import {
   ThreadAccessControl,
   type ThreadAccessValue,
@@ -5410,7 +5411,7 @@ export default function App({
                 setPrimaryView("chat");
               }}
             >
-              {brandBoltIcon("text-sm")}
+              {brandLogoIcon("h-4 w-4")}
               <span className="mt-1 font-label text-[10px] uppercase tracking-widest">
                 Chat
               </span>

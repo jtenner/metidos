@@ -26,9 +26,10 @@ import type {
   RpcReasoningEffort,
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
+import { brandLogoIcon } from "../controls/brand-logo";
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
-import { brandBoltIcon, materialSymbol } from "../controls/icons";
+import { materialSymbol } from "../controls/icons";
 import {
   ThreadAccessControl,
   type ThreadAccessValue,
@@ -570,8 +571,8 @@ const DesktopTranscriptGroupRow = memo(function DesktopTranscriptGroupRow({
     >
       {group.kind === "assistant" ? (
         <div className="group flex w-full min-w-0 items-start gap-6">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center bg-[#adcbe0]">
-            {brandBoltIcon("text-sm text-[#224259]")}
+          <div className="mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#10161d]">
+            {brandLogoIcon("h-full w-full")}
           </div>
           <div className="min-w-0 flex-1 space-y-4">
             <div className="font-label text-[10px] font-bold uppercase tracking-widest text-[#bdd5e6]">
@@ -640,7 +641,7 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
       {group.kind === "assistant" ? (
         <div className="flex w-full max-w-full flex-col items-start gap-1.5">
           <div className="flex items-center gap-2 px-[2px] text-[#bdd5e6]">
-            {brandBoltIcon("text-sm")}
+            {brandLogoIcon("h-4 w-4")}
             <span className="text-[10px] font-label font-bold uppercase tracking-wider">
               {APP_TITLE}
             </span>

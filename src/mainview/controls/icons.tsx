@@ -298,12 +298,3 @@ export function materialSymbol(
     </svg>
   );
 }
-
-/**
- * App-branded rotated bolt icon used in top-level shell affordances.
- */
-export function brandBoltIcon(className = ""): JSX.Element {
-  return materialSymbol("bolt", `rotate-45 ${className}`.trim(), {
-    filled: true,
-  });
-}

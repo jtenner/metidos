@@ -23,25 +23,36 @@ export type MainviewAssetSnapshot = {
 };
 
 export type BuildMainviewAssetSnapshotOptions = {
+  crownPath: string;
   bundlePath: string;
   bundleSourceMapPath: string | null;
   cssPath: string;
   firaCodeFontPath: string;
   interLatinFontPath: string;
   interLatinExtFontPath: string;
+  logoPath: string;
 };
 
 function buildMainviewAssetDescriptors({
+  crownPath,
   bundlePath,
   bundleSourceMapPath,
   cssPath,
   firaCodeFontPath,
   interLatinFontPath,
   interLatinExtFontPath,
+  logoPath,
 }: BuildMainviewAssetSnapshotOptions): Array<
   [string, MainviewAssetDescriptor]
 > {
   const descriptors: Array<[string, MainviewAssetDescriptor]> = [
+    [
+      "crown.png",
+      {
+        contentType: "image/png",
+        filePath: crownPath,
+      },
+    ],
     [
       "index.css",
       {
@@ -75,6 +86,13 @@ function buildMainviewAssetDescriptors({
       {
         contentType: "font/woff2",
         filePath: interLatinFontPath,
+      },
+    ],
+    [
+      "logo.png",
+      {
+        contentType: "image/png",
+        filePath: logoPath,
       },
     ],
   ];
