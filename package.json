@@ -37,6 +37,7 @@
     "react-spinners": "^0.17.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
+    "turndown": "^7.2.4",
     "vm2": "^3.10.5",
     "zod": "^4.3.6"
   },
@@ -51,6 +52,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/turndown": "5.0.6",
     "@typescript/native-preview": "^7.0.0-dev.20260401.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "tailwindcss": "^4.2.2"
