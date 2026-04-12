@@ -9,8 +9,6 @@ import { deleteRuntimeStatsSidecarDatabaseFiles } from "./runtime-stats-sidecar"
 
 export const DEV_AUTH_BYPASS_ENV = "METIDOS_DEV_BYPASS";
 export const DEV_RESET_ENV = "METIDOS_DEV_RESET";
-const LEGACY_DEV_AUTH_BYPASS_ENV = "JOLT_DEV_BYPASS";
-const LEGACY_DEV_RESET_ENV = "JOLT_DEV_RESET";
 const DEV_WEBSOCKET_TICKET_LIFETIME_MS = 60 * 1000;
 
 type DevFlowOptions = {
@@ -65,14 +63,8 @@ function assertDevOnlyFlag(
 
 export function resolveDevFlowMode(options: DevFlowOptions): DevFlowMode {
   const env = options.env ?? process.env;
-  const authBypass = envFlagEnabled(env, [
-    DEV_AUTH_BYPASS_ENV,
-    LEGACY_DEV_AUTH_BYPASS_ENV,
-  ]);
-  const resetOnStartup = envFlagEnabled(env, [
-    DEV_RESET_ENV,
-    LEGACY_DEV_RESET_ENV,
-  ]);
+  const authBypass = envFlagEnabled(env, [DEV_AUTH_BYPASS_ENV]);
+  const resetOnStartup = envFlagEnabled(env, [DEV_RESET_ENV]);
 
   assertDevOnlyFlag(authBypass, DEV_AUTH_BYPASS_ENV, options.isDevServer);
   assertDevOnlyFlag(resetOnStartup, DEV_RESET_ENV, options.isDevServer);

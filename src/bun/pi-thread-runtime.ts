@@ -59,8 +59,6 @@ export const PI_THREAD_AGENT_DIRECTORY_NAME = "pi-agent";
 export const PI_THREAD_SESSIONS_DIRECTORY_NAME = "thread-sessions";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
   "METIDOS_PI_RUNTIME_TEST_PROVIDER";
-const LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV =
-  "JOLT_PI_RUNTIME_TEST_PROVIDER";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE = "openai-probe";
 export const PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE =
   "all-providers-probe";
@@ -292,9 +290,7 @@ function applyPiRuntimeTestProviderOverride(
   modelRegistry: ModelRegistry,
 ): void {
   const configuredProvider =
-    process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
-    process.env[LEGACY_PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() ||
-    "";
+    process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV]?.trim() || "";
   if (
     configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE &&
     configuredProvider !== PI_THREAD_RUNTIME_TEST_PROVIDER_ALL_PROVIDERS_PROBE

@@ -29,10 +29,7 @@ let loggingThreadSupported = true;
 export function isTraceLoggingEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return (
-    env[TRACE_LOGGING_ENV]?.trim() === "1" ||
-    env.JOLT_TRACE_LOGS?.trim() === "1"
-  );
+  return env[TRACE_LOGGING_ENV]?.trim() === "1";
 }
 
 export function shouldEmitLogLevel(

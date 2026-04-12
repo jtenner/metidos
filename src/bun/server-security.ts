@@ -109,6 +109,23 @@ export function parseAllowedBrowserOrigins(
 }
 
 /**
+ * Build the configured websocket/browser origin allowlist from env-style inputs.
+ */
+export function buildConfiguredBrowserOrigins(options: {
+  allowedOrigins?: string | undefined;
+  publicOrigin?: string | undefined;
+}): string[] {
+  const normalized = new Set<string>();
+  for (const origin of parseAllowedBrowserOrigins(options.allowedOrigins)) {
+    normalized.add(origin);
+  }
+  for (const origin of parseAllowedBrowserOrigins(options.publicOrigin)) {
+    normalized.add(origin);
+  }
+  return [...normalized];
+}
+
+/**
  * Allow missing Origin for non-browser local clients but validate browser origins strictly.
  */
 

@@ -7,6 +7,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   applySecurityHeaders,
+  buildConfiguredBrowserOrigins,
   buildContentSecurityPolicy,
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
@@ -51,6 +52,15 @@ describe("server security helpers", () => {
     expect(() => parseAllowedBrowserOrigins("ws://localhost:7599")).toThrow(
       'Invalid browser origin "ws://localhost:7599".',
     );
+  });
+
+  it("merges the public origin into configured websocket origins", () => {
+    expect(
+      buildConfiguredBrowserOrigins({
+        allowedOrigins: "https://other-host.example https://notwindows",
+        publicOrigin: "https://notwindows",
+      }),
+    ).toEqual(["https://other-host.example", "https://notwindows"]);
   });
 
   it("allows missing Origin for non-browser local clients", () => {

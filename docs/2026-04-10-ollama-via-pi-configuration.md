@@ -53,9 +53,6 @@ These are the env vars that matter for Ollama in Metidos:
 - `METIDOS_APP_DATA_DIR`
   - Optional.
   - Use this only if you want Metidos to store `pi-agent/models.json` somewhere other than the default per-user app-data directory.
-- `JOLT_APP_DATA_DIR`
-  - Optional legacy fallback.
-  - Prefer `METIDOS_APP_DATA_DIR`.
 - Custom env vars referenced by your own `models.json`
   - Optional.
   - Only relevant if you choose to set `apiKey` or custom `headers` to env-var names such as `OLLAMA_API_KEY`.

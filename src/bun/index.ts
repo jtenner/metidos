@@ -151,13 +151,13 @@ import {
 } from "./runtime-stats-sidecar";
 import {
   applySecurityHeaders,
+  buildConfiguredBrowserOrigins,
   buildLivenessPayload,
   buildLoopbackBrowserOrigins,
   buildRuntimeConfigElement,
   type InjectedRuntimeConfig,
   isWebSocketOriginAllowed,
   LOOPBACK_HOSTNAME,
-  parseAllowedBrowserOrigins,
 } from "./server-security";
 import {
   startCronScheduler,
@@ -351,19 +351,13 @@ function resolveServerPort(args: string[], envPort?: string): number {
   return parsedPort;
 }
 
-function readBrandEnvVar(name: string): string | undefined {
-  const canonicalValue = process.env[name]?.trim();
-  if (canonicalValue) {
-    return canonicalValue;
-  }
-
-  const legacyName = name.replace(/^METIDOS_/, "JOLT_");
-  const legacyValue = process.env[legacyName]?.trim();
-  return legacyValue || undefined;
+function readEnvVar(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
 }
 
-function readBrandEnvFlag(name: string): boolean {
-  return readBrandEnvVar(name) === "1";
+function readEnvFlag(name: string): boolean {
+  return readEnvVar(name) === "1";
 }
 
 const WIPE_USER_DATA_FLAG = "--wipe-user-data";
@@ -371,17 +365,13 @@ const WIPE_USER_DATA_CONFIRMATION = "DELETE";
 
 const SERVER_ARGS = Bun.argv.slice(2);
 const CONFIGURED_SERVER_PORT =
-  readCliPort(SERVER_ARGS) ?? readBrandEnvVar("METIDOS_PORT");
-const SERVER_PORT = resolveServerPort(
-  SERVER_ARGS,
-  readBrandEnvVar("METIDOS_PORT"),
-);
+  readCliPort(SERVER_ARGS) ?? readEnvVar("METIDOS_PORT");
+const SERVER_PORT = resolveServerPort(SERVER_ARGS, readEnvVar("METIDOS_PORT"));
 const SERVER_PORT_IS_EXPLICIT = CONFIGURED_SERVER_PORT !== undefined;
 const BACKEND_ONLY =
-  SERVER_ARGS.includes("--backend-only") ||
-  readBrandEnvFlag("METIDOS_BACKEND_ONLY");
+  SERVER_ARGS.includes("--backend-only") || readEnvFlag("METIDOS_BACKEND_ONLY");
 const IS_DEV_SERVER =
-  SERVER_ARGS.includes("--dev") || readBrandEnvFlag("METIDOS_DEV");
+  SERVER_ARGS.includes("--dev") || readEnvFlag("METIDOS_DEV");
 const TRACK_RUNTIME_TELEMETRY = SERVER_ARGS.includes(TRACK_TELEMETRY_FLAG);
 const PUBLIC_TLS_ENABLED = isPublicTlsEnabled(SERVER_ARGS, process.env);
 const TLS_RUNTIME = resolveTlsRuntimeConfig({
@@ -399,9 +389,10 @@ process.env.METIDOS_RPC_HTTP_ORIGIN = formatLoopbackHttpOrigin(
 );
 process.env.METIDOS_RPC_URL = formatLoopbackWebSocketUrl(SERVER_PORT, false);
 
-const CONFIGURED_ALLOWED_WS_ORIGINS = parseAllowedBrowserOrigins(
-  readBrandEnvVar("METIDOS_ALLOWED_WS_ORIGINS"),
-);
+const CONFIGURED_ALLOWED_WS_ORIGINS = buildConfiguredBrowserOrigins({
+  allowedOrigins: readEnvVar("METIDOS_ALLOWED_WS_ORIGINS"),
+  publicOrigin: readEnvVar("METIDOS_PUBLIC_ORIGIN"),
+});
 
 /**
  * Runs the destructive local database wipe confirmation flow.

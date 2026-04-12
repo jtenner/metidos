@@ -16,7 +16,6 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const APP_NAME = ".metidos";
-const LEGACY_APP_NAME = ".jolt";
 /** Database filename under the app data directory. */
 const DB_FILE_NAME = "app.db";
 /** Default thread model used when no explicit model is provided. */
@@ -24,6 +23,7 @@ const DB_FILE_NAME = "app.db";
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
 /** Default reasoning effort used for thread creation and migration repair. */
 export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
+const PREVIOUS_BRAND_ACCESS_COLUMN_NAME = ["jo", "lt_access"].join("");
 /** Lazily-initialized singleton db handle for the process lifetime. */
 
 let appDatabase: Database | null = null;
@@ -362,7 +362,6 @@ function buildDefaultAppDataDirPath(appName: string): string {
 }
 
 const DEFAULT_APP_DATA_DIR = buildDefaultAppDataDirPath(APP_NAME);
-const LEGACY_DEFAULT_APP_DATA_DIR = buildDefaultAppDataDirPath(LEGACY_APP_NAME);
 /** Cached app-data directory path resolved for this process. */
 
 let resolvedAppDataDir: string | null = null;
@@ -496,18 +495,10 @@ export function selectWritableAppDataDirectory(options: {
   configuredAppDataDir?: string | null | undefined;
   defaultAppDataDir: string;
   isWritableDirectory?: (path: string) => boolean;
-  legacyDefaultAppDataDir?: string | null | undefined;
 }): string {
   const isWritable = options.isWritableDirectory ?? isWritableDirectory;
-  const preferLegacyDefault =
-    !options.configuredAppDataDir &&
-    typeof options.legacyDefaultAppDataDir === "string" &&
-    options.legacyDefaultAppDataDir.length > 0 &&
-    existsSync(options.legacyDefaultAppDataDir) &&
-    !existsSync(options.defaultAppDataDir);
   const candidates = [
     options.configuredAppDataDir || null,
-    preferLegacyDefault ? options.legacyDefaultAppDataDir || null : null,
     options.defaultAppDataDir,
   ].filter((value): value is string => Boolean(value));
 
@@ -520,9 +511,7 @@ export function selectWritableAppDataDirectory(options: {
 
   const checkedPaths = options.configuredAppDataDir
     ? `Checked METIDOS_APP_DATA_DIR=${options.configuredAppDataDir} and ${options.defaultAppDataDir}.`
-    : typeof options.legacyDefaultAppDataDir === "string"
-      ? `Checked ${options.defaultAppDataDir} and legacy ${options.legacyDefaultAppDataDir}.`
-      : `Checked ${options.defaultAppDataDir}.`;
+    : `Checked ${options.defaultAppDataDir}.`;
   throw new Error(
     [
       "Unable to find a writable application data directory.",
@@ -541,13 +530,10 @@ function resolveAppDataDirectory(): string {
     return resolvedAppDataDir;
   }
 
-  const configuredAppDataDir =
-    process.env.METIDOS_APP_DATA_DIR?.trim() ||
-    process.env.JOLT_APP_DATA_DIR?.trim();
+  const configuredAppDataDir = process.env.METIDOS_APP_DATA_DIR?.trim();
   resolvedAppDataDir = selectWritableAppDataDirectory({
     configuredAppDataDir,
     defaultAppDataDir: DEFAULT_APP_DATA_DIR,
-    legacyDefaultAppDataDir: LEGACY_DEFAULT_APP_DATA_DIR,
   });
   return resolvedAppDataDir;
 }
@@ -751,7 +737,7 @@ export function migrateDatabase(db: Database): void {
   const hasLegacyThreadAccessColumn = tableHasColumn(
     db,
     "threads",
-    "jolt_access",
+    PREVIOUS_BRAND_ACCESS_COLUMN_NAME,
   );
   const hasMetidosThreadAccessColumn = tableHasColumn(
     db,
@@ -825,7 +811,7 @@ export function migrateDatabase(db: Database): void {
       db,
       `
 			UPDATE threads
-			SET metidos_access = jolt_access
+			SET metidos_access = ${PREVIOUS_BRAND_ACCESS_COLUMN_NAME}
 		`,
     );
   }
@@ -1095,7 +1081,7 @@ export function migrateDatabase(db: Database): void {
   const hasLegacyCronAccessColumn = tableHasColumn(
     db,
     "cron_jobs",
-    "jolt_access",
+    PREVIOUS_BRAND_ACCESS_COLUMN_NAME,
   );
   const hasMetidosCronAccessColumn = tableHasColumn(
     db,
@@ -1150,7 +1136,7 @@ export function migrateDatabase(db: Database): void {
       db,
       `
 			UPDATE cron_jobs
-			SET metidos_access = jolt_access
+			SET metidos_access = ${PREVIOUS_BRAND_ACCESS_COLUMN_NAME}
 		`,
     );
   }

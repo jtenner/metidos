@@ -81,7 +81,10 @@ flowchart TD
 
 1. **Startup**
    - `bun run src/bun/index.ts` (or `bun run start`) boots the server.
+   - `bun run start:telemetry` boots the same server with `--track-telemetry` so periodic runtime snapshots are persisted into the sidecar telemetry database.
    - `bun run start:tls` starts the same single-port server in reverse-proxy TLS mode so browser-facing transport is treated as HTTPS/WSS when nginx or another proxy terminates TLS upstream.
+   - `bun run start:tls:telemetry` combines reverse-proxy TLS mode with `--track-telemetry`.
+     Bun auto-loads `.env` for these scripts; set `METIDOS_PUBLIC_ORIGIN=https://notwindows` in `.env` and the backend will automatically fold that origin into the websocket allowlist. Use `METIDOS_ALLOWED_WS_ORIGINS` only when you need additional browser-facing origins.
      Point both `/` and `/rpc` at the same backend upstream, and preserve `X-Forwarded-Host` plus `X-Forwarded-Proto` so websocket origin checks see the browser origin.
    - The server builds/serves the mainview bundle and exposes:
      - HTTP static handlers for app assets, with `index.html` served as `no-store` and versioned frontend assets under `/assets/mainview/<version>/...`
@@ -160,7 +163,9 @@ Useful scripts from `package.json`:
 
 ```bash
 bun run start                 # build CSS + run server
-bun run start:tls             # build CSS + run server in reverse-proxy TLS mode
+bun run start:telemetry       # build CSS + run server with runtime telemetry sidecar persistence
+bun run start:tls             # build CSS + run server in reverse-proxy TLS mode (reads .env)
+bun run start:tls:telemetry   # build CSS + run TLS-mode server with telemetry sidecar persistence (reads .env)
 bun run dev                   # build CSS + run main dev server with CSS watch
 bun run build:dev             # install + build unminified mainview bundle with sourcemaps
 bun run build:prod            # install + build minified mainview bundle (no sourcemap by default)
@@ -179,10 +184,11 @@ bun run harness:starvation    # run starvation harness utility
 - `--track-telemetry` to persist periodic runtime-stat snapshots into a separate sidecar SQLite database under the app-data directory.
 - `--wipe-user-data` to confirm, delete the local SQLite database files (including the telemetry sidecar DB when present), and exit before startup.
 - `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
+- `METIDOS_PUBLIC_ORIGIN` as the primary browser-facing origin used by reverse-proxy TLS mode; the backend automatically adds it to the websocket allowlist.
 - `METIDOS_APP_DATA_DIR` for an explicit per-user application data location.
 - `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve the versioned mainview sourcemap path (for example `/assets/mainview/<version>/index.js.map`) for non-dev builds when you need production bundle debugging.
 
-Canonical environment variables use the `METIDOS_*` prefix. Deprecated `JOLT_*` aliases are still accepted as compatibility fallbacks for startup and existing local installs.
+For local startup, Bun auto-loads `.env`; copy `.env.example` to `.env` and set `METIDOS_PUBLIC_ORIGIN=https://notwindows` when you want the reverse-proxy TLS scripts to accept that host.
 
 ## Data and performance characteristics
 

@@ -52,10 +52,7 @@ export function isPublicTlsEnabled(
   if (args.includes("--tls")) {
     return true;
   }
-  return (
-    env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1" ||
-    env.JOLT_TLS?.trim() === "1"
-  );
+  return env[TLS_PUBLIC_TRANSPORT_ENV]?.trim() === "1";
 }
 /**
  * Resolves tls runtime config.

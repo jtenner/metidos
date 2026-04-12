@@ -9,9 +9,10 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`, `--track-telemetry`) and builds the shared runtime configuration.
   - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files plus the optional telemetry sidecar database and exiting before server bootstrap.
   - Exposes loopback HTTP routes for mainview assets, serving versioned frontend assets under `/assets/mainview/<version>/...` with immutable cache headers while keeping HTML bootstrap responses `no-store`, plus compatibility root asset aliases and websocket RPC at `/rpc`.
+  - Merges `METIDOS_ALLOWED_WS_ORIGINS` with `METIDOS_PUBLIC_ORIGIN` so reverse-proxy TLS deployments can keep one canonical browser-facing origin in `.env` while still satisfying websocket origin checks.
   - Registers all RPC handlers from `project-procedures.ts`.
   - Tracks websocket lifecycle, pending request cancellation, overload telemetry, and startup/shutdown behavior.
-  - Backing entrypoint for the default `bun start` and `bun start:tls` scripts.
+  - Backing entrypoint for the default `bun start`, `bun start:telemetry`, `bun start:tls`, and `bun start:tls:telemetry` scripts.
 
 - `tls-config.ts`
   - Resolves the reverse-proxy TLS policy shared across the Bun entrypoints.
@@ -288,4 +289,5 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.
 - Bun listeners stay on loopback HTTP/WS. Use `--tls` or `METIDOS_TLS=1` only when an upstream reverse proxy is terminating TLS for browser traffic.
-- Default reverse-proxy loopback origins on `http://localhost`, `https://localhost`, `http://127.0.0.1`, and `https://127.0.0.1` are accepted automatically; set `METIDOS_ALLOWED_WS_ORIGINS` to add any non-default browser-facing origin or port.
+- Default reverse-proxy loopback origins on `http://localhost`, `https://localhost`, `http://127.0.0.1`, and `https://127.0.0.1` are accepted automatically; set `METIDOS_PUBLIC_ORIGIN` for the primary browser-facing host and `METIDOS_ALLOWED_WS_ORIGINS` only when you need extra origins or ports.
+- Bun auto-loads `.env` for the repo-local start scripts; copy `.env.example` to `.env` and set `METIDOS_PUBLIC_ORIGIN=https://notwindows` when you want the TLS scripts to accept that host by default.

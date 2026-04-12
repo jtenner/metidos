@@ -302,8 +302,6 @@ export const MAINVIEW_STATE_WRITE_DEBOUNCE_MS = 160;
 export const TREE_VIEW_STATE_STORAGE_KEY = "metidos:tree-view-state";
 export const TREE_VIEW_STATE_STORAGE_VERSION = 1;
 export const APP_TITLE = "Metidos";
-const LEGACY_MAINVIEW_STATE_STORAGE_KEY = "jolt:mainview-state";
-const LEGACY_TREE_VIEW_STATE_STORAGE_KEY = "jolt:tree-view-state";
 const GIT_HISTORY_TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
@@ -879,9 +877,7 @@ export function readPersistedMainviewState(): PersistedMainviewState {
   }
 
   try {
-    const raw =
-      window.localStorage.getItem(MAINVIEW_STATE_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_MAINVIEW_STATE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(MAINVIEW_STATE_STORAGE_KEY);
     if (!raw) {
       return defaultPersistedMainviewState();
     }
@@ -929,9 +925,7 @@ export function readPersistedTreeViewState(): PersistedTreeViewState {
   }
 
   try {
-    const raw =
-      window.localStorage.getItem(TREE_VIEW_STATE_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_TREE_VIEW_STATE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(TREE_VIEW_STATE_STORAGE_KEY);
     if (!raw) {
       return defaultPersistedTreeViewState();
     }

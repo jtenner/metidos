@@ -44,22 +44,13 @@ export type MainviewBuildResult = {
   sourcemap: "external" | "none";
 };
 
-function readBrandEnvVar(
-  env: NodeJS.ProcessEnv,
-  name: string,
-): string | undefined {
-  const canonicalValue = env[name]?.trim();
-  if (canonicalValue) {
-    return canonicalValue;
-  }
-
-  const legacyName = name.replace(/^METIDOS_/, "JOLT_");
-  const legacyValue = env[legacyName]?.trim();
-  return legacyValue || undefined;
+function readEnvVar(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const value = env[name]?.trim();
+  return value || undefined;
 }
 
-function readBrandEnvFlag(env: NodeJS.ProcessEnv, name: string): boolean {
-  return readBrandEnvVar(env, name) === "1";
+function readEnvFlag(env: NodeJS.ProcessEnv, name: string): boolean {
+  return readEnvVar(env, name) === "1";
 }
 
 function readLastCliFlag(
@@ -92,7 +83,7 @@ export function resolveMainviewBuildOptions({
       ? "development"
       : modeFlag === "--production"
         ? "production"
-        : readBrandEnvFlag(env, "METIDOS_DEV")
+        : readEnvFlag(env, "METIDOS_DEV")
           ? "development"
           : "production");
 
@@ -107,7 +98,7 @@ export function resolveMainviewBuildOptions({
       : sourceMapFlag === "--no-sourcemap"
         ? false
         : resolvedMode === "development" ||
-          readBrandEnvFlag(env, "METIDOS_MAINVIEW_SOURCEMAP"));
+          readEnvFlag(env, "METIDOS_MAINVIEW_SOURCEMAP"));
 
   return {
     emitSourceMap: resolvedEmitSourceMap,
