@@ -102,6 +102,11 @@ All static checks pass and tests are comprehensive (including deep security, san
 9. .metidos/ committed (vs AGENTS.md); 2026 dates (time skew?); abundant warnings/edges (no TODOs good); single-process limits; large test surface (387 passing but maintenance heavy); Git/fs/ command normalization solid but complex.
 10. Positives: Clean code/lint/TS, exhaustive tests (auth, scope, VM escapes, lockouts, Pi, normalization, derived state), parameterized DB, constant-time verifies, strong bounds/telemetry foundation, React Compiler.
 
+## Task Graph Follow-up
+- The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
+- Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
+- Child risk records and mitigation tasks capture the main clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, Pi compatibility, and task-graph policy clarity.
+
 ## Recommendations
 - **Priority**: Split monoliths; default safe threads + explicit unsafe UX; add all missing telemetry hooks/counters for tools/VM2/unsafe/cron; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
@@ -109,4 +114,4 @@ All static checks pass and tests are comprehensive (including deep security, san
 - **Maintenance**: Align .metidos with AGENTS.md/gitignore; keep this doc updated as single source; follow .tasks/commit.md strictly for changes. Refactor tools to modular files.
 - **Next**: Production build/load test with heavy unsafe/agent workloads; Pi SDK compatibility audit; track telemetry for high-risk paths.
 
-This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, and AGENTS.md.
+This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

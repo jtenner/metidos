@@ -1,13 +1,45 @@
 schema = "metidos.task-tags/v2"
 
 [[tag]]
+name = "area:agent-runtime"
+description = "Agent runtime, tool hosts, and sidecar execution"
+exclusive_group = "area"
+
+[[tag]]
+name = "area:auth"
+description = "Authentication, authorization, and user management"
+exclusive_group = "area"
+
+[[tag]]
+name = "area:mainview"
+description = "Main browser UI shell and workspace rendering"
+exclusive_group = "area"
+
+[[tag]]
+name = "area:performance"
+description = "Performance, scalability, and runtime efficiency"
+exclusive_group = "area"
+
+[[tag]]
 name = "area:task-graph"
 description = "Git-native task graph work"
 exclusive_group = "area"
 
 [[tag]]
+name = "component:auth-service"
+description = "Auth service orchestration and session handling"
+
+[[tag]]
+name = "component:mainview-app"
+description = "Top-level mainview application shell"
+
+[[tag]]
 name = "component:pi-metidos-tools"
 description = "Metidos tool host and tool exposure"
+
+[[tag]]
+name = "component:pi-thread-runtime"
+description = "Pi thread runtime integration and event projection"
 
 [[tag]]
 name = "component:project-procedures"
@@ -16,6 +48,14 @@ description = "Backend project procedure modules"
 [[tag]]
 name = "component:rpc-schema"
 description = "RPC request and response schemas"
+
+[[tag]]
+name = "component:runtime-stats"
+description = "Runtime stats, telemetry counters, and reporting"
+
+[[tag]]
+name = "component:vm2-runner"
+description = "VM2-backed untrusted JavaScript execution"
 
 [[tag]]
 name = "discipline:backend"
@@ -28,10 +68,31 @@ description = "Documentation work"
 exclusive_group = "discipline"
 
 [[tag]]
+name = "discipline:frontend"
+description = "Frontend and UI implementation work"
+exclusive_group = "discipline"
+
+[[tag]]
 name = "discipline:test"
 description = "Automated test coverage"
 exclusive_group = "discipline"
 
 [[tag]]
+name = "source:audit-2026-04-12"
+description = "Tasks derived from the 2026-04-12 project audit"
+
+[[tag]]
+name = "theme:maintainability"
+description = "Code structure, modularity, and change safety"
+
+[[tag]]
+name = "theme:performance"
+description = "Performance, load, and capacity concerns"
+
+[[tag]]
 name = "theme:reliability"
 description = "Correctness, validation, and stable rewrites"
+
+[[tag]]
+name = "theme:security"
+description = "Security boundaries, auth, and isolation"

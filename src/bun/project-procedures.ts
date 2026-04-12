@@ -195,7 +195,10 @@ import type {
   RpcWorktreeSnapshot,
 } from "./rpc-schema";
 import { recordSqliteRetryLoop } from "./runtime-stats";
-import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
+import {
+  runCronNow as runCronNowInScheduler,
+  syncCronSchedulerCron,
+} from "./sidecar-cron-scheduler";
 
 /**
  * Shared DB handle for all RPC procedures in this process.
@@ -1247,7 +1250,13 @@ function createPiToolRequestContext(
   };
 }
 
-function createPiMetidosToolHost(ownerUserId: number): PiMetidosToolHost {
+export function createPiMetidosToolHost(
+  ownerUserId: number,
+  options?: {
+    syncCronSchedulerCron?: (cronJobId: number) => void;
+  },
+): PiMetidosToolHost {
+  const syncCron = options?.syncCronSchedulerCron ?? syncCronSchedulerCron;
   return {
     createThread: (params) =>
       createThreadProcedure(params, createPiToolRequestContext(ownerUserId)),
@@ -1267,8 +1276,14 @@ function createPiMetidosToolHost(ownerUserId: number): PiMetidosToolHost {
       listProjectsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
     listThreads: () =>
       listThreadsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
-    newCron: (params) =>
-      newCronProcedure(params, createPiToolRequestContext(ownerUserId)),
+    newCron: async (params) => {
+      const cron = await newCronProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId),
+      );
+      syncCron(cron.id);
+      return cron;
+    },
     requestThreadStart: (params) =>
       requestThreadStartProcedure(
         params,
@@ -1279,8 +1294,14 @@ function createPiMetidosToolHost(ownerUserId: number): PiMetidosToolHost {
         params,
         createPiToolRequestContext(ownerUserId),
       ),
-    updateCron: (params) =>
-      updateCronProcedure(params, createPiToolRequestContext(ownerUserId)),
+    updateCron: async (params) => {
+      const cron = await updateCronProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId),
+      );
+      syncCron(cron.id);
+      return cron;
+    },
     updateThreadMetadata: (params) =>
       updateThreadMetadataProcedure(
         params,

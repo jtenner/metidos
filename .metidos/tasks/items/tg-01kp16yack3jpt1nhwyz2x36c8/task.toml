@@ -1,0 +1,16 @@
+schema = "metidos.task/v2"
+id = "tg-01kp16yack3jpt1nhwyz2x36c8"
+title = "Risk: unsafe-mode usage and vm2 isolation leave execution boundaries too broad"
+type = "risk"
+status = "open"
+priority = "p1"
+severity = "critical"
+size = "m"
+created_at = "2026-04-12T16:12:00Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:agent-runtime", "component:vm2-runner", "source:audit-2026-04-12", "theme:security"]
+milestone = "audit-remediation-2026-04"
+
+[parent]
+task = "tg-01kp16yachnc2h5f7wm9kd8eqa"

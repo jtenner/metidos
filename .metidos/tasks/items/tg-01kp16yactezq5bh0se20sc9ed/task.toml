@@ -1,0 +1,18 @@
+schema = "metidos.task/v2"
+id = "tg-01kp16yactezq5bh0se20sc9ed"
+title = "Modularize auth-service.ts into focused auth lifecycle modules"
+type = "refactor"
+status = "open"
+priority = "p1"
+size = "m"
+created_at = "2026-04-12T16:19:00Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:auth", "component:auth-service", "discipline:backend", "source:audit-2026-04-12", "theme:maintainability"]
+milestone = "audit-remediation-2026-04"
+
+[mitigates]
+tasks = ["tg-01kp16yacmnebebbnpwbgbe9g9"]
+
+[parent]
+task = "tg-01kp16yachnc2h5f7wm9kd8eqa"

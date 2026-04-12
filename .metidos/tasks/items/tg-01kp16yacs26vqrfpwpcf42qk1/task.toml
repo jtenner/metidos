@@ -1,0 +1,18 @@
+schema = "metidos.task/v2"
+id = "tg-01kp16yacs26vqrfpwpcf42qk1"
+title = "Refactor App.tsx into smaller mainview controllers and workspace modules"
+type = "refactor"
+status = "open"
+priority = "p1"
+size = "l"
+created_at = "2026-04-12T16:18:00Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:mainview", "component:mainview-app", "discipline:frontend", "source:audit-2026-04-12", "theme:maintainability"]
+milestone = "audit-remediation-2026-04"
+
+[mitigates]
+tasks = ["tg-01kp16yacjxf2533v1n47c9042", "tg-01kp16yacpfks7pd3be0srahtt"]
+
+[parent]
+task = "tg-01kp16yachnc2h5f7wm9kd8eqa"

@@ -1,0 +1,18 @@
+schema = "metidos.task/v2"
+id = "tg-01kp16yacvhe337zm3jhtyds2m"
+title = "Modularize pi-metidos-tools.ts into smaller tool packs and schema units"
+type = "refactor"
+status = "open"
+priority = "p1"
+size = "m"
+created_at = "2026-04-12T16:20:00Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:agent-runtime", "component:pi-metidos-tools", "discipline:backend", "source:audit-2026-04-12", "theme:maintainability"]
+milestone = "audit-remediation-2026-04"
+
+[mitigates]
+tasks = ["tg-01kp16yacnvg0vqfesjce7t9z5", "tg-01kp16yacq91qm303xgnq7n1n8"]
+
+[parent]
+task = "tg-01kp16yachnc2h5f7wm9kd8eqa"

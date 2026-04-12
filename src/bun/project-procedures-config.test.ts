@@ -995,6 +995,51 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("syncs the cron scheduler when Pi tool hosts create or update cron jobs", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const username = createUniqueUsername("pi-cron-owner");
+    const user = createUser(database, {
+      isAdmin: true,
+      username,
+    });
+    const repoPath = createTempDirectory("metidos-pi-cron-host-repo-");
+    initializeGitRepository(repoPath);
+    const project = upsertProject(database, {
+      name: "Pi Cron Host Repo",
+      ownerUserId: user.id,
+      projectPath: repoPath,
+    });
+    const syncedCronIds: number[] = [];
+    const host = procedures.createPiMetidosToolHost(user.id, {
+      syncCronSchedulerCron: (cronJobId) => {
+        syncedCronIds.push(cronJobId);
+      },
+    });
+
+    const created = await host.newCron({
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: false,
+      model: "openai:gpt-5.4",
+      projectId: project.id,
+      prompt: "Summarize the repo",
+      schedule: "*/10 * * * 0",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+
+    expect(syncedCronIds).toEqual([created.id]);
+
+    syncedCronIds.length = 0;
+    await host.updateCron({
+      cronJobId: created.id,
+      title: "Retitled Pi Cron",
+    });
+
+    expect(syncedCronIds).toEqual([created.id]);
+  });
+
   it("returns a private workspace home and scoped directory suggestions for regular users", async () => {
     const procedures = await loadProjectProcedures();
     const database = initAppDatabase();

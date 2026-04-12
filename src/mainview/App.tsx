@@ -567,6 +567,7 @@ export default function App({
   const [isLoadingCronJobs, setIsLoadingCronJobs] = useState(false);
   const [isCreatingCronJob, setIsCreatingCronJob] = useState(false);
   const [runningCronJobs, setRunningCronJobs] = useState(new Set<number>());
+  const [deletingCronJobs, setDeletingCronJobs] = useState(new Set<number>());
   const [cronCreatorMode, setCronCreatorMode] =
     useState<CronCreatorMode>("describe");
   const [cronCreatorOpen, setCronCreatorOpen] = useState(false);
@@ -4105,6 +4106,68 @@ export default function App({
     [loadCronJobs, openCronThreadInRecent, procedures],
   );
 
+  const handleDeleteCron = useCallback(
+    (cronJob: RpcCronJob) => {
+      if (deletingCronJobs.has(cronJob.id)) {
+        return;
+      }
+
+      const cronLabel = cronJob.title.trim()
+        ? `"${cronJob.title.trim()}"`
+        : `#${cronJob.id}`;
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(
+          `Delete cron job ${cronLabel}? This disables the cron and keeps its run history.`,
+        )
+      ) {
+        return;
+      }
+
+      void (async () => {
+        setDeletingCronJobs((current) => {
+          if (current.has(cronJob.id)) {
+            return current;
+          }
+          const next = new Set(current);
+          next.add(cronJob.id);
+          return next;
+        });
+        setCronJobsError("");
+
+        try {
+          await procedures.updateCron({
+            cronJobId: cronJob.id,
+            deleted: true,
+          });
+          setCronJobs((current) =>
+            current.filter((entry) => entry.id !== cronJob.id),
+          );
+          if (cronEditingCronJobId === cronJob.id) {
+            setCronCreatorOpen(false);
+            setCronCreatorError("");
+            setCronEditingCronJobId(null);
+          }
+          void loadCronJobs();
+        } catch (error) {
+          setCronJobsError(
+            error instanceof Error ? error.message : String(error),
+          );
+        } finally {
+          setDeletingCronJobs((current) => {
+            if (!current.has(cronJob.id)) {
+              return current;
+            }
+            const next = new Set(current);
+            next.delete(cronJob.id);
+            return next;
+          });
+        }
+      })();
+    },
+    [cronEditingCronJobId, deletingCronJobs, loadCronJobs, procedures],
+  );
+
   const refreshCronJobsForDescribeCron = useCallback(async () => {
     await loadCronJobs();
 
@@ -4998,7 +5061,9 @@ export default function App({
                 <CronjobWorkspace
                   cronJobs={cronJobs}
                   cronJobsError={cronJobsError}
+                  deletingCronJobs={deletingCronJobs}
                   isLoadingCronJobs={isLoadingCronJobs}
+                  onDeleteCron={handleDeleteCron}
                   onEditCron={openCronEditor}
                   onRunCron={handleRunCronNow}
                   runningCronJobs={runningCronJobs}
@@ -5450,7 +5515,9 @@ export default function App({
               <CronjobWorkspace
                 cronJobs={cronJobs}
                 cronJobsError={cronJobsError}
+                deletingCronJobs={deletingCronJobs}
                 isLoadingCronJobs={isLoadingCronJobs}
+                onDeleteCron={handleDeleteCron}
                 onEditCron={openCronEditor}
                 onRunCron={handleRunCronNow}
                 runningCronJobs={runningCronJobs}
