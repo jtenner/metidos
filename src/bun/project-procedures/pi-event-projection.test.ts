@@ -263,6 +263,75 @@ describe("createPiThreadEventProjector", () => {
     }
   });
 
+  it("projects web_search tool lifecycle events into dedicated web-search rows", () => {
+    const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
+    const projector = createPiThreadEventProjector({
+      startedAt: STARTED_AT,
+      threadId: THREAD_ID,
+      worktreePath,
+    });
+
+    try {
+      const searchStart = projector.project({
+        args: {
+          query: "bun webview docs",
+        },
+        toolCallId: "search-1",
+        toolName: "web_search",
+        type: "tool_execution_start",
+      } as AgentSessionEvent);
+      const searchEnd = projector.project({
+        isError: false,
+        result: {
+          content: [
+            {
+              text: "1. Bun v1.3.12",
+              type: "text",
+            },
+          ],
+        },
+        toolCallId: "search-1",
+        toolName: "web_search",
+        type: "tool_execution_end",
+      } as AgentSessionEvent);
+
+      expect(searchStart).toEqual([
+        {
+          activityId: `${STARTED_AT}:tool:search-1`,
+          inputs: [
+            expect.objectContaining({
+              itemId: `${STARTED_AT}:tool:search-1`,
+              kind: "web_search",
+              state: "in_progress",
+              text: "bun webview docs",
+              threadId: THREAD_ID,
+            }),
+          ],
+          signature: "in_progress\u0000bun webview docs",
+        },
+      ]);
+      expect(searchEnd).toEqual([
+        {
+          activityId: `${STARTED_AT}:tool:search-1`,
+          force: true,
+          inputs: [
+            expect.objectContaining({
+              itemId: `${STARTED_AT}:tool:search-1`,
+              kind: "web_search",
+              state: "completed",
+              text: "bun webview docs",
+              threadId: THREAD_ID,
+            }),
+          ],
+          signature: "completed\u0000bun webview docs",
+          terminal: true,
+        },
+      ]);
+    } finally {
+      rmSync(worktreePath, { force: true, recursive: true });
+    }
+  });
+
   it("projects Pi edit completions into both tool-call and file-change rows", () => {
     const worktreePath = mkdtempSync(join(tmpdir(), "metidos-pi-projection-"));
     writeFileSync(join(worktreePath, "README.md"), "before\n");

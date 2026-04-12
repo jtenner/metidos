@@ -1186,6 +1186,7 @@ function applyActiveThreadRuntimeTelemetry(thread: RpcThread): RpcThread {
  */
 
 type ThreadAccessControls = {
+  webSearchAccess: boolean;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -1206,6 +1207,7 @@ function resolveUnsafeMode(unsafeMode: boolean | null | undefined): boolean {
 
 function resolveThreadAccessControls(
   input: {
+    webSearchAccess?: boolean | null;
     githubAccess?: boolean | null;
     agentsAccess?: boolean | null;
     metidosAccess?: boolean | null;
@@ -1221,6 +1223,7 @@ function resolveThreadAccessControls(
     requireUnsafeModeAllowed(context);
   }
   return {
+    webSearchAccess: input.webSearchAccess !== false,
     githubAccess: input.githubAccess === true,
     agentsAccess: input.agentsAccess === true,
     metidosAccess: input.metidosAccess !== false,
@@ -2988,6 +2991,7 @@ async function createThreadRecord(
       title: buildThreadTitle(worktree, worktreePath),
       model,
       reasoningEffort,
+      webSearchAccess: access.webSearchAccess,
       githubAccess: access.githubAccess,
       agentsAccess: access.agentsAccess,
       metidosAccess: access.metidosAccess,
@@ -3347,6 +3351,7 @@ export async function requestThreadStartProcedure(
     reasoningEffort: params.reasoningEffort?.trim()
       ? resolveCodexReasoningEffort(params.reasoningEffort)
       : null,
+    webSearchAccess: access.webSearchAccess,
     githubAccess: access.githubAccess,
     agentsAccess: access.agentsAccess,
     metidosAccess: access.metidosAccess,
@@ -3451,6 +3456,7 @@ export async function newCronProcedure(
       worktreePath,
       schedule,
       prompt,
+      webSearchAccess: access.webSearchAccess,
       githubAccess: access.githubAccess,
       agentsAccess: access.agentsAccess,
       metidosAccess: access.metidosAccess,
@@ -3497,6 +3503,7 @@ export async function updateCronProcedure(
   }
 
   const updates: {
+    webSearchAccess?: boolean;
     schedule?: string;
     prompt?: string;
     title?: string;
@@ -3518,6 +3525,10 @@ export async function updateCronProcedure(
     updates.reasoningEffort = resolveCodexReasoningEffort(
       params.reasoningEffort,
     );
+  }
+
+  if (typeof params.webSearchAccess === "boolean") {
+    updates.webSearchAccess = params.webSearchAccess;
   }
 
   if (typeof params.githubAccess === "boolean") {
@@ -3582,6 +3593,7 @@ export async function updateCronProcedure(
     typeof updates.description === "undefined" &&
     typeof updates.model === "undefined" &&
     typeof updates.reasoningEffort === "undefined" &&
+    typeof updates.webSearchAccess === "undefined" &&
     typeof updates.githubAccess === "undefined" &&
     typeof updates.agentsAccess === "undefined" &&
     typeof updates.metidosAccess === "undefined" &&
@@ -3932,6 +3944,10 @@ export async function updateThreadAccessProcedure(
   }
 
   const next = {
+    webSearchAccess:
+      typeof params.webSearchAccess === "boolean"
+        ? params.webSearchAccess
+        : thread.webSearchAccess,
     githubAccess:
       typeof params.githubAccess === "boolean"
         ? params.githubAccess
@@ -3954,6 +3970,7 @@ export async function updateThreadAccessProcedure(
   }
 
   if (
+    next.webSearchAccess === thread.webSearchAccess &&
     next.githubAccess === thread.githubAccess &&
     next.agentsAccess === thread.agentsAccess &&
     next.metidosAccess === thread.metidosAccess &&

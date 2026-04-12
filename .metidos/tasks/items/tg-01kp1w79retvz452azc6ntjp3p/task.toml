@@ -1,0 +1,11 @@
+schema = "metidos.task/v2"
+id = "tg-01kp1w79retvz452azc6ntjp3p"
+title = "Prototype WebView-backed page extraction for browser navigation"
+type = "feature"
+status = "open"
+priority = "p3"
+size = "s"
+created_at = "2026-04-12T22:15:58Z"
+created_by = "codex"
+assignees = ["agent"]
+tags = ["area:agent-runtime", "component:pi-thread-runtime", "discipline:backend", "theme:maintainability"]

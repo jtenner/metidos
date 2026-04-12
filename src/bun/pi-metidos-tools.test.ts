@@ -77,6 +77,7 @@ function makeThread(input?: Partial<RpcThread>): RpcThread {
     pinnedAt: null,
     projectId: 7,
     reasoningEffort: "medium",
+    webSearchAccess: true,
     runStatus: {
       error: null,
       hasUnreadError: false,
@@ -124,6 +125,7 @@ function makeCron(input?: Partial<RpcCronJob>): RpcCronJob {
     title: "Nightly report",
     unsafeMode: false,
     updatedAt: NOW,
+    webSearchAccess: true,
     worktreePath: "/repo/alpha/feature-a",
     ...input,
   };
@@ -150,6 +152,7 @@ function makeThreadStartRequest(
     threadId: null,
     title: null,
     unsafeMode: false,
+    webSearchAccess: true,
     worktreePath: "/repo/alpha/feature-a",
     ...input,
   };
@@ -408,6 +411,7 @@ describe("createPiMetidosTools", () => {
       projectId: 7,
       reasoningEffort: "high",
       unsafeMode: null,
+      webSearchAccess: null,
       worktreePath: scope.worktreePathContext,
     });
     expect(resultText(result)).toBe(
@@ -436,6 +440,7 @@ describe("createPiMetidosTools", () => {
       threadId: null,
       title: null,
       unsafeMode: false,
+      webSearchAccess: true,
       worktreePath: "/repo/alpha/feature-a",
     });
   });

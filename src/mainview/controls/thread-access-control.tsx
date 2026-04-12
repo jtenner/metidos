@@ -6,13 +6,14 @@
 import type { JSX } from "react";
 
 import { DropdownControl } from "./dropdown";
-import { materialSymbol } from "./icons";
+import { type AppIconName, materialSymbol } from "./icons";
 
 export type ThreadAccessValue = {
   agentsAccess: boolean;
   githubAccess: boolean;
   metidosAccess: boolean;
   unsafeMode: boolean;
+  webSearchAccess: boolean;
 };
 
 type ThreadAccessControlProps = {
@@ -29,6 +30,8 @@ function AccessRow({
   checked,
   description,
   disabled,
+  iconClassName,
+  iconName,
   label,
   onChange,
   toneClassName,
@@ -37,6 +40,8 @@ function AccessRow({
   checked: boolean;
   description: string;
   disabled: boolean;
+  iconClassName?: string;
+  iconName?: AppIconName;
   label: string;
   onChange: (checked: boolean) => void;
   toneClassName: string;
@@ -61,6 +66,17 @@ function AccessRow({
         }}
         type="checkbox"
       />
+      {iconName ? (
+        <span
+          aria-hidden="true"
+          className={[
+            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#33404a] bg-[#0f1519]",
+            iconClassName ?? "text-[#9eb1be]",
+          ].join(" ")}
+        >
+          {materialSymbol(iconName, "text-[13px]")}
+        </span>
+      ) : null}
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f0f6fb]">
           {label}
@@ -139,10 +155,28 @@ export function ThreadAccessControl({
           </div>
           <div className="space-y-2 p-3">
             <AccessRow
+              accentClassName="accent-[#69c6ff]"
+              checked={value.webSearchAccess}
+              description="Allow web search for current information. Metidos uses provider-native search when available and falls back to local Ollama web tools otherwise."
+              disabled={disabled}
+              iconClassName="text-[#7fd6ff]"
+              iconName="public"
+              label="Web Search"
+              onChange={(checked) => {
+                onChange({
+                  ...value,
+                  webSearchAccess: checked,
+                });
+              }}
+              toneClassName=""
+            />
+            <AccessRow
               accentClassName="accent-[#7ea6ff]"
               checked={value.githubAccess}
               description="Allow GitHub repo, issue, pull-request, checks, and diff tools scoped to the current repository."
               disabled={disabled}
+              iconClassName="text-[#8fb6ff]"
+              iconName="code"
               label="GitHub"
               onChange={(checked) => {
                 onChange({
@@ -157,6 +191,8 @@ export function ThreadAccessControl({
               checked={value.agentsAccess}
               description="Allow plan updates and one-shot delegated helper tasks."
               disabled={disabled}
+              iconClassName="text-[#8ff1a2]"
+              iconName="checklist"
               label="Agents"
               onChange={(checked) => {
                 onChange({
@@ -171,6 +207,8 @@ export function ThreadAccessControl({
               checked={value.metidosAccess}
               description="Allow Metidos tools such as thread, cron, workspace, and vm2 helpers."
               disabled={disabled}
+              iconClassName="text-[#9dd8ff]"
+              iconName="folder_open"
               label="Metidos"
               onChange={(checked) => {
                 onChange({
@@ -185,6 +223,8 @@ export function ThreadAccessControl({
               checked={value.unsafeMode}
               description="Opt in to shell access and allow Metidos tools to create unsafe child threads or cron jobs. Leave this off unless you intentionally need broader execution."
               disabled={disabled || unsafeModeDisabled}
+              iconClassName="text-[#f2d79b]"
+              iconName="terminal"
               label="Unsafe"
               onChange={(checked) => {
                 onChange({

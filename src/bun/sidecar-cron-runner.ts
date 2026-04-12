@@ -256,6 +256,7 @@ async function executeCronJob(
       reasoningEffort: normalizeStoredCodexReasoningEffort(
         cronJob.reasoningEffort,
       ),
+      webSearchAccess: cronJob.webSearchAccess,
       githubAccess: cronJob.githubAccess,
       agentsAccess: cronJob.agentsAccess,
       metidosAccess: cronJob.metidosAccess,

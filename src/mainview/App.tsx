@@ -535,6 +535,8 @@ export default function App({
         ? initialMainviewState.pendingThreadReasoningEffort
         : defaultCodexReasoningEffort,
     );
+  const [pendingThreadWebSearchAccess, setPendingThreadWebSearchAccess] =
+    useState(initialMainviewState.pendingThreadWebSearchAccess);
   const [pendingThreadGithubAccess, setPendingThreadGithubAccess] = useState(
     initialMainviewState.pendingThreadGithubAccess,
   );
@@ -584,6 +586,7 @@ export default function App({
   const [cronEditSchedule, setCronEditSchedule] = useState("");
   const [cronEditPrompt, setCronEditPrompt] = useState("");
   const [cronEditEnabled, setCronEditEnabled] = useState(true);
+  const [cronEditWebSearchAccess, setCronEditWebSearchAccess] = useState(true);
   const [cronEditGithubAccess, setCronEditGithubAccess] = useState(false);
   const [cronEditAgentsAccess, setCronEditAgentsAccess] = useState(false);
   const [cronEditMetidosAccess, setCronEditMetidosAccess] = useState(true);
@@ -900,6 +903,7 @@ export default function App({
     activeCodexModel,
     activeContextInputTokens,
     activeContextWindowTokens,
+    activeWebSearchAccess,
     activeGithubAccess,
     activeAgentsAccess,
     activeMetidosAccess,
@@ -960,6 +964,7 @@ export default function App({
     isUpdatingThreadModel,
     isUpdatingThreadReasoningEffort,
     isUpdatingThreadAccess,
+    pendingThreadWebSearchAccess,
     pendingThreadGithubAccess,
     pendingThreadAgentsAccess,
     pendingThreadMetidosAccess,
@@ -1001,6 +1006,7 @@ export default function App({
   });
 
   const activeThreadAccessValue: ThreadAccessValue = {
+    webSearchAccess: activeWebSearchAccess,
     githubAccess: activeGithubAccess,
     agentsAccess: activeAgentsAccess,
     metidosAccess: activeMetidosAccess,
@@ -1616,6 +1622,7 @@ export default function App({
               model: activeCodexModel || defaultCodexModel || null,
               reasoningEffort:
                 activeReasoningEffort || defaultCodexReasoningEffort || null,
+              webSearchAccess: safeChildAccessDefaults.webSearchAccess,
               githubAccess: safeChildAccessDefaults.githubAccess,
               agentsAccess: safeChildAccessDefaults.agentsAccess,
               metidosAccess: safeChildAccessDefaults.metidosAccess,
@@ -1649,6 +1656,7 @@ export default function App({
         selectedThreadRunStateRef.current = detail.thread.runStatus.state;
         setThreadMessages(detail.messages);
         syncThreadContext(detail.thread);
+        setPrimaryView("chat");
         setMobileProjectListOpen(false);
         try {
           await loadProjectWorktrees(detail.thread.projectId);
@@ -1724,45 +1732,58 @@ export default function App({
     controller.abort(createAbortError(null, reason));
   }, []);
 
-  const loadCronJobs = useCallback(async (): Promise<void> => {
-    if (isLoadingCronJobs) {
-      return;
-    }
+  const loadCronJobs = useCallback(
+    async (options?: { background?: boolean }): Promise<void> => {
+      if (isLoadingCronJobs) {
+        return;
+      }
 
-    const requestId = ++cronJobsRequestIdRef.current;
-    abortCronJobsRequest("Cron job request was superseded.");
-    const controller = new AbortController();
-    cronJobsAbortControllerRef.current = controller;
-    setIsLoadingCronJobs(true);
-    setCronJobsError("");
+      const isBackgroundRefresh = options?.background === true;
+      const requestId = ++cronJobsRequestIdRef.current;
+      abortCronJobsRequest("Cron job request was superseded.");
+      const controller = new AbortController();
+      cronJobsAbortControllerRef.current = controller;
+      if (!isBackgroundRefresh || cronJobs.length === 0) {
+        setIsLoadingCronJobs(true);
+      }
+      if (!isBackgroundRefresh) {
+        setCronJobsError("");
+      }
 
-    try {
-      const result = await procedures.listCrons(undefined, {
-        priority: "foreground",
-        signal: controller.signal,
-      });
-      if (cronJobsRequestIdRef.current !== requestId) {
-        return;
+      try {
+        const result = await procedures.listCrons(undefined, {
+          priority: isBackgroundRefresh ? "background" : "foreground",
+          signal: controller.signal,
+        });
+        if (cronJobsRequestIdRef.current !== requestId) {
+          return;
+        }
+        setCronJobs(result);
+        setCronJobsError("");
+      } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
+        if (cronJobsRequestIdRef.current !== requestId) {
+          return;
+        }
+        if (cronJobs.length === 0) {
+          setCronJobs([]);
+        }
+        setCronJobsError(
+          error instanceof Error ? error.message : String(error),
+        );
+      } finally {
+        if (cronJobsAbortControllerRef.current === controller) {
+          cronJobsAbortControllerRef.current = null;
+        }
+        if (cronJobsRequestIdRef.current === requestId) {
+          setIsLoadingCronJobs(false);
+        }
       }
-      setCronJobs(result);
-    } catch (error) {
-      if (isAbortError(error)) {
-        return;
-      }
-      if (cronJobsRequestIdRef.current !== requestId) {
-        return;
-      }
-      setCronJobs([]);
-      setCronJobsError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (cronJobsAbortControllerRef.current === controller) {
-        cronJobsAbortControllerRef.current = null;
-      }
-      if (cronJobsRequestIdRef.current === requestId) {
-        setIsLoadingCronJobs(false);
-      }
-    }
-  }, [abortCronJobsRequest, isLoadingCronJobs, procedures]);
+    },
+    [abortCronJobsRequest, cronJobs.length, isLoadingCronJobs, procedures],
+  );
 
   const primeCronJobs = useCallback(() => {
     void loadCronJobs();
@@ -2093,6 +2114,7 @@ export default function App({
               currentWorktreePath: selectedWorktreePathRef.current,
               model: request.model,
               reasoningEffort: request.reasoningEffort,
+              webSearchAccess: request.webSearchAccess,
               githubAccess: request.githubAccess,
               agentsAccess: request.agentsAccess,
               metidosAccess: request.metidosAccess,
@@ -3186,6 +3208,7 @@ export default function App({
       selectedThreadId,
       pendingThreadModel,
       pendingThreadReasoningEffort,
+      pendingThreadWebSearchAccess,
       pendingThreadGithubAccess,
       pendingThreadAgentsAccess,
       pendingThreadMetidosAccess,
@@ -3198,6 +3221,7 @@ export default function App({
   }, [
     pendingThreadModel,
     pendingThreadReasoningEffort,
+    pendingThreadWebSearchAccess,
     pendingThreadGithubAccess,
     pendingThreadAgentsAccess,
     pendingThreadMetidosAccess,
@@ -3271,6 +3295,7 @@ export default function App({
     if (!selectedThread) {
       return;
     }
+    setPendingThreadWebSearchAccess(selectedThread.webSearchAccess);
     setPendingThreadGithubAccess(selectedThread.githubAccess);
     setPendingThreadAgentsAccess(selectedThread.agentsAccess);
     setPendingThreadMetidosAccess(selectedThread.metidosAccess);
@@ -3487,15 +3512,15 @@ export default function App({
       return;
     }
 
-    void loadCronJobs();
+    void loadCronJobs({ background: cronJobs.length > 0 });
     const timer = window.setInterval(() => {
-      void loadCronJobs();
+      void loadCronJobs({ background: true });
     }, THREAD_STATUS_POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [isDocumentVisible, loadCronJobs, primaryView]);
+  }, [cronJobs.length, isDocumentVisible, loadCronJobs, primaryView]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
@@ -3575,6 +3600,7 @@ export default function App({
       setThreadAccessControlError("");
 
       if (!selectedThread) {
+        setPendingThreadWebSearchAccess(access.webSearchAccess);
         setPendingThreadGithubAccess(access.githubAccess);
         setPendingThreadAgentsAccess(access.agentsAccess);
         setPendingThreadMetidosAccess(access.metidosAccess);
@@ -3583,7 +3609,8 @@ export default function App({
       }
 
       if (
-        (selectedThread.githubAccess === access.githubAccess &&
+        (selectedThread.webSearchAccess === access.webSearchAccess &&
+          selectedThread.githubAccess === access.githubAccess &&
           selectedThread.agentsAccess === access.agentsAccess &&
           selectedThread.metidosAccess === access.metidosAccess &&
           selectedThread.unsafeMode === access.unsafeMode) ||
@@ -3596,12 +3623,14 @@ export default function App({
       try {
         const updatedThread = await procedures.updateThreadAccess({
           threadId: selectedThread.id,
+          webSearchAccess: access.webSearchAccess,
           githubAccess: access.githubAccess,
           agentsAccess: access.agentsAccess,
           metidosAccess: access.metidosAccess,
           unsafeMode: access.unsafeMode,
         });
         upsertThread(updatedThread);
+        setPendingThreadWebSearchAccess(updatedThread.webSearchAccess);
         setPendingThreadGithubAccess(updatedThread.githubAccess);
         setPendingThreadAgentsAccess(updatedThread.agentsAccess);
         setPendingThreadMetidosAccess(updatedThread.metidosAccess);
@@ -4224,6 +4253,7 @@ export default function App({
     setCronEditSchedule("");
     setCronEditPrompt("");
     setCronEditEnabled(true);
+    setCronEditWebSearchAccess(safeChildAccessDefaults.webSearchAccess);
     setCronEditGithubAccess(safeChildAccessDefaults.githubAccess);
     setCronEditAgentsAccess(safeChildAccessDefaults.agentsAccess);
     setCronEditMetidosAccess(safeChildAccessDefaults.metidosAccess);
@@ -4259,6 +4289,7 @@ export default function App({
     setCronEditSchedule(cronJob.schedule);
     setCronEditPrompt(cronJob.prompt);
     setCronEditEnabled(cronJob.enabled === 1);
+    setCronEditWebSearchAccess(cronJob.webSearchAccess);
     setCronEditGithubAccess(cronJob.githubAccess);
     setCronEditAgentsAccess(cronJob.agentsAccess);
     setCronEditMetidosAccess(cronJob.metidosAccess);
@@ -4317,6 +4348,7 @@ export default function App({
               model,
               reasoningEffort:
                 reasoningEffort || defaultCodexReasoningEffort || null,
+              webSearchAccess: cronEditWebSearchAccess,
               githubAccess: cronEditGithubAccess,
               agentsAccess: cronEditAgentsAccess,
               metidosAccess: cronEditMetidosAccess,
@@ -4330,6 +4362,7 @@ export default function App({
         const threadId = createdDetail.thread.id;
         const threadMessage = [
           "Use the new_cron tool to create this cron job for the current workspace.",
+          `Set webSearchAccess to ${cronEditWebSearchAccess ? "true" : "false"}.`,
           `Set githubAccess to ${cronEditGithubAccess ? "true" : "false"}.`,
           `Set agentsAccess to ${cronEditAgentsAccess ? "true" : "false"}.`,
           `Set metidosAccess to ${cronEditMetidosAccess ? "true" : "false"}.`,
@@ -4384,6 +4417,7 @@ export default function App({
     cronEditAgentsAccess,
     cronEditGithubAccess,
     cronEditMetidosAccess,
+    cronEditWebSearchAccess,
     cronEditUnsafeMode,
     defaultCodexReasoningEffort,
     cronCreatorReasoningEffort,
@@ -4435,6 +4469,7 @@ export default function App({
             ...(cronEditDescription.trim()
               ? { description: cronEditDescription.trim() }
               : {}),
+            webSearchAccess: cronEditWebSearchAccess,
             githubAccess: cronEditGithubAccess,
             agentsAccess: cronEditAgentsAccess,
             metidosAccess: cronEditMetidosAccess,
@@ -4456,6 +4491,7 @@ export default function App({
             ...(cronEditDescription.trim()
               ? { description: cronEditDescription.trim() }
               : {}),
+            webSearchAccess: cronEditWebSearchAccess,
             githubAccess: cronEditGithubAccess,
             agentsAccess: cronEditAgentsAccess,
             metidosAccess: cronEditMetidosAccess,
@@ -4484,6 +4520,7 @@ export default function App({
     cronEditAgentsAccess,
     cronEditGithubAccess,
     cronEditMetidosAccess,
+    cronEditWebSearchAccess,
     cronEditPrompt,
     cronEditSchedule,
     cronEditTitle,
@@ -4532,6 +4569,7 @@ export default function App({
   }, []);
 
   const cronEditorAccessValue: ThreadAccessValue = {
+    webSearchAccess: cronEditWebSearchAccess,
     githubAccess: cronEditGithubAccess,
     agentsAccess: cronEditAgentsAccess,
     metidosAccess: cronEditMetidosAccess,
@@ -4539,6 +4577,7 @@ export default function App({
   };
   const handleCronEditorAccessChange = useCallback(
     (value: ThreadAccessValue) => {
+      setCronEditWebSearchAccess(value.webSearchAccess);
       setCronEditGithubAccess(value.githubAccess);
       setCronEditAgentsAccess(value.agentsAccess);
       setCronEditMetidosAccess(value.metidosAccess);
@@ -5778,6 +5817,14 @@ export default function App({
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
                 Thinking: {currentThreadStartRequestThinkingLabel}
+              </span>
+              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+                Web Search:{" "}
+                {currentThreadStartRequest.webSearchAccess === null
+                  ? "default"
+                  : currentThreadStartRequest.webSearchAccess
+                    ? "on"
+                    : "off"}
               </span>
               <span className="rounded-full border border-[#3a4751] px-3 py-1">
                 GitHub:{" "}

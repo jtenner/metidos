@@ -53,6 +53,7 @@ type UpdateThreadToolInput = {
   summary?: string | null | undefined;
   title?: string | null | undefined;
   unsafeMode?: boolean | null | undefined;
+  webSearchAccess?: boolean | null | undefined;
 };
 
 export type PiMetidosToolScope = {
@@ -105,6 +106,7 @@ const PI_THINKING_LEVEL_VALUES = [
 const SUPPORTED_MODELS_SENTENCE =
   "Supported models are loaded from the Pi-backed catalog.";
 const UPDATE_THREAD_IGNORED_ACCESS_FIELDS = [
+  "webSearchAccess",
   "githubAccess",
   "agentsAccess",
   "metidosAccess",
@@ -194,6 +196,15 @@ const UpdateThreadToolParameters = Type.Object({
       Type.Null(),
     ]),
   ),
+  webSearchAccess: Type.Optional(
+    Type.Union([
+      Type.Boolean({
+        description:
+          ignoredUpdateThreadAccessFieldDescription("webSearchAccess"),
+      }),
+      Type.Null(),
+    ]),
+  ),
 });
 const SetContextToolParameters = Type.Object({
   project: Type.String({
@@ -233,6 +244,7 @@ const NewCronToolParameters = Type.Object({
   }),
   title: Type.Optional(NullableString),
   unsafeMode: Type.Optional(Type.Boolean()),
+  webSearchAccess: Type.Optional(Type.Boolean()),
   worktreePath: Type.Optional(
     Type.String({
       description: "Worktree path. Omit to target the current worktree.",
@@ -254,6 +266,7 @@ const UpdateCronToolParameters = Type.Object({
   schedule: Type.Optional(Type.String({ minLength: 1 })),
   title: Type.Optional(NullableString),
   unsafeMode: Type.Optional(Type.Boolean()),
+  webSearchAccess: Type.Optional(Type.Boolean()),
 });
 const NewThreadToolParameters = Type.Object({
   agentsAccess: Type.Optional(Type.Boolean()),
@@ -269,6 +282,7 @@ const NewThreadToolParameters = Type.Object({
   projectPath: Type.Optional(Type.String({ minLength: 1 })),
   reasoningEffort: Type.Optional(ThinkingLevel),
   unsafeMode: Type.Optional(Type.Boolean()),
+  webSearchAccess: Type.Optional(Type.Boolean()),
   worktreePath: Type.Optional(Type.String({ minLength: 1 })),
 });
 
@@ -326,7 +340,7 @@ function normalizeThreadIdInput(
 }
 
 function updateThreadDescription(boundThreadId: number): string {
-  return `Update Metidos thread metadata only. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning would make the thread easier to scan. Never send access-control fields such as githubAccess, agentsAccess, metidosAccess, or unsafeMode with this tool; they are legacy compatibility inputs and are ignored from inside a running thread. Bound thread: ${boundThreadId}.`;
+  return `Update Metidos thread metadata only. Use this liberally to keep threads organized: every thread should get a concise title, including quick one-off tasks, and you should reuse this tool whenever a better title, a short summary, or pinning would make the thread easier to scan. Never send access-control fields such as webSearchAccess, githubAccess, agentsAccess, metidosAccess, or unsafeMode with this tool; they are legacy compatibility inputs and are ignored from inside a running thread. Bound thread: ${boundThreadId}.`;
 }
 
 function ignoredUpdateThreadAccessFieldDescription(fieldName: string): string {
@@ -398,6 +412,7 @@ function threadMetadataPayload(thread: RpcThreadDetail["thread"] | RpcThread) {
     threadId: thread.id,
     title: thread.title,
     unsafeMode: thread.unsafeMode,
+    webSearchAccess: thread.webSearchAccess,
     worktreePath: thread.worktreePath,
   };
 }
@@ -463,6 +478,7 @@ function cronJobPayload(cronJob: RpcCronJob) {
     title: cronJob.title,
     unsafeMode: cronJob.unsafeMode,
     updatedAt: cronJob.updatedAt,
+    webSearchAccess: cronJob.webSearchAccess,
     worktreePath: cronJob.worktreePath,
   };
 }
@@ -1041,6 +1057,7 @@ export function createPiMetidosTools(
             "metidosAccess",
             "pinned",
             "unsafeMode",
+            "webSearchAccess",
           ],
           ["threadId"],
         ),
@@ -1246,6 +1263,9 @@ export function createPiMetidosTools(
           ...(typeof params.unsafeMode === "boolean"
             ? { unsafeMode: params.unsafeMode }
             : {}),
+          ...(typeof params.webSearchAccess === "boolean"
+            ? { webSearchAccess: params.webSearchAccess }
+            : {}),
           worktreePath: target.worktreePath,
         });
         return textToolResult(
@@ -1265,6 +1285,7 @@ export function createPiMetidosTools(
             "githubAccess",
             "metidosAccess",
             "unsafeMode",
+            "webSearchAccess",
           ],
           ["projectId"],
         ),
@@ -1281,6 +1302,7 @@ export function createPiMetidosTools(
           params.schedule === undefined &&
           params.prompt === undefined &&
           params.model === undefined &&
+          params.webSearchAccess === undefined &&
           params.githubAccess === undefined &&
           params.agentsAccess === undefined &&
           params.metidosAccess === undefined &&
@@ -1331,6 +1353,9 @@ export function createPiMetidosTools(
           ...(typeof params.unsafeMode === "boolean"
             ? { unsafeMode: params.unsafeMode }
             : {}),
+          ...(typeof params.webSearchAccess === "boolean"
+            ? { webSearchAccess: params.webSearchAccess }
+            : {}),
         });
         return textToolResult(
           `Updated cron job ${updated.id}.`,
@@ -1350,6 +1375,7 @@ export function createPiMetidosTools(
             "githubAccess",
             "metidosAccess",
             "unsafeMode",
+            "webSearchAccess",
           ],
           ["cronJobId"],
         ),
@@ -1388,6 +1414,7 @@ export function createPiMetidosTools(
             projectId: target.projectId,
             reasoningEffort: params.reasoningEffort ?? null,
             unsafeMode: params.unsafeMode ?? null,
+            webSearchAccess: params.webSearchAccess ?? null,
             worktreePath: target.worktreePath,
           });
           return textToolResult(
@@ -1414,6 +1441,9 @@ export function createPiMetidosTools(
           ...(typeof params.unsafeMode === "boolean"
             ? { unsafeMode: params.unsafeMode }
             : {}),
+          ...(typeof params.webSearchAccess === "boolean"
+            ? { webSearchAccess: params.webSearchAccess }
+            : {}),
           worktreePath: target.worktreePath,
         });
         const started = await host.sendThreadMessage({
@@ -1438,6 +1468,7 @@ export function createPiMetidosTools(
             "githubAccess",
             "metidosAccess",
             "unsafeMode",
+            "webSearchAccess",
           ],
           ["projectId"],
         ),

@@ -14,6 +14,7 @@ export function deriveSafeChildAccessDefaults(
   access: ThreadAccessValue,
 ): ThreadAccessValue {
   return {
+    webSearchAccess: access.webSearchAccess,
     githubAccess: access.githubAccess,
     agentsAccess: access.agentsAccess,
     metidosAccess: access.metidosAccess,

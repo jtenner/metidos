@@ -7,6 +7,7 @@ import { resetResolvedAppDataDirectory } from "./db";
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiGitHubToolHost } from "./pi-github-tools";
 import type { PiMetidosToolHost } from "./pi-metidos-tools";
+import { usesPiNativeWebSearch } from "./pi-native-web-search";
 import {
   buildPiAgentDirectoryPath,
   buildPiThreadSessionDirectoryPath,
@@ -76,6 +77,8 @@ const EXPECTED_SAFE_RUNTIME_TOOL_NAMES: string[] = [
   "grep",
   "edit",
   "write",
+  "web_search",
+  "web_fetch",
   "github_repo",
   "github_issue",
   "github_pr",
@@ -92,6 +95,17 @@ const EXPECTED_SAFE_RUNTIME_TOOL_NAMES: string[] = [
   "update_plan",
   "delegate_task",
 ];
+
+function expectedSafeRuntimeToolNamesForModel(options: {
+  nativeWebSearch: boolean;
+}): string[] {
+  if (options.nativeWebSearch) {
+    return EXPECTED_SAFE_RUNTIME_TOOL_NAMES.filter(
+      (name) => name !== "web_search" && name !== "web_fetch",
+    );
+  }
+  return EXPECTED_SAFE_RUNTIME_TOOL_NAMES;
+}
 
 function collectAssistantText(
   runtime: Awaited<ReturnType<typeof createPiThreadRuntime>>,
@@ -230,6 +244,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -244,7 +259,9 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       buildPiThreadSessionDirectoryPath(17, appDataDir),
     );
     expect(safeRuntime.session.getActiveToolNames()).toEqual(
-      EXPECTED_SAFE_RUNTIME_TOOL_NAMES,
+      expectedSafeRuntimeToolNamesForModel({
+        nativeWebSearch: usesPiNativeWebSearch(safeRuntime.model),
+      }),
     );
     expect(safeRuntime.session.extensionRunner).toBeDefined();
 
@@ -270,6 +287,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -294,6 +312,7 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 1,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -309,6 +328,8 @@ test("creates deterministic Pi sessions and resumes them for the same thread", a
       "grep",
       "edit",
       "write",
+      "web_search",
+      "web_fetch",
     ]);
     unsafeRuntime.session.dispose();
   } finally {
@@ -371,6 +392,7 @@ test("every provider runtime exposes Metidos, GitHub, and agent tools to the mod
           projectId: 1,
           reasoningEffort: "medium",
           unsafeMode: 0,
+          webSearchAccess: true,
           worktreePath: workspaceDir,
         },
         {
@@ -381,9 +403,10 @@ test("every provider runtime exposes Metidos, GitHub, and agent tools to the mod
       );
 
       try {
-        expect(runtime.session.getActiveToolNames()).toEqual(
-          EXPECTED_SAFE_RUNTIME_TOOL_NAMES,
-        );
+        const expectedToolNames = expectedSafeRuntimeToolNamesForModel({
+          nativeWebSearch: usesPiNativeWebSearch(runtime.model),
+        });
+        expect(runtime.session.getActiveToolNames()).toEqual(expectedToolNames);
         expect(runtime.session.systemPrompt).toContain(
           "Agent coordination tools are installed in this runtime: update_plan and delegate_task.",
         );
@@ -400,7 +423,7 @@ test("every provider runtime exposes Metidos, GitHub, and agent tools to the mod
 
         expect(
           new Set(extractProbeField(streamed.getText(), "tools").split(",")),
-        ).toEqual(new Set(EXPECTED_SAFE_RUNTIME_TOOL_NAMES));
+        ).toEqual(new Set(expectedToolNames));
         expect(extractProbeField(streamed.getText(), "promptTools")).toBe(
           "agents,github,metidos",
         );
@@ -451,6 +474,7 @@ test("keeps the explicit OpenAI Codex provider instead of silently normalizing b
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -461,6 +485,69 @@ test("keeps the explicit OpenAI Codex provider instead of silently normalizing b
     expect(runtime.model.provider).toBe("openai-codex");
     expect(`${runtime.model.provider}:${runtime.model.id}`).toBe(
       "openai-codex:gpt-5.4",
+    );
+    expect(usesPiNativeWebSearch(runtime.model)).toBeTrue();
+    expect(runtime.session.getActiveToolNames()).not.toContain("web_search");
+    expect(runtime.session.getActiveToolNames()).not.toContain("web_fetch");
+    expect(runtime.session.systemPrompt).toContain(
+      "Provider-native web search is enabled for this runtime through the OpenAI Codex Responses API.",
+    );
+    runtime.session.dispose();
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
+test("rewires xAI models onto Responses API so native web search can be enabled", async () => {
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const workspaceDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
+  );
+
+  try {
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
+
+    const runtime = await createPiThreadRuntime(
+      {
+        agentsAccess: false,
+        githubAccess: false,
+        id: 20,
+        metidosAccess: false,
+        model: "xai:grok-4-1-fast",
+        piSessionFile: null,
+        projectId: 1,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        webSearchAccess: true,
+        worktreePath: workspaceDir,
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    expect(runtime.model.provider).toBe("xai");
+    expect(runtime.model.api).toBe("openai-responses");
+    expect(usesPiNativeWebSearch(runtime.model)).toBeTrue();
+    expect(runtime.session.getActiveToolNames()).not.toContain("web_search");
+    expect(runtime.session.getActiveToolNames()).not.toContain("web_fetch");
+    expect(runtime.session.systemPrompt).toContain(
+      "Provider-native web search is enabled for this runtime through the xAI Responses API.",
     );
     runtime.session.dispose();
   } finally {
@@ -504,6 +591,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -550,6 +638,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -599,6 +688,7 @@ test("runPiDelegatedTask executes an isolated child session without agent recurs
         projectId: 1,
         reasoningEffort: "medium",
         unsafeMode: 0,
+        webSearchAccess: true,
         worktreePath: workspaceDir,
       },
       {
@@ -621,6 +711,8 @@ test("runPiDelegatedTask executes an isolated child session without agent recurs
       "grep",
       "edit",
       "write",
+      "web_search",
+      "web_fetch",
     ]);
   } finally {
     rmSync(appDataDir, {

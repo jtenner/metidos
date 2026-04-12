@@ -48,6 +48,7 @@ function thread(overrides?: Partial<RpcThread>): RpcThread {
     pinnedAt: null,
     projectId: 1,
     reasoningEffort: "medium",
+    webSearchAccess: true,
     runStatus: {
       error: null,
       hasUnreadError: false,

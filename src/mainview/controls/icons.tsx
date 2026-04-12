@@ -29,6 +29,7 @@ export type AppIconName =
   | "history"
   | "menu"
   | "person"
+  | "public"
   | "push_pin"
   | "radio_button_unchecked"
   | "search"
@@ -179,6 +180,17 @@ function renderIconGlyph(
         <>
           <circle cx="12" cy="9" r="2.5" />
           <path d="M7.5 18c1.15-2.1 3.05-3.2 4.5-3.2s3.35 1.1 4.5 3.2" />
+        </>
+      );
+    case "public":
+      return (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M4.5 12h15" />
+          <path d="M12 4.5c2.2 2.15 3.35 4.95 3.35 7.5S14.2 17.35 12 19.5" />
+          <path d="M12 4.5c-2.2 2.15-3.35 4.95-3.35 7.5S9.8 17.35 12 19.5" />
+          <path d="M6 8.75c1.65.8 3.8 1.25 6 1.25s4.35-.45 6-1.25" />
+          <path d="M6 15.25c1.65-.8 3.8-1.25 6-1.25s4.35.45 6 1.25" />
         </>
       );
     case "push_pin":

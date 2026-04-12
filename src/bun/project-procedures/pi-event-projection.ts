@@ -266,6 +266,32 @@ function buildToolCallActivityInputPayload(
   };
 }
 
+function extractPiWebSearchQuery(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const candidate = value as {
+    query?: unknown;
+  };
+  return typeof candidate.query === "string" ? candidate.query.trim() : "";
+}
+
+function buildWebSearchActivityInput(
+  threadId: number,
+  itemId: string,
+  query: string,
+  state: "in_progress" | "completed" | "stopped",
+): ThreadActivityInput {
+  return {
+    threadId,
+    itemId,
+    kind: "web_search",
+    text: query,
+    state,
+  };
+}
+
 function buildProjectedWrite(
   activityId: string,
   signature: string,
@@ -714,6 +740,20 @@ export function createPiThreadEventProjector(input: {
           ];
         }
 
+        if (event.toolName === "web_search") {
+          const query = extractPiWebSearchQuery(event.args) || "Web search";
+          return [
+            buildProjectedWrite(activityItemId, `in_progress\u0000${query}`, [
+              buildWebSearchActivityInput(
+                threadId,
+                activityItemId,
+                query,
+                "in_progress",
+              ),
+            ]),
+          ];
+        }
+
         return [
           buildProjectedWrite(
             activityItemId,
@@ -764,6 +804,20 @@ export function createPiThreadEventProjector(input: {
           ];
         }
 
+        if (event.toolName === "web_search") {
+          const query = extractPiWebSearchQuery(event.args) || "Web search";
+          return [
+            buildProjectedWrite(activityItemId, `in_progress\u0000${query}`, [
+              buildWebSearchActivityInput(
+                threadId,
+                activityItemId,
+                query,
+                "in_progress",
+              ),
+            ]),
+          ];
+        }
+
         return [
           buildProjectedWrite(
             activityItemId,
@@ -810,6 +864,29 @@ export function createPiThreadEventProjector(input: {
                   output,
                   state,
                 }),
+              ],
+              {
+                force: true,
+                terminal: true,
+              },
+            ),
+          ];
+        }
+
+        if (event.toolName === "web_search") {
+          const query = extractPiWebSearchQuery(toolArgs) || "Web search";
+          const searchState = event.isError ? "stopped" : "completed";
+          return [
+            buildProjectedWrite(
+              activityItemId,
+              `${searchState}\u0000${query}`,
+              [
+                buildWebSearchActivityInput(
+                  threadId,
+                  activityItemId,
+                  query,
+                  searchState,
+                ),
               ],
               {
                 force: true,

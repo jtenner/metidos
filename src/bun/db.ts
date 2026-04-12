@@ -51,6 +51,7 @@ type ThreadInput = {
   title: string;
   model: string;
   reasoningEffort: string;
+  webSearchAccess?: boolean | null;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -170,6 +171,7 @@ export type ThreadRecord = {
   summary: string | null;
   model: string;
   reasoningEffort: string;
+  webSearchAccess: boolean;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -198,11 +200,12 @@ export type ThreadRecord = {
 
 type ThreadSqlRecord = Omit<
   ThreadRecord,
-  "agentsAccess" | "githubAccess" | "metidosAccess"
+  "agentsAccess" | "githubAccess" | "metidosAccess" | "webSearchAccess"
 > & {
   agentsAccess: 0 | 1;
   githubAccess: 0 | 1;
   metidosAccess: 0 | 1;
+  webSearchAccess: 0 | 1;
 };
 
 /** Public DB shape for thread_messages rows returned from queries. */
@@ -318,6 +321,7 @@ export type CronJobRecord = {
   description: string;
   model: string;
   reasoningEffort: string;
+  webSearchAccess: boolean;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -348,6 +352,7 @@ type CronJobInput = {
   description: string;
   model: string;
   reasoningEffort: string;
+  webSearchAccess?: boolean | null;
   githubAccess?: boolean | null;
   agentsAccess?: boolean | null;
   metidosAccess?: boolean | null;
@@ -362,6 +367,7 @@ type CronJobUpdateInput = {
   description?: string;
   model?: string;
   reasoningEffort?: string;
+  webSearchAccess?: boolean;
   githubAccess?: boolean;
   agentsAccess?: boolean;
   metidosAccess?: boolean;
@@ -378,11 +384,16 @@ type CronJobRunInput = {
 
 type CronJobSqlRecord = Omit<
   CronJobRecord,
-  "agentsAccess" | "githubAccess" | "metidosAccess" | "nextRunDate"
+  | "agentsAccess"
+  | "githubAccess"
+  | "metidosAccess"
+  | "nextRunDate"
+  | "webSearchAccess"
 > & {
   agentsAccess: 0 | 1;
   githubAccess: 0 | 1;
   metidosAccess: 0 | 1;
+  webSearchAccess: 0 | 1;
 };
 
 function buildDefaultAppDataDirPath(appName: string): string {
@@ -434,6 +445,7 @@ function hydrateCronJobFromSqlRow(
 ): CronJobRecord {
   return {
     ...cronJob,
+    webSearchAccess: cronJob.webSearchAccess === 1,
     githubAccess: cronJob.githubAccess === 1,
     agentsAccess: cronJob.agentsAccess === 1,
     metidosAccess: cronJob.metidosAccess === 1,
@@ -1225,6 +1237,7 @@ export function migrateDatabase(db: Database): void {
 				summary TEXT,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				web_search_access INTEGER NOT NULL DEFAULT 1,
 				github_access INTEGER NOT NULL DEFAULT 0,
 				agents_access INTEGER NOT NULL DEFAULT 0,
 				metidos_access INTEGER NOT NULL DEFAULT 1,
@@ -1309,6 +1322,11 @@ export function migrateDatabase(db: Database): void {
   );
   ensureThreadColumn(
     db,
+    "web_search_access",
+    "web_search_access INTEGER NOT NULL DEFAULT 1",
+  );
+  ensureThreadColumn(
+    db,
     "github_access",
     "github_access INTEGER NOT NULL DEFAULT 0",
   );
@@ -1365,6 +1383,14 @@ export function migrateDatabase(db: Database): void {
 			UPDATE threads
 			SET unsafe_mode = 0
 			WHERE unsafe_mode IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE threads
+			SET web_search_access = 1
+			WHERE web_search_access IS NULL
 		`,
   );
   runStatement(
@@ -1584,6 +1610,7 @@ export function migrateDatabase(db: Database): void {
 				description TEXT NOT NULL,
 				model TEXT NOT NULL DEFAULT 'gpt-5.4',
 				reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+				web_search_access INTEGER NOT NULL DEFAULT 1,
 				github_access INTEGER NOT NULL DEFAULT 0,
 				agents_access INTEGER NOT NULL DEFAULT 0,
 				metidos_access INTEGER NOT NULL DEFAULT 1,
@@ -1632,6 +1659,11 @@ export function migrateDatabase(db: Database): void {
     db,
     "reasoning_effort",
     "reasoning_effort TEXT NOT NULL DEFAULT 'medium'",
+  );
+  ensureCronJobColumn(
+    db,
+    "web_search_access",
+    "web_search_access INTEGER NOT NULL DEFAULT 1",
   );
   ensureCronJobColumn(
     db,
@@ -1712,6 +1744,15 @@ export function migrateDatabase(db: Database): void {
 			SET
 				unsafe_mode = 0
 			WHERE unsafe_mode IS NULL
+		`,
+  );
+  runStatement(
+    db,
+    `
+			UPDATE cron_jobs
+			SET
+				web_search_access = 1
+			WHERE web_search_access IS NULL
 		`,
   );
   runStatement(
@@ -3249,13 +3290,14 @@ export function listThreads(database: Database): ThreadRecord[] {
 					projects.owner_user_id AS ownerUserId,
 					threads.project_id AS projectId,
 					threads.worktree_path AS worktreePath,
-					threads.title AS title,
-					threads.summary AS summary,
-					threads.model AS model,
-					threads.reasoning_effort AS reasoningEffort,
-					threads.github_access AS githubAccess,
-					threads.agents_access AS agentsAccess,
-					threads.metidos_access AS metidosAccess,
+				threads.title AS title,
+				threads.summary AS summary,
+				threads.model AS model,
+				threads.reasoning_effort AS reasoningEffort,
+				threads.web_search_access AS webSearchAccess,
+				threads.github_access AS githubAccess,
+				threads.agents_access AS agentsAccess,
+				threads.metidos_access AS metidosAccess,
 					threads.unsafe_mode AS unsafeMode,
 					threads.pi_session_id AS piSessionId,
 					threads.pi_session_file AS piSessionFile,
@@ -3304,13 +3346,14 @@ export function listThreadsForUser(
 					projects.owner_user_id AS ownerUserId,
 					threads.project_id AS projectId,
 					threads.worktree_path AS worktreePath,
-					threads.title AS title,
-					threads.summary AS summary,
-					threads.model AS model,
-					threads.reasoning_effort AS reasoningEffort,
-					threads.github_access AS githubAccess,
-					threads.agents_access AS agentsAccess,
-					threads.metidos_access AS metidosAccess,
+				threads.title AS title,
+				threads.summary AS summary,
+				threads.model AS model,
+				threads.reasoning_effort AS reasoningEffort,
+				threads.web_search_access AS webSearchAccess,
+				threads.github_access AS githubAccess,
+				threads.agents_access AS agentsAccess,
+				threads.metidos_access AS metidosAccess,
 					threads.unsafe_mode AS unsafeMode,
 					threads.pi_session_id AS piSessionId,
 					threads.pi_session_file AS piSessionFile,
@@ -3365,13 +3408,14 @@ export function getThreadById(
 					projects.owner_user_id AS ownerUserId,
 					threads.project_id AS projectId,
 					threads.worktree_path AS worktreePath,
-					threads.title AS title,
-					threads.summary AS summary,
-					threads.model AS model,
-					threads.reasoning_effort AS reasoningEffort,
-					threads.github_access AS githubAccess,
-					threads.agents_access AS agentsAccess,
-					threads.metidos_access AS metidosAccess,
+				threads.title AS title,
+				threads.summary AS summary,
+				threads.model AS model,
+				threads.reasoning_effort AS reasoningEffort,
+				threads.web_search_access AS webSearchAccess,
+				threads.github_access AS githubAccess,
+				threads.agents_access AS agentsAccess,
+				threads.metidos_access AS metidosAccess,
 					threads.unsafe_mode AS unsafeMode,
 					threads.pi_session_id AS piSessionId,
 					threads.pi_session_file AS piSessionFile,
@@ -3416,13 +3460,14 @@ export function getThreadByIdForUser(
 					projects.owner_user_id AS ownerUserId,
 					threads.project_id AS projectId,
 					threads.worktree_path AS worktreePath,
-					threads.title AS title,
-					threads.summary AS summary,
-					threads.model AS model,
-					threads.reasoning_effort AS reasoningEffort,
-					threads.github_access AS githubAccess,
-					threads.agents_access AS agentsAccess,
-					threads.metidos_access AS metidosAccess,
+				threads.title AS title,
+				threads.summary AS summary,
+				threads.model AS model,
+				threads.reasoning_effort AS reasoningEffort,
+				threads.web_search_access AS webSearchAccess,
+				threads.github_access AS githubAccess,
+				threads.agents_access AS agentsAccess,
+				threads.metidos_access AS metidosAccess,
 					threads.unsafe_mode AS unsafeMode,
 					threads.pi_session_id AS piSessionId,
 					threads.pi_session_file AS piSessionFile,
@@ -3458,6 +3503,7 @@ export function getThreadByIdForUser(
 function hydrateThreadFromSqlRow(thread: ThreadSqlRecord): ThreadRecord {
   return {
     ...thread,
+    webSearchAccess: thread.webSearchAccess === 1,
     githubAccess: thread.githubAccess === 1,
     agentsAccess: thread.agentsAccess === 1,
     metidosAccess: thread.metidosAccess === 1,
@@ -3487,6 +3533,7 @@ export function createThread(
 				title,
 				model,
 				reasoning_effort,
+				web_search_access,
 				github_access,
 				agents_access,
 				metidos_access,
@@ -3509,6 +3556,7 @@ export function createThread(
 					?,
 					?,
 					?,
+					?,
 					strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 				)
 		`,
@@ -3517,6 +3565,7 @@ export function createThread(
     input.title,
     input.model,
     input.reasoningEffort,
+    input.webSearchAccess === false ? 0 : 1,
     input.githubAccess ? 1 : 0,
     input.agentsAccess ? 1 : 0,
     input.metidosAccess ? 1 : 0,
@@ -3666,6 +3715,7 @@ export function setThreadAccess(
   database: Database,
   threadId: number,
   input: {
+    webSearchAccess: boolean;
     githubAccess: boolean;
     agentsAccess: boolean;
     metidosAccess: boolean;
@@ -3678,6 +3728,7 @@ export function setThreadAccess(
     `
 			UPDATE threads
 			SET
+				web_search_access = ?,
 				github_access = ?,
 				agents_access = ?,
 				metidos_access = ?,
@@ -3685,6 +3736,7 @@ export function setThreadAccess(
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE id = ?
 		`,
+    input.webSearchAccess ? 1 : 0,
     input.githubAccess ? 1 : 0,
     input.agentsAccess ? 1 : 0,
     input.metidosAccess ? 1 : 0,
@@ -4355,6 +4407,7 @@ export function createCronJob(
 				description,
 				model,
 				reasoning_effort,
+				web_search_access,
 				github_access,
 				agents_access,
 				metidos_access,
@@ -4362,6 +4415,7 @@ export function createCronJob(
 				enabled
 			)
 				VALUES (
+					?,
 					?,
 					?,
 					?,
@@ -4385,6 +4439,7 @@ export function createCronJob(
     input.description,
     input.model,
     input.reasoningEffort,
+    input.webSearchAccess === false ? 0 : 1,
     input.githubAccess === true ? 1 : 0,
     input.agentsAccess === true ? 1 : 0,
     input.metidosAccess === false ? 0 : 1,
@@ -4420,6 +4475,7 @@ export function listCronJobs(database: Database): CronJobRecord[] {
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,
@@ -4458,6 +4514,7 @@ export function listCronJobsForUser(
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,
@@ -4505,6 +4562,7 @@ export function getCronJobById(
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,
@@ -4546,6 +4604,7 @@ export function getCronJobByIdForUser(
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,
@@ -4609,6 +4668,11 @@ export function updateCronJob(
   if (typeof input.reasoningEffort === "string") {
     updates.push("reasoning_effort = ?");
     bindings.push(input.reasoningEffort);
+  }
+
+  if (typeof input.webSearchAccess === "boolean") {
+    updates.push("web_search_access = ?");
+    bindings.push(input.webSearchAccess ? 1 : 0);
   }
 
   if (typeof input.githubAccess === "boolean") {
@@ -4676,6 +4740,7 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,
@@ -4820,6 +4885,7 @@ export function claimCronJobsForScheduledRun(
 				cron_jobs.description AS description,
 				cron_jobs.model AS model,
 				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.web_search_access AS webSearchAccess,
 				cron_jobs.github_access AS githubAccess,
 				cron_jobs.agents_access AS agentsAccess,
 				cron_jobs.metidos_access AS metidosAccess,

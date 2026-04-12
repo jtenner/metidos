@@ -26,6 +26,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@mariozechner/pi-ai": "^0.66.1",
     "@mariozechner/pi-coding-agent": "^0.66.1",
+    "@ollama/pi-web-search": "^0.0.5",
     "@tanstack/react-virtual": "^3.13.23",
     "cronstrue": "^3.14.0",
     "firacode": "^6.2.0",

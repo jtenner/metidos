@@ -23,6 +23,7 @@ function createThread(
     summary,
     model: "gpt-5.4",
     reasoningEffort: "medium",
+    webSearchAccess: true,
     githubAccess: false,
     agentsAccess: false,
     metidosAccess: true,

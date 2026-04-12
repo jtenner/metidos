@@ -801,6 +801,7 @@ describe("project procedure configuration helpers", () => {
         projectId: opened.project.id,
         reasoningEffort: "medium",
         unsafeMode: false,
+        webSearchAccess: false,
         worktreePath: repoPath,
       }),
     ).rejects.toThrow(unavailableMessage);

@@ -175,6 +175,7 @@ function makeThread(input?: Partial<RpcThread>): RpcThread {
       inputTokens: 900,
       outputTokens: 20,
     },
+    webSearchAccess: false,
     worktreePath: "/repo",
     ...input,
   };

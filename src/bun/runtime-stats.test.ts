@@ -20,6 +20,7 @@ import {
   recordGitHistoryCachePreemption,
   recordGitHistoryCachePrefetchWait,
   recordGitHistoryCacheRangeHit,
+  recordNativeWebSearchDecision,
   recordRpcCanceled,
   recordRpcFailed,
   recordRpcStarted,
@@ -215,6 +216,53 @@ describe("runtime stats collector", () => {
       misses: 1,
       pendingReuse: 1,
       stores: 1,
+    });
+  });
+
+  it("tracks provider-native web-search payload injection decisions", () => {
+    recordNativeWebSearchDecision({
+      decision: "injected",
+      provider: "openai",
+    });
+    recordNativeWebSearchDecision({
+      decision: "skipped",
+      provider: "openai-codex",
+    });
+    recordNativeWebSearchDecision({
+      decision: "injected",
+      provider: "openai",
+    });
+
+    const snapshot = getRuntimeStatsSnapshot();
+    expect(snapshot.webSearch).toEqual({
+      byProvider: {
+        openai: {
+          eligibleRequests: 2,
+          injectedRequests: 2,
+          skippedRequests: 0,
+        },
+        "openai-codex": {
+          eligibleRequests: 1,
+          injectedRequests: 0,
+          skippedRequests: 1,
+        },
+      },
+      totals: {
+        eligibleRequests: 3,
+        injectedRequests: 2,
+        skippedRequests: 1,
+      },
+    });
+
+    const summary = getRuntimeStatsSummary();
+    expect(summary.webSearch).toEqual({
+      byProvider: snapshot.webSearch?.byProvider ?? {},
+      providerCount: 2,
+      totals: snapshot.webSearch?.totals ?? {
+        eligibleRequests: 0,
+        injectedRequests: 0,
+        skippedRequests: 0,
+      },
     });
   });
 

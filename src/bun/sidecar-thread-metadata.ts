@@ -34,6 +34,7 @@ type SidecarThreadUpdateParams = {
   threadId: number;
   title?: string | null;
   unsafeMode?: boolean;
+  webSearchAccess?: boolean;
 };
 
 export type UpdateThreadFromSidecarResult = {
@@ -52,6 +53,7 @@ function hasThreadMetadataUpdate(params: SidecarThreadUpdateParams): boolean {
 
 function hasThreadAccessUpdate(params: SidecarThreadUpdateParams): boolean {
   return (
+    typeof params.webSearchAccess !== "undefined" ||
     typeof params.githubAccess !== "undefined" ||
     typeof params.agentsAccess !== "undefined" ||
     typeof params.metidosAccess !== "undefined" ||
@@ -190,17 +192,19 @@ export async function updateThreadAccessFromSidecar(
     metidosAccess?: boolean;
     threadId: number;
     unsafeMode?: boolean;
+    webSearchAccess?: boolean;
   },
   options?: RpcProcedureCallOptions,
 ): Promise<RpcThread> {
   if (
+    typeof params.webSearchAccess === "undefined" &&
     typeof params.githubAccess === "undefined" &&
     typeof params.agentsAccess === "undefined" &&
     typeof params.metidosAccess === "undefined" &&
     typeof params.unsafeMode === "undefined"
   ) {
     throw new Error(
-      "At least one of githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
+      "At least one of webSearchAccess, githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
     );
   }
 
@@ -208,6 +212,9 @@ export async function updateThreadAccessFromSidecar(
     return await rpcCall(
       {
         threadId: params.threadId,
+        ...(typeof params.webSearchAccess === "boolean"
+          ? { webSearchAccess: params.webSearchAccess }
+          : {}),
         ...(typeof params.githubAccess === "boolean"
           ? { githubAccess: params.githubAccess }
           : {}),
@@ -248,7 +255,7 @@ export async function updateThreadFromSidecar(
 
   if (!hasMetadataUpdate && !hasAccessUpdate) {
     throw new Error(
-      "At least one of title, summary, description, pinned, githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
+      "At least one of title, summary, description, pinned, webSearchAccess, githubAccess, agentsAccess, metidosAccess, or unsafeMode is required.",
     );
   }
 

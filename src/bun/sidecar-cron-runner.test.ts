@@ -215,6 +215,7 @@ function buildFakeThreadDetail(options: {
       unsafeMode: false,
       updatedAt,
       usage: null,
+      webSearchAccess: false,
       worktreePath: options.worktreePath,
     },
   };

@@ -84,6 +84,17 @@ export type CronRuntimeStats = {
   totalDurationMs: number;
 };
 
+export type NativeWebSearchProviderRuntimeStats = {
+  eligibleRequests: number;
+  injectedRequests: number;
+  skippedRequests: number;
+};
+
+export type NativeWebSearchRuntimeStats = {
+  byProvider: Record<string, NativeWebSearchProviderRuntimeStats>;
+  totals: NativeWebSearchProviderRuntimeStats;
+};
+
 export type RuntimeStatsSnapshot = {
   cron: CronRuntimeStats;
   gitCache: {
@@ -96,6 +107,7 @@ export type RuntimeStatsSnapshot = {
   };
   sqliteRetry: SqliteRetryRuntimeStats;
   startedAt: string;
+  webSearch?: NativeWebSearchRuntimeStats;
   websocketPush: {
     byType: Record<string, WebSocketPushRuntimeStats>;
     totals: RuntimeStatsWebSocketTotals;
@@ -126,6 +138,9 @@ export type RuntimeStatsSummary = {
   };
   sqliteRetry: SqliteRetryRuntimeStats;
   startedAt: string;
+  webSearch?: NativeWebSearchRuntimeStats & {
+    providerCount: number;
+  };
   websocketPush: RuntimeStatsWebSocketTotals & {
     topPayloadBytesTypes: RankedWebSocketPushPayloadRuntimeStats[];
     typeCount: number;
@@ -181,6 +196,8 @@ export type CronRunMeasurementToken = {
 type RuntimeStatsState = {
   cron: CronRuntimeStats;
   gitCache: RuntimeStatsSnapshot["gitCache"];
+  nativeWebSearchByProvider: Map<string, NativeWebSearchProviderRuntimeStats>;
+  nativeWebSearchTotals: NativeWebSearchProviderRuntimeStats;
   rpcByMethod: Map<string, RpcMethodRuntimeStats>;
   rpcTotals: RuntimeStatsRpcTotals;
   sqliteRetry: SqliteRetryRuntimeStats;
@@ -234,6 +251,15 @@ function createEmptyRuntimeStatsState(now = new Date()): RuntimeStatsState {
         preemptions: 0,
         prefetchWaits: 0,
       },
+    },
+    nativeWebSearchByProvider: new Map<
+      string,
+      NativeWebSearchProviderRuntimeStats
+    >(),
+    nativeWebSearchTotals: {
+      eligibleRequests: 0,
+      injectedRequests: 0,
+      skippedRequests: 0,
     },
     rpcByMethod: new Map<string, RpcMethodRuntimeStats>(),
     rpcTotals: {
@@ -298,6 +324,23 @@ function ensureWebSocketPushRuntimeStats(
     payloadBytes: 0,
   };
   runtimeStatsState.websocketPushByType.set(type, created);
+  return created;
+}
+
+function ensureNativeWebSearchProviderRuntimeStats(
+  provider: string,
+): NativeWebSearchProviderRuntimeStats {
+  const existing = runtimeStatsState.nativeWebSearchByProvider.get(provider);
+  if (existing) {
+    return existing;
+  }
+
+  const created: NativeWebSearchProviderRuntimeStats = {
+    eligibleRequests: 0,
+    injectedRequests: 0,
+    skippedRequests: 0,
+  };
+  runtimeStatsState.nativeWebSearchByProvider.set(provider, created);
   return created;
 }
 
@@ -479,6 +522,26 @@ export function recordWebSocketPush(options: {
   runtimeStatsState.websocketPushTotals.payloadBytes += options.payloadBytes;
 }
 
+export function recordNativeWebSearchDecision(options: {
+  decision: "injected" | "skipped";
+  provider: string;
+}): void {
+  const providerStats = ensureNativeWebSearchProviderRuntimeStats(
+    options.provider,
+  );
+
+  providerStats.eligibleRequests += 1;
+  runtimeStatsState.nativeWebSearchTotals.eligibleRequests += 1;
+  if (options.decision === "injected") {
+    providerStats.injectedRequests += 1;
+    runtimeStatsState.nativeWebSearchTotals.injectedRequests += 1;
+    return;
+  }
+
+  providerStats.skippedRequests += 1;
+  runtimeStatsState.nativeWebSearchTotals.skippedRequests += 1;
+}
+
 export function recordCronRunQueued(pendingRuns: number): void {
   runtimeStatsState.cron.saturationEvents += 1;
   updateCronPressureState({
@@ -618,6 +681,12 @@ export function getRuntimeStatsSnapshot(): RuntimeStatsSnapshot {
       ...runtimeStatsState.sqliteRetry,
     },
     startedAt: runtimeStatsState.startedAt,
+    webSearch: {
+      byProvider: cloneMapRecord(runtimeStatsState.nativeWebSearchByProvider),
+      totals: {
+        ...runtimeStatsState.nativeWebSearchTotals,
+      },
+    },
     websocketPush: {
       byType: cloneMapRecord(runtimeStatsState.websocketPushByType),
       totals: {
@@ -651,6 +720,13 @@ export function getRuntimeStatsSummary(): RuntimeStatsSummary {
       ...runtimeStatsState.sqliteRetry,
     },
     startedAt: runtimeStatsState.startedAt,
+    webSearch: {
+      byProvider: cloneMapRecord(runtimeStatsState.nativeWebSearchByProvider),
+      providerCount: runtimeStatsState.nativeWebSearchByProvider.size,
+      totals: {
+        ...runtimeStatsState.nativeWebSearchTotals,
+      },
+    },
     websocketPush: {
       ...runtimeStatsState.websocketPushTotals,
       topPayloadBytesTypes: summarizeTopWebSocketPushPayloadTypes(

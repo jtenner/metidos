@@ -64,6 +64,7 @@ describe("sidecar thread metadata updates", () => {
       calls.push({ options, params });
       return {
         id: 17,
+        webSearchAccess: false,
         githubAccess: false,
         agentsAccess: false,
         metidosAccess: true,
@@ -143,6 +144,7 @@ describe("sidecar thread metadata updates", () => {
       calls.push(params);
       return {
         id: 17,
+        webSearchAccess: false,
         githubAccess: false,
         agentsAccess: false,
         metidosAccess: true,
@@ -220,6 +222,7 @@ describe("sidecar thread metadata updates", () => {
         summary: "Existing summary",
         model: "gpt-5.4",
         reasoningEffort: "medium",
+        webSearchAccess: params.webSearchAccess ?? false,
         githubAccess: params.githubAccess ?? false,
         agentsAccess: params.agentsAccess ?? false,
         metidosAccess: params.metidosAccess ?? true,
@@ -297,6 +300,7 @@ describe("sidecar thread metadata updates", () => {
         summary: params.summary ?? "Existing summary",
         model: "gpt-5.4",
         reasoningEffort: "medium",
+        webSearchAccess: false,
         githubAccess: false,
         agentsAccess: false,
         metidosAccess: true,

@@ -73,6 +73,7 @@ type UseMainviewDerivedStateParams = {
   isUpdatingThreadModel: boolean;
   isUpdatingThreadReasoningEffort: boolean;
   isUpdatingThreadAccess: boolean;
+  pendingThreadWebSearchAccess: boolean;
   pendingThreadGithubAccess: boolean;
   pendingThreadAgentsAccess: boolean;
   pendingThreadMetidosAccess: boolean;
@@ -149,6 +150,7 @@ export function useMainviewDerivedState({
   isUpdatingThreadModel,
   isUpdatingThreadReasoningEffort,
   isUpdatingThreadAccess,
+  pendingThreadWebSearchAccess,
   pendingThreadGithubAccess,
   pendingThreadAgentsAccess,
   pendingThreadMetidosAccess,
@@ -279,6 +281,13 @@ export function useMainviewDerivedState({
     }
     return pendingThreadGithubAccess;
   }, [pendingThreadGithubAccess, selectedThread]);
+
+  const activeWebSearchAccess = useMemo(() => {
+    if (selectedThread) {
+      return selectedThread.webSearchAccess;
+    }
+    return pendingThreadWebSearchAccess;
+  }, [pendingThreadWebSearchAccess, selectedThread]);
 
   const activeAgentsAccess = useMemo(() => {
     if (selectedThread) {
@@ -610,6 +619,7 @@ export function useMainviewDerivedState({
     activeCodexModel,
     activeContextInputTokens,
     activeContextWindowTokens,
+    activeWebSearchAccess,
     activeGithubAccess,
     activeAgentsAccess,
     activeMetidosAccess,

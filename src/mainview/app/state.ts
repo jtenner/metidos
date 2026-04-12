@@ -210,6 +210,7 @@ export type PersistedMainviewState = {
   selectedThreadId: number | null;
   pendingThreadModel: string;
   pendingThreadReasoningEffort: string;
+  pendingThreadWebSearchAccess: boolean;
   pendingThreadGithubAccess: boolean;
   pendingThreadAgentsAccess: boolean;
   pendingThreadMetidosAccess: boolean;
@@ -226,6 +227,7 @@ type PersistedMainviewStorageRecord = Omit<
   | "pendingThreadAgentsAccess"
   | "pendingThreadGithubAccess"
   | "pendingThreadMetidosAccess"
+  | "pendingThreadWebSearchAccess"
   | "pendingThreadUnsafeMode"
 >;
 
@@ -753,6 +755,7 @@ export function defaultPersistedMainviewState(): PersistedMainviewState {
     selectedThreadId: null,
     pendingThreadModel: "",
     pendingThreadReasoningEffort: "",
+    pendingThreadWebSearchAccess: true,
     pendingThreadGithubAccess: false,
     pendingThreadAgentsAccess: false,
     pendingThreadMetidosAccess: true,
@@ -902,6 +905,7 @@ export function readPersistedMainviewState(): PersistedMainviewState {
         typeof parsed.pendingThreadReasoningEffort === "string"
           ? parsed.pendingThreadReasoningEffort
           : "",
+      pendingThreadWebSearchAccess: true,
       pendingThreadGithubAccess: false,
       pendingThreadAgentsAccess: false,
       pendingThreadMetidosAccess: true,
@@ -962,6 +966,7 @@ function serializePersistedMainviewState(
     pendingThreadAgentsAccess: _pendingThreadAgentsAccess,
     pendingThreadGithubAccess: _pendingThreadGithubAccess,
     pendingThreadMetidosAccess: _pendingThreadMetidosAccess,
+    pendingThreadWebSearchAccess: _pendingThreadWebSearchAccess,
     pendingThreadUnsafeMode: _pendingThreadUnsafeMode,
     ...persistedState
   } = state;

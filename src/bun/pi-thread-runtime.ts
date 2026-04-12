@@ -46,6 +46,13 @@ import {
   type PiMetidosToolHost,
 } from "./pi-metidos-tools";
 import {
+  buildPiWebSearchPromptLine,
+  createPiNativeWebSearchExtension,
+  registerPiXaiResponsesProviderOverride,
+  resolvePiWebSearchRuntimeMode,
+} from "./pi-native-web-search";
+import registerOllamaPiWebSearchTools from "./pi-ollama-web-search";
+import {
   createPiRuntimeProbeProviderConfig,
   PI_RUNTIME_PROBE_RUNTIME_API_KEY,
 } from "./pi-runtime-probe";
@@ -80,6 +87,7 @@ type PiRuntimeThread = Pick<
   | "projectId"
   | "reasoningEffort"
   | "unsafeMode"
+  | "webSearchAccess"
   | "worktreePath"
 >;
 
@@ -171,9 +179,15 @@ export function buildPiThreadToolPolicy(thread: {
   };
 }
 
-function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
+function buildPiRuntimeAppendSystemPrompt(
+  thread: PiRuntimeThread,
+  model: Model<Api>,
+): string {
   const toolPolicy = buildPiThreadToolPolicy(thread);
   const customToolLines: string[] = [];
+  if (thread.webSearchAccess !== false) {
+    customToolLines.push(buildPiWebSearchPromptLine(model));
+  }
   if (thread.agentsAccess === true) {
     customToolLines.push(
       "Agent coordination tools are installed in this runtime: update_plan and delegate_task.",
@@ -197,7 +211,7 @@ function buildPiRuntimeAppendSystemPrompt(thread: PiRuntimeThread): string {
     ...(customToolLines.length > 0
       ? customToolLines
       : [
-          "No GitHub, Metidos, or agent-coordination tools are installed in this runtime. Web search is not installed.",
+          "No web, GitHub, Metidos, or agent-coordination tools are installed in this runtime.",
         ]),
   ].join("\n");
 }
@@ -227,6 +241,21 @@ function resolveThreadScopedPath(
   throw new Error(
     `Path is outside the current workspace root: ${candidatePath}`,
   );
+}
+
+function buildPiRuntimeExtensionFactories(
+  thread: PiRuntimeThread,
+  model: Model<Api>,
+): ExtensionFactory[] {
+  const webSearchMode = resolvePiWebSearchRuntimeMode({
+    model,
+    webSearchAccess: thread.webSearchAccess,
+  });
+  return [
+    createThreadToolPolicyExtension(thread),
+    createPiNativeWebSearchExtension(thread),
+    ...(webSearchMode === "ollama" ? [registerOllamaPiWebSearchTools] : []),
+  ];
 }
 
 function toolPathFromEvent(
@@ -403,6 +432,7 @@ function createPiModelRegistry(agentDirectory: string): {
     authStorage,
     join(agentDirectory, "models.json"),
   );
+  registerPiXaiResponsesProviderOverride(modelRegistry);
   applyPiRuntimeTestProviderOverride(authStorage, modelRegistry);
   return {
     authStorage,
@@ -444,12 +474,18 @@ function buildPiTools(
   return tools;
 }
 
-function buildPiDelegatedTaskSystemPrompt(thread: PiRuntimeThread): string {
+function buildPiDelegatedTaskSystemPrompt(
+  thread: PiRuntimeThread,
+  model: Model<Api>,
+): string {
   return [
-    buildPiRuntimeAppendSystemPrompt({
-      ...thread,
-      agentsAccess: false,
-    }),
+    buildPiRuntimeAppendSystemPrompt(
+      {
+        ...thread,
+        agentsAccess: false,
+      },
+      model,
+    ),
     "You are a delegated helper agent running on behalf of another agent.",
     "Finish only the assigned task, stay tightly scoped, do not request follow-up lifecycle actions, and do not create additional helper agents.",
     "Return a concise final answer that the parent agent can reuse directly.",
@@ -541,9 +577,9 @@ export async function runPiDelegatedTask(
   });
   const resourceLoader = new DefaultResourceLoader({
     agentDir: agentDirectory,
-    appendSystemPrompt: buildPiDelegatedTaskSystemPrompt(childThread),
+    appendSystemPrompt: buildPiDelegatedTaskSystemPrompt(childThread, model),
     cwd: thread.worktreePath,
-    extensionFactories: [createThreadToolPolicyExtension(childThread)],
+    extensionFactories: buildPiRuntimeExtensionFactories(childThread, model),
     noExtensions: true,
     noPromptTemplates: true,
     noSkills: true,
@@ -700,9 +736,9 @@ export async function createPiThreadRuntime(
   });
   const resourceLoader = new DefaultResourceLoader({
     agentDir: agentDirectory,
-    appendSystemPrompt: buildPiRuntimeAppendSystemPrompt(thread),
+    appendSystemPrompt: buildPiRuntimeAppendSystemPrompt(thread, model),
     cwd: thread.worktreePath,
-    extensionFactories: [createThreadToolPolicyExtension(thread)],
+    extensionFactories: buildPiRuntimeExtensionFactories(thread, model),
     noExtensions: true,
     noPromptTemplates: true,
     noSkills: true,

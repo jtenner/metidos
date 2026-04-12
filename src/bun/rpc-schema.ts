@@ -262,6 +262,7 @@ export type RpcThreadStartRequest = {
   input: string;
   model: string | null;
   reasoningEffort: RpcReasoningEffort | null;
+  webSearchAccess: boolean | null;
   githubAccess: boolean | null;
   agentsAccess: boolean | null;
   metidosAccess: boolean | null;
@@ -535,6 +536,7 @@ export type RpcThread = {
   summary: string | null;
   model: string;
   reasoningEffort: RpcReasoningEffort;
+  webSearchAccess: boolean;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -567,6 +569,7 @@ export type RpcCronJob = {
   description: string;
   model: string;
   reasoningEffort: RpcReasoningEffort;
+  webSearchAccess: boolean;
   githubAccess: boolean;
   agentsAccess: boolean;
   metidosAccess: boolean;
@@ -910,6 +913,7 @@ export type AppRPCSchema = {
         currentWorktreePath?: string | null;
         model?: string | null;
         reasoningEffort?: RpcReasoningEffort | null;
+        webSearchAccess?: boolean | null;
         githubAccess?: boolean | null;
         agentsAccess?: boolean | null;
         metidosAccess?: boolean | null;
@@ -924,6 +928,7 @@ export type AppRPCSchema = {
         input: string;
         model: string | null;
         reasoningEffort: RpcReasoningEffort | null;
+        webSearchAccess: boolean | null;
         githubAccess: boolean | null;
         agentsAccess: boolean | null;
         metidosAccess: boolean | null;
@@ -938,6 +943,7 @@ export type AppRPCSchema = {
         worktreePath: string;
         schedule: string;
         prompt: string;
+        webSearchAccess?: boolean;
         githubAccess?: boolean;
         agentsAccess?: boolean;
         metidosAccess?: boolean;
@@ -955,6 +961,7 @@ export type AppRPCSchema = {
         cronJobId: number;
         model?: string;
         reasoningEffort?: RpcReasoningEffort;
+        webSearchAccess?: boolean;
         githubAccess?: boolean;
         agentsAccess?: boolean;
         metidosAccess?: boolean;
@@ -1001,6 +1008,7 @@ export type AppRPCSchema = {
     updateThreadAccess: {
       params: {
         threadId: number;
+        webSearchAccess?: boolean;
         githubAccess?: boolean;
         agentsAccess?: boolean;
         metidosAccess?: boolean;
