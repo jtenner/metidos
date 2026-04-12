@@ -23,7 +23,10 @@ describe("rpc websocket auth helper", () => {
       ok: true,
       socketData: {
         authBypass: true,
+        isAdmin: true,
         sessionId: null,
+        userId: null,
+        username: null,
       },
     });
     expect(validateTicket).not.toHaveBeenCalled();
@@ -61,7 +64,10 @@ describe("rpc websocket auth helper", () => {
       ok: true,
       socketData: {
         authBypass: false,
+        isAdmin: false,
         sessionId: "session-123",
+        userId: null,
+        username: null,
       },
     });
     expect(validateTicket).not.toHaveBeenCalled();
@@ -82,7 +88,10 @@ describe("rpc websocket auth helper", () => {
       ok: true,
       socketData: {
         authBypass: false,
+        isAdmin: false,
         sessionId: "session-123",
+        userId: null,
+        username: null,
       },
     });
     expect(validateTicket).toHaveBeenCalledWith({
@@ -113,7 +122,10 @@ describe("rpc websocket auth helper", () => {
       ok: true,
       socketData: {
         authBypass: false,
+        isAdmin: false,
         sessionId: "session-123",
+        userId: null,
+        username: null,
       },
     });
   });

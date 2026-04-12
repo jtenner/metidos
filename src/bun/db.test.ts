@@ -25,20 +25,29 @@ import {
   createSecurityAuditEvent,
   createThread,
   createThreadMessage,
+  createUser,
   DEFAULT_THREAD_MODEL,
   DEFAULT_THREAD_REASONING_EFFORT,
   deleteAppDatabaseFiles,
+  ensureProjectWorktreeVisible,
   getAppDatabasePath,
+  getAuthSettings,
   getThreadById,
+  getUserByUsername,
   initAppDatabase,
+  LEGACY_DEFAULT_USERNAME,
   listProjects,
+  listProjectWorktreesMetadata,
   listSecurityAuditEvents,
   listThreads,
+  listUsersWithSetupStatus,
   migrateDatabase,
   resetResolvedAppDataDirectory,
   SQL_BUSY_TIMEOUT_MS,
   selectWritableAppDataDirectory,
+  setProjectWorktreePinned,
   updateThreadPiSessionState,
+  upsertAuthSettings,
   upsertProject,
 } from "./db";
 
@@ -345,6 +354,11 @@ describe("app database storage", () => {
     const { database, primaryThreadId } = createQueryPlanAuditDatabase();
 
     try {
+      const ownerUserId = listProjects(database)[0]?.ownerUserId;
+      if (typeof ownerUserId !== "number") {
+        throw new Error("Expected seeded projects to include an owner user.");
+      }
+
       const listProjectsPlan = explainQueryPlan(
         database,
         `
@@ -358,8 +372,10 @@ describe("app database storage", () => {
             updated_at AS updatedAt,
             last_opened_at AS lastOpenedAt
           FROM projects
+          WHERE owner_user_id = ?
           ORDER BY last_opened_at DESC, name ASC
         `,
+        [ownerUserId],
       );
       expect(listProjectsPlan).toEqual(
         expect.arrayContaining([
@@ -383,9 +399,10 @@ describe("app database storage", () => {
             updated_at AS updatedAt,
             last_opened_at AS lastOpenedAt
           FROM projects
-          WHERE is_open = 1
+          WHERE owner_user_id = ? AND is_open = 1
           ORDER BY last_opened_at DESC
         `,
+        [ownerUserId],
       );
       expect(listOpenProjectsPlan).toEqual(
         expect.arrayContaining([
@@ -628,6 +645,249 @@ describe("app database storage", () => {
     expect(listProjects(freshDatabase)).toHaveLength(0);
     expect(listThreads(freshDatabase)).toHaveLength(0);
     expect(listSecurityAuditEvents(freshDatabase)).toHaveLength(0);
+  });
+
+  it("renames the legacy bootstrap user to jtenner without changing project or thread ownership", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      const legacyUser = createUser(database, {
+        isAdmin: true,
+        username: "local-user",
+      });
+      upsertAuthSettings(database, {
+        primaryFactorHash: "primary-factor-hash",
+        primaryFactorType: "pin",
+        sessionLifetimeDays: 7,
+        totpSecretCiphertext: "existing-totp-secret",
+        userId: legacyUser.id,
+      });
+      const project = upsertProject(database, {
+        name: "Legacy Project",
+        ownerUserId: legacyUser.id,
+        projectPath: "/tmp/legacy-project",
+      });
+      const thread = createThread(database, {
+        agentsAccess: false,
+        githubAccess: false,
+        metidosAccess: true,
+        model: DEFAULT_THREAD_MODEL,
+        projectId: project.id,
+        reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+        title: "Legacy Thread",
+        unsafeMode: false,
+        worktreePath: project.path,
+      });
+
+      migrateDatabase(database);
+
+      expect(getUserByUsername(database, "local-user")).toBeNull();
+      expect(getUserByUsername(database, LEGACY_DEFAULT_USERNAME)).toEqual(
+        expect.objectContaining({
+          id: legacyUser.id,
+          isAdmin: true,
+          username: LEGACY_DEFAULT_USERNAME,
+        }),
+      );
+      expect(getAuthSettings(database, legacyUser.id)).toEqual(
+        expect.objectContaining({
+          primaryFactorType: "pin",
+          totpSecretCiphertext: "existing-totp-secret",
+          userId: legacyUser.id,
+        }),
+      );
+      expect(listProjects(database)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: project.id,
+            ownerUserId: legacyUser.id,
+          }),
+        ]),
+      );
+      expect(listThreads(database)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: thread.id,
+            ownerUserId: legacyUser.id,
+            projectId: project.id,
+          }),
+        ]),
+      );
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("tracks visible subprojects separately from optional pin state", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      const project = upsertProject(database, {
+        name: "Tracked Project",
+        projectPath: "/tmp/tracked-project",
+      });
+
+      expect(listProjectWorktreesMetadata(database, project.id)).toEqual([]);
+
+      ensureProjectWorktreeVisible(
+        database,
+        project.id,
+        "/tmp/tracked-project-feature",
+      );
+
+      expect(listProjectWorktreesMetadata(database, project.id)).toEqual([
+        {
+          pinnedAt: null,
+          projectId: project.id,
+          worktreePath: "/tmp/tracked-project-feature",
+        },
+      ]);
+
+      setProjectWorktreePinned(
+        database,
+        project.id,
+        "/tmp/tracked-project-feature",
+        true,
+      );
+      setProjectWorktreePinned(
+        database,
+        project.id,
+        "/tmp/tracked-project-release",
+        true,
+      );
+
+      const pinnedRecords = listProjectWorktreesMetadata(database, project.id);
+      expect(pinnedRecords).toHaveLength(2);
+      expect(pinnedRecords).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            projectId: project.id,
+            worktreePath: "/tmp/tracked-project-feature",
+          }),
+          expect.objectContaining({
+            projectId: project.id,
+            worktreePath: "/tmp/tracked-project-release",
+          }),
+        ]),
+      );
+      expect(
+        pinnedRecords.every((record) => typeof record.pinnedAt === "string"),
+      ).toBeTrue();
+
+      setProjectWorktreePinned(
+        database,
+        project.id,
+        "/tmp/tracked-project-feature",
+        false,
+      );
+
+      expect(listProjectWorktreesMetadata(database, project.id)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            pinnedAt: null,
+            projectId: project.id,
+            worktreePath: "/tmp/tracked-project-feature",
+          }),
+          expect.objectContaining({
+            projectId: project.id,
+            worktreePath: "/tmp/tracked-project-release",
+          }),
+        ]),
+      );
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("migrates legacy pinned worktree rows into tracked subprojects", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      const project = upsertProject(database, {
+        name: "Legacy Worktree Project",
+        projectPath: "/tmp/legacy-worktree-project",
+      });
+
+      database.run("DROP TABLE project_worktrees");
+      database.run(`
+        CREATE TABLE project_worktrees (
+          project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          worktree_path TEXT NOT NULL,
+          pinned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          PRIMARY KEY (project_id, worktree_path)
+        )
+      `);
+      database.run(
+        `
+          INSERT INTO project_worktrees (
+            project_id,
+            worktree_path,
+            pinned_at
+          )
+          VALUES (?, ?, ?)
+        `,
+        [
+          project.id,
+          "/tmp/legacy-worktree-project-feature",
+          "2026-04-12T12:00:00.000Z",
+        ],
+      );
+
+      migrateDatabase(database);
+      ensureProjectWorktreeVisible(
+        database,
+        project.id,
+        "/tmp/legacy-worktree-project-release",
+      );
+
+      expect(listProjectWorktreesMetadata(database, project.id)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            pinnedAt: "2026-04-12T12:00:00.000Z",
+            projectId: project.id,
+            worktreePath: "/tmp/legacy-worktree-project-feature",
+          }),
+          expect.objectContaining({
+            pinnedAt: null,
+            projectId: project.id,
+            worktreePath: "/tmp/legacy-worktree-project-release",
+          }),
+        ]),
+      );
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("treats users without a stored TOTP secret as pending setup", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      const user = createUser(database, {
+        isAdmin: false,
+        username: "pending-user",
+      });
+      upsertAuthSettings(database, {
+        primaryFactorHash: "primary-factor-hash",
+        primaryFactorType: "pin",
+        sessionLifetimeDays: 7,
+        totpSecretCiphertext: "",
+        userId: user.id,
+      });
+
+      expect(listUsersWithSetupStatus(database)).toEqual([
+        expect.objectContaining({
+          configured: false,
+          username: "pending-user",
+        }),
+      ]);
+    } finally {
+      database.close(false);
+    }
   });
 
   it("persists security audit events for dangerous local actions", () => {

@@ -51,11 +51,13 @@ export type RpcWorktreeFileDiff = {
 };
 
 export type RpcProjectWorktreesResult = {
+  hiddenWorktrees: RpcWorktree[];
   project: RpcProject;
   worktrees: RpcWorktree[];
 };
 
 export type RpcOpenProjectRequest = {
+  initGitIfNeeded?: boolean;
   projectPath: string;
   name?: string | null;
 };
@@ -100,9 +102,10 @@ export type RpcAppBootstrapHint = {
 };
 
 export type RpcOpenWorktreeResult = {
-  project: RpcProject;
   worktree: RpcWorktreeSnapshot;
   history: RpcWorktreeGitHistoryResult;
+  project: RpcProject;
+  worktrees: RpcWorktree[];
 };
 
 export type RpcSetActiveWorktreeResult = {
@@ -120,9 +123,7 @@ export type RpcDirectorySuggestionsResult = {
   directories: string[];
 };
 
-export type RpcCreateWorktreeResult = {
-  project: RpcProject;
-  worktrees: RpcWorktree[];
+export type RpcCreateWorktreeResult = RpcProjectWorktreesResult & {
   worktreePath: string;
 };
 
@@ -342,7 +343,10 @@ export type RpcProcedureCallOptions = {
 
 export type RpcAuthContext = {
   authBypass: boolean;
+  isAdmin: boolean;
   sessionId: string | null;
+  userId: number | null;
+  username: string | null;
 };
 
 export type RpcRequestContext = {
@@ -468,6 +472,15 @@ export type RpcOllamaProviderConfig = {
 export type RpcOllamaProviderConfigResult = {
   modelCatalog: RpcModelCatalog;
   ollama: RpcOllamaProviderConfig;
+};
+
+export type RpcManagedUser = {
+  configured: boolean;
+  createdAt: string;
+  id: number;
+  isAdmin: boolean;
+  updatedAt: string;
+  username: string;
 };
 
 export type RpcAppBootstrapResult = {
@@ -741,6 +754,17 @@ export type AppRPCSchema = {
       };
       response: RpcProviderAuthResult;
     };
+    listUsers: {
+      params: undefined;
+      response: RpcManagedUser[];
+    };
+    createUser: {
+      params: {
+        pin: string;
+        username: string;
+      };
+      response: RpcManagedUser;
+    };
     getAppBootstrap: {
       params: RpcAppBootstrapHint | undefined;
       response: RpcAppBootstrapResult;
@@ -772,7 +796,7 @@ export type AppRPCSchema = {
       response: { success: boolean; projectId: number; message?: string };
     };
     listProjectWorktrees: {
-      params: { projectId: number };
+      params: { projectId: number; includeHidden?: boolean };
       response: RpcProjectWorktreesResult;
     };
     createWorktree: {
@@ -1080,6 +1104,14 @@ export interface ProjectProcedures {
   logoutProviderAuth: RpcProcedureCall<
     AppRPCSchema["requests"]["logoutProviderAuth"]["params"],
     AppRPCSchema["requests"]["logoutProviderAuth"]["response"]
+  >;
+  listUsers: RpcProcedureCall<
+    AppRPCSchema["requests"]["listUsers"]["params"],
+    AppRPCSchema["requests"]["listUsers"]["response"]
+  >;
+  createUser: RpcProcedureCall<
+    AppRPCSchema["requests"]["createUser"]["params"],
+    AppRPCSchema["requests"]["createUser"]["response"]
   >;
   getAppBootstrap: RpcProcedureCall<
     AppRPCSchema["requests"]["getAppBootstrap"]["params"],

@@ -3,22 +3,21 @@
  * @description Module for projects panel.
  */
 
-import {
-  measureElement as defaultMeasureElement,
-  useVirtualizer,
-} from "@tanstack/react-virtual";
-import { type FormEvent, memo, useMemo, useRef } from "react";
+import { type FormEvent, memo, useMemo } from "react";
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
-import { matchesNormalizedSearchText } from "../controls/search-utils";
+import {
+  buildNormalizedSearchText,
+  matchesNormalizedSearchText,
+} from "../controls/search-utils";
 import { SidebarSectionHeader } from "../controls/sidebar-section-header";
 import { DESKTOP_THREAD_SWITCHER_POPOVER_ID } from "./desktop-thread-switcher";
 import {
   toggleProjectsPanelOpen,
-  useOpenProjectPaths,
   useProjectsPanelOpen,
 } from "./sidebar-panels-state";
 import {
+  findPrimaryWorktree,
   formatDirectoryPathForInput,
   orderProjectWorktrees,
   type ProjectNodeState,
@@ -29,12 +28,30 @@ import {
   worktreeThreadPopoverAnchorId,
 } from "./state";
 
-type ProjectWorktreeListData = {
-  visibleWorktrees: RpcWorktree[];
+export type ProjectsPanelRow = {
+  kind: "project" | "subproject";
+  project: RpcProject;
+  worktree: RpcWorktree;
+  worktreeLoaded: boolean;
 };
 
-const PROJECT_WORKTREE_ROW_ESTIMATE_PX = 56;
-const PROJECT_WORKTREE_LIST_OVERSCAN = 6;
+function createSyntheticPrimaryWorktree(project: RpcProject): RpcWorktree {
+  return {
+    bare: false,
+    branch: null,
+    head: null,
+    path: project.path,
+    pinnedAt: null,
+  };
+}
+
+function rowSearchText(row: ProjectsPanelRow): string {
+  return buildNormalizedSearchText(
+    row.project.name,
+    row.worktree.branch,
+    row.worktree.path,
+  );
+}
 
 export function worktreePinButtonVisibilityClassName(
   worktreePinned: boolean,
@@ -46,12 +63,67 @@ export function worktreePinButtonVisibilityClassName(
   return "pointer-events-none opacity-0 group-hover/worktree:pointer-events-auto group-hover/worktree:opacity-100 group-focus-within/worktree:pointer-events-auto group-focus-within/worktree:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100";
 }
 
-/**
- * Row props for one worktree entry in the project selector list.
- */
-type ProjectWorktreeRowProps = {
+export function deriveProjectsPanelRows(
+  filteredProjects: RpcProject[],
+  getProjectWorktrees: (projectId: number) => RpcWorktree[],
+  normalizedSidebarSearchQuery: string,
+  worktreeSearchTextByKey: ReadonlyMap<string, string>,
+): ProjectsPanelRow[] {
+  const rows: ProjectsPanelRow[] = [];
+
+  for (const project of filteredProjects) {
+    const worktrees = getProjectWorktrees(project.id);
+    const primaryWorktree =
+      findPrimaryWorktree(project, worktrees) ??
+      createSyntheticPrimaryWorktree(project);
+    const candidateRows: ProjectsPanelRow[] = [
+      {
+        kind: "project",
+        project,
+        worktree: primaryWorktree,
+        worktreeLoaded: worktrees.some(
+          (worktree) => worktree.path === project.path,
+        ),
+      },
+      ...orderProjectWorktrees(
+        project,
+        worktrees.filter((worktree) => worktree.path !== project.path),
+      ).map((worktree) => ({
+        kind: "subproject" as const,
+        project,
+        worktree,
+        worktreeLoaded: true,
+      })),
+    ];
+
+    for (const row of candidateRows) {
+      if (!normalizedSidebarSearchQuery) {
+        rows.push(row);
+        continue;
+      }
+
+      const searchText = row.worktreeLoaded
+        ? (worktreeSearchTextByKey.get(
+            worktreeKey(row.project.id, row.worktree.path),
+          ) ?? rowSearchText(row))
+        : rowSearchText(row);
+      if (
+        !matchesNormalizedSearchText(normalizedSidebarSearchQuery, searchText)
+      ) {
+        continue;
+      }
+      rows.push(row);
+    }
+  }
+
+  return rows;
+}
+
+type ProjectListRowProps = {
   activeWorktree: boolean;
   displayPath: string;
+  error: string;
+  onOpenProjectActionMenu: (project: RpcProject, x: number, y: number) => void;
   onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
   onToggleWorktreePinned: (
     projectId: number,
@@ -62,102 +134,68 @@ type ProjectWorktreeRowProps = {
     projectId: number,
     worktreePath: string,
   ) => void;
-  project: RpcProject;
+  row: ProjectsPanelRow;
+  sidebarActionButtonClass: string;
   threadSwitcherEnabled: boolean;
   threadSwitcherOpen: boolean;
-  worktree: RpcWorktree;
   worktreePinBusyPath: string | null;
-  worktreeState: WorktreeNodeState;
 };
 
-/**
- * Match a project/worktree pair against sidebar search query.
- */
-function worktreeMatchesProjectsSearch(
-  normalizedSidebarSearchQuery: string,
-  worktreeSearchTextByKey: ReadonlyMap<string, string>,
-  projectId: number,
-  worktree: RpcWorktree,
-): boolean {
-  return matchesNormalizedSearchText(
-    normalizedSidebarSearchQuery,
-    worktreeSearchTextByKey.get(worktreeKey(projectId, worktree.path)) ?? "",
-  );
-}
-
-/**
- * Derives projects panel worktree data.
- */
-export function deriveProjectsPanelWorktreeData(
-  filteredProjects: RpcProject[],
-  getProjectWorktrees: (projectId: number) => RpcWorktree[],
-  normalizedSidebarSearchQuery: string,
-  worktreeSearchTextByKey: ReadonlyMap<string, string>,
-): ReadonlyMap<number, ProjectWorktreeListData> {
-  const projectWorktreeDataById = new Map<number, ProjectWorktreeListData>();
-
-  for (const project of filteredProjects) {
-    const orderedWorktrees = orderProjectWorktrees(
-      project,
-      getProjectWorktrees(project.id),
-    );
-    const visibleWorktrees: RpcWorktree[] = [];
-
-    for (const worktree of orderedWorktrees) {
-      if (
-        !worktreeMatchesProjectsSearch(
-          normalizedSidebarSearchQuery,
-          worktreeSearchTextByKey,
-          project.id,
-          worktree,
-        )
-      ) {
-        continue;
-      }
-
-      visibleWorktrees.push(worktree);
-    }
-
-    projectWorktreeDataById.set(project.id, {
-      visibleWorktrees,
-    });
-  }
-
-  return projectWorktreeDataById;
-}
-
-/**
- * Render a selectable worktree row with pin/unpin affordance.
- */
-function ProjectWorktreeRow({
+function ProjectListRow({
   activeWorktree,
   displayPath,
+  error,
+  onOpenProjectActionMenu,
   onProjectWorktreeClick,
   onToggleWorktreePinned,
   onToggleWorktreeThreadSwitcher,
-  project,
+  row,
+  sidebarActionButtonClass,
   threadSwitcherEnabled,
   threadSwitcherOpen,
-  worktree,
   worktreePinBusyPath,
-  worktreeState,
-}: ProjectWorktreeRowProps) {
-  const worktreePinned = Boolean(worktree.pinnedAt);
-  const togglingPin = worktreePinBusyPath === worktree.path;
+}: ProjectListRowProps) {
+  const worktreePinned = Boolean(row.worktree.pinnedAt);
+  const togglingPin = worktreePinBusyPath === row.worktree.path;
+  const showPinButton = row.worktreeLoaded;
+  const showProjectMenuButton = row.kind === "project";
   const showThreadSwitcherButton = threadSwitcherEnabled && activeWorktree;
+  const rightPaddingClass =
+    showProjectMenuButton && showThreadSwitcherButton
+      ? "pr-24"
+      : showProjectMenuButton || showThreadSwitcherButton
+        ? "pr-16"
+        : showPinButton
+          ? "pr-10"
+          : "pr-4";
+  const secondaryLabel = row.worktree.branch?.trim()
+    ? `${row.worktree.branch} · ${displayPath}`
+    : displayPath;
 
   return (
     <div className="group/worktree relative">
       <button
         type="button"
-        className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors ${
+        className={`flex w-full min-w-0 items-center gap-2.5 px-2.5 py-2 text-left transition-colors ${
           activeWorktree
             ? "bg-surface-2 text-text-primary shadow-[inset_2px_0_0_0_var(--color-accent-emphasis)]"
             : "text-text-secondary hover:bg-surface-1"
-        } ${showThreadSwitcherButton ? "pr-16" : "pr-10"}`}
+        } ${rightPaddingClass}`}
         onClick={() => {
-          onProjectWorktreeClick(project, worktree.path);
+          onProjectWorktreeClick(row.project, row.worktree.path);
         }}
+        onContextMenu={
+          showProjectMenuButton
+            ? (event) => {
+                event.preventDefault();
+                onOpenProjectActionMenu(
+                  row.project,
+                  event.clientX + 6,
+                  event.clientY + 6,
+                );
+              }
+            : undefined
+        }
       >
         <span
           className={`flex h-6 w-6 shrink-0 items-center justify-center ${
@@ -172,29 +210,54 @@ function ProjectWorktreeRow({
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <div
-            className="truncate text-[13px] font-medium leading-4"
-            title={shortName(worktree.path)}
-          >
-            {shortName(worktree.path)}
-          </div>
-          <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]">
-            <span
-              aria-hidden="true"
-              className="text-[12px] leading-none text-[#a7b5be]"
+          <div className="flex min-w-0 items-center gap-2">
+            <div
+              className="truncate text-[13px] font-medium leading-4"
+              title={shortName(row.worktree.path)}
             >
-              ⎇
-            </span>
-            <span>
-              {worktree.branch ?? "Primary"} · {displayPath}
-            </span>
+              {shortName(row.worktree.path)}
+            </div>
+            {row.kind === "subproject" ? (
+              <span className="shrink-0 rounded-full border border-[#334651] bg-[#131d23] px-1.5 py-0.5 font-label text-[9px] font-semibold uppercase tracking-[0.14em] text-[#9fc1da]">
+                Subproject
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 truncate text-[10px] leading-[0.85rem] text-[#8f9aa2]">
+            {secondaryLabel}
           </div>
         </div>
       </button>
+
+      {showProjectMenuButton ? (
+        <button
+          type="button"
+          className={`${sidebarActionButtonClass} absolute top-1/2 -translate-y-1/2 ${
+            showThreadSwitcherButton ? "right-14" : "right-8"
+          } ${
+            activeWorktree
+              ? "opacity-100"
+              : "pointer-events-none opacity-0 group-hover/worktree:pointer-events-auto group-hover/worktree:opacity-100 group-focus-within/worktree:pointer-events-auto group-focus-within/worktree:opacity-100"
+          }`}
+          onClick={(event) => {
+            event.stopPropagation();
+            const rect = event.currentTarget.getBoundingClientRect();
+            onOpenProjectActionMenu(
+              row.project,
+              rect.right + 8,
+              rect.bottom + 6,
+            );
+          }}
+          aria-label={`Project actions for ${row.project.name}`}
+        >
+          {materialSymbol("menu", "text-[14px]")}
+        </button>
+      ) : null}
+
       {showThreadSwitcherButton ? (
         <button
           type="button"
-          id={worktreeThreadPopoverAnchorId(project.id, worktree.path)}
+          id={worktreeThreadPopoverAnchorId(row.project.id, row.worktree.path)}
           className={`absolute right-8 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-colors ${
             threadSwitcherOpen
               ? "border-[#4a6274] bg-[#24333b] text-[#dfebf3]"
@@ -202,7 +265,7 @@ function ProjectWorktreeRow({
           }`}
           onClick={(event) => {
             event.stopPropagation();
-            onToggleWorktreeThreadSwitcher(project.id, worktree.path);
+            onToggleWorktreeThreadSwitcher(row.project.id, row.worktree.path);
           }}
           aria-controls={DESKTOP_THREAD_SWITCHER_POPOVER_ID}
           aria-expanded={threadSwitcherOpen}
@@ -216,151 +279,41 @@ function ProjectWorktreeRow({
           {materialSymbol("chat_bubble", "text-[13px]")}
         </button>
       ) : null}
-      <button
-        type="button"
-        className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-[opacity,color,background-color,border-color] disabled:cursor-not-allowed disabled:opacity-60 ${worktreePinButtonVisibilityClassName(
-          worktreePinned,
-        )} ${
-          activeWorktree
-            ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
-            : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
-        }`}
-        onClick={() => {
-          onToggleWorktreePinned(project.id, worktree.path, worktreePinned);
-        }}
-        disabled={togglingPin || worktreePinBusyPath !== null}
-        aria-label={worktreePinned ? "Unpin worktree" : "Pin worktree"}
-        title={worktreePinned ? "Unpin worktree" : "Pin worktree"}
-      >
-        {materialSymbol("push_pin", "text-[13px]", {
-          filled: worktreePinned,
-        })}
-      </button>
-      {worktreeState.error ? (
-        <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">
-          {worktreeState.error}
-        </div>
+
+      {showPinButton ? (
+        <button
+          type="button"
+          className={`absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center border transition-[opacity,color,background-color,border-color] disabled:cursor-not-allowed disabled:opacity-60 ${worktreePinButtonVisibilityClassName(
+            worktreePinned,
+          )} ${
+            activeWorktree
+              ? "border-[#35414a] bg-[#1f282f] text-[#dfebf3]"
+              : "border-[#303940] bg-[#1a2025] text-[#acb8c1] hover:bg-[#242d33] hover:text-[#f2f0ef]"
+          }`}
+          onClick={() => {
+            onToggleWorktreePinned(
+              row.project.id,
+              row.worktree.path,
+              worktreePinned,
+            );
+          }}
+          disabled={togglingPin || worktreePinBusyPath !== null}
+          aria-label={worktreePinned ? "Unpin subproject" : "Pin subproject"}
+          title={worktreePinned ? "Unpin subproject" : "Pin subproject"}
+        >
+          {materialSymbol("push_pin", "text-[13px]", {
+            filled: worktreePinned,
+          })}
+        </button>
+      ) : null}
+
+      {error ? (
+        <div className="px-3 pt-1 text-[11px] text-[#ff6e84]">{error}</div>
       ) : null}
     </div>
   );
 }
 
-type ProjectWorktreeListProps = {
-  getWorktreeState: (
-    projectId: number,
-    worktreePath: string,
-  ) => WorktreeNodeState;
-  isActiveWorktree: (projectId: number, worktreePath: string) => boolean;
-  onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
-  onToggleWorktreePinned: (
-    projectId: number,
-    worktreePath: string,
-    pinned: boolean,
-  ) => void;
-  onToggleWorktreeThreadSwitcher: (
-    projectId: number,
-    worktreePath: string,
-  ) => void;
-  project: RpcProject;
-  threadSwitcherEnabled: boolean;
-  threadSwitcherOpen: boolean;
-  worktrees: RpcWorktree[];
-  worktreeDisplayPathByKey: ReadonlyMap<string, string>;
-  worktreePinBusyPath: string | null;
-};
-
-/**
- * Virtualized list for a project's worktree selector rows.
- */
-function ProjectWorktreeList({
-  getWorktreeState,
-  isActiveWorktree,
-  onProjectWorktreeClick,
-  onToggleWorktreePinned,
-  onToggleWorktreeThreadSwitcher,
-  project,
-  threadSwitcherEnabled,
-  threadSwitcherOpen,
-  worktrees,
-  worktreeDisplayPathByKey,
-  worktreePinBusyPath,
-}: ProjectWorktreeListProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
-    count: worktrees.length,
-    estimateSize: () => PROJECT_WORKTREE_ROW_ESTIMATE_PX,
-    getItemKey: (index) => {
-      const worktree = worktrees[index];
-      return worktree ? worktreeKey(project.id, worktree.path) : index;
-    },
-    getScrollElement: () => scrollRef.current,
-    measureElement: defaultMeasureElement,
-    overscan: PROJECT_WORKTREE_LIST_OVERSCAN,
-    useAnimationFrameWithResizeObserver: true,
-  });
-  const virtualRows = virtualizer.getVirtualItems();
-  const totalSize = virtualizer.getTotalSize();
-
-  return (
-    <div
-      ref={scrollRef}
-      className="app-scrollbar max-h-[17rem] overflow-y-auto overscroll-contain pr-1"
-    >
-      <div
-        className="relative w-full"
-        style={{
-          height: `${totalSize}px`,
-        }}
-      >
-        {virtualRows.map((virtualRow) => {
-          const worktree = worktrees[virtualRow.index];
-          if (!worktree) {
-            return null;
-          }
-
-          const worktreePath = worktree.path;
-
-          return (
-            <div
-              className="absolute left-0 top-0 w-full"
-              data-index={virtualRow.index}
-              key={virtualRow.key}
-              ref={virtualizer.measureElement}
-              style={{
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <ProjectWorktreeRow
-                activeWorktree={isActiveWorktree(project.id, worktreePath)}
-                displayPath={
-                  worktreeDisplayPathByKey.get(
-                    worktreeKey(project.id, worktreePath),
-                  ) ?? worktreePath
-                }
-                onProjectWorktreeClick={onProjectWorktreeClick}
-                onToggleWorktreePinned={onToggleWorktreePinned}
-                onToggleWorktreeThreadSwitcher={onToggleWorktreeThreadSwitcher}
-                project={project}
-                threadSwitcherEnabled={threadSwitcherEnabled}
-                threadSwitcherOpen={
-                  threadSwitcherOpen &&
-                  isActiveWorktree(project.id, worktreePath)
-                }
-                worktree={worktree}
-                worktreePinBusyPath={worktreePinBusyPath}
-                worktreeState={getWorktreeState(project.id, worktreePath)}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Full prop contract for the sidebar ProjectsPanel.
- */
 type ProjectsPanelProps = {
   addProjectError: string;
   addProjectInputIsPreviewing: boolean;
@@ -386,7 +339,6 @@ type ProjectsPanelProps = {
   onDirectorySuggestionLeave: (directory: string) => void;
   onOpenProjectActionMenu: (project: RpcProject, x: number, y: number) => void;
   onProjectWorktreeClick: (project: RpcProject, worktreePath: string) => void;
-  onRefreshProject: (project: RpcProject, expanded: boolean) => Promise<void>;
   onSelectDirectorySuggestion: (directory: string) => void;
   onSubmitAddProject: (event: FormEvent<HTMLFormElement>) => void;
   onToggleAddProjectForm: () => void;
@@ -399,9 +351,8 @@ type ProjectsPanelProps = {
     projectId: number,
     worktreePath: string,
   ) => void;
-  selectedProjectId: number | null;
-  supportsTildePath: boolean;
   sidebarActionButtonClass: string;
+  supportsTildePath: boolean;
   threadSwitcherEnabled: boolean;
   threadSwitcherOpen: boolean;
   worktreePinBusyPath: string | null;
@@ -409,12 +360,6 @@ type ProjectsPanelProps = {
   worktreeSearchTextByKey: ReadonlyMap<string, string>;
 };
 
-/**
- * Sidebar section for project/worktree management:
- * - add-project form + directory autocomplete
- * - expandable project trees with a single virtualized worktree list per project
- * - project-local worktree rows with thread-switch affordances
- */
 export const ProjectsPanel = memo(function ProjectsPanel({
   addProjectError,
   addProjectInputIsPreviewing,
@@ -437,13 +382,11 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   onDirectorySuggestionLeave,
   onOpenProjectActionMenu,
   onProjectWorktreeClick,
-  onRefreshProject,
   onSelectDirectorySuggestion,
   onSubmitAddProject,
   onToggleAddProjectForm,
   onToggleWorktreePinned,
   onToggleWorktreeThreadSwitcher,
-  selectedProjectId,
   sidebarActionButtonClass,
   supportsTildePath,
   threadSwitcherEnabled,
@@ -453,20 +396,21 @@ export const ProjectsPanel = memo(function ProjectsPanel({
   worktreeSearchTextByKey,
 }: ProjectsPanelProps) {
   const projectsOpen = useProjectsPanelOpen();
-  const openProjectPaths = useOpenProjectPaths();
-  const projectWorktreeDataById = useMemo(() => {
-    return deriveProjectsPanelWorktreeData(
+  const projectRows = useMemo(
+    () =>
+      deriveProjectsPanelRows(
+        filteredProjects,
+        (projectId) => projectStateWorktrees(getProjectState(projectId)),
+        normalizedSidebarSearchQuery,
+        worktreeSearchTextByKey,
+      ),
+    [
       filteredProjects,
-      (projectId) => projectStateWorktrees(getProjectState(projectId)),
+      getProjectState,
       normalizedSidebarSearchQuery,
       worktreeSearchTextByKey,
-    );
-  }, [
-    filteredProjects,
-    getProjectState,
-    normalizedSidebarSearchQuery,
-    worktreeSearchTextByKey,
-  ]);
+    ],
+  );
 
   return (
     <section className="select-none">
@@ -603,7 +547,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               </label>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-[#8f8d8b]">
-                  Add a repo by its root folder path.
+                  Adds the folder as a project and initializes Git if needed.
                 </p>
                 <button
                   type="button"
@@ -618,141 +562,48 @@ export const ProjectsPanel = memo(function ProjectsPanel({
               ) : null}
             </form>
           ) : null}
+
           <div className="space-y-1">
-            {filteredProjects.length === 0 ? (
+            {projectRows.length === 0 ? (
               <div className="bg-[#151515] px-3 py-2.5 text-[13px] text-[#a7a7a7]">
                 {normalizedSidebarSearchQuery
                   ? "No matching projects."
-                  : "No projects in database. Use + to add a project folder."}
+                  : "Use + to add a project folder."}
               </div>
             ) : (
-              filteredProjects.map((project) => {
-                const state = getProjectState(project.id);
-                const visibleWorktrees =
-                  projectWorktreeDataById.get(project.id)?.visibleWorktrees ??
-                  [];
-                const projectTreeOpen = openProjectPaths.has(project.path);
-                const isActive = selectedProjectId === project.id;
-                const showWorktrees =
-                  projectTreeOpen || Boolean(normalizedSidebarSearchQuery);
-
+              projectRows.map((row) => {
+                const key = worktreeKey(row.project.id, row.worktree.path);
+                const projectState = getProjectState(row.project.id);
+                const worktreeState = getWorktreeState(
+                  row.project.id,
+                  row.worktree.path,
+                );
                 return (
-                  <div className="space-y-1" key={project.id}>
-                    <div className="group/project flex items-center gap-2">
-                      <button
-                        type="button"
-                        className={`min-w-0 flex-1 px-3 py-2 text-left transition-colors ${
-                          isActive
-                            ? "bg-[#181f22] text-[#f2f0ef] shadow-[inset_3px_0_0_0_#7aa5c4]"
-                            : "text-[#d7d7d7] hover:bg-[#171a1b]"
-                        }`}
-                        onClick={() => {
-                          const nextOpen = !projectTreeOpen;
-                          void onRefreshProject(project, nextOpen);
-                        }}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          onOpenProjectActionMenu(
-                            project,
-                            event.clientX + 6,
-                            event.clientY + 6,
-                          );
-                        }}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center ${
-                              isActive
-                                ? "bg-[#1f313c] text-[#bdd5e6]"
-                                : "bg-[#151a1c] text-[#8ca6b9]"
-                            }`}
-                          >
-                            {materialSymbol(
-                              showWorktrees ? "folder_open" : "folder",
-                              "text-[16px]",
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1 truncate text-[14px] font-medium">
-                            {project.name}
-                          </div>
-                          <div className="flex shrink-0 items-center">
-                            <span className="text-[#62737e]">
-                              {materialSymbol(
-                                projectTreeOpen
-                                  ? "expand_more"
-                                  : "chevron_right",
-                                "text-[17px]",
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        className={`${sidebarActionButtonClass} ${
-                          isActive
-                            ? "opacity-100"
-                            : "pointer-events-none opacity-0 group-hover/project:pointer-events-auto group-hover/project:opacity-100 group-focus-within/project:pointer-events-auto group-focus-within/project:opacity-100"
-                        }`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          const rect =
-                            event.currentTarget.getBoundingClientRect();
-                          onOpenProjectActionMenu(
-                            project,
-                            rect.right + 8,
-                            rect.bottom + 6,
-                          );
-                        }}
-                        aria-label={`Project actions for ${project.name}`}
-                      >
-                        {materialSymbol("menu", "text-[14px]")}
-                      </button>
-                    </div>
-
-                    {showWorktrees ? (
-                      <div className="ml-4 border-l border-[#1f262a] pl-3">
-                        <div className="space-y-1">
-                          {state.loadingWorktrees ? (
-                            <div className="px-3 py-1 text-xs text-[#8f9aa2]">
-                              Loading worktrees...
-                            </div>
-                          ) : null}
-                          {state.error ? (
-                            <div className="bg-[#2c1117] px-3 py-2 text-xs text-[#ff9db0]">
-                              {state.error}
-                            </div>
-                          ) : null}
-                          {visibleWorktrees.length === 0 ? (
-                            <div className="bg-[#141516] px-3 py-2 text-xs text-[#8f8d8b]">
-                              {normalizedSidebarSearchQuery
-                                ? "No matching worktrees."
-                                : "No worktrees found."}
-                            </div>
-                          ) : null}
-                          {visibleWorktrees.length > 0 ? (
-                            <ProjectWorktreeList
-                              getWorktreeState={getWorktreeState}
-                              isActiveWorktree={isActiveWorktree}
-                              onProjectWorktreeClick={onProjectWorktreeClick}
-                              onToggleWorktreePinned={onToggleWorktreePinned}
-                              onToggleWorktreeThreadSwitcher={
-                                onToggleWorktreeThreadSwitcher
-                              }
-                              project={project}
-                              threadSwitcherEnabled={threadSwitcherEnabled}
-                              threadSwitcherOpen={threadSwitcherOpen}
-                              worktrees={visibleWorktrees}
-                              worktreeDisplayPathByKey={
-                                worktreeDisplayPathByKey
-                              }
-                              worktreePinBusyPath={worktreePinBusyPath}
-                            />
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
+                  <ProjectListRow
+                    key={key}
+                    activeWorktree={isActiveWorktree(
+                      row.project.id,
+                      row.worktree.path,
+                    )}
+                    displayPath={
+                      worktreeDisplayPathByKey.get(key) ?? row.worktree.path
+                    }
+                    error={
+                      worktreeState.error ||
+                      (row.kind === "project" ? projectState.error : "")
+                    }
+                    onOpenProjectActionMenu={onOpenProjectActionMenu}
+                    onProjectWorktreeClick={onProjectWorktreeClick}
+                    onToggleWorktreePinned={onToggleWorktreePinned}
+                    onToggleWorktreeThreadSwitcher={
+                      onToggleWorktreeThreadSwitcher
+                    }
+                    row={row}
+                    sidebarActionButtonClass={sidebarActionButtonClass}
+                    threadSwitcherEnabled={threadSwitcherEnabled}
+                    threadSwitcherOpen={threadSwitcherOpen}
+                    worktreePinBusyPath={worktreePinBusyPath}
+                  />
                 );
               })
             )}

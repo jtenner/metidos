@@ -853,6 +853,8 @@ const procedures: ProjectProcedures = {
   completeProviderAuthLogin: createProcedure("completeProviderAuthLogin"),
   refreshProviderAuth: createProcedure("refreshProviderAuth"),
   logoutProviderAuth: createProcedure("logoutProviderAuth"),
+  listUsers: createProcedure("listUsers"),
+  createUser: createProcedure("createUser"),
   getAppBootstrap: createProcedure("getAppBootstrap"),
   listProjects: createProcedure("listProjects"),
   listThreads: createProcedure("listThreads"),

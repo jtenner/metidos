@@ -34,6 +34,7 @@ import {
   type MainviewBuildResult,
 } from "./build-mainview";
 import {
+  type AuthSessionRecord,
   closeAppDatabase,
   deleteAppDatabaseFiles,
   getAppDatabasePath,
@@ -58,6 +59,7 @@ import {
   closeWorktreeProcedure,
   completeProviderAuthLoginProcedure,
   createThreadProcedure,
+  createUserProcedure,
   createWorktreeProcedure,
   deleteProjectProcedure,
   deleteThreadProcedure,
@@ -78,6 +80,7 @@ import {
   listProjectWorktreesProcedure,
   listThreadStatusesProcedure,
   listThreadsProcedure,
+  listUsersProcedure,
   listWorktreeGitHistoryProcedure,
   logoutProviderAuthProcedure,
   markThreadErrorSeenProcedure,
@@ -470,37 +473,58 @@ function requireFreshStepUpForRpcAction(
   });
 }
 
+function buildRpcSocketDataFromSession(
+  session: AuthSessionRecord,
+): RpcWebSocketSocketData {
+  return {
+    authBypass: false,
+    isAdmin: session.isAdmin,
+    sessionId: session.id,
+    userId: session.userId,
+    username: session.username,
+  };
+}
+
 const rpcHandlers: RpcRequestHandlerMap = {
   getHomeDirectory: () => getHomeDirectoryProcedure(),
   listDirectorySuggestions: (params) =>
     listDirectorySuggestionsProcedure(params),
   getModelCatalog: (params) => getModelCatalogProcedure(params),
-  getProviderAuthStatus: (params) => getProviderAuthStatusProcedure(params),
-  getOllamaProviderConfig: (params) => getOllamaProviderConfigProcedure(params),
-  saveOllamaProviderConfig: (params) =>
-    saveOllamaProviderConfigProcedure(params),
-  startProviderAuthLogin: (params) => startProviderAuthLoginProcedure(params),
-  completeProviderAuthLogin: (params) =>
-    completeProviderAuthLoginProcedure(params),
-  refreshProviderAuth: (params) => refreshProviderAuthProcedure(params),
-  logoutProviderAuth: (params) => logoutProviderAuthProcedure(params),
-  getAppBootstrap: (params) => getAppBootstrapProcedure(params),
-  listProjects: (params) => listProjectsProcedure(params),
-  listThreads: (params) => listThreadsProcedure(params),
-  listThreadStatuses: (params) => listThreadStatusesProcedure(params),
+  getProviderAuthStatus: (params, context) =>
+    getProviderAuthStatusProcedure(params, context),
+  getOllamaProviderConfig: (params, context) =>
+    getOllamaProviderConfigProcedure(params, context),
+  saveOllamaProviderConfig: (params, context) =>
+    saveOllamaProviderConfigProcedure(params, context),
+  startProviderAuthLogin: (params, context) =>
+    startProviderAuthLoginProcedure(params, context),
+  completeProviderAuthLogin: (params, context) =>
+    completeProviderAuthLoginProcedure(params, context),
+  refreshProviderAuth: (params, context) =>
+    refreshProviderAuthProcedure(params, context),
+  logoutProviderAuth: (params, context) =>
+    logoutProviderAuthProcedure(params, context),
+  listUsers: (params, context) => listUsersProcedure(params, context),
+  createUser: (params, context) => createUserProcedure(params, context),
+  getAppBootstrap: (params, context) =>
+    getAppBootstrapProcedure(params, context),
+  listProjects: (params, context) => listProjectsProcedure(params, context),
+  listThreads: (params, context) => listThreadsProcedure(params, context),
+  listThreadStatuses: (params, context) =>
+    listThreadStatusesProcedure(params, context),
   openProject: (params, context) => openProjectProcedure(params, context),
   openProjectsBatch: (params, context) =>
     openProjectsBatchProcedure(params, context),
   openWorktreesBatch: (params, context) =>
     openWorktreesBatchProcedure(params, context),
-  closeProject: (params) => closeProjectProcedure(params),
+  closeProject: (params, context) => closeProjectProcedure(params, context),
   deleteProject: (params, context) => {
     requireFreshStepUpForRpcAction(context, "delete a project");
-    return deleteProjectProcedure(params);
+    return deleteProjectProcedure(params, context);
   },
   listProjectWorktrees: (params, context) =>
     listProjectWorktreesProcedure(params, context),
-  createWorktree: (params) => createWorktreeProcedure(params),
+  createWorktree: (params, context) => createWorktreeProcedure(params, context),
   createThread: (params, context) => {
     if (createThreadRequiresStepUp(params)) {
       requireFreshStepUpForRpcAction(
@@ -510,38 +534,45 @@ const rpcHandlers: RpcRequestHandlerMap = {
     }
     return createThreadProcedure(params, context);
   },
-  requestThreadStart: async (params) => {
-    const request = await requestThreadStartProcedure(params);
+  requestThreadStart: async (params, context) => {
+    const request = await requestThreadStartProcedure(params, context);
     broadcastThreadStartRequestCreated(request);
     return request;
   },
-  newCron: async (params) => {
-    const cron = await newCronProcedure(params);
+  newCron: async (params, context) => {
+    const cron = await newCronProcedure(params, context);
     syncCronSchedulerCron(cron.id);
     return cron;
   },
-  updateCron: async (params) => {
-    const cron = await updateCronProcedure(params);
+  updateCron: async (params, context) => {
+    const cron = await updateCronProcedure(params, context);
     syncCronSchedulerCron(cron.id);
     return cron;
   },
-  listCrons: (params) => listCronsProcedure(params),
-  runCronNow: (params) => runCronNowProcedure(params),
-  getThread: (params) => getThreadProcedure(params),
-  markThreadErrorSeen: (params) => markThreadErrorSeenProcedure(params),
+  listCrons: (params, context) => listCronsProcedure(params, context),
+  runCronNow: (params, context) => runCronNowProcedure(params, context),
+  getThread: (params, context) => getThreadProcedure(params, context),
+  markThreadErrorSeen: (params, context) =>
+    markThreadErrorSeenProcedure(params, context),
   sendThreadMessage: (params, context) =>
     sendThreadMessageProcedure(params, context),
-  stopThreadTurn: (params) => stopThreadTurnProcedure(params),
-  updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
-  updateThreadAccess: (params) => updateThreadAccessProcedure(params),
-  renameThread: (params) => renameThreadProcedure(params),
-  setThreadPinned: (params) => setThreadPinnedProcedure(params),
-  updateThreadModel: (params) => updateThreadModelProcedure(params),
-  updateThreadReasoningEffort: (params) =>
-    updateThreadReasoningEffortProcedure(params),
-  updateThreadUnsafeMode: (params) => updateThreadUnsafeModeProcedure(params),
-  deleteThread: (params) => deleteThreadProcedure(params),
-  discardEmptyThread: (params) => discardEmptyThreadProcedure(params),
+  stopThreadTurn: (params, context) => stopThreadTurnProcedure(params, context),
+  updateThreadMetadata: (params, context) =>
+    updateThreadMetadataProcedure(params, context),
+  updateThreadAccess: (params, context) =>
+    updateThreadAccessProcedure(params, context),
+  renameThread: (params, context) => renameThreadProcedure(params, context),
+  setThreadPinned: (params, context) =>
+    setThreadPinnedProcedure(params, context),
+  updateThreadModel: (params, context) =>
+    updateThreadModelProcedure(params, context),
+  updateThreadReasoningEffort: (params, context) =>
+    updateThreadReasoningEffortProcedure(params, context),
+  updateThreadUnsafeMode: (params, context) =>
+    updateThreadUnsafeModeProcedure(params, context),
+  deleteThread: (params, context) => deleteThreadProcedure(params, context),
+  discardEmptyThread: (params, context) =>
+    discardEmptyThreadProcedure(params, context),
   openWorktree: (params, context) => openWorktreeProcedure(params, context),
   getWorktreeSnapshot: (params, context) =>
     getWorktreeSnapshotProcedure(params, context),
@@ -549,22 +580,24 @@ const rpcHandlers: RpcRequestHandlerMap = {
     readWorktreeFileContentPageProcedure(params, context),
   readWorktreeFileDiff: (params, context) =>
     readWorktreeFileDiffProcedure(params, context),
-  setActiveWorktree: (params) => setActiveWorktreeProcedure(params),
+  setActiveWorktree: (params, context) =>
+    setActiveWorktreeProcedure(params, context),
   focusContext: async (params, context) => {
     const result = await focusContextProcedure(params, context);
     broadcastContextFocusChanged(result);
     return result;
   },
-  respondThreadExtensionUi: (params) =>
-    respondThreadExtensionUiProcedure(params),
-  updateThreadExtensionEditor: (params) =>
-    updateThreadExtensionEditorProcedure(params),
+  respondThreadExtensionUi: (params, context) =>
+    respondThreadExtensionUiProcedure(params, context),
+  updateThreadExtensionEditor: (params, context) =>
+    updateThreadExtensionEditorProcedure(params, context),
   listWorktreeGitHistory: (params, context) =>
     listWorktreeGitHistoryProcedure(params, context),
   getWorktreeGitCommitDiff: (params, context) =>
     getWorktreeGitCommitDiffProcedure(params, context),
-  closeWorktree: (params) => closeWorktreeProcedure(params),
-  setWorktreePinned: (params) => setWorktreePinnedProcedure(params),
+  closeWorktree: (params, context) => closeWorktreeProcedure(params, context),
+  setWorktreePinned: (params, context) =>
+    setWorktreePinnedProcedure(params, context),
 };
 
 const rpcClients = new Set<ServerWebSocket<RpcWebSocketSocketData>>();
@@ -1180,21 +1213,8 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     }
 
     if (pathname === "/auth/setup/start" && request.method === "POST") {
-      if (
-        getAuthStatus(database, null, {
-          devBypass: DEV_FLOW_MODE.authBypass,
-          nowMs,
-        }).configured
-      ) {
-        throw new AuthServiceError(
-          "auth_already_configured",
-          "Authentication has already been configured.",
-          409,
-        );
-      }
       const body = await readJsonBody(request);
-      const accountName =
-        readOptionalString(body, "accountName") || "local-user";
+      const accountName = readRequiredString(body, "username");
       const issuer = readOptionalString(body, "issuer");
       const enrollment = prepareTotpEnrollment(
         issuer
@@ -1221,6 +1241,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         primaryFactorType: readPrimaryFactorType(body),
         totpCode: readRequiredString(body, "totpCode"),
         totpSecret: readRequiredString(body, "totpSecret"),
+        username: readRequiredString(body, "username"),
         ...(typeof sessionLifetimeDays === "number"
           ? {
               sessionLifetimeDays,
@@ -1255,7 +1276,8 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
       const result = await login(database, {
         nowMs,
         primaryFactor: readRequiredString(body, "primaryFactor"),
-        totpCode: readRequiredString(body, "totpCode"),
+        totpCode: readOptionalString(body, "totpCode") ?? "",
+        username: readRequiredString(body, "username"),
       });
 
       return respondAuthJson(
@@ -1285,6 +1307,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
         nowMs,
         primaryFactor: readRequiredString(body, "primaryFactor"),
         recoveryCode: readRequiredString(body, "recoveryCode"),
+        username: readRequiredString(body, "username"),
       });
 
       return respondAuthJson(
@@ -2465,19 +2488,37 @@ async function bootstrap(): Promise<void> {
           });
         }
 
+        const socketData = websocketAuth.socketData.authBypass
+          ? websocketAuth.socketData
+          : (() => {
+              const session = resolveSession(initAppDatabase(), {
+                nowMs: currentNowMs(),
+                sessionId: websocketAuth.socketData.sessionId,
+                touch: true,
+              });
+              if (!session) {
+                throw new AuthServiceError(
+                  "session_required",
+                  "A valid authenticated session is required.",
+                  401,
+                );
+              }
+              return buildRpcSocketDataFromSession(session);
+            })();
+
         webServerLogger.trace({
           message: "WebSocket auth passed",
           method: request.method,
           pathname,
-          authBypass: websocketAuth.socketData.authBypass,
-          sessionId: websocketAuth.socketData.sessionId,
+          authBypass: socketData.authBypass,
+          sessionId: socketData.sessionId,
           source,
           requestId: requestId ?? null,
         });
 
         if (
           serverInstance.upgrade(request, {
-            data: websocketAuth.socketData,
+            data: socketData,
           })
         ) {
           webServerLogger.info({
@@ -2823,6 +2864,10 @@ async function bootstrap(): Promise<void> {
                   401,
                 );
               }
+              ws.data.isAdmin = session.isAdmin;
+              ws.data.sessionId = session.id;
+              ws.data.userId = session.userId;
+              ws.data.username = session.username;
             }
 
             const handler = rpcHandlers[request.method] as (

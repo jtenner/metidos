@@ -3,7 +3,7 @@
  * @description Module for auth shell connect.
  */
 
-import type { AuthStatus, TotpEnrollment } from "./auth-client";
+import type { AuthStatus } from "./auth-client";
 import { AuthApiError, isAuthRequiredError } from "./auth-client";
 import { isAuthRequiredRpcError } from "./rpc-errors";
 
@@ -11,13 +11,10 @@ export const INITIAL_RPC_CONNECT_MAX_ATTEMPTS = 4;
 export const INITIAL_RPC_CONNECT_BASE_DELAY_MS = 250;
 export const INITIAL_RPC_CONNECT_MAX_DELAY_MS = 1_000;
 export const AUTH_SHELL_STATUS_TIMEOUT_MS = 5_000;
-export const AUTH_SHELL_SETUP_TIMEOUT_MS = 5_000;
 export const INITIAL_RPC_CONNECT_TIMEOUT_MS = 5_000;
 
 const AUTH_STATUS_TIMEOUT_MESSAGE =
   "Checking authorization timed out. Retry and confirm the local server is responding.";
-const AUTH_SETUP_TIMEOUT_MESSAGE =
-  "Preparing authorization setup timed out. Retry and confirm the local server is responding.";
 const INITIAL_RPC_CONNECT_TIMEOUT_MESSAGE =
   "Opening the authenticated workspace timed out. Retry and confirm the local RPC transport is responding.";
 
@@ -27,7 +24,6 @@ export type AuthShellGateResolution =
       status: AuthStatus;
     }
   | {
-      enrollment: TotpEnrollment;
       kind: "setup";
       notice?: string;
       status: AuthStatus;
@@ -72,8 +68,6 @@ type ResolveAuthShellGateOptions = {
   getAuthStatus: () => Promise<AuthStatus>;
   onAuthenticatedConnectRetry?: (info: InitialRpcConnectRetryInfo) => void;
   onAuthenticatedConnectStart?: () => void;
-  prepareSetupEnrollment: () => Promise<TotpEnrollment>;
-  setupTimeoutMs?: number;
   statusTimeoutMs?: number;
 };
 /**
@@ -205,7 +199,6 @@ export async function resolveAuthShellGate(
 ): Promise<AuthShellGateResolution> {
   const statusTimeoutMs =
     options.statusTimeoutMs ?? AUTH_SHELL_STATUS_TIMEOUT_MS;
-  const setupTimeoutMs = options.setupTimeoutMs ?? AUTH_SHELL_SETUP_TIMEOUT_MS;
   const connectTimeoutMs =
     options.connectTimeoutMs ?? INITIAL_RPC_CONNECT_TIMEOUT_MS;
   const getTimedAuthStatus = () =>
@@ -213,12 +206,6 @@ export async function resolveAuthShellGate(
       message: AUTH_STATUS_TIMEOUT_MESSAGE,
       operation: options.getAuthStatus(),
       timeoutMs: statusTimeoutMs,
-    });
-  const prepareTimedSetupEnrollment = () =>
-    withTimeout({
-      message: AUTH_SETUP_TIMEOUT_MESSAGE,
-      operation: options.prepareSetupEnrollment(),
-      timeoutMs: setupTimeoutMs,
     });
   const connectAuthenticatedTransport = async () => {
     try {
@@ -276,7 +263,6 @@ export async function resolveAuthShellGate(
         if (!refreshedStatus.authenticated) {
           if (!refreshedStatus.configured) {
             return {
-              enrollment: await prepareTimedSetupEnrollment(),
               kind: "setup",
               notice: DISCARDED_SESSION_NOTICE,
               status: refreshedStatus,
@@ -296,7 +282,6 @@ export async function resolveAuthShellGate(
 
   if (!status.configured) {
     return {
-      enrollment: await prepareTimedSetupEnrollment(),
       kind: "setup",
       status,
     };

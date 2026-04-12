@@ -188,11 +188,6 @@ describe("auth shell connect retry helpers", () => {
       onAuthenticatedConnectRetry: ({ nextAttemptNumber }) => {
         retries.push(nextAttemptNumber);
       },
-      prepareSetupEnrollment: async () => {
-        throw new Error(
-          "setup enrollment should not load for authenticated sessions",
-        );
-      },
     });
 
     expect(result).toEqual({
@@ -212,11 +207,6 @@ describe("auth shell connect retry helpers", () => {
         connectRpcTransport: async () => {},
         connectTimeoutMs: INITIAL_RPC_CONNECT_TIMEOUT_MS,
         getAuthStatus: async () => new Promise<AuthStatus>(() => {}),
-        prepareSetupEnrollment: async () => {
-          throw new Error(
-            "setup enrollment should not load when auth status stalls",
-          );
-        },
         statusTimeoutMs: 5,
       });
       throw new Error("expected stalled auth status to time out");
@@ -249,11 +239,6 @@ describe("auth shell connect retry helpers", () => {
       },
       onAuthenticatedConnectStart: () => {
         connectStarted += 1;
-      },
-      prepareSetupEnrollment: async () => {
-        throw new Error(
-          "setup enrollment should not load for authenticated sessions",
-        );
       },
     });
 
@@ -290,11 +275,6 @@ describe("auth shell connect retry helpers", () => {
       onAuthenticatedConnectStart: () => {
         connectStarted += 1;
       },
-      prepareSetupEnrollment: async () => {
-        throw new Error(
-          "setup enrollment should not load for authenticated sessions",
-        );
-      },
     });
 
     expect(result).toEqual({
@@ -308,9 +288,8 @@ describe("auth shell connect retry helpers", () => {
     expect(retries).toEqual([2]);
   });
 
-  it("returns setup enrollment when auth is not configured", async () => {
+  it("returns the setup gate when auth is not configured", async () => {
     let connectAttempts = 0;
-    let setupLoads = 0;
 
     const result = await resolveAuthShellGate({
       connectRpcTransport: async () => {
@@ -321,20 +300,9 @@ describe("auth shell connect retry helpers", () => {
           configured: false,
           primaryFactorType: null,
         }),
-      prepareSetupEnrollment: async () => {
-        setupLoads += 1;
-        return {
-          totpSecret: "secret",
-          totpUri: "otpauth://example",
-        };
-      },
     });
 
     expect(result).toEqual({
-      enrollment: {
-        totpSecret: "secret",
-        totpUri: "otpauth://example",
-      },
       kind: "setup",
       status: buildAuthStatus({
         configured: false,
@@ -342,7 +310,6 @@ describe("auth shell connect retry helpers", () => {
       }),
     });
     expect(connectAttempts).toBe(0);
-    expect(setupLoads).toBe(1);
   });
 
   it("returns the login gate with a discarded-session notice when authenticated bootstrap loses the session", async () => {
@@ -371,11 +338,6 @@ describe("auth shell connect retry helpers", () => {
         }
         return nextStatus;
       },
-      prepareSetupEnrollment: async () => {
-        throw new Error(
-          "setup enrollment should not load after a discarded session",
-        );
-      },
     });
 
     expect(result).toEqual({
@@ -388,20 +350,12 @@ describe("auth shell connect retry helpers", () => {
 
   it("returns the login gate when auth is configured but no session is active", async () => {
     let connectAttempts = 0;
-    let setupLoads = 0;
 
     const result = await resolveAuthShellGate({
       connectRpcTransport: async () => {
         connectAttempts += 1;
       },
       getAuthStatus: async () => buildAuthStatus(),
-      prepareSetupEnrollment: async () => {
-        setupLoads += 1;
-        return {
-          totpSecret: "secret",
-          totpUri: "otpauth://example",
-        };
-      },
     });
 
     expect(result).toEqual({
@@ -409,6 +363,5 @@ describe("auth shell connect retry helpers", () => {
       status: buildAuthStatus(),
     });
     expect(connectAttempts).toBe(0);
-    expect(setupLoads).toBe(0);
   });
 });

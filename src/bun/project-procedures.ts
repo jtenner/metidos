@@ -8,11 +8,13 @@ import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
+import { AuthServiceError, createPendingUser } from "./auth-service";
 import type {
   CronJobRecord,
   ProjectRecord,
   ThreadActivityInput,
   ThreadRecord,
+  UserSetupRecord,
 } from "./db";
 import {
   createCronJob,
@@ -21,18 +23,28 @@ import {
   createThreadMessage,
   deleteProject,
   deleteThread,
+  ensureProjectWorktreeVisible,
   getCronJobById,
+  getCronJobByIdForUser,
   getProject,
   getProjectById,
+  getProjectByIdForUser,
+  getProjectForUser,
   getThreadById,
+  getThreadByIdForUser,
+  getUserById,
   initAppDatabase,
   listCronJobs,
+  listCronJobsForUser,
   listProjects,
-  listProjectWorktreePins,
+  listProjectsForUser,
+  listProjectWorktreesMetadata,
   listThreadMessages,
   listThreadMessagesPage,
   listThreads,
+  listThreadsForUser,
   listThreadsWithInProgressMessages,
+  listUsersWithSetupStatus,
   markThreadErrorSeen,
   markThreadFailed,
   markThreadRan,
@@ -153,6 +165,7 @@ import type {
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
+  RpcManagedUser,
   RpcModelCatalog,
   RpcOllamaProviderConfig,
   RpcOllamaProviderConfigResult,
@@ -187,6 +200,73 @@ import { runCronNow as runCronNowInScheduler } from "./sidecar-cron-scheduler";
  */
 
 const db = initAppDatabase();
+const NEVER_ABORT_SIGNAL = new AbortController().signal;
+
+function authUserId(context?: RpcRequestContext): number | null {
+  return context?.auth.authBypass
+    ? null
+    : typeof context?.auth.userId === "number"
+      ? context.auth.userId
+      : null;
+}
+
+function isAdminContext(context?: RpcRequestContext): boolean {
+  return context?.auth.authBypass === true || context?.auth.isAdmin === true;
+}
+
+function requireAdminContext(context?: RpcRequestContext): void {
+  if (isAdminContext(context)) {
+    return;
+  }
+  throw new AuthServiceError(
+    "admin_required",
+    "Administrator privileges are required for this action.",
+    403,
+  );
+}
+
+function requireUnsafeModeAllowed(context?: RpcRequestContext): void {
+  if (isAdminContext(context)) {
+    return;
+  }
+  throw new AuthServiceError(
+    "admin_required",
+    "Administrator privileges are required to enable unsafe mode.",
+    403,
+  );
+}
+
+function visibleProjects(context?: RpcRequestContext): ProjectRecord[] {
+  const userId = authUserId(context);
+  return typeof userId === "number"
+    ? listProjectsForUser(db, userId)
+    : listProjects(db);
+}
+
+function visibleThreads(context?: RpcRequestContext): ThreadRecord[] {
+  const userId = authUserId(context);
+  return typeof userId === "number"
+    ? listThreadsForUser(db, userId)
+    : listThreads(db);
+}
+
+function visibleCronJobs(context?: RpcRequestContext): CronJobRecord[] {
+  const userId = authUserId(context);
+  return typeof userId === "number"
+    ? listCronJobsForUser(db, userId)
+    : listCronJobs(db);
+}
+
+function toRpcManagedUser(user: UserSetupRecord): RpcManagedUser {
+  return {
+    configured: user.configured,
+    createdAt: user.createdAt,
+    id: user.id,
+    isAdmin: user.isAdmin,
+    updatedAt: user.updatedAt,
+    username: user.username,
+  };
+}
 
 /**
  * RPC procedure: returns OS home directory and whether shell-like `~` expansion
@@ -207,8 +287,9 @@ export async function getHomeDirectoryProcedure(): Promise<RpcHomeDirectoryResul
 
 export async function listProjectsProcedure(
   _params?: AppRPCSchema["requests"]["listProjects"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProject[]> {
-  return listProjects(db);
+  return visibleProjects(context);
 }
 
 /**
@@ -217,8 +298,9 @@ export async function listProjectsProcedure(
 
 export async function listThreadsProcedure(
   _params?: AppRPCSchema["requests"]["listThreads"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread[]> {
-  return listThreads(db).map((thread) =>
+  return visibleThreads(context).map((thread) =>
     applyActiveThreadRuntimeTelemetry(
       toRpcThread(thread, currentThreadRunStatus(thread)),
     ),
@@ -231,13 +313,14 @@ export async function listThreadsProcedure(
 
 export async function listThreadStatusesProcedure(
   params: AppRPCSchema["requests"]["listThreadStatuses"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread[]> {
   const requestedThreadIds = new Set(params.threadIds);
   if (requestedThreadIds.size === 0) {
     return [];
   }
 
-  return listThreads(db)
+  return visibleThreads(context)
     .filter((thread) => requestedThreadIds.has(thread.id))
     .map((thread) =>
       applyActiveThreadRuntimeTelemetry(
@@ -394,7 +477,9 @@ export async function getModelCatalogProcedure(
  */
 export async function getOllamaProviderConfigProcedure(
   _params?: AppRPCSchema["requests"]["getOllamaProviderConfig"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcOllamaProviderConfig> {
+  requireAdminContext(context);
   return getOllamaProviderConfig();
 }
 
@@ -403,7 +488,9 @@ export async function getOllamaProviderConfigProcedure(
  */
 export async function saveOllamaProviderConfigProcedure(
   params: AppRPCSchema["requests"]["saveOllamaProviderConfig"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcOllamaProviderConfigResult> {
+  requireAdminContext(context);
   const ollama = await saveOllamaProviderConfig({
     apiKey: params.apiKey,
     url: params.url,
@@ -426,7 +513,9 @@ function buildProviderAuthResult(providerId: string): RpcProviderAuthResult {
  */
 export async function getProviderAuthStatusProcedure(
   params: AppRPCSchema["requests"]["getProviderAuthStatus"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProviderAuthResult> {
+  requireAdminContext(context);
   return buildProviderAuthResult(params.providerId);
 }
 
@@ -435,7 +524,9 @@ export async function getProviderAuthStatusProcedure(
  */
 export async function startProviderAuthLoginProcedure(
   params: AppRPCSchema["requests"]["startProviderAuthLogin"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProviderAuthResult> {
+  requireAdminContext(context);
   await startProviderAuthLogin(buildPiAgentDirectoryPath(), params);
   return buildProviderAuthResult(params.providerId);
 }
@@ -445,7 +536,9 @@ export async function startProviderAuthLoginProcedure(
  */
 export async function completeProviderAuthLoginProcedure(
   params: AppRPCSchema["requests"]["completeProviderAuthLogin"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProviderAuthResult> {
+  requireAdminContext(context);
   await completeProviderAuthLogin(buildPiAgentDirectoryPath(), params);
   return buildProviderAuthResult(params.providerId);
 }
@@ -455,7 +548,9 @@ export async function completeProviderAuthLoginProcedure(
  */
 export async function refreshProviderAuthProcedure(
   params: AppRPCSchema["requests"]["refreshProviderAuth"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProviderAuthResult> {
+  requireAdminContext(context);
   await refreshProviderAuth(buildPiAgentDirectoryPath(), params.providerId);
   return buildProviderAuthResult(params.providerId);
 }
@@ -465,9 +560,42 @@ export async function refreshProviderAuthProcedure(
  */
 export async function logoutProviderAuthProcedure(
   params: AppRPCSchema["requests"]["logoutProviderAuth"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProviderAuthResult> {
+  requireAdminContext(context);
   await logoutProviderAuth(buildPiAgentDirectoryPath(), params.providerId);
   return buildProviderAuthResult(params.providerId);
+}
+
+/**
+ * RPC procedure: list all configured and pending user accounts for admin management.
+ */
+export async function listUsersProcedure(
+  _params: AppRPCSchema["requests"]["listUsers"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcManagedUser[]> {
+  requireAdminContext(context);
+  return listUsersWithSetupStatus(db).map(toRpcManagedUser);
+}
+
+/**
+ * RPC procedure: create a regular pending user account that must finish auth setup.
+ */
+export async function createUserProcedure(
+  params: AppRPCSchema["requests"]["createUser"]["params"],
+  context?: RpcRequestContext,
+): Promise<RpcManagedUser> {
+  requireAdminContext(context);
+  const user = await createPendingUser(db, {
+    actorUserId: context?.auth.userId ?? null,
+    actorUsername: context?.auth.username ?? null,
+    pin: params.pin,
+    username: params.username,
+  });
+  return toRpcManagedUser({
+    ...user,
+    configured: false,
+  });
 }
 
 /**
@@ -477,12 +605,13 @@ export async function logoutProviderAuthProcedure(
 
 export async function getAppBootstrapProcedure(
   params?: AppRPCSchema["requests"]["getAppBootstrap"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcAppBootstrapResult> {
   const [homeDirectory, modelCatalog] = await Promise.all([
     getHomeDirectoryProcedure(),
     getModelCatalogProcedure(),
   ]);
-  const threads = listThreads(db);
+  const threads = visibleThreads(context);
   const hintedThread = pickBootstrapThreadRecord(threads, params);
   const threadDetail =
     hintedThread === null
@@ -492,7 +621,7 @@ export async function getAppBootstrapProcedure(
   return {
     homeDirectory,
     modelCatalog,
-    projects: listProjects(db),
+    projects: visibleProjects(context),
     threadDetail,
     threads: threads.map((thread) =>
       applyActiveThreadRuntimeTelemetry(
@@ -522,6 +651,12 @@ const DIFF_LOAD_CONCURRENCY = 2;
 
 type ProjectWorktreeReadOptions = GitCommandOptions & {
   forceRefresh?: boolean;
+  includeHidden?: boolean;
+};
+
+type ProjectWorktreeListing = {
+  hiddenWorktrees: RpcWorktree[];
+  worktrees: RpcWorktree[];
 };
 
 type CreateThreadRecordOptions = ProjectWorktreeReadOptions & {
@@ -891,12 +1026,17 @@ function resolveThreadAccessControls(
     metidosAccess?: boolean | null;
     unsafeMode?: boolean | null;
   } = {},
+  context?: RpcRequestContext,
 ): ThreadAccessControls {
+  const unsafeMode = resolveUnsafeMode(input.unsafeMode ?? null);
+  if (unsafeMode) {
+    requireUnsafeModeAllowed(context);
+  }
   return {
     githubAccess: input.githubAccess === true,
     agentsAccess: input.agentsAccess === true,
     metidosAccess: input.metidosAccess !== false,
-    unsafeMode: resolveUnsafeMode(input.unsafeMode ?? null),
+    unsafeMode,
   };
 }
 
@@ -912,7 +1052,7 @@ async function ensurePiThreadRuntime(
 
   const next = await createPiThreadRuntime(thread, {
     extensionUiBridge: piThreadExtensionUiBridge,
-    metidosToolHost: createPiMetidosToolHost(),
+    metidosToolHost: createPiMetidosToolHost(thread.ownerUserId),
   });
   piThreadRuntimeMap.set(thread.id, next);
   syncPiThreadSessionState(thread, next);
@@ -920,41 +1060,64 @@ async function ensurePiThreadRuntime(
 }
 
 function createPiToolRequestContext(
+  ownerUserId: number,
   signal?: AbortSignal,
-): RpcRequestContext | undefined {
-  if (!signal) {
-    return undefined;
-  }
+): RpcRequestContext {
+  const ownerUser = getUserById(db, ownerUserId);
 
   return {
     auth: {
       authBypass: false,
+      isAdmin: ownerUser?.isAdmin ?? false,
       sessionId: null,
+      userId: ownerUserId,
+      username: ownerUser?.username ?? null,
     },
     priority: "foreground",
-    signal,
+    signal: signal ?? NEVER_ABORT_SIGNAL,
     timeoutMs: null,
   };
 }
 
-function createPiMetidosToolHost(): PiMetidosToolHost {
+function createPiMetidosToolHost(ownerUserId: number): PiMetidosToolHost {
   return {
-    createThread: (params) => createThreadProcedure(params),
+    createThread: (params) =>
+      createThreadProcedure(params, createPiToolRequestContext(ownerUserId)),
     focusContext: (params, signal) =>
-      focusContextProcedure(params, createPiToolRequestContext(signal)),
-    listCrons: () => listCronsProcedure(undefined),
+      focusContextProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId, signal),
+      ),
+    listCrons: () =>
+      listCronsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
     listProjectWorktrees: (params, signal) =>
       listProjectWorktreesProcedure(
         params,
-        createPiToolRequestContext(signal),
+        createPiToolRequestContext(ownerUserId, signal),
       ).then((result) => result.worktrees),
-    listProjects: () => listProjectsProcedure(),
-    listThreads: () => listThreadsProcedure(),
-    newCron: (params) => newCronProcedure(params),
-    requestThreadStart: (params) => requestThreadStartProcedure(params),
-    sendThreadMessage: (params) => sendThreadMessageProcedure(params),
-    updateCron: (params) => updateCronProcedure(params),
-    updateThreadMetadata: (params) => updateThreadMetadataProcedure(params),
+    listProjects: () =>
+      listProjectsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
+    listThreads: () =>
+      listThreadsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
+    newCron: (params) =>
+      newCronProcedure(params, createPiToolRequestContext(ownerUserId)),
+    requestThreadStart: (params) =>
+      requestThreadStartProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId),
+      ),
+    sendThreadMessage: (params) =>
+      sendThreadMessageProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId),
+      ),
+    updateCron: (params) =>
+      updateCronProcedure(params, createPiToolRequestContext(ownerUserId)),
+    updateThreadMetadata: (params) =>
+      updateThreadMetadataProcedure(
+        params,
+        createPiToolRequestContext(ownerUserId),
+      ),
   };
 }
 
@@ -986,8 +1149,15 @@ function syncPiThreadSessionState(
  * @param threadId - Thread identifier.
  */
 
-function threadById(threadId: number): ThreadRecord {
-  const thread = getThreadById(db, threadId);
+function threadById(
+  threadId: number,
+  context?: RpcRequestContext,
+): ThreadRecord {
+  const userId = authUserId(context);
+  const thread =
+    typeof userId === "number"
+      ? getThreadByIdForUser(db, userId, threadId)
+      : getThreadById(db, threadId);
   if (!thread) {
     throw new Error(`Thread not found: ${threadId}`);
   }
@@ -998,8 +1168,11 @@ function threadById(threadId: number): ThreadRecord {
  * @param threadId - Thread identifier.
  */
 
-function rpcThreadById(threadId: number): RpcThread {
-  const thread = threadById(threadId);
+function rpcThreadById(
+  threadId: number,
+  context?: RpcRequestContext,
+): RpcThread {
+  const thread = threadById(threadId, context);
   return applyActiveThreadRuntimeTelemetry(
     toRpcThread(thread, currentThreadRunStatus(thread)),
   );
@@ -1390,10 +1563,20 @@ async function readProjectWorktrees(
   projectId?: number,
   options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree[]> {
+  return (await readProjectWorktreeListing(projectPath, projectId, options))
+    .worktrees;
+}
+
+async function readProjectWorktreeListing(
+  projectPath: string,
+  projectId?: number,
+  options?: ProjectWorktreeReadOptions,
+): Promise<ProjectWorktreeListing> {
   const { signal } = normalizeGitCommandOptions(options);
   throwIfAborted(signal, "Project worktree read was aborted.");
+  const includeHidden = options?.includeHidden === true;
 
-  if (typeof projectId === "number") {
+  if (typeof projectId === "number" && !includeHidden) {
     const state = projectPollMap.get(projectId);
     if (state && state.worktreesLoadedAt > 0 && !options?.forceRefresh) {
       if (
@@ -1409,11 +1592,14 @@ async function readProjectWorktrees(
           );
         });
       }
-      return state.worktrees;
+      return {
+        hiddenWorktrees: [],
+        worktrees: state.worktrees,
+      };
     }
   }
 
-  const worktrees = await listFreshProjectWorktrees(
+  const listing = await listFreshProjectWorktreeListing(
     projectPath,
     projectId,
     options,
@@ -1421,11 +1607,11 @@ async function readProjectWorktrees(
   if (typeof projectId === "number") {
     const state = projectPollMap.get(projectId);
     if (state) {
-      state.worktrees = worktrees;
+      state.worktrees = listing.worktrees;
       state.worktreesLoadedAt = Date.now();
     }
   }
-  return worktrees;
+  return listing;
 }
 /**
  * Lists directory suggestions procedure.
@@ -1873,21 +2059,43 @@ async function upsertAssistantChatActivity(
  * @param worktrees - Worktree descriptors to merge into pinning metadata.
  */
 
-function mergeProjectWorktreePins(
+function splitProjectWorktreesForVisibility(
+  projectPath: string,
   projectId: number,
   worktrees: RpcWorktree[],
-): RpcWorktree[] {
-  const pinnedAtByPath = new Map(
-    listProjectWorktreePins(db, projectId).map((record) => [
+  includeHidden: boolean,
+): ProjectWorktreeListing {
+  const trackedWorktreePaths = new Map(
+    listProjectWorktreesMetadata(db, projectId).map((record) => [
       record.worktreePath,
       record.pinnedAt,
     ]),
   );
 
-  return worktrees.map((worktree) => ({
-    ...worktree,
-    pinnedAt: pinnedAtByPath.get(worktree.path) ?? null,
-  }));
+  const visibleWorktrees: RpcWorktree[] = [];
+  const hiddenWorktrees: RpcWorktree[] = [];
+
+  for (const worktree of worktrees) {
+    const nextWorktree = {
+      ...worktree,
+      pinnedAt: trackedWorktreePaths.get(worktree.path) ?? null,
+    } satisfies RpcWorktree;
+    if (
+      worktree.path === projectPath ||
+      trackedWorktreePaths.has(worktree.path)
+    ) {
+      visibleWorktrees.push(nextWorktree);
+      continue;
+    }
+    if (includeHidden) {
+      hiddenWorktrees.push(nextWorktree);
+    }
+  }
+
+  return {
+    hiddenWorktrees,
+    worktrees: visibleWorktrees,
+  };
 }
 /**
  * Lists fresh project worktrees.
@@ -1896,16 +2104,34 @@ function mergeProjectWorktreePins(
  * @param options - Configuration options used by this operation.
  */
 
+async function listFreshProjectWorktreeListing(
+  projectPath: string,
+  projectId?: number,
+  options?: ProjectWorktreeReadOptions,
+): Promise<ProjectWorktreeListing> {
+  const worktrees = await listGitWorktreesForProjectPath(projectPath, options);
+  if (typeof projectId !== "number") {
+    return {
+      hiddenWorktrees: [],
+      worktrees,
+    };
+  }
+  return splitProjectWorktreesForVisibility(
+    projectPath,
+    projectId,
+    worktrees,
+    options?.includeHidden === true,
+  );
+}
+
 async function listFreshProjectWorktrees(
   projectPath: string,
   projectId?: number,
   options?: GitCommandOptions,
 ): Promise<RpcWorktree[]> {
-  const worktrees = await listGitWorktreesForProjectPath(projectPath, options);
-  if (typeof projectId !== "number") {
-    return worktrees;
-  }
-  return mergeProjectWorktreePins(projectId, worktrees);
+  return (
+    await listFreshProjectWorktreeListing(projectPath, projectId, options)
+  ).worktrees;
 }
 /**
  * Finds known project worktree.
@@ -2340,12 +2566,32 @@ function stopProjectPoller(projectId: number): void {
  * @param projectId - Project identifier.
  */
 
-function projectByIdForPath(projectId: number): ProjectRecord {
-  const project = getProjectById(db, projectId);
+function projectByIdForPath(
+  projectId: number,
+  context?: RpcRequestContext,
+): ProjectRecord {
+  const userId = authUserId(context);
+  const project =
+    typeof userId === "number"
+      ? getProjectByIdForUser(db, userId, projectId)
+      : getProjectById(db, projectId);
   if (!project) {
     throw new Error(`Project not currently tracked: ${projectId}`);
   }
   return project;
+}
+
+function cronJobById(
+  cronJobId: number,
+  context?: RpcRequestContext,
+  options?: {
+    includeNextRunDate?: boolean;
+  },
+): CronJobRecord | null {
+  const userId = authUserId(context);
+  return typeof userId === "number"
+    ? getCronJobByIdForUser(db, userId, cronJobId, options)
+    : getCronJobById(db, cronJobId, options);
 }
 /**
  * Finds project worktree.
@@ -2359,12 +2605,15 @@ async function findProjectWorktree(
   worktreePath: string,
   options?: ProjectWorktreeReadOptions,
 ): Promise<RpcWorktree | null> {
-  const worktrees = await readProjectWorktrees(
-    project.path,
-    project.id,
-    options,
+  const listing = await readProjectWorktreeListing(project.path, project.id, {
+    ...options,
+    includeHidden: true,
+  });
+  return (
+    [...listing.worktrees, ...listing.hiddenWorktrees].find(
+      (entry) => entry.path === worktreePath,
+    ) ?? null
   );
-  return worktrees.find((entry) => entry.path === worktreePath) ?? null;
 }
 /**
  * Performs assertProjectWorktree operation.
@@ -2514,7 +2763,7 @@ export async function openProjectProcedure(
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
     const opened = await awaitAbortableResult(
-      openProjectWithGitOptions(params, requestGitOptions),
+      openProjectWithGitOptions(params, requestGitOptions, context),
       context?.signal,
       "Project open was aborted.",
     );
@@ -2531,34 +2780,68 @@ export async function openProjectProcedure(
 async function openProjectWithGitOptions(
   params: AppRPCSchema["requests"]["openProject"]["params"],
   requestGitOptions?: GitCommandOptions,
+  context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
   const projectPath = normalizePath(params.projectPath);
   assertProjectDirectory(projectPath);
-  const existingProject = getProject(db, projectPath);
+  const userId = authUserId(context);
+  const existingProject =
+    typeof userId === "number"
+      ? getProjectForUser(db, userId, projectPath)
+      : getProject(db, projectPath);
 
   let worktrees: RpcWorktree[];
   try {
-    worktrees = await readProjectWorktrees(
-      projectPath,
-      existingProject?.id,
-      requestGitOptions,
-    );
+    if (existingProject) {
+      worktrees = await readProjectWorktrees(
+        projectPath,
+        existingProject.id,
+        requestGitOptions,
+      );
+    } else {
+      await listGitWorktreesForProjectPath(projectPath, requestGitOptions);
+      worktrees = [];
+    }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
-    );
+    if (params.initGitIfNeeded === true) {
+      await runGitCommand(projectPath, ["init"], requestGitOptions);
+      if (existingProject) {
+        worktrees = await readProjectWorktrees(
+          projectPath,
+          existingProject.id,
+          {
+            ...requestGitOptions,
+            forceRefresh: true,
+          },
+        );
+      } else {
+        worktrees = [];
+      }
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Project folder must be a git repository root or worktree: ${projectPath}${message ? ` (${message})` : ""}`,
+      );
+    }
   }
 
   const project = upsertProject(db, {
+    ...(typeof userId === "number" ? { ownerUserId: userId } : {}),
     projectPath,
     name: params.name ?? basename(projectPath),
   });
+  if (!existingProject) {
+    worktrees = await readProjectWorktrees(projectPath, project.id, {
+      ...requestGitOptions,
+      forceRefresh: true,
+    });
+  }
   const state = ensureProjectPoller(project);
   state.worktrees = worktrees;
   state.worktreesLoadedAt = Date.now();
 
   return {
+    hiddenWorktrees: [],
     project,
     worktrees: state.worktrees,
   };
@@ -2581,7 +2864,7 @@ export async function openProjectsBatchProcedure(
       throwIfAborted(context?.signal, "Project restore was aborted.");
       try {
         const opened = await awaitAbortableResult(
-          openProjectWithGitOptions(project, requestGitOptions),
+          openProjectWithGitOptions(project, requestGitOptions, context),
           context?.signal,
           "Project restore was aborted.",
         );
@@ -2615,17 +2898,21 @@ export async function listProjectWorktreesProcedure(
 ): Promise<RpcProjectWorktreesResult> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     ensureProjectPoller(project);
-    const worktrees = await awaitAbortableResult(
-      readProjectWorktrees(project.path, project.id, requestGitOptions),
+    const listing = await awaitAbortableResult(
+      readProjectWorktreeListing(project.path, project.id, {
+        ...requestGitOptions,
+        ...(params.includeHidden === true ? { includeHidden: true } : {}),
+      }),
       context?.signal,
       "Project worktree read was aborted.",
     );
 
     return {
+      hiddenWorktrees: listing.hiddenWorktrees,
       project,
-      worktrees,
+      worktrees: listing.worktrees,
     };
   });
 }
@@ -2636,8 +2923,9 @@ export async function listProjectWorktreesProcedure(
 
 export async function createWorktreeProcedure(
   params: AppRPCSchema["requests"]["createWorktree"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcCreateWorktreeResult> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const worktreeName = params.name.trim();
   if (!worktreeName) {
     throw new Error("Worktree name is required.");
@@ -2656,12 +2944,15 @@ export async function createWorktreeProcedure(
     worktreePath,
   ]);
 
-  const worktrees = await readProjectWorktrees(project.path, project.id, {
+  ensureProjectWorktreeVisible(db, project.id, worktreePath);
+
+  const listing = await readProjectWorktreeListing(project.path, project.id, {
     forceRefresh: true,
   });
   return {
+    hiddenWorktrees: listing.hiddenWorktrees,
     project,
-    worktrees,
+    worktrees: listing.worktrees,
     worktreePath,
   };
 }
@@ -2672,8 +2963,9 @@ export async function createWorktreeProcedure(
 
 export async function setWorktreePinnedProcedure(
   params: AppRPCSchema["requests"]["setWorktreePinned"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcProjectWorktreesResult> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const worktreePath = normalizePath(params.worktreePath);
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
@@ -2687,6 +2979,7 @@ export async function setWorktreePinnedProcedure(
   state.worktreesLoadedAt = Date.now();
 
   return {
+    hiddenWorktrees: [],
     project,
     worktrees,
   };
@@ -2700,11 +2993,11 @@ export async function createThreadProcedure(
   params: AppRPCSchema["requests"]["createThread"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const worktreePath = normalizePath(params.worktreePath);
   const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
-  const access = resolveThreadAccessControls(params);
+  const access = resolveThreadAccessControls(params, context);
   const thread = await createThreadRecord(
     project,
     worktreePath,
@@ -2729,8 +3022,9 @@ export async function createThreadProcedure(
 
 export async function requestThreadStartProcedure(
   params: AppRPCSchema["requests"]["requestThreadStart"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadStartRequest> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const worktreePath = normalizePath(params.worktreePath);
   const input = params.input.trim();
   if (!input) {
@@ -2740,7 +3034,7 @@ export async function requestThreadStartProcedure(
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
   });
-  const access = resolveThreadAccessControls(params);
+  const access = resolveThreadAccessControls(params, context);
 
   return {
     requestId: crypto.randomUUID(),
@@ -2816,8 +3110,9 @@ function normalizeCronJobReasoningEffort(cronJob: CronJobRecord): RpcCronJob {
 
 export async function newCronProcedure(
   params: AppRPCSchema["requests"]["newCron"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcCronJob> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const worktreePath = normalizePath(params.worktreePath);
   await assertProjectWorktree(project, worktreePath, {
     forceRefresh: true,
@@ -2826,7 +3121,7 @@ export async function newCronProcedure(
   const schedule = params.schedule.trim();
   const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
-  const access = resolveThreadAccessControls(params);
+  const access = resolveThreadAccessControls(params, context);
   if (!schedule) {
     throw new Error("Cron schedule is required.");
   }
@@ -2874,8 +3169,9 @@ export async function newCronProcedure(
 
 export async function updateCronProcedure(
   params: AppRPCSchema["requests"]["updateCron"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcCronJob> {
-  const current = getCronJobById(db, params.cronJobId);
+  const current = cronJobById(params.cronJobId, context);
   if (!current) {
     throw new Error(`Cron job not found: ${params.cronJobId}`);
   }
@@ -2884,7 +3180,7 @@ export async function updateCronProcedure(
     if (current.deletedAt === null) {
       softDeleteCronJob(db, current.id);
       return normalizeCronJobReasoningEffort(
-        getCronJobById(db, current.id) ?? current,
+        cronJobById(current.id, context) ?? current,
       );
     }
     return normalizeCronJobReasoningEffort(current);
@@ -2971,6 +3267,9 @@ export async function updateCronProcedure(
   }
 
   if (typeof params.unsafeMode === "boolean") {
+    if (params.unsafeMode) {
+      requireUnsafeModeAllowed(context);
+    }
     updates.unsafeMode = params.unsafeMode;
   }
 
@@ -3000,8 +3299,9 @@ export async function updateCronProcedure(
  */
 export async function runCronNowProcedure(
   params: AppRPCSchema["requests"]["runCronNow"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["runCronNow"]["response"]> {
-  const cronJob = getCronJobById(db, params.cronJobId);
+  const cronJob = cronJobById(params.cronJobId, context);
   if (!cronJob) {
     throw new Error(`Cron job not found: ${params.cronJobId}`);
   }
@@ -3032,8 +3332,9 @@ export async function runCronNowProcedure(
  */
 export async function listCronsProcedure(
   _params: AppRPCSchema["requests"]["listCrons"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcCronJob[]> {
-  return listCronJobs(db)
+  return visibleCronJobs(context)
     .filter((cronJob) => cronJob.deletedAt === null)
     .map(normalizeCronJobReasoningEffort);
 }
@@ -3044,7 +3345,9 @@ export async function listCronsProcedure(
 
 export async function getThreadProcedure(
   params: AppRPCSchema["requests"]["getThread"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
+  threadById(params.threadId, context);
   if (typeof params.cursor === "number") {
     return buildThreadDetail(params.threadId, {
       cursor: params.cursor,
@@ -3060,8 +3363,9 @@ export async function getThreadProcedure(
 
 export async function markThreadErrorSeenProcedure(
   params: AppRPCSchema["requests"]["markThreadErrorSeen"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   markThreadErrorSeen(db, thread.id);
   const currentStatus = currentThreadRunStatus(thread);
   setThreadRunStatus(thread.id, {
@@ -3079,7 +3383,7 @@ export async function sendThreadMessageProcedure(
   params: AppRPCSchema["requests"]["sendThreadMessage"]["params"],
   context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   const input = params.input.trim();
   if (!input) {
     throw new Error("Thread input is required.");
@@ -3168,8 +3472,9 @@ async function readAndStoreWorktreeSnapshot(
 
 export async function stopThreadTurnProcedure(
   params: AppRPCSchema["requests"]["stopThreadTurn"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThreadDetail> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state !== "working") {
     return readThreadDetailCached(thread.id);
   }
@@ -3195,14 +3500,18 @@ export async function stopThreadTurnProcedure(
 
 export async function renameThreadProcedure(
   params: AppRPCSchema["requests"]["renameThread"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  return updateThreadMetadataProcedure({
-    threadId: params.threadId,
-    title: params.title,
-    ...(typeof params.summary === "undefined"
-      ? {}
-      : { summary: params.summary }),
-  });
+  return updateThreadMetadataProcedure(
+    {
+      threadId: params.threadId,
+      title: params.title,
+      ...(typeof params.summary === "undefined"
+        ? {}
+        : { summary: params.summary }),
+    },
+    context,
+  );
 }
 /**
  * Updates thread metadata procedure.
@@ -3211,8 +3520,9 @@ export async function renameThreadProcedure(
 
 export async function updateThreadMetadataProcedure(
   params: AppRPCSchema["requests"]["updateThreadMetadata"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (
     typeof params.title === "undefined" &&
     typeof params.summary === "undefined" &&
@@ -3248,7 +3558,7 @@ export async function updateThreadMetadataProcedure(
   }
 
   invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return rpcThreadById(thread.id, context);
 }
 /**
  * Sets thread pinned procedure.
@@ -3257,8 +3567,9 @@ export async function updateThreadMetadataProcedure(
 
 export async function setThreadPinnedProcedure(
   params: AppRPCSchema["requests"]["setThreadPinned"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  return updateThreadMetadataProcedure(params);
+  return updateThreadMetadataProcedure(params, context);
 }
 /**
  * Updates thread model procedure.
@@ -3267,8 +3578,9 @@ export async function setThreadPinnedProcedure(
 
 export async function updateThreadModelProcedure(
   params: AppRPCSchema["requests"]["updateThreadModel"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error("Thread model cannot change while a run is processing.");
   }
@@ -3277,7 +3589,7 @@ export async function updateThreadModelProcedure(
   setThreadModel(db, thread.id, model);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return rpcThreadById(thread.id, context);
 }
 /**
  * Updates thread reasoning effort procedure.
@@ -3286,8 +3598,9 @@ export async function updateThreadModelProcedure(
 
 export async function updateThreadReasoningEffortProcedure(
   params: AppRPCSchema["requests"]["updateThreadReasoningEffort"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
       "Thread reasoning effort cannot change while a run is processing.",
@@ -3298,7 +3611,7 @@ export async function updateThreadReasoningEffortProcedure(
   setThreadReasoningEffort(db, thread.id, reasoningEffort);
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return rpcThreadById(thread.id, context);
 }
 /**
  * Updates thread access controls procedure.
@@ -3307,8 +3620,9 @@ export async function updateThreadReasoningEffortProcedure(
 
 export async function updateThreadAccessProcedure(
   params: AppRPCSchema["requests"]["updateThreadAccess"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
       "Thread access controls cannot change while a run is processing.",
@@ -3333,6 +3647,9 @@ export async function updateThreadAccessProcedure(
         ? params.unsafeMode
         : thread.unsafeMode === 1,
   };
+  if (next.unsafeMode) {
+    requireUnsafeModeAllowed(context);
+  }
 
   if (
     next.githubAccess === thread.githubAccess &&
@@ -3340,7 +3657,7 @@ export async function updateThreadAccessProcedure(
     next.metidosAccess === thread.metidosAccess &&
     next.unsafeMode === (thread.unsafeMode === 1)
   ) {
-    return rpcThreadById(thread.id);
+    return rpcThreadById(thread.id, context);
   }
 
   setThreadAccess(db, thread.id, next);
@@ -3349,7 +3666,7 @@ export async function updateThreadAccessProcedure(
   }
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return rpcThreadById(thread.id, context);
 }
 /**
  * Updates thread unsafe mode procedure.
@@ -3358,8 +3675,9 @@ export async function updateThreadAccessProcedure(
 
 export async function updateThreadUnsafeModeProcedure(
   params: AppRPCSchema["requests"]["updateThreadUnsafeMode"]["params"],
+  context?: RpcRequestContext,
 ): Promise<RpcThread> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error(
       "Thread unsafe mode cannot change while a run is processing.",
@@ -3367,15 +3685,18 @@ export async function updateThreadUnsafeModeProcedure(
   }
 
   const unsafeMode = resolveUnsafeMode(params.unsafeMode);
+  if (unsafeMode) {
+    requireUnsafeModeAllowed(context);
+  }
   if ((thread.unsafeMode === 1) === unsafeMode) {
-    return rpcThreadById(thread.id);
+    return rpcThreadById(thread.id, context);
   }
 
   setThreadUnsafeMode(db, thread.id, unsafeMode);
   recordUnsafeModeAuditEvent(thread, unsafeMode, "toggle");
   disposePiThreadRuntime(thread.id);
   invalidateThreadDetailCache(thread.id);
-  return rpcThreadById(thread.id);
+  return rpcThreadById(thread.id, context);
 }
 /**
  * Deletes thread procedure.
@@ -3384,8 +3705,9 @@ export async function updateThreadUnsafeModeProcedure(
 
 export async function deleteThreadProcedure(
   params: AppRPCSchema["requests"]["deleteThread"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["deleteThread"]["response"]> {
-  const thread = threadById(params.threadId);
+  const thread = threadById(params.threadId, context);
   if (currentThreadRunStatus(thread).state === "working") {
     throw new Error("Thread is currently processing and cannot be deleted.");
   }
@@ -3405,8 +3727,13 @@ export async function deleteThreadProcedure(
 
 export async function discardEmptyThreadProcedure(
   params: AppRPCSchema["requests"]["discardEmptyThread"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["discardEmptyThread"]["response"]> {
-  const thread = getThreadById(db, params.threadId);
+  const userId = authUserId(context);
+  const thread =
+    typeof userId === "number"
+      ? getThreadByIdForUser(db, userId, params.threadId)
+      : getThreadById(db, params.threadId);
   if (!thread || currentThreadRunStatus(thread).state === "working") {
     return {
       threadId: params.threadId,
@@ -3445,6 +3772,7 @@ export async function openWorktreeProcedure(
       params,
       requestGitOptions,
       context?.signal,
+      context,
     );
   });
 }
@@ -3459,13 +3787,33 @@ async function openWorktreeWithGitOptions(
   params: AppRPCSchema["requests"]["openWorktree"]["params"],
   requestGitOptions?: GitCommandOptions,
   signal?: AbortSignal,
+  context?: RpcRequestContext,
 ): Promise<RpcOpenWorktreeResult> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const state = ensureProjectPoller(project);
   const worktreePath = normalizePath(params.worktreePath);
-  await ensureTrackedProjectWorktree(project, state, worktreePath, {
+  await assertProjectWorktree(project, worktreePath, {
     ...requestGitOptions,
+    includeHidden: true,
+    forceRefresh: true,
   });
+  if (worktreePath !== project.path) {
+    ensureProjectWorktreeVisible(db, project.id, worktreePath);
+  }
+  const { worktrees } = await readProjectWorktreeListing(
+    project.path,
+    project.id,
+    {
+      ...requestGitOptions,
+      forceRefresh: true,
+    },
+  );
+
+  if (!trackedProjectWorktree(state, worktreePath)) {
+    throw new Error(
+      `Worktree not found for project ${project.path}: ${worktreePath}`,
+    );
+  }
 
   const worktreeState = ensureWorktreePollState(state, worktreePath);
   const [{ history, summary, signature }, snapshot] =
@@ -3495,9 +3843,10 @@ async function openWorktreeWithGitOptions(
   );
 
   return {
+    history,
     project,
     worktree: snapshot,
-    history,
+    worktrees,
   };
 }
 /**
@@ -3521,6 +3870,7 @@ export async function openWorktreesBatchProcedure(
           worktree,
           requestGitOptions,
           context?.signal,
+          context,
         );
         results.push({
           ok: true,
@@ -3553,7 +3903,7 @@ export async function getWorktreeSnapshotProcedure(
 ): Promise<RpcWorktreeSnapshot> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
@@ -3579,7 +3929,7 @@ export async function readWorktreeFileContentPageProcedure(
 ): Promise<RpcWorktreeFileContentPage> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
@@ -3613,7 +3963,7 @@ export async function readWorktreeFileDiffProcedure(
 ): Promise<RpcWorktreeFileDiff> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const state = ensureProjectPoller(project);
     const worktreePath = normalizePath(params.worktreePath);
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
@@ -3647,7 +3997,7 @@ export async function listWorktreeGitHistoryProcedure(
 ): Promise<RpcWorktreeGitHistoryResult> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const worktreePath = normalizePath(params.worktreePath);
     const offset =
       Number.isInteger(params.offset) && typeof params.offset === "number"
@@ -3777,7 +4127,7 @@ export async function getWorktreeGitCommitDiffProcedure(
 ): Promise<RpcGitCommitDiffResult> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const worktreePath = normalizePath(params.worktreePath);
     if (!findKnownProjectWorktree(project.id, worktreePath)) {
       await assertProjectWorktree(project, worktreePath, requestGitOptions);
@@ -3830,7 +4180,7 @@ export async function setActiveWorktreeProcedure(
   let projectId: number | null = null;
   let worktreePath: string | null = null;
   if (requestedProjectId !== null) {
-    const project = projectByIdForPath(requestedProjectId);
+    const project = projectByIdForPath(requestedProjectId, context);
     if (project.isOpen === 1) {
       ensureProjectPoller(project);
       projectId = project.id;
@@ -3903,7 +4253,7 @@ export async function focusContextProcedure(
 ): Promise<RpcContextFocusChanged> {
   return withForegroundRead(async () => {
     const requestGitOptions = gitCommandOptionsFromRequest(context);
-    const project = projectByIdForPath(params.projectId);
+    const project = projectByIdForPath(params.projectId, context);
     const openedProject = await awaitAbortableResult(
       openProjectWithGitOptions(
         {
@@ -3911,6 +4261,7 @@ export async function focusContextProcedure(
           name: project.name,
         },
         requestGitOptions,
+        context,
       ),
       context?.signal,
       "Context focus was aborted.",
@@ -3926,6 +4277,7 @@ export async function focusContextProcedure(
         },
         requestGitOptions,
         context?.signal,
+        context,
       ),
       context?.signal,
       "Context focus was aborted.",
@@ -3941,7 +4293,7 @@ export async function focusContextProcedure(
     );
 
     if (typeof params.threadId === "number") {
-      const thread = threadById(params.threadId);
+      const thread = threadById(params.threadId, context);
       if (
         thread.projectId !== openedProject.project.id ||
         normalizePath(thread.worktreePath) !== normalizedWorktreePath
@@ -3970,8 +4322,9 @@ export async function focusContextProcedure(
 
 export async function respondThreadExtensionUiProcedure(
   params: AppRPCSchema["requests"]["respondThreadExtensionUi"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["respondThreadExtensionUi"]["response"]> {
-  threadById(params.threadId);
+  threadById(params.threadId, context);
   return {
     accepted: piThreadExtensionUiBridge.handleResponse(
       params.threadId,
@@ -3982,10 +4335,11 @@ export async function respondThreadExtensionUiProcedure(
 
 export async function updateThreadExtensionEditorProcedure(
   params: AppRPCSchema["requests"]["updateThreadExtensionEditor"]["params"],
+  context?: RpcRequestContext,
 ): Promise<
   AppRPCSchema["requests"]["updateThreadExtensionEditor"]["response"]
 > {
-  threadById(params.threadId);
+  threadById(params.threadId, context);
   piThreadExtensionUiBridge.updateEditorText(params.threadId, params.text);
   return {
     success: true,
@@ -3999,7 +4353,9 @@ export async function updateThreadExtensionEditorProcedure(
 
 export async function closeWorktreeProcedure(
   params: AppRPCSchema["requests"]["closeWorktree"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["closeWorktree"]["response"]> {
+  projectByIdForPath(params.projectId, context);
   const state = projectPollMap.get(params.projectId);
   if (state) {
     const normalizedPath = normalizePath(params.worktreePath);
@@ -4023,8 +4379,9 @@ export async function closeWorktreeProcedure(
 
 export async function closeProjectProcedure(
   params: AppRPCSchema["requests"]["closeProject"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["closeProject"]["response"]> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   stopProjectPoller(project.id);
   setProjectClosed(db, project.id);
   return {
@@ -4040,8 +4397,9 @@ export async function closeProjectProcedure(
 
 export async function deleteProjectProcedure(
   params: AppRPCSchema["requests"]["deleteProject"]["params"],
+  context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["deleteProject"]["response"]> {
-  const project = projectByIdForPath(params.projectId);
+  const project = projectByIdForPath(params.projectId, context);
   const projectThreads = listThreads(db).filter(
     (thread) => thread.projectId === project.id,
   );

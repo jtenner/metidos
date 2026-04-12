@@ -14,6 +14,7 @@ import {
 
 import type {
   ProjectProcedures,
+  RpcManagedUser,
   RpcModelCatalog,
   RpcOllamaProviderConfig,
   RpcProviderAuthResult,
@@ -34,6 +35,7 @@ type ProviderAuthBadge = {
 };
 
 type SettingsPanelProps = {
+  isAdmin: boolean;
   onModelCatalogChange: (modelCatalog: RpcModelCatalog) => void;
   procedures: ProjectProcedures;
   variant: "desktop" | "mobile";
@@ -108,10 +110,22 @@ function toDisplayError(error: unknown): string {
     : String(error ?? "Unknown error");
 }
 
+function sortManagedUsers(users: RpcManagedUser[]): RpcManagedUser[] {
+  return [...users].sort(
+    (left, right) =>
+      Number(right.isAdmin) - Number(left.isAdmin) ||
+      left.username.localeCompare(right.username, undefined, {
+        sensitivity: "base",
+      }) ||
+      left.id - right.id,
+  );
+}
+
 /**
  * Top-right settings trigger and shell for app and workspace preferences.
  */
 export function SettingsPanel({
+  isAdmin,
   onModelCatalogChange,
   procedures,
   variant,
@@ -126,6 +140,12 @@ export function SettingsPanel({
   const [panelError, setPanelError] = useState("");
   const [providerAuthResult, setProviderAuthResult] =
     useState<RpcProviderAuthResult | null>(null);
+  const [managedUsers, setManagedUsers] = useState<RpcManagedUser[]>([]);
+  const [managedUsersLoading, setManagedUsersLoading] = useState(false);
+  const [managedUsersError, setManagedUsersError] = useState("");
+  const [newUserPin, setNewUserPin] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [userCreateLoading, setUserCreateLoading] = useState(false);
   const [ollamaConfig, setOllamaConfig] =
     useState<RpcOllamaProviderConfig | null>(null);
   const [ollamaUrl, setOllamaUrl] = useState("");
@@ -218,6 +238,35 @@ export function SettingsPanel({
       }
     },
     [applyOllamaConfig, procedures],
+  );
+
+  const loadManagedUsers = useCallback(
+    async (options?: {
+      priority?: RpcRequestPriority;
+      silent?: boolean;
+    }): Promise<RpcManagedUser[] | null> => {
+      if (!options?.silent) {
+        setManagedUsersLoading(true);
+      }
+      try {
+        const result = sortManagedUsers(
+          await procedures.listUsers(undefined, {
+            priority: options?.priority ?? "default",
+          }),
+        );
+        setManagedUsers(result);
+        setManagedUsersError("");
+        return result;
+      } catch (error) {
+        setManagedUsersError(toDisplayError(error));
+        return null;
+      } finally {
+        if (!options?.silent) {
+          setManagedUsersLoading(false);
+        }
+      }
+    },
+    [procedures],
   );
 
   const saveOllamaSettings = useCallback(
@@ -313,20 +362,70 @@ export function SettingsPanel({
       });
   }, [applyProviderAuthResult, procedures]);
 
-  useEffect(() => {
-    if (!open) {
+  const handleCreateUser = useCallback((): void => {
+    const normalizedUsername = newUsername.trim();
+    if (!normalizedUsername) {
+      setManagedUsersError("Username is required.");
       return;
     }
+    if (!newUserPin.trim()) {
+      setManagedUsersError("A setup PIN is required.");
+      return;
+    }
+
+    setUserCreateLoading(true);
+    setManagedUsersError("");
+    void procedures
+      .createUser(
+        {
+          pin: newUserPin,
+          username: normalizedUsername,
+        },
+        {
+          priority: "foreground",
+        },
+      )
+      .then((createdUser) => {
+        setManagedUsers((currentUsers) =>
+          sortManagedUsers([
+            ...currentUsers.filter((user) => user.id !== createdUser.id),
+            createdUser,
+          ]),
+        );
+        setNewUserPin("");
+        setNewUsername("");
+      })
+      .catch((error) => {
+        setManagedUsersError(toDisplayError(error));
+      })
+      .finally(() => {
+        setUserCreateLoading(false);
+      });
+  }, [newUserPin, newUsername, procedures]);
+
+  useEffect(() => {
+    if (!open || !isAdmin) {
+      return;
+    }
+    void loadManagedUsers({
+      priority: "foreground",
+    });
     void loadProviderAuthStatus({
       priority: "foreground",
     });
     void loadOllamaProviderConfig({
       priority: "foreground",
     });
-  }, [loadOllamaProviderConfig, loadProviderAuthStatus, open]);
+  }, [
+    isAdmin,
+    loadManagedUsers,
+    loadOllamaProviderConfig,
+    loadProviderAuthStatus,
+    open,
+  ]);
 
   useEffect(() => {
-    if (!open || !loginActive) {
+    if (!open || !loginActive || !isAdmin) {
       return;
     }
     const timeoutId = window.setTimeout(() => {
@@ -338,7 +437,7 @@ export function SettingsPanel({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [loadProviderAuthStatus, loginActive, open]);
+  }, [isAdmin, loadProviderAuthStatus, loginActive, open]);
 
   return (
     <DropdownControl
@@ -379,118 +478,254 @@ export function SettingsPanel({
           </div>
 
           <div className="p-4">
-            <section>
-              <div className="flex items-start justify-between gap-3">
-                <div className="text-sm font-semibold text-[#f4f8fb]">
-                  OpenAI Codex
-                </div>
-                <span
-                  className={`border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] rounded-none ${providerAuthToneClassName(
-                    badge.tone,
-                  )}`}
-                >
-                  {badge.label}
-                </span>
+            {!isAdmin ? (
+              <div className="border border-[#2f404b] bg-[#0f171c] px-4 py-4 text-sm leading-6 text-[#9cb4c4]">
+                Server settings are managed by administrators.
               </div>
+            ) : (
+              <>
+                <section>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-[#f4f8fb]">
+                        User Manager
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-[#8ea5b6]">
+                        Only the primary user can create accounts, and every new
+                        account is always a regular user.
+                      </div>
+                    </div>
+                    <button
+                      className={`${actionButtonClassName} border-[#3d4d57] bg-[#0f1519] text-[#c7d7e2] hover:border-[#6d7b85] hover:text-white`}
+                      disabled={managedUsersLoading || userCreateLoading}
+                      onClick={() => {
+                        void loadManagedUsers({
+                          priority: "foreground",
+                        });
+                      }}
+                      type="button"
+                    >
+                      {managedUsersLoading ? "Refreshing..." : "Refresh Users"}
+                    </button>
+                  </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  className={`${actionButtonClassName} ${
-                    showDisconnectAction
-                      ? "border-[#69473b] bg-[#1c1210] text-[#f1d2c2] hover:border-[#9f6b57] hover:text-white"
-                      : "border-[#45606f] bg-[#10181d] text-[#d7ebfb] hover:border-[#7aa5c4] hover:text-white"
-                  }`}
-                  disabled={busyAction !== null || statusLoading}
-                  onClick={showDisconnectAction ? handleLogout : handleConnect}
-                  type="button"
-                >
-                  {showDisconnectAction
-                    ? busyAction === "logout"
-                      ? "Disconnecting..."
-                      : "Disconnect"
-                    : busyAction === "connect"
-                      ? "Connecting..."
-                      : "Connect"}
-                </button>
-                <button
-                  className={`${actionButtonClassName} border-[#3d4d57] bg-[#0f1519] text-[#c7d7e2] hover:border-[#6d7b85] hover:text-white`}
-                  disabled={busyAction !== null || statusLoading}
-                  onClick={() => {
-                    void loadProviderAuthStatus({
-                      priority: "foreground",
-                    });
-                  }}
-                  type="button"
-                >
-                  {statusLoading ? "Refreshing..." : "Refresh Status"}
-                </button>
-              </div>
-            </section>
+                  <div className="mt-4 space-y-2">
+                    {managedUsers.map((user) => (
+                      <div
+                        className="border border-[#27333c] bg-[#0d1419] px-3 py-3"
+                        key={user.id}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-[#e5edf3]">
+                              {user.username}
+                            </div>
+                            <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[#6f8798]">
+                              {user.isAdmin ? "Primary user" : "Regular user"}
+                            </div>
+                          </div>
+                          <span
+                            className={`border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] rounded-none ${
+                              user.configured
+                                ? "border-[#35684d] bg-[#102217] text-[#9ce2b3]"
+                                : "border-[#5d5633] bg-[#1e190f] text-[#e6d08a]"
+                            }`}
+                          >
+                            {user.configured ? "Configured" : "Pending TOTP"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-            {surfaceError ? (
-              <div className="mt-3 border border-[#6a4b34] bg-[#23170f] px-3 py-3 text-xs leading-5 text-[#f0c7a7]">
-                {surfaceError}
-              </div>
-            ) : null}
+                  {managedUsersError ? (
+                    <div className="mt-3 border border-[#6a4b34] bg-[#23170f] px-3 py-3 text-xs leading-5 text-[#f0c7a7]">
+                      {managedUsersError}
+                    </div>
+                  ) : null}
 
-            <section className="mt-6 border-t border-[#27333c] pt-4">
-              <div className="text-sm font-semibold text-[#f4f8fb]">Ollama</div>
-              <label className="mt-3 block">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
-                  Ollama URL
-                </div>
-                <input
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
-                  disabled={ollamaStatusLoading}
-                  onBlur={() => {
-                    saveOllamaSettings({
-                      priority: "foreground",
-                    });
-                  }}
-                  onChange={(event) => {
-                    setOllamaUrl(event.currentTarget.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  placeholder="http://localhost:11434"
-                  spellCheck={false}
-                  type="text"
-                  value={ollamaUrl}
-                />
-              </label>
-              <label className="mt-3 block">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
-                  Ollama key
-                </div>
-                <input
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
-                  disabled={ollamaStatusLoading}
-                  onBlur={() => {
-                    saveOllamaSettings({
-                      priority: "foreground",
-                    });
-                  }}
-                  onChange={(event) => {
-                    setOllamaApiKey(event.currentTarget.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  spellCheck={false}
-                  type="text"
-                  value={ollamaApiKey}
-                />
-              </label>
-            </section>
+                  <div className="mt-4 border border-[#27333c] bg-[#0d1419] px-3 py-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
+                      Create user
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      <input
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        className="h-9 w-full min-w-0 border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                        disabled={userCreateLoading}
+                        onChange={(event) => {
+                          setNewUsername(event.currentTarget.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleCreateUser();
+                          }
+                        }}
+                        placeholder="username"
+                        spellCheck={false}
+                        type="text"
+                        value={newUsername}
+                      />
+                      <input
+                        autoComplete="off"
+                        className="h-9 w-full min-w-0 border border-[#31414d] bg-[#0d1114] px-3 font-mono text-[12px] tracking-[0.12em] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                        disabled={userCreateLoading}
+                        inputMode="numeric"
+                        onChange={(event) => {
+                          setNewUserPin(
+                            event.currentTarget.value.replace(/\D+/g, ""),
+                          );
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleCreateUser();
+                          }
+                        }}
+                        placeholder="6+ digit setup PIN"
+                        spellCheck={false}
+                        type="text"
+                        value={newUserPin}
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        className={`${actionButtonClassName} border-[#45606f] bg-[#10181d] text-[#d7ebfb] hover:border-[#7aa5c4] hover:text-white`}
+                        disabled={userCreateLoading}
+                        onClick={handleCreateUser}
+                        type="button"
+                      >
+                        {userCreateLoading ? "Creating..." : "Create"}
+                      </button>
+                    </div>
+                    <div className="mt-3 text-xs leading-5 text-[#8ea5b6]">
+                      New users sign in with the username and PIN you assign
+                      here, then finish TOTP enrollment on first login. Admin
+                      access cannot be granted here.
+                    </div>
+                  </div>
+                </section>
+
+                <section className="mt-6 border-t border-[#27333c] pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold text-[#f4f8fb]">
+                      OpenAI Codex
+                    </div>
+                    <span
+                      className={`border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] rounded-none ${providerAuthToneClassName(
+                        badge.tone,
+                      )}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      className={`${actionButtonClassName} ${
+                        showDisconnectAction
+                          ? "border-[#69473b] bg-[#1c1210] text-[#f1d2c2] hover:border-[#9f6b57] hover:text-white"
+                          : "border-[#45606f] bg-[#10181d] text-[#d7ebfb] hover:border-[#7aa5c4] hover:text-white"
+                      }`}
+                      disabled={busyAction !== null || statusLoading}
+                      onClick={
+                        showDisconnectAction ? handleLogout : handleConnect
+                      }
+                      type="button"
+                    >
+                      {showDisconnectAction
+                        ? busyAction === "logout"
+                          ? "Disconnecting..."
+                          : "Disconnect"
+                        : busyAction === "connect"
+                          ? "Connecting..."
+                          : "Connect"}
+                    </button>
+                    <button
+                      className={`${actionButtonClassName} border-[#3d4d57] bg-[#0f1519] text-[#c7d7e2] hover:border-[#6d7b85] hover:text-white`}
+                      disabled={busyAction !== null || statusLoading}
+                      onClick={() => {
+                        void loadProviderAuthStatus({
+                          priority: "foreground",
+                        });
+                      }}
+                      type="button"
+                    >
+                      {statusLoading ? "Refreshing..." : "Refresh Status"}
+                    </button>
+                  </div>
+                </section>
+
+                {surfaceError ? (
+                  <div className="mt-3 border border-[#6a4b34] bg-[#23170f] px-3 py-3 text-xs leading-5 text-[#f0c7a7]">
+                    {surfaceError}
+                  </div>
+                ) : null}
+
+                <section className="mt-6 border-t border-[#27333c] pt-4">
+                  <div className="text-sm font-semibold text-[#f4f8fb]">
+                    Ollama
+                  </div>
+                  <label className="mt-3 block">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
+                      Ollama URL
+                    </div>
+                    <input
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                      disabled={ollamaStatusLoading}
+                      onBlur={() => {
+                        saveOllamaSettings({
+                          priority: "foreground",
+                        });
+                      }}
+                      onChange={(event) => {
+                        setOllamaUrl(event.currentTarget.value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      placeholder="http://localhost:11434"
+                      spellCheck={false}
+                      type="text"
+                      value={ollamaUrl}
+                    />
+                  </label>
+                  <label className="mt-3 block">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7895a8]">
+                      Ollama key
+                    </div>
+                    <input
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      className="mt-2 h-9 w-full border border-[#31414d] bg-[#0d1114] px-3 text-[12px] text-[#dce9f2] outline-none rounded-none focus:border-[#7aa5c4] focus:ring-2 focus:ring-[#7aa5c4]/25"
+                      disabled={ollamaStatusLoading}
+                      onBlur={() => {
+                        saveOllamaSettings({
+                          priority: "foreground",
+                        });
+                      }}
+                      onChange={(event) => {
+                        setOllamaApiKey(event.currentTarget.value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      spellCheck={false}
+                      type="text"
+                      value={ollamaApiKey}
+                    />
+                  </label>
+                </section>
+              </>
+            )}
           </div>
         </div>
       )}

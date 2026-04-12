@@ -14,7 +14,10 @@ import {
 
 export type RpcWebSocketSocketData = {
   authBypass: boolean;
+  isAdmin: boolean;
   sessionId: string | null;
+  userId: number | null;
+  username: string | null;
 };
 
 type ValidateTicketInput = {
@@ -64,7 +67,10 @@ export function authorizeRpcWebSocketUpgrade(options: {
       ok: true,
       socketData: {
         authBypass: true,
+        isAdmin: true,
         sessionId: null,
+        userId: null,
+        username: null,
       },
     };
   }
@@ -98,7 +104,10 @@ export function authorizeRpcWebSocketUpgrade(options: {
           ok: true,
           socketData: {
             authBypass: false,
+            isAdmin: false,
             sessionId,
+            userId: null,
+            username: null,
           },
         };
       }
@@ -121,7 +130,10 @@ export function authorizeRpcWebSocketUpgrade(options: {
     ok: true,
     socketData: {
       authBypass: false,
+      isAdmin: false,
       sessionId,
+      userId: null,
+      username: null,
     },
   };
 }

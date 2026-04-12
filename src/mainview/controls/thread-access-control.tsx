@@ -19,6 +19,7 @@ type ThreadAccessControlProps = {
   disabled: boolean;
   onChange: (value: ThreadAccessValue) => void;
   title?: string;
+  unsafeModeDisabled?: boolean;
   value: ThreadAccessValue;
   variant: "desktop" | "mobile";
 };
@@ -79,6 +80,7 @@ export function ThreadAccessControl({
   disabled,
   onChange,
   title = "Access controls for the current thread or cron job.",
+  unsafeModeDisabled = false,
   value,
   variant,
 }: ThreadAccessControlProps): JSX.Element {
@@ -182,7 +184,7 @@ export function ThreadAccessControl({
               accentClassName="accent-[#d89256]"
               checked={value.unsafeMode}
               description="Enable shell access and allow Metidos tools to create unsafe child threads or cron jobs."
-              disabled={disabled}
+              disabled={disabled || unsafeModeDisabled}
               label="Unsafe"
               onChange={(checked) => {
                 onChange({

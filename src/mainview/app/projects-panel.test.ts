@@ -8,7 +8,7 @@ import { describe, expect, it } from "bun:test";
 import type { RpcProject, RpcWorktree } from "../../bun/rpc-schema";
 import { buildNormalizedSearchText } from "../controls/search-utils";
 import {
-  deriveProjectsPanelWorktreeData,
+  deriveProjectsPanelRows,
   worktreePinButtonVisibilityClassName,
 } from "./projects-panel";
 import { worktreeKey } from "./state";
@@ -57,8 +57,8 @@ function buildWorktreeSearchText(
   return next;
 }
 
-describe("deriveProjectsPanelWorktreeData", () => {
-  it("orders pinned worktrees first and then alphabetically by workspace name", () => {
+describe("deriveProjectsPanelRows", () => {
+  it("keeps the primary folder first and orders subprojects by pin state and name", () => {
     const project = createProject(1, "Alpha", "/repos/alpha");
     const filteredProjects = [project];
     const worktreesByProjectId = new Map<number, RpcWorktree[]>([
@@ -86,7 +86,7 @@ describe("deriveProjectsPanelWorktreeData", () => {
     );
     const callsByProjectId = new Map<number, number>();
 
-    const data = deriveProjectsPanelWorktreeData(
+    const rows = deriveProjectsPanelRows(
       filteredProjects,
       (projectId) => {
         callsByProjectId.set(
@@ -101,18 +101,36 @@ describe("deriveProjectsPanelWorktreeData", () => {
 
     expect(callsByProjectId).toEqual(new Map([[project.id, 1]]));
 
-    const sections = data.get(project.id);
-    expect(sections?.visibleWorktrees.map((worktree) => worktree.path)).toEqual(
-      [
-        "/repos/alpha/beta",
-        "/repos/alpha/zeta",
-        "/repos/alpha/alpha",
-        "/repos/alpha/delta",
-      ],
-    );
+    expect(
+      rows.map((row) => ({
+        kind: row.kind,
+        path: row.worktree.path,
+      })),
+    ).toEqual([
+      {
+        kind: "project",
+        path: "/repos/alpha",
+      },
+      {
+        kind: "subproject",
+        path: "/repos/alpha/beta",
+      },
+      {
+        kind: "subproject",
+        path: "/repos/alpha/zeta",
+      },
+      {
+        kind: "subproject",
+        path: "/repos/alpha/alpha",
+      },
+      {
+        kind: "subproject",
+        path: "/repos/alpha/delta",
+      },
+    ]);
   });
 
-  it("filters out nonmatching worktrees without changing the selector order", () => {
+  it("filters the flat list down to matching folders", () => {
     const project = createProject(7, "Gamma", "/repos/gamma");
     const filteredProjects = [project];
     const worktreesByProjectId = new Map<number, RpcWorktree[]>([
@@ -134,17 +152,20 @@ describe("deriveProjectsPanelWorktreeData", () => {
       worktreesByProjectId,
     );
 
-    const data = deriveProjectsPanelWorktreeData(
+    const rows = deriveProjectsPanelRows(
       filteredProjects,
       (projectId) => worktreesByProjectId.get(projectId) ?? [],
       "release",
       worktreeSearchTextByKey,
     );
 
-    const sections = data.get(project.id);
-    expect(sections?.visibleWorktrees.map((worktree) => worktree.path)).toEqual(
-      ["/repos/gamma/release"],
-    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "subproject",
+      worktree: {
+        path: "/repos/gamma/release",
+      },
+    });
   });
 });
 

@@ -13,9 +13,12 @@ export type AuthStatus = {
   authenticated: boolean;
   configured: boolean;
   devBypass: boolean;
+  isAdmin?: boolean;
+  knownUsernames?: string[];
   lockedUntil: string | null;
   primaryFactorType: AuthPrimaryFactorType | null;
   sessionExpiresAt: string | null;
+  username?: string | null;
 };
 
 export type TotpEnrollment = {
@@ -186,12 +189,16 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   return payload.status;
 }
 
-export async function prepareSetupEnrollment(): Promise<TotpEnrollment> {
+export async function prepareSetupEnrollment(input: {
+  username: string;
+}): Promise<TotpEnrollment> {
   const payload = await requestAuthJson<{
     enrollment: TotpEnrollment;
     ok: true;
   }>("/auth/setup/start", {
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      username: input.username,
+    }),
     method: "POST",
   });
   return payload.enrollment;
@@ -207,6 +214,7 @@ export async function completeAuthSetup(input: {
   sessionLifetimeDays?: number;
   totpCode: string;
   totpSecret: string;
+  username: string;
 }): Promise<{
   recoveryCodes: string[];
   status: AuthStatus;
@@ -228,6 +236,7 @@ export async function completeAuthSetup(input: {
 export async function loginAuth(input: {
   primaryFactor: string;
   totpCode: string;
+  username: string;
 }): Promise<{
   status: AuthStatus;
 }> {
@@ -247,6 +256,7 @@ export async function loginAuth(input: {
 export async function loginWithRecoveryCodeAuth(input: {
   primaryFactor: string;
   recoveryCode: string;
+  username: string;
 }): Promise<{
   status: AuthStatus;
 }> {

@@ -25,22 +25,29 @@ import {
   type AuthSessionRecord,
   type AuthSettingsRecord,
   consumeAuthWebSocketTicket,
+  countConfiguredAuthUsers,
   createAuthSession,
   createAuthWebSocketTicket,
   createSecurityAuditEvent,
+  createUser,
   deleteAuthSession,
   deleteExpiredAuthSessions,
   deleteExpiredAuthWebSocketTickets,
   getAuthSession,
   getAuthSettings,
   getAuthWebSocketTicket,
+  getUserById,
+  getUserByUsername,
   listAuthRecoveryCodes,
+  listKnownAuthUsernames,
   markAuthRecoveryCodeUsed,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
   setAuthFailureState,
   setAuthSessionStepUpValidUntil,
   touchAuthSession,
+  type UserRecord,
+  updateUserAdminStatus,
   upsertAuthSettings,
 } from "./db";
 
@@ -71,17 +78,20 @@ type SetupAuthInput = TimestampOptions &
     sessionLifetimeDays?: number;
     totpCode: string;
     totpSecret: string;
+    username: string;
   };
 
 type LoginInput = TimestampOptions &
   AuthSecretOptions & {
     primaryFactor: string;
     totpCode: string;
+    username: string;
   };
 
 type RecoveryLoginInput = TimestampOptions & {
   primaryFactor: string;
   recoveryCode: string;
+  username: string;
 };
 
 type PrepareTotpEnrollmentInput = {
@@ -103,9 +113,12 @@ type RequireFreshStepUpInput = TimestampOptions & {
   sessionId: string | null;
 };
 
-type StepUpInput = LoginInput & {
-  sessionId: string;
-};
+type StepUpInput = TimestampOptions &
+  AuthSecretOptions & {
+    primaryFactor: string;
+    totpCode: string;
+    sessionId: string;
+  };
 
 type ConsumeWebSocketTicketInput = TimestampOptions & {
   sessionId: string;
@@ -116,9 +129,12 @@ type AuthStatus = {
   authenticated: boolean;
   configured: boolean;
   devBypass: boolean;
+  isAdmin?: boolean;
+  knownUsernames?: string[];
   lockedUntil: string | null;
   primaryFactorType: AuthPrimaryFactorType | null;
   sessionExpiresAt: string | null;
+  username?: string | null;
 };
 
 type SessionCookieOptions = {
@@ -159,11 +175,14 @@ export class AuthServiceError extends Error {
       | "auth_already_configured"
       | "auth_not_configured"
       | "auth_locked"
+      | "admin_required"
       | "invalid_credentials"
       | "step_up_required"
       | "session_required"
       | "session_expired"
-      | "invalid_websocket_ticket",
+      | "invalid_websocket_ticket"
+      | "totp_setup_required"
+      | "username_taken",
     message: string,
     readonly status: number,
     readonly details?: Record<string, string | null>,
@@ -248,6 +267,25 @@ function buildTimestampOptions(nowMs?: number): TimestampOptions {
 function buildAuthSecretOptions(appDataDir?: string): AuthSecretOptions {
   return typeof appDataDir === "string" ? { appDataDir } : {};
 }
+
+function normalizeUsername(username: string): string {
+  const normalizedUsername = username.trim();
+  if (!normalizedUsername) {
+    throw new Error("Username is required.");
+  }
+  return normalizedUsername;
+}
+
+type ConfiguredAuthUser = {
+  settings: AuthSettingsRecord;
+  user: UserRecord;
+};
+
+function hasTotpEnrollment(
+  settings: Pick<AuthSettingsRecord, "totpSecretCiphertext">,
+): boolean {
+  return settings.totpSecretCiphertext.trim().length > 0;
+}
 /**
  * Build a new session record object with expiration timestamps.
  * @param sessionLifetimeDays - Session TTL in days.
@@ -279,6 +317,7 @@ function buildSession(
 
 function incrementFailedAttempts(
   database: Database,
+  userId: number,
   failedAttempts: number,
   now: Date,
 ): { lockedUntil: string | null } {
@@ -288,28 +327,30 @@ function incrementFailedAttempts(
       now,
       LOGIN_LOCKOUT_WINDOW_MS,
     ).toISOString();
-    setAuthFailureState(database, 0, lockedUntil);
+    setAuthFailureState(database, 0, lockedUntil, userId);
     return {
       lockedUntil,
     };
   }
 
-  setAuthFailureState(database, nextAttempts, null);
+  setAuthFailureState(database, nextAttempts, null, userId);
   return {
     lockedUntil: null,
   };
 }
 /**
- * Read current auth settings and clear stale lockout state.
+ * Read current auth settings for one user and clear stale lockout state.
  * @param database - Database handle.
+ * @param userId - Authenticated user identifier.
  * @param now - Current timestamp.
  */
 
-function readCurrentAuthSettings(
+function readCurrentAuthSettingsForUser(
   database: Database,
+  userId: number,
   now: Date,
 ): ReturnType<typeof getAuthSettings> {
-  const settings = getAuthSettings(database);
+  const settings = getAuthSettings(database, userId);
   if (!settings) {
     return null;
   }
@@ -318,24 +359,77 @@ function readCurrentAuthSettings(
     settings.lockedUntil &&
     Date.parse(settings.lockedUntil) <= now.getTime()
   ) {
-    resetAuthFailureState(database);
-    return getAuthSettings(database);
+    resetAuthFailureState(database, userId);
+    return getAuthSettings(database, userId);
   }
 
   return settings;
 }
 /**
- * Load auth settings and ensure authentication is configured and unlocked.
- * @param database - Database handle.
- * @param now - Timestamp used for lockout checks.
+ * Resolve a configured auth user by username.
  */
 
-function enforceConfigured(
+function findConfiguredAuthUserByUsername(
   database: Database,
+  username: string,
   now: Date,
-): NonNullable<ReturnType<typeof getAuthSettings>> {
-  const settings = readCurrentAuthSettings(database, now);
+): ConfiguredAuthUser | null {
+  const user = getUserByUsername(database, username);
+  if (!user) {
+    return null;
+  }
+  const settings = readCurrentAuthSettingsForUser(database, user.id, now);
   if (!settings) {
+    return null;
+  }
+  return {
+    settings,
+    user,
+  };
+}
+
+function enforceConfiguredUserByUsername(
+  database: Database,
+  username: string,
+  now: Date,
+): ConfiguredAuthUser {
+  if (countConfiguredAuthUsers(database) === 0) {
+    throw new AuthServiceError(
+      "auth_not_configured",
+      "Authentication is not configured yet.",
+      409,
+    );
+  }
+
+  const resolved = findConfiguredAuthUserByUsername(database, username, now);
+  if (!resolved) {
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+  if (resolved.settings.lockedUntil) {
+    throw new AuthServiceError(
+      "auth_locked",
+      `Authentication is locked until ${resolved.settings.lockedUntil}.`,
+      423,
+      {
+        lockedUntil: resolved.settings.lockedUntil,
+      },
+    );
+  }
+  return resolved;
+}
+
+function enforceConfiguredUserById(
+  database: Database,
+  userId: number,
+  now: Date,
+): ConfiguredAuthUser {
+  const user = getUserById(database, userId);
+  const settings = readCurrentAuthSettingsForUser(database, userId, now);
+  if (!user || !settings) {
     throw new AuthServiceError(
       "auth_not_configured",
       "Authentication is not configured yet.",
@@ -352,17 +446,22 @@ function enforceConfigured(
       },
     );
   }
-  return settings;
+  return {
+    settings,
+    user,
+  };
 }
 /**
  * Create and persist a session row after cleaning expired auth data.
  * @param database - Database handle.
+ * @param userId - User that owns the new session.
  * @param sessionLifetimeDays - Session TTL in days.
  * @param now - Current timestamp.
  */
 
 async function createSessionRecord(
   database: Database,
+  userId: number,
   sessionLifetimeDays: number,
   now = new Date(),
 ): Promise<AuthSessionRecord> {
@@ -375,6 +474,7 @@ async function createSessionRecord(
     issuedAt: session.issuedAt,
     lastUsedAt: session.lastUsedAt,
     stepUpValidUntil: null,
+    userId,
   });
 }
 /**
@@ -591,21 +691,30 @@ export function getAuthStatus(
   sessionId: string | null,
   options: TimestampOptions = {},
 ): AuthStatus {
-  const settings = readCurrentAuthSettings(database, nowDate(options.nowMs));
+  const now = nowDate(options.nowMs);
+  const knownUsernames = listKnownAuthUsernames(database);
   const session = sessionId
     ? resolveSession(database, {
         sessionId,
         ...buildTimestampOptions(options.nowMs),
       })
     : null;
+  const settings =
+    session === null
+      ? null
+      : readCurrentAuthSettingsForUser(database, session.userId, now);
 
   return {
     authenticated: options.devBypass === true || session !== null,
-    configured: settings !== null,
+    configured: knownUsernames.length > 0,
     devBypass: options.devBypass === true,
-    lockedUntil: settings?.lockedUntil ?? null,
-    primaryFactorType: settings?.primaryFactorType ?? null,
+    isAdmin: session?.isAdmin ?? false,
+    knownUsernames,
+    lockedUntil: session === null ? null : (settings?.lockedUntil ?? null),
+    primaryFactorType:
+      session === null ? null : (settings?.primaryFactorType ?? null),
     sessionExpiresAt: session?.expiresAt ?? null,
+    username: session?.username ?? null,
   };
 }
 
@@ -617,9 +726,14 @@ export function getAuthStatus(
 export async function verifyPrimaryFactorAndTotp(
   database: Database,
   input: LoginInput,
-): Promise<AuthSettingsRecord> {
+): Promise<ConfiguredAuthUser> {
   const now = nowDate(input.nowMs);
-  const settings = enforceConfigured(database, now);
+  const normalizedUsername = normalizeUsername(input.username);
+  const { settings, user } = enforceConfiguredUserByUsername(
+    database,
+    normalizedUsername,
+    now,
+  );
 
   const primaryFactorValid = await verifyPrimaryFactor(
     input.primaryFactor,
@@ -628,6 +742,7 @@ export async function verifyPrimaryFactorAndTotp(
   if (!primaryFactorValid) {
     const failure = incrementFailedAttempts(
       database,
+      user.id,
       settings.failedPrimaryFactorAttempts,
       now,
     );
@@ -652,6 +767,17 @@ export async function verifyPrimaryFactorAndTotp(
       "invalid_credentials",
       "The provided credentials are invalid.",
       401,
+    );
+  }
+
+  if (!hasTotpEnrollment(settings)) {
+    throw new AuthServiceError(
+      "totp_setup_required",
+      "Complete authenticator setup to finish signing in.",
+      409,
+      {
+        username: user.username,
+      },
     );
   }
 
@@ -682,8 +808,11 @@ export async function verifyPrimaryFactorAndTotp(
     );
   }
 
-  resetAuthFailureState(database);
-  return settings;
+  resetAuthFailureState(database, user.id);
+  return {
+    settings,
+    user,
+  };
 }
 
 /**
@@ -693,9 +822,14 @@ export async function verifyPrimaryFactorAndTotp(
 export async function verifyPrimaryFactorAndRecoveryCode(
   database: Database,
   input: RecoveryLoginInput,
-): Promise<AuthSettingsRecord> {
+): Promise<ConfiguredAuthUser> {
   const now = nowDate(input.nowMs);
-  const settings = enforceConfigured(database, now);
+  const normalizedUsername = normalizeUsername(input.username);
+  const { settings, user } = enforceConfiguredUserByUsername(
+    database,
+    normalizedUsername,
+    now,
+  );
   const primaryFactorValid = await verifyPrimaryFactor(
     input.primaryFactor,
     settings.primaryFactorHash,
@@ -703,7 +837,7 @@ export async function verifyPrimaryFactorAndRecoveryCode(
 
   let matchingCodeHash: string | null = null;
   if (primaryFactorValid) {
-    for (const record of listAuthRecoveryCodes(database)) {
+    for (const record of listAuthRecoveryCodes(database, user.id)) {
       if (record.usedAt !== null) {
         continue;
       }
@@ -718,6 +852,7 @@ export async function verifyPrimaryFactorAndRecoveryCode(
     if (!primaryFactorValid) {
       const failure = incrementFailedAttempts(
         database,
+        user.id,
         settings.failedPrimaryFactorAttempts,
         now,
       );
@@ -745,6 +880,17 @@ export async function verifyPrimaryFactorAndRecoveryCode(
       });
     }
 
+    if (primaryFactorValid && !hasTotpEnrollment(settings)) {
+      throw new AuthServiceError(
+        "totp_setup_required",
+        "Complete authenticator setup to finish signing in.",
+        409,
+        {
+          username: user.username,
+        },
+      );
+    }
+
     throw new AuthServiceError(
       "invalid_credentials",
       "The provided credentials are invalid.",
@@ -756,6 +902,7 @@ export async function verifyPrimaryFactorAndRecoveryCode(
     database,
     matchingCodeHash,
     now.toISOString(),
+    user.id,
   );
   if (!markedUsed) {
     throw new AuthServiceError(
@@ -765,8 +912,11 @@ export async function verifyPrimaryFactorAndRecoveryCode(
     );
   }
 
-  resetAuthFailureState(database);
-  return settings;
+  resetAuthFailureState(database, user.id);
+  return {
+    settings,
+    user,
+  };
 }
 
 /**
@@ -777,15 +927,37 @@ export async function setupAuth(
   database: Database,
   input: SetupAuthInput,
 ): Promise<SetupAuthResult> {
-  if (getAuthSettings(database)) {
+  const normalizedUsername = normalizeUsername(input.username);
+  const now = nowDate(input.nowMs);
+  const configuredUserCount = countConfiguredAuthUsers(database);
+  const existingUser = getUserByUsername(database, normalizedUsername);
+  const existingSettings = existingUser
+    ? readCurrentAuthSettingsForUser(database, existingUser.id, now)
+    : null;
+  if (existingSettings && hasTotpEnrollment(existingSettings)) {
     throw new AuthServiceError(
-      "auth_already_configured",
-      "Authentication has already been configured.",
+      "username_taken",
+      `The username "${normalizedUsername}" is already configured.`,
       409,
     );
   }
-
-  const now = nowDate(input.nowMs);
+  if (configuredUserCount > 0 && !existingUser) {
+    throw new AuthServiceError(
+      "admin_required",
+      `Only administrators can create users. Ask the primary user to create "${normalizedUsername}" first.`,
+      403,
+    );
+  }
+  if (existingSettings?.lockedUntil) {
+    throw new AuthServiceError(
+      "auth_locked",
+      `Authentication is locked until ${existingSettings.lockedUntil}.`,
+      423,
+      {
+        lockedUntil: existingSettings.lockedUntil,
+      },
+    );
+  }
   const totpValid = await verifyTotpCode(input.totpSecret, input.totpCode, {
     atMs: now.getTime(),
   });
@@ -797,44 +969,167 @@ export async function setupAuth(
     );
   }
 
-  const primaryFactorHash = await hashPrimaryFactor(
-    input.primaryFactorType,
-    input.primaryFactor,
-  );
   const totpSecretCiphertext = await encryptAuthSecret(
     input.totpSecret,
     buildAuthSecretOptions(input.appDataDir),
   );
-  const sessionLifetimeDays = normalizeSessionLifetimeDays(
+  const requestedSessionLifetimeDays = normalizeSessionLifetimeDays(
     input.sessionLifetimeDays,
   );
   const recoveryCodes = generateRecoveryCodes();
   const recoveryCodeHashes = await Promise.all(
     recoveryCodes.map((code) => hashRecoveryCode(code)),
   );
+  let primaryFactorHash: string;
+  let primaryFactorType: AuthPrimaryFactorType;
+  let sessionLifetimeDays: number;
+  let user: UserRecord;
+
+  if (existingUser && existingSettings) {
+    const primaryFactorValid = await verifyPrimaryFactor(
+      input.primaryFactor,
+      existingSettings.primaryFactorHash,
+    );
+    if (!primaryFactorValid) {
+      const failure = incrementFailedAttempts(
+        database,
+        existingUser.id,
+        existingSettings.failedPrimaryFactorAttempts,
+        now,
+      );
+      recordInvalidAuthAttempt(database, {
+        lockedUntil: failure.lockedUntil,
+        method: "totp",
+        primaryFactorType: existingSettings.primaryFactorType,
+      });
+
+      if (failure.lockedUntil) {
+        throw new AuthServiceError(
+          "auth_locked",
+          `Authentication is locked until ${failure.lockedUntil}.`,
+          423,
+          {
+            lockedUntil: failure.lockedUntil,
+          },
+        );
+      }
+
+      throw new AuthServiceError(
+        "invalid_credentials",
+        "The provided credentials are invalid.",
+        401,
+      );
+    }
+
+    resetAuthFailureState(database, existingUser.id);
+    primaryFactorHash = existingSettings.primaryFactorHash;
+    primaryFactorType = existingSettings.primaryFactorType;
+    sessionLifetimeDays = existingSettings.sessionLifetimeDays;
+    user = existingUser;
+  } else {
+    primaryFactorHash = await hashPrimaryFactor(
+      input.primaryFactorType,
+      input.primaryFactor,
+    );
+    primaryFactorType = input.primaryFactorType;
+    sessionLifetimeDays = requestedSessionLifetimeDays;
+    user = existingUser
+      ? configuredUserCount === 0 && !existingUser.isAdmin
+        ? updateUserAdminStatus(database, existingUser.id, true)
+        : existingUser
+      : createUser(database, {
+          isAdmin: configuredUserCount === 0,
+          username: normalizedUsername,
+        });
+  }
 
   upsertAuthSettings(database, {
     primaryFactorHash,
-    primaryFactorType: input.primaryFactorType,
+    primaryFactorType,
     sessionLifetimeDays,
     totpSecretCiphertext,
+    userId: user.id,
   });
-  replaceAuthRecoveryCodeHashes(database, recoveryCodeHashes);
-  const session = await createSessionRecord(database, sessionLifetimeDays, now);
+  replaceAuthRecoveryCodeHashes(database, recoveryCodeHashes, user.id);
+  const session = await createSessionRecord(
+    database,
+    user.id,
+    sessionLifetimeDays,
+    now,
+  );
   recordAuthAuditEvent(database, {
     eventType: "auth_configured",
     payload: {
-      primaryFactorType: input.primaryFactorType,
+      primaryFactorType,
       sessionLifetimeDays,
+      userId: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
     },
     summaryText:
-      "Authentication was configured and the first session was created.",
+      "Authentication was configured for a user and a session was created.",
   });
 
   return {
     recoveryCodes,
     session,
   };
+}
+
+/**
+ * Create a regular pending user who must finish auth setup later.
+ */
+export async function createPendingUser(
+  database: Database,
+  input: {
+    actorUserId?: number | null;
+    actorUsername?: string | null;
+    pin: string;
+    username: string;
+  },
+): Promise<UserRecord> {
+  if (countConfiguredAuthUsers(database) === 0) {
+    throw new AuthServiceError(
+      "auth_not_configured",
+      "Configure the primary user before creating additional users.",
+      409,
+    );
+  }
+
+  const normalizedUsername = normalizeUsername(input.username);
+  const existingUser = getUserByUsername(database, normalizedUsername);
+  if (existingUser) {
+    throw new AuthServiceError(
+      "username_taken",
+      `The username "${normalizedUsername}" already exists.`,
+      409,
+    );
+  }
+
+  const user = createUser(database, {
+    isAdmin: false,
+    username: normalizedUsername,
+  });
+  upsertAuthSettings(database, {
+    primaryFactorHash: await hashPrimaryFactor("pin", input.pin),
+    primaryFactorType: "pin",
+    sessionLifetimeDays: DEFAULT_SESSION_LIFETIME_DAYS,
+    totpSecretCiphertext: "",
+    userId: user.id,
+  });
+  recordAuthAuditEvent(database, {
+    eventType: "user_created",
+    payload: {
+      createdByUserId: input.actorUserId ?? null,
+      createdByUsername: input.actorUsername ?? null,
+      isAdmin: user.isAdmin,
+      userId: user.id,
+      username: user.username,
+    },
+    summaryText:
+      "A regular user account was created with an assigned PIN and pending authenticator setup.",
+  });
+  return user;
 }
 
 /**
@@ -846,9 +1141,10 @@ export async function login(
   input: LoginInput,
 ): Promise<LoginResult> {
   const now = nowDate(input.nowMs);
-  const settings = await verifyPrimaryFactorAndTotp(database, input);
+  const { settings, user } = await verifyPrimaryFactorAndTotp(database, input);
   const session = await createSessionRecord(
     database,
+    user.id,
     settings.sessionLifetimeDays,
     now,
   );
@@ -857,6 +1153,8 @@ export async function login(
     payload: {
       method: "totp",
       primaryFactorType: settings.primaryFactorType,
+      userId: user.id,
+      username: user.username,
     },
     summaryText: "Authenticated with the configured primary factor and TOTP.",
   });
@@ -874,9 +1172,13 @@ export async function loginWithRecoveryCode(
   input: RecoveryLoginInput,
 ): Promise<LoginResult> {
   const now = nowDate(input.nowMs);
-  const settings = await verifyPrimaryFactorAndRecoveryCode(database, input);
+  const { settings, user } = await verifyPrimaryFactorAndRecoveryCode(
+    database,
+    input,
+  );
   const session = await createSessionRecord(
     database,
+    user.id,
     settings.sessionLifetimeDays,
     now,
   );
@@ -885,6 +1187,8 @@ export async function loginWithRecoveryCode(
     payload: {
       method: "recovery_code",
       primaryFactorType: settings.primaryFactorType,
+      userId: user.id,
+      username: user.username,
     },
     summaryText:
       "Authenticated with the configured primary factor and a recovery code.",
@@ -947,6 +1251,10 @@ export function logout(database: Database, sessionId: string | null): void {
   }
   recordAuthAuditEvent(database, {
     eventType: "auth_logout",
+    payload: {
+      userId: session.userId,
+      username: session.username,
+    },
     summaryText: "Logged out of the current authenticated session.",
   });
 }
@@ -973,7 +1281,63 @@ export async function stepUpSession(
     );
   }
 
-  const settings = await verifyPrimaryFactorAndTotp(database, input);
+  const { settings } = enforceConfiguredUserById(database, session.userId, now);
+  const primaryFactorValid = await verifyPrimaryFactor(
+    input.primaryFactor,
+    settings.primaryFactorHash,
+  );
+  if (!primaryFactorValid) {
+    const failure = incrementFailedAttempts(
+      database,
+      session.userId,
+      settings.failedPrimaryFactorAttempts,
+      now,
+    );
+    recordInvalidAuthAttempt(database, {
+      lockedUntil: failure.lockedUntil,
+      method: "totp",
+      primaryFactorType: settings.primaryFactorType,
+    });
+
+    if (failure.lockedUntil) {
+      throw new AuthServiceError(
+        "auth_locked",
+        `Authentication is locked until ${failure.lockedUntil}.`,
+        423,
+        {
+          lockedUntil: failure.lockedUntil,
+        },
+      );
+    }
+
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  const totpSecret = await decryptAuthSecret(
+    settings.totpSecretCiphertext,
+    buildAuthSecretOptions(input.appDataDir),
+  );
+  const totpValid = await verifyTotpCode(totpSecret, input.totpCode, {
+    atMs: now.getTime(),
+  });
+  if (!totpValid) {
+    recordInvalidAuthAttempt(database, {
+      lockedUntil: null,
+      method: "totp",
+      primaryFactorType: settings.primaryFactorType,
+    });
+    throw new AuthServiceError(
+      "invalid_credentials",
+      "The provided credentials are invalid.",
+      401,
+    );
+  }
+
+  resetAuthFailureState(database, session.userId);
   const stepUpValidUntil = addMilliseconds(
     now,
     DEFAULT_STEP_UP_LIFETIME_MS,
@@ -984,6 +1348,8 @@ export async function stepUpSession(
     payload: {
       primaryFactorType: settings.primaryFactorType,
       stepUpValidUntil,
+      userId: session.userId,
+      username: session.username,
     },
     summaryText:
       "Completed step-up authentication for privileged local actions.",

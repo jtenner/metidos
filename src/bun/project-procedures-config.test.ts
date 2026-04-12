@@ -15,7 +15,13 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { closeAppDatabase, resetResolvedAppDataDirectory } from "./db";
+import { generateTotpCode } from "./auth";
+import { prepareTotpEnrollment, setupAuth } from "./auth-service";
+import {
+  closeAppDatabase,
+  initAppDatabase,
+  resetResolvedAppDataDirectory,
+} from "./db";
 import {
   resetPiCodexAuthTestOverrides,
   setPiCodexAuthTestOverrides,
@@ -647,6 +653,101 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("initializes git when opening a new project folder on demand", async () => {
+    const procedures = await loadProjectProcedures();
+    const projectPath = createTempDirectory("metidos-init-project-folder-");
+
+    expect(existsSync(join(projectPath, ".git"))).toBe(false);
+
+    const opened = await procedures.openProjectProcedure({
+      initGitIfNeeded: true,
+      name: "Fresh Folder",
+      projectPath,
+    });
+
+    expect(existsSync(join(projectPath, ".git"))).toBe(true);
+    expect(opened.project.path).toBe(projectPath);
+    expect(opened.worktrees).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: projectPath,
+        }),
+      ]),
+    );
+    expect(opened.hiddenWorktrees).toEqual([]);
+  });
+
+  it("keeps external subprojects hidden until they are explicitly opened", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("metidos-hidden-subproject-repo-");
+    initializeGitRepository(repoPath);
+
+    const hiddenSubprojectPath = `${repoPath}-feature`;
+    execFileSync(
+      "git",
+      ["worktree", "add", "-b", "feature-hidden", hiddenSubprojectPath],
+      {
+        cwd: repoPath,
+        stdio: "ignore",
+      },
+    );
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Hidden Subproject Repo",
+      projectPath: repoPath,
+    });
+
+    expect(opened.worktrees.map((worktree) => worktree.path)).toEqual([
+      repoPath,
+    ]);
+    expect(opened.hiddenWorktrees).toEqual([]);
+
+    const listed = await procedures.listProjectWorktreesProcedure({
+      includeHidden: true,
+      projectId: opened.project.id,
+    });
+
+    expect(listed.worktrees.map((worktree) => worktree.path)).toEqual([
+      repoPath,
+    ]);
+    expect(listed.hiddenWorktrees).toEqual([
+      expect.objectContaining({
+        path: hiddenSubprojectPath,
+      }),
+    ]);
+
+    const openedSubproject = await procedures.openWorktreeProcedure({
+      projectId: opened.project.id,
+      worktreePath: hiddenSubprojectPath,
+    });
+
+    expect(
+      openedSubproject.worktrees
+        .map((worktree) => worktree.path)
+        .sort((left, right) => left.localeCompare(right)),
+    ).toEqual(
+      [repoPath, hiddenSubprojectPath].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    );
+
+    const relisted = await procedures.listProjectWorktreesProcedure({
+      includeHidden: true,
+      projectId: opened.project.id,
+    });
+
+    expect(
+      relisted.worktrees
+        .map((worktree) => worktree.path)
+        .sort((left, right) => left.localeCompare(right)),
+    ).toEqual(
+      [repoPath, hiddenSubprojectPath].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    );
+    expect(relisted.hiddenWorktrees).toEqual([]);
+  });
+
   it("rejects unavailable Codex providers before creating threads or cron jobs", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("metidos-provider-guard-repo-");
@@ -785,6 +886,85 @@ describe("project procedure configuration helpers", () => {
     );
   });
 
+  it("lets only admins create regular pending users in the user manager", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "alice",
+    });
+    const adminSetup = await setupAuth(database, {
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
+      totpSecret: enrollment.totpSecret,
+      username: "alice",
+    });
+    const adminContext = {
+      auth: {
+        authBypass: false,
+        isAdmin: adminSetup.session.isAdmin,
+        sessionId: adminSetup.session.id,
+        userId: adminSetup.session.userId,
+        username: adminSetup.session.username,
+      },
+      priority: "foreground" as const,
+      signal: new AbortController().signal,
+      timeoutMs: null,
+    };
+
+    const createdUser = await procedures.createUserProcedure(
+      {
+        pin: "654321",
+        username: "bob",
+      },
+      adminContext,
+    );
+
+    expect(createdUser).toEqual(
+      expect.objectContaining({
+        configured: false,
+        isAdmin: false,
+        username: "bob",
+      }),
+    );
+    await expect(
+      procedures.createUserProcedure(
+        {
+          pin: "654321",
+          username: "charlie",
+        },
+        {
+          ...adminContext,
+          auth: {
+            ...adminContext.auth,
+            isAdmin: false,
+            sessionId: "non-admin-session",
+            userId: 999,
+            username: "bob",
+          },
+        },
+      ),
+    ).rejects.toThrow("Administrator privileges are required for this action.");
+    await expect(
+      procedures.listUsersProcedure(undefined, adminContext),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          configured: true,
+          isAdmin: true,
+          username: "alice",
+        }),
+        expect.objectContaining({
+          configured: false,
+          isAdmin: false,
+          username: "bob",
+        }),
+      ]),
+    );
+  });
+
   it("fails empty assistant completions instead of fabricating a reply", async () => {
     const procedures = await loadProjectProcedures();
 
@@ -817,7 +997,10 @@ describe("project procedure configuration helpers", () => {
         {
           auth: {
             authBypass: true,
+            isAdmin: true,
             sessionId: null,
+            userId: null,
+            username: null,
           },
           priority: "default",
           signal: AbortSignal.abort(
@@ -851,6 +1034,7 @@ describe("project procedure configuration helpers", () => {
         projectId: opened.project.id,
       }),
     ).resolves.toEqual({
+      hiddenWorktrees: [],
       project: expect.objectContaining({
         id: opened.project.id,
       }),

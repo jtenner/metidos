@@ -16,6 +16,7 @@ import {
   buildClearedWebSocketTicketCookieHeader,
   buildSessionCookieHeader,
   buildWebSocketTicketCookieHeader,
+  createPendingUser,
   DEFAULT_SESSION_IDLE_TIMEOUT_MS,
   DEFAULT_STEP_UP_LIFETIME_MS,
   getAuthStatus,
@@ -41,6 +42,7 @@ import {
 
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
+const TEST_USERNAME = "alice";
 
 function createTestDatabase(): Database {
   const database = new Database(":memory:");
@@ -88,7 +90,7 @@ const LOCKOUT_SCENARIOS = [
 describe("auth service", () => {
   it("prepares TOTP enrollment material", () => {
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     expect(enrollment.totpSecret.length).toBeGreaterThan(0);
@@ -100,7 +102,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
     const totpCode = await generateTotpCode(enrollment.totpSecret, nowMs);
 
@@ -111,6 +113,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode,
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     expect(result.recoveryCodes).toHaveLength(10);
@@ -126,9 +129,12 @@ describe("auth service", () => {
       authenticated: true,
       configured: true,
       devBypass: false,
+      isAdmin: true,
+      knownUsernames: [TEST_USERNAME],
       lockedUntil: null,
       primaryFactorType: "pin",
       sessionExpiresAt: result.session.expiresAt,
+      username: TEST_USERNAME,
     });
   });
 
@@ -145,9 +151,12 @@ describe("auth service", () => {
       authenticated: true,
       configured: false,
       devBypass: true,
+      isAdmin: false,
+      knownUsernames: [],
       lockedUntil: null,
       primaryFactorType: null,
       sessionExpiresAt: null,
+      username: null,
     });
   });
 
@@ -157,7 +166,7 @@ describe("auth service", () => {
       const appDataDir = createTempDirectory();
       const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
       const enrollment = prepareTotpEnrollment({
-        accountName: "local-user",
+        accountName: TEST_USERNAME,
       });
       const setupCode = await generateTotpCode(
         enrollment.totpSecret,
@@ -171,6 +180,7 @@ describe("auth service", () => {
         primaryFactorType: scenario.primaryFactorType,
         totpCode: setupCode,
         totpSecret: enrollment.totpSecret,
+        username: TEST_USERNAME,
       });
 
       const firstAttemptCode = await generateTotpCode(
@@ -183,6 +193,7 @@ describe("auth service", () => {
           nowMs: setupTimeMs + 1_000,
           primaryFactor: scenario.invalidPrimaryFactor,
           totpCode: firstAttemptCode,
+          username: TEST_USERNAME,
         }),
       ).rejects.toThrow("The provided credentials are invalid.");
 
@@ -192,6 +203,7 @@ describe("auth service", () => {
           nowMs: setupTimeMs + 2_000,
           primaryFactor: scenario.invalidPrimaryFactor,
           totpCode: firstAttemptCode,
+          username: TEST_USERNAME,
         }),
       ).rejects.toThrow("The provided credentials are invalid.");
 
@@ -201,6 +213,7 @@ describe("auth service", () => {
           nowMs: setupTimeMs + 3_000,
           primaryFactor: scenario.invalidPrimaryFactor,
           totpCode: firstAttemptCode,
+          username: TEST_USERNAME,
         }),
       ).rejects.toMatchObject({
         code: "auth_locked",
@@ -212,6 +225,7 @@ describe("auth service", () => {
           nowMs: setupTimeMs + 4_000,
           primaryFactor: scenario.primaryFactor,
           totpCode: firstAttemptCode,
+          username: TEST_USERNAME,
         }),
       ).rejects.toMatchObject({
         code: "auth_locked",
@@ -226,6 +240,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 10 * 60 * 1000 + 4_000,
         primaryFactor: scenario.primaryFactor,
         totpCode: successCode,
+        username: TEST_USERNAME,
       });
       expect(loginResult.session.id.length).toBeGreaterThan(10);
       const failureEvents = listSecurityAuditEvents(database).filter(
@@ -252,7 +267,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
     const setupCode = await generateTotpCode(
       enrollment.totpSecret,
@@ -266,6 +281,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: setupCode,
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     const validTotp = await generateTotpCode(
@@ -281,6 +297,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 1_000,
         primaryFactor: "123456",
         totpCode: invalidTotp,
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
     await expect(
@@ -289,6 +306,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 2_000,
         primaryFactor: "123456",
         totpCode: invalidTotp,
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
     await expect(
@@ -297,6 +315,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 3_000,
         primaryFactor: "123456",
         totpCode: invalidTotp,
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
 
@@ -316,6 +335,7 @@ describe("auth service", () => {
       nowMs: setupTimeMs + 4_000,
       primaryFactor: "123456",
       totpCode: successCode,
+      username: TEST_USERNAME,
     });
     expect(loginResult.session.id.length).toBeGreaterThan(10);
   });
@@ -325,7 +345,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
     const setupCode = await generateTotpCode(
       enrollment.totpSecret,
@@ -339,6 +359,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: setupCode,
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     await expect(
@@ -346,6 +367,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 1_000,
         primaryFactor: "123456",
         recoveryCode: "INVALID-CODE-1",
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
     await expect(
@@ -353,6 +375,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 2_000,
         primaryFactor: "123456",
         recoveryCode: "INVALID-CODE-2",
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
     await expect(
@@ -360,6 +383,7 @@ describe("auth service", () => {
         nowMs: setupTimeMs + 3_000,
         primaryFactor: "123456",
         recoveryCode: "INVALID-CODE-3",
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
 
@@ -371,12 +395,144 @@ describe("auth service", () => {
     ).toBeFalse();
   });
 
+  it("allows an admin-created pending user to finish auth setup", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const adminEnrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
+      totpSecret: adminEnrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    await createPendingUser(database, {
+      actorUserId: 1,
+      actorUsername: TEST_USERNAME,
+      pin: "654321",
+      username: "bob",
+    });
+    const invitedEnrollment = prepareTotpEnrollment({
+      accountName: "bob",
+    });
+
+    const invitedResult = await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs + 1_000,
+      primaryFactor: "654321",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(
+        invitedEnrollment.totpSecret,
+        setupTimeMs + 1_000,
+      ),
+      totpSecret: invitedEnrollment.totpSecret,
+      username: "bob",
+    });
+
+    expect(invitedResult.session.username).toBe("bob");
+    expect(invitedResult.session.isAdmin).toBeFalse();
+    expect(getAuthSettings(database, invitedResult.session.userId)).toEqual(
+      expect.objectContaining({
+        primaryFactorType: "pin",
+        userId: invitedResult.session.userId,
+      }),
+    );
+  });
+
+  it("rejects self-service setup for unknown usernames after the primary user exists", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const adminEnrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
+      totpSecret: adminEnrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    const invitedEnrollment = prepareTotpEnrollment({
+      accountName: "charlie",
+    });
+
+    await expect(
+      setupAuth(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 1_000,
+        primaryFactor: "654321",
+        primaryFactorType: "pin",
+        totpCode: await generateTotpCode(
+          invitedEnrollment.totpSecret,
+          setupTimeMs + 1_000,
+        ),
+        totpSecret: invitedEnrollment.totpSecret,
+        username: "charlie",
+      }),
+    ).rejects.toMatchObject({
+      code: "admin_required",
+    } satisfies Partial<AuthServiceError>);
+  });
+
+  it("redirects a pending invited user into TOTP setup on first login", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const adminEnrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    const adminSetup = await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: "123456",
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
+      totpSecret: adminEnrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    await createPendingUser(database, {
+      actorUserId: adminSetup.session.userId,
+      actorUsername: adminSetup.session.username,
+      pin: "654321",
+      username: "bob",
+    });
+
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 1_000,
+        primaryFactor: "654321",
+        totpCode: "",
+        username: "bob",
+      }),
+    ).rejects.toMatchObject({
+      code: "totp_setup_required",
+      details: {
+        username: "bob",
+      },
+    } satisfies Partial<AuthServiceError>);
+  });
+
   it("issues and consumes websocket tickets for valid sessions", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -386,6 +542,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     const ticket = issueWebSocketTicket(database, {
@@ -412,7 +569,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -422,6 +579,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
     const recoveryCode = setupResult.recoveryCodes[0];
     if (!recoveryCode) {
@@ -432,6 +590,7 @@ describe("auth service", () => {
       nowMs: nowMs + 1_000,
       primaryFactor: "123456",
       recoveryCode,
+      username: TEST_USERNAME,
     });
 
     expect(result.session.id.length).toBeGreaterThan(10);
@@ -454,6 +613,7 @@ describe("auth service", () => {
         nowMs: nowMs + 2_000,
         primaryFactor: "123456",
         recoveryCode,
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
     expect(
@@ -468,7 +628,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -478,6 +638,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
     logout(database, setupResult.session.id);
 
@@ -486,6 +647,7 @@ describe("auth service", () => {
       nowMs: nowMs + 1_000,
       primaryFactor: "123456",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 1_000),
+      username: TEST_USERNAME,
     });
     await stepUpSession(database, {
       appDataDir,
@@ -524,7 +686,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -534,6 +696,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     expect(
@@ -564,7 +727,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -574,6 +737,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     expect(() =>
@@ -589,7 +753,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -599,6 +763,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     expect(() =>
@@ -668,7 +833,7 @@ describe("auth service", () => {
     const appDataDir = createTempDirectory();
     const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -678,6 +843,7 @@ describe("auth service", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     expect(

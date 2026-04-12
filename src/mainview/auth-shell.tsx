@@ -277,8 +277,11 @@ export default function AuthShell({
   const [setupPrimaryFactorType, setSetupPrimaryFactorType] = useState<
     "password" | "pin"
   >("pin");
+  const [setupUsername, setSetupUsername] = useState("");
+  const [setupEnrollmentUsername, setSetupEnrollmentUsername] = useState("");
   const [setupPrimaryFactor, setSetupPrimaryFactor] = useState("");
   const [setupTotpCode, setSetupTotpCode] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
   const [loginPrimaryFactor, setLoginPrimaryFactor] = useState("");
   const [loginRecoveryCode, setLoginRecoveryCode] = useState("");
   const [loginTotpCode, setLoginTotpCode] = useState("");
@@ -299,8 +302,9 @@ export default function AuthShell({
     () => formatDateTime(status?.sessionExpiresAt ?? null),
     [status],
   );
-  const loginFactorLabel =
-    status?.primaryFactorType === "pin" ? "PIN" : "Password";
+  const loginPrimaryFactorIsPin =
+    status?.authenticated === true && status.primaryFactorType === "pin";
+  const loginFactorLabel = loginPrimaryFactorIsPin ? "PIN" : "Primary factor";
 
   const loadGateState = useCallback(
     async (options?: { preserveError?: boolean }) => {
@@ -331,7 +335,6 @@ export default function AuthShell({
             }
             setLoadingMessage("Opening authenticated workspace…");
           },
-          prepareSetupEnrollment,
         });
         if (loadGateRequestIdRef.current !== requestId) {
           return;
@@ -349,7 +352,9 @@ export default function AuthShell({
             setError(gate.notice);
           }
           setLoadingMessage("Preparing first-run setup…");
-          setEnrollment(gate.enrollment);
+          setEnrollment(null);
+          setSetupEnrollmentUsername("");
+          setSetupUsername("");
           setSetupPrimaryFactor("");
           setSetupTotpCode("");
           setRecoveryCodes([]);
@@ -361,9 +366,12 @@ export default function AuthShell({
         if (gate.notice) {
           setError(gate.notice);
         }
+        setSetupEnrollmentUsername("");
+        setSetupUsername("");
         setLoginPrimaryFactor("");
         setLoginRecoveryCode("");
         setLoginTotpCode("");
+        setLoginUsername("");
         setView("login");
       } catch (nextError) {
         if (loadGateRequestIdRef.current !== requestId) {
@@ -433,10 +441,39 @@ export default function AuthShell({
     };
   }, [enrollment?.totpUri]);
 
+  const handlePrepareSetupEnrollment = useCallback(async () => {
+    const normalizedUsername = setupUsername.trim();
+    if (!normalizedUsername) {
+      setError("Username is required before preparing authenticator setup.");
+      return;
+    }
+
+    setIsBusy(true);
+    setError("");
+    try {
+      const nextEnrollment = await prepareSetupEnrollment({
+        username: normalizedUsername,
+      });
+      setEnrollment(nextEnrollment);
+      setSetupEnrollmentUsername(normalizedUsername);
+    } catch (nextError) {
+      setEnrollment(null);
+      setSetupEnrollmentUsername("");
+      setError(errorMessage(nextError));
+    } finally {
+      setIsBusy(false);
+    }
+  }, [setupUsername]);
+
   const handleSetupSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!enrollment) {
+      const normalizedUsername = setupUsername.trim();
+      if (!normalizedUsername) {
+        setError("Username is required.");
+        return;
+      }
+      if (!enrollment || setupEnrollmentUsername !== normalizedUsername) {
         setError("TOTP enrollment material is not ready yet.");
         return;
       }
@@ -447,10 +484,13 @@ export default function AuthShell({
       try {
         const result = await completeAuthSetup({
           primaryFactor: setupPrimaryFactor,
-          primaryFactorType: setupPrimaryFactorType,
+          primaryFactorType: status?.configured
+            ? "pin"
+            : setupPrimaryFactorType,
           sessionLifetimeDays: SESSION_LIFETIME_DAYS,
           totpCode: setupTotpCode,
           totpSecret: enrollment.totpSecret,
+          username: normalizedUsername,
         });
         setStatus(result.status);
         setRecoveryCodes(result.recoveryCodes);
@@ -472,24 +512,52 @@ export default function AuthShell({
     [
       enrollment,
       loadGateState,
+      setupEnrollmentUsername,
       setupPrimaryFactor,
       setupPrimaryFactorType,
       setupTotpCode,
+      setupUsername,
+      status?.configured,
     ],
   );
 
   const handleLoginSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      const normalizedUsername = loginUsername.trim();
       setIsBusy(true);
       setError("");
       try {
         await loginAuth({
           primaryFactor: loginPrimaryFactor,
           totpCode: loginTotpCode,
+          username: normalizedUsername,
         });
         await loadGateState();
       } catch (nextError) {
+        if (
+          nextError instanceof AuthApiError &&
+          nextError.code === "totp_setup_required"
+        ) {
+          setError("");
+          setEnrollment(null);
+          setSetupEnrollmentUsername("");
+          setSetupPrimaryFactorType("pin");
+          setSetupPrimaryFactor(loginPrimaryFactor.replace(/\D+/g, ""));
+          setSetupTotpCode("");
+          setSetupUsername(normalizedUsername);
+          setView("setup");
+          try {
+            const nextEnrollment = await prepareSetupEnrollment({
+              username: normalizedUsername,
+            });
+            setEnrollment(nextEnrollment);
+            setSetupEnrollmentUsername(normalizedUsername);
+          } catch (enrollmentError) {
+            setError(errorMessage(enrollmentError));
+          }
+          return;
+        }
         setError(errorMessage(nextError));
         const lockedUntil = readLockedUntil(status, nextError);
         setStatus((current) =>
@@ -504,7 +572,7 @@ export default function AuthShell({
         setIsBusy(false);
       }
     },
-    [loadGateState, loginPrimaryFactor, loginTotpCode, status],
+    [loadGateState, loginPrimaryFactor, loginTotpCode, loginUsername, status],
   );
 
   const handleRecoveryLoginSubmit = useCallback(
@@ -516,6 +584,7 @@ export default function AuthShell({
         await loginWithRecoveryCodeAuth({
           primaryFactor: loginPrimaryFactor,
           recoveryCode: loginRecoveryCode,
+          username: loginUsername,
         });
         await loadGateState();
       } catch (nextError) {
@@ -533,7 +602,13 @@ export default function AuthShell({
         setIsBusy(false);
       }
     },
-    [loadGateState, loginPrimaryFactor, loginRecoveryCode, status],
+    [
+      loadGateState,
+      loginPrimaryFactor,
+      loginRecoveryCode,
+      loginUsername,
+      status,
+    ],
   );
 
   const handleRecoveryContinue = useCallback(async () => {
@@ -618,6 +693,7 @@ export default function AuthShell({
           </div>
         ) : null}
         <App
+          isAdmin={status.isAdmin ?? false}
           primaryFactorType={status.primaryFactorType}
           procedures={procedures}
         />
@@ -654,6 +730,32 @@ export default function AuthShell({
     return authConsoleShell({
       children: (
         <form className="space-y-6" onSubmit={handleSetupSubmit}>
+          <AuthInput
+            autoComplete="username"
+            label="Username"
+            onChange={(value) => {
+              setSetupUsername(value);
+              if (value.trim() !== setupEnrollmentUsername) {
+                setEnrollment(null);
+                setSetupEnrollmentUsername("");
+              }
+            }}
+            placeholder={
+              status?.configured
+                ? "Enter the username assigned by an administrator"
+                : "Choose the primary username"
+            }
+            type="text"
+            value={setupUsername}
+          />
+
+          {status?.configured ? (
+            <div className="border border-[#19303d] bg-[#07131b] px-4 py-3 text-sm leading-6 text-[#8ea5b6]">
+              Finish first-time sign-in with the administrator-issued PIN, then
+              enroll your authenticator app.
+            </div>
+          ) : null}
+
           <div className="flex gap-5">
             <div className="flex-shrink-0">
               {qrCodeDataUrl ? (
@@ -664,7 +766,7 @@ export default function AuthShell({
                 />
               ) : (
                 <div className="flex h-[140px] w-[140px] items-center justify-center border border-dashed border-[#29404e] bg-[#09121a] text-center text-xs leading-5 text-[#546e80]">
-                  Generating…
+                  Generate a QR code after choosing a username.
                 </div>
               )}
             </div>
@@ -673,7 +775,7 @@ export default function AuthShell({
                 Manual entry
               </p>
               <p className="mt-2 break-all font-mono text-xs leading-6 text-[#aec8d8]">
-                {enrollment?.totpSecret ?? "Preparing…"}
+                {enrollment?.totpSecret ?? "No TOTP secret generated yet."}
               </p>
               <p className="mt-2 text-xs text-[#4d7a95]">
                 Use only if QR scan fails.
@@ -681,50 +783,79 @@ export default function AuthShell({
             </div>
           </div>
 
-          <div>
-            <p className="mb-3 font-mono text-[10px] tracking-[0.22em] text-[#4d7a95] uppercase">
-              Primary factor
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <AuthChoiceButton
-                active={setupPrimaryFactorType === "pin"}
-                body="6+ digits"
-                onClick={() => {
-                  setSetupPrimaryFactorType("pin");
-                  setSetupPrimaryFactor("");
-                }}
-                title="PIN"
-              />
-              <AuthChoiceButton
-                active={setupPrimaryFactorType === "password"}
-                body="Any passphrase"
-                onClick={() => {
-                  setSetupPrimaryFactorType("password");
-                  setSetupPrimaryFactor("");
-                }}
-                title="Passphrase"
-              />
+          <AuthActionButton
+            disabled={isBusy || !setupUsername.trim()}
+            onClick={() => {
+              void handlePrepareSetupEnrollment();
+            }}
+            variant="secondary"
+            wide
+          >
+            {isBusy
+              ? "Preparing…"
+              : enrollment
+                ? "Regenerate authenticator code"
+                : "Generate authenticator code"}
+          </AuthActionButton>
+
+          {!status?.configured ? (
+            <div>
+              <p className="mb-3 font-mono text-[10px] tracking-[0.22em] text-[#4d7a95] uppercase">
+                Primary factor
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <AuthChoiceButton
+                  active={setupPrimaryFactorType === "pin"}
+                  body="6+ digits"
+                  onClick={() => {
+                    setSetupPrimaryFactorType("pin");
+                    setSetupPrimaryFactor("");
+                  }}
+                  title="PIN"
+                />
+                <AuthChoiceButton
+                  active={setupPrimaryFactorType === "password"}
+                  body="Any passphrase"
+                  onClick={() => {
+                    setSetupPrimaryFactorType("password");
+                    setSetupPrimaryFactor("");
+                  }}
+                  title="Passphrase"
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <AuthInput
-            autoComplete="new-password"
-            inputMode={setupPrimaryFactorType === "pin" ? "numeric" : "text"}
             label={
-              setupPrimaryFactorType === "pin" ? "Set PIN" : "Set passphrase"
+              status?.configured
+                ? "Administrator PIN"
+                : setupPrimaryFactorType === "pin"
+                  ? "Set PIN"
+                  : "Set passphrase"
             }
-            monospace={setupPrimaryFactorType === "pin"}
+            autoComplete={
+              status?.configured ? "current-password" : "new-password"
+            }
+            inputMode={
+              status?.configured || setupPrimaryFactorType === "pin"
+                ? "numeric"
+                : "text"
+            }
+            monospace={status?.configured || setupPrimaryFactorType === "pin"}
             onChange={(value) => {
               setSetupPrimaryFactor(
-                setupPrimaryFactorType === "pin"
+                status?.configured || setupPrimaryFactorType === "pin"
                   ? value.replace(/\D+/g, "")
                   : value,
               );
             }}
             placeholder={
-              setupPrimaryFactorType === "pin"
-                ? "Enter 6+ digits"
-                : "Enter passphrase"
+              status?.configured
+                ? "Enter the PIN given to you by an administrator"
+                : setupPrimaryFactorType === "pin"
+                  ? "Enter 6+ digits"
+                  : "Enter passphrase"
             }
             type="password"
             value={setupPrimaryFactor}
@@ -755,9 +886,10 @@ export default function AuthShell({
       ),
       error,
       size: "md",
-      subtitle:
-        "Scan the QR code with your authenticator app, then complete the form below.",
-      title: "First-run setup",
+      subtitle: status?.configured
+        ? "Scan the QR code with your authenticator app, then confirm the current code to finish first login."
+        : "Scan the QR code with your authenticator app, then complete the form below.",
+      title: "Setup User",
     });
   }
 
@@ -820,22 +952,24 @@ export default function AuthShell({
       children: (
         <form className="space-y-5" onSubmit={handleRecoveryLoginSubmit}>
           <AuthInput
+            autoComplete="username"
+            label="Username"
+            onChange={setLoginUsername}
+            placeholder="Enter your username"
+            type="text"
+            value={loginUsername}
+          />
+          <AuthInput
             autoComplete="current-password"
-            inputMode={status?.primaryFactorType === "pin" ? "numeric" : "text"}
+            inputMode={loginPrimaryFactorIsPin ? "numeric" : "text"}
             label={loginFactorLabel}
-            monospace={status?.primaryFactorType === "pin"}
+            monospace={loginPrimaryFactorIsPin}
             onChange={(value) => {
               setLoginPrimaryFactor(
-                status?.primaryFactorType === "pin"
-                  ? value.replace(/\D+/g, "")
-                  : value,
+                loginPrimaryFactorIsPin ? value.replace(/\D+/g, "") : value,
               );
             }}
-            placeholder={
-              status?.primaryFactorType === "pin"
-                ? "Enter your PIN"
-                : "Enter your passphrase"
-            }
+            placeholder="Enter your PIN or password"
             type="password"
             value={loginPrimaryFactor}
           />
@@ -874,6 +1008,7 @@ export default function AuthShell({
               setError("");
               setLoginRecoveryCode("");
               setLoginTotpCode("");
+              setLoginPrimaryFactor("");
               setView("login");
             }}
             variant="secondary"
@@ -888,97 +1023,79 @@ export default function AuthShell({
   }
 
   return authConsoleShell({
-    title: "Set Password or Pin",
+    title: "Setup User",
     children: (
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <form
-          className="space-y-5 border border-[#162733] bg-[#06111a] px-6 py-6"
-          onSubmit={handleLoginSubmit}
-        >
-          <AuthInput
-            autoComplete="current-password"
-            inputMode={status?.primaryFactorType === "pin" ? "numeric" : "text"}
-            label={loginFactorLabel}
-            monospace={status?.primaryFactorType === "pin"}
-            onChange={(value) => {
-              setLoginPrimaryFactor(
-                status?.primaryFactorType === "pin"
-                  ? value.replace(/\D+/g, "")
-                  : value,
-              );
-            }}
-            placeholder={
-              status?.primaryFactorType === "pin"
-                ? "Enter your PIN"
-                : "Enter your password or passphrase"
-            }
-            type="password"
-            value={loginPrimaryFactor}
-          />
-          <AuthInput
-            autoComplete="one-time-code"
-            inputMode="numeric"
-            label="TOTP code"
-            maxLength={6}
-            monospace
-            onChange={(value) => {
-              setLoginTotpCode(value.replace(/\D+/g, ""));
-            }}
-            placeholder="Enter the current 6-digit code"
-            type="text"
-            value={loginTotpCode}
-          />
-
-          <AuthActionButton
-            disabled={isBusy}
-            type="submit"
-            variant="primary"
-            wide
-          >
-            {isBusy ? "Signing in..." : "Unlock workspace"}
-          </AuthActionButton>
-
-          <AuthActionButton
-            disabled={isBusy}
-            onClick={() => {
-              setError("");
-              setLoginTotpCode("");
-              setLoginRecoveryCode("");
-              setView("recovery-login");
-            }}
-            variant="secondary"
-            wide
-          >
-            Use a recovery code instead
-          </AuthActionButton>
-        </form>
-
-        <div className="space-y-5">
-          <div className="border border-[#162733] bg-[#0a1620] px-5 py-5">
-            <div className="font-mono text-[11px] tracking-[0.22em] text-[#688093] uppercase">
-              Active policy
-            </div>
-            <div className="mt-4 text-sm leading-7 text-[#8ea5b6]">
-              Every login requires the configured{" "}
-              {loginFactorLabel.toLowerCase()} plus the current TOTP code from
-              your authenticator app.
-            </div>
-          </div>
-
-          <div className="border border-[#162733] bg-[#06111a] px-5 py-5">
-            <div className="font-mono text-[11px] tracking-[0.22em] text-[#688093] uppercase">
-              Session scope
-            </div>
-            <div className="mt-4 text-sm leading-7 text-[#8ea5b6]">
-              Workspace data and RPC transport remain unavailable until the
-              sign-in succeeds.
-            </div>
-          </div>
+      <form
+        className="space-y-5 border border-[#162733] bg-[#06111a] px-6 py-6"
+        onSubmit={handleLoginSubmit}
+      >
+        <AuthInput
+          autoComplete="username"
+          label="Username"
+          onChange={setLoginUsername}
+          placeholder="Enter your username"
+          type="text"
+          value={loginUsername}
+        />
+        <AuthInput
+          autoComplete="current-password"
+          inputMode={loginPrimaryFactorIsPin ? "numeric" : "text"}
+          label={loginFactorLabel}
+          monospace={loginPrimaryFactorIsPin}
+          onChange={(value) => {
+            setLoginPrimaryFactor(
+              loginPrimaryFactorIsPin ? value.replace(/\D+/g, "") : value,
+            );
+          }}
+          placeholder="Enter your PIN or password"
+          type="password"
+          value={loginPrimaryFactor}
+        />
+        <AuthInput
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          label="TOTP code"
+          maxLength={6}
+          monospace
+          onChange={(value) => {
+            setLoginTotpCode(value.replace(/\D+/g, ""));
+          }}
+          placeholder="Enter the current 6-digit code"
+          type="text"
+          value={loginTotpCode}
+        />
+        <div className="text-sm leading-6 text-[#6a8799]">
+          Leave the TOTP field blank on first login. After your username and
+          primary factor are verified, you will be taken to authenticator setup.
         </div>
-      </div>
+
+        <AuthActionButton
+          disabled={isBusy}
+          type="submit"
+          variant="primary"
+          wide
+        >
+          {isBusy ? "Continuing..." : "Continue"}
+        </AuthActionButton>
+
+        <AuthActionButton
+          disabled={isBusy}
+          onClick={() => {
+            setError("");
+            setLoginTotpCode("");
+            setLoginRecoveryCode("");
+            setLoginPrimaryFactor("");
+            setView("recovery-login");
+          }}
+          variant="secondary"
+          wide
+        >
+          Use a recovery code instead
+        </AuthActionButton>
+      </form>
     ),
     error,
-    size: "xl",
+    size: "md",
     footer: lockedUntilLabel ? (
       <div className="border border-[#503526] bg-[#281a13] px-4 py-3 text-sm leading-7 text-[#efc092]">
         Too many failed attempts. Login is locked until {lockedUntilLabel}.

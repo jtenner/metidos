@@ -273,10 +273,11 @@ export function useProjectWorktreeController({
           snapshot: result.worktree,
           error: "",
         });
+        const currentProjectState = getProjectState(projectId);
         setProjectState(projectId, {
-          loadingWorktrees: false,
+          ...buildLoadedProjectWorktreesState(result.worktrees),
           openWorktrees: new Set([
-            ...getProjectState(projectId).openWorktrees,
+            ...currentProjectState.openWorktrees,
             worktreePath,
           ]),
         });

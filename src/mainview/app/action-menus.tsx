@@ -4,7 +4,7 @@
  */
 
 import type { FormEvent, JSX, RefObject } from "react";
-import type { RpcProject, RpcThread } from "../../bun/rpc-schema";
+import type { RpcProject, RpcThread, RpcWorktree } from "../../bun/rpc-schema";
 import { materialSymbol } from "../controls/icons";
 import {
   formatPathForDisplay,
@@ -18,12 +18,17 @@ import {
 type ProjectActionMenuProps = {
   error: string;
   homeDirectory: string;
+  hiddenWorktreePath: string;
+  hiddenWorktrees: RpcWorktree[];
   isCreatingWorktree: boolean;
+  isOpeningHiddenWorktree: boolean;
   menu: ProjectActionMenuState | null;
   newWorktreeName: string;
   onClose: () => void;
   onDeleteProject: () => void;
+  onHiddenWorktreePathChange: (value: string) => void;
   onNewWorktreeNameChange: (value: string) => void;
+  onOpenHiddenWorktree: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   project: RpcProject | null;
   projectActionMenuRef: RefObject<HTMLDivElement | null>;
@@ -32,17 +37,22 @@ type ProjectActionMenuProps = {
 };
 
 /**
- * Floating project action menu with project deletion and worktree creation.
+ * Floating project action menu with project deletion and subproject creation.
  */
 export function ProjectActionMenu({
   error,
   homeDirectory,
+  hiddenWorktreePath,
+  hiddenWorktrees,
   isCreatingWorktree,
+  isOpeningHiddenWorktree,
   menu,
   newWorktreeName,
   onClose,
   onDeleteProject,
+  onHiddenWorktreePathChange,
   onNewWorktreeNameChange,
+  onOpenHiddenWorktree,
   onSubmit,
   project,
   projectActionMenuRef,
@@ -56,7 +66,7 @@ export function ProjectActionMenu({
 
   return (
     <div
-      className="fixed z-[90] w-80 select-none overflow-hidden border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
+      className="fixed z-[90] max-h-[min(32rem,calc(100vh-24px))] w-80 select-none overflow-y-auto border border-[#35414a] bg-[#13181b]/96 shadow-[0_18px_42px_rgba(0,0,0,0.58)] backdrop-blur-xl"
       ref={projectActionMenuRef}
       style={{
         left: menu.x,
@@ -117,13 +127,13 @@ export function ProjectActionMenu({
           className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
           htmlFor="new-worktree-name"
         >
-          New Worktree
+          New Subproject
         </label>
         <div className="mt-2 flex items-center gap-2">
           <input
             id="new-worktree-name"
             className="min-w-0 flex-1 select-text border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors placeholder:text-[#727e86] focus:border-[#99bed9]"
-            placeholder="feature/new-worktree"
+            placeholder="feature/new-subproject"
             value={newWorktreeName}
             onChange={(event) => {
               onNewWorktreeNameChange(event.currentTarget.value);
@@ -135,16 +145,69 @@ export function ProjectActionMenu({
           {/* Disable while submission is in progress to prevent duplicate create-worktree requests. */}
           <button
             className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isCreatingWorktree || worktreePinBusyPath !== null}
+            disabled={
+              isCreatingWorktree ||
+              isOpeningHiddenWorktree ||
+              worktreePinBusyPath !== null
+            }
             type="submit"
           >
             {isCreatingWorktree ? "Creating" : "Create"}
           </button>
         </div>
         <div className="mt-2 text-xs text-[#828d94]">
-          Creates a new branch and sibling worktree folder.
+          Creates a new branch and sibling subproject folder.
         </div>
       </form>
+      {hiddenWorktrees.length > 0 ? (
+        <div className="border-t border-[#2b343b] bg-[#171d21] px-3 py-3">
+          <label
+            className="block text-[10px] font-label uppercase tracking-widest text-[#98b9d0]"
+            htmlFor="open-hidden-worktree"
+          >
+            Open Subproject
+          </label>
+          <div className="mt-2 flex items-center gap-2">
+            <select
+              id="open-hidden-worktree"
+              className="min-w-0 flex-1 border border-[#3b474f] bg-[#12171b] px-3 py-2 text-sm text-[#f2f0ef] outline-none transition-colors focus:border-[#99bed9]"
+              value={hiddenWorktreePath}
+              onChange={(event) => {
+                onHiddenWorktreePathChange(event.currentTarget.value);
+              }}
+            >
+              {hiddenWorktrees.map((worktree) => {
+                const displayPath = formatPathForDisplay(
+                  worktree.path,
+                  homeDirectory,
+                  supportsTildePath,
+                );
+                const label = worktree.branch?.trim()
+                  ? `${displayPath} · ${worktree.branch}`
+                  : displayPath;
+                return (
+                  <option key={worktree.path} value={worktree.path}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+            <button
+              type="button"
+              className="bg-[#f2f0ef] px-3 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-[#181818] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={
+                isCreatingWorktree ||
+                isOpeningHiddenWorktree ||
+                worktreePinBusyPath !== null ||
+                !hiddenWorktreePath
+              }
+              onClick={onOpenHiddenWorktree}
+            >
+              {isOpeningHiddenWorktree ? "Opening" : "Open"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

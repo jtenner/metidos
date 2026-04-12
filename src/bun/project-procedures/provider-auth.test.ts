@@ -27,6 +27,18 @@ const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+const ADMIN_CONTEXT = {
+  auth: {
+    authBypass: true,
+    isAdmin: true,
+    sessionId: null,
+    userId: null,
+    username: null,
+  },
+  priority: "foreground" as const,
+  signal: new AbortController().signal,
+  timeoutMs: null,
+};
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -126,9 +138,12 @@ describe("provider auth procedures", () => {
       codexHome: missingCodexHome,
     });
     const missingStatus =
-      await missingProcedures.getProviderAuthStatusProcedure({
-        providerId: "openai-codex",
-      });
+      await missingProcedures.getProviderAuthStatusProcedure(
+        {
+          providerId: "openai-codex",
+        },
+        ADMIN_CONTEXT,
+      );
     expect(missingStatus.provider).toEqual(
       expect.objectContaining({
         codexConfigFilePath: join(missingCodexHome, "config.toml"),
@@ -163,9 +178,12 @@ describe("provider auth procedures", () => {
       codexHome: unusableCodexHome,
     });
     const unusableStatus =
-      await unusableProcedures.getProviderAuthStatusProcedure({
-        providerId: "openai-codex",
-      });
+      await unusableProcedures.getProviderAuthStatusProcedure(
+        {
+          providerId: "openai-codex",
+        },
+        ADMIN_CONTEXT,
+      );
     expect(unusableStatus.provider).toEqual(
       expect.objectContaining({
         configured: false,
@@ -214,9 +232,12 @@ describe("provider auth procedures", () => {
       },
     });
 
-    const startResult = await procedures.startProviderAuthLoginProcedure({
-      providerId: "openai-codex",
-    });
+    const startResult = await procedures.startProviderAuthLoginProcedure(
+      {
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
     expect(startResult.provider).toEqual(
       expect.objectContaining({
         configured: false,
@@ -234,11 +255,14 @@ describe("provider auth procedures", () => {
     const loginId = startResult.provider.login?.loginId;
     expect(typeof loginId).toBe("string");
 
-    const completeResult = await procedures.completeProviderAuthLoginProcedure({
-      loginId: loginId ?? "",
-      manualCode: "code=manual-success",
-      providerId: "openai-codex",
-    });
+    const completeResult = await procedures.completeProviderAuthLoginProcedure(
+      {
+        loginId: loginId ?? "",
+        manualCode: "code=manual-success",
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
 
     expect(completeResult.provider).toEqual(
       expect.objectContaining({
@@ -279,9 +303,12 @@ describe("provider auth procedures", () => {
       },
     });
 
-    const logoutResult = await procedures.logoutProviderAuthProcedure({
-      providerId: "openai-codex",
-    });
+    const logoutResult = await procedures.logoutProviderAuthProcedure(
+      {
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
     expect(logoutResult.provider).toEqual(
       expect.objectContaining({
         configured: false,
@@ -353,10 +380,13 @@ describe("provider auth procedures", () => {
       },
     });
 
-    const startResult = await procedures.startProviderAuthLoginProcedure({
-      loginMode: "device",
-      providerId: "openai-codex",
-    });
+    const startResult = await procedures.startProviderAuthLoginProcedure(
+      {
+        loginMode: "device",
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
 
     expect(startResult.provider).toEqual(
       expect.objectContaining({
@@ -384,9 +414,12 @@ describe("provider auth procedures", () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const finishedStatus = await procedures.getProviderAuthStatusProcedure({
-      providerId: "openai-codex",
-    });
+    const finishedStatus = await procedures.getProviderAuthStatusProcedure(
+      {
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
     expect(finishedStatus.provider).toEqual(
       expect.objectContaining({
         accountId: "acct_device",
@@ -456,9 +489,12 @@ describe("provider auth procedures", () => {
       },
     });
 
-    const refreshResult = await procedures.refreshProviderAuthProcedure({
-      providerId: "openai-codex",
-    });
+    const refreshResult = await procedures.refreshProviderAuthProcedure(
+      {
+        providerId: "openai-codex",
+      },
+      ADMIN_CONTEXT,
+    );
 
     expect(refreshResult.provider).toEqual(
       expect.objectContaining({

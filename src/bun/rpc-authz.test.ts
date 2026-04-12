@@ -58,7 +58,10 @@ describe("rpc authz helpers", () => {
       context: {
         auth: {
           authBypass: true,
+          isAdmin: true,
           sessionId: null,
+          userId: null,
+          username: null,
         },
         priority: "foreground",
         signal: new AbortController().signal,
@@ -78,7 +81,10 @@ describe("rpc authz helpers", () => {
       context: {
         auth: {
           authBypass: false,
+          isAdmin: false,
           sessionId: "session-123",
+          userId: 17,
+          username: "alice",
         },
         priority: "foreground",
         signal: new AbortController().signal,

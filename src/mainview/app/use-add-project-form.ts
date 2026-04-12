@@ -383,7 +383,10 @@ export function useAddProjectForm({
       setIsAddingProject(true);
       setAddProjectError("");
       try {
-        const result = await procedures.openProject({ projectPath });
+        const result = await procedures.openProject({
+          initGitIfNeeded: true,
+          projectPath,
+        });
         // Hydrate project rows and select the project immediately after open.
         const existingState = getProjectState(result.project.id);
         upsertProject(result.project);

@@ -18,7 +18,9 @@ import {
   createSecurityAuditEvent,
   deleteAllAuthSessions,
   getAuthSettings,
+  getUserByUsername,
   initAppDatabase,
+  listKnownAuthUsernames,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
   upsertAuthSettings,
@@ -36,6 +38,7 @@ type CliAuthProofInput = TimestampOptions &
   AuthSecretOptions & {
     primaryFactor: string;
     totpCode: string;
+    username: string;
   };
 
 export type ResetPrimaryFactorInput = CliAuthProofInput & {
@@ -48,11 +51,12 @@ type AuthResetCommand = "regenerate-recovery-codes" | "reset-primary-factor";
 type ParsedArgs = {
   command: AuthResetCommand;
   newPrimaryFactorType?: AuthPrimaryFactorType;
+  username?: string;
 };
 
 const HELP_TEXT = `Usage:
-  bun run auth:reset reset-primary-factor [--new-type pin|password]
-  bun run auth:reset regenerate-recovery-codes
+  bun run auth:reset reset-primary-factor [--username name] [--new-type pin|password]
+  bun run auth:reset regenerate-recovery-codes [--username name]
 
 Commands:
   reset-primary-factor      Verify current factor + TOTP, then replace the PIN/password.
@@ -141,11 +145,31 @@ function parseArgs(args: string[]): ParsedArgs {
   }
 
   let newPrimaryFactorType: AuthPrimaryFactorType | undefined;
+  let username: string | undefined;
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
     if (!arg) {
       continue;
     }
+    if (arg === "--username") {
+      const nextValue = rest[index + 1]?.trim();
+      if (!nextValue) {
+        throw new Error(`Expected "--username" to be followed by a username.`);
+      }
+      username = nextValue;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--username=")) {
+      const value = arg.slice("--username=".length).trim();
+      if (!value) {
+        throw new Error("Username cannot be empty.");
+      }
+      username = value;
+      continue;
+    }
+
     if (arg === "--new-type") {
       const nextValue = rest[index + 1];
       if (!nextValue || !isAuthPrimaryFactorType(nextValue)) {
@@ -173,6 +197,7 @@ function parseArgs(args: string[]): ParsedArgs {
   return {
     command,
     ...(newPrimaryFactorType ? { newPrimaryFactorType } : {}),
+    ...(username ? { username } : {}),
   };
 }
 /**
@@ -184,6 +209,7 @@ function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
   return {
     primaryFactor: input.primaryFactor,
     totpCode: input.totpCode,
+    username: input.username,
     ...(typeof input.appDataDir === "string"
       ? {
           appDataDir: input.appDataDir,
@@ -209,7 +235,7 @@ export async function resetPrimaryFactorFromCli(
   revokedSessionCount: number;
   primaryFactorType: AuthPrimaryFactorType;
 }> {
-  const settings = await verifyPrimaryFactorAndTotp(
+  const { settings, user } = await verifyPrimaryFactorAndTotp(
     database,
     buildCliAuthProofInput(input),
   );
@@ -223,14 +249,17 @@ export async function resetPrimaryFactorFromCli(
     primaryFactorType: input.newPrimaryFactorType,
     sessionLifetimeDays: settings.sessionLifetimeDays,
     totpSecretCiphertext: settings.totpSecretCiphertext,
+    userId: user.id,
   });
-  resetAuthFailureState(database);
-  const revokedSessionCount = deleteAllAuthSessions(database);
+  resetAuthFailureState(database, user.id);
+  const revokedSessionCount = deleteAllAuthSessions(database, user.id);
   createSecurityAuditEvent(database, {
     eventType: "primary_factor_reset",
     payloadJson: JSON.stringify({
       primaryFactorType: input.newPrimaryFactorType,
       revokedSessionCount,
+      userId: user.id,
+      username: user.username,
     }),
     summaryText: "Primary factor was reset via the authenticated CLI flow.",
   });
@@ -249,16 +278,21 @@ export async function regenerateRecoveryCodesFromCli(
   database: Database,
   input: CliAuthProofInput,
 ): Promise<string[]> {
-  await verifyPrimaryFactorAndTotp(database, buildCliAuthProofInput(input));
+  const { user } = await verifyPrimaryFactorAndTotp(
+    database,
+    buildCliAuthProofInput(input),
+  );
   const recoveryCodes = generateRecoveryCodes();
   const codeHashes = await Promise.all(
     recoveryCodes.map((code) => hashRecoveryCode(code)),
   );
-  replaceAuthRecoveryCodeHashes(database, codeHashes);
+  replaceAuthRecoveryCodeHashes(database, codeHashes, user.id);
   createSecurityAuditEvent(database, {
     eventType: "recovery_codes_regenerated",
     payloadJson: JSON.stringify({
       recoveryCodeCount: recoveryCodes.length,
+      userId: user.id,
+      username: user.username,
     }),
     summaryText:
       "Recovery codes were regenerated via the authenticated CLI flow.",
@@ -320,6 +354,22 @@ async function promptPrimaryFactorType(
     console.error('Please enter either "pin" or "password".');
   }
 }
+
+async function promptUsername(
+  readlineInterface: ReturnType<typeof createInterface>,
+  knownUsernames: readonly string[],
+): Promise<string> {
+  while (true) {
+    const value = await promptVisible(
+      readlineInterface,
+      `Enter username${knownUsernames.length ? ` (${knownUsernames.join(", ")})` : ""}: `,
+    );
+    if (value) {
+      return value;
+    }
+    console.error("Username is required.");
+  }
+}
 /**
  * Run the interactive reset flow from command line prompts.
  * @param args - Process argv arguments.
@@ -332,8 +382,8 @@ async function runInteractiveCli(args: string[]): Promise<void> {
 
   const parsedArgs = parseArgs(args);
   const database = initAppDatabase();
-  const settings = getAuthSettings(database);
-  if (!settings) {
+  const knownUsernames = listKnownAuthUsernames(database);
+  if (knownUsernames.length === 0) {
     throw new Error("Authentication is not configured yet.");
   }
 
@@ -345,6 +395,16 @@ async function runInteractiveCli(args: string[]): Promise<void> {
   });
 
   try {
+    const username =
+      parsedArgs.username ??
+      (knownUsernames.length === 1
+        ? (knownUsernames[0] ?? "")
+        : await promptUsername(readlineInterface, knownUsernames));
+    const user = getUserByUsername(database, username);
+    const settings = user ? getAuthSettings(database, user.id) : null;
+    if (!user || !settings) {
+      throw new Error(`No configured user found for "${username}".`);
+    }
     const currentPrimaryFactor = await promptSecret(
       readlineInterface,
       output,
@@ -379,6 +439,7 @@ async function runInteractiveCli(args: string[]): Promise<void> {
         newPrimaryFactorType,
         primaryFactor: currentPrimaryFactor,
         totpCode,
+        username,
       });
       console.log(
         `Primary factor updated to ${result.primaryFactorType}. Revoked ${result.revokedSessionCount} existing session(s).`,
@@ -389,6 +450,7 @@ async function runInteractiveCli(args: string[]): Promise<void> {
     const recoveryCodes = await regenerateRecoveryCodesFromCli(database, {
       primaryFactor: currentPrimaryFactor,
       totpCode,
+      username,
     });
     console.log(
       "New recovery codes generated. They are shown once below; store them before closing this terminal.",

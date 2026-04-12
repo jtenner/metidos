@@ -130,10 +130,7 @@ import {
   ThreadAccessControl,
   type ThreadAccessValue,
 } from "./controls/thread-access-control";
-import {
-  buildLoadedProjectWorktreesState,
-  shouldRefreshProjectActionMenuWorktrees,
-} from "./project-worktree-refresh";
+import { buildLoadedProjectWorktreesState } from "./project-worktree-refresh";
 import { isStepUpRequiredError } from "./rpc-errors";
 import {
   closeProjectsForStartupRestore,
@@ -332,6 +329,7 @@ function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
 }
 
 type AppProps = {
+  isAdmin: boolean;
   primaryFactorType: AuthPrimaryFactorType | null;
   procedures: ProjectProcedures;
 };
@@ -469,6 +467,7 @@ declare global {
  */
 
 export default function App({
+  isAdmin,
   primaryFactorType,
   procedures,
 }: AppProps): JSX.Element {
@@ -492,11 +491,20 @@ export default function App({
   const [threadActionMenu, setThreadActionMenu] =
     useState<ThreadActionMenuState | null>(null);
   const [projectActionMenuError, setProjectActionMenuError] = useState("");
+  const [
+    projectActionMenuHiddenWorktreePath,
+    setProjectActionMenuHiddenWorktreePath,
+  ] = useState("");
+  const [
+    projectActionMenuHiddenWorktrees,
+    setProjectActionMenuHiddenWorktrees,
+  ] = useState<RpcWorktree[]>([]);
   const [threadActionMenuError, setThreadActionMenuError] = useState("");
   const [newWorktreeName, setNewWorktreeName] = useState("");
   const [threadRenameTitle, setThreadRenameTitle] = useState("");
   const [threadRenameSummary, setThreadRenameSummary] = useState("");
   const [isCreatingWorktree, setIsCreatingWorktree] = useState(false);
+  const [isOpeningHiddenWorktree, setIsOpeningHiddenWorktree] = useState(false);
   const [worktreePinBusyPath, setWorktreePinBusyPath] = useState<string | null>(
     null,
   );
@@ -1551,7 +1559,7 @@ export default function App({
     setSelectedWorktreePath(thread.worktreePath);
   }, []);
 
-  const { ensureWorktreeOpen, loadProjectWorktrees, refreshProject } =
+  const { ensureWorktreeOpen, loadProjectWorktrees } =
     useProjectWorktreeController({
       activeSelectedWorktreePath,
       getProjectState,
@@ -2524,6 +2532,10 @@ export default function App({
 
       for (const result of restoredOpenWorktrees) {
         if (result.ok) {
+          setProjectState(
+            result.projectId,
+            buildLoadedProjectWorktreesState(result.worktrees),
+          );
           primeGitHistoryResult(result.history);
           setWorktreeState(result.projectId, result.worktreePath, {
             loading: false,
@@ -2616,7 +2628,10 @@ export default function App({
   const closeProjectActionMenu = useCallback(() => {
     setProjectActionMenu(null);
     setProjectActionMenuError("");
+    setProjectActionMenuHiddenWorktreePath("");
+    setProjectActionMenuHiddenWorktrees([]);
     setNewWorktreeName("");
+    setIsOpeningHiddenWorktree(false);
   }, []);
 
   const closeThreadActionMenu = useCallback(() => {
@@ -2639,21 +2654,35 @@ export default function App({
       setProjectActionMenu({
         projectId: project.id,
         x: clampProjectMenuCoordinate(x, viewportWidth, 336),
-        y: clampProjectMenuCoordinate(y, viewportHeight, 420),
+        y: clampProjectMenuCoordinate(y, viewportHeight, 520),
       });
       setProjectActionMenuError("");
+      setProjectActionMenuHiddenWorktreePath("");
+      setProjectActionMenuHiddenWorktrees([]);
       setNewWorktreeName("");
-
-      if (
-        !shouldRefreshProjectActionMenuWorktrees(getProjectState(project.id))
-      ) {
-        return;
-      }
+      setIsOpeningHiddenWorktree(false);
 
       try {
-        await loadProjectWorktrees(project.id, {
-          backgroundRefresh: true,
-        });
+        const result = await procedures.listProjectWorktrees(
+          {
+            includeHidden: true,
+            projectId: project.id,
+          },
+          {
+            priority: "foreground",
+          },
+        );
+        if (projectActionMenuRequestId.current !== requestId) {
+          return;
+        }
+        setProjectState(
+          project.id,
+          buildLoadedProjectWorktreesState(result.worktrees),
+        );
+        setProjectActionMenuHiddenWorktrees(result.hiddenWorktrees);
+        setProjectActionMenuHiddenWorktreePath(
+          result.hiddenWorktrees[0]?.path ?? "",
+        );
       } catch (error) {
         if (projectActionMenuRequestId.current === requestId) {
           setProjectActionMenuError(
@@ -2662,7 +2691,7 @@ export default function App({
         }
       }
     },
-    [closeThreadActionMenu, getProjectState, loadProjectWorktrees],
+    [closeThreadActionMenu, procedures, setProjectState],
   );
 
   const openThreadActionMenu = useCallback(
@@ -2895,13 +2924,18 @@ export default function App({
   const submitNewWorktree = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!projectActionMenu || isCreatingWorktree || worktreePinBusyPath) {
+      if (
+        !projectActionMenu ||
+        isCreatingWorktree ||
+        isOpeningHiddenWorktree ||
+        worktreePinBusyPath
+      ) {
         return;
       }
 
       const name = newWorktreeName.trim();
       if (!name) {
-        setProjectActionMenuError("Enter a worktree name.");
+        setProjectActionMenuError("Enter a subproject name.");
         return;
       }
 
@@ -2916,6 +2950,10 @@ export default function App({
           projectActionMenu.projectId,
           buildLoadedProjectWorktreesState(result.worktrees),
         );
+        clearThreadSelection();
+        selectProject(result.project, result.worktreePath);
+        closeProjectActionMenu();
+        void ensureWorktreeOpen(result.project.id, result.worktreePath);
         setNewWorktreeName("");
       } catch (error) {
         setProjectActionMenuError(
@@ -2926,14 +2964,63 @@ export default function App({
       }
     },
     [
+      clearThreadSelection,
+      closeProjectActionMenu,
+      ensureWorktreeOpen,
       isCreatingWorktree,
+      isOpeningHiddenWorktree,
       newWorktreeName,
       procedures,
       projectActionMenu,
+      selectProject,
       setProjectState,
       worktreePinBusyPath,
     ],
   );
+
+  const openHiddenProjectWorktree = useCallback(async () => {
+    if (
+      !projectActionMenu ||
+      !projectActionMenuHiddenWorktreePath ||
+      isCreatingWorktree ||
+      isOpeningHiddenWorktree ||
+      worktreePinBusyPath
+    ) {
+      return;
+    }
+
+    const project = projectStore.byId[projectActionMenu.projectId] ?? null;
+    if (!project) {
+      setProjectActionMenuError("Project no longer exists.");
+      return;
+    }
+
+    setIsOpeningHiddenWorktree(true);
+    setProjectActionMenuError("");
+    try {
+      await ensureWorktreeOpen(project.id, projectActionMenuHiddenWorktreePath);
+      clearThreadSelection();
+      selectProject(project, projectActionMenuHiddenWorktreePath);
+      closeProjectActionMenu();
+    } catch (error) {
+      setProjectActionMenuError(
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setIsOpeningHiddenWorktree(false);
+    }
+  }, [
+    clearThreadSelection,
+    closeProjectActionMenu,
+    ensureWorktreeOpen,
+    isCreatingWorktree,
+    isOpeningHiddenWorktree,
+    projectActionMenu,
+    projectActionMenuHiddenWorktreePath,
+    projectStore.byId,
+    selectProject,
+    worktreePinBusyPath,
+  ]);
 
   useEffect(() => {
     if (!projectActionMenu) {
@@ -3621,26 +3708,64 @@ export default function App({
   const handleProjectWorktreeClick = useCallback(
     (project: RpcProject, worktreePath: string) => {
       setThreadsError("");
-      const target = getWorktreeState(project.id, worktreePath);
-      const alreadySelected =
-        selectedProjectIdRef.current === project.id &&
-        selectedWorktreePathRef.current === worktreePath;
-      if (!alreadySelected) {
-        clearThreadSelection();
-        selectProject(project, worktreePath);
-      }
-      syncSelectedWorktreeThread(project.id, worktreePath);
-      if (target.opened || target.loading) {
-        return;
-      }
-      void ensureWorktreeOpen(project.id, worktreePath);
+      void (async () => {
+        let resolvedProject = project;
+        let resolvedProjectId = project.id;
+        const projectState = getProjectState(project.id);
+        if (
+          project.isOpen !== 1 ||
+          projectStateWorktrees(projectState).length === 0
+        ) {
+          try {
+            const openedProject = await procedures.openProject(
+              {
+                name: project.name,
+                projectPath: project.path,
+              },
+              {
+                priority: "foreground",
+              },
+            );
+            upsertProject(openedProject.project);
+            setProjectState(
+              openedProject.project.id,
+              buildLoadedProjectWorktreesState(openedProject.worktrees),
+            );
+            resolvedProject = openedProject.project;
+            resolvedProjectId = openedProject.project.id;
+          } catch (error) {
+            setThreadsError(
+              error instanceof Error ? error.message : String(error),
+            );
+            return;
+          }
+        }
+
+        const target = getWorktreeState(resolvedProjectId, worktreePath);
+        const alreadySelected =
+          selectedProjectIdRef.current === resolvedProjectId &&
+          selectedWorktreePathRef.current === worktreePath;
+        if (!alreadySelected) {
+          clearThreadSelection();
+          selectProject(resolvedProject, worktreePath);
+        }
+        syncSelectedWorktreeThread(resolvedProjectId, worktreePath);
+        if (target.opened || target.loading) {
+          return;
+        }
+        await ensureWorktreeOpen(resolvedProjectId, worktreePath);
+      })();
     },
     [
       clearThreadSelection,
       ensureWorktreeOpen,
+      getProjectState,
       getWorktreeState,
+      procedures,
       selectProject,
+      setProjectState,
       syncSelectedWorktreeThread,
+      upsertProject,
     ],
   );
 
@@ -3794,7 +3919,7 @@ export default function App({
         ),
       ];
     } else if (threadMessages.length === 0) {
-      const threadReadyMessageText = `Thread ready in ${selectedProject?.name ?? "this project"} · ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`;
+      const threadReadyMessageText = `Thread ready in ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`;
       messages = [
         readCachedVisibleMessage(
           visibleMessageCache,
@@ -4472,6 +4597,7 @@ export default function App({
           </div>
           <div className="flex items-center gap-3">
             <SettingsPanel
+              isAdmin={isAdmin}
               onModelCatalogChange={applyModelCatalog}
               procedures={procedures}
               variant="desktop"
@@ -4485,7 +4611,7 @@ export default function App({
         >
           <span className="font-label text-xs font-bold text-[#bdd5e6] shrink-0">
             {selectedThread?.title ??
-              selectedProject?.name ??
+              activeSelectedWorktreeFolder ??
               "No project selected"}
           </span>
           {selectedProject ? (
@@ -4574,14 +4700,12 @@ export default function App({
                     onDirectorySuggestionLeave: handleDirectorySuggestionLeave,
                     onOpenProjectActionMenu: openProjectActionMenu,
                     onProjectWorktreeClick: handleProjectWorktreeClick,
-                    onRefreshProject: refreshProject,
                     onSelectDirectorySuggestion: selectDirectorySuggestion,
                     onSubmitAddProject: submitAddProject,
                     onToggleAddProjectForm: toggleAddProjectForm,
                     onToggleWorktreePinned: handleToggleWorktreePinned,
                     onToggleWorktreeThreadSwitcher:
                       handleToggleDesktopThreadSwitcher,
-                    selectedProjectId,
                     sidebarActionButtonClass,
                     supportsTildePath,
                     threadSwitcherEnabled: true,
@@ -4590,7 +4714,7 @@ export default function App({
                     worktreeDisplayPathByKey,
                     worktreeSearchTextByKey,
                   }}
-                  selectedProjectName={selectedProject?.name ?? null}
+                  selectedProjectName={activeSelectedWorktreeFolder}
                 />
               </div>
             )}
@@ -4734,6 +4858,7 @@ export default function App({
                             disabled={isCreatingCronJob}
                             onChange={handleCronEditorAccessChange}
                             title="Access controls for this cron job."
+                            unsafeModeDisabled={!isAdmin}
                             value={cronEditorAccessValue}
                             variant="desktop"
                           />
@@ -4820,6 +4945,7 @@ export default function App({
                             disabled={isCreatingCronJob}
                             onChange={handleCronEditorAccessChange}
                             title="Access controls for this cron job."
+                            unsafeModeDisabled={!isAdmin}
                             value={cronEditorAccessValue}
                             variant="desktop"
                           />
@@ -4942,6 +5068,7 @@ export default function App({
           </div>
           <div className="flex items-center gap-3">
             <SettingsPanel
+              isAdmin={isAdmin}
               onModelCatalogChange={applyModelCatalog}
               procedures={procedures}
               variant="mobile"
@@ -4993,14 +5120,12 @@ export default function App({
                 onDirectorySuggestionLeave: handleDirectorySuggestionLeave,
                 onOpenProjectActionMenu: openProjectActionMenu,
                 onProjectWorktreeClick: handleProjectWorktreeClick,
-                onRefreshProject: refreshProject,
                 onSelectDirectorySuggestion: selectDirectorySuggestion,
                 onSubmitAddProject: submitAddProject,
                 onToggleAddProjectForm: toggleAddProjectForm,
                 onToggleWorktreePinned: handleToggleWorktreePinned,
                 onToggleWorktreeThreadSwitcher:
                   handleToggleDesktopThreadSwitcher,
-                selectedProjectId,
                 sidebarActionButtonClass,
                 supportsTildePath,
                 threadSwitcherEnabled: false,
@@ -5009,7 +5134,7 @@ export default function App({
                 worktreeDisplayPathByKey,
                 worktreeSearchTextByKey,
               }}
-              selectedProjectName={selectedProject?.name ?? null}
+              selectedProjectName={activeSelectedWorktreeFolder}
               sidebarSearchQuery={sidebarSearchQuery}
               workspacePanelProps={{
                 acknowledgeThreadErrorSeenInBackground,
@@ -5036,7 +5161,7 @@ export default function App({
                 selectedThreadId,
                 sidebarActionButtonClass,
                 selectedProjectNameForThread:
-                  selectedProject?.name ?? "Current project",
+                  activeSelectedWorktreeFolder ?? "Current project",
                 threadPreviewsDisabled: threadActionMenu !== null,
                 threadActivityIndicator,
                 threadsError,
@@ -5185,6 +5310,7 @@ export default function App({
                           disabled={isCreatingCronJob}
                           onChange={handleCronEditorAccessChange}
                           title="Access controls for this cron job."
+                          unsafeModeDisabled={!isAdmin}
                           value={cronEditorAccessValue}
                           variant="mobile"
                         />
@@ -5271,6 +5397,7 @@ export default function App({
                           disabled={isCreatingCronJob}
                           onChange={handleCronEditorAccessChange}
                           title="Access controls for this cron job."
+                          unsafeModeDisabled={!isAdmin}
                           value={cronEditorAccessValue}
                           variant="mobile"
                         />
@@ -5636,7 +5763,10 @@ export default function App({
       <ProjectActionMenu
         error={projectActionMenuError}
         homeDirectory={homeDirectory}
+        hiddenWorktreePath={projectActionMenuHiddenWorktreePath}
+        hiddenWorktrees={projectActionMenuHiddenWorktrees}
         isCreatingWorktree={isCreatingWorktree}
+        isOpeningHiddenWorktree={isOpeningHiddenWorktree}
         menu={projectActionMenu}
         newWorktreeName={newWorktreeName}
         onClose={closeProjectActionMenu}
@@ -5646,7 +5776,11 @@ export default function App({
           }
           void deleteTrackedProject(projectActionMenuProject.id);
         }}
+        onHiddenWorktreePathChange={setProjectActionMenuHiddenWorktreePath}
         onNewWorktreeNameChange={handleNewWorktreeNameChange}
+        onOpenHiddenWorktree={() => {
+          void openHiddenProjectWorktree();
+        }}
         onSubmit={submitNewWorktree}
         project={projectActionMenuProject}
         projectActionMenuRef={projectActionMenuRef}

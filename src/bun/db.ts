@@ -23,6 +23,8 @@ const DB_FILE_NAME = "app.db";
 export const DEFAULT_THREAD_MODEL = "gpt-5.4";
 /** Default reasoning effort used for thread creation and migration repair. */
 export const DEFAULT_THREAD_REASONING_EFFORT = "medium";
+export const LEGACY_DEFAULT_USERNAME = "jtenner";
+const PREVIOUS_LEGACY_DEFAULT_USERNAME = "local-user";
 const PREVIOUS_BRAND_ACCESS_COLUMN_NAME = ["jo", "lt_access"].join("");
 /** Lazily-initialized singleton db handle for the process lifetime. */
 
@@ -37,6 +39,7 @@ const TEST_APP_DATABASE_JOURNAL_MODE = "delete";
 const TEST_APP_DATABASE_SYNCHRONOUS = "FULL";
 
 type ProjectInput = {
+  ownerUserId?: number | null;
   projectPath: string;
   name?: string | null;
 };
@@ -106,6 +109,7 @@ type ThreadActivityPersistInput = ThreadActivityInput & {
 export type AuthPrimaryFactorType = "pin" | "password";
 
 type AuthSettingsInput = {
+  userId?: number | null;
   primaryFactorType: AuthPrimaryFactorType;
   primaryFactorHash: string;
   totpSecretCiphertext: string;
@@ -114,10 +118,16 @@ type AuthSettingsInput = {
 
 type AuthSessionInput = {
   id: string;
+  userId?: number | null;
   issuedAt: string;
   expiresAt: string;
   lastUsedAt: string;
   stepUpValidUntil?: string | null;
+};
+
+type UserInput = {
+  isAdmin: boolean;
+  username: string;
 };
 
 type AuthWebSocketTicketInput = {
@@ -139,6 +149,7 @@ type SecurityAuditEventInput = {
 /** Public DB shape for project rows returned from queries. */
 export type ProjectRecord = {
   id: number;
+  ownerUserId: number;
   path: string;
   name: string;
   gitRemote: string | null;
@@ -152,6 +163,7 @@ export type ProjectRecord = {
 
 export type ThreadRecord = {
   id: number;
+  ownerUserId: number;
   projectId: number;
   worktreePath: string;
   title: string;
@@ -207,10 +219,10 @@ export type ThreadMessageRecord = {
   updatedAt: string;
 };
 
-export type ProjectWorktreePinRecord = {
+export type ProjectWorktreeRecord = {
   projectId: number;
   worktreePath: string;
-  pinnedAt: string;
+  pinnedAt: string | null;
 };
 
 export type InProgressThreadMessageRecord = {
@@ -219,7 +231,7 @@ export type InProgressThreadMessageRecord = {
 };
 
 export type AuthSettingsRecord = {
-  id: number;
+  userId: number;
   primaryFactorType: AuthPrimaryFactorType;
   primaryFactorHash: string;
   totpSecretCiphertext: string;
@@ -232,6 +244,9 @@ export type AuthSettingsRecord = {
 
 export type AuthSessionRecord = {
   id: string;
+  userId: number;
+  username: string;
+  isAdmin: boolean;
   issuedAt: string;
   expiresAt: string;
   lastUsedAt: string;
@@ -240,6 +255,7 @@ export type AuthSessionRecord = {
 
 export type AuthRecoveryCodeRecord = {
   id: number;
+  userId: number;
   codeHash: string;
   usedAt: string | null;
   createdAt: string;
@@ -264,6 +280,27 @@ export type SecurityAuditEventRecord = {
   createdAt: string;
 };
 
+export type UserRecord = {
+  id: number;
+  username: string;
+  isAdmin: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserSetupRecord = UserRecord & {
+  configured: boolean;
+};
+
+type AuthSessionSqlRecord = Omit<AuthSessionRecord, "isAdmin"> & {
+  isAdmin: 0 | 1;
+};
+
+type UserSetupSqlRecord = Omit<UserSetupRecord, "configured" | "isAdmin"> & {
+  configured: 0 | 1;
+  isAdmin: 0 | 1;
+};
+
 export type CronJobRunStatus =
   | "InProgress"
   | "Stopped"
@@ -272,6 +309,7 @@ export type CronJobRunStatus =
 
 export type CronJobRecord = {
   id: number;
+  ownerUserId: number;
   projectId: number;
   worktreePath: string;
   schedule: string;
@@ -581,6 +619,20 @@ function tableHasColumn(
     .some((column) => column.name === columnName);
 }
 
+function tableColumnIsNotNull(
+  db: Database,
+  tableName: string,
+  columnName: string,
+): boolean {
+  const column = db
+    .query<{ name: string; notnull: number }, []>(
+      `PRAGMA table_info(${tableName})`,
+    )
+    .all()
+    .find((entry) => entry.name === columnName);
+  return column?.notnull === 1;
+}
+
 /**
  * Ensure `threads` has a column for evolving schema versions.
  * This lets existing databases safely add newer nullable/default fields.
@@ -664,6 +716,372 @@ function dedupeActiveCronJobTitles(database: Database): void {
   }
 }
 
+function tableExists(db: Database, tableName: string): boolean {
+  return Boolean(
+    db
+      .query<{ name: string }, [string]>(
+        `
+			SELECT name
+			FROM sqlite_master
+			WHERE type = 'table' AND name = ?
+		`,
+      )
+      .get(tableName),
+  );
+}
+
+function countRows(db: Database, tableName: string): number {
+  const row = db
+    .query<{ count: number }, []>(`SELECT COUNT(*) AS count FROM ${tableName}`)
+    .get();
+  return row?.count ?? 0;
+}
+
+function getFirstUserId(db: Database): number | null {
+  const row = db
+    .query<{ id: number }, []>(
+      `
+			SELECT id
+			FROM users
+			ORDER BY id ASC
+			LIMIT 1
+		`,
+    )
+    .get();
+  return row?.id ?? null;
+}
+
+function createLegacyBootstrapUser(db: Database): number {
+  runStatement(
+    db,
+    `
+			INSERT INTO users (
+				username,
+				is_admin,
+				updated_at
+			)
+			VALUES (
+				?,
+				1,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			)
+			ON CONFLICT(username) DO UPDATE SET
+				is_admin = 1,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		`,
+    LEGACY_DEFAULT_USERNAME,
+  );
+  const userId = getFirstUserId(db);
+  if (userId === null) {
+    throw new Error("Failed to create the legacy bootstrap user.");
+  }
+  return userId;
+}
+
+function renameLegacyBootstrapUser(db: Database): void {
+  if (!tableExists(db, "users")) {
+    return;
+  }
+
+  const previousUser = db
+    .query<{ id: number }, [string]>(
+      `
+			SELECT id
+			FROM users
+			WHERE username = ?
+			LIMIT 1
+		`,
+    )
+    .get(PREVIOUS_LEGACY_DEFAULT_USERNAME);
+  if (!previousUser) {
+    return;
+  }
+
+  const replacementUser = db
+    .query<{ id: number }, [string]>(
+      `
+			SELECT id
+			FROM users
+			WHERE username = ?
+			LIMIT 1
+		`,
+    )
+    .get(LEGACY_DEFAULT_USERNAME);
+  if (replacementUser && replacementUser.id !== previousUser.id) {
+    return;
+  }
+
+  runStatement(
+    db,
+    `
+			UPDATE users
+			SET
+				username = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    LEGACY_DEFAULT_USERNAME,
+    previousUser.id,
+  );
+}
+
+function resolveMigrationOwnerUserId(db: Database): number | null {
+  const existingUserId = getFirstUserId(db);
+  if (existingUserId !== null) {
+    return existingUserId;
+  }
+
+  const hasLegacyAuthSettings =
+    tableExists(db, "auth_settings") && countRows(db, "auth_settings") > 0;
+  const hasProjects =
+    tableExists(db, "projects") && countRows(db, "projects") > 0;
+  if (!hasLegacyAuthSettings && !hasProjects) {
+    return null;
+  }
+
+  return createLegacyBootstrapUser(db);
+}
+
+function rebuildProjectsTableForMultiUser(db: Database): void {
+  if (
+    !tableExists(db, "projects") ||
+    tableHasColumn(db, "projects", "owner_user_id")
+  ) {
+    return;
+  }
+
+  const legacyProjectCount = countRows(db, "projects");
+  const ownerUserId =
+    legacyProjectCount > 0 ? resolveMigrationOwnerUserId(db) : null;
+  if (legacyProjectCount > 0 && ownerUserId === null) {
+    throw new Error("Unable to determine the owner for legacy project data.");
+  }
+
+  runStatement(db, "PRAGMA foreign_keys = OFF");
+  try {
+    runStatement(
+      db,
+      `
+			CREATE TABLE projects_multi_user (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				path TEXT NOT NULL,
+				name TEXT NOT NULL,
+				git_remote TEXT,
+				is_open INTEGER NOT NULL DEFAULT 1,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				UNIQUE(owner_user_id, path)
+			);
+		`,
+    );
+    if (legacyProjectCount > 0) {
+      runStatement(
+        db,
+        `
+			INSERT INTO projects_multi_user (
+				id,
+				owner_user_id,
+				path,
+				name,
+				git_remote,
+				is_open,
+				created_at,
+				updated_at,
+				last_opened_at
+			)
+			SELECT
+				id,
+				?,
+				path,
+				name,
+				git_remote,
+				is_open,
+				created_at,
+				updated_at,
+				last_opened_at
+			FROM projects
+		`,
+        ownerUserId,
+      );
+    }
+    runStatement(db, "DROP TABLE projects");
+    runStatement(db, "ALTER TABLE projects_multi_user RENAME TO projects");
+  } finally {
+    runStatement(db, "PRAGMA foreign_keys = ON");
+  }
+}
+
+function rebuildProjectWorktreesTableForTracking(db: Database): void {
+  if (
+    !tableExists(db, "project_worktrees") ||
+    !tableColumnIsNotNull(db, "project_worktrees", "pinned_at")
+  ) {
+    return;
+  }
+
+  const legacyRowCount = countRows(db, "project_worktrees");
+
+  runStatement(db, "PRAGMA foreign_keys = OFF");
+  try {
+    runStatement(
+      db,
+      `
+			CREATE TABLE project_worktrees_tracked (
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				pinned_at TEXT,
+				PRIMARY KEY (project_id, worktree_path)
+			);
+		`,
+    );
+    if (legacyRowCount > 0) {
+      runStatement(
+        db,
+        `
+			INSERT INTO project_worktrees_tracked (
+				project_id,
+				worktree_path,
+				pinned_at
+			)
+			SELECT
+				project_id,
+				worktree_path,
+				pinned_at
+			FROM project_worktrees
+		`,
+      );
+    }
+    runStatement(db, "DROP TABLE project_worktrees");
+    runStatement(
+      db,
+      "ALTER TABLE project_worktrees_tracked RENAME TO project_worktrees",
+    );
+  } finally {
+    runStatement(db, "PRAGMA foreign_keys = ON");
+  }
+}
+
+function migrateLegacySingleUserAuth(db: Database): void {
+  if (
+    !tableExists(db, "users") ||
+    !tableExists(db, "user_auth_settings") ||
+    !tableExists(db, "auth_settings")
+  ) {
+    return;
+  }
+  if (
+    countRows(db, "user_auth_settings") > 0 ||
+    countRows(db, "auth_settings") === 0
+  ) {
+    return;
+  }
+
+  const ownerUserId = resolveMigrationOwnerUserId(db);
+  if (ownerUserId === null) {
+    return;
+  }
+
+  runStatement(
+    db,
+    `
+			INSERT INTO user_auth_settings (
+				user_id,
+				primary_factor_type,
+				primary_factor_hash,
+				totp_secret_ciphertext,
+				session_lifetime_days,
+				failed_primary_factor_attempts,
+				locked_until,
+				created_at,
+				updated_at
+			)
+			SELECT
+				?,
+				primary_factor_type,
+				primary_factor_hash,
+				totp_secret_ciphertext,
+				session_lifetime_days,
+				failed_primary_factor_attempts,
+				locked_until,
+				created_at,
+				updated_at
+			FROM auth_settings
+			WHERE id = 1
+		`,
+    ownerUserId,
+  );
+
+  if (tableExists(db, "auth_recovery_codes")) {
+    runStatement(
+      db,
+      `
+			INSERT INTO user_auth_recovery_codes (
+				user_id,
+				code_hash,
+				used_at,
+				created_at
+			)
+			SELECT
+				?,
+				code_hash,
+				used_at,
+				created_at
+			FROM auth_recovery_codes
+		`,
+      ownerUserId,
+    );
+  }
+
+  if (tableExists(db, "auth_sessions")) {
+    runStatement(
+      db,
+      `
+			INSERT INTO user_auth_sessions (
+				id,
+				user_id,
+				issued_at,
+				expires_at,
+				last_used_at,
+				step_up_valid_until
+			)
+			SELECT
+				id,
+				?,
+				issued_at,
+				expires_at,
+				last_used_at,
+				step_up_valid_until
+			FROM auth_sessions
+		`,
+      ownerUserId,
+    );
+  }
+
+  if (tableExists(db, "auth_websocket_tickets")) {
+    runStatement(
+      db,
+      `
+			INSERT INTO user_auth_websocket_tickets (
+				id,
+				session_id,
+				issued_at,
+				expires_at,
+				consumed_at
+			)
+			SELECT
+				id,
+				session_id,
+				issued_at,
+				expires_at,
+				consumed_at
+			FROM auth_websocket_tickets
+		`,
+    );
+  }
+}
+
 /**
  * Migrate/create schema and apply incremental column backfills on startup.
  * Keeps the on-disk DB in sync with expected runtime shape.
@@ -673,29 +1091,129 @@ export function migrateDatabase(db: Database): void {
   runStatement(
     db,
     `
-			CREATE TABLE IF NOT EXISTS projects (
+			CREATE TABLE IF NOT EXISTS users (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
-			path TEXT NOT NULL UNIQUE,
-			name TEXT NOT NULL,
-			git_remote TEXT,
-			is_open INTEGER NOT NULL DEFAULT 1,
-			created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-			updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+				username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+				is_admin INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  renameLegacyBootstrapUser(db);
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS user_auth_settings (
+				user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+				primary_factor_type TEXT NOT NULL CHECK(primary_factor_type IN ('pin', 'password')),
+				primary_factor_hash TEXT NOT NULL,
+				totp_secret_ciphertext TEXT NOT NULL,
+				session_lifetime_days INTEGER NOT NULL DEFAULT 7,
+				failed_primary_factor_attempts INTEGER NOT NULL DEFAULT 0,
+				locked_until TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			);
 		`,
   );
   runStatement(
     db,
     `
+			CREATE TABLE IF NOT EXISTS user_auth_sessions (
+				id TEXT PRIMARY KEY,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				issued_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL,
+				last_used_at TEXT NOT NULL,
+				step_up_valid_until TEXT
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS user_auth_recovery_codes (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				code_hash TEXT NOT NULL,
+				used_at TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				UNIQUE(user_id, code_hash)
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS user_auth_websocket_tickets (
+				id TEXT PRIMARY KEY,
+				session_id TEXT NOT NULL REFERENCES user_auth_sessions(id) ON DELETE CASCADE,
+				issued_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL,
+				consumed_at TEXT
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_user_auth_sessions_expires_at
+			ON user_auth_sessions(expires_at);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_user_auth_recovery_codes_user_used_at
+			ON user_auth_recovery_codes(user_id, used_at);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_user_auth_websocket_tickets_session_id
+			ON user_auth_websocket_tickets(session_id);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE INDEX IF NOT EXISTS idx_user_auth_websocket_tickets_expires_at
+			ON user_auth_websocket_tickets(expires_at);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS projects (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				path TEXT NOT NULL,
+				name TEXT NOT NULL,
+				git_remote TEXT,
+				is_open INTEGER NOT NULL DEFAULT 1,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+				,
+				UNIQUE(owner_user_id, path)
+			);
+		`,
+  );
+  rebuildProjectsTableForMultiUser(db);
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS project_worktrees (
 				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 				worktree_path TEXT NOT NULL,
-				pinned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				pinned_at TEXT,
 				PRIMARY KEY (project_id, worktree_path)
 			);
 		`,
   );
+  rebuildProjectWorktreesTableForTracking(db);
   runStatement(
     db,
     `
@@ -906,7 +1424,7 @@ export function migrateDatabase(db: Database): void {
     db,
     `
 			CREATE INDEX IF NOT EXISTS idx_projects_last_opened_at_name
-			ON projects(last_opened_at DESC, name ASC);
+			ON projects(owner_user_id, last_opened_at DESC, name ASC);
 		`,
   );
   runStatement(db, `DROP INDEX IF EXISTS idx_threads_updated_at`);
@@ -995,6 +1513,7 @@ export function migrateDatabase(db: Database): void {
 			);
 		`,
   );
+  migrateLegacySingleUserAuth(db);
   runStatement(
     db,
     `
@@ -1372,18 +1891,254 @@ export function initAppDatabase(): Database {
   appDatabase = db;
   return db;
 }
+
+type UserSqlRecord = Omit<UserRecord, "isAdmin"> & {
+  isAdmin: 0 | 1;
+};
+
+function hydrateUserFromSqlRow(user: UserSqlRecord): UserRecord {
+  return {
+    ...user,
+    isAdmin: user.isAdmin === 1,
+  };
+}
+
+function hydrateUserSetupFromSqlRow(user: UserSetupSqlRecord): UserSetupRecord {
+  return {
+    ...user,
+    configured: user.configured === 1,
+    isAdmin: user.isAdmin === 1,
+  };
+}
+
+function hydrateAuthSessionFromSqlRow(
+  session: AuthSessionSqlRecord,
+): AuthSessionRecord {
+  return {
+    ...session,
+    isAdmin: session.isAdmin === 1,
+  };
+}
+
+function getFirstConfiguredAuthUserId(database: Database): number | null {
+  const row = database
+    .query<{ userId: number }, []>(
+      `
+			SELECT user_id AS userId
+			FROM user_auth_settings
+			WHERE length(trim(totp_secret_ciphertext)) > 0
+			ORDER BY user_id ASC
+			LIMIT 1
+		`,
+    )
+    .get();
+  return row?.userId ?? null;
+}
+
+function resolveRequiredAuthUserId(
+  database: Database,
+  userId?: number | null,
+): number {
+  if (typeof userId === "number") {
+    return userId;
+  }
+  const existingUserId =
+    getFirstConfiguredAuthUserId(database) ?? getFirstUserId(database);
+  if (existingUserId !== null) {
+    return existingUserId;
+  }
+  return createLegacyBootstrapUser(database);
+}
+
+export function createUser(database: Database, input: UserInput): UserRecord {
+  runStatement(
+    database,
+    `
+			INSERT INTO users (
+				username,
+				is_admin,
+				updated_at
+			)
+			VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		`,
+    input.username.trim(),
+    input.isAdmin ? 1 : 0,
+  );
+  const user = getUserByUsername(database, input.username);
+  if (!user) {
+    throw new Error(`Failed to create user "${input.username}".`);
+  }
+  return user;
+}
+
+export function updateUserAdminStatus(
+  database: Database,
+  userId: number,
+  isAdmin: boolean,
+): UserRecord {
+  runStatement(
+    database,
+    `
+			UPDATE users
+			SET
+				is_admin = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+		`,
+    isAdmin ? 1 : 0,
+    userId,
+  );
+  const user = getUserById(database, userId);
+  if (!user) {
+    throw new Error(`Failed to update admin state for user ${userId}.`);
+  }
+  return user;
+}
+
+export function getUserById(
+  database: Database,
+  userId: number,
+): UserRecord | null {
+  const user = database
+    .query<UserSqlRecord, [number]>(
+      `
+			SELECT
+				id,
+				username,
+				is_admin AS isAdmin,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM users
+			WHERE id = ?
+		`,
+    )
+    .get(userId);
+  return user ? hydrateUserFromSqlRow(user) : null;
+}
+
+export function getUserByUsername(
+  database: Database,
+  username: string,
+): UserRecord | null {
+  const normalizedUsername = username.trim();
+  if (!normalizedUsername) {
+    return null;
+  }
+
+  const user = database
+    .query<UserSqlRecord, [string]>(
+      `
+			SELECT
+				id,
+				username,
+				is_admin AS isAdmin,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM users
+			WHERE username = ?
+		`,
+    )
+    .get(normalizedUsername);
+  return user ? hydrateUserFromSqlRow(user) : null;
+}
+
+export function listUsers(database: Database): UserRecord[] {
+  return database
+    .query<UserSqlRecord, []>(
+      `
+			SELECT
+				id,
+				username,
+				is_admin AS isAdmin,
+				created_at AS createdAt,
+				updated_at AS updatedAt
+			FROM users
+			ORDER BY username COLLATE NOCASE ASC, id ASC
+		`,
+    )
+    .all()
+    .map(hydrateUserFromSqlRow);
+}
+
+export function listUsersWithSetupStatus(
+  database: Database,
+): UserSetupRecord[] {
+  return database
+    .query<UserSetupSqlRecord, []>(
+      `
+			SELECT
+				users.id AS id,
+				users.username AS username,
+				users.is_admin AS isAdmin,
+				CASE
+					WHEN user_auth_settings.user_id IS NOT NULL
+						AND length(trim(user_auth_settings.totp_secret_ciphertext)) > 0
+					THEN 1
+					ELSE 0
+				END AS configured,
+				users.created_at AS createdAt,
+				users.updated_at AS updatedAt
+			FROM users
+			LEFT JOIN user_auth_settings
+				ON user_auth_settings.user_id = users.id
+			ORDER BY users.is_admin DESC, users.username COLLATE NOCASE ASC, users.id ASC
+		`,
+    )
+    .all()
+    .map(hydrateUserSetupFromSqlRow);
+}
+
+export function countConfiguredAuthUsers(database: Database): number {
+  const row = database
+    .query<{ count: number }, []>(
+      `
+			SELECT COUNT(*) AS count
+			FROM user_auth_settings
+			WHERE length(trim(totp_secret_ciphertext)) > 0
+		`,
+    )
+    .get();
+  return row?.count ?? 0;
+}
+
+export function listKnownAuthUsernames(database: Database): string[] {
+  return database
+    .query<{ username: string }, []>(
+      `
+			SELECT users.username AS username
+			FROM users
+			INNER JOIN user_auth_settings
+				ON user_auth_settings.user_id = users.id
+			WHERE length(trim(user_auth_settings.totp_secret_ciphertext)) > 0
+			ORDER BY users.username COLLATE NOCASE ASC, users.id ASC
+		`,
+    )
+    .all()
+    .map((row) => row.username);
+}
+
 /**
  * Gets auth settings.
  * @param database - Database instance to read authentication settings from.
  */
 
-export function getAuthSettings(database: Database): AuthSettingsRecord | null {
-  /** Read the singleton auth-settings row if setup has been completed. */
+export function getAuthSettings(
+  database: Database,
+  userId?: number | null,
+): AuthSettingsRecord | null {
+  const resolvedUserId =
+    typeof userId === "number"
+      ? userId
+      : getFirstConfiguredAuthUserId(database);
+  if (resolvedUserId === null) {
+    return null;
+  }
+
   return database
-    .query<AuthSettingsRecord, []>(
+    .query<AuthSettingsRecord, [number]>(
       `
 			SELECT
-				id,
+				user_id AS userId,
 				primary_factor_type AS primaryFactorType,
 				primary_factor_hash AS primaryFactorHash,
 				totp_secret_ciphertext AS totpSecretCiphertext,
@@ -1392,11 +2147,11 @@ export function getAuthSettings(database: Database): AuthSettingsRecord | null {
 				locked_until AS lockedUntil,
 				created_at AS createdAt,
 				updated_at AS updatedAt
-			FROM auth_settings
-			WHERE id = 1
+			FROM user_auth_settings
+			WHERE user_id = ?
 		`,
     )
-    .get();
+    .get(resolvedUserId);
 }
 /**
  * Upserts auth settings.
@@ -1408,13 +2163,13 @@ export function upsertAuthSettings(
   database: Database,
   input: AuthSettingsInput,
 ): AuthSettingsRecord {
-  /** Create or replace the singleton auth configuration row. */
+  const userId = resolveRequiredAuthUserId(database, input.userId);
 
   runStatement(
     database,
     `
-			INSERT INTO auth_settings (
-				id,
+			INSERT INTO user_auth_settings (
+				user_id,
 				primary_factor_type,
 				primary_factor_hash,
 				totp_secret_ciphertext,
@@ -1424,7 +2179,7 @@ export function upsertAuthSettings(
 				updated_at
 			)
 			VALUES (
-				1,
+				?,
 				?,
 				?,
 				?,
@@ -1433,20 +2188,21 @@ export function upsertAuthSettings(
 				NULL,
 				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			)
-			ON CONFLICT(id) DO UPDATE SET
+			ON CONFLICT(user_id) DO UPDATE SET
 				primary_factor_type = excluded.primary_factor_type,
 				primary_factor_hash = excluded.primary_factor_hash,
 				totp_secret_ciphertext = excluded.totp_secret_ciphertext,
 				session_lifetime_days = excluded.session_lifetime_days,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		`,
+    userId,
     input.primaryFactorType,
     input.primaryFactorHash,
     input.totpSecretCiphertext,
     input.sessionLifetimeDays,
   );
 
-  const settings = getAuthSettings(database);
+  const settings = getAuthSettings(database, userId);
   if (!settings) {
     throw new Error("Failed to upsert auth settings.");
   }
@@ -1463,20 +2219,22 @@ export function setAuthFailureState(
   database: Database,
   failedPrimaryFactorAttempts: number,
   lockedUntil: string | null,
+  userId?: number | null,
 ): void {
-  /** Persist login failure counters and optional lockout expiry on the singleton row. */
+  const resolvedUserId = resolveRequiredAuthUserId(database, userId);
   runStatement(
     database,
     `
-			UPDATE auth_settings
+			UPDATE user_auth_settings
 			SET
 				failed_primary_factor_attempts = ?,
 				locked_until = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = 1
+			WHERE user_id = ?
 		`,
     failedPrimaryFactorAttempts,
     lockedUntil,
+    resolvedUserId,
   );
 }
 /**
@@ -1484,10 +2242,11 @@ export function setAuthFailureState(
  * @param database - Database instance used to clear failure state.
  */
 
-export function resetAuthFailureState(database: Database): void {
-  /** Clear any stored failed-attempt counters and lockout state. */
-
-  setAuthFailureState(database, 0, null);
+export function resetAuthFailureState(
+  database: Database,
+  userId?: number | null,
+): void {
+  setAuthFailureState(database, 0, null, userId);
 }
 /**
  * Lists auth recovery codes.
@@ -1496,21 +2255,24 @@ export function resetAuthFailureState(database: Database): void {
 
 export function listAuthRecoveryCodes(
   database: Database,
+  userId?: number | null,
 ): AuthRecoveryCodeRecord[] {
-  /** List all stored recovery-code hashes and whether they have been consumed. */
+  const resolvedUserId = resolveRequiredAuthUserId(database, userId);
   return database
-    .query<AuthRecoveryCodeRecord, []>(
+    .query<AuthRecoveryCodeRecord, [number]>(
       `
 			SELECT
 				id,
+				user_id AS userId,
 				code_hash AS codeHash,
 				used_at AS usedAt,
 				created_at AS createdAt
-			FROM auth_recovery_codes
+			FROM user_auth_recovery_codes
+			WHERE user_id = ?
 			ORDER BY id ASC
 		`,
     )
-    .all();
+    .all(resolvedUserId);
 }
 /**
  * Replaces auth recovery code hashes.
@@ -1521,26 +2283,29 @@ export function listAuthRecoveryCodes(
 export function replaceAuthRecoveryCodeHashes(
   database: Database,
   codeHashes: readonly string[],
+  userId?: number | null,
 ): AuthRecoveryCodeRecord[] {
-  /**
-   * Replace the full recovery-code set atomically so setup/regeneration never leaves
-   * a partial code list behind.
-   */
+  const resolvedUserId = resolveRequiredAuthUserId(database, userId);
 
   return runInTransaction(database, () => {
-    runStatement(database, "DELETE FROM auth_recovery_codes");
+    runStatement(
+      database,
+      "DELETE FROM user_auth_recovery_codes WHERE user_id = ?",
+      resolvedUserId,
+    );
     for (const codeHash of codeHashes) {
       runStatement(
         database,
         `
-				INSERT INTO auth_recovery_codes (code_hash)
-				VALUES (?)
+				INSERT INTO user_auth_recovery_codes (user_id, code_hash)
+				VALUES (?, ?)
 			`,
+        resolvedUserId,
         codeHash,
       );
     }
 
-    return listAuthRecoveryCodes(database);
+    return listAuthRecoveryCodes(database, resolvedUserId);
   });
 }
 /**
@@ -1554,17 +2319,20 @@ export function markAuthRecoveryCodeUsed(
   database: Database,
   codeHash: string,
   usedAt: string,
+  userId?: number | null,
 ): boolean {
-  /** Consume one recovery code exactly once. */
+  const resolvedUserId = resolveRequiredAuthUserId(database, userId);
   const result = runStatement(
     database,
     `
-			UPDATE auth_recovery_codes
+			UPDATE user_auth_recovery_codes
 			SET used_at = ?
-			WHERE code_hash = ?
+			WHERE user_id = ?
+				AND code_hash = ?
 				AND used_at IS NULL
 		`,
     usedAt,
+    resolvedUserId,
     codeHash,
   );
   return Number(result.changes) > 0;
@@ -1579,21 +2347,23 @@ export function createAuthSession(
   database: Database,
   input: AuthSessionInput,
 ): AuthSessionRecord {
-  /** Insert one authenticated session row and return the stored record. */
+  const userId = resolveRequiredAuthUserId(database, input.userId);
 
   runStatement(
     database,
     `
-			INSERT INTO auth_sessions (
+			INSERT INTO user_auth_sessions (
 				id,
+				user_id,
 				issued_at,
 				expires_at,
 				last_used_at,
 				step_up_valid_until
 			)
-			VALUES (?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?)
 		`,
     input.id,
+    userId,
     input.issuedAt,
     input.expiresAt,
     input.lastUsedAt,
@@ -1616,21 +2386,26 @@ export function getAuthSession(
   database: Database,
   sessionId: string,
 ): AuthSessionRecord | null {
-  /** Fetch one session row by opaque session token. */
-  return database
-    .query<AuthSessionRecord, [string]>(
+  const session = database
+    .query<AuthSessionSqlRecord, [string]>(
       `
 			SELECT
-				id,
-				issued_at AS issuedAt,
-				expires_at AS expiresAt,
-				last_used_at AS lastUsedAt,
-				step_up_valid_until AS stepUpValidUntil
-			FROM auth_sessions
-			WHERE id = ?
+				user_auth_sessions.id AS id,
+				user_auth_sessions.user_id AS userId,
+				users.username AS username,
+				users.is_admin AS isAdmin,
+				user_auth_sessions.issued_at AS issuedAt,
+				user_auth_sessions.expires_at AS expiresAt,
+				user_auth_sessions.last_used_at AS lastUsedAt,
+				user_auth_sessions.step_up_valid_until AS stepUpValidUntil
+			FROM user_auth_sessions
+			INNER JOIN users
+				ON users.id = user_auth_sessions.user_id
+			WHERE user_auth_sessions.id = ?
 		`,
     )
     .get(sessionId);
+  return session ? hydrateAuthSessionFromSqlRow(session) : null;
 }
 /**
  * Touches auth session.
@@ -1652,7 +2427,7 @@ export function touchAuthSession(
     runStatement(
       database,
       `
-				UPDATE auth_sessions
+				UPDATE user_auth_sessions
 				SET
 					last_used_at = ?,
 					expires_at = ?
@@ -1668,7 +2443,7 @@ export function touchAuthSession(
   runStatement(
     database,
     `
-			UPDATE auth_sessions
+			UPDATE user_auth_sessions
 			SET last_used_at = ?
 			WHERE id = ?
 		`,
@@ -1692,7 +2467,7 @@ export function setAuthSessionStepUpValidUntil(
   runStatement(
     database,
     `
-			UPDATE auth_sessions
+			UPDATE user_auth_sessions
 			SET step_up_valid_until = ?
 			WHERE id = ?
 		`,
@@ -1707,18 +2482,29 @@ export function setAuthSessionStepUpValidUntil(
  */
 
 export function deleteAuthSession(database: Database, sessionId: string): void {
-  /** Remove one session and cascade any dependent websocket tickets. */
-
-  runStatement(database, "DELETE FROM auth_sessions WHERE id = ?", sessionId);
+  runStatement(
+    database,
+    "DELETE FROM user_auth_sessions WHERE id = ?",
+    sessionId,
+  );
 }
 /**
  * Deletes all auth sessions.
  * @param database - Database handle used to purge all sessions.
  */
 
-export function deleteAllAuthSessions(database: Database): number {
-  /** Revoke every authenticated session and cascade dependent websocket tickets. */
-  const result = runStatement(database, "DELETE FROM auth_sessions");
+export function deleteAllAuthSessions(
+  database: Database,
+  userId?: number | null,
+): number {
+  const result =
+    typeof userId === "number"
+      ? runStatement(
+          database,
+          "DELETE FROM user_auth_sessions WHERE user_id = ?",
+          userId,
+        )
+      : runStatement(database, "DELETE FROM user_auth_sessions");
   return Number(result.changes);
 }
 /**
@@ -1736,7 +2522,7 @@ export function deleteExpiredAuthSessions(
   const result = runStatement(
     database,
     `
-			DELETE FROM auth_sessions
+			DELETE FROM user_auth_sessions
 			WHERE expires_at <= ?
 		`,
     now,
@@ -1753,11 +2539,10 @@ export function createAuthWebSocketTicket(
   database: Database,
   input: AuthWebSocketTicketInput,
 ): AuthWebSocketTicketRecord {
-  /** Insert one short-lived websocket ticket bound to an authenticated session. */
   runStatement(
     database,
     `
-			INSERT INTO auth_websocket_tickets (
+			INSERT INTO user_auth_websocket_tickets (
 				id,
 				session_id,
 				issued_at,
@@ -1788,8 +2573,6 @@ export function getAuthWebSocketTicket(
   database: Database,
   ticketId: string,
 ): AuthWebSocketTicketRecord | null {
-  /** Fetch one websocket ticket row by opaque ticket id. */
-
   return database
     .query<AuthWebSocketTicketRecord, [string]>(
       `
@@ -1799,7 +2582,7 @@ export function getAuthWebSocketTicket(
 				issued_at AS issuedAt,
 				expires_at AS expiresAt,
 				consumed_at AS consumedAt
-			FROM auth_websocket_tickets
+			FROM user_auth_websocket_tickets
 			WHERE id = ?
 		`,
     )
@@ -1821,7 +2604,7 @@ export function consumeAuthWebSocketTicket(
   const result = runStatement(
     database,
     `
-			UPDATE auth_websocket_tickets
+			UPDATE user_auth_websocket_tickets
 			SET consumed_at = ?
 			WHERE id = ?
 				AND consumed_at IS NULL
@@ -1849,7 +2632,7 @@ export function deleteExpiredAuthWebSocketTickets(
   const result = runStatement(
     database,
     `
-			DELETE FROM auth_websocket_tickets
+			DELETE FROM user_auth_websocket_tickets
 			WHERE expires_at <= ?
 				OR consumed_at IS NOT NULL
 		`,
@@ -2068,12 +2851,12 @@ export function getProject(
   database: Database,
   projectPath: string,
 ): ProjectRecord | null {
-  /** Load a single project row by canonical path. */
   return database
     .query<ProjectRecord, [string]>(
       `
 			SELECT
 				id,
+				owner_user_id AS ownerUserId,
 				path,
 				name,
 				git_remote AS gitRemote,
@@ -2083,9 +2866,38 @@ export function getProject(
 				last_opened_at AS lastOpenedAt
 			FROM projects
 			WHERE path = ?
+			ORDER BY last_opened_at DESC, id DESC
+			LIMIT 1
 		`,
     )
     .get(projectPath);
+}
+
+export function getProjectForUser(
+  database: Database,
+  ownerUserId: number,
+  projectPath: string,
+): ProjectRecord | null {
+  return database
+    .query<ProjectRecord, [number, string]>(
+      `
+			SELECT
+				id,
+				owner_user_id AS ownerUserId,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			WHERE owner_user_id = ?
+				AND path = ?
+			LIMIT 1
+		`,
+    )
+    .get(ownerUserId, projectPath);
 }
 /**
  * Gets project by id.
@@ -2104,6 +2916,7 @@ export function getProjectById(
       `
 			SELECT
 				id,
+				owner_user_id AS ownerUserId,
 				path,
 				name,
 				git_remote AS gitRemote,
@@ -2117,18 +2930,45 @@ export function getProjectById(
     )
     .get(projectId);
 }
+
+export function getProjectByIdForUser(
+  database: Database,
+  ownerUserId: number,
+  projectId: number,
+): ProjectRecord | null {
+  return database
+    .query<ProjectRecord, [number, number]>(
+      `
+			SELECT
+				id,
+				owner_user_id AS ownerUserId,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			WHERE owner_user_id = ?
+				AND id = ?
+			LIMIT 1
+		`,
+    )
+    .get(ownerUserId, projectId);
+}
 /**
  * Lists projects.
  * @param database - Database handle used to list projects.
  */
 
 export function listProjects(database: Database): ProjectRecord[] {
-  /** Read all projects ordered by recent activity and then name. */
   return database
     .query<ProjectRecord, []>(
       `
 			SELECT
 				id,
+				owner_user_id AS ownerUserId,
 				path,
 				name,
 				git_remote AS gitRemote,
@@ -2142,6 +2982,31 @@ export function listProjects(database: Database): ProjectRecord[] {
     )
     .all();
 }
+
+export function listProjectsForUser(
+  database: Database,
+  ownerUserId: number,
+): ProjectRecord[] {
+  return database
+    .query<ProjectRecord, [number]>(
+      `
+			SELECT
+				id,
+				owner_user_id AS ownerUserId,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			WHERE owner_user_id = ?
+			ORDER BY last_opened_at DESC, name ASC
+		`,
+    )
+    .all(ownerUserId);
+}
 /**
  * Upserts project.
  * @param database - Database handle used to upsert project metadata.
@@ -2152,25 +3017,38 @@ export function upsertProject(
   database: Database,
   input: ProjectInput,
 ): ProjectRecord {
-  /**
-   * Create-or-update a project row and refresh its open/timestamp state.
-   * Returns the canonical row after write so callers always read the persisted state.
-   */
+  const ownerUserId = resolveRequiredAuthUserId(database, input.ownerUserId);
 
   runStatement(
     database,
     `
-			INSERT INTO projects (path, name, is_open, last_opened_at, updated_at)
-			VALUES (?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			ON CONFLICT(path) DO UPDATE SET
+			INSERT INTO projects (
+				owner_user_id,
+				path,
+				name,
+				is_open,
+				last_opened_at,
+				updated_at
+			)
+			VALUES (
+				?,
+				?,
+				?,
+				1,
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+				strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			)
+			ON CONFLICT(owner_user_id, path) DO UPDATE SET
+				name = excluded.name,
 				is_open = 1,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				last_opened_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		`,
+    ownerUserId,
     input.projectPath,
     input.name ?? "",
   );
-  const project = getProject(database, input.projectPath);
+  const project = getProjectForUser(database, ownerUserId, input.projectPath);
   if (!project) {
     throw new Error(`Failed to upsert project at ${input.projectPath}`);
   }
@@ -2183,12 +3061,12 @@ export function upsertProject(
  */
 
 export function listOpenProjects(database: Database): ProjectRecord[] {
-  /** Return only open projects for current workspaces. */
   return database
     .query<ProjectRecord, []>(
       `
 			SELECT
 				id,
+				owner_user_id AS ownerUserId,
 				path,
 				name,
 				git_remote AS gitRemote,
@@ -2202,6 +3080,32 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 		`,
     )
     .all();
+}
+
+export function listOpenProjectsForUser(
+  database: Database,
+  ownerUserId: number,
+): ProjectRecord[] {
+  return database
+    .query<ProjectRecord, [number]>(
+      `
+			SELECT
+				id,
+				owner_user_id AS ownerUserId,
+				path,
+				name,
+				git_remote AS gitRemote,
+				is_open AS isOpen,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				last_opened_at AS lastOpenedAt
+			FROM projects
+			WHERE owner_user_id = ?
+				AND is_open = 1
+			ORDER BY last_opened_at DESC
+		`,
+    )
+    .all(ownerUserId);
 }
 /**
  * Sets project closed.
@@ -2234,14 +3138,14 @@ export function deleteProject(database: Database, projectId: number): void {
  * @param projectId - Project identifier.
  */
 
-export function listProjectWorktreePins(
+export function listProjectWorktreesMetadata(
   database: Database,
   projectId: number,
-): ProjectWorktreePinRecord[] {
-  /** Fetch pinned worktree entries for project workspace recall. */
+): ProjectWorktreeRecord[] {
+  /** Fetch tracked subproject rows, including optional pin state. */
 
   return database
-    .query<ProjectWorktreePinRecord, [number]>(
+    .query<ProjectWorktreeRecord, [number]>(
       `
 			SELECT
 				project_id AS projectId,
@@ -2249,9 +3153,34 @@ export function listProjectWorktreePins(
 				pinned_at AS pinnedAt
 			FROM project_worktrees
 			WHERE project_id = ?
+			ORDER BY
+				(pinned_at IS NULL) ASC,
+				pinned_at DESC,
+				worktree_path ASC
 		`,
     )
     .all(projectId);
+}
+
+export function ensureProjectWorktreeVisible(
+  database: Database,
+  projectId: number,
+  worktreePath: string,
+): void {
+  runStatement(
+    database,
+    `
+			INSERT INTO project_worktrees (
+				project_id,
+				worktree_path,
+				pinned_at
+			)
+			VALUES (?, ?, NULL)
+			ON CONFLICT(project_id, worktree_path) DO NOTHING
+		`,
+    projectId,
+    worktreePath,
+  );
 }
 /**
  * Sets project worktree pinned.
@@ -2268,8 +3197,8 @@ export function setProjectWorktreePinned(
   pinned: boolean,
 ): void {
   /**
-   * Add or remove a pinned worktree marker.
-   * Insert updates pin timestamps; delete unpins and removes history.
+   * Update optional pin metadata for a tracked subproject row.
+   * Pinning also ensures the subproject is tracked and visible.
    */
 
   if (pinned) {
@@ -2298,7 +3227,8 @@ export function setProjectWorktreePinned(
   runStatement(
     database,
     `
-			DELETE FROM project_worktrees
+			UPDATE project_worktrees
+			SET pinned_at = NULL
 			WHERE project_id = ? AND worktree_path = ?
 		`,
     projectId,
@@ -2311,52 +3241,110 @@ export function setProjectWorktreePinned(
  */
 
 export function listThreads(database: Database): ThreadRecord[] {
-  /** Fetch all threads, prioritized by pin state and recency. */
   const rows = database
     .query<ThreadSqlRecord, []>(
       `
 				SELECT
-					id,
-					project_id AS projectId,
-					worktree_path AS worktreePath,
-				title,
-				summary,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				pi_session_id AS piSessionId,
-				pi_session_file AS piSessionFile,
-				pi_leaf_entry_id AS piLeafEntryId,
-					pinned_at AS pinnedAt,
-						created_at AS createdAt,
-						updated_at AS updatedAt,
-						last_run_at AS lastRunAt,
-						last_input_tokens AS lastInputTokens,
-						last_cached_input_tokens AS lastCachedInputTokens,
-						last_output_tokens AS lastOutputTokens,
-						max_input_tokens AS maxInputTokens,
-						estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
-						compaction_count AS compactionCount,
-						last_compaction_at AS lastCompactionAt,
-						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
-						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
-						active_turn_started_at AS activeTurnStartedAt,
-						last_error_at AS lastErrorAt,
-						last_error_seen_at AS lastErrorSeenAt,
-						last_error_message AS lastErrorMessage
+					threads.id AS id,
+					projects.owner_user_id AS ownerUserId,
+					threads.project_id AS projectId,
+					threads.worktree_path AS worktreePath,
+					threads.title AS title,
+					threads.summary AS summary,
+					threads.model AS model,
+					threads.reasoning_effort AS reasoningEffort,
+					threads.github_access AS githubAccess,
+					threads.agents_access AS agentsAccess,
+					threads.metidos_access AS metidosAccess,
+					threads.unsafe_mode AS unsafeMode,
+					threads.pi_session_id AS piSessionId,
+					threads.pi_session_file AS piSessionFile,
+					threads.pi_leaf_entry_id AS piLeafEntryId,
+					threads.pinned_at AS pinnedAt,
+					threads.created_at AS createdAt,
+					threads.updated_at AS updatedAt,
+					threads.last_run_at AS lastRunAt,
+					threads.last_input_tokens AS lastInputTokens,
+					threads.last_cached_input_tokens AS lastCachedInputTokens,
+					threads.last_output_tokens AS lastOutputTokens,
+					threads.max_input_tokens AS maxInputTokens,
+					threads.estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+					threads.compaction_count AS compactionCount,
+					threads.last_compaction_at AS lastCompactionAt,
+					threads.last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+					threads.last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+					threads.active_turn_started_at AS activeTurnStartedAt,
+					threads.last_error_at AS lastErrorAt,
+					threads.last_error_seen_at AS lastErrorSeenAt,
+					threads.last_error_message AS lastErrorMessage
 				FROM threads
+				INNER JOIN projects
+					ON projects.id = threads.project_id
 				ORDER BY
-					(pinned_at IS NULL) ASC,
-					pinned_at DESC,
-					updated_at DESC,
-					created_at DESC,
-					id DESC
+					(threads.pinned_at IS NULL) ASC,
+					threads.pinned_at DESC,
+					threads.updated_at DESC,
+					threads.created_at DESC,
+					threads.id DESC
 			`,
     )
     .all();
+  return rows.map(hydrateThreadFromSqlRow);
+}
+
+export function listThreadsForUser(
+  database: Database,
+  ownerUserId: number,
+): ThreadRecord[] {
+  const rows = database
+    .query<ThreadSqlRecord, [number]>(
+      `
+				SELECT
+					threads.id AS id,
+					projects.owner_user_id AS ownerUserId,
+					threads.project_id AS projectId,
+					threads.worktree_path AS worktreePath,
+					threads.title AS title,
+					threads.summary AS summary,
+					threads.model AS model,
+					threads.reasoning_effort AS reasoningEffort,
+					threads.github_access AS githubAccess,
+					threads.agents_access AS agentsAccess,
+					threads.metidos_access AS metidosAccess,
+					threads.unsafe_mode AS unsafeMode,
+					threads.pi_session_id AS piSessionId,
+					threads.pi_session_file AS piSessionFile,
+					threads.pi_leaf_entry_id AS piLeafEntryId,
+					threads.pinned_at AS pinnedAt,
+					threads.created_at AS createdAt,
+					threads.updated_at AS updatedAt,
+					threads.last_run_at AS lastRunAt,
+					threads.last_input_tokens AS lastInputTokens,
+					threads.last_cached_input_tokens AS lastCachedInputTokens,
+					threads.last_output_tokens AS lastOutputTokens,
+					threads.max_input_tokens AS maxInputTokens,
+					threads.estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+					threads.compaction_count AS compactionCount,
+					threads.last_compaction_at AS lastCompactionAt,
+					threads.last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+					threads.last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+					threads.active_turn_started_at AS activeTurnStartedAt,
+					threads.last_error_at AS lastErrorAt,
+					threads.last_error_seen_at AS lastErrorSeenAt,
+					threads.last_error_message AS lastErrorMessage
+				FROM threads
+				INNER JOIN projects
+					ON projects.id = threads.project_id
+				WHERE projects.owner_user_id = ?
+				ORDER BY
+					(threads.pinned_at IS NULL) ASC,
+					threads.pinned_at DESC,
+					threads.updated_at DESC,
+					threads.created_at DESC,
+					threads.id DESC
+			`,
+    )
+    .all(ownerUserId);
   return rows.map(hydrateThreadFromSqlRow);
 }
 /**
@@ -2369,48 +3357,101 @@ export function getThreadById(
   database: Database,
   threadId: number,
 ): ThreadRecord | null {
-  /** Fetch one thread record with token/compaction/error metadata mapped to camelCase. */
-
   const thread = database
     .query<ThreadSqlRecord, [number]>(
       `
 				SELECT
-					id,
-					project_id AS projectId,
-					worktree_path AS worktreePath,
-				title,
-				summary,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				pi_session_id AS piSessionId,
-				pi_session_file AS piSessionFile,
-				pi_leaf_entry_id AS piLeafEntryId,
-					pinned_at AS pinnedAt,
-						created_at AS createdAt,
-						updated_at AS updatedAt,
-						last_run_at AS lastRunAt,
-						last_input_tokens AS lastInputTokens,
-						last_cached_input_tokens AS lastCachedInputTokens,
-						last_output_tokens AS lastOutputTokens,
-						max_input_tokens AS maxInputTokens,
-						estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
-						compaction_count AS compactionCount,
-						last_compaction_at AS lastCompactionAt,
-						last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
-						last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
-						active_turn_started_at AS activeTurnStartedAt,
-						last_error_at AS lastErrorAt,
-						last_error_seen_at AS lastErrorSeenAt,
-						last_error_message AS lastErrorMessage
+					threads.id AS id,
+					projects.owner_user_id AS ownerUserId,
+					threads.project_id AS projectId,
+					threads.worktree_path AS worktreePath,
+					threads.title AS title,
+					threads.summary AS summary,
+					threads.model AS model,
+					threads.reasoning_effort AS reasoningEffort,
+					threads.github_access AS githubAccess,
+					threads.agents_access AS agentsAccess,
+					threads.metidos_access AS metidosAccess,
+					threads.unsafe_mode AS unsafeMode,
+					threads.pi_session_id AS piSessionId,
+					threads.pi_session_file AS piSessionFile,
+					threads.pi_leaf_entry_id AS piLeafEntryId,
+					threads.pinned_at AS pinnedAt,
+					threads.created_at AS createdAt,
+					threads.updated_at AS updatedAt,
+					threads.last_run_at AS lastRunAt,
+					threads.last_input_tokens AS lastInputTokens,
+					threads.last_cached_input_tokens AS lastCachedInputTokens,
+					threads.last_output_tokens AS lastOutputTokens,
+					threads.max_input_tokens AS maxInputTokens,
+					threads.estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+					threads.compaction_count AS compactionCount,
+					threads.last_compaction_at AS lastCompactionAt,
+					threads.last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+					threads.last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+					threads.active_turn_started_at AS activeTurnStartedAt,
+					threads.last_error_at AS lastErrorAt,
+					threads.last_error_seen_at AS lastErrorSeenAt,
+					threads.last_error_message AS lastErrorMessage
 				FROM threads
-					WHERE id = ?
+				INNER JOIN projects
+					ON projects.id = threads.project_id
+				WHERE threads.id = ?
 			`,
     )
     .get(threadId);
+  return thread ? hydrateThreadFromSqlRow(thread) : null;
+}
+
+export function getThreadByIdForUser(
+  database: Database,
+  ownerUserId: number,
+  threadId: number,
+): ThreadRecord | null {
+  const thread = database
+    .query<ThreadSqlRecord, [number, number]>(
+      `
+				SELECT
+					threads.id AS id,
+					projects.owner_user_id AS ownerUserId,
+					threads.project_id AS projectId,
+					threads.worktree_path AS worktreePath,
+					threads.title AS title,
+					threads.summary AS summary,
+					threads.model AS model,
+					threads.reasoning_effort AS reasoningEffort,
+					threads.github_access AS githubAccess,
+					threads.agents_access AS agentsAccess,
+					threads.metidos_access AS metidosAccess,
+					threads.unsafe_mode AS unsafeMode,
+					threads.pi_session_id AS piSessionId,
+					threads.pi_session_file AS piSessionFile,
+					threads.pi_leaf_entry_id AS piLeafEntryId,
+					threads.pinned_at AS pinnedAt,
+					threads.created_at AS createdAt,
+					threads.updated_at AS updatedAt,
+					threads.last_run_at AS lastRunAt,
+					threads.last_input_tokens AS lastInputTokens,
+					threads.last_cached_input_tokens AS lastCachedInputTokens,
+					threads.last_output_tokens AS lastOutputTokens,
+					threads.max_input_tokens AS maxInputTokens,
+					threads.estimated_compaction_trigger_tokens AS estimatedCompactionTriggerTokens,
+					threads.compaction_count AS compactionCount,
+					threads.last_compaction_at AS lastCompactionAt,
+					threads.last_compaction_before_input_tokens AS lastCompactionBeforeInputTokens,
+					threads.last_compaction_after_input_tokens AS lastCompactionAfterInputTokens,
+					threads.active_turn_started_at AS activeTurnStartedAt,
+					threads.last_error_at AS lastErrorAt,
+					threads.last_error_seen_at AS lastErrorSeenAt,
+					threads.last_error_message AS lastErrorMessage
+				FROM threads
+				INNER JOIN projects
+					ON projects.id = threads.project_id
+				WHERE projects.owner_user_id = ?
+					AND threads.id = ?
+			`,
+    )
+    .get(ownerUserId, threadId);
   return thread ? hydrateThreadFromSqlRow(thread) : null;
 }
 
@@ -3369,30 +4410,72 @@ export function listCronJobs(database: Database): CronJobRecord[] {
     .query<CronJobSqlRecord, []>(
       `
 			SELECT
-				id,
-				project_id AS projectId,
-				worktree_path AS worktreePath,
-				schedule,
-				prompt,
-				title,
-				description,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				last_run_date AS lastRunDate,
-				last_run_status AS lastRunStatus,
-				enabled,
-				deleted_at AS deletedAt,
-				created_at AS createdAt,
-				updated_at AS updatedAt
+				cron_jobs.id AS id,
+				projects.owner_user_id AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
 			FROM cron_jobs
-			ORDER BY id DESC
+			INNER JOIN projects
+				ON projects.id = cron_jobs.project_id
+			ORDER BY cron_jobs.id DESC
 		`,
     )
     .all();
+  return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, true));
+}
+
+export function listCronJobsForUser(
+  database: Database,
+  ownerUserId: number,
+): CronJobRecord[] {
+  const rows = database
+    .query<CronJobSqlRecord, [number]>(
+      `
+			SELECT
+				cron_jobs.id AS id,
+				projects.owner_user_id AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
+			FROM cron_jobs
+			INNER JOIN projects
+				ON projects.id = cron_jobs.project_id
+			WHERE projects.owner_user_id = ?
+			ORDER BY cron_jobs.id DESC
+		`,
+    )
+    .all(ownerUserId);
   return rows.map((cronJob) => hydrateCronJobFromSqlRow(cronJob, true));
 }
 
@@ -3412,30 +4495,75 @@ export function getCronJobById(
     .query<CronJobSqlRecord, [number]>(
       `
 			SELECT
-				id,
-				project_id AS projectId,
-				worktree_path AS worktreePath,
-				schedule,
-				prompt,
-				title,
-				description,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				last_run_date AS lastRunDate,
-				last_run_status AS lastRunStatus,
-				enabled,
-				deleted_at AS deletedAt,
-				created_at AS createdAt,
-				updated_at AS updatedAt
+				cron_jobs.id AS id,
+				projects.owner_user_id AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
 			FROM cron_jobs
-			WHERE id = ?
+			INNER JOIN projects
+				ON projects.id = cron_jobs.project_id
+			WHERE cron_jobs.id = ?
 		`,
     )
     .get(cronJobId);
+  return cronJob ? hydrateCronJobFromSqlRow(cronJob, includeNextRunDate) : null;
+}
+
+export function getCronJobByIdForUser(
+  database: Database,
+  ownerUserId: number,
+  cronJobId: number,
+  options: { includeNextRunDate?: boolean } = {},
+): CronJobRecord | null {
+  const { includeNextRunDate = true } = options;
+  const cronJob = database
+    .query<CronJobSqlRecord, [number, number]>(
+      `
+			SELECT
+				cron_jobs.id AS id,
+				projects.owner_user_id AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
+			FROM cron_jobs
+			INNER JOIN projects
+				ON projects.id = cron_jobs.project_id
+			WHERE projects.owner_user_id = ?
+				AND cron_jobs.id = ?
+		`,
+    )
+    .get(ownerUserId, cronJobId);
   return cronJob ? hydrateCronJobFromSqlRow(cronJob, includeNextRunDate) : null;
 }
 
@@ -3538,28 +4666,31 @@ export function listActiveCronJobs(database: Database): CronJobRecord[] {
     .query<CronJobSqlRecord, []>(
       `
 			SELECT
-				id,
-				project_id AS projectId,
-				worktree_path AS worktreePath,
-				schedule,
-				prompt,
-				title,
-				description,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				last_run_date AS lastRunDate,
-				last_run_status AS lastRunStatus,
-				enabled,
-				deleted_at AS deletedAt,
-				created_at AS createdAt,
-				updated_at AS updatedAt
+				cron_jobs.id AS id,
+				projects.owner_user_id AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
 			FROM cron_jobs
+			INNER JOIN projects
+				ON projects.id = cron_jobs.project_id
 			WHERE enabled = 1 AND deleted_at IS NULL
-			ORDER BY id ASC
+			ORDER BY cron_jobs.id ASC
 		`,
     )
     .all();
@@ -3675,25 +4806,30 @@ export function claimCronJobsForScheduledRun(
 					)
 			)
 			RETURNING
-				id,
-				project_id AS projectId,
-				worktree_path AS worktreePath,
-				schedule,
-				prompt,
-				title,
-				description,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				last_run_date AS lastRunDate,
-				last_run_status AS lastRunStatus,
-				enabled,
-				deleted_at AS deletedAt,
-				created_at AS createdAt,
-				updated_at AS updatedAt
+				cron_jobs.id AS id,
+				(
+					SELECT projects.owner_user_id
+					FROM projects
+					WHERE projects.id = cron_jobs.project_id
+				) AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
 		`,
     )
     .all(runDate, schedule, runDate);
@@ -3724,25 +4860,30 @@ export function claimCronJobForScheduledRunById(
 					OR last_run_date < ?
 				)
 			RETURNING
-				id,
-				project_id AS projectId,
-				worktree_path AS worktreePath,
-				schedule,
-				prompt,
-				title,
-				description,
-				model,
-				reasoning_effort AS reasoningEffort,
-				github_access AS githubAccess,
-				agents_access AS agentsAccess,
-				metidos_access AS metidosAccess,
-				unsafe_mode AS unsafeMode,
-				last_run_date AS lastRunDate,
-				last_run_status AS lastRunStatus,
-				enabled,
-				deleted_at AS deletedAt,
-				created_at AS createdAt,
-				updated_at AS updatedAt
+				cron_jobs.id AS id,
+				(
+					SELECT projects.owner_user_id
+					FROM projects
+					WHERE projects.id = cron_jobs.project_id
+				) AS ownerUserId,
+				cron_jobs.project_id AS projectId,
+				cron_jobs.worktree_path AS worktreePath,
+				cron_jobs.schedule AS schedule,
+				cron_jobs.prompt AS prompt,
+				cron_jobs.title AS title,
+				cron_jobs.description AS description,
+				cron_jobs.model AS model,
+				cron_jobs.reasoning_effort AS reasoningEffort,
+				cron_jobs.github_access AS githubAccess,
+				cron_jobs.agents_access AS agentsAccess,
+				cron_jobs.metidos_access AS metidosAccess,
+				cron_jobs.unsafe_mode AS unsafeMode,
+				cron_jobs.last_run_date AS lastRunDate,
+				cron_jobs.last_run_status AS lastRunStatus,
+				cron_jobs.enabled AS enabled,
+				cron_jobs.deleted_at AS deletedAt,
+				cron_jobs.created_at AS createdAt,
+				cron_jobs.updated_at AS updatedAt
 		`,
     )
     .all(runDate, cronJobId, runDate);

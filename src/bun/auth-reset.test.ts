@@ -29,6 +29,7 @@ import {
 
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
+const TEST_USERNAME = "alice";
 
 function createTestDatabase(): Database {
   const database = new Database(":memory:");
@@ -64,7 +65,7 @@ describe("auth reset CLI helpers", () => {
     const appDataDir = createTempDirectory();
     const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -74,6 +75,7 @@ describe("auth reset CLI helpers", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
 
     const resetResult = await resetPrimaryFactorFromCli(database, {
@@ -86,6 +88,7 @@ describe("auth reset CLI helpers", () => {
         enrollment.totpSecret,
         setupTimeMs + 1_000,
       ),
+      username: TEST_USERNAME,
     });
 
     expect(resetResult.primaryFactorType).toBe("password");
@@ -112,6 +115,7 @@ describe("auth reset CLI helpers", () => {
           enrollment.totpSecret,
           setupTimeMs + 2_000,
         ),
+        username: TEST_USERNAME,
       }),
     ).rejects.toThrow("The provided credentials are invalid.");
 
@@ -123,6 +127,7 @@ describe("auth reset CLI helpers", () => {
         enrollment.totpSecret,
         setupTimeMs + 3_000,
       ),
+      username: TEST_USERNAME,
     });
     expect(loginResult.session.id.length).toBeGreaterThan(10);
   });
@@ -132,7 +137,7 @@ describe("auth reset CLI helpers", () => {
     const appDataDir = createTempDirectory();
     const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
     const enrollment = prepareTotpEnrollment({
-      accountName: "local-user",
+      accountName: TEST_USERNAME,
     });
 
     const setupResult = await setupAuth(database, {
@@ -142,6 +147,7 @@ describe("auth reset CLI helpers", () => {
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
       totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
     });
     const originalRecoveryCode = setupResult.recoveryCodes[0];
     if (!originalRecoveryCode) {
@@ -156,6 +162,7 @@ describe("auth reset CLI helpers", () => {
         enrollment.totpSecret,
         setupTimeMs + 1_000,
       ),
+      username: TEST_USERNAME,
     });
 
     expect(regeneratedCodes).toHaveLength(10);
