@@ -1198,9 +1198,12 @@ function resolveThreadAccessControls(
     unsafeMode?: boolean | null;
   } = {},
   context?: RpcRequestContext,
+  options?: {
+    allowPreauthorizedUnsafeMode?: boolean;
+  },
 ): ThreadAccessControls {
   const unsafeMode = resolveUnsafeMode(input.unsafeMode ?? null);
-  if (unsafeMode) {
+  if (unsafeMode && options?.allowPreauthorizedUnsafeMode !== true) {
     requireUnsafeModeAllowed(context);
   }
   return {
@@ -3237,6 +3240,9 @@ export async function setWorktreePinnedProcedure(
 export async function createThreadProcedure(
   params: AppRPCSchema["requests"]["createThread"]["params"],
   context?: RpcRequestContext,
+  options?: {
+    allowPreauthorizedUnsafeMode?: boolean;
+  },
 ): Promise<RpcThreadDetail> {
   const project = projectByIdForPath(params.projectId, context);
   const worktreePath = normalizeRequestedWorkspacePath(
@@ -3245,7 +3251,7 @@ export async function createThreadProcedure(
   );
   const model = resolveRunnableCodexModel(params.model);
   const reasoningEffort = resolveCodexReasoningEffort(params.reasoningEffort);
-  const access = resolveThreadAccessControls(params, context);
+  const access = resolveThreadAccessControls(params, context, options);
   const thread = await createThreadRecord(
     project,
     worktreePath,

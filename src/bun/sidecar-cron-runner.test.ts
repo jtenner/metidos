@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +8,7 @@ import {
   closeAppDatabase,
   createCronJob,
   createThread,
+  createUser,
   initAppDatabase,
   listCronJobRuns,
   resetResolvedAppDataDirectory,
@@ -335,6 +336,68 @@ describe("sidecar cron runner", () => {
     expect(lastAssistantMessage?.text).toContain("cron run now smoke");
     expect(completedCron.lastRunStatus).toBe("Completed");
     expect(completedCron.lastRunDate).not.toBeNull();
+  });
+
+  it("runCronJobById reuses stored unsafe mode for non-admin-owned cron jobs", async () => {
+    const { cronRunner: runner, projectProcedures: procedures } =
+      await loadCronModules();
+    const database = initAppDatabase();
+    const username = `cron-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const user = createUser(database, {
+      isAdmin: false,
+      username,
+    });
+    const userWorkspaceHome = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "users",
+      username,
+    );
+    const repoPath = join(userWorkspaceHome, "unsafe-cron-repo");
+    mkdirSync(repoPath, {
+      recursive: true,
+    });
+    initializeGitRepository(repoPath);
+
+    const project = upsertProject(database, {
+      name: "Unsafe Cron Repo",
+      ownerUserId: user.id,
+      projectPath: repoPath,
+    });
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Unsafe cron smoke test",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "unsafe cron smoke",
+      reasoningEffort: "medium",
+      schedule: "*/5 * * * *",
+      title: "Unsafe Cron Smoke",
+      unsafeMode: true,
+      worktreePath: repoPath,
+    });
+
+    const threadId = await runner.runCronJobById(cronJob.id, Date.now(), {
+      createThread: (params) =>
+        procedures.createThreadProcedure(params, undefined, {
+          allowPreauthorizedUnsafeMode: params.unsafeMode === true,
+        }),
+      sendThreadMessage: procedures.sendThreadMessageProcedure,
+    });
+    expect(threadId).not.toBeNull();
+    if (threadId === null) {
+      throw new Error("Expected cron runner to create an unsafe thread.");
+    }
+    const settled = await waitForThreadToSettle(procedures, threadId);
+    const completedCron = await waitForCronCompletion(procedures, cronJob.id);
+
+    expect(cronJob.ownerUserId).toBe(user.id);
+    expect(settled.thread.projectId).toBe(project.id);
+    expect(settled.thread.worktreePath).toBe(repoPath);
+    expect(Boolean(settled.thread.unsafeMode)).toBeTrue();
+    expect(completedCron.lastRunStatus).toBe("Completed");
   });
 
   it("runDueCronJobs executes scheduled work through the Pi-backed thread path", async () => {

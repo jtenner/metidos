@@ -227,7 +227,10 @@ export type CronThreadExecutionHost = {
 };
 
 const defaultCronThreadExecutionHost: CronThreadExecutionHost = {
-  createThread: createThreadProcedure,
+  createThread: (params) =>
+    createThreadProcedure(params, undefined, {
+      allowPreauthorizedUnsafeMode: params.unsafeMode === true,
+    }),
   sendThreadMessage: sendThreadMessageProcedure,
 };
 

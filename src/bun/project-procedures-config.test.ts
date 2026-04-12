@@ -1040,6 +1040,62 @@ describe("project procedure configuration helpers", () => {
     expect(syncedCronIds).toEqual([created.id]);
   });
 
+  it("allows preauthorized unsafe thread creation for persisted cron execution", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const username = createUniqueUsername("unsafe-cron-owner");
+    const user = createUser(database, {
+      isAdmin: false,
+      username,
+    });
+    const userContext = createRpcContext({
+      isAdmin: false,
+      userId: user.id,
+      username: user.username,
+    });
+    const repoPath = join(
+      process.env.METIDOS_APP_DATA_DIR as string,
+      "users",
+      user.username,
+      "unsafe-cron-repo",
+    );
+
+    mkdirSync(repoPath, {
+      recursive: true,
+    });
+    initializeGitRepository(repoPath);
+
+    const project = upsertProject(database, {
+      name: "Unsafe Cron Repo",
+      ownerUserId: user.id,
+      projectPath: repoPath,
+    });
+    const params = {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "openai:gpt-5.4",
+      projectId: project.id,
+      reasoningEffort: "medium" as const,
+      unsafeMode: true,
+      worktreePath: repoPath,
+    };
+
+    await expect(
+      procedures.createThreadProcedure(params, userContext),
+    ).rejects.toThrow(
+      "Administrator privileges are required to enable unsafe mode.",
+    );
+
+    const created = await procedures.createThreadProcedure(params, undefined, {
+      allowPreauthorizedUnsafeMode: true,
+    });
+
+    expect(created.thread.projectId).toBe(project.id);
+    expect(created.thread.worktreePath).toBe(repoPath);
+    expect(Boolean(created.thread.unsafeMode)).toBeTrue();
+  });
+
   it("returns a private workspace home and scoped directory suggestions for regular users", async () => {
     const procedures = await loadProjectProcedures();
     const database = initAppDatabase();
