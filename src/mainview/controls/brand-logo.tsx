@@ -7,17 +7,10 @@ import type { CSSProperties, JSX } from "react";
 
 const MAINVIEW_FAVICON_META_NAME = "metidos-mainview-favicon";
 const MAINVIEW_LOGO_META_NAME = "metidos-mainview-logo";
-const FAVICON_SIZE_PX = 64;
 const MAINVIEW_ICON_CROP = {
   leftRatio: 162 / 1024,
   sizeRatio: 700 / 1024,
   topRatio: 102 / 1024,
-} as const;
-const CROWN_FAVICON_CROP = {
-  // Crop the wide crown art down to the central crest so the favicon stays readable.
-  leftRatio: 232 / 1024,
-  sizeRatio: 560 / 1024,
-  topRatio: 122 / 1024,
 } as const;
 const MAINVIEW_LOGO_SCALE_PERCENT = (1 / MAINVIEW_ICON_CROP.sizeRatio) * 100;
 
@@ -81,43 +74,7 @@ export function installBrandFavicon(): void {
   if (!faviconSourceUrl) {
     return;
   }
-
-  const image = new Image();
-  image.decoding = "async";
-  image.addEventListener("error", () => {
-    upsertBrandFavicon(faviconSourceUrl);
-  });
-  image.addEventListener("load", () => {
-    const cropLeftPx = image.naturalWidth * CROWN_FAVICON_CROP.leftRatio;
-    const cropTopPx = image.naturalHeight * CROWN_FAVICON_CROP.topRatio;
-    const cropWidthPx = image.naturalWidth * CROWN_FAVICON_CROP.sizeRatio;
-    const cropHeightPx = image.naturalHeight * CROWN_FAVICON_CROP.sizeRatio;
-    const canvas = document.createElement("canvas");
-    canvas.height = FAVICON_SIZE_PX;
-    canvas.width = FAVICON_SIZE_PX;
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      upsertBrandFavicon(faviconSourceUrl);
-      return;
-    }
-
-    context.clearRect(0, 0, FAVICON_SIZE_PX, FAVICON_SIZE_PX);
-    context.imageSmoothingEnabled = true;
-    context.drawImage(
-      image,
-      cropLeftPx,
-      cropTopPx,
-      cropWidthPx,
-      cropHeightPx,
-      0,
-      0,
-      FAVICON_SIZE_PX,
-      FAVICON_SIZE_PX,
-    );
-    upsertBrandFavicon(canvas.toDataURL("image/png"));
-  });
-  image.src = faviconSourceUrl;
+  upsertBrandFavicon(faviconSourceUrl);
 }
 
 export function brandLogoIcon(className = ""): JSX.Element {

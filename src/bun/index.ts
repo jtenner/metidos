@@ -178,7 +178,10 @@ const DEFAULT_SERVER_PORT = "7599";
 const MAINVIEW_SOURCE_DIR = resolve(process.cwd(), "src/mainview");
 const MAINVIEW_HTML_PATH = resolve(process.cwd(), "src/mainview/index.html");
 const MAINVIEW_CSS_PATH = resolve(process.cwd(), "src/mainview/index.css");
-const MAINVIEW_CROWN_PATH = resolve(process.cwd(), "src/mainview/crown.png");
+const MAINVIEW_CROWN_PATH = resolve(
+  process.cwd(),
+  "src/mainview/pixel-crown.png",
+);
 const MAINVIEW_LOGO_PATH = resolve(process.cwd(), "src/mainview/logo.png");
 const FIRA_CODE_VARIABLE_FONT_PATH = resolve(
   process.cwd(),
