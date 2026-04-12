@@ -20,6 +20,11 @@ import {
   recordGitHistoryCachePreemption,
   recordGitHistoryCachePrefetchWait,
   recordGitHistoryCacheRangeHit,
+  recordMetidosSandboxRun,
+  recordMetidosToolFailed,
+  recordMetidosToolStarted,
+  recordMetidosToolSucceeded,
+  recordMetidosUnsafeModeRequest,
   recordNativeWebSearchDecision,
   recordRpcCanceled,
   recordRpcFailed,
@@ -264,6 +269,85 @@ describe("runtime stats collector", () => {
         skippedRequests: 0,
       },
     });
+  });
+
+  it("tracks Metidos tool invocations, unsafe-mode requests, and sandbox outcomes", () => {
+    const listThreads = recordMetidosToolStarted("list_threads");
+    recordMetidosToolSucceeded(listThreads);
+
+    const newThread = recordMetidosToolStarted("new_thread");
+    recordMetidosToolFailed(newThread);
+
+    recordMetidosUnsafeModeRequest({
+      allowed: true,
+      toolName: "new_thread",
+    });
+    recordMetidosUnsafeModeRequest({
+      allowed: false,
+      toolName: "new_cron",
+    });
+
+    recordMetidosSandboxRun({
+      outcome: "succeeded",
+    });
+    recordMetidosSandboxRun({
+      outcome: "failed",
+    });
+    recordMetidosSandboxRun({
+      outcome: "timedOut",
+    });
+
+    const snapshot = getRuntimeStatsSnapshot();
+    expect(snapshot.metidosTools.totals.calls).toBe(2);
+    expect(snapshot.metidosTools.totals.succeeded).toBe(1);
+    expect(snapshot.metidosTools.totals.failed).toBe(1);
+    expect(snapshot.metidosTools.byTool.list_threads).toMatchObject({
+      calls: 1,
+      failed: 0,
+      succeeded: 1,
+    });
+    expect(snapshot.metidosTools.byTool.new_thread).toMatchObject({
+      calls: 1,
+      failed: 1,
+      succeeded: 0,
+    });
+    expect(snapshot.metidosTools.sandbox).toEqual({
+      calls: 3,
+      failed: 1,
+      succeeded: 1,
+      timedOut: 1,
+    });
+    expect(snapshot.metidosTools.unsafeModeRequests).toEqual({
+      byTool: {
+        new_cron: {
+          allowed: 0,
+          blocked: 1,
+          requested: 1,
+        },
+        new_thread: {
+          allowed: 1,
+          blocked: 0,
+          requested: 1,
+        },
+      },
+      totals: {
+        allowed: 1,
+        blocked: 1,
+        requested: 2,
+      },
+    });
+    expect(snapshot.metidosTools.totals.totalDurationMs).toBeGreaterThanOrEqual(
+      0,
+    );
+
+    const summary = getRuntimeStatsSummary();
+    expect(summary.metidosTools.toolCount).toBe(2);
+    expect(summary.metidosTools.unsafeModeToolCount).toBe(2);
+    expect(summary.metidosTools.byTool).toEqual(snapshot.metidosTools.byTool);
+    expect(summary.metidosTools.sandbox).toEqual(snapshot.metidosTools.sandbox);
+    expect(summary.metidosTools.unsafeModeRequests).toEqual(
+      snapshot.metidosTools.unsafeModeRequests,
+    );
   });
 
   it("tracks cron run duration, queue pressure, and timeout counters", async () => {

@@ -77,6 +77,46 @@ function createRuntimeDiagnosticsSnapshot(
           prefetchWaits: ordinal + 7,
         },
       },
+      metidosTools: {
+        byTool: {
+          new_thread: {
+            calls,
+            failed: ordinal,
+            lastDurationMs: 8 + ordinal,
+            peakDurationMs: 9 + ordinal,
+            succeeded: calls - ordinal,
+            totalDurationMs: 10 + ordinal,
+          },
+        },
+        sandbox: {
+          calls: ordinal + 1,
+          failed: ordinal,
+          succeeded: 1,
+          timedOut: 0,
+        },
+        totals: {
+          calls,
+          failed: ordinal,
+          lastDurationMs: 8 + ordinal,
+          peakDurationMs: 9 + ordinal,
+          succeeded: calls - ordinal,
+          totalDurationMs: 10 + ordinal,
+        },
+        unsafeModeRequests: {
+          byTool: {
+            new_thread: {
+              allowed: ordinal,
+              blocked: 0,
+              requested: ordinal,
+            },
+          },
+          totals: {
+            allowed: ordinal,
+            blocked: 0,
+            requested: ordinal,
+          },
+        },
+      },
       rpc: {
         byMethod: {
           getThread: {
@@ -158,6 +198,48 @@ function createRuntimeDiagnosticsSnapshot(
           preemptions: ordinal + 6,
           prefetchWaits: ordinal + 7,
         },
+      },
+      metidosTools: {
+        byTool: {
+          new_thread: {
+            calls,
+            failed: ordinal,
+            lastDurationMs: 8 + ordinal,
+            peakDurationMs: 9 + ordinal,
+            succeeded: calls - ordinal,
+            totalDurationMs: 10 + ordinal,
+          },
+        },
+        sandbox: {
+          calls: ordinal + 1,
+          failed: ordinal,
+          succeeded: 1,
+          timedOut: 0,
+        },
+        toolCount: 1,
+        totals: {
+          calls,
+          failed: ordinal,
+          lastDurationMs: 8 + ordinal,
+          peakDurationMs: 9 + ordinal,
+          succeeded: calls - ordinal,
+          totalDurationMs: 10 + ordinal,
+        },
+        unsafeModeRequests: {
+          byTool: {
+            new_thread: {
+              allowed: ordinal,
+              blocked: 0,
+              requested: ordinal,
+            },
+          },
+          totals: {
+            allowed: ordinal,
+            blocked: 0,
+            requested: ordinal,
+          },
+        },
+        unsafeModeToolCount: 1,
       },
       rpc: {
         calls,

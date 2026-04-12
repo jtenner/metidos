@@ -94,7 +94,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 
 **Medium**:
 4. Auth/user issues: Custom TOTP (SHA-1, clock risks), lockout races (no universal TX), critical auth-secret.key (reset path exists but disruptive), weak PIN step-up, legacy migration complexity, username edges, devBypass, no ratelimits.
-5. Agent tools gaps: Monolithic pi-metidos-tools (schemas, per-call scoping, RPC delegation for list/update/new_thread/cron/focus/runUntrustedJS/etc.); incomplete telemetry (RPC/cron/VM tracked but missing per-tool/unsafe/sandbox counters per AGENTS.md); cron DoS via unsafe; GitHub truncation; complex projection/normalization (many edge tests = prior bugs); scope canonicalization platform edges; no tool ratelimits.
+5. Agent tools gaps: Monolithic pi-metidos-tools (schemas, per-call scoping, RPC delegation for list/update/new_thread/cron/focus/runUntrustedJS/etc.); the first missing telemetry slice is now in place through a `metidosTools` runtime-stats bucket (per-tool calls, explicit unsafe-mode requests, vm2 failures/timeouts), but budgets/ratelimits and broader load validation still remain; cron DoS via unsafe; GitHub truncation; complex projection/normalization (many edge tests = prior bugs); scope canonicalization platform edges; no tool ratelimits.
 6. Performance (re-renders, SQLite despite WAL/indexes/sidecar, RPC, cron, memory per 15+ OPT docs); slow tests risk flakiness; large mainview state/selectors/workers.
 7. Pi/SDK coupling (pi-thread-runtime, Codex sync, event projection, session quirks, migration risks – breaks tools/telemetry on upstream change).
 8. Security surface (strong scoping/audits/headers but residual from unsafe/VM2/keyfile/tool breadth; no vuln scanning in validate).
@@ -110,12 +110,13 @@ All static checks pass and tests are comprehensive (including deep security, san
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
+- The first agent-tool telemetry slice is now implemented too: runtime stats expose per-tool Metidos counts plus explicit unsafe-mode and vm2 sandbox outcome counters, which narrows the remaining observability gap to rate limits, budgets, and load-test baselines.
 
 ## Recommendations
-- **Priority**: Split monoliths; default safe threads + explicit unsafe UX; add all missing telemetry hooks/counters for tools/VM2/unsafe/cron; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
+- **Priority**: Split monoliths; default safe threads + explicit unsafe UX; build on the new tool/unsafe/vm2 telemetry with budgets and load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
 - **Perf/Obs**: Finish OPT roadmap with production telemetry; load test agent tool usage.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Production build/load test with heavy unsafe/agent workloads; Pi SDK compatibility audit; track telemetry for high-risk paths.
+- **Next**: Production build/load test with heavy unsafe/agent workloads using the new tool telemetry; Pi SDK compatibility audit; add rate limits and resource budgets for the remaining high-risk paths.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

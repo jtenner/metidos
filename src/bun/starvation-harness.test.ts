@@ -58,6 +58,46 @@ function buildDiagnosticsSnapshot(
           prefetchWaits: 1,
         },
       },
+      metidosTools: {
+        byTool: {
+          new_thread: {
+            calls: 1,
+            failed: 0,
+            lastDurationMs: 11,
+            peakDurationMs: 11,
+            succeeded: 1,
+            totalDurationMs: 11,
+          },
+        },
+        sandbox: {
+          calls: 1,
+          failed: 0,
+          succeeded: 1,
+          timedOut: 0,
+        },
+        totals: {
+          calls: 1,
+          failed: 0,
+          lastDurationMs: 11,
+          peakDurationMs: 11,
+          succeeded: 1,
+          totalDurationMs: 11,
+        },
+        unsafeModeRequests: {
+          byTool: {
+            new_thread: {
+              allowed: 0,
+              blocked: 0,
+              requested: 0,
+            },
+          },
+          totals: {
+            allowed: 0,
+            blocked: 0,
+            requested: 0,
+          },
+        },
+      },
       rpc: {
         byMethod: {
           openWorktree: {
@@ -139,6 +179,48 @@ function buildDiagnosticsSnapshot(
           preemptions: 1,
           prefetchWaits: 1,
         },
+      },
+      metidosTools: {
+        byTool: {
+          new_thread: {
+            calls: 1,
+            failed: 0,
+            lastDurationMs: 11,
+            peakDurationMs: 11,
+            succeeded: 1,
+            totalDurationMs: 11,
+          },
+        },
+        sandbox: {
+          calls: 1,
+          failed: 0,
+          succeeded: 1,
+          timedOut: 0,
+        },
+        toolCount: 1,
+        totals: {
+          calls: 1,
+          failed: 0,
+          lastDurationMs: 11,
+          peakDurationMs: 11,
+          succeeded: 1,
+          totalDurationMs: 11,
+        },
+        unsafeModeRequests: {
+          byTool: {
+            new_thread: {
+              allowed: 0,
+              blocked: 0,
+              requested: 0,
+            },
+          },
+          totals: {
+            allowed: 0,
+            blocked: 0,
+            requested: 0,
+          },
+        },
+        unsafeModeToolCount: 1,
       },
       rpc: {
         calls: 2,

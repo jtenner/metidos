@@ -14,6 +14,11 @@ import type {
   RpcThreadStartRequest,
   RpcWorktree,
 } from "./rpc-schema";
+import {
+  getRuntimeStatsSnapshot,
+  getRuntimeStatsSummary,
+  resetRuntimeStats,
+} from "./runtime-stats";
 
 const NOW = "2026-04-09T12:00:00.000Z";
 
@@ -603,5 +608,104 @@ describe("createPiMetidosTools", () => {
     ).rejects.toThrow(
       "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
     );
+  });
+
+  it("records per-tool, unsafe-mode, and sandbox telemetry through the Metidos tool wrapper", async () => {
+    resetRuntimeStats();
+    const safeScope = makeScope();
+    const unsafeScope = makeScope({
+      allowUnsafeModeEscalation: true,
+    });
+    const host = createHost();
+
+    const failedSandbox = await executeTool(
+      safeScope,
+      host,
+      "run_untrusted_js",
+      {
+        code: 'throw new Error("boom")',
+      },
+    );
+    const timedOutSandbox = await executeTool(
+      safeScope,
+      host,
+      "run_untrusted_js",
+      {
+        code: "while (true) {}",
+        timeoutMs: 10,
+      },
+    );
+    await executeTool(safeScope, host, "list_crons", {});
+    await executeTool(unsafeScope, host, "new_thread", {
+      input: "Ship it",
+      unsafeMode: "true",
+    });
+    await expect(
+      executeTool(safeScope, host, "new_cron", {
+        prompt: "Summarize the repo",
+        schedule: "0 0 * * *",
+        unsafeMode: "true",
+      }),
+    ).rejects.toThrow(
+      "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
+    );
+
+    expect(resultText(failedSandbox)).toContain("Sandbox failed");
+    expect(resultText(timedOutSandbox)).toContain("Sandbox timed out");
+
+    const snapshot = getRuntimeStatsSnapshot();
+    expect(snapshot.metidosTools.byTool.run_untrusted_js).toMatchObject({
+      calls: 2,
+      failed: 0,
+      succeeded: 2,
+    });
+    expect(snapshot.metidosTools.byTool.list_crons).toMatchObject({
+      calls: 1,
+      failed: 0,
+      succeeded: 1,
+    });
+    expect(snapshot.metidosTools.byTool.new_thread).toMatchObject({
+      calls: 1,
+      failed: 0,
+      succeeded: 1,
+    });
+    expect(snapshot.metidosTools.byTool.new_cron).toMatchObject({
+      calls: 1,
+      failed: 1,
+      succeeded: 0,
+    });
+    expect(snapshot.metidosTools.unsafeModeRequests).toEqual({
+      byTool: {
+        new_cron: {
+          allowed: 0,
+          blocked: 1,
+          requested: 1,
+        },
+        new_thread: {
+          allowed: 1,
+          blocked: 0,
+          requested: 1,
+        },
+      },
+      totals: {
+        allowed: 1,
+        blocked: 1,
+        requested: 2,
+      },
+    });
+    expect(snapshot.metidosTools.sandbox).toEqual({
+      calls: 2,
+      failed: 1,
+      succeeded: 0,
+      timedOut: 1,
+    });
+
+    const summary = getRuntimeStatsSummary();
+    expect(summary.metidosTools.toolCount).toBe(4);
+    expect(summary.metidosTools.unsafeModeToolCount).toBe(2);
+    expect(summary.metidosTools.byTool.new_cron).toEqual(
+      snapshot.metidosTools.byTool.new_cron,
+    );
+    expect(summary.metidosTools.sandbox).toEqual(snapshot.metidosTools.sandbox);
   });
 });

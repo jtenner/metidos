@@ -19,6 +19,13 @@ import type {
   RpcThreadStartRequest,
   RpcWorktree,
 } from "./rpc-schema";
+import {
+  recordMetidosSandboxRun,
+  recordMetidosToolFailed,
+  recordMetidosToolStarted,
+  recordMetidosToolSucceeded,
+  recordMetidosUnsafeModeRequest,
+} from "./runtime-stats";
 import { updateThreadMetadataFromSidecar } from "./sidecar-thread-metadata";
 import {
   canonicalizeThreadToolPath,
@@ -568,14 +575,51 @@ function prepareThreadIdAndBooleanArguments<TParams extends TSchema>(
 }
 
 function assertUnsafeModeEscalationAllowed(
+  toolName: string,
   scope: PiMetidosToolScope,
   requestedUnsafeMode: boolean | null | undefined,
 ): void {
-  if (requestedUnsafeMode === true && !scope.allowUnsafeModeEscalation) {
+  if (requestedUnsafeMode !== true) {
+    return;
+  }
+
+  if (!scope.allowUnsafeModeEscalation) {
+    recordMetidosUnsafeModeRequest({
+      allowed: false,
+      toolName,
+    });
     throw new Error(
       "Unsafe mode is disabled for the current thread. This thread cannot create or update unsafe child threads or cron jobs.",
     );
   }
+
+  recordMetidosUnsafeModeRequest({
+    allowed: true,
+    toolName,
+  });
+}
+
+function withMetidosToolTelemetry<
+  TParameters extends TSchema = TSchema,
+  TDetails = Record<string, unknown>,
+>(
+  tool: ToolDefinition<TParameters, TDetails>,
+): ToolDefinition<TParameters, TDetails> {
+  const execute = tool.execute;
+  return {
+    ...tool,
+    execute: async (...args: Parameters<typeof execute>) => {
+      const token = recordMetidosToolStarted(tool.name);
+      try {
+        const result = await execute(...args);
+        recordMetidosToolSucceeded(token);
+        return result;
+      } catch (error) {
+        recordMetidosToolFailed(token);
+        throw error;
+      }
+    },
+  };
 }
 
 async function resolveProjectByName(
@@ -975,508 +1019,548 @@ export function createPiMetidosTools(
   host: PiMetidosToolHost,
 ): ToolDefinition[] {
   return [
-    defineTool({
-      description: updateThreadDescription(scope.threadIdContext),
-      execute: async (_toolCallId, params) => {
-        const resolvedThreadId =
-          typeof params.threadId === "number"
-            ? params.threadId
-            : scope.threadIdContext;
-        enforceBoundThreadScope(resolvedThreadId, scope.threadIdContext);
-        const ignoredAccessFields = collectIgnoredUpdateThreadAccessFields({
-          agentsAccess: params.agentsAccess,
-          description: params.description,
-          githubAccess: params.githubAccess,
-          metidosAccess: params.metidosAccess,
-          pinned: params.pinned,
-          summary: params.summary,
-          title: params.title,
-          unsafeMode: params.unsafeMode,
-        });
-        const hasMetadataUpdate =
-          typeof params.title === "string" ||
-          typeof params.summary === "string" ||
-          typeof params.description === "string" ||
-          typeof params.pinned === "boolean";
-        if (!hasMetadataUpdate && ignoredAccessFields.length === 0) {
-          throw new Error(
-            "At least one of title, summary, description, or pinned is required.",
-          );
-        }
-        if (!hasMetadataUpdate) {
-          return textToolResult(
-            `Ignored thread access changes for thread ${resolvedThreadId}. This tool only updates metadata from inside a running thread.`,
-            {
-              ignoredAccessFields,
-              threadId: resolvedThreadId,
-            },
-          );
-        }
-
-        const thread = await updateThreadMetadataFromSidecar(
-          host.updateThreadMetadata,
-          {
-            ...(typeof params.description === "undefined"
-              ? {}
-              : { description: params.description }),
-            ...(typeof params.pinned === "undefined"
-              ? {}
-              : { pinned: params.pinned }),
-            ...(typeof params.summary === "undefined"
-              ? {}
-              : { summary: params.summary }),
-            threadId: resolvedThreadId,
-            ...(typeof params.title === "undefined"
-              ? {}
-              : { title: params.title }),
-          },
-        );
-
-        return textToolResult(
-          ignoredAccessFields.length
-            ? `Updated thread ${thread.id}. Ignored in-thread access changes.`
-            : `Updated thread ${thread.id}.`,
-          buildUpdateThreadToolPayload(thread, {
+    withMetidosToolTelemetry(
+      defineTool({
+        description: updateThreadDescription(scope.threadIdContext),
+        execute: async (_toolCallId, params) => {
+          const resolvedThreadId =
+            typeof params.threadId === "number"
+              ? params.threadId
+              : scope.threadIdContext;
+          enforceBoundThreadScope(resolvedThreadId, scope.threadIdContext);
+          const ignoredAccessFields = collectIgnoredUpdateThreadAccessFields({
+            agentsAccess: params.agentsAccess,
             description: params.description,
-            ignoredAccessFields,
+            githubAccess: params.githubAccess,
+            metidosAccess: params.metidosAccess,
             pinned: params.pinned,
             summary: params.summary,
             title: params.title,
-          }),
-        );
-      },
-      label: "Update Thread",
-      name: "update_thread",
-      parameters: UpdateThreadToolParameters,
-      prepareArguments: (args) =>
-        prepareThreadIdAndBooleanArguments<typeof UpdateThreadToolParameters>(
-          args,
-          [
-            "agentsAccess",
-            "githubAccess",
-            "metidosAccess",
-            "pinned",
-            "unsafeMode",
-            "webSearchAccess",
-          ],
-          ["threadId"],
-        ),
-      promptGuidelines: [
-        "Use this to rename, summarize, or pin the current thread instead of describing those metadata changes in plain text.",
-      ],
-      promptSnippet: "Update Metidos thread title, summary, or pin state",
-    }),
-    defineTool({
-      description:
-        "List Metidos threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
-      execute: async (_toolCallId, params) => {
-        const { project, rows, workspace } = await buildThreadListRows(
-          {
-            projectName: params.projectName,
-            workspaceName: params.workspaceName,
-          },
-          host,
-          scope,
-        );
-        const textLines = rows.length
-          ? rows.map(
-              (row) =>
-                `- [${row.threadId}] ${row.title} (${row.workspaceName} · ${row.workspacePath})${row.pinned ? " [pinned]" : ""}${row.summary ? ` - ${row.summary}` : ""}`,
-            )
-          : [
-              workspace
-                ? `No threads found in ${project.name} / ${workspace.branch?.trim() || shortName(workspace.path)}.`
-                : `No threads found in ${project.name}.`,
-            ];
-        return textToolResult(
-          [
-            `Threads for ${project.name}${workspace ? ` / ${workspace.branch?.trim() || shortName(workspace.path)}` : ""}:`,
-            ...textLines,
-          ].join("\n"),
-          {
-            projectId: project.id,
-            projectName: project.name,
-            projectPath: project.path,
-            threads: rows,
-            workspaceName: workspace
-              ? workspace.branch?.trim() ||
-                (samePath(workspace.path, project.path, scope)
-                  ? "Primary"
-                  : shortName(workspace.path))
-              : null,
-            workspacePath: workspace?.path ?? null,
-          },
-        );
-      },
-      label: "List Threads",
-      name: "list_threads",
-      parameters: Type.Object({
-        projectName: Type.String({
-          description: "Project name or path to inspect.",
-          minLength: 1,
-        }),
-        workspaceName: Type.Optional(
-          Type.String({
-            description: "Optional git worktree name or path.",
+            unsafeMode: params.unsafeMode,
+          });
+          const hasMetadataUpdate =
+            typeof params.title === "string" ||
+            typeof params.summary === "string" ||
+            typeof params.description === "string" ||
+            typeof params.pinned === "boolean";
+          if (!hasMetadataUpdate && ignoredAccessFields.length === 0) {
+            throw new Error(
+              "At least one of title, summary, description, or pinned is required.",
+            );
+          }
+          if (!hasMetadataUpdate) {
+            return textToolResult(
+              `Ignored thread access changes for thread ${resolvedThreadId}. This tool only updates metadata from inside a running thread.`,
+              {
+                ignoredAccessFields,
+                threadId: resolvedThreadId,
+              },
+            );
+          }
+
+          const thread = await updateThreadMetadataFromSidecar(
+            host.updateThreadMetadata,
+            {
+              ...(typeof params.description === "undefined"
+                ? {}
+                : { description: params.description }),
+              ...(typeof params.pinned === "undefined"
+                ? {}
+                : { pinned: params.pinned }),
+              ...(typeof params.summary === "undefined"
+                ? {}
+                : { summary: params.summary }),
+              threadId: resolvedThreadId,
+              ...(typeof params.title === "undefined"
+                ? {}
+                : { title: params.title }),
+            },
+          );
+
+          return textToolResult(
+            ignoredAccessFields.length
+              ? `Updated thread ${thread.id}. Ignored in-thread access changes.`
+              : `Updated thread ${thread.id}.`,
+            buildUpdateThreadToolPayload(thread, {
+              description: params.description,
+              ignoredAccessFields,
+              pinned: params.pinned,
+              summary: params.summary,
+              title: params.title,
+            }),
+          );
+        },
+        label: "Update Thread",
+        name: "update_thread",
+        parameters: UpdateThreadToolParameters,
+        prepareArguments: (args) =>
+          prepareThreadIdAndBooleanArguments<typeof UpdateThreadToolParameters>(
+            args,
+            [
+              "agentsAccess",
+              "githubAccess",
+              "metidosAccess",
+              "pinned",
+              "unsafeMode",
+              "webSearchAccess",
+            ],
+            ["threadId"],
+          ),
+        promptGuidelines: [
+          "Use this to rename, summarize, or pin the current thread instead of describing those metadata changes in plain text.",
+        ],
+        promptSnippet: "Update Metidos thread title, summary, or pin state",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description:
+          "List Metidos threads in a project. Workspace means the git worktree. Omit workspaceName to list every thread and include each thread's worktree.",
+        execute: async (_toolCallId, params) => {
+          const { project, rows, workspace } = await buildThreadListRows(
+            {
+              projectName: params.projectName,
+              workspaceName: params.workspaceName,
+            },
+            host,
+            scope,
+          );
+          const textLines = rows.length
+            ? rows.map(
+                (row) =>
+                  `- [${row.threadId}] ${row.title} (${row.workspaceName} · ${row.workspacePath})${row.pinned ? " [pinned]" : ""}${row.summary ? ` - ${row.summary}` : ""}`,
+              )
+            : [
+                workspace
+                  ? `No threads found in ${project.name} / ${workspace.branch?.trim() || shortName(workspace.path)}.`
+                  : `No threads found in ${project.name}.`,
+              ];
+          return textToolResult(
+            [
+              `Threads for ${project.name}${workspace ? ` / ${workspace.branch?.trim() || shortName(workspace.path)}` : ""}:`,
+              ...textLines,
+            ].join("\n"),
+            {
+              projectId: project.id,
+              projectName: project.name,
+              projectPath: project.path,
+              threads: rows,
+              workspaceName: workspace
+                ? workspace.branch?.trim() ||
+                  (samePath(workspace.path, project.path, scope)
+                    ? "Primary"
+                    : shortName(workspace.path))
+                : null,
+              workspacePath: workspace?.path ?? null,
+            },
+          );
+        },
+        label: "List Threads",
+        name: "list_threads",
+        parameters: Type.Object({
+          projectName: Type.String({
+            description: "Project name or path to inspect.",
             minLength: 1,
           }),
-        ),
-      }),
-      promptGuidelines: [
-        "Use this before creating or focusing another thread when you need to inspect existing work in the same project.",
-      ],
-      promptSnippet: "List Metidos threads in a project or worktree",
-    }),
-    defineTool({
-      description:
-        "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Node fs writes stay inside the current worktree, ambient network access is disabled, and only a reduced Bun helper subset is exposed.",
-      execute: async (_toolCallId, params) => {
-        const report = await runUntrustedJavaScriptInVm2({
-          code: params.code,
-          ...(typeof params.timeoutMs === "number"
-            ? { timeoutMs: params.timeoutMs }
-            : {}),
-          worktreePath: scope.worktreePathContext,
-        });
-        return textToolResult(formatVm2ExecutionReportText(report), report);
-      },
-      label: "Run Untrusted JS",
-      name: "run_untrusted_js",
-      parameters: Type.Object({
-        code: Type.String({
-          description: "TypeScript or JavaScript source to execute.",
-          minLength: 1,
+          workspaceName: Type.Optional(
+            Type.String({
+              description: "Optional git worktree name or path.",
+              minLength: 1,
+            }),
+          ),
         }),
-        timeoutMs: Type.Optional(
-          Type.Number({
-            description: "Sandbox timeout in milliseconds. Defaults to 60000.",
-            minimum: 1,
-          }),
-        ),
+        promptGuidelines: [
+          "Use this before creating or focusing another thread when you need to inspect existing work in the same project.",
+        ],
+        promptSnippet: "List Metidos threads in a project or worktree",
       }),
-      promptGuidelines: [
-        "Use this only when sandboxed computation or scripted analysis is better than a direct edit, grep, or shell command.",
-      ],
-      promptSnippet: "Run sandboxed JavaScript or TypeScript inside Metidos",
-    }),
-    defineTool({
-      description:
-        "Focus the Metidos UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
-      execute: async (_toolCallId, params, signal) => {
-        const target = await resolveFocusContextTarget(
-          {
-            project: params.project,
-            threadId: params.threadId,
-            workspace: params.workspace,
-          },
-          host,
-          scope,
-        );
-        const result = await host.focusContext(
-          {
-            ...(target.threadId === null ? {} : { threadId: target.threadId }),
-            projectId: target.project.id,
-            worktreePath: target.worktree.path,
-          },
-          signal,
-        );
-        return textToolResult(
-          `Focused ${result.projectName} / ${shortName(result.worktreePath)}${result.threadId ? ` / thread ${result.threadId}` : ""}.`,
-          {
-            projectId: result.projectId,
-            projectName: result.projectName,
-            projectPath: result.projectPath,
-            threadId: result.threadId,
-            worktreePath: result.worktreePath,
-          },
-        );
-      },
-      label: "Set Context",
-      name: "set_context",
-      parameters: SetContextToolParameters,
-      prepareArguments: (args) =>
-        prepareThreadIdAndBooleanArguments<typeof SetContextToolParameters>(
-          args,
-          [],
-          ["threadId"],
-        ),
-      promptGuidelines: [
-        "Use this when the user explicitly wants the browser UI moved to another project, worktree, or thread.",
-      ],
-      promptSnippet:
-        "Focus the Metidos UI on another project, worktree, or thread",
-    }),
-    defineTool({
-      description: "List all non-deleted cron jobs with latest run metadata.",
-      execute: async () => {
-        const crons = await host.listCrons();
-        return textToolResult(`Found ${crons.length} cron job(s).`, {
-          cronJobs: crons.map(cronJobPayload),
-        });
-      },
-      label: "List Cron Jobs",
-      name: "list_crons",
-      parameters: Type.Object({}),
-      promptSnippet: "List Metidos cron jobs",
-    }),
-    defineTool({
-      description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. Safe threads must leave unsafeMode off. ${SUPPORTED_MODELS_SENTENCE}`,
-      execute: async (_toolCallId, params) => {
-        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
-        const target = await resolveWorktreeTarget(
-          {
-            projectId: params.projectId,
-            projectPath: params.projectPath,
-            worktreePath: params.worktreePath,
-          },
-          host,
-          scope,
-        );
-        const created = await host.newCron({
-          ...(typeof params.agentsAccess === "boolean"
-            ? { agentsAccess: params.agentsAccess }
-            : {}),
-          ...(typeof params.description === "string"
-            ? { description: params.description.trim() }
-            : {}),
-          ...(typeof params.enabled === "boolean"
-            ? { enabled: params.enabled }
-            : {}),
-          ...(typeof params.githubAccess === "boolean"
-            ? { githubAccess: params.githubAccess }
-            : {}),
-          ...(typeof params.metidosAccess === "boolean"
-            ? { metidosAccess: params.metidosAccess }
-            : {}),
-          ...(typeof params.model === "string"
-            ? { model: params.model.trim() }
-            : {}),
-          projectId: target.projectId,
-          prompt: params.prompt.trim(),
-          ...(typeof params.reasoningEffort === "string"
-            ? { reasoningEffort: params.reasoningEffort }
-            : {}),
-          schedule: params.schedule.trim(),
-          ...(typeof params.title === "string"
-            ? { title: params.title.trim() }
-            : {}),
-          ...(typeof params.unsafeMode === "boolean"
-            ? { unsafeMode: params.unsafeMode }
-            : {}),
-          ...(typeof params.webSearchAccess === "boolean"
-            ? { webSearchAccess: params.webSearchAccess }
-            : {}),
-          worktreePath: target.worktreePath,
-        });
-        return textToolResult(
-          `Created cron job ${created.id} in ${target.worktreePath}.`,
-          cronJobPayload(created),
-        );
-      },
-      label: "New Cron Job",
-      name: "new_cron",
-      parameters: NewCronToolParameters,
-      prepareArguments: (args) =>
-        prepareThreadIdAndBooleanArguments<typeof NewCronToolParameters>(
-          args,
-          [
-            "agentsAccess",
-            "enabled",
-            "githubAccess",
-            "metidosAccess",
-            "unsafeMode",
-            "webSearchAccess",
-          ],
-          ["projectId"],
-        ),
-      promptGuidelines: [
-        "Use this to define recurring Metidos work instead of describing cron changes abstractly.",
-      ],
-      promptSnippet: "Create a Metidos cron job for recurring work",
-    }),
-    defineTool({
-      description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. Safe threads cannot turn cron jobs into unsafe jobs. ${SUPPORTED_MODELS_SENTENCE}`,
-      execute: async (_toolCallId, params) => {
-        if (
-          params.deleted === undefined &&
-          params.schedule === undefined &&
-          params.prompt === undefined &&
-          params.model === undefined &&
-          params.webSearchAccess === undefined &&
-          params.githubAccess === undefined &&
-          params.agentsAccess === undefined &&
-          params.metidosAccess === undefined &&
-          params.title === undefined &&
-          params.description === undefined &&
-          params.unsafeMode === undefined &&
-          params.reasoningEffort === undefined &&
-          params.enabled === undefined
-        ) {
-          throw new Error("At least one update field is required.");
-        }
-        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
-        const updated = await host.updateCron({
-          ...(typeof params.agentsAccess === "boolean"
-            ? { agentsAccess: params.agentsAccess }
-            : {}),
-          cronJobId: params.cronJobId,
-          ...(typeof params.deleted === "boolean"
-            ? { deleted: params.deleted }
-            : {}),
-          ...(typeof params.description === "string"
-            ? { description: params.description.trim() }
-            : {}),
-          ...(typeof params.enabled === "boolean"
-            ? { enabled: params.enabled }
-            : {}),
-          ...(typeof params.githubAccess === "boolean"
-            ? { githubAccess: params.githubAccess }
-            : {}),
-          ...(typeof params.metidosAccess === "boolean"
-            ? { metidosAccess: params.metidosAccess }
-            : {}),
-          ...(typeof params.model === "string"
-            ? { model: params.model.trim() }
-            : {}),
-          ...(typeof params.prompt === "string"
-            ? { prompt: params.prompt.trim() }
-            : {}),
-          ...(typeof params.reasoningEffort === "string"
-            ? { reasoningEffort: params.reasoningEffort }
-            : {}),
-          ...(typeof params.schedule === "string"
-            ? { schedule: params.schedule.trim() }
-            : {}),
-          ...(typeof params.title === "string"
-            ? { title: params.title.trim() }
-            : {}),
-          ...(typeof params.unsafeMode === "boolean"
-            ? { unsafeMode: params.unsafeMode }
-            : {}),
-          ...(typeof params.webSearchAccess === "boolean"
-            ? { webSearchAccess: params.webSearchAccess }
-            : {}),
-        });
-        return textToolResult(
-          `Updated cron job ${updated.id}.`,
-          cronJobPayload(updated),
-        );
-      },
-      label: "Update Cron Job",
-      name: "update_cron",
-      parameters: UpdateCronToolParameters,
-      prepareArguments: (args) =>
-        prepareThreadIdAndBooleanArguments<typeof UpdateCronToolParameters>(
-          args,
-          [
-            "agentsAccess",
-            "deleted",
-            "enabled",
-            "githubAccess",
-            "metidosAccess",
-            "unsafeMode",
-            "webSearchAccess",
-          ],
-          ["cronJobId"],
-        ),
-      promptSnippet: "Update or delete a Metidos cron job",
-    }),
-    defineTool<typeof NewThreadToolParameters, Record<string, unknown>>({
-      description: `Start a separate Metidos thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Safe threads must leave unsafeMode off. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
-      execute: async (_toolCallId, params) => {
-        assertUnsafeModeEscalationAllowed(scope, params.unsafeMode);
-        const target = await resolveWorktreeTarget(
-          {
-            projectId: params.projectId,
-            projectPath: params.projectPath,
-            worktreePath: params.worktreePath,
-          },
-          host,
-          scope,
-        );
-        const metadata = {
-          autoStart: params.autoStart ?? null,
-          input: params.input,
-          model: params.model ?? null,
-          projectPath: target.projectPath,
-          reasoningEffort: params.reasoningEffort ?? null,
-          unsafeMode: params.unsafeMode ?? null,
-        };
-
-        if (params.autoStart === true && params.unsafeMode !== true) {
-          const request = await host.requestThreadStart({
-            agentsAccess: params.agentsAccess ?? null,
-            autoStart: true,
-            githubAccess: params.githubAccess ?? null,
-            input: params.input,
-            metidosAccess: params.metidosAccess ?? null,
-            model: params.model ?? null,
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description:
+          "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Node fs writes stay inside the current worktree, ambient network access is disabled, and only a reduced Bun helper subset is exposed.",
+        execute: async (_toolCallId, params) => {
+          const report = await runUntrustedJavaScriptInVm2({
+            code: params.code,
+            ...(typeof params.timeoutMs === "number"
+              ? { timeoutMs: params.timeoutMs }
+              : {}),
+            worktreePath: scope.worktreePathContext,
+          });
+          recordMetidosSandboxRun({
+            outcome: report.ok
+              ? "succeeded"
+              : report.timedOut
+                ? "timedOut"
+                : "failed",
+          });
+          return textToolResult(formatVm2ExecutionReportText(report), report);
+        },
+        label: "Run Untrusted JS",
+        name: "run_untrusted_js",
+        parameters: Type.Object({
+          code: Type.String({
+            description: "TypeScript or JavaScript source to execute.",
+            minLength: 1,
+          }),
+          timeoutMs: Type.Optional(
+            Type.Number({
+              description:
+                "Sandbox timeout in milliseconds. Defaults to 60000.",
+              minimum: 1,
+            }),
+          ),
+        }),
+        promptGuidelines: [
+          "Use this only when sandboxed computation or scripted analysis is better than a direct edit, grep, or shell command.",
+        ],
+        promptSnippet: "Run sandboxed JavaScript or TypeScript inside Metidos",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description:
+          "Focus the Metidos UI on a project, git worktree, and optional thread. Omit workspace to use the primary worktree. threadId wins and opens that thread's project/worktree.",
+        execute: async (_toolCallId, params, signal) => {
+          const target = await resolveFocusContextTarget(
+            {
+              project: params.project,
+              threadId: params.threadId,
+              workspace: params.workspace,
+            },
+            host,
+            scope,
+          );
+          const result = await host.focusContext(
+            {
+              ...(target.threadId === null
+                ? {}
+                : { threadId: target.threadId }),
+              projectId: target.project.id,
+              worktreePath: target.worktree.path,
+            },
+            signal,
+          );
+          return textToolResult(
+            `Focused ${result.projectName} / ${shortName(result.worktreePath)}${result.threadId ? ` / thread ${result.threadId}` : ""}.`,
+            {
+              projectId: result.projectId,
+              projectName: result.projectName,
+              projectPath: result.projectPath,
+              threadId: result.threadId,
+              worktreePath: result.worktreePath,
+            },
+          );
+        },
+        label: "Set Context",
+        name: "set_context",
+        parameters: SetContextToolParameters,
+        prepareArguments: (args) =>
+          prepareThreadIdAndBooleanArguments<typeof SetContextToolParameters>(
+            args,
+            [],
+            ["threadId"],
+          ),
+        promptGuidelines: [
+          "Use this when the user explicitly wants the browser UI moved to another project, worktree, or thread.",
+        ],
+        promptSnippet:
+          "Focus the Metidos UI on another project, worktree, or thread",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description: "List all non-deleted cron jobs with latest run metadata.",
+        execute: async () => {
+          const crons = await host.listCrons();
+          return textToolResult(`Found ${crons.length} cron job(s).`, {
+            cronJobs: crons.map(cronJobPayload),
+          });
+        },
+        label: "List Cron Jobs",
+        name: "list_crons",
+        parameters: Type.Object({}),
+        promptSnippet: "List Metidos cron jobs",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description: `Create a new cron job bound to a project workspace. The run prompt is reused for each fire time. Access flags mirror thread controls. Safe threads must leave unsafeMode off. ${SUPPORTED_MODELS_SENTENCE}`,
+        execute: async (_toolCallId, params) => {
+          assertUnsafeModeEscalationAllowed(
+            "new_cron",
+            scope,
+            params.unsafeMode,
+          );
+          const target = await resolveWorktreeTarget(
+            {
+              projectId: params.projectId,
+              projectPath: params.projectPath,
+              worktreePath: params.worktreePath,
+            },
+            host,
+            scope,
+          );
+          const created = await host.newCron({
+            ...(typeof params.agentsAccess === "boolean"
+              ? { agentsAccess: params.agentsAccess }
+              : {}),
+            ...(typeof params.description === "string"
+              ? { description: params.description.trim() }
+              : {}),
+            ...(typeof params.enabled === "boolean"
+              ? { enabled: params.enabled }
+              : {}),
+            ...(typeof params.githubAccess === "boolean"
+              ? { githubAccess: params.githubAccess }
+              : {}),
+            ...(typeof params.metidosAccess === "boolean"
+              ? { metidosAccess: params.metidosAccess }
+              : {}),
+            ...(typeof params.model === "string"
+              ? { model: params.model.trim() }
+              : {}),
             projectId: target.projectId,
-            reasoningEffort: params.reasoningEffort ?? null,
-            unsafeMode: params.unsafeMode ?? null,
-            webSearchAccess: params.webSearchAccess ?? null,
+            prompt: params.prompt.trim(),
+            ...(typeof params.reasoningEffort === "string"
+              ? { reasoningEffort: params.reasoningEffort }
+              : {}),
+            schedule: params.schedule.trim(),
+            ...(typeof params.title === "string"
+              ? { title: params.title.trim() }
+              : {}),
+            ...(typeof params.unsafeMode === "boolean"
+              ? { unsafeMode: params.unsafeMode }
+              : {}),
+            ...(typeof params.webSearchAccess === "boolean"
+              ? { webSearchAccess: params.webSearchAccess }
+              : {}),
             worktreePath: target.worktreePath,
           });
           return textToolResult(
-            `Requested permission to start a thread for ${target.worktreePath}.`,
-            threadStartRequestPayload(request),
+            `Created cron job ${created.id} in ${target.worktreePath}.`,
+            cronJobPayload(created),
           );
-        }
+        },
+        label: "New Cron Job",
+        name: "new_cron",
+        parameters: NewCronToolParameters,
+        prepareArguments: (args) =>
+          prepareThreadIdAndBooleanArguments<typeof NewCronToolParameters>(
+            args,
+            [
+              "agentsAccess",
+              "enabled",
+              "githubAccess",
+              "metidosAccess",
+              "unsafeMode",
+              "webSearchAccess",
+            ],
+            ["projectId"],
+          ),
+        promptGuidelines: [
+          "Use this to define recurring Metidos work instead of describing cron changes abstractly.",
+        ],
+        promptSnippet: "Create a Metidos cron job for recurring work",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool({
+        description: `Update schedule, prompt, access controls, enabled state, or soft-delete a cron job. Safe threads cannot turn cron jobs into unsafe jobs. ${SUPPORTED_MODELS_SENTENCE}`,
+        execute: async (_toolCallId, params) => {
+          if (
+            params.deleted === undefined &&
+            params.schedule === undefined &&
+            params.prompt === undefined &&
+            params.model === undefined &&
+            params.webSearchAccess === undefined &&
+            params.githubAccess === undefined &&
+            params.agentsAccess === undefined &&
+            params.metidosAccess === undefined &&
+            params.title === undefined &&
+            params.description === undefined &&
+            params.unsafeMode === undefined &&
+            params.reasoningEffort === undefined &&
+            params.enabled === undefined
+          ) {
+            throw new Error("At least one update field is required.");
+          }
+          assertUnsafeModeEscalationAllowed(
+            "update_cron",
+            scope,
+            params.unsafeMode,
+          );
+          const updated = await host.updateCron({
+            ...(typeof params.agentsAccess === "boolean"
+              ? { agentsAccess: params.agentsAccess }
+              : {}),
+            cronJobId: params.cronJobId,
+            ...(typeof params.deleted === "boolean"
+              ? { deleted: params.deleted }
+              : {}),
+            ...(typeof params.description === "string"
+              ? { description: params.description.trim() }
+              : {}),
+            ...(typeof params.enabled === "boolean"
+              ? { enabled: params.enabled }
+              : {}),
+            ...(typeof params.githubAccess === "boolean"
+              ? { githubAccess: params.githubAccess }
+              : {}),
+            ...(typeof params.metidosAccess === "boolean"
+              ? { metidosAccess: params.metidosAccess }
+              : {}),
+            ...(typeof params.model === "string"
+              ? { model: params.model.trim() }
+              : {}),
+            ...(typeof params.prompt === "string"
+              ? { prompt: params.prompt.trim() }
+              : {}),
+            ...(typeof params.reasoningEffort === "string"
+              ? { reasoningEffort: params.reasoningEffort }
+              : {}),
+            ...(typeof params.schedule === "string"
+              ? { schedule: params.schedule.trim() }
+              : {}),
+            ...(typeof params.title === "string"
+              ? { title: params.title.trim() }
+              : {}),
+            ...(typeof params.unsafeMode === "boolean"
+              ? { unsafeMode: params.unsafeMode }
+              : {}),
+            ...(typeof params.webSearchAccess === "boolean"
+              ? { webSearchAccess: params.webSearchAccess }
+              : {}),
+          });
+          return textToolResult(
+            `Updated cron job ${updated.id}.`,
+            cronJobPayload(updated),
+          );
+        },
+        label: "Update Cron Job",
+        name: "update_cron",
+        parameters: UpdateCronToolParameters,
+        prepareArguments: (args) =>
+          prepareThreadIdAndBooleanArguments<typeof UpdateCronToolParameters>(
+            args,
+            [
+              "agentsAccess",
+              "deleted",
+              "enabled",
+              "githubAccess",
+              "metidosAccess",
+              "unsafeMode",
+              "webSearchAccess",
+            ],
+            ["cronJobId"],
+          ),
+        promptSnippet: "Update or delete a Metidos cron job",
+      }),
+    ),
+    withMetidosToolTelemetry(
+      defineTool<typeof NewThreadToolParameters, Record<string, unknown>>({
+        description: `Start a separate Metidos thread for distinct work or another git worktree. Bound sessions cannot escape their current project/worktree. Set autoStart=true to request permission first; unsafeMode skips that request path. Safe threads must leave unsafeMode off. Access flags mirror thread controls. ${SUPPORTED_MODELS_SENTENCE}`,
+        execute: async (_toolCallId, params) => {
+          assertUnsafeModeEscalationAllowed(
+            "new_thread",
+            scope,
+            params.unsafeMode,
+          );
+          const target = await resolveWorktreeTarget(
+            {
+              projectId: params.projectId,
+              projectPath: params.projectPath,
+              worktreePath: params.worktreePath,
+            },
+            host,
+            scope,
+          );
+          const metadata = {
+            autoStart: params.autoStart ?? null,
+            input: params.input,
+            model: params.model ?? null,
+            projectPath: target.projectPath,
+            reasoningEffort: params.reasoningEffort ?? null,
+            unsafeMode: params.unsafeMode ?? null,
+          };
 
-        const created = await host.createThread({
-          ...(typeof params.agentsAccess === "boolean"
-            ? { agentsAccess: params.agentsAccess }
-            : {}),
-          ...(typeof params.githubAccess === "boolean"
-            ? { githubAccess: params.githubAccess }
-            : {}),
-          ...(typeof params.metidosAccess === "boolean"
-            ? { metidosAccess: params.metidosAccess }
-            : {}),
-          ...(typeof params.model === "string" ? { model: params.model } : {}),
-          projectId: target.projectId,
-          ...(typeof params.reasoningEffort === "string"
-            ? { reasoningEffort: params.reasoningEffort }
-            : {}),
-          ...(typeof params.unsafeMode === "boolean"
-            ? { unsafeMode: params.unsafeMode }
-            : {}),
-          ...(typeof params.webSearchAccess === "boolean"
-            ? { webSearchAccess: params.webSearchAccess }
-            : {}),
-          worktreePath: target.worktreePath,
-        });
-        const started = await host.sendThreadMessage({
-          input: params.input,
-          threadId: created.thread.id,
-        });
-        const payload = threadStatusPayload(started, metadata);
-        return textToolResult(
-          `Started thread ${payload.threadId} (${payload.status}).`,
-          payload,
-        );
-      },
-      label: "New Thread",
-      name: "new_thread",
-      parameters: NewThreadToolParameters,
-      prepareArguments: (args) =>
-        prepareThreadIdAndBooleanArguments<typeof NewThreadToolParameters>(
-          args,
-          [
-            "agentsAccess",
-            "autoStart",
-            "githubAccess",
-            "metidosAccess",
-            "unsafeMode",
-            "webSearchAccess",
-          ],
-          ["projectId"],
-        ),
-      promptGuidelines: [
-        "Use this when the work should continue in a separate Metidos thread or worktree instead of overloading the current transcript.",
-      ],
-      promptSnippet:
-        "Create a new Metidos thread in the current project or worktree",
-    }),
+          if (params.autoStart === true && params.unsafeMode !== true) {
+            const request = await host.requestThreadStart({
+              agentsAccess: params.agentsAccess ?? null,
+              autoStart: true,
+              githubAccess: params.githubAccess ?? null,
+              input: params.input,
+              metidosAccess: params.metidosAccess ?? null,
+              model: params.model ?? null,
+              projectId: target.projectId,
+              reasoningEffort: params.reasoningEffort ?? null,
+              unsafeMode: params.unsafeMode ?? null,
+              webSearchAccess: params.webSearchAccess ?? null,
+              worktreePath: target.worktreePath,
+            });
+            return textToolResult(
+              `Requested permission to start a thread for ${target.worktreePath}.`,
+              threadStartRequestPayload(request),
+            );
+          }
+
+          const created = await host.createThread({
+            ...(typeof params.agentsAccess === "boolean"
+              ? { agentsAccess: params.agentsAccess }
+              : {}),
+            ...(typeof params.githubAccess === "boolean"
+              ? { githubAccess: params.githubAccess }
+              : {}),
+            ...(typeof params.metidosAccess === "boolean"
+              ? { metidosAccess: params.metidosAccess }
+              : {}),
+            ...(typeof params.model === "string"
+              ? { model: params.model }
+              : {}),
+            projectId: target.projectId,
+            ...(typeof params.reasoningEffort === "string"
+              ? { reasoningEffort: params.reasoningEffort }
+              : {}),
+            ...(typeof params.unsafeMode === "boolean"
+              ? { unsafeMode: params.unsafeMode }
+              : {}),
+            ...(typeof params.webSearchAccess === "boolean"
+              ? { webSearchAccess: params.webSearchAccess }
+              : {}),
+            worktreePath: target.worktreePath,
+          });
+          const started = await host.sendThreadMessage({
+            input: params.input,
+            threadId: created.thread.id,
+          });
+          const payload = threadStatusPayload(started, metadata);
+          return textToolResult(
+            `Started thread ${payload.threadId} (${payload.status}).`,
+            payload,
+          );
+        },
+        label: "New Thread",
+        name: "new_thread",
+        parameters: NewThreadToolParameters,
+        prepareArguments: (args) =>
+          prepareThreadIdAndBooleanArguments<typeof NewThreadToolParameters>(
+            args,
+            [
+              "agentsAccess",
+              "autoStart",
+              "githubAccess",
+              "metidosAccess",
+              "unsafeMode",
+              "webSearchAccess",
+            ],
+            ["projectId"],
+          ),
+        promptGuidelines: [
+          "Use this when the work should continue in a separate Metidos thread or worktree instead of overloading the current transcript.",
+        ],
+        promptSnippet:
+          "Create a new Metidos thread in the current project or worktree",
+      }),
+    ),
   ];
 }

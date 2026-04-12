@@ -101,6 +101,7 @@ export type RuntimeStatsSnapshot = {
     commitDiff: GitCommitDiffCacheRuntimeStats;
     historyPage: GitHistoryPageCacheRuntimeStats;
   };
+  metidosTools: RuntimeStatsMetidosToolsSnapshot;
   rpc: {
     byMethod: Record<string, RpcMethodRuntimeStats>;
     totals: RuntimeStatsRpcTotals;
@@ -132,6 +133,7 @@ export type RankedWebSocketPushPayloadRuntimeStats = {
 export type RuntimeStatsSummary = {
   cron: CronRuntimeStats;
   gitCache: RuntimeStatsSnapshot["gitCache"];
+  metidosTools: RuntimeStatsMetidosToolsSummary;
   rpc: RuntimeStatsRpcTotals & {
     methodCount: number;
     topResponseBytesMethods: RankedRpcPayloadRuntimeStats[];
@@ -193,9 +195,57 @@ export type CronRunMeasurementToken = {
   startedAtMs: number;
 };
 
+export type MetidosToolMeasurementToken = {
+  startedAtMs: number;
+  toolName: string;
+};
+
+export type MetidosToolRuntimeStats = {
+  calls: number;
+  failed: number;
+  lastDurationMs: number;
+  peakDurationMs: number;
+  succeeded: number;
+  totalDurationMs: number;
+};
+
+export type MetidosUnsafeModeRequestRuntimeStats = {
+  allowed: number;
+  blocked: number;
+  requested: number;
+};
+
+export type MetidosSandboxRuntimeStats = {
+  calls: number;
+  failed: number;
+  succeeded: number;
+  timedOut: number;
+};
+
+export type RuntimeStatsMetidosToolsSnapshot = {
+  byTool: Record<string, MetidosToolRuntimeStats>;
+  sandbox: MetidosSandboxRuntimeStats;
+  totals: MetidosToolRuntimeStats;
+  unsafeModeRequests: {
+    byTool: Record<string, MetidosUnsafeModeRequestRuntimeStats>;
+    totals: MetidosUnsafeModeRequestRuntimeStats;
+  };
+};
+
+export type RuntimeStatsMetidosToolsSummary =
+  RuntimeStatsMetidosToolsSnapshot & {
+    toolCount: number;
+    unsafeModeToolCount: number;
+  };
+
 type RuntimeStatsState = {
   cron: CronRuntimeStats;
   gitCache: RuntimeStatsSnapshot["gitCache"];
+  metidosSandbox: MetidosSandboxRuntimeStats;
+  metidosToolByName: Map<string, MetidosToolRuntimeStats>;
+  metidosToolTotals: MetidosToolRuntimeStats;
+  metidosUnsafeModeByTool: Map<string, MetidosUnsafeModeRequestRuntimeStats>;
+  metidosUnsafeModeTotals: MetidosUnsafeModeRequestRuntimeStats;
   nativeWebSearchByProvider: Map<string, NativeWebSearchProviderRuntimeStats>;
   nativeWebSearchTotals: NativeWebSearchProviderRuntimeStats;
   rpcByMethod: Map<string, RpcMethodRuntimeStats>;
@@ -218,6 +268,25 @@ function createEmptyRpcMethodRuntimeStats(): RpcMethodRuntimeStats {
     succeeded: 0,
     timedOut: 0,
     totalDurationMs: 0,
+  };
+}
+
+function createEmptyMetidosToolRuntimeStats(): MetidosToolRuntimeStats {
+  return {
+    calls: 0,
+    failed: 0,
+    lastDurationMs: 0,
+    peakDurationMs: 0,
+    succeeded: 0,
+    totalDurationMs: 0,
+  };
+}
+
+function createEmptyMetidosUnsafeModeRequestRuntimeStats(): MetidosUnsafeModeRequestRuntimeStats {
+  return {
+    allowed: 0,
+    blocked: 0,
+    requested: 0,
   };
 }
 
@@ -252,6 +321,19 @@ function createEmptyRuntimeStatsState(now = new Date()): RuntimeStatsState {
         prefetchWaits: 0,
       },
     },
+    metidosSandbox: {
+      calls: 0,
+      failed: 0,
+      succeeded: 0,
+      timedOut: 0,
+    },
+    metidosToolByName: new Map<string, MetidosToolRuntimeStats>(),
+    metidosToolTotals: createEmptyMetidosToolRuntimeStats(),
+    metidosUnsafeModeByTool: new Map<
+      string,
+      MetidosUnsafeModeRequestRuntimeStats
+    >(),
+    metidosUnsafeModeTotals: createEmptyMetidosUnsafeModeRequestRuntimeStats(),
     nativeWebSearchByProvider: new Map<
       string,
       NativeWebSearchProviderRuntimeStats
@@ -324,6 +406,32 @@ function ensureWebSocketPushRuntimeStats(
     payloadBytes: 0,
   };
   runtimeStatsState.websocketPushByType.set(type, created);
+  return created;
+}
+
+function ensureMetidosToolRuntimeStats(
+  toolName: string,
+): MetidosToolRuntimeStats {
+  const existing = runtimeStatsState.metidosToolByName.get(toolName);
+  if (existing) {
+    return existing;
+  }
+
+  const created = createEmptyMetidosToolRuntimeStats();
+  runtimeStatsState.metidosToolByName.set(toolName, created);
+  return created;
+}
+
+function ensureMetidosUnsafeModeRequestRuntimeStats(
+  toolName: string,
+): MetidosUnsafeModeRequestRuntimeStats {
+  const existing = runtimeStatsState.metidosUnsafeModeByTool.get(toolName);
+  if (existing) {
+    return existing;
+  }
+
+  const created = createEmptyMetidosUnsafeModeRequestRuntimeStats();
+  runtimeStatsState.metidosUnsafeModeByTool.set(toolName, created);
   return created;
 }
 
@@ -607,6 +715,93 @@ export function recordCronRunFinished(
   }
 }
 
+function recordMetidosToolOutcome(
+  token: MetidosToolMeasurementToken,
+  outcome: "failed" | "succeeded",
+): void {
+  const durationMs = Math.max(0, performance.now() - token.startedAtMs);
+  const toolStats = ensureMetidosToolRuntimeStats(token.toolName);
+  toolStats.lastDurationMs = durationMs;
+  toolStats.peakDurationMs = Math.max(toolStats.peakDurationMs, durationMs);
+  toolStats.totalDurationMs += durationMs;
+
+  runtimeStatsState.metidosToolTotals.lastDurationMs = durationMs;
+  runtimeStatsState.metidosToolTotals.peakDurationMs = Math.max(
+    runtimeStatsState.metidosToolTotals.peakDurationMs,
+    durationMs,
+  );
+  runtimeStatsState.metidosToolTotals.totalDurationMs += durationMs;
+
+  if (outcome === "succeeded") {
+    toolStats.succeeded += 1;
+    runtimeStatsState.metidosToolTotals.succeeded += 1;
+    return;
+  }
+
+  toolStats.failed += 1;
+  runtimeStatsState.metidosToolTotals.failed += 1;
+}
+
+export function recordMetidosToolStarted(
+  toolName: string,
+): MetidosToolMeasurementToken {
+  const toolStats = ensureMetidosToolRuntimeStats(toolName);
+  toolStats.calls += 1;
+  runtimeStatsState.metidosToolTotals.calls += 1;
+
+  return {
+    startedAtMs: performance.now(),
+    toolName,
+  };
+}
+
+export function recordMetidosToolSucceeded(
+  token: MetidosToolMeasurementToken,
+): void {
+  recordMetidosToolOutcome(token, "succeeded");
+}
+
+export function recordMetidosToolFailed(
+  token: MetidosToolMeasurementToken,
+): void {
+  recordMetidosToolOutcome(token, "failed");
+}
+
+export function recordMetidosUnsafeModeRequest(options: {
+  allowed: boolean;
+  toolName: string;
+}): void {
+  const toolStats = ensureMetidosUnsafeModeRequestRuntimeStats(
+    options.toolName,
+  );
+  toolStats.requested += 1;
+  runtimeStatsState.metidosUnsafeModeTotals.requested += 1;
+  if (options.allowed) {
+    toolStats.allowed += 1;
+    runtimeStatsState.metidosUnsafeModeTotals.allowed += 1;
+    return;
+  }
+  toolStats.blocked += 1;
+  runtimeStatsState.metidosUnsafeModeTotals.blocked += 1;
+}
+
+export function recordMetidosSandboxRun(options: {
+  outcome: "failed" | "succeeded" | "timedOut";
+}): void {
+  runtimeStatsState.metidosSandbox.calls += 1;
+  switch (options.outcome) {
+    case "succeeded":
+      runtimeStatsState.metidosSandbox.succeeded += 1;
+      return;
+    case "timedOut":
+      runtimeStatsState.metidosSandbox.timedOut += 1;
+      return;
+    case "failed":
+      runtimeStatsState.metidosSandbox.failed += 1;
+      return;
+  }
+}
+
 export function recordSqliteRetryLoop(options: {
   exhausted: boolean;
   retryCount: number;
@@ -671,6 +866,21 @@ export function getRuntimeStatsSnapshot(): RuntimeStatsSnapshot {
         ...runtimeStatsState.gitCache.historyPage,
       },
     },
+    metidosTools: {
+      byTool: cloneMapRecord(runtimeStatsState.metidosToolByName),
+      sandbox: {
+        ...runtimeStatsState.metidosSandbox,
+      },
+      totals: {
+        ...runtimeStatsState.metidosToolTotals,
+      },
+      unsafeModeRequests: {
+        byTool: cloneMapRecord(runtimeStatsState.metidosUnsafeModeByTool),
+        totals: {
+          ...runtimeStatsState.metidosUnsafeModeTotals,
+        },
+      },
+    },
     rpc: {
       byMethod: cloneMapRecord(runtimeStatsState.rpcByMethod),
       totals: {
@@ -708,6 +918,23 @@ export function getRuntimeStatsSummary(): RuntimeStatsSummary {
       historyPage: {
         ...runtimeStatsState.gitCache.historyPage,
       },
+    },
+    metidosTools: {
+      byTool: cloneMapRecord(runtimeStatsState.metidosToolByName),
+      sandbox: {
+        ...runtimeStatsState.metidosSandbox,
+      },
+      toolCount: runtimeStatsState.metidosToolByName.size,
+      totals: {
+        ...runtimeStatsState.metidosToolTotals,
+      },
+      unsafeModeRequests: {
+        byTool: cloneMapRecord(runtimeStatsState.metidosUnsafeModeByTool),
+        totals: {
+          ...runtimeStatsState.metidosUnsafeModeTotals,
+        },
+      },
+      unsafeModeToolCount: runtimeStatsState.metidosUnsafeModeByTool.size,
     },
     rpc: {
       ...runtimeStatsState.rpcTotals,
