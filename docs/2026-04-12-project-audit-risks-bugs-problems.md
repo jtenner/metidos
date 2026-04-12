@@ -30,8 +30,8 @@ All static checks pass and tests are comprehensive (including deep security, san
    - vm2 (^3.10.5) has a well-known history of sandbox escape CVEs. This project runs untrusted agent/LLM-generated JS.
    - Custom `buildVm2FsMock()` is extremely complex (50+ wrapped methods for path resolution, write guards, open flags parsing, symlink handling). `assertWritableResolvedPath`, `resolveWorktreePath`, and promise wrappers could have edge-case bypasses (TOCTOU, symlink races, Bun.Glob/Bun.file abuse).
    - Global `patchVm2SetupSandboxReadFileSync()` monkey-patches `fs.readFileSync` to workaround Bun + vm2 incompatibility. Fragile, affects entire process, only applied once but still a hack.
-   - Exposes many Bun APIs (`Bun.SQLite`, `Bun.file`, `fetch`, etc.) and safe builtins. `deepFreeze()` helps but not comprehensive against prototype pollution or advanced escapes.
-   - Tests (vm2-runner-*.test.ts, vm2-runner-worktree.test.ts) validate some constraints but not exhaustive against novel bypasses.
+   - The first hardening slice has now removed ambient `fetch` plus unscoped `Bun.file`, `Bun.SQLite`, and `Bun.Glob` from the safe sandbox, but vm2 still exposes a reduced Bun helper subset and still relies on the process-wide Bun compatibility patch.
+   - Tests now cover the removed Bun/global escape paths as well as the older Node `fs` and timeout constraints, but the runner still depends on vm2 and a large custom `fs` policy surface.
    - See `runUntrustedJavaScriptInVm2()`, worker communication, timeout handling.
 
 ### Medium Impact
@@ -109,6 +109,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 - Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, and Pi compatibility.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
+- That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
 
 ## Recommendations
 - **Priority**: Split monoliths; default safe threads + explicit unsafe UX; add all missing telemetry hooks/counters for tools/VM2/unsafe/cron; harden VM2 (update, more tests, or replace); key rotation + ratelimits.

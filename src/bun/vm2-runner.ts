@@ -3,7 +3,6 @@
  * @description Shared helpers for the vm2-backed untrusted JavaScript runner.
  */
 
-import * as SQLite from "bun:sqlite";
 import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import * as fsPromises from "node:fs/promises";
@@ -394,14 +393,10 @@ export function patchVm2SetupSandboxReadFileSync(): void {
  * @param none - No arguments.
  */
 export function buildVm2BunSandbox(): Record<string, unknown> {
-  const sqliteSandbox = Object.fromEntries(Object.entries(SQLite));
   return deepFreeze({
-    Glob: Bun.Glob,
-    SQLite: sqliteSandbox,
     TOML: Bun.TOML,
     color: Bun.color,
     deflateSync: Bun.deflateSync,
-    file: Bun.file,
     gunzipSync: Bun.gunzipSync,
     gzipSync: Bun.gzipSync,
     inflateSync: Bun.inflateSync,
@@ -423,7 +418,6 @@ export function buildVm2BunSandbox(): Record<string, unknown> {
 export function buildVm2Sandbox(): Record<string, unknown> {
   return deepFreeze({
     Bun: buildVm2BunSandbox(),
-    fetch,
   });
 }
 

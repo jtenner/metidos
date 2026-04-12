@@ -12,7 +12,11 @@ Repository: `metidos`
   - `Bun.file("/abs/path").text()` can read files outside the worktree
   - `new Bun.SQLite.Database("/abs/path")` can create and write a database outside the worktree
   - global `fetch(...)` can make network requests
-- Recommendation: keep vm2 for the next implementation slice, but materially narrow the exposed surface first. Do not treat replacement as the immediate move while these cheaper, high-impact reductions are still unimplemented.
+- That recommendation has now been applied in the first hardening slice:
+  - ambient `fetch` was removed from the safe sandbox
+  - unscoped `Bun.file`, `Bun.SQLite`, and `Bun.Glob` were removed
+  - targeted regressions now pin those three boundaries
+- Replacement is still a later question, but the immediate Bun/global escape paths from this audit are no longer exposed in the safe sandbox.
 
 ## Goal
 
@@ -206,26 +210,26 @@ Use **Option 1** for the next implementation task:
 
 This is the smallest plan that meaningfully reduces risk.
 
-## Minimum Follow-up Implementation Set
+## Implemented Hardening Slice
 
-The next implementation task should do all of the following.
+The follow-up implementation slice applied the bounded plan from this audit in the current codebase:
 
-### 1. Remove global network access from the sandbox
+### 1. Removed global network access from the sandbox
 
-- stop exposing top-level `fetch`
-- ensure safe-thread `run_untrusted_js` has no ambient network access
+- top-level `fetch` is no longer exposed from `buildVm2Sandbox()`
+- safe-thread `run_untrusted_js` no longer has ambient network access
 
-### 2. Remove unscoped Bun file and database capabilities
+### 2. Removed unscoped Bun file and database capabilities
 
-At minimum, remove these from `buildVm2BunSandbox()`:
+These were removed from `buildVm2BunSandbox()`:
 
 - `file`
 - `SQLite`
 - `Glob`
 
-Those APIs either bypass the worktree `fs` guard directly or make it too easy to do so.
+Those APIs were the concrete bypasses confirmed by the local probes.
 
-### 3. Re-evaluate the rest of the Bun allowlist
+### 3. Kept only the smaller Bun helper subset
 
 Keep only Bun helpers that are pure computation or serialization utilities. Likely candidates to keep:
 
@@ -235,28 +239,36 @@ Keep only Bun helpers that are pure computation or serialization utilities. Like
 - `sleep`
 - `nanoseconds`
 
-Helpers that interact with the host filesystem, database layer, browser-like fetching, or path walking should be excluded unless they get their own explicit policy wrapper.
+Helpers that interact with the host filesystem, database layer, browser-like fetching, or path walking are no longer exposed from the safe sandbox.
 
-### 4. Add regression tests for the concrete escape paths
+### 4. Added regression tests for the concrete escape paths
 
-Add tests that fail if sandbox code can still:
+The current vm2 regression suite now fails if sandbox code can still:
 
 - read outside-worktree files with `Bun.file`
 - create or mutate outside-worktree SQLite files through `Bun.SQLite`
 - make network requests through `fetch`
 
-### 5. Update the tool contract wording
+Those checks live in [src/bun/vm2-runner-sandbox-surface.test.ts](../src/bun/vm2-runner-sandbox-surface.test.ts).
 
-After hardening lands, update the `run_untrusted_js` tool description so it describes the actual boundary instead of only the mocked `fs` behavior.
+### 5. Updated the tool contract wording
 
-### 6. Measure failures and timeouts explicitly
+The `run_untrusted_js` tool description now says the actual safe-thread boundary more directly:
 
-The later telemetry task should count:
+- Node `fs` writes stay inside the worktree
+- ambient network access is disabled
+- only a reduced Bun helper subset is exposed
+
+### 6. Failure and timeout behavior remains observable
+
+The execution report still captures:
 
 - sandbox invocation totals
-- timeout totals
-- failure totals
-- denied-capability outcomes if the hardening path surfaces them distinctly
+- duration in milliseconds
+- timeout state
+- error name and message for denied capability use
+
+That keeps the hardening observable without mixing this slice with the broader telemetry task.
 
 ## Replacement Decision For Later
 

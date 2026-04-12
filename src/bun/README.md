@@ -215,7 +215,8 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `vm2-runner.ts`
   - Shared vm2-backed sandbox helpers for the sidecar's untrusted JS tool.
-  - Builds the frozen Bun sandbox, the worktree-restricted fs mock, and the MCP-facing execution report formatter.
+  - Builds the reduced frozen Bun sandbox, the worktree-restricted fs mock, and the MCP-facing execution report formatter.
+  - Safe-thread runs do not expose ambient `fetch`, `Bun.file`, `Bun.SQLite`, or `Bun.Glob`.
   - Spawns the worker-backed runner used to enforce the external timeout and collect console events.
 
 - `vm2-runner-worker.ts`

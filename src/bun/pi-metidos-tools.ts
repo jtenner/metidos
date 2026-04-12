@@ -1129,7 +1129,7 @@ export function createPiMetidosTools(
     }),
     defineTool({
       description:
-        "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. The sandboxed fs mock is read-only outside the current worktree and writable only inside it.",
+        "Execute untrusted JavaScript or TypeScript inside a vm2 NodeVM sandbox. Node fs writes stay inside the current worktree, ambient network access is disabled, and only a reduced Bun helper subset is exposed.",
       execute: async (_toolCallId, params) => {
         const report = await runUntrustedJavaScriptInVm2({
           code: params.code,

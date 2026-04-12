@@ -18,7 +18,7 @@ tasks = ["tg-01kp173j302pbwxjcqk0mgnf4p", "tg-01kp173j316mrbxx0xc9ft1n26"]
 tasks = ["tg-01kp16yacpfks7pd3be0srahtt"]
 
 [tests_for]
-tasks = ["tg-01kp16yacw2hxs9tdgfdhh34kp", "tg-01kp16yacyec9wxaqkghq43dmg", "tg-01kp173j302pbwxjcqk0mgnf4p", "tg-01kp173j316mrbxx0xc9ft1n26", "tg-01kp173j34097wawtydpy8bq4g"]
+tasks = ["tg-01kp16yacw2hxs9tdgfdhh34kp", "tg-01kp173j302pbwxjcqk0mgnf4p", "tg-01kp173j316mrbxx0xc9ft1n26", "tg-01kp173j34097wawtydpy8bq4g"]
 
 [parent]
 task = "tg-01kp16yachnc2h5f7wm9kd8eqa"
