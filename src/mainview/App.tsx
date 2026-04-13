@@ -3096,9 +3096,9 @@ export default function App({
           variant={variant}
         />
         {cronCreatorModelScope ? (
-          <div className="rounded-xl border border-[#31414d] bg-[#101416] px-3 py-3">
+          <div className="border border-[#31414d] bg-[#101416] px-3 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
+              <span className="border border-[#45606f] bg-[#132129] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#d7ebfb]">
                 {cronCreatorModelScope.badge}
               </span>
               <span className="font-label text-[10px] font-bold uppercase tracking-[0.16em] text-[#f4f8fb]">
@@ -3389,7 +3389,7 @@ export default function App({
                   </div>
                   <button
                     type="button"
-                    className="rounded-lg border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => {
                       openCronCreator("describe");
                     }}
@@ -3398,11 +3398,11 @@ export default function App({
                   </button>
                 </div>
                 {cronCreatorOpen ? (
-                  <div className="rounded-lg border border-[#2b3a45] bg-[#161a1d] p-4">
+                  <div className="border border-[#2b3a45] bg-[#161a1d] p-4">
                     <div className="mb-4 flex gap-2 border-b border-[#27333a] pb-3">
                       <button
                         type="button"
-                        className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                        className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
                           cronCreatorMode === "describe"
                             ? "bg-[#2f3b43] text-[#f2f0ef]"
                             : "text-[#9db9cb] hover:text-[#f2f0ef]"
@@ -3416,7 +3416,7 @@ export default function App({
                       </button>
                       <button
                         type="button"
-                        className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                        className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
                           cronCreatorMode === "edit"
                             ? "bg-[#2f3b43] text-[#f2f0ef]"
                             : "text-[#9db9cb] hover:text-[#f2f0ef]"
@@ -3431,7 +3431,7 @@ export default function App({
                     </div>
 
                     {isEditingExistingCron ? (
-                      <div className="mb-4 rounded border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
+                      <div className="mb-4 border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
                         Editing cron job #{cronEditingCronJobId}
                       </div>
                     ) : null}
@@ -3446,7 +3446,7 @@ export default function App({
                         </label>
                         <textarea
                           id="cron-describe-input"
-                          className="min-h-28 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          className="min-h-28 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                           placeholder="Describe cron schedule and work to perform."
                           rows={6}
                           value={cronDescribePrompt}
@@ -3480,7 +3480,7 @@ export default function App({
                           </label>
                           <input
                             id="cron-edit-title"
-                            className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            className="w-full border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                             placeholder="Optional title"
                             value={cronEditTitle}
                             onChange={(event) => {
@@ -3497,7 +3497,7 @@ export default function App({
                           </label>
                           <textarea
                             id="cron-edit-description"
-                            className="min-h-16 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            className="min-h-16 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                             placeholder="Optional description"
                             rows={3}
                             value={cronEditDescription}
@@ -3515,7 +3515,7 @@ export default function App({
                           </label>
                           <input
                             id="cron-edit-schedule"
-                            className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            className="w-full border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                             placeholder="cron expression, e.g. */5 * * * *"
                             value={cronEditSchedule}
                             onChange={(event) => {
@@ -3532,7 +3532,7 @@ export default function App({
                           </label>
                           <textarea
                             id="cron-edit-prompt"
-                            className="min-h-20 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                            className="min-h-20 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                             placeholder="What the cron run thread should do"
                             rows={4}
                             value={cronEditPrompt}
@@ -3570,7 +3570,7 @@ export default function App({
                     )}
 
                     {cronCreatorError ? (
-                      <div className="mt-4 rounded border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
+                      <div className="mt-4 border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
                         {cronCreatorError}
                       </div>
                     ) : null}
@@ -3578,14 +3578,14 @@ export default function App({
                     <div className="mt-4 flex justify-end gap-2">
                       <button
                         type="button"
-                        className="rounded-lg border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
+                        className="border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
                         onClick={closeCronCreator}
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
-                        className="rounded-lg border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={isCreatingCronJob}
                         onClick={() => {
                           if (cronCreatorMode === "describe") {
@@ -3661,7 +3661,7 @@ export default function App({
               {mobileNavigationIndicator !== "none" ? (
                 <span
                   aria-hidden="true"
-                  className={`absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border border-[#0e0e0e] ${
+                  className={`absolute bottom-0 right-0 block h-2.5 w-2.5 border border-[#0e0e0e] ${
                     mobileNavigationIndicator === "completed"
                       ? "bg-[#5df28b]"
                       : "bg-[#4aa8ff]"
@@ -3843,7 +3843,7 @@ export default function App({
                 </div>
                 <button
                   type="button"
-                  className="rounded-lg border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3]"
+                  className="border border-[#2f3b43] bg-[#182026] px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3]"
                   onClick={() => {
                     openCronCreator("describe");
                   }}
@@ -3852,11 +3852,11 @@ export default function App({
                 </button>
               </div>
               {cronCreatorOpen ? (
-                <div className="rounded-lg border border-[#2b3a45] bg-[#161a1d] p-4">
+                <div className="border border-[#2b3a45] bg-[#161a1d] p-4">
                   <div className="mb-4 flex gap-2 border-b border-[#27333a] pb-3">
                     <button
                       type="button"
-                      className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                      className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
                         cronCreatorMode === "describe"
                           ? "bg-[#2f3b43] text-[#f2f0ef]"
                           : "text-[#9db9cb] hover:text-[#f2f0ef]"
@@ -3870,7 +3870,7 @@ export default function App({
                     </button>
                     <button
                       type="button"
-                      className={`rounded px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
+                      className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.14em] transition-colors ${
                         cronCreatorMode === "edit"
                           ? "bg-[#2f3b43] text-[#f2f0ef]"
                           : "text-[#9db9cb] hover:text-[#f2f0ef]"
@@ -3885,7 +3885,7 @@ export default function App({
                   </div>
 
                   {isEditingExistingCron ? (
-                    <div className="mb-4 rounded border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
+                    <div className="mb-4 border border-[#32414b] bg-[#11181d] px-3 py-2 text-xs text-[#c5d6df]">
                       Editing cron job #{cronEditingCronJobId}
                     </div>
                   ) : null}
@@ -3900,7 +3900,7 @@ export default function App({
                       </label>
                       <textarea
                         id="cron-describe-input-mobile"
-                        className="min-h-28 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                        className="min-h-28 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                         placeholder="Describe cron schedule and work to perform."
                         rows={6}
                         value={cronDescribePrompt}
@@ -3934,7 +3934,7 @@ export default function App({
                         </label>
                         <input
                           id="cron-edit-title-mobile"
-                          className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          className="w-full border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                           placeholder="Optional title"
                           value={cronEditTitle}
                           onChange={(event) => {
@@ -3951,7 +3951,7 @@ export default function App({
                         </label>
                         <textarea
                           id="cron-edit-description-mobile"
-                          className="min-h-16 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          className="min-h-16 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                           placeholder="Optional description"
                           rows={3}
                           value={cronEditDescription}
@@ -3969,7 +3969,7 @@ export default function App({
                         </label>
                         <input
                           id="cron-edit-schedule-mobile"
-                          className="w-full rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          className="w-full border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                           placeholder="cron expression, e.g. */5 * * * *"
                           value={cronEditSchedule}
                           onChange={(event) => {
@@ -3986,7 +3986,7 @@ export default function App({
                         </label>
                         <textarea
                           id="cron-edit-prompt-mobile"
-                          className="min-h-20 w-full resize-y rounded-md border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
+                          className="min-h-20 w-full resize-y border border-[#29353d] bg-[#0d1012] px-3 py-2 text-sm text-[#d8e5ee] outline-none focus:border-[#4a89b3] focus:ring-2 focus:ring-[#4a89b3]/25"
                           placeholder="What the cron run thread should do"
                           rows={4}
                           value={cronEditPrompt}
@@ -4024,7 +4024,7 @@ export default function App({
                   )}
 
                   {cronCreatorError ? (
-                    <div className="mt-4 rounded border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
+                    <div className="mt-4 border border-[#4f2734] bg-[#2a121b] px-3 py-2 text-xs text-[#ff9db0]">
                       {cronCreatorError}
                     </div>
                   ) : null}
@@ -4032,14 +4032,14 @@ export default function App({
                   <div className="mt-4 flex justify-end gap-2">
                     <button
                       type="button"
-                      className="rounded-lg border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
+                      className="border border-[#39464f] bg-[#1a242b] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#9ab2c0] transition-colors hover:border-[#4a5e6c] hover:bg-[#242f38]"
                       onClick={closeCronCreator}
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
-                      className="rounded-lg border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="border border-[#2f3b43] bg-[#263743] px-3 py-2 text-xs font-label uppercase tracking-[0.14em] text-[#f2f0ef] transition-colors hover:border-[#5ba6d8] hover:bg-[#2f4f66] disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={isCreatingCronJob}
                       onClick={() => {
                         if (cronCreatorMode === "describe") {
@@ -4187,7 +4187,7 @@ export default function App({
       <div className="pointer-events-none fixed right-4 top-4 z-[109] flex max-w-sm flex-col gap-2">
         {threadExtensionUiNotifications.map((notification) => (
           <button
-            className={`pointer-events-auto rounded-xl border px-4 py-3 text-left text-sm shadow-xl shadow-black/35 ${
+            className={`pointer-events-auto border px-4 py-3 text-left text-sm shadow-xl shadow-black/35 ${
               notification.type === "error"
                 ? "border-[#6b3a3a] bg-[#2a1717] text-[#ffb9b9]"
                 : notification.type === "warning"
@@ -4237,7 +4237,7 @@ export default function App({
       />
       {currentThreadStartRequest ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 px-4 py-6">
-          <div className="w-full max-w-xl rounded-2xl border border-[#3a4751] bg-[#151718] p-5 shadow-2xl shadow-black/50">
+          <div className="w-full max-w-xl border border-[#3a4751] bg-[#151718] p-5 shadow-2xl shadow-black/50">
             <div className="mb-2 font-label text-[11px] uppercase tracking-[0.18em] text-[#8fb5cd]">
               New Thread Request
             </div>
@@ -4248,7 +4248,7 @@ export default function App({
               {currentThreadStartRequestProject?.name ??
                 currentThreadStartRequest.projectPath}
             </div>
-            <div className="mb-4 rounded-xl border border-[#2b343b] bg-[#0e1011] px-4 py-3">
+            <div className="mb-4 border border-[#2b343b] bg-[#0e1011] px-4 py-3">
               <div className="mb-1 font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
                 Workspace
               </div>
@@ -4256,7 +4256,7 @@ export default function App({
                 {currentThreadStartRequestWorkspace}
               </div>
             </div>
-            <div className="mb-4 rounded-xl border border-[#2b343b] bg-[#0e1011] px-4 py-3">
+            <div className="mb-4 border border-[#2b343b] bg-[#0e1011] px-4 py-3">
               <div className="mb-1 font-label text-[10px] uppercase tracking-[0.16em] text-[#7ea2b8]">
                 Initial Prompt
               </div>
@@ -4265,13 +4265,13 @@ export default function App({
               </div>
             </div>
             <div className="mb-4 flex flex-wrap gap-2 text-xs text-[#9db4c2]">
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 Model: {currentThreadStartRequestModelLabel}
               </span>
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 Thinking: {currentThreadStartRequestThinkingLabel}
               </span>
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 Web Search:{" "}
                 {currentThreadStartRequest.webSearchAccess === null
                   ? "default"
@@ -4279,7 +4279,7 @@ export default function App({
                     ? "on"
                     : "off"}
               </span>
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 GitHub:{" "}
                 {currentThreadStartRequest.githubAccess === null
                   ? "default"
@@ -4287,7 +4287,7 @@ export default function App({
                     ? "on"
                     : "off"}
               </span>
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 Agents:{" "}
                 {currentThreadStartRequest.agentsAccess === null
                   ? "default"
@@ -4295,7 +4295,7 @@ export default function App({
                     ? "on"
                     : "off"}
               </span>
-              <span className="rounded-full border border-[#3a4751] px-3 py-1">
+              <span className="border border-[#3a4751] px-3 py-1">
                 Metidos:{" "}
                 {currentThreadStartRequest.metidosAccess === null
                   ? "default"
@@ -4303,7 +4303,7 @@ export default function App({
                     ? "on"
                     : "off"}
               </span>
-              <span className="rounded-full border border-[#8a6b2f] bg-[#231d11] px-3 py-1 text-[#f2d79b]">
+              <span className="border border-[#8a6b2f] bg-[#231d11] px-3 py-1 text-[#f2d79b]">
                 Unsafe:{" "}
                 {currentThreadStartRequest.unsafeMode === null
                   ? "default"
@@ -4313,7 +4313,7 @@ export default function App({
               </span>
             </div>
             {threadStartRequestError ? (
-              <div className="mb-4 rounded-xl border border-[#6b3a3a] bg-[#2a1717] px-4 py-3 text-sm text-[#ffb9b9]">
+              <div className="mb-4 border border-[#6b3a3a] bg-[#2a1717] px-4 py-3 text-sm text-[#ffb9b9]">
                 {threadStartRequestError}
               </div>
             ) : null}
@@ -4326,7 +4326,7 @@ export default function App({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  className="rounded-full border border-[#46535c] px-4 py-2 text-sm text-[#d4dee5] transition hover:border-[#6d7b85] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="border border-[#46535c] px-4 py-2 text-sm text-[#d4dee5] transition hover:border-[#6d7b85] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={isApprovingThreadStartRequest}
                   onClick={() => {
                     dismissThreadStartRequest(
@@ -4338,7 +4338,7 @@ export default function App({
                 </button>
                 <button
                   type="button"
-                  className="rounded-full bg-[#bdd5e6] px-4 py-2 text-sm font-semibold text-[#0f1418] transition hover:bg-[#d8e6f0] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="bg-[#bdd5e6] px-4 py-2 text-sm font-semibold text-[#0f1418] transition hover:bg-[#d8e6f0] disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={isApprovingThreadStartRequest}
                   onClick={() => {
                     void approveThreadStartRequest(currentThreadStartRequest);
