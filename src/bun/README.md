@@ -72,6 +72,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Resolves the Pi model, constructs the bounded Pi tool surface, applies worktree path policy, and creates/resumes deterministic Pi sessions under Metidos app data.
   - Treats provider-qualified model ids as authoritative at runtime so `openai-codex` stays distinct from plain `openai` for overlapping GPT model ids.
   - Defines the current Pi-era safe-vs-unsafe policy: safe threads keep worktree-scoped file/search/edit/write tools but lose `bash`, while unsafe threads also gain `bash` and may request unsafe child threads or cron jobs.
+  - New interactive threads and cron definitions now default to that safe posture unless `unsafeMode` is explicitly requested through an admin-authorized path.
   - Installs the Pi-native GitHub tool pack when `githubAccess` is enabled for the thread, binding those tools to the GitHub repository that owns the current worktree.
   - Installs the Pi-native agents pack when `agentsAccess` is enabled, exposing `update_plan` plus a bounded `delegate_task` helper instead of Codex’s full child-agent lifecycle.
   - Installs the Pi-native Metidos custom tool pack when `metidosAccess` is enabled for the thread.
@@ -125,7 +126,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Pi-native Metidos custom tool-pack entrypoint for thread metadata/listing/creation, cron management, UI context focus, the vm2-backed untrusted JS runner, and task-graph admin helpers for init/validate/normalize.
   - Now composes smaller domain files (`pi-metidos-tools-thread.ts`, `pi-metidos-tools-cron.ts`, `pi-metidos-tools-context.ts`, `pi-metidos-tools-sandbox.ts`, and `pi-metidos-tools-task-graph.ts`) so scope checks, schemas, and host wiring no longer live in one monolith.
   - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Metidos MCP bridge for those operations.
-  - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools.
+  - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools, and omitted `unsafeMode` inputs stay on the safe path by default.
   - Also enforces the runtime-only `taskGraphAdmin` policy so task-graph scaffolding, validation, and normalization can be exposed without inventing custom task mutation tools.
   - Wraps each Metidos tool with runtime-stats instrumentation so per-tool calls, explicit unsafe-mode requests, and vm2 sandbox outcomes are visible through the shared diagnostics snapshot.
 

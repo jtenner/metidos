@@ -276,8 +276,8 @@ describe("task graph normalization", () => {
 
   it("normalizes only the requested task ids when a subset is provided", async () => {
     const root = createTaskGraphRoot();
-    const targetTaskId = "tg-01kp173j34097wawtydpy8bq4g";
-    const untouchedTaskId = "tg-01kp16yacw2hxs9tdgfdhh34kp";
+    const targetTaskId = "tg-01fixturetaskgraph0000000011";
+    const untouchedTaskId = "tg-01fixturetaskgraph0000000012";
     mkdirSync(join(root, "items", targetTaskId), {
       recursive: true,
     });
@@ -303,7 +303,7 @@ describe("task graph normalization", () => {
         'title = "Target task"',
         'status = "open"',
         'type = "feature"',
-        'id = "tg-01kp173j34097wawtydpy8bq4g"',
+        'id = "tg-01fixturetaskgraph0000000011"',
         'tags = ["theme:reliability", "area:task-graph", "theme:reliability"]',
         "",
       ].join("\n"),
@@ -321,7 +321,7 @@ describe("task graph normalization", () => {
       'title = "Untouched task"',
       'status = "open"',
       'type = "feature"',
-      'id = "tg-01kp16yacw2hxs9tdgfdhh34kp"',
+      'id = "tg-01fixturetaskgraph0000000012"',
       'tags = ["theme:reliability", "area:task-graph", "theme:reliability"]',
       "",
     ].join("\n");

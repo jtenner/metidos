@@ -111,10 +111,11 @@ All static checks pass and tests are comprehensive (including deep security, san
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
 - The first agent-tool telemetry slice is now implemented too: runtime stats expose per-tool Metidos counts plus explicit unsafe-mode and vm2 sandbox outcome counters, which narrows the remaining observability gap to rate limits, budgets, and load-test baselines.
+- New thread-start requests, interactive threads, and cron definitions now default to safe mode unless `unsafeMode` is explicitly requested through the admin-authorized backend path, and regression tests now pin that behavior across the main creation entrypoints.
 - The auth-service monolith has now been split into focused setup/login, session/ticket, cookie, and shared-core modules behind the stable `auth-service.ts` entrypoint, so the remaining auth hardening task is no longer blocked on editing one 1.5k-line orchestration file.
 
 ## Recommendations
-- **Priority**: Split monoliths; default safe threads + explicit unsafe UX; build on the new tool/unsafe/vm2 telemetry with budgets and load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
+- **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry with budgets and load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
 - **Perf/Obs**: Finish OPT roadmap with production telemetry; load test agent tool usage.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.

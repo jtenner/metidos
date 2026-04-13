@@ -835,6 +835,67 @@ describe("project procedure configuration helpers", () => {
     ).rejects.toThrow(unavailableMessage);
   });
 
+  it("defaults thread-start requests, new threads, and cron jobs to safe mode when unsafe mode is left unset", async () => {
+    const procedures = await loadProjectProcedures();
+    const repoPath = createTempDirectory("metidos-safe-defaults-repo-");
+    initializeGitRepository(repoPath);
+
+    const opened = await procedures.openProjectProcedure({
+      name: "Safe Defaults Repo",
+      projectPath: repoPath,
+    });
+
+    const requested = await procedures.requestThreadStartProcedure({
+      agentsAccess: null,
+      autoStart: null,
+      githubAccess: null,
+      input: "queue a safe thread",
+      metidosAccess: null,
+      model: "openai:gpt-5.4",
+      projectId: opened.project.id,
+      reasoningEffort: "medium",
+      unsafeMode: null,
+      webSearchAccess: null,
+      worktreePath: repoPath,
+    });
+    const created = await procedures.createThreadProcedure({
+      model: "openai:gpt-5.4",
+      projectId: opened.project.id,
+      reasoningEffort: "medium",
+      worktreePath: repoPath,
+    });
+    const cronJob = await procedures.newCronProcedure({
+      model: "openai:gpt-5.4",
+      projectId: opened.project.id,
+      prompt: "safe defaults cron",
+      reasoningEffort: "medium",
+      schedule: "*/15 * * * *",
+      worktreePath: repoPath,
+    });
+
+    expect(requested).toMatchObject({
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      unsafeMode: false,
+      webSearchAccess: true,
+    });
+    expect(created.thread).toMatchObject({
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      unsafeMode: false,
+      webSearchAccess: true,
+    });
+    expect(cronJob).toMatchObject({
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      unsafeMode: false,
+      webSearchAccess: true,
+    });
+  });
+
   it("rejects unavailable Codex providers before queued runs or model updates", async () => {
     const procedures = await loadProjectProcedures();
     const repoPath = createTempDirectory("metidos-provider-run-guard-repo-");
