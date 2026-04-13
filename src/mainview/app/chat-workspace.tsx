@@ -571,7 +571,7 @@ const DesktopTranscriptGroupRow = memo(function DesktopTranscriptGroupRow({
     >
       {group.kind === "assistant" ? (
         <div className="group flex w-full min-w-0 items-start gap-6">
-          <div className="mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#10161d]">
+          <div className="mt-0.5 flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm">
             {brandLogoIcon("h-full w-full")}
           </div>
           <div className="min-w-0 flex-1 space-y-4">
