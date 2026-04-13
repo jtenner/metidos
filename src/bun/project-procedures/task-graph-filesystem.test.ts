@@ -65,8 +65,13 @@ describe("task graph filesystem model", () => {
     expect(graph.types).toBeNull();
     expect(graph.tasks.length).toBeGreaterThan(0);
 
-    const task = graph.tasks_by_id.get("tg-01jv6xcy6h8m2p5s7w9z3b6dfg");
-    expect(task?.task.links.parent).toBe("tg-01jv6x6kh5z8y4v9m2c3d7pqra");
+    const taskWithParent =
+      graph.tasks.find((taskFile) => taskFile.task.links.parent !== null) ??
+      null;
+    expect(taskWithParent).not.toBeNull();
+    expect(
+      graph.tasks_by_id.has(taskWithParent?.task.links.parent ?? ""),
+    ).toBeTrue();
     expect(
       graph.tasks.every((taskFile) =>
         [

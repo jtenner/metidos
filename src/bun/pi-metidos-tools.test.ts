@@ -560,10 +560,91 @@ describe("createPiMetidosTools", () => {
     const host = createHost();
 
     await expect(
+      executeTool(scope, host, "init_task_graph", {}),
+    ).rejects.toThrow(
+      "Task graph admin tools are disabled for this runtime. This thread cannot initialize, validate, or normalize the repository task graph.",
+    );
+    await expect(
       executeTool(scope, host, "validate_task_graph", {}),
     ).rejects.toThrow(
       "Task graph admin tools are disabled for this runtime. This thread cannot initialize, validate, or normalize the repository task graph.",
     );
+    await expect(
+      executeTool(scope, host, "normalize_task_graph", {}),
+    ).rejects.toThrow(
+      "Task graph admin tools are disabled for this runtime. This thread cannot initialize, validate, or normalize the repository task graph.",
+    );
+  });
+
+  it("normalizes admin-tool inputs before calling the host", async () => {
+    const scope = makeScope();
+    let initCall: { params: unknown; worktreePath: string } | null = null;
+    let validateCall: { params: unknown; worktreePath: string } | null = null;
+    let normalizeCall: { params: unknown; worktreePath: string } | null = null;
+    const host = createHost({
+      capabilities: {
+        taskGraphAdmin: true,
+      },
+      initTaskGraph: async (params, worktreePath) => {
+        initCall = { params, worktreePath };
+        return makeInitTaskGraphResult();
+      },
+      normalizeTaskGraph: async (params, worktreePath) => {
+        normalizeCall = { params, worktreePath };
+        return makeNormalizeTaskGraphResult();
+      },
+      validateTaskGraph: async (params, worktreePath) => {
+        validateCall = { params, worktreePath };
+        return makeValidateTaskGraphResult();
+      },
+    });
+
+    await executeTool(scope, host, "init_task_graph", {
+      idPrefix: "  next-prefix  ",
+    });
+    await executeTool(scope, host, "validate_task_graph", {
+      taskIds: [
+        " tg-01jv6xcy6h8m2p5s7w9z3b6dfg ",
+        "",
+        "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+        "  tg-01jv6x6kh5z8y4v9m2c3d7pqra",
+      ],
+    });
+    await executeTool(scope, host, "normalize_task_graph", {
+      taskIds: [
+        "",
+        " tg-01jv6x6kh5z8y4v9m2c3d7pqra ",
+        "tg-01jv6x6kh5z8y4v9m2c3d7pqra",
+      ],
+    });
+
+    expectDeepEqual(requireValue(initCall), {
+      params: {
+        idPrefix: "next-prefix",
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+    expectDeepEqual(requireValue(validateCall), {
+      params: {
+        taskIds: [
+          "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+          "tg-01jv6x6kh5z8y4v9m2c3d7pqra",
+        ],
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+    expectDeepEqual(requireValue(normalizeCall), {
+      params: {
+        taskIds: ["tg-01jv6x6kh5z8y4v9m2c3d7pqra"],
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+
+    await expect(
+      executeTool(scope, host, "init_task_graph", {
+        idPrefix: "   ",
+      }),
+    ).rejects.toThrow("idPrefix must not be empty.");
   });
 
   it("focuses the UI context through the direct host callback", async () => {
