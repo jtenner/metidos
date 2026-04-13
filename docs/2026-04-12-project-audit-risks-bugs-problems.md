@@ -106,12 +106,13 @@ All static checks pass and tests are comprehensive (including deep security, san
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, performance/load validation, and Pi compatibility.
+- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, tool telemetry and budgets, and performance/load validation.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
 - The first agent-tool telemetry slice is now implemented too: runtime stats expose per-tool Metidos counts plus explicit unsafe-mode and vm2 sandbox outcome counters, which narrows the remaining observability gap to rate limits, budgets, and load-test baselines.
 - New thread-start requests, interactive threads, and cron definitions now default to safe mode unless `unsafeMode` is explicitly requested through the admin-authorized backend path, and regression tests now pin that behavior across the main creation entrypoints.
+- The Pi compatibility slice is now implemented too: a shared `pi-sdk-shapes.ts` boundary plus a real Bun-SDK runtime smoke test keep event projection, telemetry extraction, and session-resume assumptions aligned in one place instead of scattering Pi-owned payload knowledge across the runtime.
 - The auth-service monolith has now been split into focused setup/login, session/ticket, cookie, and shared-core modules behind the stable `auth-service.ts` entrypoint, so the remaining auth hardening task is no longer blocked on editing one 1.5k-line orchestration file.
 
 ## Recommendations
@@ -119,6 +120,6 @@ All static checks pass and tests are comprehensive (including deep security, san
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
 - **Perf/Obs**: Finish OPT roadmap with production telemetry; load test agent tool usage.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Production build/load test with heavy unsafe/agent workloads using the new tool telemetry; Pi SDK compatibility audit; add rate limits and resource budgets for the remaining high-risk paths.
+- **Next**: Production build/load test with heavy unsafe/agent workloads using the new tool telemetry; add rate limits and resource budgets for the remaining high-risk paths.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

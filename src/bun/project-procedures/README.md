@@ -70,6 +70,7 @@ The maintainer-facing workflow and expected result shapes for that surface are d
   - Shared Pi SDK payload-shape boundary used by turn settlement, event projection, and runtime telemetry.
   - Centralizes how Metidos reads assistant text, token usage, timestamps, and tool output from Pi-owned message/event payloads.
   - Keeps Bun-side Pi compatibility assumptions in one place so smoke tests can catch upstream SDK drift before it turns into projection bugs.
+  - Works with the real Pi runtime smoke in `pi-thread-runtime.test.ts` to keep session resumption, projection, and telemetry coupling from drifting independently.
 
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.
