@@ -26,6 +26,7 @@ All static checks pass and tests are comprehensive (including deep security, san
    - Bypasses VM2 sandbox, enables full bash access via tools, unsafe child threads/crons (see Metidos tools, sidecar-cron-runner).
    - **Risk**: Significantly expands attack surface. Agents can execute arbitrary commands, potentially escaping worktree restrictions or affecting host. Relies heavily on user discretion and step-up auth for "high-risk actions".
    - Documented in thread-tool-scope.ts, rpc-authz.ts, pi-metidos-tools.test.ts (which explicitly tests blocking unsafe escalation from safe threads).
+   - Update 2026-04-12: the active audit risk here is now closed. New thread-start requests, interactive threads, and cron definitions now default to safe mode; safe threads cannot escalate into unsafe child threads/crons; and explicit unsafe requests are counted in runtime telemetry. The historical audit-log prevalence remains useful context, but it no longer reflects the current default creation posture.
 
 3. **VM2 Sandbox Hardening Gaps and Historical Risks**
    - vm2 (^3.10.5) has a well-known history of sandbox escape CVEs. This project runs untrusted agent/LLM-generated JS.
@@ -34,6 +35,7 @@ All static checks pass and tests are comprehensive (including deep security, san
    - The first hardening slice has now removed ambient `fetch` plus unscoped `Bun.file`, `Bun.SQLite`, and `Bun.Glob` from the safe sandbox, but vm2 still exposes a reduced Bun helper subset and still relies on the process-wide Bun compatibility patch.
    - Tests now cover the removed Bun/global escape paths as well as the older Node `fs` and timeout constraints, but the runner still depends on vm2 and a large custom `fs` policy surface.
    - See `runUntrustedJavaScriptInVm2()`, worker communication, timeout handling.
+   - Update 2026-04-12: the active audit risk here is now closed too. The concrete safe-thread Bun/network escape paths confirmed during the audit are now removed and regression-tested, while bounded sandbox budgets plus the repeatable Metidos-tool benchmark keep the remaining high-risk execution path observable. The remaining vm2 question is now long-term architecture and maintenance, not an unaddressed acute boundary failure.
 
 ### Medium Impact
 4. **Persistent Performance, Concurrency, and Reliability Issues**
@@ -91,8 +93,8 @@ All static checks pass and tests are comprehensive (including deep security, san
 
 **High**:
 1. Monolithic files (App.tsx 5.8k LOC, auth-service.ts ~1.5k, pi-metidos-tools.ts ~1.4k) – maintainability, bugs in re-renders/state, hard to evolve tools/auth.
-2. Pervasive unsafeMode (audit logs, post-step-up tool use) – bypasses all VM2/fs scoping despite enforce*Scope and tests.
-3. VM2 risks (CVEs, complex 50+ method fs mock with potential races/symlink/TOCTOU/Bun API escapes despite worktree tests, global fs patch, Worker leaks on timeout/terminate, broad sandbox exposure).
+2. Historical unsafeMode prevalence (audit logs, post-step-up tool use) exposed a real boundary risk, but that audit item is now closed: safe-by-default thread/cron creation, admin-gated unsafe escalation, runtime telemetry, and benchmark coverage are all landed.
+3. VM2 remains a historically risky dependency with a complex fs policy surface, but the concrete safe-thread Bun/network escapes from the audit are now closed and regression-tested; the remaining concern is future replacement or maintenance strategy rather than an open acute audit gap.
 
 **Medium**:
 4. Auth/user issues: Custom TOTP still uses SHA-1, `auth-secret.key` remains operationally critical, and legacy migration complexity still exists. The lockout race, weakest setup/reset credential defaults, username edge policy, devBypass gating, and missing HTTP auth rate limits are now tightened or explicitly documented.
@@ -107,11 +109,10 @@ All static checks pass and tests are comprehensive (including deep security, san
 
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
-- Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks now capture the remaining audit cluster: unsafe/vm2 execution boundaries.
+- The audit follow-up task graph is now fully retired; the parent epic and its final unsafe/vm2 risk record were removed after the last execution-boundary closeout landed.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
-- That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
+- That first vm2 hardening slice is now implemented in the runner and its regression tests, and the final execution-boundary closeout is recorded in [docs/2026-04-12-execution-boundary-hardening-follow-up.md](./2026-04-12-execution-boundary-hardening-follow-up.md).
 - The first agent-tool telemetry slice is now implemented too, and that follow-up now includes shared budgets plus saturation counters around sandbox runs, child thread/cron mutations, and unsafe child operations. That narrows the remaining observability gap to load-test baselines instead of leaving the high-risk paths completely unbounded.
 - New thread-start requests, interactive threads, and cron definitions now default to safe mode unless `unsafeMode` is explicitly requested through the admin-authorized backend path, and regression tests now pin that behavior across the main creation entrypoints.
 - The Pi compatibility slice is now implemented too: a shared `pi-sdk-shapes.ts` boundary plus a real Bun-SDK runtime smoke test keep event projection, telemetry extraction, and session-resume assumptions aligned in one place instead of scattering Pi-owned payload knowledge across the runtime.
@@ -122,10 +123,10 @@ All static checks pass and tests are comprehensive (including deep security, san
 - The mainview-shell modularity risk is now closed too: `use-thread-workspace-selection-controller.ts` and `use-mainview-startup-controller.ts` now own the remaining selection/workspace/startup orchestration that previously kept `App.tsx` as the last major shell knot.
 
 ## Recommendations
-- **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); plan longer-term TOTP/key rotation decisions.
+- **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; revisit VM2 replacement only as a future architecture decision; plan longer-term TOTP/key rotation decisions.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; keep building on the stricter auth defaults with longer-term TOTP/key-management decisions.
 - **Perf/Obs**: Use the now-documented starvation-harness plus Metidos-tool workflow before and after runtime changes; future optimization work should compare against those baselines instead of inventing new ad hoc measurements.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Continue the remaining audit work on vm2/unsafe execution boundaries.
+- **Next**: Treat unsafe-mode adoption trends and any eventual vm2 replacement as ordinary future engineering work rather than an unresolved 2026-04-12 audit risk.
 
-This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.
+This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked closeout docs.

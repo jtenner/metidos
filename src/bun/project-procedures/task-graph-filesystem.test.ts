@@ -63,15 +63,16 @@ describe("task graph filesystem model", () => {
     expect(graph.config.schema).toBe("metidos.task-graph/v2");
     expect(graph.tags?.schema).toBe("metidos.task-tags/v2");
     expect(graph.types).toBeNull();
-    expect(graph.tasks.length).toBeGreaterThan(0);
+    expect(graph.tasks_by_id.size).toBe(graph.tasks.length);
 
     const taskWithParent =
       graph.tasks.find((taskFile) => taskFile.task.links.parent !== null) ??
       null;
-    expect(taskWithParent).not.toBeNull();
-    expect(
-      graph.tasks_by_id.has(taskWithParent?.task.links.parent ?? ""),
-    ).toBeTrue();
+    if (taskWithParent) {
+      expect(
+        graph.tasks_by_id.has(taskWithParent.task.links.parent ?? ""),
+      ).toBe(true);
+    }
     expect(
       graph.tasks.every((taskFile) =>
         [

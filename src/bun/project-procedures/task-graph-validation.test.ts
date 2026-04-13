@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   buildDefaultTaskGraphConfig,
   initTaskGraphFilesystem,
+  loadTaskGraphFilesystem,
   serializeTaskGraphConfigToml,
   serializeTaskGraphTagRegistryToml,
   serializeTaskGraphTypeRegistryToml,
@@ -79,12 +80,15 @@ afterEach(() => {
 
 describe("task graph validation", () => {
   it("validates the live repository task graph with no findings", async () => {
+    const graph = await loadTaskGraphFilesystem(".metidos/tasks");
     const result = await validateTaskGraphFilesystem(".metidos/tasks");
 
     expect(result.ok).toBeTrue();
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
-    expect(result.validated_task_ids.length).toBeGreaterThan(0);
+    expect(result.validated_task_ids).toEqual(
+      graph.tasks.map((taskFile) => taskFile.task.id),
+    );
   });
 
   it("reports structured errors and warnings for invalid repositories", async () => {
