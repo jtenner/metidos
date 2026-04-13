@@ -3,7 +3,7 @@
  * @description Module for thread access control.
  */
 
-import type { JSX } from "react";
+import { type JSX, useId } from "react";
 
 import { DropdownControl } from "./dropdown";
 import { type AppIconName, materialSymbol } from "./icons";
@@ -25,6 +25,50 @@ type ThreadAccessControlProps = {
   variant: "desktop" | "mobile";
 };
 
+export function accessDescriptionPopoverPositionClassName(
+  variant: ThreadAccessControlProps["variant"],
+): string {
+  return variant === "desktop"
+    ? "left-full top-1/2 ml-2 -translate-y-1/2"
+    : "right-full top-1/2 mr-2 -translate-y-1/2";
+}
+
+function AccessDescriptionPopover({
+  description,
+  label,
+  variant,
+}: {
+  description: string;
+  label: string;
+  variant: ThreadAccessControlProps["variant"];
+}): JSX.Element {
+  const tooltipId = useId();
+
+  return (
+    <span className="group/access-tooltip relative shrink-0 self-center">
+      <button
+        aria-describedby={tooltipId}
+        aria-label={`About ${label} access`}
+        className="inline-flex h-5 w-5 items-center justify-center text-[11px] font-semibold leading-none text-[#9eb1be] transition-colors hover:text-[#f4f8fb] focus-visible:text-[#f4f8fb] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#5d7e93] focus-visible:outline-offset-1"
+        type="button"
+      >
+        ?
+      </button>
+      <span
+        aria-hidden="true"
+        className={[
+          "pointer-events-none invisible absolute z-50 w-[15rem] max-w-[min(72vw,15rem)] border border-[#3c5462] bg-[#141b20] px-2.5 py-2 text-left text-[11px] leading-5 text-[#e2eef7] opacity-0 shadow-[0_18px_38px_rgba(0,0,0,0.42)] transition-opacity duration-150 group-hover/access-tooltip:visible group-hover/access-tooltip:opacity-100 group-focus-within/access-tooltip:visible group-focus-within/access-tooltip:opacity-100",
+          accessDescriptionPopoverPositionClassName(variant),
+        ].join(" ")}
+        id={tooltipId}
+        role="tooltip"
+      >
+        {description}
+      </span>
+    </span>
+  );
+}
+
 function AccessRow({
   accentClassName,
   checked,
@@ -35,6 +79,7 @@ function AccessRow({
   label,
   onChange,
   toneClassName,
+  variant,
 }: {
   accentClassName: string;
   checked: boolean;
@@ -45,47 +90,57 @@ function AccessRow({
   label: string;
   onChange: (checked: boolean) => void;
   toneClassName: string;
+  variant: ThreadAccessControlProps["variant"];
 }): JSX.Element {
   return (
-    <label
+    <div
       className={[
-        "flex items-start gap-2 border px-1 py-1 transition-colors",
+        "flex items-center gap-2 border px-1 py-1 transition-colors",
         checked
           ? "border-[#4c6070] bg-[#171d21]"
           : "border-[#303840] bg-[#11161a]",
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+        disabled ? "opacity-60" : "",
         toneClassName,
       ].join(" ")}
     >
-      <input
-        checked={checked}
-        className={`mt-0.5 h-4 w-4 shrink-0 ${accentClassName}`}
-        disabled={disabled}
-        onChange={(event) => {
-          onChange(event.currentTarget.checked);
-        }}
-        type="checkbox"
+      <label
+        className={[
+          "flex min-w-0 flex-1 items-center gap-2",
+          disabled ? "cursor-not-allowed" : "cursor-pointer",
+        ].join(" ")}
+      >
+        <input
+          checked={checked}
+          className={`h-4 w-4 shrink-0 ${accentClassName}`}
+          disabled={disabled}
+          onChange={(event) => {
+            onChange(event.currentTarget.checked);
+          }}
+          type="checkbox"
+        />
+        {iconName ? (
+          <span
+            aria-hidden="true"
+            className={[
+              "flex h-4 w-4 shrink-0 items-center justify-center",
+              iconClassName ?? "text-[#9eb1be]",
+            ].join(" ")}
+          >
+            {materialSymbol(iconName, "text-[13px]")}
+          </span>
+        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold leading-4 uppercase tracking-[0.14em] text-[#f0f6fb]">
+            {label}
+          </span>
+        </span>
+      </label>
+      <AccessDescriptionPopover
+        description={description}
+        label={label}
+        variant={variant}
       />
-      {iconName ? (
-        <span
-          aria-hidden="true"
-          className={[
-            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#33404a] bg-[#0f1519]",
-            iconClassName ?? "text-[#9eb1be]",
-          ].join(" ")}
-        >
-          {materialSymbol(iconName, "text-[13px]")}
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f0f6fb]">
-          {label}
-        </span>
-        <span className="mt-1 block text-xs leading-5 text-[#9eb1be]">
-          {description}
-        </span>
-      </span>
-    </label>
+    </div>
   );
 }
 
@@ -142,7 +197,7 @@ export function ThreadAccessControl({
       renderPanel={() => (
         <div
           className={[
-            "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 overflow-hidden border border-[#3a4751] bg-[#12171b] shadow-[0_24px_60px_rgba(0,0,0,0.52)]",
+            "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 overflow-visible border border-[#3a4751] bg-[#12171b] shadow-[0_24px_60px_rgba(0,0,0,0.52)]",
             compact
               ? "w-[18rem] max-w-[calc(100vw-1rem)]"
               : "w-[20rem] max-w-[calc(100vw-2rem)]",
@@ -169,6 +224,7 @@ export function ThreadAccessControl({
                 });
               }}
               toneClassName=""
+              variant={variant}
             />
             <AccessRow
               accentClassName="accent-[#7ea6ff]"
@@ -185,6 +241,7 @@ export function ThreadAccessControl({
                 });
               }}
               toneClassName=""
+              variant={variant}
             />
             <AccessRow
               accentClassName="accent-[#7ce38d]"
@@ -201,6 +258,7 @@ export function ThreadAccessControl({
                 });
               }}
               toneClassName=""
+              variant={variant}
             />
             <AccessRow
               accentClassName="accent-[#8ed0ff]"
@@ -217,6 +275,7 @@ export function ThreadAccessControl({
                 });
               }}
               toneClassName=""
+              variant={variant}
             />
             <AccessRow
               accentClassName="accent-[#d89256]"
@@ -237,6 +296,7 @@ export function ThreadAccessControl({
                 value.unsafeMode ? "bg-[#2a1d10]" : "bg-[#1e1710]",
                 "text-[#f2d79b]",
               ].join(" ")}
+              variant={variant}
             />
           </div>
         </div>

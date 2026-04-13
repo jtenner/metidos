@@ -127,6 +127,7 @@ import {
   ThreadAccessControl,
   type ThreadAccessValue,
 } from "./controls/thread-access-control";
+import { resolveCronJobsLoadBehavior } from "./cronjob-load-state";
 import { buildLoadedProjectWorktreesState } from "./project-worktree-refresh";
 import {
   shouldApplySentThreadDetailToSelection,
@@ -519,6 +520,7 @@ export default function App({
 
   const cronJobsRequestIdRef = useRef(0);
   const cronJobsAbortControllerRef = useRef<AbortController | null>(null);
+  const cronJobsInitializedRef = useRef(false);
   // Request/caching refs below track in-flight RPCs by key so refreshes can be
   // shared, cancelled, or ignored without extra state transitions.
   const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
@@ -1044,30 +1046,34 @@ export default function App({
 
   const loadCronJobs = useCallback(
     async (options?: { background?: boolean }): Promise<void> => {
-      if (isLoadingCronJobs) {
+      const loadBehavior = resolveCronJobsLoadBehavior({
+        hasInitializedCronJobs: cronJobsInitializedRef.current,
+        isBackgroundRefresh: options?.background === true,
+        requestInFlight: cronJobsAbortControllerRef.current !== null,
+      });
+      if (loadBehavior.mode === "skip") {
         return;
       }
 
-      const isBackgroundRefresh = options?.background === true;
       const requestId = ++cronJobsRequestIdRef.current;
-      abortCronJobsRequest("Cron job request was superseded.");
       const controller = new AbortController();
       cronJobsAbortControllerRef.current = controller;
-      if (!isBackgroundRefresh || cronJobs.length === 0) {
+      if (loadBehavior.showLoadingState) {
         setIsLoadingCronJobs(true);
       }
-      if (!isBackgroundRefresh) {
+      if (loadBehavior.clearError) {
         setCronJobsError("");
       }
 
       try {
         const result = await procedures.listCrons(undefined, {
-          priority: isBackgroundRefresh ? "background" : "foreground",
+          priority: loadBehavior.mode,
           signal: controller.signal,
         });
         if (cronJobsRequestIdRef.current !== requestId) {
           return;
         }
+        cronJobsInitializedRef.current = true;
         setCronJobs(result);
         setCronJobsError("");
       } catch (error) {
@@ -1077,9 +1083,7 @@ export default function App({
         if (cronJobsRequestIdRef.current !== requestId) {
           return;
         }
-        if (cronJobs.length === 0) {
-          setCronJobs([]);
-        }
+        cronJobsInitializedRef.current = true;
         setCronJobsError(
           error instanceof Error ? error.message : String(error),
         );
@@ -1092,11 +1096,13 @@ export default function App({
         }
       }
     },
-    [abortCronJobsRequest, cronJobs.length, isLoadingCronJobs, procedures],
+    [procedures],
   );
 
   const primeCronJobs = useCallback(() => {
-    void loadCronJobs();
+    void loadCronJobs({
+      background: cronJobsInitializedRef.current,
+    });
   }, [loadCronJobs]);
 
   const abortThreadHistoryBackfill = useCallback((reason: string) => {
@@ -2231,7 +2237,9 @@ export default function App({
       return;
     }
 
-    void loadCronJobs({ background: cronJobs.length > 0 });
+    void loadCronJobs({
+      background: cronJobsInitializedRef.current,
+    });
     const timer = window.setInterval(() => {
       void loadCronJobs({ background: true });
     }, THREAD_STATUS_POLL_INTERVAL_MS);
@@ -2239,7 +2247,7 @@ export default function App({
     return () => {
       window.clearInterval(timer);
     };
-  }, [cronJobs.length, isDocumentVisible, loadCronJobs, primaryView]);
+  }, [isDocumentVisible, loadCronJobs, primaryView]);
 
   const updateActiveCodexModel = useCallback(
     async (model: string) => {
