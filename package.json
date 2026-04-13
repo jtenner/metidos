@@ -21,7 +21,7 @@
     "validate": "bunx biome check biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json && bun run typecheck && bun run test",
     "build:dev": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts --dev",
     "build:prod": "bun install && bun run tailwind:build && bun run src/bun/build-mainview.ts --production",
-    "format": "bunx biome format biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json --write"
+    "format": "bunx biome check biome.json bun-plugin-react-compiler.ts src/bun src/mainview package.json tsconfig.json --write --unsafe"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

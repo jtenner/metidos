@@ -27,6 +27,7 @@ import type {
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
 import { brandLogoIcon } from "../controls/brand-logo";
+import { ContextUsageMeter } from "../controls/ContextUsageMeter";
 import { ChatComposerControl } from "../controls/chat-composer-control";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { materialSymbol } from "../controls/icons";
@@ -39,7 +40,6 @@ import {
   ChatErrorMessage,
   ChatNoticeMessage,
   CommandExecutionMessage,
-  ContextUsageMeter,
   ErrorItemMessage,
   FileChangeMessage,
   isAssistantVisibleMessage,

@@ -3254,15 +3254,21 @@ export default function App({
                   }}
                   pinnedThreadsPanelProps={{
                     acknowledgeThreadErrorSeenInBackground,
+                    canCreateThread:
+                      selectedProject !== null &&
+                      activeSelectedWorktreePath !== null,
                     clearCompletedThreadIndicator,
                     dismissThreadStatus,
+                    isCreatingThread,
                     isThreadStatusDismissed,
+                    onCreateThread: handleCreateThreadForActiveWorktree,
                     onOpenThread: handleOpenPinnedThread,
                     onOpenThreadActionMenu: openThreadActionMenu,
                     pinnedThreads: desktopPinnedThreads,
                     projectById,
                     recentThreads: filteredWorkspaceActiveThreads,
                     selectedThreadId,
+                    sidebarActionButtonClass,
                     threadActivityIndicator,
                     threadPreviewsDisabled: threadActionMenu !== null,
                     threadsError,

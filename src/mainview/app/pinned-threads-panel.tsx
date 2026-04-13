@@ -10,7 +10,7 @@ import {
   toggleThreadsPanelOpen,
   useThreadsPanelOpen,
 } from "./sidebar-panels-state";
-import { sortThreads } from "./state";
+import { APP_TITLE, sortThreads } from "./state";
 import { type SharedThreadListProps, ThreadList } from "./thread-list-row";
 
 const DESKTOP_RECENT_THREADS_VISIBLE_COUNT = 5;
@@ -25,8 +25,12 @@ export function deriveVisibleDesktopRecentThreads(
 }
 
 type PinnedThreadsPanelProps = SharedThreadListProps & {
+  canCreateThread: boolean;
+  isCreatingThread: boolean;
+  onCreateThread: () => void;
   pinnedThreads: RpcThread[];
   recentThreads: RpcThread[];
+  sidebarActionButtonClass: string;
   threadPreviewsDisabled: boolean;
   threadsError: string;
 };
@@ -36,15 +40,19 @@ type PinnedThreadsPanelProps = SharedThreadListProps & {
  */
 export const PinnedThreadsPanel = memo(function PinnedThreadsPanel({
   acknowledgeThreadErrorSeenInBackground,
+  canCreateThread,
   clearCompletedThreadIndicator,
   dismissThreadStatus,
+  isCreatingThread,
   isThreadStatusDismissed,
+  onCreateThread,
   onOpenThread,
   onOpenThreadActionMenu,
   pinnedThreads,
   projectById,
   recentThreads,
   selectedThreadId,
+  sidebarActionButtonClass,
   threadActivityIndicator,
   threadPreviewsDisabled,
   threadsError,
@@ -55,6 +63,7 @@ export const PinnedThreadsPanel = memo(function PinnedThreadsPanel({
   const visibleRecentThreads = deriveVisibleDesktopRecentThreads(recentThreads);
   const hasThreads =
     pinnedThreads.length > 0 || visibleRecentThreads.length > 0;
+  const createThreadDisabled = isCreatingThread || !canCreateThread;
 
   return (
     <section className="select-none">
@@ -62,12 +71,35 @@ export const PinnedThreadsPanel = memo(function PinnedThreadsPanel({
         title="Threads"
         open={threadsOpen}
         onToggle={toggleThreadsPanelOpen}
+        action={
+          <button
+            type="button"
+            className={sidebarActionButtonClass}
+            onClick={onCreateThread}
+            aria-label={
+              canCreateThread
+                ? "Create thread for selected worktree"
+                : "Select a project and worktree first"
+            }
+            aria-busy={isCreatingThread}
+            disabled={createThreadDisabled}
+            title={
+              canCreateThread
+                ? `Start a new ${APP_TITLE} thread for the selected worktree`
+                : "Select a project and worktree first"
+            }
+          >
+            +
+          </button>
+        }
       />
       {threadsOpen ? (
         <div className="mt-3 space-y-3">
           {!hasThreads ? (
             <div className="bg-surface-1 px-3 py-2.5 text-xs text-text-muted">
-              No pinned or recent threads yet.
+              {canCreateThread
+                ? `No pinned or recent threads yet. Use + to start a ${APP_TITLE} thread for the selected worktree.`
+                : "No pinned or recent threads yet."}
             </div>
           ) : null}
           {pinnedThreads.length > 0 ? (

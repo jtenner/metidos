@@ -33,4 +33,4 @@
   - `src/mainview/app/`
     Main interface features and stateful UI modules for threads, projects, diffs, settings, and chat rendering.
   - `src/mainview/controls/`
-    Reusable UI controls and selectors used across the mainview.
+    Reusable UI controls, selectors, and shared display primitives used across the mainview.
