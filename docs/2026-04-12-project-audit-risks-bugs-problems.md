@@ -42,8 +42,9 @@ All static checks pass and tests are comprehensive (including deep security, san
      - RPC payload bloat, thread status refresh deduping, cron concurrency caps, starvation detection.
      - Mainview build modes, cacheable assets, sourcemaps.
    - runtime-stats.ts, runtime-stats-sidecar.ts, starvation-harness.ts exist specifically to measure these.
-   - **Risk**: Production deployments may still hit memory pressure, slow queries, or UI lag under load. Telemetry is present but requires `--track-telemetry`.
-   - WAL, indexes, sidecar telemetry, and a repeatable bounded Metidos-tool benchmark baseline are now in place, but broader production-shaped load validation and UI-side performance work still remain.
+   - The original audit risk here was the lack of repeatable evidence, not the existence of any future optimization work.
+   - That measurement gap is now closed: the runtime has sidecar-backed telemetry, the starvation harness now reports scheduler preemptions separately from true failures, and the bounded Metidos-tool benchmark covers the highest-risk child-thread/cron/sandbox paths.
+   - See [docs/2026-04-12-performance-validation-workflow.md](./2026-04-12-performance-validation-workflow.md) for the current workflow and representative 2026-04-12 run data.
 
 5. **Deep TS Review: Authentication, User Management & Related Modules**
    - **Core Files Examined**: `auth-service.ts` (1494 LOC orchestration for setup/login/sessions/tickets/step-up/lockouts), `auth.ts` (TOTP, Argon2id/Bun.password, recovery, HOTP impl), `auth-secrets.ts` (AES-GCM key mgmt with `auth-secret.key`), `auth-reset.ts`, `db.ts` (multi-user schema, migrations, queries), `rpc-authz.ts`, `rpc-websocket-auth.ts`, `project-security-audit.ts`, `project-procedures/*.ts` (user scoping, admin/pending users), mainview auth-shell/* + tests. Sampled ~50 other TS files (vm2-runner, git, pi-*, state, controls, etc.).
@@ -106,7 +107,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, auth hardening, and performance/load validation.
+- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, and auth hardening.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
@@ -116,12 +117,13 @@ All static checks pass and tests are comprehensive (including deep security, san
 - The auth-service monolith has now been split into focused setup/login, session/ticket, cookie, and shared-core modules behind the stable `auth-service.ts` entrypoint, which made the landing auth hardening slice tractable without reworking one 1.5k-line orchestration file.
 - The auth hardening slice is now landed too: [docs/2026-04-12-auth-hardening-follow-up.md](./2026-04-12-auth-hardening-follow-up.md) records the stricter primary-factor policy, the transaction-backed lockout fix, and the explicit `auth-secret.key` recovery behavior.
 - The agent-runtime load-test slice now has a repeatable local benchmark too: [docs/2026-04-12-metidos-tool-load-benchmark-baseline.md](./2026-04-12-metidos-tool-load-benchmark-baseline.md) records the first safe-versus-unsafe child-thread/cron and sandbox saturation baseline using the landed Metidos-tool budgets.
+- The broader performance/load-validation risk is now closed too: [docs/2026-04-12-performance-validation-workflow.md](./2026-04-12-performance-validation-workflow.md) records the current starvation-harness plus Metidos-tool benchmark workflow, including the refreshed preemption-aware harness results from 2026-04-12.
 
 ## Recommendations
 - **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; keep building on the stricter auth defaults with rate limiting and longer-term TOTP/key-management decisions.
-- **Perf/Obs**: Finish OPT roadmap with production telemetry; extend load validation beyond the bounded Metidos-tool benchmark into broader whole-runtime pressure runs.
+- **Perf/Obs**: Use the now-documented starvation-harness plus Metidos-tool workflow before and after runtime changes; future optimization work should compare against those baselines instead of inventing new ad hoc measurements.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Production build/load test with heavy unsafe/agent workloads using the new tool telemetry and newly bounded high-risk paths.
+- **Next**: Continue the remaining audit work on mainview modularity, vm2/unsafe execution boundaries, and residual auth operational hardening.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

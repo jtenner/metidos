@@ -307,10 +307,12 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `starvation-harness.ts`
   - Optional benchmarking harness to exercise startup, HTTP, and RPC behavior under worker concurrency.
   - Produces timing summaries, latency percentiles, runtime-stats snapshots, memory snapshots, and top-byte transport rankings to help validate race/pressure behavior in development and CI-like scenarios.
+  - Separates expected git-scheduler preemptions from true pressure-loop failures so queue backpressure stays visible without polluting the failure count.
 
 - `metidos-tool-load-benchmark.ts`
   - Repeatable synthetic benchmark for the bounded Metidos tool paths that the audit called out as likely to regress under agent-heavy pressure.
   - Exercises safe versus unsafe child-thread and cron mutations plus the sandbox budget, and reports latency plus per-budget runtime-stats counters so future budget changes can be compared against a stable local baseline.
+  - Use together with the starvation harness via [docs/2026-04-12-performance-validation-workflow.md](../../docs/2026-04-12-performance-validation-workflow.md) when validating the current performance/load story.
 
 ## Notes
 

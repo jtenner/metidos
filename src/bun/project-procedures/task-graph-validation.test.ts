@@ -216,11 +216,13 @@ describe("task graph validation", () => {
     });
     rmSync(join(root, "items", missingBodyId, "body.md"));
 
-    mkdirSync(join(root, "items", "tg-01kp16yacpfks7pd3be0srahtt"), {
+    const missingTaskTomlId = "tg-01fixturetaskgraph0000000013";
+
+    mkdirSync(join(root, "items", missingTaskTomlId), {
       recursive: true,
     });
     writeFileSync(
-      join(root, "items", "tg-01kp16yacpfks7pd3be0srahtt", "body.md"),
+      join(root, "items", missingTaskTomlId, "body.md"),
       "Missing task.toml fixture.\n",
       "utf8",
     );

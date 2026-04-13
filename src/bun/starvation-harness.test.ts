@@ -8,6 +8,7 @@ import { describe, expect, it } from "bun:test";
 import type { RuntimeDiagnosticsSnapshot } from "./runtime-stats";
 import {
   buildHarnessReport,
+  isGitBackgroundPreemptionStatus,
   type PressureSummary,
   parseArgs,
   type StartupSummary,
@@ -309,6 +310,17 @@ describe("starvation harness helpers", () => {
     });
   });
 
+  it("recognizes git-scheduler preemption labels separately from ordinary failures", () => {
+    expect(
+      isGitBackgroundPreemptionStatus(
+        "Foreground git command preempted background work for /repo/example.",
+      ),
+    ).toBe(true);
+    expect(isGitBackgroundPreemptionStatus("RPC request timed out.")).toBe(
+      false,
+    );
+  });
+
   it("merges pressure worker summaries and builds a structured report", () => {
     const pressureA: PressureSummary = {
       abortedCount: 1,
@@ -316,6 +328,10 @@ describe("starvation harness helpers", () => {
       failedCount: 1,
       failureCountByLabel: {
         listWorktreeGitHistory: 1,
+      },
+      preemptedCount: 2,
+      preemptionCountByLabel: {
+        openWorktree: 2,
       },
       timingsByLabel: {
         openWorktree: [10, 20],
@@ -326,6 +342,10 @@ describe("starvation harness helpers", () => {
       completedCount: 1,
       failedCount: 0,
       failureCountByLabel: {},
+      preemptedCount: 1,
+      preemptionCountByLabel: {
+        getWorktreeGitCommitDiff: 1,
+      },
       timingsByLabel: {
         getWorktreeGitCommitDiff: [30],
         openWorktree: [15],
@@ -338,6 +358,11 @@ describe("starvation harness helpers", () => {
       failedCount: 1,
       failureCountByLabel: {
         listWorktreeGitHistory: 1,
+      },
+      preemptedCount: 3,
+      preemptionCountByLabel: {
+        getWorktreeGitCommitDiff: 1,
+        openWorktree: 2,
       },
       timingsByLabel: {
         getWorktreeGitCommitDiff: [30],
@@ -442,6 +467,11 @@ describe("starvation harness helpers", () => {
     });
     expect(report.pressure.failureCountByLabel).toEqual({
       listWorktreeGitHistory: 1,
+    });
+    expect(report.pressure.preemptedCount).toBe(3);
+    expect(report.pressure.preemptionCountByLabel).toEqual({
+      getWorktreeGitCommitDiff: 1,
+      openWorktree: 2,
     });
     expect(report.diagnostics.afterPressure.memoryUsage.rss).toBe(30_000_000);
   });

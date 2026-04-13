@@ -73,6 +73,8 @@ export type PressureSummary = {
   completedCount: number;
   failedCount: number;
   failureCountByLabel: Record<string, number>;
+  preemptedCount: number;
+  preemptionCountByLabel: Record<string, number>;
   timingsByLabel: Record<string, number[]>;
 };
 
@@ -98,6 +100,8 @@ export type HarnessReport = {
     completedCount: number;
     failedCount: number;
     failureCountByLabel: Record<string, number>;
+    preemptedCount: number;
+    preemptionCountByLabel: Record<string, number>;
   };
   startup: StartupSummary;
   target: {
@@ -455,6 +459,15 @@ function isAbortError(error: unknown): boolean {
 }
 
 /**
+ * The git scheduler intentionally aborts background work when foreground reads
+ * need the queue. The harness should surface that as backpressure, not as an
+ * ordinary functional failure.
+ */
+export function isGitBackgroundPreemptionStatus(status: string): boolean {
+  return status.includes("Foreground git command preempted background work");
+}
+
+/**
  * Time an HTTP endpoint request and classify latency/outcome.
  */
 
@@ -620,6 +633,8 @@ async function runPressureWorker(
     completedCount: 0,
     failedCount: 0,
     failureCountByLabel: {},
+    preemptedCount: 0,
+    preemptionCountByLabel: {},
     timingsByLabel: {},
   };
 
@@ -639,6 +654,12 @@ async function runPressureWorker(
         },
       );
       if (!opened.timing.ok || !opened.result) {
+        if (isGitBackgroundPreemptionStatus(opened.timing.status)) {
+          summary.preemptedCount += 1;
+          summary.preemptionCountByLabel.openWorktree =
+            (summary.preemptionCountByLabel.openWorktree ?? 0) + 1;
+          continue;
+        }
         summary.failedCount += 1;
         summary.failureCountByLabel.openWorktree =
           (summary.failureCountByLabel.openWorktree ?? 0) + 1;
@@ -667,6 +688,13 @@ async function runPressureWorker(
           },
         );
         if (!diff.timing.ok) {
+          if (isGitBackgroundPreemptionStatus(diff.timing.status)) {
+            summary.preemptedCount += 1;
+            summary.preemptionCountByLabel.getWorktreeGitCommitDiff =
+              (summary.preemptionCountByLabel.getWorktreeGitCommitDiff ?? 0) +
+              1;
+            continue;
+          }
           summary.failedCount += 1;
           summary.failureCountByLabel.getWorktreeGitCommitDiff =
             (summary.failureCountByLabel.getWorktreeGitCommitDiff ?? 0) + 1;
@@ -694,6 +722,12 @@ async function runPressureWorker(
         },
       );
       if (!history.timing.ok) {
+        if (isGitBackgroundPreemptionStatus(history.timing.status)) {
+          summary.preemptedCount += 1;
+          summary.preemptionCountByLabel.listWorktreeGitHistory =
+            (summary.preemptionCountByLabel.listWorktreeGitHistory ?? 0) + 1;
+          continue;
+        }
         summary.failedCount += 1;
         summary.failureCountByLabel.listWorktreeGitHistory =
           (summary.failureCountByLabel.listWorktreeGitHistory ?? 0) + 1;
@@ -1105,6 +1139,8 @@ export function summarizePressure(results: PressureSummary[]): PressureSummary {
     completedCount: 0,
     failedCount: 0,
     failureCountByLabel: {},
+    preemptedCount: 0,
+    preemptionCountByLabel: {},
     timingsByLabel: {},
   };
 
@@ -1112,10 +1148,17 @@ export function summarizePressure(results: PressureSummary[]): PressureSummary {
     summary.abortedCount += current.abortedCount;
     summary.completedCount += current.completedCount;
     summary.failedCount += current.failedCount;
+    summary.preemptedCount += current.preemptedCount;
 
     for (const [label, count] of Object.entries(current.failureCountByLabel)) {
       summary.failureCountByLabel[label] =
         (summary.failureCountByLabel[label] ?? 0) + count;
+    }
+    for (const [label, count] of Object.entries(
+      current.preemptionCountByLabel,
+    )) {
+      summary.preemptionCountByLabel[label] =
+        (summary.preemptionCountByLabel[label] ?? 0) + count;
     }
     for (const [label, samples] of Object.entries(current.timingsByLabel)) {
       for (const durationMs of samples) {
@@ -1172,6 +1215,10 @@ export function buildHarnessReport(options: {
       failedCount: options.pressure.failedCount,
       failureCountByLabel: sortNumberRecord(
         options.pressure.failureCountByLabel,
+      ),
+      preemptedCount: options.pressure.preemptedCount,
+      preemptionCountByLabel: sortNumberRecord(
+        options.pressure.preemptionCountByLabel,
       ),
     },
     startup: options.startup,
@@ -1242,7 +1289,16 @@ function printHarnessReport(
   console.log("Pressure");
   console.log(`  completed loops: ${report.pressure.completedCount}`);
   console.log(`  aborted loops: ${report.pressure.abortedCount}`);
+  console.log(`  preempted loops: ${report.pressure.preemptedCount}`);
   console.log(`  failed loops: ${report.pressure.failedCount}`);
+  if (Object.keys(report.pressure.preemptionCountByLabel).length > 0) {
+    console.log("  preemptions by label:");
+    for (const [label, count] of Object.entries(
+      report.pressure.preemptionCountByLabel,
+    )) {
+      console.log(`    ${label}: ${count}`);
+    }
+  }
   if (Object.keys(report.pressure.failureCountByLabel).length > 0) {
     console.log("  failures by label:");
     for (const [label, count] of Object.entries(
