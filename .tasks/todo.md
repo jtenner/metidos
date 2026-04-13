@@ -326,14 +326,15 @@ The v2 spec recommends only three dedicated admin tools:
 - `validate_task_graph`
 - `normalize_task_graph`
 
-After inspecting this repo, those names appear in design docs and in task descriptions, but not in the current source tree as implemented runtime tools yet. For now, task graph maintenance is primarily manual file editing against `.metidos/tasks/**`, following the canonical format above.
+Those tools now exist in the Pi-native Metidos host path in `src/bun/pi-metidos-tools.ts`, backed by the shared filesystem/init/validate/normalize helpers under `src/bun/project-procedures/`.
 
-The shared filesystem reader and canonical writer for those files now lives in `src/bun/project-procedures/task-graph-filesystem.ts`. The structured validator for canonical findings now lives in `src/bun/project-procedures/task-graph-validation.ts`, and the canonical rewrite pass now lives in `src/bun/project-procedures/task-graph-normalization.ts`. Future admin tooling should build on those modules rather than reparsing `.metidos/tasks/**` ad hoc.
+The shared filesystem reader and canonical writer for those files lives in `src/bun/project-procedures/task-graph-filesystem.ts`. The structured validator for canonical findings lives in `src/bun/project-procedures/task-graph-validation.ts`, and the canonical rewrite pass lives in `src/bun/project-procedures/task-graph-normalization.ts`. Future task-graph work should build on those modules rather than reparsing `.metidos/tasks/**` ad hoc.
 
-Once admin tooling exists, the intended split is:
+The intended split is:
 
 - use normal file edits for routine task creation and updates
 - use admin tools only for scaffolding, validation, and canonical normalization
+- keep `taskGraphAdmin` as a runtime policy gate rather than repository-stored task metadata
 
 ## Canonical Vs Generated
 

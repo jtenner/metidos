@@ -122,9 +122,10 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Backend smoke test proving that `project-procedures.ts` can now execute a real thread lifecycle through the Pi adapter and persist the resulting assistant reply.
 
 - `pi-metidos-tools.ts`
-  - Pi-native Metidos custom tool pack for thread metadata, thread listing/creation, cron management, UI context focus, and the vm2-backed untrusted JS runner.
+  - Pi-native Metidos custom tool pack for thread metadata, thread listing/creation, cron management, UI context focus, the vm2-backed untrusted JS runner, and task-graph admin helpers for init/validate/normalize.
   - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Metidos MCP bridge for those operations.
   - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools.
+  - Also enforces the runtime-only `taskGraphAdmin` policy so task-graph scaffolding, validation, and normalization can be exposed without inventing custom task mutation tools.
   - Wraps each Metidos tool with runtime-stats instrumentation so per-tool calls, explicit unsafe-mode requests, and vm2 sandbox outcomes are visible through the shared diagnostics snapshot.
 
 - `pi-metidos-tools.test.ts`

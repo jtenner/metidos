@@ -119,6 +119,96 @@ export type RpcHomeDirectoryResult = {
   supportsTildePath: boolean;
 };
 
+export type RpcTaskGraphConfig = {
+  bodyFormat: string;
+  defaults: {
+    priority: string | null;
+    status: string | null;
+    type: string | null;
+  };
+  idPrefix: string;
+  schema: string;
+  strictTags: boolean;
+  strictTypes: boolean;
+};
+
+export type RpcTaskGraphInitializationStatus =
+  | "created"
+  | "existing"
+  | "skipped";
+
+export type RpcInitTaskGraphRequest = {
+  createTagsRegistry?: boolean;
+  createTypesRegistry?: boolean;
+  idPrefix?: string;
+  strictTags?: boolean;
+  strictTypes?: boolean;
+};
+
+export type RpcInitTaskGraphResult = {
+  config: RpcTaskGraphConfig;
+  paths: {
+    config: string;
+    items: string;
+    root: string;
+    tags: string | null;
+    types: string | null;
+  };
+  status: {
+    config: Exclude<RpcTaskGraphInitializationStatus, "skipped">;
+    items: Exclude<RpcTaskGraphInitializationStatus, "skipped">;
+    root: Exclude<RpcTaskGraphInitializationStatus, "skipped">;
+    tags: RpcTaskGraphInitializationStatus;
+    types: RpcTaskGraphInitializationStatus;
+  };
+};
+
+export type RpcValidateTaskGraphRequest = {
+  taskIds?: string[];
+};
+
+export type RpcTaskGraphValidationFinding = {
+  code: string;
+  field: string | null;
+  message: string;
+  path: string;
+  relatedTaskId: string | null;
+  severity: "error" | "warning";
+  taskId: string | null;
+};
+
+export type RpcValidateTaskGraphResult = {
+  errors: RpcTaskGraphValidationFinding[];
+  findings: RpcTaskGraphValidationFinding[];
+  ok: boolean;
+  root: string;
+  validatedTaskIds: string[];
+  warnings: RpcTaskGraphValidationFinding[];
+};
+
+export type RpcNormalizeTaskGraphRequest = {
+  taskIds?: string[];
+};
+
+export type RpcNormalizeTaskGraphFileResult = {
+  changed: boolean;
+  fileKind:
+    | "body_md"
+    | "config_toml"
+    | "tags_toml"
+    | "task_toml"
+    | "types_toml";
+  path: string;
+  taskId: string | null;
+};
+
+export type RpcNormalizeTaskGraphResult = {
+  changedFiles: RpcNormalizeTaskGraphFileResult[];
+  normalizedTaskIds: string[];
+  root: string;
+  unchangedFiles: RpcNormalizeTaskGraphFileResult[];
+};
+
 export type RpcDirectorySuggestionsResult = {
   directories: string[];
 };

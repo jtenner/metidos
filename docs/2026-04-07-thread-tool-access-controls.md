@@ -100,9 +100,17 @@ The current Pi-native Metidos tool pack in `src/bun/pi-metidos-tools.ts` now exp
 
 - `update_thread`
 - `list_threads`
+- `run_untrusted_js`
+- `init_task_graph`
+- `validate_task_graph`
+- `normalize_task_graph`
+- `set_context`
+- `list_crons`
+- `new_cron`
+- `update_cron`
 - `new_thread`
 
-This makes the `Metidos` toggle own the full sidecar surface instead of only the cron/runtime subset.
+This makes the `Metidos` toggle own the full sidecar surface instead of only the cron/runtime subset, while still allowing narrower runtime policy on specific high-impact helpers such as the task-graph admin tools.
 
 ### 2a. Keep `update_thread` metadata-only inside a running thread
 

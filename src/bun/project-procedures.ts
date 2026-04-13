@@ -145,6 +145,9 @@ import {
   throwIfAborted,
   writeLruValue,
 } from "./project-procedures/shared";
+import { initTaskGraphFilesystem } from "./project-procedures/task-graph-filesystem";
+import { normalizeTaskGraphFilesystem } from "./project-procedures/task-graph-normalization";
+import { validateTaskGraphFilesystem } from "./project-procedures/task-graph-validation";
 import {
   buildThreadTitle,
   isStoppedThreadMessage,
@@ -167,8 +170,12 @@ import type {
   RpcGitCommitDiffResult,
   RpcGitHistoryEntry,
   RpcHomeDirectoryResult,
+  RpcInitTaskGraphRequest,
+  RpcInitTaskGraphResult,
   RpcManagedUser,
   RpcModelCatalog,
+  RpcNormalizeTaskGraphRequest,
+  RpcNormalizeTaskGraphResult,
   RpcOllamaProviderConfig,
   RpcOllamaProviderConfigResult,
   RpcOpenProjectsBatchResultItem,
@@ -186,6 +193,8 @@ import type {
   RpcThreadRunStatus,
   RpcThreadStartRequest,
   RpcThreadUsage,
+  RpcValidateTaskGraphRequest,
+  RpcValidateTaskGraphResult,
   RpcWorktree,
   RpcWorktreeChange,
   RpcWorktreeFileContentPage,
@@ -1270,14 +1279,151 @@ function createPiToolRequestContext(
   };
 }
 
+function resolveTaskGraphRootPath(worktreePath: string): string {
+  return resolve(worktreePath, ".metidos", "tasks");
+}
+
+function toRpcTaskGraphConfig(
+  config: Awaited<ReturnType<typeof initTaskGraphFilesystem>>["config"],
+): RpcInitTaskGraphResult["config"] {
+  return {
+    bodyFormat: config.body_format,
+    defaults: {
+      priority: config.defaults.priority,
+      status: config.defaults.status,
+      type: config.defaults.type,
+    },
+    idPrefix: config.id_prefix,
+    schema: config.schema,
+    strictTags: config.strict_tags,
+    strictTypes: config.strict_types,
+  };
+}
+
+function toRpcInitTaskGraphResult(
+  result: Awaited<ReturnType<typeof initTaskGraphFilesystem>>,
+): RpcInitTaskGraphResult {
+  return {
+    config: toRpcTaskGraphConfig(result.config),
+    paths: result.paths,
+    status: result.status,
+  };
+}
+
+function toRpcValidateTaskGraphResult(
+  result: Awaited<ReturnType<typeof validateTaskGraphFilesystem>>,
+): RpcValidateTaskGraphResult {
+  const findings = result.findings.map((finding) => ({
+    code: finding.code,
+    field: finding.field,
+    message: finding.message,
+    path: finding.path,
+    relatedTaskId: finding.related_task_id,
+    severity: finding.severity,
+    taskId: finding.task_id,
+  }));
+  return {
+    errors: findings.filter((finding) => finding.severity === "error"),
+    findings,
+    ok: result.ok,
+    root: result.root,
+    validatedTaskIds: result.validated_task_ids,
+    warnings: findings.filter((finding) => finding.severity === "warning"),
+  };
+}
+
+function toRpcNormalizeTaskGraphResult(
+  result: Awaited<ReturnType<typeof normalizeTaskGraphFilesystem>>,
+): RpcNormalizeTaskGraphResult {
+  const mapFileResult = (
+    file: (typeof result.changed_files)[number],
+  ): RpcNormalizeTaskGraphResult["changedFiles"][number] => ({
+    changed: file.changed,
+    fileKind: file.file_kind,
+    path: file.path,
+    taskId: file.task_id,
+  });
+  return {
+    changedFiles: result.changed_files.map(mapFileResult),
+    normalizedTaskIds: result.normalized_task_ids,
+    root: result.root,
+    unchangedFiles: result.unchanged_files.map(mapFileResult),
+  };
+}
+
+export async function initTaskGraphProcedure(
+  params: RpcInitTaskGraphRequest = {},
+  worktreePath: string,
+  context?: RpcRequestContext,
+): Promise<RpcInitTaskGraphResult> {
+  requireAdminContext(context);
+  const result = await initTaskGraphFilesystem(
+    resolveTaskGraphRootPath(worktreePath),
+    {
+      ...(typeof params.createTagsRegistry === "boolean"
+        ? { createTagsRegistry: params.createTagsRegistry }
+        : {}),
+      ...(typeof params.createTypesRegistry === "boolean"
+        ? { createTypesRegistry: params.createTypesRegistry }
+        : {}),
+      ...(typeof params.idPrefix === "string"
+        ? { idPrefix: params.idPrefix }
+        : {}),
+      ...(typeof params.strictTags === "boolean"
+        ? { strictTags: params.strictTags }
+        : {}),
+      ...(typeof params.strictTypes === "boolean"
+        ? { strictTypes: params.strictTypes }
+        : {}),
+    },
+  );
+  return toRpcInitTaskGraphResult(result);
+}
+
+export async function validateTaskGraphProcedure(
+  params: RpcValidateTaskGraphRequest = {},
+  worktreePath: string,
+  context?: RpcRequestContext,
+): Promise<RpcValidateTaskGraphResult> {
+  requireAdminContext(context);
+  const result = await validateTaskGraphFilesystem(
+    resolveTaskGraphRootPath(worktreePath),
+    {
+      ...(params.taskIds ? { taskIds: params.taskIds } : {}),
+    },
+  );
+  return toRpcValidateTaskGraphResult(result);
+}
+
+export async function normalizeTaskGraphProcedure(
+  params: RpcNormalizeTaskGraphRequest = {},
+  worktreePath: string,
+  context?: RpcRequestContext,
+): Promise<RpcNormalizeTaskGraphResult> {
+  requireAdminContext(context);
+  const result = await normalizeTaskGraphFilesystem(
+    resolveTaskGraphRootPath(worktreePath),
+    {
+      ...(params.taskIds ? { taskIds: params.taskIds } : {}),
+    },
+  );
+  return toRpcNormalizeTaskGraphResult(result);
+}
+
 export function createPiMetidosToolHost(
   ownerUserId: number,
   options?: {
     syncCronSchedulerCron?: (cronJobId: number) => void;
+    taskGraphAdmin?: boolean;
   },
 ): PiMetidosToolHost {
+  const ownerUser = getUserById(db, ownerUserId);
   const syncCron = options?.syncCronSchedulerCron ?? syncCronSchedulerCron;
+  const taskGraphAdmin = options?.taskGraphAdmin ?? ownerUser?.isAdmin ?? false;
   return {
+    capabilities: {
+      taskGraphAdmin,
+    },
     createThread: (params) =>
       createThreadProcedure(params, createPiToolRequestContext(ownerUserId)),
     focusContext: (params, signal) =>
@@ -1296,6 +1442,12 @@ export function createPiMetidosToolHost(
       listProjectsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
     listThreads: () =>
       listThreadsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
+    initTaskGraph: (params, worktreePath) =>
+      initTaskGraphProcedure(
+        params,
+        worktreePath,
+        createPiToolRequestContext(ownerUserId),
+      ),
     newCron: async (params) => {
       const cron = await newCronProcedure(
         params,
@@ -1304,6 +1456,12 @@ export function createPiMetidosToolHost(
       syncCron(cron.id);
       return cron;
     },
+    normalizeTaskGraph: (params, worktreePath) =>
+      normalizeTaskGraphProcedure(
+        params,
+        worktreePath,
+        createPiToolRequestContext(ownerUserId),
+      ),
     requestThreadStart: (params) =>
       requestThreadStartProcedure(
         params,
@@ -1325,6 +1483,12 @@ export function createPiMetidosToolHost(
     updateThreadMetadata: (params) =>
       updateThreadMetadataProcedure(
         params,
+        createPiToolRequestContext(ownerUserId),
+      ),
+    validateTaskGraph: (params, worktreePath) =>
+      validateTaskGraphProcedure(
+        params,
+        worktreePath,
         createPiToolRequestContext(ownerUserId),
       ),
   };

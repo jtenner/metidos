@@ -201,7 +201,8 @@ function buildPiRuntimeAppendSystemPrompt(
   }
   if (thread.metidosAccess === true) {
     customToolLines.push(
-      "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
+      "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, init_task_graph, validate_task_graph, normalize_task_graph, set_context, list_crons, new_cron, update_cron, and new_thread.",
+      "The task-graph admin helpers are runtime-policy gated and should be used only for scaffolding, validation, and canonical normalization under .metidos/tasks/.",
     );
   }
   return [

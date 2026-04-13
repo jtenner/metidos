@@ -11,11 +11,8 @@ assignees = ["agent"]
 tags = ["area:task-graph", "discipline:test", "theme:reliability"]
 milestone = "task-graph-admin-v1"
 
-[blockers]
-tasks = ["tg-01jv6xbw5g7k1n4r6v8x2z5cde"]
-
 [tests_for]
-tasks = ["tg-01jv6xbw5g7k1n4r6v8x2z5cde"]
+tasks = ["tg-01jv6x6kh5z8y4v9m2c3d7pqra"]
 
 [parent]
 task = "tg-01jv6x6kh5z8y4v9m2c3d7pqra"

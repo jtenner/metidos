@@ -838,12 +838,13 @@ Implemented on 2026-04-09 with:
 
 What the current implementation now does:
 
-- adds Pi-native custom tools for `update_thread`, `list_threads`, `run_untrusted_js`, `set_context`, `list_crons`, `new_cron`, `update_cron`, and `new_thread`
+- adds Pi-native custom tools for `update_thread`, `list_threads`, `run_untrusted_js`, `init_task_graph`, `validate_task_graph`, `normalize_task_graph`, `set_context`, `list_crons`, `new_cron`, `update_cron`, and `new_thread`
 - installs that tool pack only when a thread has `metidosAccess=true`, so the existing Metidos access toggle now has a real Pi-era meaning
 - routes those Pi tool calls directly into the existing backend procedure layer through an in-process host adapter instead of going through websocket RPC plus a self-hosted MCP sidecar
 - reuses the current scope-enforcement helpers so bound threads cannot escape their current project/worktree when they list threads, move UI context, or create new cron/thread work
 - preserves the current metadata semantics for `update_thread`, including ignoring in-thread access-control changes and routing summary/title normalization through the authoritative backend helper
 - preserves the current `new_thread` split between “request permission first” and “create immediately” behavior, including the explicit `requestThreadStart(...)` path when `autoStart=true` and `unsafeMode` is still off
+- adds the git-native task-graph admin helpers through the same host path while keeping them behind a runtime-only `taskGraphAdmin` capability instead of introducing bespoke task mutation RPCs
 - keeps the vm2-backed untrusted JS runner available as a Pi tool without expanding its filesystem reach beyond the bound worktree
 
 What this still does not do yet:

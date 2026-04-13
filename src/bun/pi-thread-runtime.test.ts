@@ -44,6 +44,9 @@ const piGitHubToolHostStub: PiGitHubToolHost = {
   },
 };
 const piMetidosToolHostStub: PiMetidosToolHost = {
+  capabilities: {
+    taskGraphAdmin: false,
+  },
   createThread: async () => {
     throw new Error("createThread should not run in this test.");
   },
@@ -54,8 +57,14 @@ const piMetidosToolHostStub: PiMetidosToolHost = {
   listProjectWorktrees: async () => [],
   listProjects: async () => [],
   listThreads: async () => [],
+  initTaskGraph: async () => {
+    throw new Error("initTaskGraph should not run in this test.");
+  },
   newCron: async () => {
     throw new Error("newCron should not run in this test.");
+  },
+  normalizeTaskGraph: async () => {
+    throw new Error("normalizeTaskGraph should not run in this test.");
   },
   requestThreadStart: async () => {
     throw new Error("requestThreadStart should not run in this test.");
@@ -68,6 +77,9 @@ const piMetidosToolHostStub: PiMetidosToolHost = {
   },
   updateThreadMetadata: async () => {
     throw new Error("updateThreadMetadata should not run in this test.");
+  },
+  validateTaskGraph: async () => {
+    throw new Error("validateTaskGraph should not run in this test.");
   },
 };
 const EXPECTED_SAFE_RUNTIME_TOOL_NAMES: string[] = [
@@ -87,6 +99,9 @@ const EXPECTED_SAFE_RUNTIME_TOOL_NAMES: string[] = [
   "update_thread",
   "list_threads",
   "run_untrusted_js",
+  "init_task_graph",
+  "validate_task_graph",
+  "normalize_task_graph",
   "set_context",
   "list_crons",
   "new_cron",
@@ -414,7 +429,7 @@ test("every provider runtime exposes Metidos, GitHub, and agent tools to the mod
           "GitHub-native tools are installed in this runtime: github_repo, github_issue, github_pr, github_pr_checks, and github_pr_diff.",
         );
         expect(runtime.session.systemPrompt).toContain(
-          "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, set_context, list_crons, new_cron, update_cron, and new_thread.",
+          "Metidos-native tools are installed in this runtime: update_thread, list_threads, run_untrusted_js, init_task_graph, validate_task_graph, normalize_task_graph, set_context, list_crons, new_cron, update_cron, and new_thread.",
         );
 
         const streamed = collectAssistantText(runtime);

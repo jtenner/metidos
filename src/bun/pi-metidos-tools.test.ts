@@ -8,10 +8,13 @@ import {
 import type {
   RpcContextFocusChanged,
   RpcCronJob,
+  RpcInitTaskGraphResult,
+  RpcNormalizeTaskGraphResult,
   RpcProject,
   RpcThread,
   RpcThreadDetail,
   RpcThreadStartRequest,
+  RpcValidateTaskGraphResult,
   RpcWorktree,
 } from "./rpc-schema";
 import {
@@ -163,10 +166,79 @@ function makeThreadStartRequest(
   };
 }
 
+function makeInitTaskGraphResult(
+  input?: Partial<RpcInitTaskGraphResult>,
+): RpcInitTaskGraphResult {
+  return {
+    config: {
+      bodyFormat: "markdown",
+      defaults: {
+        priority: "p2",
+        status: "open",
+        type: "task",
+      },
+      idPrefix: "tg",
+      schema: "metidos.task-graph/v2",
+      strictTags: false,
+      strictTypes: false,
+    },
+    paths: {
+      config: "/repo/alpha/feature-a/.metidos/tasks/config.toml",
+      items: "/repo/alpha/feature-a/.metidos/tasks/items",
+      root: "/repo/alpha/feature-a/.metidos/tasks",
+      tags: null,
+      types: null,
+    },
+    status: {
+      config: "created",
+      items: "created",
+      root: "created",
+      tags: "skipped",
+      types: "skipped",
+    },
+    ...input,
+  };
+}
+
+function makeValidateTaskGraphResult(
+  input?: Partial<RpcValidateTaskGraphResult>,
+): RpcValidateTaskGraphResult {
+  return {
+    errors: [],
+    findings: [],
+    ok: true,
+    root: "/repo/alpha/feature-a/.metidos/tasks",
+    validatedTaskIds: [
+      "tg-01jv6xbw5g7k1n4r6v8x2z5cde",
+      "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+    ],
+    warnings: [],
+    ...input,
+  };
+}
+
+function makeNormalizeTaskGraphResult(
+  input?: Partial<RpcNormalizeTaskGraphResult>,
+): RpcNormalizeTaskGraphResult {
+  return {
+    changedFiles: [],
+    normalizedTaskIds: [
+      "tg-01jv6xbw5g7k1n4r6v8x2z5cde",
+      "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+    ],
+    root: "/repo/alpha/feature-a/.metidos/tasks",
+    unchangedFiles: [],
+    ...input,
+  };
+}
+
 function createHost(
   overrides: Partial<PiMetidosToolHost> = {},
 ): PiMetidosToolHost {
   return {
+    capabilities: {
+      taskGraphAdmin: false,
+    },
     createThread: async () => makeThreadDetail(),
     focusContext: async () =>
       ({
@@ -180,11 +252,14 @@ function createHost(
     listProjectWorktrees: async () => [makeWorktree()],
     listProjects: async () => [makeProject()],
     listThreads: async () => [makeThread()],
+    initTaskGraph: async () => makeInitTaskGraphResult(),
     newCron: async () => makeCron(),
+    normalizeTaskGraph: async () => makeNormalizeTaskGraphResult(),
     requestThreadStart: async () => makeThreadStartRequest(),
     sendThreadMessage: async () => makeThreadDetail(),
     updateCron: async () => makeCron(),
     updateThreadMetadata: async () => makeThread(),
+    validateTaskGraph: async () => makeValidateTaskGraphResult(),
     ...overrides,
   };
 }
@@ -348,6 +423,147 @@ describe("createPiMetidosTools", () => {
       workspaceName: "feature-a",
       workspacePath: "/repo/alpha/feature-a",
     });
+  });
+
+  it("runs task graph admin tools with structured results when the runtime allows them", async () => {
+    const scope = makeScope();
+    let initCall: { params: unknown; worktreePath: string } | null = null;
+    let validateCall: { params: unknown; worktreePath: string } | null = null;
+    let normalizeCall: { params: unknown; worktreePath: string } | null = null;
+    const warning = {
+      code: "doc_task_without_docs_for",
+      field: null,
+      message: "Docs tasks should usually declare docs_for links.",
+      path: "/repo/alpha/feature-a/.metidos/tasks/items/tg-01jv6xcy6h8m2p5s7w9z3b6dfg/task.toml",
+      relatedTaskId: null,
+      severity: "warning" as const,
+      taskId: "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+    };
+    const host = createHost({
+      capabilities: {
+        taskGraphAdmin: true,
+      },
+      initTaskGraph: async (params, worktreePath) => {
+        initCall = { params, worktreePath };
+        return makeInitTaskGraphResult({
+          status: {
+            config: "created",
+            items: "created",
+            root: "existing",
+            tags: "created",
+            types: "skipped",
+          },
+        });
+      },
+      normalizeTaskGraph: async (params, worktreePath) => {
+        normalizeCall = { params, worktreePath };
+        return makeNormalizeTaskGraphResult({
+          changedFiles: [
+            {
+              changed: true,
+              fileKind: "task_toml",
+              path: "/repo/alpha/feature-a/.metidos/tasks/items/tg-01jv6xcy6h8m2p5s7w9z3b6dfg/task.toml",
+              taskId: "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+            },
+          ],
+          normalizedTaskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+        });
+      },
+      validateTaskGraph: async (params, worktreePath) => {
+        validateCall = { params, worktreePath };
+        return makeValidateTaskGraphResult({
+          findings: [warning],
+          validatedTaskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+          warnings: [warning],
+        });
+      },
+    });
+
+    const init = await executeTool(scope, host, "init_task_graph", {
+      createTagsRegistry: true,
+      idPrefix: " tg ",
+      strictTypes: true,
+    });
+    const validate = await executeTool(scope, host, "validate_task_graph", {
+      taskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+    });
+    const normalize = await executeTool(scope, host, "normalize_task_graph", {
+      taskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+    });
+
+    expectDeepEqual(requireValue(initCall), {
+      params: {
+        createTagsRegistry: true,
+        idPrefix: "tg",
+        strictTypes: true,
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+    expect(resultText(init)).toBe(
+      "Task graph init finished at /repo/alpha/feature-a/.metidos/tasks (3 created, 1 existing, 1 skipped).",
+    );
+    expect(init.details).toEqual(
+      makeInitTaskGraphResult({
+        status: {
+          config: "created",
+          items: "created",
+          root: "existing",
+          tags: "created",
+          types: "skipped",
+        },
+      }),
+    );
+
+    expectDeepEqual(requireValue(validateCall), {
+      params: {
+        taskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+    expect(resultText(validate)).toBe(
+      "Task graph validation completed at /repo/alpha/feature-a/.metidos/tasks with 0 error(s) and 1 warning(s).",
+    );
+    expect(validate.details).toEqual(
+      makeValidateTaskGraphResult({
+        findings: [warning],
+        validatedTaskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+        warnings: [warning],
+      }),
+    );
+
+    expectDeepEqual(requireValue(normalizeCall), {
+      params: {
+        taskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+      },
+      worktreePath: scope.worktreePathContext,
+    });
+    expect(resultText(normalize)).toBe(
+      "Normalized task graph at /repo/alpha/feature-a/.metidos/tasks; rewrote 1 file(s).",
+    );
+    expect(normalize.details).toEqual(
+      makeNormalizeTaskGraphResult({
+        changedFiles: [
+          {
+            changed: true,
+            fileKind: "task_toml",
+            path: "/repo/alpha/feature-a/.metidos/tasks/items/tg-01jv6xcy6h8m2p5s7w9z3b6dfg/task.toml",
+            taskId: "tg-01jv6xcy6h8m2p5s7w9z3b6dfg",
+          },
+        ],
+        normalizedTaskIds: ["tg-01jv6xcy6h8m2p5s7w9z3b6dfg"],
+      }),
+    );
+  });
+
+  it("blocks task graph admin tools when the runtime policy disables them", async () => {
+    const scope = makeScope();
+    const host = createHost();
+
+    await expect(
+      executeTool(scope, host, "validate_task_graph", {}),
+    ).rejects.toThrow(
+      "Task graph admin tools are disabled for this runtime. This thread cannot initialize, validate, or normalize the repository task graph.",
+    );
   });
 
   it("focuses the UI context through the direct host callback", async () => {

@@ -1041,6 +1041,62 @@ describe("project procedure configuration helpers", () => {
     expect(syncedCronIds).toEqual([created.id]);
   });
 
+  it("wires task graph admin host callbacks to the canonical repository graph with admin gating", async () => {
+    const procedures = await loadProjectProcedures();
+    const database = initAppDatabase();
+    const adminUser = createUser(database, {
+      isAdmin: true,
+      username: createUniqueUsername("pi-task-graph-admin"),
+    });
+    const regularUser = createUser(database, {
+      isAdmin: false,
+      username: createUniqueUsername("pi-task-graph-member"),
+    });
+    const repoPath = createTempDirectory("metidos-task-graph-host-repo-");
+    initializeGitRepository(repoPath);
+
+    const adminHost = procedures.createPiMetidosToolHost(adminUser.id);
+    expect(adminHost.capabilities).toEqual({
+      taskGraphAdmin: true,
+    });
+
+    const init = await adminHost.initTaskGraph(
+      {
+        createTagsRegistry: true,
+        idPrefix: "tg",
+        strictTypes: true,
+      },
+      repoPath,
+    );
+    expect(init.paths.root).toBe(join(repoPath, ".metidos", "tasks"));
+    expect(init.config.idPrefix).toBe("tg");
+    expect(init.config.strictTypes).toBe(true);
+    expect(existsSync(init.paths.config)).toBe(true);
+    expect(existsSync(init.paths.items)).toBe(true);
+    expect(existsSync(init.paths.tags ?? "")).toBe(true);
+
+    const validate = await adminHost.validateTaskGraph({}, repoPath);
+    expect(validate.ok).toBe(true);
+    expect(validate.root).toBe(join(repoPath, ".metidos", "tasks"));
+    expect(validate.errors).toEqual([]);
+    expect(validate.warnings).toEqual([]);
+
+    const normalize = await adminHost.normalizeTaskGraph({}, repoPath);
+    expect(normalize.root).toBe(join(repoPath, ".metidos", "tasks"));
+    expect(normalize.changedFiles).toEqual([]);
+
+    const regularHost = procedures.createPiMetidosToolHost(regularUser.id);
+    expect(regularHost.capabilities).toEqual({
+      taskGraphAdmin: false,
+    });
+    await expect(
+      regularHost.validateTaskGraph({}, repoPath),
+    ).rejects.toMatchObject({
+      code: "admin_required",
+      status: 403,
+    });
+  });
+
   it("allows preauthorized unsafe thread creation for persisted cron execution", async () => {
     const procedures = await loadProjectProcedures();
     const database = initAppDatabase();
