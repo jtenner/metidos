@@ -211,7 +211,7 @@ describe("task graph normalization", () => {
 
   it("preserves unknown-but-valid task fields and tables while normalizing known metadata", async () => {
     const root = createTaskGraphRoot();
-    const taskId = "tg-01kp173j316mrbxx0xc9ft1n26";
+    const taskId = "tg-01xxxxxxxxxxxxxxxxxxxxxxxx";
     await initTaskGraphFilesystem(root);
     mkdirSync(join(root, "items", taskId), {
       recursive: true,
@@ -225,7 +225,7 @@ describe("task graph normalization", () => {
         'priority = "p1"',
         'status = "open"',
         'type = "feature"',
-        'id = "tg-01kp173j316mrbxx0xc9ft1n26"',
+        'id = "tg-01xxxxxxxxxxxxxxxxxxxxxxxx"',
         'created_at = "2026-04-12T20:00:00Z"',
         'custom_field = "keep me"',
         'tags = ["theme:reliability", "area:task-graph", "theme:reliability"]',

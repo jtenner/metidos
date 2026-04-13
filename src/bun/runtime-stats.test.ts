@@ -21,6 +21,10 @@ import {
   recordGitHistoryCachePrefetchWait,
   recordGitHistoryCacheRangeHit,
   recordMetidosSandboxRun,
+  recordMetidosToolBudgetFinished,
+  recordMetidosToolBudgetQueued,
+  recordMetidosToolBudgetSaturated,
+  recordMetidosToolBudgetStarted,
   recordMetidosToolFailed,
   recordMetidosToolStarted,
   recordMetidosToolSucceeded,
@@ -296,6 +300,46 @@ describe("runtime stats collector", () => {
     recordMetidosSandboxRun({
       outcome: "timedOut",
     });
+    recordMetidosToolBudgetStarted({
+      activeCount: 1,
+      budgetName: "thread_cron_mutations",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetQueued({
+      activeCount: 1,
+      budgetName: "thread_cron_mutations",
+      pendingCount: 1,
+    });
+    recordMetidosToolBudgetStarted({
+      activeCount: 2,
+      budgetName: "thread_cron_mutations",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetFinished({
+      activeCount: 1,
+      budgetName: "thread_cron_mutations",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetFinished({
+      activeCount: 0,
+      budgetName: "thread_cron_mutations",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetStarted({
+      activeCount: 1,
+      budgetName: "sandbox_runs",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetSaturated({
+      activeCount: 1,
+      budgetName: "sandbox_runs",
+      pendingCount: 0,
+    });
+    recordMetidosToolBudgetFinished({
+      activeCount: 0,
+      budgetName: "sandbox_runs",
+      pendingCount: 0,
+    });
 
     const snapshot = getRuntimeStatsSnapshot();
     expect(snapshot.metidosTools.totals.calls).toBe(2);
@@ -316,6 +360,30 @@ describe("runtime stats collector", () => {
       failed: 1,
       succeeded: 1,
       timedOut: 1,
+    });
+    expect(snapshot.metidosTools.budgets).toEqual({
+      byBudget: {
+        sandbox_runs: {
+          activeCount: 0,
+          completedCalls: 1,
+          peakActiveCount: 1,
+          peakPendingCount: 0,
+          pendingCount: 0,
+          queuedCalls: 0,
+          saturationEvents: 1,
+          startedCalls: 1,
+        },
+        thread_cron_mutations: {
+          activeCount: 0,
+          completedCalls: 2,
+          peakActiveCount: 2,
+          peakPendingCount: 1,
+          pendingCount: 0,
+          queuedCalls: 1,
+          saturationEvents: 0,
+          startedCalls: 2,
+        },
+      },
     });
     expect(snapshot.metidosTools.unsafeModeRequests).toEqual({
       byTool: {
@@ -341,6 +409,10 @@ describe("runtime stats collector", () => {
     );
 
     const summary = getRuntimeStatsSummary();
+    expect(summary.metidosTools.budgets).toEqual({
+      budgetCount: 2,
+      byBudget: snapshot.metidosTools.budgets?.byBudget ?? {},
+    });
     expect(summary.metidosTools.toolCount).toBe(2);
     expect(summary.metidosTools.unsafeModeToolCount).toBe(2);
     expect(summary.metidosTools.byTool).toEqual(snapshot.metidosTools.byTool);

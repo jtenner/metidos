@@ -38,7 +38,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `runtime-stats.ts`
   - Process-local runtime statistics collector for backend timing, coarse payload sizes, websocket push fanout, SQLite retry loops, cron duration and queue-pressure counters, selected cache hit/miss counters, and low-cardinality Metidos tool telemetry.
   - Summarizes the heaviest RPC response methods and websocket push types by serialized bytes so transport follow-up work can target measured hot paths instead of guessing.
-  - Also tracks per-tool Metidos invocation counts plus explicit unsafe-mode requests and vm2 sandbox failure/timeout outcomes for the high-risk agent-runtime paths.
+  - Also tracks per-tool Metidos invocation counts plus explicit unsafe-mode requests, vm2 sandbox failure/timeout outcomes, and shared budget/queue saturation counters for sandbox runs and child thread/cron mutations.
   - Keeps optimization telemetry cheap, resettable, and numeric so later benchmark and diagnostics work can build on one shared source of truth.
   - Also exports the shared runtime-diagnostics snapshot builder used by the health endpoint, the starvation harness, and the optional sidecar sink.
 
@@ -128,10 +128,10 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Reuses the existing backend scope rules and authoritative procedure layer so the Pi path no longer needs a Metidos MCP bridge for those operations.
   - Enforces the current unsafe-mode escalation rule so safe threads cannot create unsafe child threads or cron jobs even though they still retain worktree-scoped edit and write tools, and omitted `unsafeMode` inputs stay on the safe path by default.
   - Also enforces the runtime-only `taskGraphAdmin` policy so task-graph scaffolding, validation, and normalization can be exposed without inventing custom task mutation tools.
-  - Wraps each Metidos tool with runtime-stats instrumentation so per-tool calls, explicit unsafe-mode requests, and vm2 sandbox outcomes are visible through the shared diagnostics snapshot.
+  - Wraps each Metidos tool with runtime-stats instrumentation plus shared bounded budgets so per-tool calls, explicit unsafe-mode requests, vm2 sandbox outcomes, and saturation events are all visible through the shared diagnostics snapshot.
 
 - `pi-metidos-tools.test.ts`
-  - Focused coverage for the Pi Metidos-tool port, including metadata updates, scoped thread listing, context focusing, cron creation/update, the auto-start versus immediate-start thread flow, and the shared tool telemetry counters.
+  - Focused coverage for the Pi Metidos-tool port, including metadata updates, scoped thread listing, context focusing, cron creation/update, the auto-start versus immediate-start thread flow, and the shared tool telemetry and saturation-budget counters.
 
 - `pi-github-tools.ts`
   - Pi-native GitHub custom tool pack backed by the local GitHub CLI.

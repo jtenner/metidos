@@ -1,11 +1,19 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { defineTool } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
 
 import {
   createPiMetidosTools,
   type PiMetidosToolHost,
   type PiMetidosToolScope,
 } from "./pi-metidos-tools";
+import {
+  resetMetidosToolBudgetsForTests,
+  textToolResult,
+  withMetidosToolTelemetry,
+} from "./pi-metidos-tools-shared";
 import type {
+  AppRPCSchema,
   RpcContextFocusChanged,
   RpcCronJob,
   RpcInitTaskGraphResult,
@@ -264,6 +272,40 @@ function createHost(
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return {
+    promise,
+    reject,
+    resolve,
+  };
+}
+
+async function nextMicrotask(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+async function waitForCondition(
+  description: string,
+  predicate: () => boolean,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await nextMicrotask();
+    await Bun.sleep(1);
+  }
+  throw new Error(`Timed out waiting for ${description}.`);
+}
+
 function getTool(
   scope: PiMetidosToolScope,
   host: PiMetidosToolHost,
@@ -313,6 +355,11 @@ function expectDeepEqual(actual: unknown, expected: unknown): void {
 }
 
 describe("createPiMetidosTools", () => {
+  beforeEach(() => {
+    resetRuntimeStats();
+    resetMetidosToolBudgetsForTests();
+  });
+
   it("updates thread metadata while ignoring in-thread access toggles", async () => {
     const scope = makeScope();
     let receivedParams: Record<string, unknown> | null = null;
@@ -907,8 +954,264 @@ describe("createPiMetidosTools", () => {
     );
   });
 
+  it("queues a bounded number of thread and cron mutations before failing loudly", async () => {
+    const scope = makeScope();
+    const launches: Array<{
+      deferred: ReturnType<typeof createDeferred<RpcCronJob>>;
+      params: AppRPCSchema["requests"]["newCron"]["params"];
+    }> = [];
+    const host = createHost({
+      newCron: async (params) => {
+        const deferred = createDeferred<RpcCronJob>();
+        launches.push({
+          deferred,
+          params,
+        });
+        return deferred.promise;
+      },
+    });
+
+    const first = executeTool(scope, host, "new_cron", {
+      prompt: "Cron 1",
+      schedule: "0 0 * * *",
+      title: "Cron 1",
+    });
+    const second = executeTool(scope, host, "new_cron", {
+      prompt: "Cron 2",
+      schedule: "0 1 * * *",
+      title: "Cron 2",
+    });
+    const third = executeTool(scope, host, "new_cron", {
+      prompt: "Cron 3",
+      schedule: "0 2 * * *",
+      title: "Cron 3",
+    });
+    const fourth = executeTool(scope, host, "new_cron", {
+      prompt: "Cron 4",
+      schedule: "0 3 * * *",
+      title: "Cron 4",
+    });
+    const fifthFailure = executeTool(scope, host, "new_cron", {
+      prompt: "Cron 5",
+      schedule: "0 4 * * *",
+      title: "Cron 5",
+    }).catch((error) => error);
+
+    await waitForCondition(
+      "two active cron launches",
+      () => launches.length === 2,
+    );
+    const fifthError = await fifthFailure;
+    expect(fifthError).toBeInstanceOf(Error);
+    expect((fifthError as Error).message).toContain(
+      "Metidos child-thread and cron mutations are saturated.",
+    );
+
+    const firstLaunch = requireValue(launches[0]);
+    firstLaunch.deferred.resolve(
+      makeCron({
+        id: 101,
+        schedule: firstLaunch.params.schedule,
+        title: firstLaunch.params.title ?? "Cron 1",
+        worktreePath: firstLaunch.params.worktreePath,
+      }),
+    );
+    await waitForCondition(
+      "third queued cron launch",
+      () => launches.length === 3,
+    );
+
+    const secondLaunch = requireValue(launches[1]);
+    secondLaunch.deferred.resolve(
+      makeCron({
+        id: 102,
+        schedule: secondLaunch.params.schedule,
+        title: secondLaunch.params.title ?? "Cron 2",
+        worktreePath: secondLaunch.params.worktreePath,
+      }),
+    );
+    await waitForCondition(
+      "fourth queued cron launch",
+      () => launches.length === 4,
+    );
+
+    const thirdLaunch = requireValue(launches[2]);
+    const fourthLaunch = requireValue(launches[3]);
+    thirdLaunch.deferred.resolve(
+      makeCron({
+        id: 103,
+        schedule: thirdLaunch.params.schedule,
+        title: thirdLaunch.params.title ?? "Cron 3",
+        worktreePath: thirdLaunch.params.worktreePath,
+      }),
+    );
+    fourthLaunch.deferred.resolve(
+      makeCron({
+        id: 104,
+        schedule: fourthLaunch.params.schedule,
+        title: fourthLaunch.params.title ?? "Cron 4",
+        worktreePath: fourthLaunch.params.worktreePath,
+      }),
+    );
+
+    await Promise.all([first, second, third, fourth]);
+
+    const mutationBudget =
+      getRuntimeStatsSnapshot().metidosTools.budgets?.byBudget
+        .thread_cron_mutations;
+    expect(mutationBudget).toMatchObject({
+      activeCount: 0,
+      completedCalls: 4,
+      peakActiveCount: 2,
+      peakPendingCount: 2,
+      pendingCount: 0,
+      queuedCalls: 2,
+      saturationEvents: 1,
+      startedCalls: 4,
+    });
+  });
+
+  it("keeps unsafe child mutations serialized even when safe mutation capacity remains", async () => {
+    const scope = makeScope({
+      allowUnsafeModeEscalation: true,
+    });
+    const launches: Array<{
+      deferred: ReturnType<typeof createDeferred<RpcCronJob>>;
+      params: AppRPCSchema["requests"]["newCron"]["params"];
+    }> = [];
+    const host = createHost({
+      newCron: async (params) => {
+        const deferred = createDeferred<RpcCronJob>();
+        launches.push({
+          deferred,
+          params,
+        });
+        return deferred.promise;
+      },
+    });
+
+    const firstUnsafe = executeTool(scope, host, "new_cron", {
+      prompt: "Unsafe cron",
+      schedule: "*/5 * * * *",
+      title: "Unsafe cron",
+      unsafeMode: "true",
+    });
+
+    await waitForCondition(
+      "first unsafe cron launch",
+      () => launches.length === 1,
+    );
+
+    await expect(
+      executeTool(scope, host, "new_cron", {
+        prompt: "Unsafe cron 2",
+        schedule: "*/10 * * * *",
+        title: "Unsafe cron 2",
+        unsafeMode: "true",
+      }),
+    ).rejects.toThrow("Unsafe child-thread and cron mutations are saturated.");
+
+    const safeCron = executeTool(scope, host, "new_cron", {
+      prompt: "Safe cron",
+      schedule: "*/15 * * * *",
+      title: "Safe cron",
+    });
+    await waitForCondition(
+      "safe cron launch beside unsafe cron",
+      () => launches.length === 2,
+    );
+
+    const unsafeLaunch = requireValue(launches[0]);
+    const safeLaunch = requireValue(launches[1]);
+    unsafeLaunch.deferred.resolve(
+      makeCron({
+        id: 201,
+        schedule: unsafeLaunch.params.schedule,
+        title: unsafeLaunch.params.title ?? "Unsafe cron",
+        unsafeMode: true,
+        worktreePath: unsafeLaunch.params.worktreePath,
+      }),
+    );
+    safeLaunch.deferred.resolve(
+      makeCron({
+        id: 202,
+        schedule: safeLaunch.params.schedule,
+        title: safeLaunch.params.title ?? "Safe cron",
+        unsafeMode: false,
+        worktreePath: safeLaunch.params.worktreePath,
+      }),
+    );
+
+    await Promise.all([firstUnsafe, safeCron]);
+
+    const unsafeBudget =
+      getRuntimeStatsSnapshot().metidosTools.budgets?.byBudget
+        .unsafe_child_operations;
+    expect(unsafeBudget).toMatchObject({
+      activeCount: 0,
+      completedCalls: 1,
+      peakActiveCount: 1,
+      peakPendingCount: 0,
+      pendingCount: 0,
+      queuedCalls: 0,
+      saturationEvents: 1,
+      startedCalls: 1,
+    });
+  });
+
+  it("fails loudly when sandbox execution is already in flight", async () => {
+    const sandboxTool = withMetidosToolTelemetry(
+      defineTool({
+        description: "Sandbox test tool",
+        execute: async () => {
+          return deferred.promise;
+        },
+        label: "Run Untrusted JS",
+        name: "run_untrusted_js",
+        parameters: Type.Object({}),
+      }),
+    );
+    const deferred = createDeferred<ReturnType<typeof textToolResult>>();
+
+    const firstRun = sandboxTool.execute(
+      "call-1",
+      {},
+      undefined,
+      async () => {},
+      {
+        cwd: "/repo/alpha/feature-a",
+      } as never,
+    );
+
+    await nextMicrotask();
+    await expect(
+      sandboxTool.execute("call-2", {}, undefined, async () => {}, {
+        cwd: "/repo/alpha/feature-a",
+      } as never),
+    ).rejects.toThrow("Sandbox execution is saturated.");
+
+    deferred.resolve(
+      textToolResult("Sandbox ok.", {
+        ok: true,
+      }),
+    );
+    await firstRun;
+
+    const sandboxBudget =
+      getRuntimeStatsSnapshot().metidosTools.budgets?.byBudget.sandbox_runs;
+    expect(sandboxBudget).toMatchObject({
+      activeCount: 0,
+      completedCalls: 1,
+      peakActiveCount: 1,
+      peakPendingCount: 0,
+      pendingCount: 0,
+      queuedCalls: 0,
+      saturationEvents: 1,
+      startedCalls: 1,
+    });
+  });
+
   it("records per-tool, unsafe-mode, and sandbox telemetry through the Metidos tool wrapper", async () => {
-    resetRuntimeStats();
     const safeScope = makeScope();
     const unsafeScope = makeScope({
       allowUnsafeModeEscalation: true,
@@ -1003,6 +1306,7 @@ describe("createPiMetidosTools", () => {
     expect(summary.metidosTools.byTool.new_cron).toEqual(
       snapshot.metidosTools.byTool.new_cron,
     );
+    expect(summary.metidosTools.budgets?.budgetCount).toBe(3);
     expect(summary.metidosTools.sandbox).toEqual(snapshot.metidosTools.sandbox);
   });
 });

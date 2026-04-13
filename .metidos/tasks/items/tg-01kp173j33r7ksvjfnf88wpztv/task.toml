@@ -11,14 +11,11 @@ assignees = ["agent"]
 tags = ["area:performance", "component:runtime-stats", "discipline:test", "source:audit-2026-04-12", "theme:performance"]
 milestone = "audit-remediation-2026-04"
 
-[blockers]
-tasks = ["tg-01kp173j316mrbxx0xc9ft1n26"]
-
 [mitigates]
 tasks = ["tg-01kp16yacpfks7pd3be0srahtt"]
 
 [tests_for]
-tasks = ["tg-01kp173j316mrbxx0xc9ft1n26"]
+tasks = ["tg-01kp16yacpfks7pd3be0srahtt"]
 
 [parent]
 task = "tg-01kp16yachnc2h5f7wm9kd8eqa"

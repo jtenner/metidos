@@ -277,8 +277,8 @@ describe("task graph validation", () => {
 
   it("supports task id subsets while resolving references against the full graph", async () => {
     const root = join(createTempDirectory(), ".metidos", "tasks");
-    const parentId = "tg-01kp16yacnvg0vqfesjce7t9z5";
-    const childId = "tg-01kp16yacs26vqrfpwpcf42qk1";
+    const parentId = "tg-01zzzzzzzzzzzzzzzzzzzzzzzz";
+    const childId = "tg-01yyyyyyyyyyyyyyyyyyyyyyyy";
     await initTaskGraphFilesystem(root);
 
     await writeTaskGraphTaskFile(join(root, "items", parentId), {
