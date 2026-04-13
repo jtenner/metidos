@@ -116,6 +116,18 @@ Owns project/worktree listing refresh, project open/close rollback-safe transiti
 `use-git-history-controller.ts`
 Owns git-history refresh, cached first-page reuse, pagination, invalidation-triggered reloads, and commit-diff modal loading so that history orchestration no longer lives inline inside `App.tsx`.
 
+`use-step-up-controller.ts`
+Owns the step-up dialog lifecycle, retry-after-auth flow, and primary-factor/TOTP input normalization for privileged actions that should not keep leaking state into the main shell.
+
+`use-thread-extension-ui-controller.ts`
+Owns Pi thread-extension UI state, dialog responses, notification lifetimes, editor-sync writes, and document-title overrides so the extension/event surface stays isolated from unrelated shell concerns.
+
+`use-desktop-thread-switcher.ts`
+Owns the desktop worktree-thread switcher state, open/close guards, filtered sections, pinned-thread projection, and worktree labeling now shared by the popover trigger and switcher surface.
+
+`use-visible-messages.ts`
+Owns visible transcript-row mapping, cached row reuse, and thread-history merge helpers so chat rendering concerns stay isolated from the rest of `App.tsx`.
+
 `use-thread-previews.ts`
 Owns the shared hover/focus preview behavior for thread rows, including summary/error popover state, positioning, and stale-hide protection when pointer movement crosses rows quickly.
 

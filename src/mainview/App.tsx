@@ -25,7 +25,6 @@ import type {
   RpcReasoningEffortOption,
   RpcThread,
   RpcThreadDetail,
-  RpcThreadExtensionUiRequest,
   RpcThreadMessage,
   RpcThreadRunStatus,
   RpcThreadStartRequest,
@@ -40,10 +39,7 @@ import { DesktopChatView, MobileChatView } from "./app/chat-workspace";
 import { CronjobWorkspace } from "./app/cronjob-workspace";
 import { DesktopSidebar } from "./app/desktop-sidebar";
 import { DesktopSidebarContent } from "./app/desktop-sidebar-content";
-import {
-  DesktopThreadSwitcher,
-  deriveDesktopThreadSwitcherSections,
-} from "./app/desktop-thread-switcher";
+import { DesktopThreadSwitcher } from "./app/desktop-thread-switcher";
 import { DiffWorkspace } from "./app/diff-workspace";
 import { GitHistoryDiffModal } from "./app/message-ui";
 import { SettingsPanel } from "./app/settings-panel";
@@ -87,8 +83,6 @@ import {
   readPersistedMainviewState,
   removeThreadFromStore,
   serializeOpenWorktrees,
-  sortThreads,
-  THREAD_EXTENSION_UI_EVENT_NAME,
   THREAD_START_REQUEST_CREATED_EVENT_NAME,
   THREAD_STATUS_CHANGED_EVENT_NAME,
   THREAD_STATUS_POLL_INTERVAL_MS,
@@ -97,22 +91,27 @@ import {
   threadStoreItems,
   upsertProjectStore,
   upsertThreadStore,
-  type VisibleMessage,
   type WorktreeNodeState,
   type WorktreeStateMap,
   withAcknowledgedUnreadThread,
   withAcknowledgedUnreadThreadDetail,
   worktreeKey,
-  worktreeThreadPopoverAnchorId,
   writePersistedMainviewState,
 } from "./app/state";
 import { deriveSafeChildAccessDefaults } from "./app/thread-access-defaults";
 import { ThreadExtensionUiDialog } from "./app/thread-extension-ui-dialog";
 import { useAddProjectForm } from "./app/use-add-project-form";
+import { useDesktopThreadSwitcher } from "./app/use-desktop-thread-switcher";
 import { useGitHistoryController } from "./app/use-git-history-controller";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useProjectWorktreeController } from "./app/use-project-worktree-controller";
+import { useStepUpController } from "./app/use-step-up-controller";
+import { useThreadExtensionUiController } from "./app/use-thread-extension-ui-controller";
 import { ThreadStatusController } from "./app/use-thread-status-controller";
+import {
+  mergeThreadMessageHistory,
+  useVisibleMessages,
+} from "./app/use-visible-messages";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
 import { stepUpAuth } from "./auth-client";
 import { brandLogoIcon } from "./controls/brand-logo";
@@ -134,7 +133,6 @@ import {
   type ThreadAccessValue,
 } from "./controls/thread-access-control";
 import { buildLoadedProjectWorktreesState } from "./project-worktree-refresh";
-import { isStepUpRequiredError } from "./rpc-errors";
 import {
   closeProjectsForStartupRestore,
   reconcileStartupProjectRestore,
@@ -144,192 +142,11 @@ import {
   reconcileStartupSelectedWorktreePath,
 } from "./startup-worktree-restore";
 import {
-  dismissThreadExtensionUiDialog,
-  dismissThreadExtensionUiNotification,
-  EMPTY_THREAD_EXTENSION_UI_STORE,
-  listThreadExtensionUiStatuses,
-  listThreadExtensionUiWidgets,
-  readThreadExtensionUiState,
-  reduceThreadExtensionUiStore,
-  type ThreadExtensionUiStore,
-} from "./thread-extension-ui";
-import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
 import { buildSelectedThreadDetailRefreshKey } from "./thread-status-refresh";
 import { derivePrimaryViewForPinnedThreadOpen } from "./thread-workspace-selection";
-
-/**
- * Merges thread message history.
- * @param current - current value.
- * @param incoming - incoming value.
- */
-
-function mergeThreadMessageHistory(
-  current: RpcThreadMessage[],
-  incoming: RpcThreadMessage[],
-): RpcThreadMessage[] {
-  if (incoming.length === 0) {
-    return current;
-  }
-  if (current.length === 0) {
-    return incoming;
-  }
-
-  const currentLastMessageId = current[current.length - 1]?.id ?? 0;
-  const incomingFirstMessageId = incoming[0]?.id ?? 0;
-  if (currentLastMessageId < incomingFirstMessageId) {
-    let canAppendIncomingRange = true;
-    let previousMessageId = currentLastMessageId;
-    for (const message of incoming) {
-      if (message.id <= previousMessageId) {
-        canAppendIncomingRange = false;
-        break;
-      }
-      previousMessageId = message.id;
-    }
-    if (canAppendIncomingRange) {
-      return [...current, ...incoming];
-    }
-  }
-
-  const messagesById = new Map<number, RpcThreadMessage>();
-  for (const message of current) {
-    messagesById.set(message.id, message);
-  }
-  for (const message of incoming) {
-    messagesById.set(message.id, message);
-  }
-
-  return Array.from(messagesById.values()).sort(
-    (left, right) => left.id - right.id,
-  );
-}
-
-type VisibleMessageCacheEntry = {
-  signature: string;
-  value: VisibleMessage;
-};
-
-/**
- * Reads a memoized cached visible message entry.
- * @param cache - cache value.
- * @param cacheKey - cacheKey value.
- * @param signature - signature value.
- * @param createValue - createValue value.
- */
-
-function readCachedVisibleMessage(
-  cache: Map<string, VisibleMessageCacheEntry>,
-  cacheKey: string,
-  signature: string,
-  createValue: () => VisibleMessage,
-): VisibleMessage {
-  const existing = cache.get(cacheKey);
-  if (existing && existing.signature === signature) {
-    return existing.value;
-  }
-
-  const nextValue = createValue();
-  cache.set(cacheKey, {
-    signature,
-    value: nextValue,
-  });
-  return nextValue;
-}
-
-/**
- * Builds a stable visible-message signature for cache invalidation.
- * @param message - Message payload.
- */
-
-function threadMessageVisibleSignature(message: RpcThreadMessage): string {
-  switch (message.kind) {
-    case "reasoning":
-      return `reasoning:${message.state}:${message.text}`;
-    case "command":
-      return `command:${message.state}:${message.exitCode ?? "null"}:${message.command}:${message.output}`;
-    case "file_change":
-      return `file_change:${message.state}:${message.changeKind}:${message.path}:${message.diffText}`;
-    case "tool_call":
-      return `tool_call:${message.state}:${message.server}:${message.tool}:${message.argumentsText}:${message.output}`;
-    case "web_search":
-      return `web_search:${message.state}:${message.query}`;
-    case "error":
-      return `error:${message.state}:${message.text}`;
-    case "chat":
-      return `chat:${message.state}:${message.role}:${message.text}`;
-  }
-}
-
-/**
- * Builds thread visible message.
- * @param message - Message payload.
- */
-
-function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
-  const key = `thread-message:${message.id}`;
-  switch (message.kind) {
-    case "reasoning":
-      return {
-        key,
-        kind: "reasoning",
-        text: message.text,
-        state: message.state,
-      };
-    case "command":
-      return {
-        key,
-        kind: "command",
-        command: message.command,
-        output: message.output,
-        state: message.state,
-        exitCode: message.exitCode,
-      };
-    case "file_change":
-      return {
-        key,
-        kind: "file_change",
-        path: message.path,
-        diffText: message.diffText,
-        changeKind: message.changeKind,
-        state: message.state,
-      };
-    case "tool_call":
-      return {
-        key,
-        kind: "tool_call",
-        server: message.server,
-        tool: message.tool,
-        argumentsText: message.argumentsText,
-        output: message.output,
-        state: message.state,
-      };
-    case "web_search":
-      return {
-        key,
-        kind: "web_search",
-        query: message.query,
-        state: message.state,
-      };
-    case "error":
-      return {
-        key,
-        kind: "error",
-        text: message.text,
-        state: message.state,
-      };
-    case "chat":
-      return {
-        key,
-        kind: "chat",
-        speaker: message.role,
-        tone: "normal",
-        text: message.text,
-      };
-  }
-}
 
 type AppProps = {
   isAdmin: boolean;
@@ -344,10 +161,6 @@ type AppProps = {
 const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
 type PrimaryView = "chat" | "diff" | "cronjobs";
 type CronCreatorMode = "describe" | "edit";
-type DesktopThreadSwitcherTarget = {
-  projectId: number;
-  worktreePath: string;
-};
 type MobileNavigationIndicatorState = "none" | "working" | "completed";
 
 /**
@@ -629,29 +442,9 @@ export default function App({
   const [selectedDiffFilePath, setSelectedDiffFilePath] = useState<
     string | null
   >(null);
-  const [stepUpActionLabel, setStepUpActionLabel] = useState("");
-  const [stepUpDialogOpen, setStepUpDialogOpen] = useState(false);
-  const [stepUpError, setStepUpError] = useState("");
-  const [stepUpPrimaryFactor, setStepUpPrimaryFactor] = useState("");
-  const [stepUpTotpCode, setStepUpTotpCode] = useState("");
-  const [isSubmittingStepUp, setIsSubmittingStepUp] = useState(false);
-  const [threadExtensionUiStore, setThreadExtensionUiStore] =
-    useState<ThreadExtensionUiStore>(EMPTY_THREAD_EXTENSION_UI_STORE);
-  const [threadExtensionUiDialogDraft, setThreadExtensionUiDialogDraft] =
-    useState("");
-  const [threadExtensionUiDialogBusy, setThreadExtensionUiDialogBusy] =
-    useState(false);
-  const [threadExtensionUiDialogError, setThreadExtensionUiDialogError] =
-    useState("");
   const [expandedTranscriptItemIds, setExpandedTranscriptItemIds] = useState(
     () => new Set<string>(),
   );
-  const [
-    desktopThreadSwitcherSearchQuery,
-    setDesktopThreadSwitcherSearchQuery,
-  ] = useState("");
-  const [desktopThreadSwitcherTarget, setDesktopThreadSwitcherTarget] =
-    useState<DesktopThreadSwitcherTarget | null>(null);
   const defaultCodexModelRef = useRef(defaultCodexModel);
   const defaultCodexReasoningEffortRef = useRef(defaultCodexReasoningEffort);
   const isDesktopViewport = useDesktopViewport();
@@ -718,27 +511,10 @@ export default function App({
   const threadActionMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopSidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileSidebarScrollRef = useRef<HTMLElement | null>(null);
-  const stepUpRequestResolveRef = useRef<
-    ((authorized: boolean) => void) | null
-  >(null);
   const projectActionMenuRequestId = useRef(0);
   const persistedMainviewStateWriteTimeoutRef = useRef<number | null>(null);
   const pendingPersistedMainviewStateRef =
     useRef<PersistedMainviewState | null>(null);
-  const threadExtensionUiNotificationTimeoutsRef = useRef(
-    new Map<string, number>(),
-  );
-
-  const closeStepUpDialog = useCallback((authorized: boolean) => {
-    setStepUpDialogOpen(false);
-    setIsSubmittingStepUp(false);
-    setStepUpError("");
-    setStepUpPrimaryFactor("");
-    setStepUpTotpCode("");
-    const resolveStepUp = stepUpRequestResolveRef.current;
-    stepUpRequestResolveRef.current = null;
-    resolveStepUp?.(authorized);
-  }, []);
   const flushPersistedMainviewStateWrite = useCallback((): void => {
     if (persistedMainviewStateWriteTimeoutRef.current !== null) {
       window.clearTimeout(persistedMainviewStateWriteTimeoutRef.current);
@@ -763,72 +539,6 @@ export default function App({
     [flushPersistedMainviewStateWrite],
   );
 
-  const requestStepUp = useCallback((actionLabel: string): Promise<boolean> => {
-    setStepUpActionLabel(actionLabel);
-    setStepUpDialogOpen(true);
-    setStepUpError("");
-    setStepUpPrimaryFactor("");
-    setStepUpTotpCode("");
-    setIsSubmittingStepUp(false);
-
-    return new Promise<boolean>((resolve) => {
-      stepUpRequestResolveRef.current = resolve;
-    });
-  }, []);
-
-  const executeWithStepUp = useCallback(
-    async <T,>(
-      actionLabel: string,
-      action: () => Promise<T>,
-    ): Promise<T | null> => {
-      try {
-        return await action();
-      } catch (error) {
-        if (!isStepUpRequiredError(error)) {
-          throw error;
-        }
-
-        const authorized = await requestStepUp(actionLabel);
-        if (!authorized) {
-          return null;
-        }
-        return action();
-      }
-    },
-    [requestStepUp],
-  );
-
-  const submitStepUp = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setIsSubmittingStepUp(true);
-      setStepUpError("");
-      try {
-        await stepUpAuth({
-          primaryFactor: stepUpPrimaryFactor,
-          totpCode: stepUpTotpCode,
-        });
-        closeStepUpDialog(true);
-      } catch (error) {
-        setStepUpError(error instanceof Error ? error.message : String(error));
-        setIsSubmittingStepUp(false);
-      }
-    },
-    [closeStepUpDialog, stepUpPrimaryFactor, stepUpTotpCode],
-  );
-
-  useEffect(() => {
-    return () => {
-      stepUpRequestResolveRef.current?.(false);
-      stepUpRequestResolveRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    void selectedThreadId;
-    visibleMessageCacheRef.current.clear();
-  }, [selectedThreadId]);
-
   const cronJobsRequestIdRef = useRef(0);
   const cronJobsAbortControllerRef = useRef<AbortController | null>(null);
   // Request/caching refs below track in-flight RPCs by key so refreshes can be
@@ -841,9 +551,6 @@ export default function App({
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const selectedThreadHistoryCursorRef = useRef<number | null>(null);
-  const visibleMessageCacheRef = useRef(
-    new Map<string, VisibleMessageCacheEntry>(),
-  );
   const selectedProjectIdRef = useRef<number | null>(
     initialMainviewState.selectedProjectId,
   );
@@ -1015,26 +722,64 @@ export default function App({
   const safeChildAccessDefaults = deriveSafeChildAccessDefaults(
     activeThreadAccessValue,
   );
-  const activeThreadExtensionUiState = useMemo(
-    () => readThreadExtensionUiState(threadExtensionUiStore, selectedThreadId),
-    [selectedThreadId, threadExtensionUiStore],
-  );
-  const activeThreadExtensionStatuses = useMemo(
-    () => listThreadExtensionUiStatuses(activeThreadExtensionUiState),
-    [activeThreadExtensionUiState],
-  );
-  const activeThreadExtensionWidgetsAbove = useMemo(
-    () =>
-      listThreadExtensionUiWidgets(activeThreadExtensionUiState, "aboveEditor"),
-    [activeThreadExtensionUiState],
-  );
-  const activeThreadExtensionWidgetsBelow = useMemo(
-    () =>
-      listThreadExtensionUiWidgets(activeThreadExtensionUiState, "belowEditor"),
-    [activeThreadExtensionUiState],
-  );
-  const currentThreadExtensionUiDialog =
-    threadExtensionUiStore.dialogs[0] ?? null;
+  const {
+    closeStepUpDialog,
+    executeWithStepUp,
+    isSubmittingStepUp,
+    stepUpActionLabel,
+    stepUpDialogOpen,
+    stepUpError,
+    stepUpPrimaryFactor,
+    stepUpTotpCode,
+    submitStepUp,
+    updateStepUpPrimaryFactor,
+    updateStepUpTotpCode,
+  } = useStepUpController({
+    primaryFactorType,
+    stepUpAuth,
+  });
+  const {
+    activeThreadExtensionStatuses,
+    activeThreadExtensionUiState,
+    activeThreadExtensionWidgetsAbove,
+    activeThreadExtensionWidgetsBelow,
+    currentThreadExtensionUiDialog,
+    dismissNotification,
+    respondToCurrentThreadExtensionUiDialog,
+    syncThreadExtensionEditor,
+    threadExtensionUiDialogBusy,
+    threadExtensionUiDialogDraft,
+    threadExtensionUiDialogError,
+    threadExtensionUiNotifications,
+    updateThreadExtensionUiDialogDraft: setThreadExtensionUiDialogDraft,
+  } = useThreadExtensionUiController({
+    activeScreenTitle,
+    initialChatInput: initialMainviewState.chatInput,
+    procedures,
+    selectedThreadId,
+  });
+  const {
+    closeDesktopThreadSwitcher,
+    desktopPinnedThreads,
+    desktopThreadSwitcherAnchorId,
+    desktopThreadSwitcherOpen,
+    desktopThreadSwitcherSearchQuery,
+    desktopThreadSwitcherSections,
+    handleToggleDesktopThreadSwitcher,
+    setDesktopThreadSwitcherSearchQuery,
+    worktreeLabel,
+    worktreeSubtitle,
+  } = useDesktopThreadSwitcher({
+    activeSelectedWorktree,
+    activeSelectedWorktreeFolder,
+    activeSelectedWorktreeName,
+    activeSelectedWorktreePath,
+    homeDirectory,
+    isDesktopViewport,
+    selectedProject,
+    sidebarCollapsed,
+    threads,
+  });
 
   // Request queue handling: show and resolve the oldest pending thread-start request
   // first so users always act on the oldest queued action.
@@ -1078,277 +823,6 @@ export default function App({
         ? currentThreadStartRequestReasoningOption.label
         : `Default (${currentThreadStartRequestReasoningOption.label})`
       : (currentThreadStartRequest?.reasoningEffort ?? "default");
-
-  const syncThreadExtensionEditor = useCallback(
-    (threadId: number | null, text: string): void => {
-      if (threadId === null) {
-        return;
-      }
-      void procedures
-        .updateThreadExtensionEditor({
-          threadId,
-          text,
-        })
-        .catch((error) => {
-          console.error("Failed to sync Pi extension editor text", error);
-        });
-    },
-    [procedures],
-  );
-
-  const respondToCurrentThreadExtensionUiDialog = useCallback(
-    async (value: boolean | string | undefined) => {
-      const dialog = currentThreadExtensionUiDialog;
-      if (!dialog) {
-        return;
-      }
-
-      setThreadExtensionUiDialogBusy(true);
-      setThreadExtensionUiDialogError("");
-      try {
-        const response =
-          typeof value === "boolean"
-            ? {
-                requestId: dialog.requestId,
-                confirmed: value,
-              }
-            : typeof value === "string"
-              ? {
-                  requestId: dialog.requestId,
-                  value,
-                }
-              : {
-                  requestId: dialog.requestId,
-                  cancelled: true as const,
-                };
-        await procedures.respondThreadExtensionUi({
-          threadId: dialog.threadId,
-          response,
-        });
-        setThreadExtensionUiStore((current) =>
-          dismissThreadExtensionUiDialog(current, dialog.requestId),
-        );
-        setThreadExtensionUiDialogDraft("");
-      } catch (error) {
-        setThreadExtensionUiDialogError(
-          error instanceof Error ? error.message : String(error),
-        );
-        return;
-      } finally {
-        setThreadExtensionUiDialogBusy(false);
-      }
-    },
-    [currentThreadExtensionUiDialog, procedures],
-  );
-
-  useEffect(() => {
-    const dialog = currentThreadExtensionUiDialog;
-    setThreadExtensionUiDialogError("");
-    setThreadExtensionUiDialogBusy(false);
-    if (!dialog) {
-      setThreadExtensionUiDialogDraft("");
-      return;
-    }
-    if (dialog.method === "editor") {
-      setThreadExtensionUiDialogDraft(dialog.prefill ?? "");
-      return;
-    }
-    if (dialog.method === "input") {
-      setThreadExtensionUiDialogDraft("");
-      return;
-    }
-    setThreadExtensionUiDialogDraft("");
-  }, [currentThreadExtensionUiDialog]);
-
-  useEffect(() => {
-    const handleThreadExtensionUiEvent = (event: Event): void => {
-      const request = (event as CustomEvent<RpcThreadExtensionUiRequest>)
-        .detail;
-      setThreadExtensionUiStore((current) =>
-        reduceThreadExtensionUiStore(current, request),
-      );
-
-      if (selectedThreadIdRef.current !== request.threadId) {
-        return;
-      }
-
-      if (request.method === "set_editor_text") {
-        setChatComposerDraft(request.text);
-        return;
-      }
-      if (request.method === "append_editor_text") {
-        setChatComposerDraft(
-          `${readChatComposerDraft(initialMainviewState.chatInput)}${request.text}`,
-        );
-      }
-    };
-
-    window.addEventListener(
-      THREAD_EXTENSION_UI_EVENT_NAME,
-      handleThreadExtensionUiEvent,
-    );
-    return () => {
-      window.removeEventListener(
-        THREAD_EXTENSION_UI_EVENT_NAME,
-        handleThreadExtensionUiEvent,
-      );
-    };
-  }, [initialMainviewState.chatInput]);
-
-  useEffect(() => {
-    const activeNotificationIds = new Set(
-      threadExtensionUiStore.notifications.map(
-        (notification) => notification.id,
-      ),
-    );
-    for (const notification of threadExtensionUiStore.notifications) {
-      if (
-        threadExtensionUiNotificationTimeoutsRef.current.has(notification.id)
-      ) {
-        continue;
-      }
-      const timeoutId = window.setTimeout(() => {
-        setThreadExtensionUiStore((current) =>
-          dismissThreadExtensionUiNotification(current, notification.id),
-        );
-        threadExtensionUiNotificationTimeoutsRef.current.delete(
-          notification.id,
-        );
-      }, 4_500);
-      threadExtensionUiNotificationTimeoutsRef.current.set(
-        notification.id,
-        timeoutId,
-      );
-    }
-    for (const [
-      notificationId,
-      timeoutId,
-    ] of threadExtensionUiNotificationTimeoutsRef.current) {
-      if (activeNotificationIds.has(notificationId)) {
-        continue;
-      }
-      window.clearTimeout(timeoutId);
-      threadExtensionUiNotificationTimeoutsRef.current.delete(notificationId);
-    }
-  }, [threadExtensionUiStore.notifications]);
-
-  useEffect(() => {
-    return () => {
-      for (const timeoutId of threadExtensionUiNotificationTimeoutsRef.current.values()) {
-        window.clearTimeout(timeoutId);
-      }
-      threadExtensionUiNotificationTimeoutsRef.current.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    syncThreadExtensionEditor(
-      selectedThreadId,
-      readChatComposerDraft(initialMainviewState.chatInput),
-    );
-  }, [
-    initialMainviewState.chatInput,
-    selectedThreadId,
-    syncThreadExtensionEditor,
-  ]);
-
-  useEffect(() => {
-    const nextDocumentTitle =
-      activeThreadExtensionUiState?.title?.trim() || activeScreenTitle;
-    document.title = nextDocumentTitle
-      ? `${nextDocumentTitle} · ${APP_TITLE}`
-      : APP_TITLE;
-  }, [activeScreenTitle, activeThreadExtensionUiState?.title]);
-
-  const desktopThreadSwitcherOpen =
-    desktopThreadSwitcherTarget !== null &&
-    selectedProject?.id === desktopThreadSwitcherTarget.projectId &&
-    activeSelectedWorktreePath === desktopThreadSwitcherTarget.worktreePath &&
-    isDesktopViewport &&
-    !sidebarCollapsed;
-  const desktopThreadSwitcherAnchorId = desktopThreadSwitcherOpen
-    ? worktreeThreadPopoverAnchorId(
-        desktopThreadSwitcherTarget.projectId,
-        desktopThreadSwitcherTarget.worktreePath,
-      )
-    : null;
-  const selectedWorktreeThreads = useMemo(() => {
-    if (!selectedProject || !activeSelectedWorktreePath) {
-      return [];
-    }
-
-    return sortThreads(
-      threads.filter(
-        (thread) =>
-          thread.projectId === selectedProject.id &&
-          thread.worktreePath === activeSelectedWorktreePath,
-      ),
-    );
-  }, [activeSelectedWorktreePath, selectedProject, threads]);
-  const desktopThreadSwitcherSections = useMemo(
-    () =>
-      deriveDesktopThreadSwitcherSections(
-        selectedWorktreeThreads,
-        desktopThreadSwitcherSearchQuery,
-      ),
-    [desktopThreadSwitcherSearchQuery, selectedWorktreeThreads],
-  );
-  const desktopPinnedThreads = useMemo(
-    () => sortThreads(threads.filter((thread) => thread.pinnedAt !== null)),
-    [threads],
-  );
-  const closeDesktopThreadSwitcher = useCallback(
-    (restoreFocus = false): void => {
-      const anchorId = desktopThreadSwitcherAnchorId;
-      setDesktopThreadSwitcherTarget(null);
-      setDesktopThreadSwitcherSearchQuery("");
-
-      if (!restoreFocus || !anchorId || typeof window === "undefined") {
-        return;
-      }
-
-      window.requestAnimationFrame(() => {
-        const anchor = document.getElementById(anchorId);
-        if (anchor instanceof HTMLElement) {
-          anchor.focus();
-        }
-      });
-    },
-    [desktopThreadSwitcherAnchorId],
-  );
-  const handleToggleDesktopThreadSwitcher = useCallback(
-    (projectId: number, worktreePath: string): void => {
-      if (
-        !isDesktopViewport ||
-        sidebarCollapsed ||
-        selectedProject?.id !== projectId ||
-        activeSelectedWorktreePath !== worktreePath
-      ) {
-        return;
-      }
-
-      setDesktopThreadSwitcherSearchQuery("");
-      setDesktopThreadSwitcherTarget((current) => {
-        if (
-          current?.projectId === projectId &&
-          current.worktreePath === worktreePath
-        ) {
-          return null;
-        }
-
-        return {
-          projectId,
-          worktreePath,
-        };
-      });
-    },
-    [
-      activeSelectedWorktreePath,
-      isDesktopViewport,
-      selectedProject,
-      sidebarCollapsed,
-    ],
-  );
 
   // Maintain a compact set of acknowledged-completed thread IDs to avoid
   // recomputing this visual state from full thread objects.
@@ -1394,28 +868,6 @@ export default function App({
     void selectedThreadId;
     setExpandedTranscriptItemIds(new Set());
   }, [selectedThreadId]);
-
-  useEffect(() => {
-    if (!desktopThreadSwitcherTarget) {
-      return;
-    }
-
-    if (
-      !isDesktopViewport ||
-      sidebarCollapsed ||
-      selectedProject?.id !== desktopThreadSwitcherTarget.projectId ||
-      activeSelectedWorktreePath !== desktopThreadSwitcherTarget.worktreePath
-    ) {
-      setDesktopThreadSwitcherTarget(null);
-      setDesktopThreadSwitcherSearchQuery("");
-    }
-  }, [
-    activeSelectedWorktreePath,
-    desktopThreadSwitcherTarget,
-    isDesktopViewport,
-    selectedProject,
-    sidebarCollapsed,
-  ]);
 
   const setProjectState = useCallback(
     (projectId: number, update: Partial<ProjectNodeState>): void => {
@@ -3941,140 +3393,18 @@ export default function App({
     [postMessage, selectedThreadIsWorking, stopSelectedThreadTurn],
   );
 
-  const visibleMessages = useMemo<VisibleMessage[]>(() => {
-    const visibleMessageCache = visibleMessageCacheRef.current;
-    let messages: VisibleMessage[];
-    const hasInProgressAssistantChat = threadMessages.some(
-      (message) =>
-        message.kind === "chat" &&
-        message.role === "assistant" &&
-        message.state === "in_progress",
-    );
-    if (isThreadLoading) {
-      messages = [
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-loading:${selectedThreadId ?? "none"}`,
-          "chat:normal:assistant:Loading thread history...",
-          () => ({
-            key: `thread-loading:${selectedThreadId ?? "none"}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "normal",
-            text: "Loading thread history...",
-          }),
-        ),
-      ];
-    } else if (!selectedThread) {
-      const emptyThreadMessageText = selectedProject
-        ? `Use the Threads panel or the selected worktree popover in the sidebar to create or open a ${APP_TITLE} thread.`
-        : "Add a project, choose a worktree, and create a thread to begin.";
-      messages = [
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
-          `chat:normal:assistant:${emptyThreadMessageText}`,
-          () => ({
-            key: `thread-empty:${selectedProject?.id ?? "none"}:${activeSelectedWorktreePath ?? "none"}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "normal",
-            text: emptyThreadMessageText,
-          }),
-        ),
-      ];
-    } else if (threadMessages.length === 0) {
-      const threadReadyMessageText = `Thread ready in ${activeSelectedWorktreeFolder}. Ask ${APP_TITLE} to inspect, refactor, or debug this worktree.`;
-      messages = [
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-ready:${selectedThread.id}`,
-          `chat:normal:assistant:${threadReadyMessageText}`,
-          () => ({
-            key: `thread-ready:${selectedThread.id}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "normal",
-            text: threadReadyMessageText,
-          }),
-        ),
-      ];
-    } else {
-      messages = threadMessages.map((message) =>
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-message:${message.id}`,
-          threadMessageVisibleSignature(message),
-          () => buildThreadVisibleMessage(message),
-        ),
-      );
-    }
-    if (
-      selectedThread?.runStatus.state === "working" &&
-      !hasInProgressAssistantChat
-    ) {
-      const workingMessageText =
-        activeThreadExtensionUiState?.workingMessage?.trim() || "Processing";
-      messages.push(
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
-          `chat:working:assistant:${workingMessageText}`,
-          () => ({
-            key: `thread-working:${selectedThread.id}:${selectedThread.updatedAt}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "working",
-            text: workingMessageText,
-          }),
-        ),
-      );
-    }
-    if (activeChatError) {
-      messages.push(
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
-          `chat:error:assistant:${activeChatError}`,
-          () => ({
-            key: `thread-chat-error:${selectedThread?.id ?? "none"}:${activeChatError}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "error",
-            text: activeChatError,
-          }),
-        ),
-      );
-    }
-    if (activeChatNotice) {
-      messages.push(
-        readCachedVisibleMessage(
-          visibleMessageCache,
-          `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
-          `chat:notice:assistant:${activeChatNotice}`,
-          () => ({
-            key: `thread-chat-notice:${selectedThread?.id ?? "none"}:${activeChatNotice}`,
-            kind: "chat",
-            speaker: "assistant",
-            tone: "notice",
-            text: activeChatNotice,
-          }),
-        ),
-      );
-    }
-    return messages;
-  }, [
-    activeSelectedWorktreeFolder,
+  const visibleMessages = useVisibleMessages({
     activeChatError,
     activeChatNotice,
-    activeThreadExtensionUiState?.workingMessage,
+    activeSelectedWorktreeFolder,
     activeSelectedWorktreePath,
+    activeThreadWorkingMessage: activeThreadExtensionUiState?.workingMessage,
     isThreadLoading,
     selectedProject,
     selectedThread,
     selectedThreadId,
     threadMessages,
-  ]);
+  });
 
   const sidebarActionButtonClass =
     "flex h-6 w-6 shrink-0 items-center justify-center border border-[#2f3b43] bg-[#182026] text-[#9db9cb] transition-colors hover:border-[#435561] hover:bg-[#212b31] hover:text-[#dfebf3] disabled:cursor-not-allowed disabled:opacity-50";
@@ -5711,21 +5041,11 @@ export default function App({
         threadsError={threadsError}
         worktreeDisplayPathByKey={worktreeDisplayPathByKey}
         worktreeByProjectAndPath={worktreeByProjectAndPath}
-        worktreeLabel={
-          activeSelectedWorktreeName || activeSelectedWorktreeFolder
-        }
-        worktreeSubtitle={
-          activeSelectedWorktreePath
-            ? `${activeSelectedWorktree?.branch?.trim() || "Primary"} · ${formatPathForDisplay(
-                activeSelectedWorktreePath,
-                homeDirectory,
-                true,
-              )}`
-            : activeSelectedWorktreeFolder || "Current worktree"
-        }
+        worktreeLabel={worktreeLabel}
+        worktreeSubtitle={worktreeSubtitle}
       />
       <div className="pointer-events-none fixed right-4 top-4 z-[109] flex max-w-sm flex-col gap-2">
-        {threadExtensionUiStore.notifications.map((notification) => (
+        {threadExtensionUiNotifications.map((notification) => (
           <button
             className={`pointer-events-auto rounded-xl border px-4 py-3 text-left text-sm shadow-xl shadow-black/35 ${
               notification.type === "error"
@@ -5736,9 +5056,7 @@ export default function App({
             }`}
             key={notification.id}
             onClick={() => {
-              setThreadExtensionUiStore((current) =>
-                dismissThreadExtensionUiNotification(current, notification.id),
-              );
+              dismissNotification(notification.id);
             }}
             type="button"
           >
@@ -5769,15 +5087,9 @@ export default function App({
         onCancel={() => {
           closeStepUpDialog(false);
         }}
-        onPrimaryFactorChange={(value) => {
-          setStepUpPrimaryFactor(
-            primaryFactorType === "pin" ? value.replace(/\D+/g, "") : value,
-          );
-        }}
+        onPrimaryFactorChange={updateStepUpPrimaryFactor}
         onSubmit={submitStepUp}
-        onTotpCodeChange={(value) => {
-          setStepUpTotpCode(value.replace(/\D+/g, ""));
-        }}
+        onTotpCodeChange={updateStepUpTotpCode}
         open={stepUpDialogOpen}
         primaryFactorType={primaryFactorType}
         primaryFactorValue={stepUpPrimaryFactor}
