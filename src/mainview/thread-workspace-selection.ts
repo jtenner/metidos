@@ -14,6 +14,18 @@ export type SelectedThreadWorkspaceTarget = {
   worktreePath: string;
 };
 
+export type SelectedWorktreeThreadSyncPlan =
+  | {
+      action: "noop";
+    }
+  | {
+      action: "open-thread";
+      threadId: number;
+    }
+  | {
+      action: "create-thread";
+    };
+
 /**
  * Pinned-thread shortcuts always return the main workspace view to chat.
  */
@@ -57,5 +69,52 @@ export function deriveSelectedThreadWorkspaceTarget(options: {
     projectPath: selectedProject.path,
     threadId: selectedThread.id,
     worktreePath: selectedThread.worktreePath,
+  };
+}
+
+/**
+ * Plans whether the shell should open an existing thread, create a new one, or
+ * do nothing when the selected worktree changes.
+ */
+export function planSelectedWorktreeThreadSync(options: {
+  preferredThreadId: number | null;
+  projectId: number;
+  selectedProjectId: number | null;
+  selectedThreadId: number | null;
+  selectedWorktreePath: string | null;
+  threadOpenInFlight: boolean;
+  worktreeAutoCreationInFlight: boolean;
+  worktreePath: string;
+}): SelectedWorktreeThreadSyncPlan {
+  if (options.preferredThreadId !== null) {
+    if (
+      options.selectedThreadId === options.preferredThreadId ||
+      options.threadOpenInFlight
+    ) {
+      return {
+        action: "noop",
+      };
+    }
+
+    return {
+      action: "open-thread",
+      threadId: options.preferredThreadId,
+    };
+  }
+
+  if (
+    options.selectedProjectId !== options.projectId ||
+    options.selectedWorktreePath !== options.worktreePath ||
+    options.selectedThreadId !== null ||
+    options.threadOpenInFlight ||
+    options.worktreeAutoCreationInFlight
+  ) {
+    return {
+      action: "noop",
+    };
+  }
+
+  return {
+    action: "create-thread",
   };
 }

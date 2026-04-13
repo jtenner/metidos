@@ -15,7 +15,6 @@ import {
 import type { AuthPrimaryFactorType } from "../bun/db";
 import type {
   ProjectProcedures,
-  RpcContextFocusChanged,
   RpcCronJob,
   RpcGitHistoryEntry,
   RpcModelCatalog,
@@ -45,15 +44,12 @@ import { GitHistoryDiffModal } from "./app/message-ui";
 import { SettingsPanel } from "./app/settings-panel";
 import { SidebarContent } from "./app/sidebar-content";
 import {
-  readSidebarPanelsSnapshot,
   setProjectTreeOpen,
   setWorkspaceActiveSectionOpen,
   setWorkspacePanelOpen,
 } from "./app/sidebar-panels-state";
 import {
   APP_TITLE,
-  awaitAbortableResult,
-  CONTEXT_FOCUS_CHANGED_EVENT_NAME,
   clampProjectMenuCoordinate,
   createAbortError,
   createProjectStore,
@@ -68,15 +64,12 @@ import {
   isCodexReasoningEffort,
   MAINVIEW_STATE_STORAGE_VERSION,
   MAINVIEW_STATE_WRITE_DEBOUNCE_MS,
-  type OpenThreadOptions,
   type PersistedMainviewState,
   type ProjectActionMenuState,
   type ProjectNodeState,
   type ProjectStateMap,
   type ProjectStore,
   patchPersistedMainviewState,
-  pickInitialThread,
-  preferredThreadForWorktree,
   primaryWorktreePath,
   projectStateWorktrees,
   projectStoreItems,
@@ -104,10 +97,12 @@ import { useAddProjectForm } from "./app/use-add-project-form";
 import { useDesktopThreadSwitcher } from "./app/use-desktop-thread-switcher";
 import { useGitHistoryController } from "./app/use-git-history-controller";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
+import { useMainviewStartupController } from "./app/use-mainview-startup-controller";
 import { useProjectWorktreeController } from "./app/use-project-worktree-controller";
 import { useStepUpController } from "./app/use-step-up-controller";
 import { useThreadExtensionUiController } from "./app/use-thread-extension-ui-controller";
 import { ThreadStatusController } from "./app/use-thread-status-controller";
+import { useThreadWorkspaceSelectionController } from "./app/use-thread-workspace-selection-controller";
 import {
   mergeThreadMessageHistory,
   useVisibleMessages,
@@ -133,14 +128,6 @@ import {
   type ThreadAccessValue,
 } from "./controls/thread-access-control";
 import { buildLoadedProjectWorktreesState } from "./project-worktree-refresh";
-import {
-  closeProjectsForStartupRestore,
-  reconcileStartupProjectRestore,
-} from "./startup-project-restore";
-import {
-  filterStartupWorktreeRestoreRequests,
-  reconcileStartupSelectedWorktreePath,
-} from "./startup-worktree-restore";
 import {
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
@@ -192,15 +179,6 @@ function useDesktopViewport(): boolean {
   }, []);
 
   return matches;
-}
-
-/**
- * Normalizes backend thread errors to a quick classification predicate.
- * @param error - Error value to process.
- */
-function isThreadNotFoundError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.startsWith("Thread not found:");
 }
 
 /**
@@ -546,8 +524,6 @@ export default function App({
   const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
     null,
   );
-  const threadOpenRequestIdRef = useRef(0);
-  const threadOpenAbortControllerRef = useRef<AbortController | null>(null);
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
   const selectedThreadIdRef = useRef<number | null>(null);
   const selectedThreadHistoryCursorRef = useRef<number | null>(null);
@@ -557,17 +533,14 @@ export default function App({
   const selectedWorktreePathRef = useRef<string | null>(
     initialMainviewState.selectedWorktreePath,
   );
-  const threadCreationInFlightCountRef = useRef(0);
   const selectedThreadRunStateRef = useRef<RpcThreadRunStatus["state"]>("idle");
   const selectedThreadDetailRefreshKeyRef = useRef<string | null>(null);
   const optimisticallyAcknowledgedThreadIdsRef = useRef(new Set<number>());
   const threadErrorSeenRequestCacheRef = useRef(
     new Map<number, Promise<RpcThreadDetail>>(),
   );
-  const autoThreadCreationWorktreeKeysRef = useRef(new Set<string>());
   const threadHistoryBackfillAbortControllerRef =
     useRef<AbortController | null>(null);
-  const initializedRef = useRef(false);
   const previousThreadRunStatesRef = useRef(
     new Map<number, RpcThreadRunStatus["state"]>(),
   );
@@ -1017,13 +990,6 @@ export default function App({
     });
   }, []);
 
-  const syncThreadContext = useCallback((thread: RpcThread) => {
-    selectedProjectIdRef.current = thread.projectId;
-    selectedWorktreePathRef.current = thread.worktreePath;
-    setSelectedProjectId(thread.projectId);
-    setSelectedWorktreePath(thread.worktreePath);
-  }, []);
-
   const { ensureWorktreeOpen, loadProjectWorktrees } =
     useProjectWorktreeController({
       activeSelectedWorktreePath,
@@ -1046,114 +1012,6 @@ export default function App({
       setWorktreeStates,
       upsertProject,
     });
-
-  const createThreadForWorktree = useCallback(
-    async (
-      projectId: number,
-      worktreePath: string,
-      options?: {
-        requireNoSelectedThread?: boolean;
-      },
-    ): Promise<RpcThreadDetail | null> => {
-      threadCreationInFlightCountRef.current += 1;
-      setIsCreatingThread(true);
-      setThreadsError("");
-      setModelControlError("");
-      setReasoningEffortControlError("");
-      setThreadAccessControlError("");
-      setChatError("");
-      try {
-        const detail = await executeWithStepUp(
-          "create a thread outside the current workspace",
-          () =>
-            procedures.createThread({
-              projectId,
-              worktreePath,
-              currentProjectId: selectedProjectIdRef.current,
-              currentWorktreePath: selectedWorktreePathRef.current,
-              model: activeCodexModel || defaultCodexModel || null,
-              reasoningEffort:
-                activeReasoningEffort || defaultCodexReasoningEffort || null,
-              webSearchAccess: safeChildAccessDefaults.webSearchAccess,
-              githubAccess: safeChildAccessDefaults.githubAccess,
-              agentsAccess: safeChildAccessDefaults.agentsAccess,
-              metidosAccess: safeChildAccessDefaults.metidosAccess,
-              unsafeMode: safeChildAccessDefaults.unsafeMode,
-            }),
-        );
-        if (!detail) {
-          return null;
-        }
-        const isActiveSelection =
-          selectedProjectIdRef.current === projectId &&
-          selectedWorktreePathRef.current === worktreePath;
-        const canApplySelection =
-          !options?.requireNoSelectedThread ||
-          (selectedThreadIdRef.current === null &&
-            threadOpenAbortControllerRef.current === null);
-        if (!isActiveSelection || !canApplySelection) {
-          void procedures
-            .discardEmptyThread({
-              threadId: detail.thread.id,
-            })
-            .catch(() => {
-              // Ignore cleanup failures for auto-created threads that are no longer current; UI state stays tied to current selection.
-            });
-          return null;
-        }
-
-        upsertThread(detail.thread);
-        setSelectedThreadId(detail.thread.id);
-        selectedThreadIdRef.current = detail.thread.id;
-        selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-        setThreadMessages(detail.messages);
-        syncThreadContext(detail.thread);
-        setPrimaryView("chat");
-        setMobileProjectListOpen(false);
-        try {
-          await loadProjectWorktrees(detail.thread.projectId);
-        } catch {
-          // Ignore worktree refresh failures; thread creation flow remains functional.
-        }
-        return detail;
-      } catch (error) {
-        if (
-          selectedProjectIdRef.current === projectId &&
-          selectedWorktreePathRef.current === worktreePath
-        ) {
-          setThreadsError(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-        return null;
-      } finally {
-        threadCreationInFlightCountRef.current = Math.max(
-          0,
-          threadCreationInFlightCountRef.current - 1,
-        );
-        setIsCreatingThread(threadCreationInFlightCountRef.current > 0);
-      }
-    },
-    [
-      activeCodexModel,
-      activeReasoningEffort,
-      defaultCodexModel,
-      defaultCodexReasoningEffort,
-      executeWithStepUp,
-      loadProjectWorktrees,
-      procedures,
-      safeChildAccessDefaults,
-      syncThreadContext,
-      upsertThread,
-    ],
-  );
-
-  const dismissThreadStartRequest = useCallback((requestId: string) => {
-    setPendingThreadStartRequests((current) =>
-      current.filter((request) => request.requestId !== requestId),
-    );
-    setThreadStartRequestError("");
-  }, []);
 
   const {
     diffFilePatchState,
@@ -1240,16 +1098,6 @@ export default function App({
   const primeCronJobs = useCallback(() => {
     void loadCronJobs();
   }, [loadCronJobs]);
-
-  const abortThreadOpenRequest = useCallback((reason: string) => {
-    const controller = threadOpenAbortControllerRef.current;
-    if (!controller) {
-      return;
-    }
-
-    threadOpenAbortControllerRef.current = null;
-    controller.abort(createAbortError(null, reason));
-  }, []);
 
   const abortThreadHistoryBackfill = useCallback((reason: string) => {
     selectedThreadHistoryCursorRef.current = null;
@@ -1348,20 +1196,6 @@ export default function App({
     },
     [],
   );
-
-  const clearThreadSelection = useCallback(() => {
-    threadOpenRequestIdRef.current += 1;
-    abortThreadOpenRequest("Thread selection was cleared.");
-    abortThreadHistoryBackfill("Thread selection was cleared.");
-    setSelectedThreadId(null);
-    setThreadMessages([]);
-    setChatError("");
-    setModelControlError("");
-    setIsThreadLoading(false);
-    selectedThreadIdRef.current = null;
-    selectedThreadRunStateRef.current = "idle";
-    selectedThreadDetailRefreshKeyRef.current = null;
-  }, [abortThreadHistoryBackfill, abortThreadOpenRequest]);
 
   const discardThreadIfEmpty = useCallback(
     async (threadId: number): Promise<void> => {
@@ -1514,580 +1348,66 @@ export default function App({
     ],
   );
 
-  const applyOpenedThreadDetail = useCallback(
-    (detail: RpcThreadDetail) => {
-      upsertThread(detail.thread);
-      setSelectedThreadId(detail.thread.id);
-      selectedThreadIdRef.current = detail.thread.id;
-      selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-      replaceSelectedThreadMessageHistory(detail);
-      syncThreadContext(detail.thread);
-      if (sessionStateReady) {
-        void loadProjectWorktrees(detail.thread.projectId).catch(() => {
-          // Ignore metadata refresh failures; still render loaded thread history.
-        });
-      }
-      setMobileProjectListOpen(false);
-    },
-    [
-      loadProjectWorktrees,
-      replaceSelectedThreadMessageHistory,
-      sessionStateReady,
-      syncThreadContext,
-      upsertThread,
-    ],
-  );
+  const {
+    approveThreadStartRequest,
+    clearThreadSelection,
+    createThreadForWorktree,
+    dismissThreadStartRequest,
+    handleProjectWorktreeClick,
+    openThread,
+  } = useThreadWorkspaceSelectionController({
+    abortThreadHistoryBackfill,
+    activeCodexModel,
+    activeReasoningEffort,
+    activeSelectedWorktreeOpened,
+    activeSelectedWorktreePath,
+    defaultCodexModel,
+    defaultCodexReasoningEffort,
+    ensureWorktreeOpen,
+    executeWithStepUp,
+    getProjectState,
+    getWorktreeState,
+    isApprovingThreadStartRequest,
+    isThreadLoading,
+    loadProjectWorktrees,
+    prepareOpenedThreadDetail,
+    procedures,
+    replaceSelectedThreadMessageHistory,
+    safeChildAccessDefaults,
+    selectProject,
+    selectedProjectId,
+    selectedProjectIdRef,
+    selectedThread,
+    selectedThreadDetailRefreshKeyRef,
+    selectedThreadId,
+    selectedThreadIdRef,
+    selectedThreadRunStateRef,
+    selectedWorktreePathRef,
+    sessionStateReady,
+    setChatError,
+    setIsApprovingThreadStartRequest,
+    setIsCreatingThread,
+    setIsThreadLoading,
+    setMobileProjectListOpen,
+    setModelControlError,
+    setPendingThreadStartRequests,
+    setPrimaryView,
+    setProjectState,
+    setReasoningEffortControlError,
+    setSelectedProjectId,
+    setSelectedThreadId,
+    setSelectedWorktreePath,
+    setThreadAccessControlError,
+    setThreadMessages,
+    setThreadsError,
+    setThreadStartRequestError,
+    threadStoreRef,
+    threads,
+    upsertProject,
+    upsertThread,
+  });
 
-  const approveThreadStartRequest = useCallback(
-    async (request: RpcThreadStartRequest) => {
-      if (isApprovingThreadStartRequest) {
-        return;
-      }
-
-      threadCreationInFlightCountRef.current += 1;
-      setIsCreatingThread(true);
-      setIsApprovingThreadStartRequest(true);
-      setThreadStartRequestError("");
-      setThreadsError("");
-      setModelControlError("");
-      setReasoningEffortControlError("");
-      setThreadAccessControlError("");
-      setChatError("");
-
-      let createdDetail: RpcThreadDetail | null = null;
-      try {
-        createdDetail = await executeWithStepUp(
-          "create a thread outside the current workspace",
-          () =>
-            procedures.createThread({
-              projectId: request.projectId,
-              worktreePath: request.worktreePath,
-              currentProjectId: selectedProjectIdRef.current,
-              currentWorktreePath: selectedWorktreePathRef.current,
-              model: request.model,
-              reasoningEffort: request.reasoningEffort,
-              webSearchAccess: request.webSearchAccess,
-              githubAccess: request.githubAccess,
-              agentsAccess: request.agentsAccess,
-              metidosAccess: request.metidosAccess,
-              unsafeMode: request.unsafeMode,
-            }),
-        );
-        if (!createdDetail) {
-          return;
-        }
-
-        const finalDetail =
-          request.input.trim().length > 0
-            ? await procedures.sendThreadMessage({
-                threadId: createdDetail.thread.id,
-                input: request.input,
-              })
-            : createdDetail;
-
-        applyOpenedThreadDetail(finalDetail);
-        dismissThreadStartRequest(request.requestId);
-      } catch (error) {
-        if (createdDetail) {
-          applyOpenedThreadDetail(createdDetail);
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        setThreadStartRequestError(message);
-        setThreadsError(message);
-      } finally {
-        setIsApprovingThreadStartRequest(false);
-        threadCreationInFlightCountRef.current = Math.max(
-          0,
-          threadCreationInFlightCountRef.current - 1,
-        );
-        setIsCreatingThread(threadCreationInFlightCountRef.current > 0);
-      }
-    },
-    [
-      applyOpenedThreadDetail,
-      dismissThreadStartRequest,
-      executeWithStepUp,
-      isApprovingThreadStartRequest,
-      procedures,
-    ],
-  );
-
-  const loadThreadDetailForOpen = useCallback(
-    async (
-      threadId: number,
-      signal: AbortSignal,
-      options?: OpenThreadOptions,
-    ): Promise<RpcThreadDetail> => {
-      const prefetchedDetail = options?.detailPromise
-        ? await awaitAbortableResult(
-            options.detailPromise.catch(() => null),
-            signal,
-            "Thread open request was aborted.",
-          )
-        : null;
-      if (prefetchedDetail) {
-        return prefetchedDetail;
-      }
-
-      return procedures.getThread(
-        { threadId },
-        {
-          priority: "foreground",
-          signal,
-        },
-      );
-    },
-    [procedures],
-  );
-
-  const openThread = useCallback(
-    async (threadId: number, options?: OpenThreadOptions) => {
-      const requestId = ++threadOpenRequestIdRef.current;
-      const optimisticThread = threadStoreRef.current.byId[threadId] ?? null;
-      abortThreadOpenRequest("Thread open request was superseded.");
-      abortThreadHistoryBackfill("Thread open request was superseded.");
-      const controller = new AbortController();
-      threadOpenAbortControllerRef.current = controller;
-      setSelectedThreadId(threadId);
-      selectedThreadIdRef.current = threadId;
-      selectedThreadRunStateRef.current =
-        optimisticThread?.runStatus.state ?? "idle";
-      selectedThreadDetailRefreshKeyRef.current = null;
-      setThreadMessages([]);
-      if (optimisticThread) {
-        syncThreadContext(optimisticThread);
-      }
-      setMobileProjectListOpen(false);
-      setIsThreadLoading(true);
-      setThreadsError("");
-      setChatError("");
-      setModelControlError("");
-      try {
-        const detail = prepareOpenedThreadDetail(
-          await loadThreadDetailForOpen(threadId, controller.signal, options),
-        );
-        if (threadOpenRequestIdRef.current !== requestId) {
-          return;
-        }
-        if (
-          options?.selectionGuard &&
-          (selectedProjectIdRef.current !== options.selectionGuard.projectId ||
-            selectedWorktreePathRef.current !==
-              options.selectionGuard.worktreePath)
-        ) {
-          upsertThread(detail.thread);
-          return;
-        }
-        applyOpenedThreadDetail(detail);
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-        if (threadOpenRequestIdRef.current !== requestId) {
-          return;
-        }
-        setThreadsError(error instanceof Error ? error.message : String(error));
-      } finally {
-        if (threadOpenAbortControllerRef.current === controller) {
-          threadOpenAbortControllerRef.current = null;
-        }
-        if (threadOpenRequestIdRef.current === requestId) {
-          setIsThreadLoading(false);
-        }
-      }
-    },
-    [
-      abortThreadHistoryBackfill,
-      abortThreadOpenRequest,
-      applyOpenedThreadDetail,
-      loadThreadDetailForOpen,
-      prepareOpenedThreadDetail,
-      syncThreadContext,
-      upsertThread,
-    ],
-  );
-
-  const syncSelectedWorktreeThread = useCallback(
-    (projectId: number, worktreePath: string): void => {
-      const preferredThread = preferredThreadForWorktree(
-        threads,
-        projectId,
-        worktreePath,
-      );
-      if (preferredThread) {
-        if (selectedThreadIdRef.current === preferredThread.id) {
-          return;
-        }
-        if (threadOpenAbortControllerRef.current !== null) {
-          return;
-        }
-        void openThread(preferredThread.id, {
-          selectionGuard: {
-            projectId,
-            worktreePath,
-          },
-        });
-        return;
-      }
-
-      if (
-        selectedProjectIdRef.current !== projectId ||
-        selectedWorktreePathRef.current !== worktreePath ||
-        selectedThreadIdRef.current !== null ||
-        threadOpenAbortControllerRef.current !== null
-      ) {
-        return;
-      }
-
-      const key = worktreeKey(projectId, worktreePath);
-      if (autoThreadCreationWorktreeKeysRef.current.has(key)) {
-        return;
-      }
-
-      autoThreadCreationWorktreeKeysRef.current.add(key);
-      void createThreadForWorktree(projectId, worktreePath, {
-        requireNoSelectedThread: true,
-      }).finally(() => {
-        autoThreadCreationWorktreeKeysRef.current.delete(key);
-      });
-    },
-    [createThreadForWorktree, openThread, threads],
-  );
-
-  const initialize = useCallback(async () => {
-    const persistedState = initialMainviewState;
-    const initiallyOpenProjectTreePaths =
-      readSidebarPanelsSnapshot().openProjectPaths;
-
-    try {
-      const {
-        homeDirectory: homeDirectoryResult,
-        modelCatalog,
-        projects: loadedProjects,
-        threadDetail: bootstrapThreadDetail,
-        threads: loadedThreads,
-      } = await procedures.getAppBootstrap(
-        {
-          selectedProjectId: persistedState.selectedProjectId,
-          selectedWorktreePath: persistedState.selectedWorktreePath,
-          threadIdHint: persistedState.selectedThreadId,
-        },
-        {
-          priority: "foreground",
-        },
-      );
-      let startupThreads = threadStoreItems(createThreadStore(loadedThreads));
-      let initialThread = pickInitialThread(startupThreads, persistedState);
-      let initialThreadDetailPromise: Promise<RpcThreadDetail> | null = null;
-      if (initialThread) {
-        try {
-          const initialThreadDetail =
-            bootstrapThreadDetail?.thread.id === initialThread.id
-              ? bootstrapThreadDetail
-              : await procedures.getThread(
-                  {
-                    threadId: initialThread.id,
-                  },
-                  {
-                    priority: "foreground",
-                  },
-                );
-          initialThreadDetailPromise = Promise.resolve(initialThreadDetail);
-        } catch (error) {
-          if (!isThreadNotFoundError(error)) {
-            throw error;
-          }
-          startupThreads = startupThreads.filter(
-            (thread) => thread.id !== initialThread?.id,
-          );
-          initialThread = pickInitialThread(startupThreads, {
-            ...persistedState,
-            selectedThreadId:
-              persistedState.selectedThreadId === initialThread.id
-                ? null
-                : persistedState.selectedThreadId,
-          });
-          initialThreadDetailPromise = null;
-        }
-      }
-      const restoredOpenProjectIds = new Set<number>();
-      for (const project of loadedProjects) {
-        if (initiallyOpenProjectTreePaths.has(project.path)) {
-          restoredOpenProjectIds.add(project.id);
-        }
-      }
-      for (const entry of persistedState.openWorktrees) {
-        restoredOpenProjectIds.add(entry.projectId);
-      }
-      if (persistedState.selectedProjectId !== null) {
-        restoredOpenProjectIds.add(persistedState.selectedProjectId);
-      }
-      if (initialThread) {
-        restoredOpenProjectIds.add(initialThread.projectId);
-      }
-      const initialProjectId =
-        initialThread?.projectId ?? persistedState.selectedProjectId ?? null;
-      if (initialProjectId !== null) {
-        restoredOpenProjectIds.add(initialProjectId);
-      } else if (loadedProjects[0]) {
-        restoredOpenProjectIds.add(loadedProjects[0].id);
-      }
-      const startupProjects = closeProjectsForStartupRestore(loadedProjects);
-      const initialThreadProject =
-        initialThread === null
-          ? undefined
-          : startupProjects.find(
-              (project) => project.id === initialThread.projectId,
-            );
-      const initialProject =
-        initialThreadProject ??
-        startupProjects.find(
-          (project) => project.id === persistedState.selectedProjectId,
-        ) ??
-        startupProjects[0] ??
-        null;
-      const initialWorktreePath =
-        initialThread?.worktreePath ??
-        (initialProject === null
-          ? null
-          : initialProject.id === persistedState.selectedProjectId &&
-              persistedState.selectedWorktreePath
-            ? persistedState.selectedWorktreePath
-            : initialProject.path);
-
-      replaceProjects(startupProjects);
-      replaceThreads(startupThreads);
-      applyModelCatalog(modelCatalog);
-      hydrateProjectRows(loadedProjects);
-      setHomeDirectory(homeDirectoryResult.homeDirectory);
-      setSupportsTildePath(homeDirectoryResult.supportsTildePath);
-      seedAddProjectPath(
-        homeDirectoryResult.homeDirectory,
-        homeDirectoryResult.supportsTildePath,
-      );
-      selectedProjectIdRef.current = initialProject?.id ?? null;
-      selectedWorktreePathRef.current = initialWorktreePath;
-      setSelectedProjectId(initialProject?.id ?? null);
-      setSelectedWorktreePath(initialWorktreePath);
-
-      const startupDirectoryPrefetchQuery =
-        homeDirectoryResult.supportsTildePath
-          ? "~/"
-          : formatDirectoryPathForInput(
-              homeDirectoryResult.homeDirectory,
-              homeDirectoryResult.homeDirectory,
-              homeDirectoryResult.supportsTildePath,
-            );
-      homeDirectoryPrefetchQueryRef.current = startupDirectoryPrefetchQuery;
-      void prefetchDirectorySuggestions(startupDirectoryPrefetchQuery);
-
-      const startupWorktreesToOpen = new Map<
-        string,
-        {
-          projectId: number;
-          worktreePath: string;
-        }
-      >();
-      for (const entry of persistedState.openWorktrees) {
-        if (!restoredOpenProjectIds.has(entry.projectId)) {
-          continue;
-        }
-        startupWorktreesToOpen.set(
-          worktreeKey(entry.projectId, entry.worktreePath),
-          entry,
-        );
-      }
-      if (initialThread) {
-        startupWorktreesToOpen.set(
-          worktreeKey(initialThread.projectId, initialThread.worktreePath),
-          {
-            projectId: initialThread.projectId,
-            worktreePath: initialThread.worktreePath,
-          },
-        );
-      }
-
-      await Promise.resolve();
-
-      const initialThreadOpenPromise = initialThread
-        ? openThread(initialThread.id, {
-            detailPromise: initialThreadDetailPromise,
-          })
-        : null;
-
-      const restoredProjects = startupProjects.filter((project) =>
-        restoredOpenProjectIds.has(project.id),
-      );
-
-      for (const project of restoredProjects) {
-        setProjectState(project.id, {
-          loadingWorktrees:
-            initiallyOpenProjectTreePaths.has(project.path) &&
-            projectStateWorktrees(getProjectState(project.id)).length === 0,
-          error: "",
-        });
-      }
-
-      let startupProjectsAfterRestore = startupProjects;
-      const restoredProjectWorktreesById = new Map<number, RpcWorktree[]>();
-      if (restoredProjects.length > 0) {
-        const restoredProjectResults = await procedures.openProjectsBatch(
-          {
-            projects: restoredProjects.map((project) => ({
-              projectId: project.id,
-              projectPath: project.path,
-              name: project.name,
-            })),
-          },
-          {
-            priority: "foreground",
-          },
-        );
-        const reconciledRestore = reconcileStartupProjectRestore({
-          allowSelectedProjectFallback: initialThread === null,
-          projects: startupProjects,
-          results: restoredProjectResults,
-          selectedProjectId: selectedProjectIdRef.current,
-          selectedWorktreePath: selectedWorktreePathRef.current,
-        });
-        startupProjectsAfterRestore = reconciledRestore.projects;
-        replaceProjects(reconciledRestore.projects);
-        for (const path of reconciledRestore.failedProjectPaths) {
-          setProjectTreeOpen(path, false);
-        }
-        if (
-          reconciledRestore.selectedProjectId !==
-            selectedProjectIdRef.current ||
-          reconciledRestore.selectedWorktreePath !==
-            selectedWorktreePathRef.current
-        ) {
-          selectedProjectIdRef.current = reconciledRestore.selectedProjectId;
-          selectedWorktreePathRef.current =
-            reconciledRestore.selectedWorktreePath;
-          setSelectedProjectId(reconciledRestore.selectedProjectId);
-          setSelectedWorktreePath(reconciledRestore.selectedWorktreePath);
-        }
-        for (const result of restoredProjectResults) {
-          if (result.ok) {
-            restoredProjectWorktreesById.set(
-              result.project.id,
-              result.worktrees,
-            );
-            setProjectState(
-              result.project.id,
-              buildLoadedProjectWorktreesState(result.worktrees),
-            );
-            continue;
-          }
-
-          setProjectState(result.projectId, {
-            loadingWorktrees: false,
-            error: result.error,
-          });
-        }
-      }
-
-      const confirmedRestoredOpenProjectIds = new Set(
-        startupProjectsAfterRestore
-          .filter((project) => project.isOpen === 1)
-          .map((project) => project.id),
-      );
-      const worktreesToRestore = filterStartupWorktreeRestoreRequests(
-        [...startupWorktreesToOpen.values()],
-        confirmedRestoredOpenProjectIds,
-      );
-      const restoredOpenWorktrees =
-        worktreesToRestore.length > 0
-          ? await procedures.openWorktreesBatch(
-              {
-                worktrees: worktreesToRestore,
-              },
-              {
-                priority: "foreground",
-              },
-            )
-          : [];
-
-      for (const result of restoredOpenWorktrees) {
-        if (result.ok) {
-          setProjectState(
-            result.projectId,
-            buildLoadedProjectWorktreesState(result.worktrees),
-          );
-          primeGitHistoryResult(result.history);
-          setWorktreeState(result.projectId, result.worktreePath, {
-            loading: false,
-            opened: true,
-            snapshot: result.worktree,
-            error: "",
-          });
-          continue;
-        }
-
-        setWorktreeState(result.projectId, result.worktreePath, {
-          loading: false,
-          opened: false,
-          snapshot: undefined,
-          error: result.error,
-        });
-      }
-
-      if (restoredOpenWorktrees.some((result) => result.ok)) {
-        setProjectStates((prev) => {
-          const next = { ...prev } as ProjectStateMap;
-          for (const result of restoredOpenWorktrees) {
-            if (!result.ok) {
-              continue;
-            }
-            const current = next[result.projectId] ?? defaultProjectState();
-            next[result.projectId] = {
-              ...current,
-              openWorktrees: new Set([
-                ...current.openWorktrees,
-                result.worktreePath,
-              ]),
-            };
-          }
-          return next;
-        });
-      }
-
-      const selectedProjectAfterRestore =
-        selectedProjectIdRef.current === null
-          ? null
-          : (startupProjectsAfterRestore.find(
-              (project) => project.id === selectedProjectIdRef.current,
-            ) ?? null);
-      const selectedProjectWorktreesAfterRestore =
-        selectedProjectAfterRestore === null
-          ? []
-          : (restoredProjectWorktreesById.get(selectedProjectAfterRestore.id) ??
-            projectStateWorktrees(
-              getProjectState(selectedProjectAfterRestore.id),
-            ));
-      const reconciledSelectedWorktreePath =
-        reconcileStartupSelectedWorktreePath({
-          allowFallback: initialThread === null,
-          project: selectedProjectAfterRestore,
-          restoredOpenWorktrees,
-          selectedWorktreePath: selectedWorktreePathRef.current,
-          worktrees: selectedProjectWorktreesAfterRestore,
-        });
-      if (reconciledSelectedWorktreePath !== selectedWorktreePathRef.current) {
-        selectedWorktreePathRef.current = reconciledSelectedWorktreePath;
-        setSelectedWorktreePath(reconciledSelectedWorktreePath);
-      }
-
-      if (initialThread) {
-        await initialThreadOpenPromise;
-        return;
-      }
-    } catch (error) {
-      setThreadsError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSessionStateReady(true);
-    }
-  }, [
+  useMainviewStartupController({
     applyModelCatalog,
     getProjectState,
     hydrateProjectRows,
@@ -2099,9 +1419,18 @@ export default function App({
     replaceProjects,
     replaceThreads,
     seedAddProjectPath,
+    selectedProjectIdRef,
+    selectedWorktreePathRef,
+    setHomeDirectory,
     setProjectState,
+    setProjectStates,
+    setSelectedProjectId,
+    setSelectedWorktreePath,
+    setSessionStateReady,
+    setSupportsTildePath,
+    setThreadsError,
     setWorktreeState,
-  ]);
+  });
 
   const closeProjectActionMenu = useCallback(() => {
     setProjectActionMenu(null);
@@ -2807,68 +2136,6 @@ export default function App({
   }, []);
 
   useEffect(() => {
-    if (
-      !selectedProjectId ||
-      !activeSelectedWorktreePath ||
-      !activeSelectedWorktreeOpened ||
-      isThreadLoading
-    ) {
-      return;
-    }
-    if (
-      selectedThread &&
-      selectedThread.projectId === selectedProjectId &&
-      selectedThread.worktreePath === activeSelectedWorktreePath
-    ) {
-      return;
-    }
-    const preferredThread = preferredThreadForWorktree(
-      threads,
-      selectedProjectId,
-      activeSelectedWorktreePath,
-    );
-    if (!preferredThread) {
-      if (selectedThreadId !== null) {
-        clearThreadSelection();
-      }
-      syncSelectedWorktreeThread(selectedProjectId, activeSelectedWorktreePath);
-      return;
-    }
-    if (selectedThreadId === preferredThread.id) {
-      return;
-    }
-    syncSelectedWorktreeThread(selectedProjectId, activeSelectedWorktreePath);
-  }, [
-    activeSelectedWorktreePath,
-    activeSelectedWorktreeOpened,
-    clearThreadSelection,
-    isThreadLoading,
-    selectedProjectId,
-    selectedThread,
-    selectedThreadId,
-    syncSelectedWorktreeThread,
-    threads,
-  ]);
-
-  useEffect(() => {
-    if (!selectedThreadId || selectedThread || isThreadLoading) {
-      return;
-    }
-    if (threads[0]) {
-      void openThread(threads[0].id);
-      return;
-    }
-    clearThreadSelection();
-  }, [
-    clearThreadSelection,
-    openThread,
-    isThreadLoading,
-    selectedThread,
-    selectedThreadId,
-    threads,
-  ]);
-
-  useEffect(() => {
     const previousThreadRunStates = previousThreadRunStatesRef.current;
     let completedThreadDetected = false;
     const nextCompletedThreadIds = new Set<number>();
@@ -3151,139 +2418,6 @@ export default function App({
       void openGitHistoryDiff(entry);
     },
     [openGitHistoryDiff],
-  );
-
-  useEffect(() => {
-    /**
-     * Handles context focus changed.
-     * @param event - event value.
-     */
-
-    const handleContextFocusChanged = (
-      event: CustomEvent<RpcContextFocusChanged>,
-    ) => {
-      if (!sessionStateReady) {
-        return;
-      }
-
-      const payload = event.detail;
-      void (async () => {
-        try {
-          const openedProject = await procedures.openProject(
-            {
-              projectPath: payload.projectPath,
-              name: payload.projectName,
-            },
-            {
-              priority: "foreground",
-            },
-          );
-          upsertProject(openedProject.project);
-          setProjectState(
-            openedProject.project.id,
-            buildLoadedProjectWorktreesState(openedProject.worktrees),
-          );
-
-          const targetWorktreePath =
-            payload.worktreePath ??
-            primaryWorktreePath(openedProject.project, openedProject.worktrees);
-          selectProject(openedProject.project, targetWorktreePath);
-          await ensureWorktreeOpen(
-            openedProject.project.id,
-            targetWorktreePath,
-          );
-
-          if (payload.threadId !== null) {
-            await openThread(payload.threadId);
-          }
-        } catch (error) {
-          console.error("Failed to apply focused Metidos context", error);
-        }
-      })();
-    };
-
-    window.addEventListener(
-      CONTEXT_FOCUS_CHANGED_EVENT_NAME,
-      handleContextFocusChanged as EventListener,
-    );
-    return () => {
-      window.removeEventListener(
-        CONTEXT_FOCUS_CHANGED_EVENT_NAME,
-        handleContextFocusChanged as EventListener,
-      );
-    };
-  }, [
-    ensureWorktreeOpen,
-    openThread,
-    procedures,
-    selectProject,
-    sessionStateReady,
-    setProjectState,
-    upsertProject,
-  ]);
-
-  const handleProjectWorktreeClick = useCallback(
-    (project: RpcProject, worktreePath: string) => {
-      setThreadsError("");
-      void (async () => {
-        let resolvedProject = project;
-        let resolvedProjectId = project.id;
-        const projectState = getProjectState(project.id);
-        if (
-          project.isOpen !== 1 ||
-          projectStateWorktrees(projectState).length === 0
-        ) {
-          try {
-            const openedProject = await procedures.openProject(
-              {
-                name: project.name,
-                projectPath: project.path,
-              },
-              {
-                priority: "foreground",
-              },
-            );
-            upsertProject(openedProject.project);
-            setProjectState(
-              openedProject.project.id,
-              buildLoadedProjectWorktreesState(openedProject.worktrees),
-            );
-            resolvedProject = openedProject.project;
-            resolvedProjectId = openedProject.project.id;
-          } catch (error) {
-            setThreadsError(
-              error instanceof Error ? error.message : String(error),
-            );
-            return;
-          }
-        }
-
-        const target = getWorktreeState(resolvedProjectId, worktreePath);
-        const alreadySelected =
-          selectedProjectIdRef.current === resolvedProjectId &&
-          selectedWorktreePathRef.current === worktreePath;
-        if (!alreadySelected) {
-          clearThreadSelection();
-          selectProject(resolvedProject, worktreePath);
-        }
-        syncSelectedWorktreeThread(resolvedProjectId, worktreePath);
-        if (target.opened || target.loading) {
-          return;
-        }
-        await ensureWorktreeOpen(resolvedProjectId, worktreePath);
-      })();
-    },
-    [
-      clearThreadSelection,
-      ensureWorktreeOpen,
-      getProjectState,
-      getWorktreeState,
-      procedures,
-      selectProject,
-      setProjectState,
-      syncSelectedWorktreeThread,
-      upsertProject,
-    ],
   );
 
   const postMessage = useCallback(() => {
@@ -3884,14 +3018,6 @@ export default function App({
     setThreadActionMenuError("");
     setThreadRenameSummary(value);
   }, []);
-
-  useEffect(() => {
-    if (initializedRef.current) {
-      return;
-    }
-    initializedRef.current = true;
-    void initialize();
-  }, [initialize]);
 
   useEffect(() => {
     window.__metidosAppMountedAt = Date.now();

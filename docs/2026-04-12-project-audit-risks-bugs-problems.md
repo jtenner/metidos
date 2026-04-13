@@ -15,10 +15,11 @@ All static checks pass and tests are comprehensive (including deep security, san
 
 ### Critical / High Impact
 1. **Monolithic Mainview (src/mainview/App.tsx - 5,813 lines)**
-   - Core UI, state management, hooks, derived selectors, rendering logic, and many helpers all live in one massive file.
-   - Violates separation of concerns; related code is split into src/mainview/app/* and controls/* but primary component is unwieldy.
-   - **Risks**: High cognitive load, merge conflicts, difficult debugging, re-render bugs (explicitly called out in multiple optimization-proposals.md entries and OPT03/OPT04 docs). Large bundle potential despite React Compiler.
-   - Related: `optimization-proposals.md` discusses memoization to catch "80% of current re-render bugs".
+  - Core UI, state management, hooks, derived selectors, rendering logic, and many helpers all live in one massive file.
+  - Violates separation of concerns; related code is split into src/mainview/app/* and controls/* but primary component is unwieldy.
+  - **Risks**: High cognitive load, merge conflicts, difficult debugging, re-render bugs (explicitly called out in multiple optimization-proposals.md entries and OPT03/OPT04 docs). Large bundle potential despite React Compiler.
+  - Related: `optimization-proposals.md` discusses memoization to catch "80% of current re-render bugs".
+  - Update 2026-04-12: the remaining shell-level selection/workspace/startup knot has now been split into `use-thread-workspace-selection-controller.ts` and `use-mainview-startup-controller.ts`, bringing `App.tsx` down to roughly 4.4k lines and closing the main outstanding audit risk in this area.
 
 2. **Pervasive unsafeMode=true Across Threads**
    - Security audit log is dominated by `unsafe_mode_enabled` events (nearly every thread since early April 2026 uses it).
@@ -107,7 +108,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks capture the main remaining clusters: mainview modularity, unsafe/vm2 execution boundaries, and auth hardening.
+- Child risk records and mitigation tasks now capture the two remaining audit clusters: unsafe/vm2 execution boundaries and auth hardening.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
@@ -118,12 +119,13 @@ All static checks pass and tests are comprehensive (including deep security, san
 - The auth hardening slice is now landed too: [docs/2026-04-12-auth-hardening-follow-up.md](./2026-04-12-auth-hardening-follow-up.md) records the stricter primary-factor policy, the transaction-backed lockout fix, and the explicit `auth-secret.key` recovery behavior.
 - The agent-runtime load-test slice now has a repeatable local benchmark too: [docs/2026-04-12-metidos-tool-load-benchmark-baseline.md](./2026-04-12-metidos-tool-load-benchmark-baseline.md) records the first safe-versus-unsafe child-thread/cron and sandbox saturation baseline using the landed Metidos-tool budgets.
 - The broader performance/load-validation risk is now closed too: [docs/2026-04-12-performance-validation-workflow.md](./2026-04-12-performance-validation-workflow.md) records the current starvation-harness plus Metidos-tool benchmark workflow, including the refreshed preemption-aware harness results from 2026-04-12.
+- The mainview-shell modularity risk is now closed too: `use-thread-workspace-selection-controller.ts` and `use-mainview-startup-controller.ts` now own the remaining selection/workspace/startup orchestration that previously kept `App.tsx` as the last major shell knot.
 
 ## Recommendations
 - **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; keep building on the stricter auth defaults with rate limiting and longer-term TOTP/key-management decisions.
 - **Perf/Obs**: Use the now-documented starvation-harness plus Metidos-tool workflow before and after runtime changes; future optimization work should compare against those baselines instead of inventing new ad hoc measurements.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Continue the remaining audit work on mainview modularity, vm2/unsafe execution boundaries, and residual auth operational hardening.
+- **Next**: Continue the remaining audit work on vm2/unsafe execution boundaries and residual auth operational hardening.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

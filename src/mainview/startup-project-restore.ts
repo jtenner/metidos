@@ -33,6 +33,49 @@ export function closeProjectsForStartupRestore(
 }
 
 /**
+ * Collect the project ids whose tree/worktree state should be restored during
+ * startup before the batch reopen RPC runs.
+ */
+export function collectStartupRestoreProjectIds(options: {
+  initialProjectId: number | null;
+  initialThreadProjectId: number | null;
+  initiallyOpenProjectTreePaths: ReadonlySet<string>;
+  loadedProjects: RpcProject[];
+  openWorktrees: Array<{
+    projectId: number;
+  }>;
+  selectedProjectId: number | null;
+}): Set<number> {
+  const restoredOpenProjectIds = new Set<number>();
+
+  for (const project of options.loadedProjects) {
+    if (options.initiallyOpenProjectTreePaths.has(project.path)) {
+      restoredOpenProjectIds.add(project.id);
+    }
+  }
+
+  for (const entry of options.openWorktrees) {
+    restoredOpenProjectIds.add(entry.projectId);
+  }
+
+  if (options.selectedProjectId !== null) {
+    restoredOpenProjectIds.add(options.selectedProjectId);
+  }
+
+  if (options.initialThreadProjectId !== null) {
+    restoredOpenProjectIds.add(options.initialThreadProjectId);
+  }
+
+  if (options.initialProjectId !== null) {
+    restoredOpenProjectIds.add(options.initialProjectId);
+  } else if (options.loadedProjects[0]) {
+    restoredOpenProjectIds.add(options.loadedProjects[0].id);
+  }
+
+  return restoredOpenProjectIds;
+}
+
+/**
  * Merge restore results back into the startup project list and optionally
  * retarget selection when the previous selection failed to reopen.
  */

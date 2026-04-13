@@ -11,6 +11,7 @@ import type {
 } from "../bun/rpc-schema";
 import {
   closeProjectsForStartupRestore,
+  collectStartupRestoreProjectIds,
   reconcileStartupProjectRestore,
 } from "./startup-project-restore";
 
@@ -45,6 +46,42 @@ describe("startup project restore helpers", () => {
     ]);
 
     expect(closed.map((entry) => entry.isOpen)).toEqual([0, 0]);
+  });
+
+  it("collects every project id whose workspace state should be restored", () => {
+    const restored = collectStartupRestoreProjectIds({
+      initialProjectId: 3,
+      initialThreadProjectId: 2,
+      initiallyOpenProjectTreePaths: new Set(["/repo-a"]),
+      loadedProjects: [
+        project(1, "/repo-a"),
+        project(2, "/repo-b"),
+        project(3, "/repo-c"),
+      ],
+      openWorktrees: [
+        {
+          projectId: 4,
+        },
+      ],
+      selectedProjectId: 5,
+    });
+
+    expect([...restored].sort((left, right) => left - right)).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+  });
+
+  it("falls back to the first loaded project when no startup selection is available", () => {
+    const restored = collectStartupRestoreProjectIds({
+      initialProjectId: null,
+      initialThreadProjectId: null,
+      initiallyOpenProjectTreePaths: new Set<string>(),
+      loadedProjects: [project(7, "/repo-a"), project(8, "/repo-b")],
+      openWorktrees: [],
+      selectedProjectId: null,
+    });
+
+    expect([...restored]).toEqual([7]);
   });
 
   it("keeps failed restore targets closed and reports their tree paths", () => {
