@@ -796,6 +796,8 @@ Only these dedicated task tools are recommended by default:
 | `validate_task_graph` | Validate canonical files |
 | `normalize_task_graph` | Rewrite canonical files into stable canonical form |
 
+The current repository's maintainer-facing implementation workflow is documented in [2026-04-12-task-graph-admin-tooling-workflow.md](./2026-04-12-task-graph-admin-tooling-workflow.md).
+
 ### Recommended runtime toggles
 
 Because task edits happen through ordinary file tools, tool toggling should be expressed as access policy, not as a large dedicated task tool family.

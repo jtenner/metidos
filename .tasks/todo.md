@@ -330,6 +330,8 @@ Those tools now exist in the Pi-native Metidos host path in `src/bun/pi-metidos-
 
 The shared filesystem reader and canonical writer for those files lives in `src/bun/project-procedures/task-graph-filesystem.ts`. The structured validator for canonical findings lives in `src/bun/project-procedures/task-graph-validation.ts`, and the canonical rewrite pass lives in `src/bun/project-procedures/task-graph-normalization.ts`. Future task-graph work should build on those modules rather than reparsing `.metidos/tasks/**` ad hoc.
 
+The maintainers-and-agents workflow for those tools is documented in `docs/2026-04-12-task-graph-admin-tooling-workflow.md`.
+
 The intended split is:
 
 - use normal file edits for routine task creation and updates

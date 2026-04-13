@@ -58,6 +58,7 @@ It is organized by concern so each module has a narrow responsibility for data m
   - Preserves unknown-but-valid TOML keys and tables while reordering the known task-graph fields into canonical sections.
 
 The Bun-side host adapter in `src/bun/project-procedures.ts` now exposes those shared helpers to the Pi-native Metidos tool pack as `init_task_graph`, `validate_task_graph`, and `normalize_task_graph`, with admin-only gating kept in runtime policy instead of repository task files.
+The maintainer-facing workflow and expected result shapes for that surface are documented in `docs/2026-04-12-task-graph-admin-tooling-workflow.md`.
 
 - `pi-event-projection.ts`
   - Projects Pi `AgentSessionEvent` updates into Metidos thread-activity writes without assuming Codex item types.
