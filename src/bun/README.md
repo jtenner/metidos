@@ -267,11 +267,24 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Encrypts and decrypts stored auth secrets with a locally generated AES-GCM key.
 
 - `auth-service.ts`
-  - Implements the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
-  - Coordinates setup, TOTP login, recovery-code login, lockout handling, session cookies, logout, and websocket ticket issuance/consumption on top of the DB/auth helpers.
-  - Persists security audit events for successful auth setup, login, step-up, recovery-code usage, logout transitions, and invalid-credential lockout events.
-  - Also manages the 24-hour idle session timeout plus the short-lived step-up freshness window used to protect high-risk RPC actions such as project deletion.
-  - Also reports auth status to the UI, including the explicit dev-bypass state used by local development flows.
+  - Stable public entrypoint for the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
+  - Re-exports the focused auth-service modules so existing imports stay stable while setup/login, session/ticket, cookie, and low-level helper logic evolve independently.
+
+- `auth-service-core.ts`
+  - Shared auth-service types, stable error codes, and low-level helpers for timing, lockout state, configured-user resolution, session creation, and audit events.
+  - Keeps the reusable auth state transitions out of the public entrypoint so later hardening work can touch smaller files.
+
+- `auth-service-login.ts`
+  - Implements setup, auth-status reads, TOTP login, recovery-code login, and pending-user creation on top of the DB/auth/auth-secret helpers.
+  - Owns the setup/login-side audit events and lockout/error handling for the primary sign-in paths.
+
+- `auth-service-session.ts`
+  - Implements session resolution/touch, logout, step-up freshness windows, and websocket ticket issuance/consumption.
+  - Owns the live-session-side auth checks used by high-risk RPC actions and websocket upgrades.
+
+- `auth-service-cookies.ts`
+  - Parses and serializes the session and websocket-ticket cookies used by the HTTP and RPC auth surfaces.
+  - Keeps cookie-header details isolated from the login/session lifecycle logic.
 
 - `auth-reset.ts`
   - Implements the command-line recovery and primary-factor reset flow for single-user local installs.

@@ -11,9 +11,6 @@ assignees = ["agent"]
 tags = ["area:auth", "component:auth-service", "discipline:backend", "source:audit-2026-04-12", "theme:security"]
 milestone = "audit-remediation-2026-04"
 
-[blockers]
-tasks = ["tg-01kp16yactezq5bh0se20sc9ed"]
-
 [mitigates]
 tasks = ["tg-01kp16yacmnebebbnpwbgbe9g9"]
 
