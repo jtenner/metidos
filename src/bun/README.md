@@ -263,11 +263,20 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
   - Enforces the current primary-factor policy: PINs must be at least 8 digits and avoid obvious sequential/repeated patterns, while passwords/passphrases must be at least 12 characters.
+  - Keeps the current custom TOTP policy explicit and test-backed: SHA-1 HMAC, 6 digits, 30-second periods, and a `+/-1` verification window for modest clock skew.
 
 - `auth-secrets.ts`
   - Manages the local encryption key used to protect persisted TOTP secrets at rest.
   - Encrypts and decrypts stored auth secrets with a locally generated AES-GCM key.
   - Decrypt paths now fail loudly when `auth-secret.key` is missing or mismatched instead of silently minting a replacement key during login or step-up flows.
+
+- `auth-usernames.ts`
+  - Shared username normalization and workspace-home safety checks used by auth provisioning and regular-user workspace scoping.
+  - New first-run usernames and admin-created pending users now have to stay path-safe, while existing historical usernames remain login-compatible.
+
+- `auth-rate-limit.ts`
+  - In-memory backoff for the local HTTP auth surface.
+  - Applies peer and peer+subject failure windows to `/auth/setup`, `/auth/login`, `/auth/recovery-login`, and `/auth/step-up`, returning `429` plus `Retry-After` when repeated failures hit the local auth endpoints.
 
 - `auth-service.ts`
   - Stable public entrypoint for the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
@@ -280,7 +289,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `auth-service-login.ts`
   - Implements setup, auth-status reads, TOTP login, recovery-code login, and pending-user creation on top of the DB/auth/auth-secret helpers.
-  - Owns the setup/login-side audit events and lockout/error handling for the primary sign-in paths.
+  - Owns the setup/login-side audit events, new-username validation, and lockout/error handling for the primary sign-in paths.
 
 - `auth-service-session.ts`
   - Implements session resolution/touch, logout, step-up freshness windows, and websocket ticket issuance/consumption.
@@ -298,7 +307,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `dev-flows.ts`
   - Parses the explicit development-only security flags (`METIDOS_DEV_BYPASS=1` and `METIDOS_DEV_RESET=1`).
-  - Provides the local-state reset helper that wipes the SQLite/auth-secret files and the synthetic websocket-ticket path used when auth bypass is intentionally enabled in dev mode.
+  - Rejects those flags outside dev mode and provides the local-state reset helper that wipes the SQLite/auth-secret files plus the synthetic websocket-ticket path used when auth bypass is intentionally enabled in dev mode.
 
 - `server-security.ts`
   - Centralizes local transport hardening helpers shared by the Bun entrypoints.

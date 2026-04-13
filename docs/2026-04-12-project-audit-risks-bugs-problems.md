@@ -53,13 +53,13 @@ All static checks pass and tests are comprehensive (including deep security, san
    - **Risks/Bugs Surfaced**:
      - Maintainability: `auth-service.ts` is monolithic (helpers for timing, normalization, failure state, session resolve/touch, error codes). Mirrors App.tsx issues.
      - Lockout/concurrency: the 3-failure → 10min lock path now re-reads and updates auth failure state inside an immediate SQLite transaction, and auth-service regression coverage now includes the concurrent bad-login case that previously undercounted.
-     - TOTP: Custom impl (SHA1-HMAC, time counter, +/-1 window) solid but SHA1 deprecated; drift risk if clocks skew. Manual base32, crypto.subtle calls async.
+     - TOTP: Custom impl (SHA1-HMAC, time counter, +/-1 window) is now explicitly test-backed and documented, so the remaining concern is long-term algorithm choice rather than unclear operational drift behavior.
      - Primary factor: new setup/reset flows now require either an 8+ digit non-obvious PIN or a 12+ character password/passphrase, but no additional 2FA exists beyond TOTP/recovery.
      - Secrets: Persisted key remains critical, but decrypt paths now fail loudly instead of silently minting a replacement `auth-secret.key`, and the expected restore-versus-full-reset recovery path is documented in [docs/2026-04-12-auth-hardening-follow-up.md](./2026-04-12-auth-hardening-follow-up.md).
-     - Multi-user: Admins control pending users/TOTP setup; ownerUserId on all entities. Legacy tables co-exist with migration – risk of inconsistent state if upgrade partial. Username NOCASE UNIQUE but normalization (trim) could allow edge duplicates/spoofs.
-     - Step-up/Unsafe: Protects escalation but audit logs show near-universal unsafeMode=true post-auth (bypasses VM2 entirely). DevBypass skips many checks.
+     - Multi-user: Admins control pending users/TOTP setup; ownerUserId on all entities. Legacy tables co-exist with migration – risk of inconsistent state if upgrade partial. New usernames now have to be safe for regular-user workspace homes, while legacy existing usernames remain setup/login-compatible.
+     - Step-up/Unsafe: Protects escalation but audit logs show near-universal unsafeMode=true post-auth (bypasses VM2 entirely). DevBypass remains intentionally development-only and startup-enforced.
      - Other TS: Good normalization in `git.ts`/`thread-tool-scope.ts` (rejects .. / symlinks / cross-scope), but VM2 patch, large derived state in mainview/app/state.ts, complex Pi event projection all add vectors. No TODOs but many test-only dev paths.
-     - General: Strong test coverage (auth-service.test.ts, db.test.ts, etc.) but slow integration tests could hide flakiness. Relies on local env (no network rate limits).
+     - General: Strong test coverage (auth-service.test.ts, db.test.ts, etc.) but slow integration tests could hide flakiness. The loopback auth surface now has explicit peer plus peer+subject HTTP rate limiting instead of relying only on per-user lockouts.
    - Positive: No obvious vulns in sampled code; security-first design with audits, bounds checking, immutable where possible (deepFreeze in VM2).
 
 6. **Tight Coupling to External Pi SDK and Sidecars**
@@ -95,7 +95,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 3. VM2 risks (CVEs, complex 50+ method fs mock with potential races/symlink/TOCTOU/Bun API escapes despite worktree tests, global fs patch, Worker leaks on timeout/terminate, broad sandbox exposure).
 
 **Medium**:
-4. Auth/user issues: Custom TOTP (SHA-1, clock risks), critical auth-secret.key (reset path still disruptive if backup is gone), legacy migration complexity, username edges, devBypass, no ratelimits. The lockout race and the weakest setup/reset credential defaults are now tightened.
+4. Auth/user issues: Custom TOTP still uses SHA-1, `auth-secret.key` remains operationally critical, and legacy migration complexity still exists. The lockout race, weakest setup/reset credential defaults, username edge policy, devBypass gating, and missing HTTP auth rate limits are now tightened or explicitly documented.
 5. Agent tools gaps: Monolithic pi-metidos-tools (schemas, per-call scoping, RPC delegation for list/update/new_thread/cron/focus/runUntrustedJS/etc.); the first missing telemetry slice is now in place through a `metidosTools` runtime-stats bucket (per-tool calls, explicit unsafe-mode requests, vm2 failures/timeouts), and the next follow-up now adds shared budgets plus loud saturation failures for sandbox runs and child thread/cron mutations, but broader load validation still remains; cron DoS via unsafe; GitHub truncation; complex projection/normalization (many edge tests = prior bugs); scope canonicalization platform edges.
 6. Performance (re-renders, SQLite despite WAL/indexes/sidecar, RPC, cron, memory per 15+ OPT docs); slow tests risk flakiness; large mainview state/selectors/workers.
 7. Pi/SDK coupling (pi-thread-runtime, Codex sync, event projection, session quirks, migration risks – breaks tools/telemetry on upstream change).
@@ -108,7 +108,7 @@ All static checks pass and tests are comprehensive (including deep security, san
 ## Task Graph Follow-up
 - The audit findings are now decomposed into the git-native task graph under `.metidos/tasks/items/`.
 - Umbrella epic: `tg-01kp16yachnc2h5f7wm9kd8eqa` — **Address 2026-04-12 audit risks across runtime, tools, and UI**.
-- Child risk records and mitigation tasks now capture the two remaining audit clusters: unsafe/vm2 execution boundaries and auth hardening.
+- Child risk records and mitigation tasks now capture the remaining audit cluster: unsafe/vm2 execution boundaries.
 - The task-graph policy-clarity follow-up was addressed directly in repo guidance (`AGENTS.md`, `.tasks/todo.md`, `.gitignore`).
 - The `run_untrusted_js` isolation spike is now captured in [docs/2026-04-12-run-untrusted-js-isolation-audit.md](./2026-04-12-run-untrusted-js-isolation-audit.md), which narrowed the next vm2 hardening slice to removing ambient network and unscoped Bun host APIs before considering a full replacement.
 - That first vm2 hardening slice is now implemented in the runner and its regression tests, so the remaining vm2 risk is narrower than it was in the original audit snapshot.
@@ -116,16 +116,16 @@ All static checks pass and tests are comprehensive (including deep security, san
 - New thread-start requests, interactive threads, and cron definitions now default to safe mode unless `unsafeMode` is explicitly requested through the admin-authorized backend path, and regression tests now pin that behavior across the main creation entrypoints.
 - The Pi compatibility slice is now implemented too: a shared `pi-sdk-shapes.ts` boundary plus a real Bun-SDK runtime smoke test keep event projection, telemetry extraction, and session-resume assumptions aligned in one place instead of scattering Pi-owned payload knowledge across the runtime.
 - The auth-service monolith has now been split into focused setup/login, session/ticket, cookie, and shared-core modules behind the stable `auth-service.ts` entrypoint, which made the landing auth hardening slice tractable without reworking one 1.5k-line orchestration file.
-- The auth hardening slice is now landed too: [docs/2026-04-12-auth-hardening-follow-up.md](./2026-04-12-auth-hardening-follow-up.md) records the stricter primary-factor policy, the transaction-backed lockout fix, and the explicit `auth-secret.key` recovery behavior.
+- The auth hardening slice is now landed too: [docs/2026-04-12-auth-hardening-follow-up.md](./2026-04-12-auth-hardening-follow-up.md) now records the stricter primary-factor policy, the transaction-backed lockout fix, the explicit `auth-secret.key` recovery behavior, the path-safe new-username policy, the loopback HTTP auth rate limits, and the current TOTP drift window.
 - The agent-runtime load-test slice now has a repeatable local benchmark too: [docs/2026-04-12-metidos-tool-load-benchmark-baseline.md](./2026-04-12-metidos-tool-load-benchmark-baseline.md) records the first safe-versus-unsafe child-thread/cron and sandbox saturation baseline using the landed Metidos-tool budgets.
 - The broader performance/load-validation risk is now closed too: [docs/2026-04-12-performance-validation-workflow.md](./2026-04-12-performance-validation-workflow.md) records the current starvation-harness plus Metidos-tool benchmark workflow, including the refreshed preemption-aware harness results from 2026-04-12.
 - The mainview-shell modularity risk is now closed too: `use-thread-workspace-selection-controller.ts` and `use-mainview-startup-controller.ts` now own the remaining selection/workspace/startup orchestration that previously kept `App.tsx` as the last major shell knot.
 
 ## Recommendations
-- **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
-- **Security**: Automated audits/vuln scans; review all tool paths for escapes; keep building on the stricter auth defaults with rate limiting and longer-term TOTP/key-management decisions.
+- **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); plan longer-term TOTP/key rotation decisions.
+- **Security**: Automated audits/vuln scans; review all tool paths for escapes; keep building on the stricter auth defaults with longer-term TOTP/key-management decisions.
 - **Perf/Obs**: Use the now-documented starvation-harness plus Metidos-tool workflow before and after runtime changes; future optimization work should compare against those baselines instead of inventing new ad hoc measurements.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
-- **Next**: Continue the remaining audit work on vm2/unsafe execution boundaries and residual auth operational hardening.
+- **Next**: Continue the remaining audit work on vm2/unsafe execution boundaries.
 
 This audit document now contains *all* problems, risks, and bugs surfaced from the complete review of TypeScript files and agent tools. It serves as the canonical record. Updated 2026-04-12. Cross-reference optimization-proposals.md, thread-tool-access-controls.md, security tests, AGENTS.md, and the linked task graph epic.

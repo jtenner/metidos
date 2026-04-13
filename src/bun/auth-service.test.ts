@@ -9,7 +9,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { generateTotpCode } from "./auth";
+import {
+  DEFAULT_SESSION_LIFETIME_DAYS,
+  generateTotpCode,
+  hashPrimaryFactor,
+} from "./auth";
 import { deleteAuthSecretKey } from "./auth-secrets";
 import type { AuthServiceError } from "./auth-service";
 import {
@@ -35,10 +39,12 @@ import {
   validateAndConsumeWebSocketTicket,
 } from "./auth-service";
 import {
+  createUser,
   getAuthSettings,
   listAuthRecoveryCodes,
   listSecurityAuditEvents,
   migrateDatabase,
+  upsertAuthSettings,
 } from "./db";
 
 const openDatabases = new Set<Database>();
@@ -546,6 +552,76 @@ describe("auth service", () => {
     );
   });
 
+  it("rejects new setup usernames that cannot own private workspace homes", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: "alice/unsafe",
+    });
+
+    await expect(
+      setupAuth(database, {
+        appDataDir,
+        nowMs,
+        primaryFactor: TEST_ADMIN_PIN,
+        primaryFactorType: "pin",
+        totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+        totpSecret: enrollment.totpSecret,
+        username: "alice/unsafe",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_username",
+    } satisfies Partial<AuthServiceError>);
+  });
+
+  it("still lets a legacy pending username finish first-run setup", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const legacyUsername = "legacy/user";
+    const legacyUser = createUser(database, {
+      isAdmin: false,
+      username: legacyUsername,
+    });
+    upsertAuthSettings(database, {
+      primaryFactorHash: await hashPrimaryFactor("pin", TEST_PENDING_USER_PIN),
+      primaryFactorType: "pin",
+      sessionLifetimeDays: DEFAULT_SESSION_LIFETIME_DAYS,
+      totpSecretCiphertext: "",
+      userId: legacyUser.id,
+    });
+    const enrollment = prepareTotpEnrollment({
+      accountName: legacyUsername,
+    });
+
+    const result = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: TEST_PENDING_USER_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+      username: legacyUsername,
+    });
+
+    expect(
+      getAuthStatus(database, result.session.id, {
+        nowMs,
+      }),
+    ).toEqual({
+      authenticated: true,
+      configured: true,
+      devBypass: false,
+      isAdmin: false,
+      knownUsernames: [legacyUsername],
+      lockedUntil: null,
+      primaryFactorType: "pin",
+      sessionExpiresAt: result.session.expiresAt,
+      username: legacyUsername,
+    });
+  });
+
   it("rejects self-service setup for unknown usernames after the primary user exists", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();
@@ -583,6 +659,36 @@ describe("auth service", () => {
       }),
     ).rejects.toMatchObject({
       code: "admin_required",
+    } satisfies Partial<AuthServiceError>);
+  });
+
+  it("rejects pending-user creation for usernames that cannot own private workspace homes", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const adminEnrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
+      totpSecret: adminEnrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    await expect(
+      createPendingUser(database, {
+        actorUserId: 1,
+        actorUsername: TEST_USERNAME,
+        pin: TEST_PENDING_USER_PIN,
+        username: "bob/unsafe",
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_username",
     } satisfies Partial<AuthServiceError>);
   });
 

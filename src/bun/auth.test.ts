@@ -115,6 +115,23 @@ describe("auth helpers", () => {
     ).toBeTrue();
   });
 
+  it("accepts one adjacent TOTP time step but rejects larger drift", async () => {
+    const secret = "JBSWY3DPEHPK3PXP";
+    const issuedAtMs = 1_710_000_000_000;
+    const code = await generateTotpCode(secret, issuedAtMs);
+
+    expect(
+      await verifyTotpCode(secret, code, {
+        atMs: issuedAtMs + 30_000,
+      }),
+    ).toBeTrue();
+    expect(
+      await verifyTotpCode(secret, code, {
+        atMs: issuedAtMs + 61_000,
+      }),
+    ).toBeFalse();
+  });
+
   it("generates setup material with recovery codes", () => {
     const setupMaterial = createAuthSetupMaterial({
       accountName: "alice@example.test",

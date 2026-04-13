@@ -9,6 +9,13 @@ import { createInterface } from "node:readline/promises";
 import type { ServerWebSocket } from "bun";
 
 import {
+  type AuthRouteRateLimitContext,
+  noteAuthRouteFailure,
+  noteAuthRouteSuccess,
+  type RateLimitedAuthPath,
+  readAuthRouteRateLimitStatus,
+} from "./auth-rate-limit";
+import {
   AuthServiceError,
   buildClearedSessionCookieHeader,
   buildClearedWebSocketTicketCookieHeader,
@@ -725,6 +732,79 @@ function utf8ByteLength(text: string): number {
   return Buffer.byteLength(text, "utf8");
 }
 
+type AuthRequestServer = Pick<ReturnType<typeof Bun.serve>, "requestIP">;
+
+function formatRetryAfterMessage(retryAfterSeconds: number): string {
+  if (retryAfterSeconds >= 120) {
+    const retryAfterMinutes = Math.ceil(retryAfterSeconds / 60);
+    return `Too many failed authentication attempts. Try again in about ${retryAfterMinutes} minutes.`;
+  }
+  return `Too many failed authentication attempts. Try again in ${retryAfterSeconds} seconds.`;
+}
+
+function createAuthRateLimitError(
+  status: NonNullable<ReturnType<typeof readAuthRouteRateLimitStatus>>,
+): AuthServiceError {
+  return new AuthServiceError(
+    "rate_limited",
+    formatRetryAfterMessage(status.retryAfterSeconds),
+    429,
+    {
+      retryAfterSeconds: String(status.retryAfterSeconds),
+    },
+  );
+}
+
+function shouldCountForAuthRateLimit(error: unknown): boolean {
+  return (
+    error instanceof AuthServiceError &&
+    (error.code === "auth_locked" || error.code === "invalid_credentials")
+  );
+}
+
+function authRateLimitSubjectKeyForUsername(username: string): string {
+  return `username:${username.trim().toLowerCase()}`;
+}
+
+function authRateLimitSubjectKeyForSession(sessionId: string): string {
+  return `session:${sessionId}`;
+}
+
+function resolveAuthRoutePeerKey(
+  request: Request,
+  serverInstance: AuthRequestServer,
+): string {
+  const address = serverInstance.requestIP(request);
+  if (address?.address.trim()) {
+    return `${address.family}:${address.address.trim()}`;
+  }
+  return "unknown";
+}
+
+async function runRateLimitedAuthAttempt<T>(
+  context: AuthRouteRateLimitContext,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const limited = readAuthRouteRateLimitStatus(context);
+  if (limited) {
+    throw createAuthRateLimitError(limited);
+  }
+
+  try {
+    const result = await operation();
+    noteAuthRouteSuccess(context);
+    return result;
+  } catch (error) {
+    if (shouldCountForAuthRateLimit(error)) {
+      const nextLimited = noteAuthRouteFailure(context);
+      if (nextLimited) {
+        throw createAuthRateLimitError(nextLimited);
+      }
+    }
+    throw error;
+  }
+}
+
 class RequestValidationError extends Error {
   readonly code: string;
   readonly status: number;
@@ -1088,6 +1168,15 @@ function authErrorResponse(
   }
 
   if (error instanceof AuthServiceError) {
+    if (error.code === "rate_limited") {
+      const retryAfterSeconds = Number.parseInt(
+        error.details?.retryAfterSeconds ?? "",
+        10,
+      );
+      if (Number.isInteger(retryAfterSeconds) && retryAfterSeconds > 0) {
+        headers.set("retry-after", String(retryAfterSeconds));
+      }
+    }
     webServerLogger.warning({
       description: "Auth request failed",
       method: request.method,
@@ -1159,7 +1248,10 @@ function authErrorResponse(
  * @param request - Incoming request payload.
  */
 
-async function handleAuthRequest(request: Request): Promise<Response | null> {
+async function handleAuthRequest(
+  request: Request,
+  serverInstance: AuthRequestServer,
+): Promise<Response | null> {
   const requestUrl = new URL(request.url);
   const { pathname } = requestUrl;
   if (!pathname.startsWith("/auth/")) {
@@ -1169,6 +1261,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
   const requestId = request.headers.get("x-request-id")?.trim();
   const sessionId = readSessionCookie(request.headers.get("cookie"));
   const secureCookie = isSecureRequest(request);
+  const peerKey = resolveAuthRoutePeerKey(request, serverInstance);
   webServerLogger.trace({
     message: "Auth request received",
     method: request.method,
@@ -1176,6 +1269,7 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     requestId: requestId ?? null,
     authBypass: DEV_FLOW_MODE.authBypass,
     hasSession: !!sessionId,
+    peerKey,
     source: requestUrl.origin,
   });
 
@@ -1196,6 +1290,15 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
   const database = initAppDatabase();
   const nowMs = currentNowMs();
+  const createAuthRateLimitContext = (
+    rateLimitedPathname: RateLimitedAuthPath,
+    subjectKey?: string | null,
+  ): AuthRouteRateLimitContext => ({
+    nowMs,
+    pathname: rateLimitedPathname,
+    peerKey,
+    ...(typeof subjectKey === "undefined" ? {} : { subjectKey }),
+  });
   const getCurrentAuthStatus = () =>
     getAuthStatus(database, sessionId, {
       devBypass: DEV_FLOW_MODE.authBypass,
@@ -1246,19 +1349,31 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
     if (pathname === "/auth/setup" && request.method === "POST") {
       const body = await readJsonBody(request);
       const sessionLifetimeDays = readOptionalSessionLifetimeDays(body);
-      const result = await setupAuth(database, {
-        nowMs,
-        primaryFactor: readRequiredString(body, "primaryFactor"),
-        primaryFactorType: readPrimaryFactorType(body),
-        totpCode: readRequiredString(body, "totpCode"),
-        totpSecret: readRequiredString(body, "totpSecret"),
-        username: readRequiredString(body, "username"),
-        ...(typeof sessionLifetimeDays === "number"
-          ? {
-              sessionLifetimeDays,
-            }
-          : {}),
-      });
+      const primaryFactor = readRequiredString(body, "primaryFactor");
+      const primaryFactorType = readPrimaryFactorType(body);
+      const totpCode = readRequiredString(body, "totpCode");
+      const totpSecret = readRequiredString(body, "totpSecret");
+      const username = readRequiredString(body, "username");
+      const result = await runRateLimitedAuthAttempt(
+        createAuthRateLimitContext(
+          "/auth/setup",
+          authRateLimitSubjectKeyForUsername(username),
+        ),
+        () =>
+          setupAuth(database, {
+            nowMs,
+            primaryFactor,
+            primaryFactorType,
+            totpCode,
+            totpSecret,
+            username,
+            ...(typeof sessionLifetimeDays === "number"
+              ? {
+                  sessionLifetimeDays,
+                }
+              : {}),
+          }),
+      );
 
       return respondAuthJson(
         {
@@ -1284,12 +1399,22 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/login" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const result = await login(database, {
-        nowMs,
-        primaryFactor: readRequiredString(body, "primaryFactor"),
-        totpCode: readOptionalString(body, "totpCode") ?? "",
-        username: readRequiredString(body, "username"),
-      });
+      const primaryFactor = readRequiredString(body, "primaryFactor");
+      const totpCode = readOptionalString(body, "totpCode") ?? "";
+      const username = readRequiredString(body, "username");
+      const result = await runRateLimitedAuthAttempt(
+        createAuthRateLimitContext(
+          "/auth/login",
+          authRateLimitSubjectKeyForUsername(username),
+        ),
+        () =>
+          login(database, {
+            nowMs,
+            primaryFactor,
+            totpCode,
+            username,
+          }),
+      );
 
       return respondAuthJson(
         {
@@ -1314,12 +1439,22 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
 
     if (pathname === "/auth/recovery-login" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const result = await loginWithRecoveryCode(database, {
-        nowMs,
-        primaryFactor: readRequiredString(body, "primaryFactor"),
-        recoveryCode: readRequiredString(body, "recoveryCode"),
-        username: readRequiredString(body, "username"),
-      });
+      const primaryFactor = readRequiredString(body, "primaryFactor");
+      const recoveryCode = readRequiredString(body, "recoveryCode");
+      const username = readRequiredString(body, "username");
+      const result = await runRateLimitedAuthAttempt(
+        createAuthRateLimitContext(
+          "/auth/recovery-login",
+          authRateLimitSubjectKeyForUsername(username),
+        ),
+        () =>
+          loginWithRecoveryCode(database, {
+            nowMs,
+            primaryFactor,
+            recoveryCode,
+            username,
+          }),
+      );
 
       return respondAuthJson(
         {
@@ -1361,12 +1496,21 @@ async function handleAuthRequest(request: Request): Promise<Response | null> {
       }
 
       const body = await readJsonBody(request);
-      const result = await stepUpSession(database, {
-        nowMs,
-        primaryFactor: readRequiredString(body, "primaryFactor"),
-        sessionId,
-        totpCode: readRequiredString(body, "totpCode"),
-      });
+      const primaryFactor = readRequiredString(body, "primaryFactor");
+      const totpCode = readRequiredString(body, "totpCode");
+      const result = await runRateLimitedAuthAttempt(
+        createAuthRateLimitContext(
+          "/auth/step-up",
+          authRateLimitSubjectKeyForSession(sessionId),
+        ),
+        () =>
+          stepUpSession(database, {
+            nowMs,
+            primaryFactor,
+            sessionId,
+            totpCode,
+          }),
+      );
 
       return respondAuthJson({
         ok: true,
@@ -2442,7 +2586,7 @@ async function bootstrap(): Promise<void> {
         requestId: requestId ?? null,
       });
 
-      const authResponse = await handleAuthRequest(request);
+      const authResponse = await handleAuthRequest(request, serverInstance);
       if (authResponse) {
         webServerLogger.trace({
           message: "HTTP request handled by auth route",

@@ -9,6 +9,7 @@ import { basename, dirname, resolve } from "node:path";
 import type { AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
 import { AuthServiceError, createPendingUser } from "./auth-service";
+import { normalizeWorkspaceHomeUsername } from "./auth-usernames";
 import type {
   CronJobRecord,
   ProjectRecord,
@@ -268,19 +269,13 @@ function defaultWorkspaceSupportsTildePath(): boolean {
 }
 
 function normalizeWorkspaceUsernameSegment(username: string): string {
-  const normalizedUsername = username.trim();
-  if (
-    !normalizedUsername ||
-    normalizedUsername === "." ||
-    normalizedUsername === ".." ||
-    /[\\/]/u.test(normalizedUsername) ||
-    /[:*?"<>|]/u.test(normalizedUsername)
-  ) {
+  try {
+    return normalizeWorkspaceHomeUsername(username);
+  } catch {
     throw new Error(
       "The current account username cannot be mapped to a private workspace home.",
     );
   }
-  return normalizedUsername;
 }
 
 function restrictedWorkspacePathScope(username: string): WorkspacePathScope {

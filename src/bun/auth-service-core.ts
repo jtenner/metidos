@@ -154,7 +154,9 @@ export class AuthServiceError extends Error {
       | "auth_locked"
       | "auth_secret_unavailable"
       | "admin_required"
+      | "invalid_username"
       | "invalid_credentials"
+      | "rate_limited"
       | "step_up_required"
       | "session_required"
       | "session_expired"
@@ -247,14 +249,6 @@ export function buildTimestampOptions(nowMs?: number): TimestampOptions {
  */
 export function buildAuthSecretOptions(appDataDir?: string): AuthSecretOptions {
   return typeof appDataDir === "string" ? { appDataDir } : {};
-}
-
-export function normalizeUsername(username: string): string {
-  const normalizedUsername = username.trim();
-  if (!normalizedUsername) {
-    throw new Error("Username is required.");
-  }
-  return normalizedUsername;
 }
 
 function runInImmediateAuthTransaction<T>(

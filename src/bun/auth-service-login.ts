@@ -36,7 +36,6 @@ import {
   type LoginInput,
   type LoginResult,
   normalizeSessionLifetimeDays,
-  normalizeUsername,
   nowDate,
   type PrepareTotpEnrollmentInput,
   type RecoveryLoginInput,
@@ -48,6 +47,10 @@ import {
   type TimestampOptions,
 } from "./auth-service-core";
 import { resolveSession } from "./auth-service-session";
+import {
+  normalizeUsername,
+  normalizeWorkspaceHomeUsername,
+} from "./auth-usernames";
 import {
   countConfiguredAuthUsers,
   createUser,
@@ -67,6 +70,18 @@ function rethrowAuthSecretError(error: unknown): never {
     throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
   }
   throw error;
+}
+
+function normalizeNewUsernameForProvisioning(username: string): string {
+  try {
+    return normalizeWorkspaceHomeUsername(username);
+  } catch (error) {
+    throw new AuthServiceError(
+      "invalid_username",
+      error instanceof Error ? error.message : "Username is invalid.",
+      400,
+    );
+  }
 }
 
 /**
@@ -317,10 +332,13 @@ export async function setupAuth(
   database: Database,
   input: SetupAuthInput,
 ): Promise<SetupAuthResult> {
-  const normalizedUsername = normalizeUsername(input.username);
+  const lookupUsername = normalizeUsername(input.username);
   const now = nowDate(input.nowMs);
   const configuredUserCount = countConfiguredAuthUsers(database);
-  const existingUser = getUserByUsername(database, normalizedUsername);
+  const existingUser = getUserByUsername(database, lookupUsername);
+  const normalizedUsername = existingUser
+    ? lookupUsername
+    : normalizeNewUsernameForProvisioning(lookupUsername);
   const existingSettings = existingUser
     ? readCurrentAuthSettingsForUser(database, existingUser.id, now)
     : null;
@@ -486,7 +504,9 @@ export async function createPendingUser(
     );
   }
 
-  const normalizedUsername = normalizeUsername(input.username);
+  const normalizedUsername = normalizeNewUsernameForProvisioning(
+    input.username,
+  );
   const existingUser = getUserByUsername(database, normalizedUsername);
   if (existingUser) {
     throw new AuthServiceError(
