@@ -43,7 +43,7 @@ All static checks pass and tests are comprehensive (including deep security, san
      - Mainview build modes, cacheable assets, sourcemaps.
    - runtime-stats.ts, runtime-stats-sidecar.ts, starvation-harness.ts exist specifically to measure these.
    - **Risk**: Production deployments may still hit memory pressure, slow queries, or UI lag under load. Telemetry is present but requires `--track-telemetry`.
-   - WAL, indexes, and sidecar implemented per docs, but baseline benchmarks and further slices remain.
+   - WAL, indexes, sidecar telemetry, and a repeatable bounded Metidos-tool benchmark baseline are now in place, but broader production-shaped load validation and UI-side performance work still remain.
 
 5. **Deep TS Review: Authentication, User Management & Related Modules**
    - **Core Files Examined**: `auth-service.ts` (1494 LOC orchestration for setup/login/sessions/tickets/step-up/lockouts), `auth.ts` (TOTP, Argon2id/Bun.password, recovery, HOTP impl), `auth-secrets.ts` (AES-GCM key mgmt with `auth-secret.key`), `auth-reset.ts`, `db.ts` (multi-user schema, migrations, queries), `rpc-authz.ts`, `rpc-websocket-auth.ts`, `project-security-audit.ts`, `project-procedures/*.ts` (user scoping, admin/pending users), mainview auth-shell/* + tests. Sampled ~50 other TS files (vm2-runner, git, pi-*, state, controls, etc.).
@@ -114,11 +114,12 @@ All static checks pass and tests are comprehensive (including deep security, san
 - New thread-start requests, interactive threads, and cron definitions now default to safe mode unless `unsafeMode` is explicitly requested through the admin-authorized backend path, and regression tests now pin that behavior across the main creation entrypoints.
 - The Pi compatibility slice is now implemented too: a shared `pi-sdk-shapes.ts` boundary plus a real Bun-SDK runtime smoke test keep event projection, telemetry extraction, and session-resume assumptions aligned in one place instead of scattering Pi-owned payload knowledge across the runtime.
 - The auth-service monolith has now been split into focused setup/login, session/ticket, cookie, and shared-core modules behind the stable `auth-service.ts` entrypoint, so the remaining auth hardening task is no longer blocked on editing one 1.5k-line orchestration file.
+- The agent-runtime load-test slice now has a repeatable local benchmark too: [docs/2026-04-12-metidos-tool-load-benchmark-baseline.md](./2026-04-12-metidos-tool-load-benchmark-baseline.md) records the first safe-versus-unsafe child-thread/cron and sandbox saturation baseline using the landed Metidos-tool budgets.
 
 ## Recommendations
 - **Priority**: Split monoliths; keep the new safe-by-default thread/cron posture intact while measuring unsafe adoption; build on the new tool/unsafe/vm2 telemetry and landed budgets with load tests; harden VM2 (update, more tests, or replace); key rotation + ratelimits.
 - **Security**: Automated audits/vuln scans; review all tool paths for escapes; stronger auth defaults.
-- **Perf/Obs**: Finish OPT roadmap with production telemetry; load test agent tool usage.
+- **Perf/Obs**: Finish OPT roadmap with production telemetry; extend load validation beyond the bounded Metidos-tool benchmark into broader whole-runtime pressure runs.
 - **Maintenance**: Keep the clarified `.metidos/tasks/**` versus `.metidos/cache/**` policy aligned across AGENTS, `.tasks/`, and `.gitignore`; keep this doc updated as single source; follow `.tasks/commit.md` strictly for changes. Refactor tools to modular files.
 - **Next**: Production build/load test with heavy unsafe/agent workloads using the new tool telemetry and newly bounded high-risk paths.
 

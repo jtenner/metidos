@@ -304,6 +304,10 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Optional benchmarking harness to exercise startup, HTTP, and RPC behavior under worker concurrency.
   - Produces timing summaries, latency percentiles, runtime-stats snapshots, memory snapshots, and top-byte transport rankings to help validate race/pressure behavior in development and CI-like scenarios.
 
+- `metidos-tool-load-benchmark.ts`
+  - Repeatable synthetic benchmark for the bounded Metidos tool paths that the audit called out as likely to regress under agent-heavy pressure.
+  - Exercises safe versus unsafe child-thread and cron mutations plus the sandbox budget, and reports latency plus per-budget runtime-stats counters so future budget changes can be compared against a stable local baseline.
+
 ## Notes
 
 - This folder is runtime-critical: changes here impact startup, RPC contracts, persistence, and thread execution behavior.

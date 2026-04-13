@@ -629,8 +629,12 @@ function getMetidosToolBudgets(
   return budgets;
 }
 
-export function resetMetidosToolBudgetsForTests(): void {
+export function resetMetidosToolBudgets(): void {
   metidosToolBudgetStates.clear();
+}
+
+export function resetMetidosToolBudgetsForTests(): void {
+  resetMetidosToolBudgets();
 }
 
 export function withMetidosToolTelemetry<
