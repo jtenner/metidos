@@ -47,7 +47,7 @@ afterEach(() => {
 describe("task graph normalization", () => {
   it("normalizes canonical files and becomes a no-op on repeated runs", async () => {
     const root = createTaskGraphRoot();
-    const taskId = "tg-01kp173j32mypsecqdb45npq5v";
+    const taskId = "tg-01xyznormalizationfixture000001";
     mkdirSync(join(root, "items", taskId), {
       recursive: true,
     });
@@ -111,7 +111,7 @@ describe("task graph normalization", () => {
         'title = "Normalization fixture"',
         'status = "open"',
         'type = "feature"',
-        'id = "tg-01kp173j32mypsecqdb45npq5v"',
+        'id = "tg-01xyznormalizationfixture000001"',
         'assignees = ["reviewer", "agent", "agent"]',
         'tags = ["theme:reliability", "area:task-graph", "theme:reliability"]',
         "",
@@ -190,7 +190,7 @@ describe("task graph normalization", () => {
     expect(readFileSync(join(root, "items", taskId, "task.toml"), "utf8")).toBe(
       [
         'schema = "metidos.task/v2"',
-        'id = "tg-01kp173j32mypsecqdb45npq5v"',
+        'id = "tg-01xyznormalizationfixture000001"',
         'title = "Normalization fixture"',
         'type = "feature"',
         'status = "open"',

@@ -16,6 +16,7 @@ import {
   generateWebSocketTicketId,
   hashPrimaryFactor,
   hashRecoveryCode,
+  MIN_PASSWORD_LENGTH,
   MIN_PIN_LENGTH,
   validatePrimaryFactor,
   verifyPrimaryFactor,
@@ -55,8 +56,8 @@ afterEach(() => {
 
 describe("auth helpers", () => {
   it("hashes and verifies primary factors", async () => {
-    const hash = await hashPrimaryFactor("pin", "123456");
-    expect(await verifyPrimaryFactor("123456", hash)).toBeTrue();
+    const hash = await hashPrimaryFactor("pin", "48295173");
+    expect(await verifyPrimaryFactor("48295173", hash)).toBeTrue();
     expect(await verifyPrimaryFactor("999999", hash)).toBeFalse();
   });
 
@@ -66,6 +67,21 @@ describe("auth helpers", () => {
     );
     expect(() => validatePrimaryFactor("pin", "12ab56")).toThrow(
       "PINs must contain digits only.",
+    );
+    expect(() => validatePrimaryFactor("pin", "12345678")).toThrow(
+      "PINs cannot be obvious repeated or sequential digit patterns.",
+    );
+    expect(() => validatePrimaryFactor("pin", "11111111")).toThrow(
+      "PINs cannot be obvious repeated or sequential digit patterns.",
+    );
+  });
+
+  it("enforces the configured passphrase policy", () => {
+    expect(() => validatePrimaryFactor("password", "")).toThrow(
+      "Password or passphrase is required.",
+    );
+    expect(() => validatePrimaryFactor("password", "short pass")).toThrow(
+      `Passwords or passphrases must be at least ${MIN_PASSWORD_LENGTH} characters.`,
     );
   });
 

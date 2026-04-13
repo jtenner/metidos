@@ -8,7 +8,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { decryptAuthSecret, encryptAuthSecret } from "./auth-secrets";
+import {
+  type AuthSecretAccessError,
+  decryptAuthSecret,
+  deleteAuthSecretKey,
+  encryptAuthSecret,
+  getAuthSecretKeyPath,
+} from "./auth-secrets";
 
 const tempDirectories = new Set<string>();
 
@@ -62,5 +68,41 @@ describe("auth secret encryption", () => {
         appDataDir,
       }),
     ).toBe("second");
+  });
+
+  it("fails loudly instead of silently rotating the key when auth-secret.key is missing", async () => {
+    const appDataDir = createTempDirectory();
+    const ciphertext = await encryptAuthSecret("totp-secret-1", {
+      appDataDir,
+    });
+
+    expect(deleteAuthSecretKey({ appDataDir })).toBeTrue();
+
+    await expect(
+      decryptAuthSecret(ciphertext, {
+        appDataDir,
+      }),
+    ).rejects.toMatchObject({
+      keyPath: getAuthSecretKeyPath({
+        appDataDir,
+      }),
+      name: "AuthSecretAccessError",
+    } satisfies Partial<AuthSecretAccessError>);
+
+    const replacementCiphertext = await encryptAuthSecret("totp-secret-2", {
+      appDataDir,
+    });
+    await expect(
+      decryptAuthSecret(ciphertext, {
+        appDataDir,
+      }),
+    ).rejects.toThrow(
+      "Restore the original key file or complete a full auth reset before re-enrolling TOTP secrets.",
+    );
+    expect(
+      await decryptAuthSecret(replacementCiphertext, {
+        appDataDir,
+      }),
+    ).toBe("totp-secret-2");
   });
 });

@@ -17,7 +17,11 @@ import {
   verifyRecoveryCode,
   verifyTotpCode,
 } from "./auth";
-import { decryptAuthSecret, encryptAuthSecret } from "./auth-secrets";
+import {
+  AuthSecretAccessError,
+  decryptAuthSecret,
+  encryptAuthSecret,
+} from "./auth-secrets";
 import {
   AuthServiceError,
   type AuthStatus,
@@ -57,6 +61,13 @@ import {
   updateUserAdminStatus,
   upsertAuthSettings,
 } from "./db";
+
+function rethrowAuthSecretError(error: unknown): never {
+  if (error instanceof AuthSecretAccessError) {
+    throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
+  }
+  throw error;
+}
 
 /**
  * Create the TOTP secret and URI needed for QR-code enrollment.
@@ -131,12 +142,7 @@ export async function verifyPrimaryFactorAndTotp(
     settings.primaryFactorHash,
   );
   if (!primaryFactorValid) {
-    const failure = incrementFailedAttempts(
-      database,
-      user.id,
-      settings.failedPrimaryFactorAttempts,
-      now,
-    );
+    const failure = incrementFailedAttempts(database, user.id, now);
     recordInvalidAuthAttempt(database, {
       lockedUntil: failure.lockedUntil,
       method: "totp",
@@ -172,10 +178,15 @@ export async function verifyPrimaryFactorAndTotp(
     );
   }
 
-  const totpSecret = await decryptAuthSecret(
-    settings.totpSecretCiphertext,
-    buildAuthSecretOptions(input.appDataDir),
-  );
+  let totpSecret: string;
+  try {
+    totpSecret = await decryptAuthSecret(
+      settings.totpSecretCiphertext,
+      buildAuthSecretOptions(input.appDataDir),
+    );
+  } catch (error) {
+    rethrowAuthSecretError(error);
+  }
   const totpValid = await verifyTotpCode(totpSecret, input.totpCode, {
     atMs: now.getTime(),
   });
@@ -235,12 +246,7 @@ export async function verifyPrimaryFactorAndRecoveryCode(
 
   if (!primaryFactorValid || !matchingCodeHash) {
     if (!primaryFactorValid) {
-      const failure = incrementFailedAttempts(
-        database,
-        user.id,
-        settings.failedPrimaryFactorAttempts,
-        now,
-      );
+      const failure = incrementFailedAttempts(database, user.id, now);
       recordInvalidAuthAttempt(database, {
         lockedUntil: failure.lockedUntil,
         method: "recovery_code",
@@ -353,10 +359,15 @@ export async function setupAuth(
     );
   }
 
-  const totpSecretCiphertext = await encryptAuthSecret(
-    input.totpSecret,
-    buildAuthSecretOptions(input.appDataDir),
-  );
+  let totpSecretCiphertext: string;
+  try {
+    totpSecretCiphertext = await encryptAuthSecret(
+      input.totpSecret,
+      buildAuthSecretOptions(input.appDataDir),
+    );
+  } catch (error) {
+    rethrowAuthSecretError(error);
+  }
   const requestedSessionLifetimeDays = normalizeSessionLifetimeDays(
     input.sessionLifetimeDays,
   );
@@ -375,12 +386,7 @@ export async function setupAuth(
       existingSettings.primaryFactorHash,
     );
     if (!primaryFactorValid) {
-      const failure = incrementFailedAttempts(
-        database,
-        existingUser.id,
-        existingSettings.failedPrimaryFactorAttempts,
-        now,
-      );
+      const failure = incrementFailedAttempts(database, existingUser.id, now);
       recordInvalidAuthAttempt(database, {
         lockedUntil: failure.lockedUntil,
         method: "totp",

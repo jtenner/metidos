@@ -987,7 +987,7 @@ describe("project procedure configuration helpers", () => {
     });
     const adminSetup = await setupAuth(database, {
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: "48295173",
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
       totpSecret: enrollment.totpSecret,
@@ -1008,7 +1008,7 @@ describe("project procedure configuration helpers", () => {
 
     const createdUser = await procedures.createUserProcedure(
       {
-        pin: "654321",
+        pin: "91582746",
         username: "bob",
       },
       adminContext,
@@ -1024,7 +1024,7 @@ describe("project procedure configuration helpers", () => {
     await expect(
       procedures.createUserProcedure(
         {
-          pin: "654321",
+          pin: "91582746",
           username: "charlie",
         },
         {

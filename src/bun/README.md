@@ -262,10 +262,12 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `auth.ts`
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.
   - Handles Argon2id hashing, TOTP secret/URI generation and verification, recovery-code generation, and opaque token creation for sessions and websocket tickets.
+  - Enforces the current primary-factor policy: PINs must be at least 8 digits and avoid obvious sequential/repeated patterns, while passwords/passphrases must be at least 12 characters.
 
 - `auth-secrets.ts`
   - Manages the local encryption key used to protect persisted TOTP secrets at rest.
   - Encrypts and decrypts stored auth secrets with a locally generated AES-GCM key.
+  - Decrypt paths now fail loudly when `auth-secret.key` is missing or mismatched instead of silently minting a replacement key during login or step-up flows.
 
 - `auth-service.ts`
   - Stable public entrypoint for the backend auth flow used by setup/login/logout, step-up verification, and RPC gating.
@@ -274,6 +276,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 - `auth-service-core.ts`
   - Shared auth-service types, stable error codes, and low-level helpers for timing, lockout state, configured-user resolution, session creation, and audit events.
   - Keeps the reusable auth state transitions out of the public entrypoint so later hardening work can touch smaller files.
+  - Applies lockout failure counting inside an immediate SQLite transaction so concurrent bad logins cannot undercount toward the 3-attempt lockout window.
 
 - `auth-service-login.ts`
   - Implements setup, auth-status reads, TOTP login, recovery-code login, and pending-user creation on top of the DB/auth/auth-secret helpers.
@@ -291,6 +294,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Implements the command-line recovery and primary-factor reset flow for single-user local installs.
   - Verifies the configured primary factor plus TOTP before regenerating recovery codes or replacing the PIN/password.
   - Records security audit events for authenticated primary-factor resets and recovery-code regeneration.
+  - Depends on the existing `auth-secret.key`; if that key is lost, the documented recovery path is a full local auth reset followed by TOTP re-enrollment.
 
 - `dev-flows.ts`
   - Parses the explicit development-only security flags (`METIDOS_DEV_BYPASS=1` and `METIDOS_DEV_RESET=1`).

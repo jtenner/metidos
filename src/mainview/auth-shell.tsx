@@ -806,7 +806,7 @@ export default function AuthShell({
               <div className="grid grid-cols-2 gap-3">
                 <AuthChoiceButton
                   active={setupPrimaryFactorType === "pin"}
-                  body="6+ digits"
+                  body="8+ digits, no obvious runs"
                   onClick={() => {
                     setSetupPrimaryFactorType("pin");
                     setSetupPrimaryFactor("");
@@ -815,7 +815,7 @@ export default function AuthShell({
                 />
                 <AuthChoiceButton
                   active={setupPrimaryFactorType === "password"}
-                  body="Any passphrase"
+                  body="12+ character passphrase"
                   onClick={() => {
                     setSetupPrimaryFactorType("password");
                     setSetupPrimaryFactor("");
@@ -854,8 +854,8 @@ export default function AuthShell({
               status?.configured
                 ? "Enter the PIN given to you by an administrator"
                 : setupPrimaryFactorType === "pin"
-                  ? "Enter 6+ digits"
-                  : "Enter passphrase"
+                  ? "Enter 8+ non-obvious digits"
+                  : "Enter 12+ character passphrase"
             }
             type="password"
             value={setupPrimaryFactor}

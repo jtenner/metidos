@@ -30,6 +30,7 @@ import {
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
 const TEST_USERNAME = "alice";
+const TEST_ADMIN_PIN = "48295173";
 
 function createTestDatabase(): Database {
   const database = new Database(":memory:");
@@ -71,7 +72,7 @@ describe("auth reset CLI helpers", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
       totpSecret: enrollment.totpSecret,
@@ -83,7 +84,7 @@ describe("auth reset CLI helpers", () => {
       newPrimaryFactor: "correct horse battery staple",
       newPrimaryFactorType: "password",
       nowMs: setupTimeMs + 1_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       totpCode: await generateTotpCode(
         enrollment.totpSecret,
         setupTimeMs + 1_000,
@@ -110,7 +111,7 @@ describe("auth reset CLI helpers", () => {
       login(database, {
         appDataDir,
         nowMs: setupTimeMs + 2_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         totpCode: await generateTotpCode(
           enrollment.totpSecret,
           setupTimeMs + 2_000,
@@ -143,7 +144,7 @@ describe("auth reset CLI helpers", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
       totpSecret: enrollment.totpSecret,
@@ -157,7 +158,7 @@ describe("auth reset CLI helpers", () => {
     const regeneratedCodes = await regenerateRecoveryCodesFromCli(database, {
       appDataDir,
       nowMs: setupTimeMs + 1_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       totpCode: await generateTotpCode(
         enrollment.totpSecret,
         setupTimeMs + 1_000,

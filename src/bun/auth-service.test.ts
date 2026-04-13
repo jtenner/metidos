@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { generateTotpCode } from "./auth";
+import { deleteAuthSecretKey } from "./auth-secrets";
 import type { AuthServiceError } from "./auth-service";
 import {
   buildClearedSessionCookieHeader,
@@ -43,6 +44,8 @@ import {
 const openDatabases = new Set<Database>();
 const tempDirectories = new Set<string>();
 const TEST_USERNAME = "alice";
+const TEST_ADMIN_PIN = "48295173";
+const TEST_PENDING_USER_PIN = "91582746";
 
 function createTestDatabase(): Database {
   const database = new Database(":memory:");
@@ -74,9 +77,9 @@ afterEach(() => {
 
 const LOCKOUT_SCENARIOS = [
   {
-    invalidPrimaryFactor: "000000",
+    invalidPrimaryFactor: "00000000",
     name: "PIN logins",
-    primaryFactor: "123456",
+    primaryFactor: TEST_ADMIN_PIN,
     primaryFactorType: "pin",
   },
   {
@@ -109,7 +112,7 @@ describe("auth service", () => {
     const result = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode,
       totpSecret: enrollment.totpSecret,
@@ -262,6 +265,103 @@ describe("auth service", () => {
     });
   }
 
+  it("locks auth after three concurrent invalid primary-factor attempts", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, setupTimeMs),
+      totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    const attemptTimeMs = setupTimeMs + 1_000;
+    const attemptCode = await generateTotpCode(
+      enrollment.totpSecret,
+      attemptTimeMs,
+    );
+    const results = await Promise.allSettled([
+      login(database, {
+        appDataDir,
+        nowMs: attemptTimeMs,
+        primaryFactor: "00000000",
+        totpCode: attemptCode,
+        username: TEST_USERNAME,
+      }),
+      login(database, {
+        appDataDir,
+        nowMs: attemptTimeMs,
+        primaryFactor: "00000000",
+        totpCode: attemptCode,
+        username: TEST_USERNAME,
+      }),
+      login(database, {
+        appDataDir,
+        nowMs: attemptTimeMs,
+        primaryFactor: "00000000",
+        totpCode: attemptCode,
+        username: TEST_USERNAME,
+      }),
+    ]);
+
+    expect(
+      results.filter(
+        (entry) =>
+          entry.status === "rejected" && entry.reason?.code === "auth_locked",
+      ),
+    ).toHaveLength(1);
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(0);
+    expect(getAuthSettings(database)?.lockedUntil).toBe(
+      new Date(attemptTimeMs + 10 * 60 * 1000).toISOString(),
+    );
+    expect(
+      listSecurityAuditEvents(database).filter(
+        (event) => event.eventType === "auth_lockout_started",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("surfaces a clear auth-secret lifecycle error when the key file is lost", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+      username: TEST_USERNAME,
+    });
+
+    expect(deleteAuthSecretKey({ appDataDir })).toBeTrue();
+
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: nowMs + 1_000,
+        primaryFactor: TEST_ADMIN_PIN,
+        totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 1_000),
+        username: TEST_USERNAME,
+      }),
+    ).rejects.toMatchObject({
+      code: "auth_secret_unavailable",
+    } satisfies Partial<AuthServiceError>);
+  });
+
   it("does not lock out for invalid TOTP when the primary factor is correct", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();
@@ -277,7 +377,7 @@ describe("auth service", () => {
     await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: setupCode,
       totpSecret: enrollment.totpSecret,
@@ -295,7 +395,7 @@ describe("auth service", () => {
       login(database, {
         appDataDir,
         nowMs: setupTimeMs + 1_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         totpCode: invalidTotp,
         username: TEST_USERNAME,
       }),
@@ -304,7 +404,7 @@ describe("auth service", () => {
       login(database, {
         appDataDir,
         nowMs: setupTimeMs + 2_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         totpCode: invalidTotp,
         username: TEST_USERNAME,
       }),
@@ -313,7 +413,7 @@ describe("auth service", () => {
       login(database, {
         appDataDir,
         nowMs: setupTimeMs + 3_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         totpCode: invalidTotp,
         username: TEST_USERNAME,
       }),
@@ -333,7 +433,7 @@ describe("auth service", () => {
     const loginResult = await login(database, {
       appDataDir,
       nowMs: setupTimeMs + 4_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       totpCode: successCode,
       username: TEST_USERNAME,
     });
@@ -355,7 +455,7 @@ describe("auth service", () => {
     await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: setupCode,
       totpSecret: enrollment.totpSecret,
@@ -365,7 +465,7 @@ describe("auth service", () => {
     await expect(
       loginWithRecoveryCode(database, {
         nowMs: setupTimeMs + 1_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         recoveryCode: "INVALID-CODE-1",
         username: TEST_USERNAME,
       }),
@@ -373,7 +473,7 @@ describe("auth service", () => {
     await expect(
       loginWithRecoveryCode(database, {
         nowMs: setupTimeMs + 2_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         recoveryCode: "INVALID-CODE-2",
         username: TEST_USERNAME,
       }),
@@ -381,7 +481,7 @@ describe("auth service", () => {
     await expect(
       loginWithRecoveryCode(database, {
         nowMs: setupTimeMs + 3_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         recoveryCode: "INVALID-CODE-3",
         username: TEST_USERNAME,
       }),
@@ -406,7 +506,7 @@ describe("auth service", () => {
     await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
       totpSecret: adminEnrollment.totpSecret,
@@ -416,7 +516,7 @@ describe("auth service", () => {
     await createPendingUser(database, {
       actorUserId: 1,
       actorUsername: TEST_USERNAME,
-      pin: "654321",
+      pin: TEST_PENDING_USER_PIN,
       username: "bob",
     });
     const invitedEnrollment = prepareTotpEnrollment({
@@ -426,7 +526,7 @@ describe("auth service", () => {
     const invitedResult = await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs + 1_000,
-      primaryFactor: "654321",
+      primaryFactor: TEST_PENDING_USER_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(
         invitedEnrollment.totpSecret,
@@ -457,7 +557,7 @@ describe("auth service", () => {
     await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
       totpSecret: adminEnrollment.totpSecret,
@@ -472,7 +572,7 @@ describe("auth service", () => {
       setupAuth(database, {
         appDataDir,
         nowMs: setupTimeMs + 1_000,
-        primaryFactor: "654321",
+        primaryFactor: TEST_PENDING_USER_PIN,
         primaryFactorType: "pin",
         totpCode: await generateTotpCode(
           invitedEnrollment.totpSecret,
@@ -497,7 +597,7 @@ describe("auth service", () => {
     const adminSetup = await setupAuth(database, {
       appDataDir,
       nowMs: setupTimeMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(adminEnrollment.totpSecret, setupTimeMs),
       totpSecret: adminEnrollment.totpSecret,
@@ -507,7 +607,7 @@ describe("auth service", () => {
     await createPendingUser(database, {
       actorUserId: adminSetup.session.userId,
       actorUsername: adminSetup.session.username,
-      pin: "654321",
+      pin: TEST_PENDING_USER_PIN,
       username: "bob",
     });
 
@@ -515,7 +615,7 @@ describe("auth service", () => {
       login(database, {
         appDataDir,
         nowMs: setupTimeMs + 1_000,
-        primaryFactor: "654321",
+        primaryFactor: TEST_PENDING_USER_PIN,
         totpCode: "",
         username: "bob",
       }),
@@ -538,7 +638,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -575,7 +675,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -588,7 +688,7 @@ describe("auth service", () => {
 
     const result = await loginWithRecoveryCode(database, {
       nowMs: nowMs + 1_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       recoveryCode,
       username: TEST_USERNAME,
     });
@@ -611,7 +711,7 @@ describe("auth service", () => {
     await expect(
       loginWithRecoveryCode(database, {
         nowMs: nowMs + 2_000,
-        primaryFactor: "123456",
+        primaryFactor: TEST_ADMIN_PIN,
         recoveryCode,
         username: TEST_USERNAME,
       }),
@@ -634,7 +734,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -645,14 +745,14 @@ describe("auth service", () => {
     const loginResult = await login(database, {
       appDataDir,
       nowMs: nowMs + 1_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 1_000),
       username: TEST_USERNAME,
     });
     await stepUpSession(database, {
       appDataDir,
       nowMs: nowMs + 2_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       sessionId: loginResult.session.id,
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 2_000),
     });
@@ -692,7 +792,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -733,7 +833,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -759,7 +859,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,
@@ -779,7 +879,7 @@ describe("auth service", () => {
     const stepUpResult = await stepUpSession(database, {
       appDataDir,
       nowMs: nowMs + 2_000,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       sessionId: setupResult.session.id,
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 2_000),
     });
@@ -839,7 +939,7 @@ describe("auth service", () => {
     const setupResult = await setupAuth(database, {
       appDataDir,
       nowMs,
-      primaryFactor: "123456",
+      primaryFactor: TEST_ADMIN_PIN,
       primaryFactorType: "pin",
       totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
       totpSecret: enrollment.totpSecret,

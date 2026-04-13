@@ -152,6 +152,7 @@ export class AuthServiceError extends Error {
       | "auth_already_configured"
       | "auth_not_configured"
       | "auth_locked"
+      | "auth_secret_unavailable"
       | "admin_required"
       | "invalid_credentials"
       | "step_up_required"
@@ -256,6 +257,54 @@ export function normalizeUsername(username: string): string {
   return normalizedUsername;
 }
 
+function runInImmediateAuthTransaction<T>(
+  database: Database,
+  callback: () => T,
+): T {
+  database.run("BEGIN IMMEDIATE");
+  try {
+    const result = callback();
+    database.run("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      database.run("ROLLBACK");
+    } catch {
+      // Preserve the original failure when rollback also fails.
+    }
+    throw error;
+  }
+}
+
+function readMutableAuthSettingsForUser(
+  database: Database,
+  userId: number,
+  now: Date,
+): AuthSettingsRecord {
+  const settings = getAuthSettings(database, userId);
+  if (!settings) {
+    throw new Error(
+      `Authentication settings were not found for user ${userId}.`,
+    );
+  }
+
+  if (
+    settings.lockedUntil &&
+    Date.parse(settings.lockedUntil) <= now.getTime()
+  ) {
+    resetAuthFailureState(database, userId);
+    const refreshedSettings = getAuthSettings(database, userId);
+    if (!refreshedSettings) {
+      throw new Error(
+        `Authentication settings were not found for user ${userId}.`,
+      );
+    }
+    return refreshedSettings;
+  }
+
+  return settings;
+}
+
 export function hasTotpEnrollment(
   settings: Pick<AuthSettingsRecord, "totpSecretCiphertext">,
 ): boolean {
@@ -293,25 +342,27 @@ export function buildSession(
 export function incrementFailedAttempts(
   database: Database,
   userId: number,
-  failedAttempts: number,
   now: Date,
 ): { lockedUntil: string | null } {
-  const nextAttempts = failedAttempts + 1;
-  if (nextAttempts >= LOGIN_LOCKOUT_AFTER_FAILURES) {
-    const lockedUntil = addMilliseconds(
-      now,
-      LOGIN_LOCKOUT_WINDOW_MS,
-    ).toISOString();
-    setAuthFailureState(database, 0, lockedUntil, userId);
-    return {
-      lockedUntil,
-    };
-  }
+  return runInImmediateAuthTransaction(database, () => {
+    const settings = readMutableAuthSettingsForUser(database, userId, now);
+    const nextAttempts = settings.failedPrimaryFactorAttempts + 1;
+    if (nextAttempts >= LOGIN_LOCKOUT_AFTER_FAILURES) {
+      const lockedUntil = addMilliseconds(
+        now,
+        LOGIN_LOCKOUT_WINDOW_MS,
+      ).toISOString();
+      setAuthFailureState(database, 0, lockedUntil, userId);
+      return {
+        lockedUntil,
+      };
+    }
 
-  setAuthFailureState(database, nextAttempts, null, userId);
-  return {
-    lockedUntil: null,
-  };
+    setAuthFailureState(database, nextAttempts, null, userId);
+    return {
+      lockedUntil: null,
+    };
+  });
 }
 
 /**

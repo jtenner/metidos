@@ -22,6 +22,24 @@ const AES_GCM_IV_LENGTH = 12;
 type AuthSecretOptions = {
   appDataDir?: string;
 };
+
+export class AuthSecretAccessError extends Error {
+  constructor(
+    message: string,
+    readonly keyPath: string,
+  ) {
+    super(message);
+    this.name = "AuthSecretAccessError";
+  }
+}
+
+function buildMissingAuthSecretKeyMessage(path: string): string {
+  return `Auth secret key file is missing at ${path}. Restore the original key file or complete a full auth reset before re-enrolling TOTP secrets.`;
+}
+
+function buildInvalidAuthSecretKeyMessage(path: string): string {
+  return `Persisted TOTP secrets cannot be decrypted with auth-secret.key at ${path}. Restore the original key file or complete a full auth reset before re-enrolling TOTP secrets.`;
+}
 /**
  * Resolve the directory for persisted auth secret key material.
  * @param options - Optional app-data override.
@@ -111,11 +129,17 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 /**
- * Load existing auth key or create a new one if missing.
+ * Load an existing auth key or create a new one when explicitly allowed.
  * @param options - Optional app-data override.
  */
-
-function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
+function loadRawKey(
+  options?: AuthSecretOptions,
+  input: {
+    createIfMissing: boolean;
+  } = {
+    createIfMissing: false,
+  },
+): Uint8Array {
   const directory = authSecretDirectory(options);
   ensureDirectory(directory);
   const path = getAuthSecretKeyPath(options);
@@ -124,9 +148,19 @@ function loadOrCreateRawKey(options?: AuthSecretOptions): Uint8Array {
     applyOwnerOnlyFilePermissions(path);
     const raw = readFileSync(path, "utf8").trim();
     if (!raw) {
-      throw new Error(`Auth secret key file at ${path} is empty.`);
+      throw new AuthSecretAccessError(
+        buildInvalidAuthSecretKeyMessage(path),
+        path,
+      );
     }
     return base64UrlDecode(raw);
+  }
+
+  if (!input.createIfMissing) {
+    throw new AuthSecretAccessError(
+      buildMissingAuthSecretKeyMessage(path),
+      path,
+    );
   }
 
   const created = randomBytes(32);
@@ -147,7 +181,9 @@ async function importSecretKey(
   usages: KeyUsage[],
   options?: AuthSecretOptions,
 ): Promise<CryptoKey> {
-  const rawKey = loadOrCreateRawKey(options);
+  const rawKey = loadRawKey(options, {
+    createIfMissing: usages.includes("encrypt"),
+  });
   return crypto.subtle.importKey(
     "raw",
     toArrayBuffer(rawKey),
@@ -218,14 +254,25 @@ export async function decryptAuthSecret(
     throw new Error("Invalid auth secret ciphertext.");
   }
 
-  const key = await importSecretKey(["decrypt"], options);
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: toArrayBuffer(base64UrlDecode(ivEncoded)),
-    },
-    key,
-    toArrayBuffer(base64UrlDecode(payloadEncoded)),
-  );
-  return new TextDecoder().decode(plaintext);
+  const keyPath = getAuthSecretKeyPath(options);
+  try {
+    const key = await importSecretKey(["decrypt"], options);
+    const plaintext = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: toArrayBuffer(base64UrlDecode(ivEncoded)),
+      },
+      key,
+      toArrayBuffer(base64UrlDecode(payloadEncoded)),
+    );
+    return new TextDecoder().decode(plaintext);
+  } catch (error) {
+    if (error instanceof AuthSecretAccessError) {
+      throw error;
+    }
+    throw new AuthSecretAccessError(
+      buildInvalidAuthSecretKeyMessage(keyPath),
+      keyPath,
+    );
+  }
 }

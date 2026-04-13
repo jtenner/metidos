@@ -61,6 +61,10 @@ const HELP_TEXT = `Usage:
 Commands:
   reset-primary-factor      Verify current factor + TOTP, then replace the PIN/password.
   regenerate-recovery-codes Verify current factor + TOTP, then print a new view-once code set.
+
+Primary-factor policy:
+  PINs must be at least 8 digits and cannot be obvious repeated or sequential patterns.
+  Passwords/passphrases must be at least 12 characters.
 `;
 
 class MutedOutput extends Writable {

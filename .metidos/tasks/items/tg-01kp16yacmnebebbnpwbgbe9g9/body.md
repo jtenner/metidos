@@ -1,11 +1,11 @@
-Authentication and user management are thoughtfully designed, but the audit still found meaningful hardening gaps around lockout concurrency, factor policy, username edge cases, and the lifecycle of `auth-secret.key`.
+Authentication and user management are thoughtfully designed, and the first hardening slice has now tightened setup/reset factor policy, fixed the lockout undercount race, and clarified the `auth-secret.key` lifecycle. The remaining auth risk is narrower: username edge cases, custom-TOTP drift/algorithm concerns, disruptive recovery when the key is truly gone, dev-bypass exposure, and the lack of network-level rate limiting.
 
 ## Signals
 
-- `auth-service.ts` is itself a large orchestration file
-- lockout updates and resets are not obviously wrapped in one consistent transaction boundary
-- weak PINs and no network-level rate limiting limit the strength of step-up protection
-- losing the auth secret key is disruptive and needs clearer lifecycle handling
+- auth still relies on a custom TOTP implementation and local clock health
+- username normalization and migration edges still deserve scrutiny in multi-user upgrades
+- losing the original auth-secret key remains disruptive even though the failure mode is now explicit
+- no network-level rate limiting exists around the local auth surface
 
 ## Desired Outcome
 

@@ -18,7 +18,8 @@ export const DEFAULT_TOTP_DIGITS = 6;
 export const DEFAULT_TOTP_PERIOD_SECONDS = 30;
 export const DEFAULT_TOTP_WINDOW = 1;
 export const DEFAULT_RECOVERY_CODE_COUNT = 10;
-export const MIN_PIN_LENGTH = 6;
+export const MIN_PIN_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 12;
 
 type TotpOptions = {
   digits?: number;
@@ -173,6 +174,32 @@ function validateTotpPeriodSeconds(periodSeconds: number): void {
   }
 }
 
+function isObviousPin(value: string): boolean {
+  if (value.length === 0) {
+    return false;
+  }
+
+  const firstDigit = value[0];
+  if (firstDigit && value.split("").every((digit) => digit === firstDigit)) {
+    return true;
+  }
+
+  let ascending = true;
+  let descending = true;
+  for (let index = 1; index < value.length; index += 1) {
+    const previousDigit = Number(value[index - 1]);
+    const currentDigit = Number(value[index]);
+    if (currentDigit !== previousDigit + 1) {
+      ascending = false;
+    }
+    if (currentDigit !== previousDigit - 1) {
+      descending = false;
+    }
+  }
+
+  return ascending || descending;
+}
+
 /**
  * Enforce the setup-time policy for the selected primary factor.
  */
@@ -188,11 +215,21 @@ export function validatePrimaryFactor(
     if (value.length < MIN_PIN_LENGTH) {
       throw new Error(`PINs must be at least ${MIN_PIN_LENGTH} digits.`);
     }
+    if (isObviousPin(value)) {
+      throw new Error(
+        "PINs cannot be obvious repeated or sequential digit patterns.",
+      );
+    }
     return;
   }
 
   if (!value || value.trim().length === 0) {
     throw new Error("Password or passphrase is required.");
+  }
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `Passwords or passphrases must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+    );
   }
 }
 

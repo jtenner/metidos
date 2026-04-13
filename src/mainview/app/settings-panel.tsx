@@ -584,7 +584,7 @@ export function SettingsPanel({
                             handleCreateUser();
                           }
                         }}
-                        placeholder="6+ digit setup PIN"
+                        placeholder="8+ digit setup PIN"
                         spellCheck={false}
                         type="text"
                         value={newUserPin}
@@ -602,8 +602,9 @@ export function SettingsPanel({
                     </div>
                     <div className="mt-3 text-xs leading-5 text-[#8ea5b6]">
                       New users sign in with the username and PIN you assign
-                      here, then finish TOTP enrollment on first login. Admin
-                      access cannot be granted here.
+                      here, then finish TOTP enrollment on first login. PINs
+                      must be 8+ digits and avoid obvious repeated or sequential
+                      patterns. Admin access cannot be granted here.
                     </div>
                   </div>
                 </section>

@@ -10,7 +10,7 @@ import {
   verifyPrimaryFactor,
   verifyTotpCode,
 } from "./auth";
-import { decryptAuthSecret } from "./auth-secrets";
+import { AuthSecretAccessError, decryptAuthSecret } from "./auth-secrets";
 import {
   AuthServiceError,
   addMilliseconds,
@@ -44,6 +44,13 @@ import {
   setAuthSessionStepUpValidUntil,
   touchAuthSession,
 } from "./db";
+
+function rethrowAuthSecretError(error: unknown): never {
+  if (error instanceof AuthSecretAccessError) {
+    throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
+  }
+  throw error;
+}
 
 /**
  * Resolve a valid session row from a session id, pruning expired rows first.
@@ -132,12 +139,7 @@ export async function stepUpSession(
     settings.primaryFactorHash,
   );
   if (!primaryFactorValid) {
-    const failure = incrementFailedAttempts(
-      database,
-      session.userId,
-      settings.failedPrimaryFactorAttempts,
-      now,
-    );
+    const failure = incrementFailedAttempts(database, session.userId, now);
     recordInvalidAuthAttempt(database, {
       lockedUntil: failure.lockedUntil,
       method: "totp",
@@ -162,10 +164,15 @@ export async function stepUpSession(
     );
   }
 
-  const totpSecret = await decryptAuthSecret(
-    settings.totpSecretCiphertext,
-    buildAuthSecretOptions(input.appDataDir),
-  );
+  let totpSecret: string;
+  try {
+    totpSecret = await decryptAuthSecret(
+      settings.totpSecretCiphertext,
+      buildAuthSecretOptions(input.appDataDir),
+    );
+  } catch (error) {
+    rethrowAuthSecretError(error);
+  }
   const totpValid = await verifyTotpCode(totpSecret, input.totpCode, {
     atMs: now.getTime(),
   });
