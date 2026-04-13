@@ -81,7 +81,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Serves as the primary bridge between Metidos thread records and Pi `AgentSession` instances.
 
 - `pi-thread-runtime.test.ts`
-  - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, and delegated child-session execution.
+  - Focused unit coverage for deterministic Pi session directories, session resume behavior, safe-vs-unsafe tool gating, delegated child-session execution, and a real Bun-SDK smoke that runs emitted Pi events through Metidos's shared projection/telemetry boundary.
 
 - `pi-codex-auth.ts`
   - Shared auth-bridge helper for Codex-via-Pi support.

@@ -66,6 +66,11 @@ The maintainer-facing workflow and expected result shapes for that surface are d
   - Synthesizes Metidos `file_change` rows for successful Pi `edit` and `write` calls so transcript diff cards stay useful after the Codex removal.
   - Keeps the Pi-to-Metidos transcript mapping explicit so later slices can extend remaining tool or custom-extension semantics cleanly.
 
+- `pi-sdk-shapes.ts`
+  - Shared Pi SDK payload-shape boundary used by turn settlement, event projection, and runtime telemetry.
+  - Centralizes how Metidos reads assistant text, token usage, timestamps, and tool output from Pi-owned message/event payloads.
+  - Keeps Bun-side Pi compatibility assumptions in one place so smoke tests can catch upstream SDK drift before it turns into projection bugs.
+
 - `shared.ts`
   - Shared infrastructure for cache, concurrency, and cancellation primitives used by multiple procedure modules.
   - Exposes LRU helpers, abort normalization, abort-aware Promise awaiting, and bounded concurrency limiting.

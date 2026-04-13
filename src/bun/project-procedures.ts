@@ -122,6 +122,10 @@ import {
   type ProjectedPiActivityWrite,
 } from "./project-procedures/pi-event-projection";
 import {
+  extractPiAssistantMessageText,
+  extractPiAssistantUsage,
+} from "./project-procedures/pi-sdk-shapes";
+import {
   applyPiRuntimeTelemetry,
   buildPiRuntimeCompaction,
   buildPiRuntimeUsage,
@@ -1684,16 +1688,6 @@ function interruptionMessageFromAbort(reason: unknown): string {
   }
   return THREAD_INTERRUPTED_MESSAGE;
 }
-/**
- * Builds thread turn activity id.
- * @param startedAt - Turn start timestamp included in the activity ID.
- * @param itemId - itemId identifier.
- */
-
-function buildThreadTurnActivityId(startedAt: string, itemId: string): string {
-  return `${startedAt}:${itemId}`;
-}
-
 const THREAD_FINAL_EVENT_GRACE_MS = 50;
 
 export function missingAssistantResponseErrorMessage(
@@ -2073,122 +2067,6 @@ type BufferedThreadActivityWrite = {
   signature: string;
   terminal: boolean;
 };
-/**
- * Performs extractToolCallTextContent operation.
- * @param content - Raw tool-call content to extract human-readable text from.
- */
-
-function extractToolCallTextContent(content: unknown): string {
-  if (!Array.isArray(content)) {
-    return "";
-  }
-
-  return content
-    .flatMap((block) => {
-      if (!block || typeof block !== "object") {
-        return [];
-      }
-      const candidate = block as { type?: unknown; text?: unknown };
-      if (
-        candidate.type !== "text" ||
-        typeof candidate.text !== "string" ||
-        !candidate.text.trim()
-      ) {
-        return [];
-      }
-      return [candidate.text];
-    })
-    .join("\n\n");
-}
-
-function extractPiAssistantMessageText(message: unknown): string {
-  if (!message || typeof message !== "object") {
-    return "";
-  }
-
-  const candidate = message as {
-    content?: string | unknown[];
-  };
-  if (typeof candidate.content === "string") {
-    return candidate.content;
-  }
-  return extractToolCallTextContent(candidate.content);
-}
-
-function extractPiAssistantUsage(message: unknown): RpcThreadUsage | null {
-  if (!message || typeof message !== "object") {
-    return null;
-  }
-
-  const usage = (message as { usage?: Record<string, unknown> }).usage;
-  if (!usage) {
-    return null;
-  }
-
-  const inputTokens =
-    typeof usage.input === "number" && Number.isFinite(usage.input)
-      ? usage.input
-      : null;
-  const cachedInputTokens =
-    typeof usage.cacheRead === "number" && Number.isFinite(usage.cacheRead)
-      ? usage.cacheRead
-      : null;
-  const outputTokens =
-    typeof usage.output === "number" && Number.isFinite(usage.output)
-      ? usage.output
-      : null;
-
-  if (
-    inputTokens === null &&
-    cachedInputTokens === null &&
-    outputTokens === null
-  ) {
-    return null;
-  }
-
-  return {
-    inputTokens: inputTokens ?? 0,
-    cachedInputTokens: cachedInputTokens ?? 0,
-    outputTokens: outputTokens ?? 0,
-  };
-}
-
-function _buildPiAssistantActivityId(
-  startedAt: string,
-  message: unknown,
-  prefix: string,
-): string {
-  const timestamp =
-    message && typeof message === "object"
-      ? (message as { timestamp?: unknown }).timestamp
-      : null;
-  const suffix =
-    typeof timestamp === "number" && Number.isFinite(timestamp)
-      ? String(timestamp)
-      : prefix;
-  return buildThreadTurnActivityId(startedAt, `${prefix}:${suffix}`);
-}
-
-function _extractPiToolExecutionOutput(value: unknown): string {
-  if (!value || typeof value !== "object") {
-    return "";
-  }
-
-  const candidate = value as {
-    content?: unknown;
-  };
-  return extractToolCallTextContent(candidate.content);
-}
-
-function _extractPiBashExitCode(output: string): number | null {
-  const match = output.match(/Command exited with code (\d+)\s*$/u);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(match[1] ?? "", 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function createBufferedThreadActivityWriter(): {
   flushAll: () => Promise<void>;

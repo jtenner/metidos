@@ -2,7 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { SessionManager } from "@mariozechner/pi-coding-agent";
+import {
+  type AgentSessionEvent,
+  SessionManager,
+} from "@mariozechner/pi-coding-agent";
 import { resetResolvedAppDataDirectory } from "./db";
 import { createPiThreadExtensionUiBridge } from "./pi-extension-ui";
 import type { PiGitHubToolHost } from "./pi-github-tools";
@@ -21,6 +24,12 @@ import {
 } from "./pi-thread-runtime";
 import { buildModelCatalog } from "./project-procedures/model-catalog";
 import { buildPiModelsJsonPath } from "./project-procedures/ollama-provider-config";
+import { createPiThreadEventProjector } from "./project-procedures/pi-event-projection";
+import {
+  extractPiAssistantMessageText,
+  extractPiAssistantUsage,
+} from "./project-procedures/pi-sdk-shapes";
+import { buildPiRuntimeUsage } from "./project-procedures/pi-session-telemetry";
 
 const originalPiRuntimeTestProvider =
   process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV];
@@ -463,6 +472,95 @@ test("every provider runtime exposes Metidos, GitHub, and agent tools to the mod
   }
 });
 
+test("real Pi SDK runs stay compatible with the shared projection and telemetry boundary", async () => {
+  const appDataDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-app-"),
+  );
+  const codexHomeDir = mkdtempSync(join(tmpdir(), "metidos-codex-home-"));
+  const workspaceDir = mkdtempSync(
+    join(tmpdir(), "metidos-pi-thread-runtime-ws-"),
+  );
+  process.env[PI_THREAD_RUNTIME_TEST_PROVIDER_ENV] =
+    PI_THREAD_RUNTIME_TEST_PROVIDER_OPENAI_PROBE;
+
+  try {
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    process.env.CODEX_HOME = codexHomeDir;
+    const runtime = await createPiThreadRuntime(
+      {
+        agentsAccess: false,
+        githubAccess: false,
+        id: 19,
+        metidosAccess: false,
+        model: "gpt-5.4",
+        piSessionFile: null,
+        projectId: 1,
+        reasoningEffort: "medium",
+        unsafeMode: 0,
+        webSearchAccess: true,
+        worktreePath: workspaceDir,
+      },
+      {
+        appDataDir,
+      },
+    );
+
+    try {
+      const projector = createPiThreadEventProjector({
+        startedAt: "2026-04-12T18:00:00.000Z",
+        threadId: 19,
+        worktreePath: workspaceDir,
+      });
+      const observedEventTypes: AgentSessionEvent["type"][] = [];
+      const unsubscribe = runtime.session.subscribe((event) => {
+        observedEventTypes.push(event.type);
+        projector.project(event);
+      });
+
+      await runtime.session.prompt("projection-boundary-smoke");
+      unsubscribe();
+
+      const snapshot = projector.snapshot();
+      const lastAssistantMessage = [...runtime.session.messages]
+        .reverse()
+        .find((message) => message.role === "assistant");
+      const runtimeUsage = buildPiRuntimeUsage(null, runtime);
+
+      expect(observedEventTypes).toContain("message_update");
+      expect(observedEventTypes).toContain("message_end");
+      expect(snapshot.lastAssistantText).toContain("pi-runtime-probe");
+      expect(snapshot.lastAssistantText).toContain("projection-boundary-smoke");
+      expect(snapshot.usage?.inputTokens ?? 0).toBeGreaterThan(0);
+      expect(extractPiAssistantMessageText(lastAssistantMessage)).toContain(
+        "projection-boundary-smoke",
+      );
+      expect(extractPiAssistantUsage(lastAssistantMessage)).toEqual(
+        expect.objectContaining({
+          inputTokens: expect.any(Number),
+          outputTokens: expect.any(Number),
+        }),
+      );
+      expect(runtimeUsage?.contextWindowTokens).toBe(8_192);
+      expect(runtimeUsage?.inputTokens ?? 0).toBeGreaterThan(0);
+    } finally {
+      runtime.session.dispose();
+    }
+  } finally {
+    rmSync(appDataDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(codexHomeDir, {
+      force: true,
+      recursive: true,
+    });
+    rmSync(workspaceDir, {
+      force: true,
+      recursive: true,
+    });
+  }
+});
+
 test("keeps the explicit OpenAI Codex provider instead of silently normalizing back to plain OpenAI", async () => {
   const appDataDir = mkdtempSync(
     join(tmpdir(), "metidos-pi-thread-runtime-app-"),
@@ -482,7 +580,7 @@ test("keeps the explicit OpenAI Codex provider instead of silently normalizing b
       {
         agentsAccess: false,
         githubAccess: false,
-        id: 19,
+        id: 20,
         metidosAccess: false,
         model: "openai-codex:gpt-5.4",
         piSessionFile: null,
@@ -541,7 +639,7 @@ test("rewires xAI models onto Responses API so native web search can be enabled"
       {
         agentsAccess: false,
         githubAccess: false,
-        id: 20,
+        id: 21,
         metidosAccess: false,
         model: "xai:grok-4-1-fast",
         piSessionFile: null,
@@ -599,7 +697,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
       {
         agentsAccess: false,
         githubAccess: false,
-        id: 21,
+        id: 22,
         metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,
@@ -626,7 +724,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
 
     const alternateSessionManager = SessionManager.create(
       workspaceDir,
-      buildPiThreadSessionDirectoryPath(21, appDataDir),
+      buildPiThreadSessionDirectoryPath(22, appDataDir),
     );
     alternateSessionManager.appendMessage({
       content: [
@@ -646,7 +744,7 @@ test("reopens the persisted Pi session file instead of the most recent session",
       {
         agentsAccess: false,
         githubAccess: false,
-        id: 21,
+        id: 22,
         metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: initialSessionFile,
@@ -696,7 +794,7 @@ test("runPiDelegatedTask executes an isolated child session without agent recurs
       {
         agentsAccess: true,
         githubAccess: false,
-        id: 23,
+        id: 24,
         metidosAccess: false,
         model: "gpt-5.4",
         piSessionFile: null,

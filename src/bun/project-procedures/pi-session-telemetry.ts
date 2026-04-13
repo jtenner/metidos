@@ -16,7 +16,7 @@ import type {
   RpcThreadRunStatus,
   RpcThreadUsage,
 } from "../rpc-schema";
-import { extractPiAssistantUsage } from "./pi-event-projection";
+import { extractPiAssistantUsage } from "./pi-sdk-shapes";
 
 function isFinitePositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
