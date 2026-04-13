@@ -4805,6 +4805,7 @@ export default function App({
                     onOpenThreadActionMenu: openThreadActionMenu,
                     pinnedThreads: desktopPinnedThreads,
                     projectById,
+                    recentThreads: filteredWorkspaceActiveThreads,
                     selectedThreadId,
                     threadActivityIndicator,
                     threadPreviewsDisabled: threadActionMenu !== null,

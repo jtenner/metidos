@@ -84,7 +84,7 @@ This contains the workspace feature modules that implement every visible workspa
 
 `app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
 
-`app/pinned-threads-panel.tsx` renders the global pinned-thread shortcuts used in the desktop navigation rail.
+`app/pinned-threads-panel.tsx` renders the desktop thread section with pinned shortcuts plus the five most recent unpinned threads.
 
 `app/settings-panel.tsx` renders the top-right settings popover shell and now hosts a minimal OpenAI Codex auth card with a status badge, `Connect`/`Disconnect`, and `Refresh Status`. The supported path stays explicit: users run `codex login` themselves, then refresh Metidos status so the shared Codex auth file can be detected.
 

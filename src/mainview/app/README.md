@@ -35,7 +35,7 @@ Composes the shared mobile/sidebar-drawer sections, including project search, th
 Renders project listings and project-focused interactions, including selection, a single virtualized worktree list ordered by pinned state and workspace name, and the active-worktree thread-switcher trigger.
 
 `pinned-threads-panel.tsx`
-Renders the global pinned-thread shortcuts used in the desktop navigation rail.
+Renders the desktop thread section with pinned shortcuts plus the five most recent unpinned threads.
 
 `threads-panel.tsx`
 Renders thread lists and thread row interactions as the canonical thread-navigation surface.
