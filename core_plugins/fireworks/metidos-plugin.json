@@ -1,0 +1,56 @@
+{
+  "id": "fireworks",
+  "name": "Fireworks AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Fireworks AI as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#ff5f1f",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.fireworks.ai/inference/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "FIREWORKS_API_KEY",
+      "description": "Fallback Fireworks API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Fireworks API key",
+      "description": "Fireworks API key used for model discovery and inference. Falls back to FIREWORKS_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "fireworks",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "fireworks",
+      "source": "env",
+      "value": "FIREWORKS_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "fireworks",
+      "name": "Fireworks AI",
+      "description": "Refreshes Fireworks chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

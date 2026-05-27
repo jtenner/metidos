@@ -1,0 +1,45 @@
+{
+  "id": "replicate",
+  "name": "Replicate",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Replicate as a first-party model provider using the fixed Replicate HTTP Predictions API for text-generation models discovered from the upstream model catalog.",
+  "color": "#000000",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": [
+      "https://api.replicate.com/v1/models",
+      "https://api.replicate.com/v1/models/**/predictions"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "REPLICATE_API_TOKEN",
+      "description": "Fallback Replicate API token used for model discovery and prediction execution when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Replicate API token",
+      "description": "Replicate API token used for model discovery and prediction execution. Falls back to REPLICATE_API_TOKEN.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "replicate",
+      "name": "Replicate",
+      "description": "Discovers prompt-based text-generation models from Replicate's /v1/models catalog and runs them through Replicate's model-scoped Predictions API.",
+      "timeoutMs": 120000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

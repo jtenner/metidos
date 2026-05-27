@@ -1,0 +1,92 @@
+{
+  "id": "notion",
+  "name": "Notion",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds Notion workspace search, read, data source query, page creation/update, and comment tools for approved threads.",
+  "color": "#ffffff",
+  "permissions": [
+    "network:fetch",
+    "metidos:can_embed",
+    "metidos:lancedb",
+    "storage:write",
+    "log:write"
+  ],
+  "env": [
+    {
+      "key": "NOTION_API_KEY",
+      "description": "Fallback Notion API key used when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Notion API key",
+      "description": "Notion integration secret used for API requests. Falls back to NOTION_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "network": {
+    "allow": ["https://api.notion.com/v1/**"],
+    "enforceHttps": true
+  },
+  "access": [
+    {
+      "id": "notion_read",
+      "name": "Notion - Read",
+      "description": "Expose Notion search, fetch, and data source query tools to selected threads.",
+      "tools": [
+        {
+          "name": "search",
+          "description": "Search Notion pages, databases, and data sources by title/content. Parameters: query string; optional filter.object page, database, or data_source; optional page_size and start_cursor.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "semantic_search",
+          "description": "Search Notion, embed returned object summaries, and rank cached results semantically. Requires a configured embedding model.",
+          "timeoutMs": 60000
+        },
+        {
+          "name": "fetch",
+          "description": "Fetch a Notion page, database, data source, or block by URL or ID. Parameters: target string; optional format summary, markdown, page, blocks, or schema; optional include_children, depth, page_size, and start_cursor.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "query_data_source",
+          "description": "Query a Notion data source with optional filter, sorts, filter_properties, page_size, and start_cursor.",
+          "timeoutMs": 30000
+        }
+      ]
+    },
+    {
+      "id": "notion_write",
+      "name": "Notion - Write",
+      "description": "Expose Notion page creation, page update, and comment tools to selected threads.",
+      "tools": [
+        {
+          "name": "create_page",
+          "description": "Create a Notion page under a page, data source, or workspace with optional title, properties, markdown, children, template_id, icon, and cover.",
+          "timeoutMs": 60000
+        },
+        {
+          "name": "update_page",
+          "description": "Update Notion page properties/icon/cover/trash state and optionally append or replace markdown/blocks using the 2026 position object for block insertion.",
+          "timeoutMs": 60000
+        },
+        {
+          "name": "comment",
+          "description": "List or create Notion comments. List requires action=list and block_id. Create requires action=create, parent, and rich_text.",
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 26214400,
+    "maxTextResultBytes": 262144
+  }
+}

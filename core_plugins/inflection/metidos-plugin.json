@@ -1,0 +1,70 @@
+{
+  "id": "inflection",
+  "name": "Inflection AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Inflection AI as a first-party OpenAI-compatible chat and embeddings provider with config discovery.",
+  "color": "#5b7cfa",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://api.inflection.ai/v1/discovery/configs",
+      "https://api.inflection.ai/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "INFLECTION_API_KEY",
+      "description": "Fallback Inflection AI API key used for config discovery, chat inference, and embeddings when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Inflection AI API key",
+      "description": "Inflection AI API key used for config discovery, chat inference, and embeddings. Falls back to INFLECTION_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "inflection",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "inflection",
+      "source": "env",
+      "value": "INFLECTION_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "inflection",
+      "name": "Inflection AI",
+      "description": "Registers Inflection OpenAI-compatible chat completions models and refreshes organization-visible configs from /v1/discovery/configs.",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "inflection_embeddings",
+      "name": "Inflection AI Embeddings",
+      "description": "Provides Inflection embeddings through the /v1/embeddings endpoint.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

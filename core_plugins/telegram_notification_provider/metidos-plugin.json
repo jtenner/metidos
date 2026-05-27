@@ -1,0 +1,73 @@
+{
+  "id": "telegram_notification_provider",
+  "name": "Telegram Notification Provider",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Sends Metidos notifications through a Telegram bot.",
+  "color": "#229ED9",
+  "permissions": ["notification:provider", "network:fetch"],
+  "network": {
+    "allow": ["https://api.telegram.org/bot*/sendMessage"]
+  },
+  "env": [
+    {
+      "key": "TELEGRAM_BOT_TOKEN",
+      "description": "Default Telegram bot token. This env var is the supported sharing point with Telegram ingress; chat IDs are configured only through plugin settings.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Enabled",
+      "description": "Send notifications through Telegram.",
+      "kind": "boolean",
+      "default": false,
+      "required": false
+    },
+    {
+      "key": "chat_id",
+      "label": "Telegram chat ID",
+      "description": "Telegram chat ID for notifications. This must be configured as a setting; there is intentionally no chat ID environment variable.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "bot_token",
+      "label": "Telegram bot token",
+      "description": "Optional notification-only Telegram bot token. Falls back to TELEGRAM_BOT_TOKEN.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "parse_mode",
+      "label": "Parse mode",
+      "description": "Telegram parse mode for messages.",
+      "kind": "enum",
+      "options": ["none", "MarkdownV2", "HTML"],
+      "default": "none",
+      "required": false
+    },
+    {
+      "key": "disable_web_page_preview",
+      "label": "Disable web page previews",
+      "description": "Ask Telegram not to render link previews for notification messages.",
+      "kind": "boolean",
+      "default": true,
+      "required": false
+    }
+  ],
+  "notificationProviders": [
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "description": "Sends Metidos notifications to a configured Telegram chat and returns provider receipts.",
+      "timeoutMs": 10000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 262144
+  }
+}

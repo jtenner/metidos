@@ -1,0 +1,56 @@
+{
+  "id": "openai",
+  "name": "OpenAI API",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Stores OpenAI API key settings for Pi's built-in OpenAI provider and registers OpenAI embedding models for Metidos vector search.",
+  "color": "#10a37f",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings"
+  ],
+  "network": {
+    "allow": ["https://api.openai.com/v1/embeddings"]
+  },
+  "env": [
+    {
+      "key": "OPENAI_API_KEY",
+      "description": "Fallback OpenAI API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "OpenAI API key",
+      "description": "OpenAI API key used for Pi's built-in OpenAI provider and embeddings. Falls back to OPENAI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "openai_embeddings",
+      "name": "OpenAI Embeddings",
+      "description": "Embeds text through OpenAI's embeddings API for Metidos vector search.",
+      "timeoutMs": 30000
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "openai",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "openai",
+      "source": "env",
+      "value": "OPENAI_API_KEY"
+    }
+  ]
+}

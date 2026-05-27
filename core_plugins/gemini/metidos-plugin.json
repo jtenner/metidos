@@ -1,0 +1,82 @@
+{
+  "id": "gemini",
+  "name": "Google Gemini",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Google Gemini as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#4285f4",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://generativelanguage.googleapis.com/v1beta/openai/models",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "GEMINI_API_KEY",
+      "description": "Fallback Google Gemini API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "GOOGLE_API_KEY",
+      "description": "Secondary fallback Google API key used when neither api_key nor GEMINI_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Google Gemini API key",
+      "description": "Google Gemini API key used for model discovery and inference. Falls back to GEMINI_API_KEY, then GOOGLE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "gemini",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "gemini",
+      "source": "env",
+      "value": "GEMINI_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "gemini",
+      "source": "env",
+      "value": "GOOGLE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "description": "Refreshes Google Gemini chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "gemini_embeddings",
+      "name": "Google Gemini Embeddings",
+      "description": "Embeds text through Gemini's native embeddings API for Metidos vector search.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

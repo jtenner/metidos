@@ -1,0 +1,95 @@
+# Copy to deploy/podman/compose.yml and adjust local paths, ports, volumes, and
+# optional provider credentials in deploy/podman/.env.podman.
+#
+# This file is safe to commit. Keep host-specific compose files ignored.
+
+services:
+  metidos:
+    build:
+      context: ../..
+      dockerfile: deploy/podman/Containerfile
+    image: localhost/metidos:podman
+    container_name: ${METIDOS_CONTAINER_NAME:-metidos}
+    restart: unless-stopped
+    network_mode: slirp4netns:allow_host_loopback=true
+    env_file:
+      - .env.podman
+    environment:
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_OAUTH_TOKEN: ${ANTHROPIC_OAUTH_TOKEN:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-}
+      AZURE_OPENAI_BASE_URL: ${AZURE_OPENAI_BASE_URL:-}
+      AZURE_OPENAI_DEPLOYMENT_NAME_MAP: ${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:-}
+      AZURE_OPENAI_RESOURCE_NAME: ${AZURE_OPENAI_RESOURCE_NAME:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      BUN_CHROME_PATH: /usr/bin/chromium
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_KEY: ${CLOUDFLARE_API_KEY:-}
+      CLOUDFLARE_GATEWAY_ID: ${CLOUDFLARE_GATEWAY_ID:-}
+      CODEX_AUTH_JSON_PATH: /data/plugins/codex/.data/auth.json
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+      GCLOUD_PROJECT: ${GCLOUD_PROJECT:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GH_CONFIG_DIR: /data/gh
+      GOOGLE_CLOUD_API_KEY: ${GOOGLE_CLOUD_API_KEY:-}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      HOME: ${METIDOS_CONTAINER_HOME:-/home/metidos}
+      INCEPTION_API_KEY: ${INCEPTION_API_KEY:-}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
+      METIDOS_APP_DATA_DIR: /data
+      METIDOS_CHROME_DEBUG_BACKEND_PORT: ${METIDOS_CHROME_DEBUG_BACKEND_PORT:-19222}
+      METIDOS_CHROME_DEBUG_PORT: ${METIDOS_CHROME_DEBUG_PORT:-9222}
+      METIDOS_CHROME_DEBUG_USER_DATA_DIR: ${METIDOS_CHROME_DEBUG_USER_DATA_DIR:-/data/chrome-debug}
+      METIDOS_INSTALL_DEPS_ON_START: ${METIDOS_INSTALL_DEPS_ON_START:-1}
+      METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS: ${METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS:-ollama}
+      METIDOS_PORT: "7599"
+      METIDOS_SERVER_HOST: 0.0.0.0
+      METIDOS_SOURCE_DIR: ${METIDOS_CONTAINER_SOURCE_DIR:-/app}
+      METIDOS_TRUST_PROXY: "true"
+      METIDOS_WEB_SERVER_SHARE_HOST: 127.0.0.1
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_CN_API_KEY: ${MINIMAX_CN_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MOONBIT_BIN_DIR: ${MOONBIT_BIN_DIR:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://10.0.2.2:11434}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      UPLOADTHING_API_KEY: ${UPLOADTHING_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+    ports:
+      - "127.0.0.1:${METIDOS_HOST_PORT:-7599}:7599"
+    volumes:
+      - metidos-data:/data
+      - ${METIDOS_HOST_PROJECTS_DIR:?set METIDOS_HOST_PROJECTS_DIR}:${METIDOS_CONTAINER_PROJECTS_DIR:-/home/metidos/Projects}
+      - metidos-source-node-modules:${METIDOS_CONTAINER_SOURCE_DIR:-/app}/node_modules
+      - ${CODEX_AUTH_JSON:?set CODEX_AUTH_JSON}:/data/plugins/codex/.data/auth.json:ro
+      # Uncomment when using the GitHub Copilot provider plugin.
+      # - ${GITHUB_COPILOT_AUTH_JSON:?set GITHUB_COPILOT_AUTH_JSON}:/data/plugins/github_copilot/.data/auth.json:ro
+      # Uncomment only if agent git operations need host SSH credentials.
+      # Prefer a deploy key or dedicated machine user over your personal ~/.ssh.
+      # - ${METIDOS_HOST_SSH_DIR:?set METIDOS_HOST_SSH_DIR}:${METIDOS_CONTAINER_HOME:-/home/metidos}/.ssh:ro
+
+volumes:
+  metidos-data:
+    name: ${METIDOS_DATA_VOLUME:-metidos-data}
+  metidos-source-node-modules:
+    name: ${METIDOS_NODE_MODULES_VOLUME:-metidos-source-node-modules}

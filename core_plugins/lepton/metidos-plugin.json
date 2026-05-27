@@ -1,0 +1,91 @@
+{
+  "id": "lepton",
+  "name": "DGX Cloud Lepton",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a DGX Cloud Lepton OpenAI-compatible endpoint as a first-party chat provider using configured model IDs.",
+  "color": "#76b900",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "LEPTON_BASE_URL",
+      "description": "Optional fallback DGX Cloud Lepton OpenAI-compatible endpoint base URL when no base_url Plugin Setting is configured. The plugin accepts HTTPS Lepton endpoint URLs under /api/v1 or /v1.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "LEPTON_API_KEY",
+      "description": "Optional fallback Lepton API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "LEPTON_API_TOKEN",
+      "description": "Optional fallback Lepton API token used for inference when no api_key Plugin Setting or LEPTON_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "LEPTON_MODEL_IDS",
+      "description": "Optional comma-separated model IDs exposed by the Lepton endpoint when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "Lepton base URL",
+      "description": "DGX Cloud Lepton endpoint base URL from the endpoint API tab. The plugin accepts provider-owned HTTPS domains ending in /api/v1 or /v1, or appends /api/v1 when only the endpoint origin is supplied.",
+      "kind": "url",
+      "required": false
+    },
+    {
+      "key": "api_key",
+      "label": "Lepton API key",
+      "description": "Optional Lepton API key or token used as a bearer token for inference. Falls back to LEPTON_API_KEY and then LEPTON_API_TOKEN.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "Lepton model IDs",
+      "description": "Model IDs to expose for the Lepton endpoint. Use IDs returned by the endpoint /models response or the deployed model name. Falls back to comma-separated LEPTON_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "lepton",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "lepton",
+      "source": "env",
+      "value": "LEPTON_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "lepton",
+      "source": "env",
+      "value": "LEPTON_API_TOKEN"
+    }
+  ],
+  "providers": [
+    {
+      "id": "lepton",
+      "name": "DGX Cloud Lepton",
+      "description": "Registers configured DGX Cloud Lepton OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "id": "sagemaker",
+  "name": "Amazon SageMaker AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Amazon SageMaker AI real-time endpoints as first-party OpenAI-compatible chat providers using configured endpoint names, model IDs, and short-lived bearer-token auth.",
+  "color": "#ff9900",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "SAGEMAKER_BEARER_TOKEN",
+      "description": "Fallback short-lived SageMaker bearer token used for inference when no bearer_token Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "AWS_BEARER_TOKEN_SAGEMAKER",
+      "description": "Alternate fallback short-lived SageMaker bearer token used for inference.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "SAGEMAKER_ENDPOINT_NAME",
+      "description": "Fallback SageMaker endpoint name used when no endpoint_name Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "SAGEMAKER_INFERENCE_COMPONENT_NAME",
+      "description": "Optional fallback SageMaker inference component name used when no inference_component_name Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "SAGEMAKER_MODEL_IDS",
+      "description": "Optional comma-separated model IDs exposed by the SageMaker endpoint when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "bearer_token",
+      "label": "SageMaker bearer token",
+      "description": "Short-lived SageMaker bearer token authorized for OpenAI-compatible endpoint inference. Falls back to SAGEMAKER_BEARER_TOKEN or AWS_BEARER_TOKEN_SAGEMAKER.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "endpoint_name",
+      "label": "SageMaker endpoint name",
+      "description": "SageMaker real-time endpoint name that exposes /openai/v1/chat/completions. Falls back to SAGEMAKER_ENDPOINT_NAME.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "inference_component_name",
+      "label": "SageMaker inference component name",
+      "description": "Optional inference component name for endpoints that route OpenAI-compatible requests through /inference-components/{name}/openai/v1. Falls back to SAGEMAKER_INFERENCE_COMPONENT_NAME.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "SageMaker model IDs",
+      "description": "Model IDs to expose for the endpoint. Some SageMaker containers ignore the OpenAI model field; use the model name expected by your container when needed. Falls back to comma-separated SAGEMAKER_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    },
+    {
+      "key": "region",
+      "label": "AWS region",
+      "description": "AWS region for the SageMaker runtime endpoint.",
+      "kind": "enum",
+      "required": false,
+      "default": "us-east-1",
+      "options": [
+        "us-east-1",
+        "us-east-2",
+        "us-west-1",
+        "us-west-2",
+        "af-south-1",
+        "ap-east-1",
+        "ap-south-1",
+        "ap-south-2",
+        "ap-southeast-1",
+        "ap-southeast-2",
+        "ap-southeast-3",
+        "ap-southeast-4",
+        "ap-northeast-1",
+        "ap-northeast-2",
+        "ap-northeast-3",
+        "ca-central-1",
+        "ca-west-1",
+        "eu-central-1",
+        "eu-central-2",
+        "eu-west-1",
+        "eu-west-2",
+        "eu-west-3",
+        "eu-north-1",
+        "eu-south-1",
+        "eu-south-2",
+        "il-central-1",
+        "me-central-1",
+        "me-south-1",
+        "mx-central-1",
+        "sa-east-1"
+      ]
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "sagemaker",
+      "source": "setting",
+      "value": "bearer_token"
+    },
+    {
+      "kind": "api_key",
+      "provider": "sagemaker",
+      "source": "env",
+      "value": "SAGEMAKER_BEARER_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "sagemaker",
+      "source": "env",
+      "value": "AWS_BEARER_TOKEN_SAGEMAKER"
+    }
+  ],
+  "providers": [
+    {
+      "id": "sagemaker",
+      "name": "Amazon SageMaker AI",
+      "description": "Registers configured SageMaker OpenAI-compatible chat endpoints and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

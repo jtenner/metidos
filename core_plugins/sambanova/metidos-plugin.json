@@ -1,0 +1,56 @@
+{
+  "id": "sambanova",
+  "name": "SambaNova Cloud",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers SambaNova Cloud as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#e84a27",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.sambanova.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "SAMBANOVA_API_KEY",
+      "description": "Fallback SambaNova API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "SambaNova API key",
+      "description": "SambaNova API key used for model discovery and inference. Falls back to SAMBANOVA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "sambanova",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "sambanova",
+      "source": "env",
+      "value": "SAMBANOVA_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "sambanova",
+      "name": "SambaNova Cloud",
+      "description": "Refreshes SambaNova Cloud chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

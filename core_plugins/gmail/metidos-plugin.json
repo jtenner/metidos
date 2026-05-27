@@ -1,0 +1,98 @@
+{
+  "id": "gmail",
+  "name": "Gmail",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds Gmail search, read, and draft creation tools for approved threads using direct Gmail REST calls. It never sends email.",
+  "color": "#ea4335",
+  "permissions": ["network:fetch"],
+  "env": [
+    {
+      "key": "GMAIL_CLIENT_ID",
+      "description": "Fallback Google OAuth client ID used when the Gmail client_id setting is not configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "GMAIL_CLIENT_SECRET",
+      "description": "Fallback Google OAuth client secret used when the Gmail client_secret setting is not configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "client_id",
+      "label": "Google OAuth client ID",
+      "description": "OAuth client ID for exchanging the Gmail refresh token. Falls back to GMAIL_CLIENT_ID.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "client_secret",
+      "label": "Google OAuth client secret",
+      "description": "OAuth client secret for exchanging the Gmail refresh token. Falls back to GMAIL_CLIENT_SECRET.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "refresh_token",
+      "label": "Gmail refresh token",
+      "description": "Google OAuth refresh token with Gmail scopes for the enabled access groups.",
+      "kind": "secret",
+      "required": true
+    },
+    {
+      "key": "send_as_email",
+      "label": "Default Gmail From address",
+      "description": "Optional default From address for created drafts. Gmail must allow the signed-in account to send as this address.",
+      "kind": "string",
+      "required": false
+    }
+  ],
+  "network": {
+    "allow": [
+      "https://oauth2.googleapis.com/token",
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/**",
+      "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
+    ],
+    "enforceHttps": true
+  },
+  "access": [
+    {
+      "id": "gmail_read",
+      "name": "Gmail - Read",
+      "description": "Expose Gmail search and message-read tools to selected threads.",
+      "tools": [
+        {
+          "name": "gmail_search",
+          "description": "Search Gmail messages with Gmail query syntax. Parameters: query string, optional max_results 1-10, optional include_spam_trash.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "gmail_read",
+          "description": "Read one Gmail message by id and return headers plus a bounded text body. Parameters: id or message_id, optional max_body_chars 1000-20000.",
+          "timeoutMs": 30000
+        }
+      ]
+    },
+    {
+      "id": "gmail_drafts",
+      "name": "Gmail - Drafts only",
+      "description": "Expose Gmail draft creation to selected threads. This access group cannot send email.",
+      "tools": [
+        {
+          "name": "gmail_create_draft",
+          "description": "Create a Gmail draft from to/cc/bcc, subject, body, optional body_format plain/html, and optional from. Does not send the draft.",
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 10485760,
+    "maxTextResultBytes": 262144
+  }
+}

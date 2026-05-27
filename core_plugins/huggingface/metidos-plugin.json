@@ -1,0 +1,68 @@
+{
+  "id": "huggingface",
+  "name": "Hugging Face Inference Providers",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Hugging Face Inference Providers as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#ffd21e",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://router.huggingface.co/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "HF_TOKEN",
+      "description": "Fallback Hugging Face user access token used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "HUGGINGFACE_API_KEY",
+      "description": "Alternate fallback Hugging Face token used when no api_key Plugin Setting or HF_TOKEN is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Hugging Face token",
+      "description": "Hugging Face user access token used for model discovery and inference. Falls back to HF_TOKEN, then HUGGINGFACE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "huggingface",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "huggingface",
+      "source": "env",
+      "value": "HF_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "huggingface",
+      "source": "env",
+      "value": "HUGGINGFACE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "huggingface",
+      "name": "Hugging Face Inference Providers",
+      "description": "Refreshes Hugging Face chat models from the upstream router catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

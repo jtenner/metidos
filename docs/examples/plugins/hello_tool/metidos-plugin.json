@@ -1,0 +1,27 @@
+{
+  "id": "hello_tool",
+  "name": "Hello Tool",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds a minimal hello-world agent tool for approved threads.",
+  "color": "#22c55e",
+  "permissions": [],
+  "access": [
+    {
+      "id": "hello_tools",
+      "name": "Hello tools",
+      "description": "Expose the hello_world tool to selected threads.",
+      "tools": [
+        {
+          "name": "hello_world",
+          "description": "Return a greeting as text or markdown.",
+          "timeoutMs": 5000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

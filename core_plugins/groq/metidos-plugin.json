@@ -1,0 +1,56 @@
+{
+  "id": "groq",
+  "name": "Groq",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Groq as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#f55036",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.groq.com/openai/v1/**"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "GROQ_API_KEY",
+      "description": "Fallback Groq API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Groq API key",
+      "description": "Groq API key used for model discovery and inference. Falls back to GROQ_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "groq",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "groq",
+      "source": "env",
+      "value": "GROQ_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "groq",
+      "name": "Groq",
+      "description": "Refreshes Groq chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

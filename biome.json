@@ -1,0 +1,32 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/coverage",
+      "!**/dist",
+      "!**/build",
+      "!**/node_modules",
+      "!**/.metidos-build",
+      "!**/src/mainview/getdown",
+      "!**/src/mainview/index.css"
+    ]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
+}

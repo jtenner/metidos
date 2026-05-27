@@ -1,0 +1,23 @@
+{
+  "id": "python_hello_tool",
+  "name": "Python Hello Tool",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./main.py",
+  "description": "Demonstrates a minimal Python agent tool running in the safe Pyodide plugin host.",
+  "color": "#3b82f6",
+  "access": [
+    {
+      "id": "python_tools",
+      "name": "Python tools",
+      "description": "Allow threads to call the Python hello-world tool.",
+      "tools": [
+        {
+          "name": "python_hello_world",
+          "description": "Return a greeting from a Python plugin.",
+          "timeoutMs": 5000
+        }
+      ]
+    }
+  ]
+}

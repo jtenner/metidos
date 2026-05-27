@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "id": "local",
+      "label": "Local Ollama",
+      "baseUrl": "http://localhost:11434",
+      "discoverModels": true,
+      "models": []
+    },
+    {
+      "id": "workstation",
+      "label": "Workstation Ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "discoverModels": false,
+      "models": [
+        {
+          "id": "qwen2.5-coder:7b",
+          "name": "Qwen2.5 Coder 7B",
+          "contextWindow": 32768,
+          "maxTokens": 4096
+        }
+      ]
+    }
+  ]
+}

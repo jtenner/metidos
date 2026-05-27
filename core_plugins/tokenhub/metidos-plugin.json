@@ -1,0 +1,87 @@
+{
+  "id": "tokenhub",
+  "name": "Tencent TokenHub",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Tencent TokenHub / Hunyuan as a first-party OpenAI-compatible chat provider using a Plugin Setting or Tencent API key environment variable.",
+  "color": "#0052d9",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "TENCENT_TOKENHUB_API_KEY",
+      "description": "Fallback Tencent TokenHub API key used when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "TENCENT_MAAS_API_KEY",
+      "description": "Alternative Tencent MaaS API key used when no api_key Plugin Setting or TENCENT_TOKENHUB_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "HUNYUAN_API_KEY",
+      "description": "Legacy Tencent Hunyuan API key fallback for TokenHub-compatible accounts.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Tencent TokenHub API key",
+      "description": "Tencent TokenHub API key used for Hunyuan inference. Falls back to TENCENT_TOKENHUB_API_KEY, TENCENT_MAAS_API_KEY, or HUNYUAN_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "region",
+      "label": "TokenHub endpoint region",
+      "description": "Fixed official TokenHub endpoint to expose through Pi. Use Singapore for international accounts unless Tencent documentation for your account says otherwise.",
+      "kind": "enum",
+      "required": false,
+      "default": "singapore",
+      "options": [
+        "singapore",
+        "guangzhou",
+        "singapore_legacy",
+        "guangzhou_legacy"
+      ]
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "tokenhub",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "tokenhub",
+      "source": "env",
+      "value": "TENCENT_TOKENHUB_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "tokenhub",
+      "source": "env",
+      "value": "TENCENT_MAAS_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "tokenhub",
+      "source": "env",
+      "value": "HUNYUAN_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "tokenhub",
+      "name": "Tencent TokenHub",
+      "description": "Runs Tencent TokenHub / Hunyuan chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

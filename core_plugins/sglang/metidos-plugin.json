@@ -1,0 +1,80 @@
+{
+  "id": "sglang",
+  "name": "SGLang OpenAI Server",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a local SGLang OpenAI-compatible server as a first-party chat provider using configured model IDs.",
+  "color": "#f59e0b",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "SGLANG_BASE_URL",
+      "description": "Optional fallback loopback SGLang OpenAI-compatible base URL. Defaults to http://localhost:30000/v1.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "SGLANG_API_KEY",
+      "description": "Optional fallback bearer token matching SGLang's --api-key option when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "SGLANG_MODEL_IDS",
+      "description": "Optional comma-separated SGLang model IDs exposed by the local server when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "SGLang base URL",
+      "description": "Loopback OpenAI-compatible base URL for SGLang. Defaults to http://localhost:30000/v1 and is restricted by the plugin to localhost, 127.0.0.1, or ::1 /v1 URLs.",
+      "kind": "url",
+      "required": false,
+      "default": "http://localhost:30000/v1"
+    },
+    {
+      "key": "api_key",
+      "label": "SGLang API token",
+      "description": "Optional bearer token matching SGLang's --api-key option. Falls back to SGLANG_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "SGLang model IDs",
+      "description": "Model IDs to expose for the local SGLang server. Use IDs returned by SGLang /v1/models, --served-model-name, or the loaded model name. Falls back to comma-separated SGLANG_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "sglang",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "sglang",
+      "source": "env",
+      "value": "SGLANG_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "sglang",
+      "name": "SGLang OpenAI Server",
+      "description": "Registers configured local SGLang OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

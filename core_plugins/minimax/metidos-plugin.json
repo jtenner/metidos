@@ -1,0 +1,56 @@
+{
+  "id": "minimax",
+  "name": "MiniMax",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers MiniMax as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#ff6a00",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.minimax.io/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "MINIMAX_API_KEY",
+      "description": "Fallback MiniMax API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "MiniMax API key",
+      "description": "MiniMax API key used for model discovery and inference. Falls back to MINIMAX_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "minimax",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "minimax",
+      "source": "env",
+      "value": "MINIMAX_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "description": "Refreshes MiniMax chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "id": "bedrock",
+  "name": "Amazon Bedrock",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Amazon Bedrock as a first-party OpenAI-compatible provider with region-scoped model discovery.",
+  "color": "#ff9900",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": [
+      "https://bedrock-mantle.us-east-1.api.aws/v1/models",
+      "https://bedrock-mantle.us-east-2.api.aws/v1/models",
+      "https://bedrock-mantle.us-west-2.api.aws/v1/models",
+      "https://bedrock-mantle.ap-northeast-1.api.aws/v1/models",
+      "https://bedrock-mantle.ap-south-1.api.aws/v1/models",
+      "https://bedrock-mantle.ap-southeast-2.api.aws/v1/models",
+      "https://bedrock-mantle.ap-southeast-3.api.aws/v1/models",
+      "https://bedrock-mantle.eu-central-1.api.aws/v1/models",
+      "https://bedrock-mantle.eu-north-1.api.aws/v1/models",
+      "https://bedrock-mantle.eu-south-1.api.aws/v1/models",
+      "https://bedrock-mantle.eu-west-1.api.aws/v1/models",
+      "https://bedrock-mantle.eu-west-2.api.aws/v1/models",
+      "https://bedrock-mantle.sa-east-1.api.aws/v1/models"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "BEDROCK_API_KEY",
+      "description": "Fallback Amazon Bedrock API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "AWS_BEARER_TOKEN_BEDROCK",
+      "description": "Alternative fallback Amazon Bedrock bearer token used when no api_key Plugin Setting or BEDROCK_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Amazon Bedrock API key",
+      "description": "Amazon Bedrock API key used for model discovery and inference. Falls back to BEDROCK_API_KEY, then AWS_BEARER_TOKEN_BEDROCK.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "region",
+      "label": "Amazon Bedrock API region",
+      "description": "Choose the fixed bedrock-mantle regional endpoint used for OpenAI-compatible model discovery and inference.",
+      "kind": "enum",
+      "options": [
+        "us-east-1",
+        "us-east-2",
+        "us-west-2",
+        "ap-northeast-1",
+        "ap-south-1",
+        "ap-southeast-2",
+        "ap-southeast-3",
+        "eu-central-1",
+        "eu-north-1",
+        "eu-south-1",
+        "eu-west-1",
+        "eu-west-2",
+        "sa-east-1"
+      ],
+      "default": "us-east-1",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "bedrock",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "bedrock",
+      "source": "env",
+      "value": "BEDROCK_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "bedrock",
+      "source": "env",
+      "value": "AWS_BEARER_TOKEN_BEDROCK"
+    }
+  ],
+  "providers": [
+    {
+      "id": "bedrock",
+      "name": "Amazon Bedrock",
+      "description": "Refreshes Amazon Bedrock OpenAI-compatible chat models from the regional upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

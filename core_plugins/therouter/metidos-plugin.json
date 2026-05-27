@@ -1,0 +1,70 @@
+{
+  "id": "therouter",
+  "name": "TheRouter",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers TheRouter as a first-party OpenAI-compatible provider with upstream chat and embedding model discovery.",
+  "color": "#00b8a9",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://api.therouter.ai/v1/models",
+      "https://api.therouter.ai/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "THEROUTER_API_KEY",
+      "description": "Fallback TheRouter API key used for discovery, inference, and embeddings when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "TheRouter API key",
+      "description": "TheRouter API key used for model discovery, inference, and embeddings. Falls back to THEROUTER_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "therouter",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "therouter",
+      "source": "env",
+      "value": "THEROUTER_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "therouter",
+      "name": "TheRouter",
+      "description": "Refreshes TheRouter chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 120000
+    },
+    {
+      "id": "therouter_embeddings",
+      "name": "TheRouter Embeddings",
+      "description": "Refreshes TheRouter embedding models and embeds text through TheRouter's embeddings API.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880
+  }
+}

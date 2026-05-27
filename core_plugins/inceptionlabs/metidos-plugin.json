@@ -1,0 +1,35 @@
+{
+  "id": "inceptionlabs",
+  "name": "Inception Labs Mercury",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Inception Labs Mercury as a first-party OpenAI-compatible provider using INCEPTION_API_KEY.",
+  "color": "#f97316",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "INCEPTION_API_KEY",
+      "description": "Fallback Inception API key used for Mercury inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Inception API key",
+      "description": "Inception API key used for Mercury inference. Falls back to INCEPTION_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "description": "Runs Inception Labs Mercury 2 through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "id": "perplexity",
+  "name": "Perplexity",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Perplexity Sonar as a first-party OpenAI-compatible chat provider with upstream model discovery.",
+  "color": "#20b8cd",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.perplexity.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "PERPLEXITY_API_KEY",
+      "description": "Fallback Perplexity API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Perplexity API key",
+      "description": "Perplexity API key used for model discovery and inference. Falls back to PERPLEXITY_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "perplexity",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "perplexity",
+      "source": "env",
+      "value": "PERPLEXITY_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "description": "Refreshes Perplexity Sonar chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

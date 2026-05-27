@@ -1,0 +1,66 @@
+{
+  "id": "ollama",
+  "name": "Ollama",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers local Ollama models as a first-party OpenAI-compatible provider with local model discovery and embeddings for Metidos vector search.",
+  "color": "#84cc16",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write",
+    "unsafe"
+  ],
+  "network": {
+    "allow": [
+      "http://localhost:11434/**",
+      "http://127.0.0.1:11434/**",
+      "http://10.0.2.2:11434/**"
+    ],
+    "enforceHttps": false
+  },
+  "env": [
+    {
+      "key": "OLLAMA_BASE_URL",
+      "description": "Fallback Ollama base URL. Defaults to http://localhost:11434.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "OLLAMA_API_KEY",
+      "description": "Optional fallback Ollama API key for authenticated compatible servers.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "Ollama base URL",
+      "description": "Ollama base URL. Must match this plugin's localhost allowlist unless the manifest is intentionally expanded.",
+      "kind": "url",
+      "default": "http://localhost:11434",
+      "required": false
+    },
+    {
+      "key": "api_key",
+      "label": "Ollama API key",
+      "description": "Optional Ollama API key for authenticated compatible servers. Falls back to OLLAMA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "description": "Discovers local Ollama tags, runs them through Pi's OpenAI-compatible completions transport, and exposes them for Ollama /api/embed embeddings.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2621440
+  }
+}

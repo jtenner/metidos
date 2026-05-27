@@ -1,0 +1,56 @@
+{
+  "id": "cohere",
+  "name": "Cohere",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Cohere as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#39594a",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.cohere.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "COHERE_API_KEY",
+      "description": "Fallback Cohere API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Cohere API key",
+      "description": "Cohere API key used for model discovery and inference. Falls back to COHERE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "cohere",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "cohere",
+      "source": "env",
+      "value": "COHERE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "cohere",
+      "name": "Cohere",
+      "description": "Refreshes Cohere chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

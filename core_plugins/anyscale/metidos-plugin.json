@@ -1,0 +1,56 @@
+{
+  "id": "anyscale",
+  "name": "Anyscale Endpoints",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Anyscale Endpoints as a first-party OpenAI-compatible chat provider with upstream model discovery.",
+  "color": "#3b82f6",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.endpoints.anyscale.com/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "ANYSCALE_API_KEY",
+      "description": "Fallback Anyscale API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Anyscale API key",
+      "description": "Anyscale API key used for model discovery and inference. Falls back to ANYSCALE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "anyscale",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "anyscale",
+      "source": "env",
+      "value": "ANYSCALE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "anyscale",
+      "name": "Anyscale Endpoints",
+      "description": "Refreshes Anyscale Endpoints OpenAI-compatible chat models from the upstream /v1/models catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

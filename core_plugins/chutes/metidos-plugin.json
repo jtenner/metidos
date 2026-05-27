@@ -1,0 +1,56 @@
+{
+  "id": "chutes",
+  "name": "Chutes",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Chutes as a first-party OpenAI-compatible chat provider with upstream shared-endpoint model discovery.",
+  "color": "#6c5ce7",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://llm.chutes.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "CHUTES_API_KEY",
+      "description": "Fallback Chutes API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Chutes API key",
+      "description": "Chutes API key used for model discovery and inference. Falls back to CHUTES_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "chutes",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "chutes",
+      "source": "env",
+      "value": "CHUTES_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "chutes",
+      "name": "Chutes",
+      "description": "Refreshes Chutes shared OpenAI-compatible chat models from the upstream /v1/models catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

@@ -1,0 +1,64 @@
+services:
+  metidos:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: metidos
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_OAUTH_TOKEN: ${ANTHROPIC_OAUTH_TOKEN:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-}
+      AZURE_OPENAI_BASE_URL: ${AZURE_OPENAI_BASE_URL:-}
+      AZURE_OPENAI_DEPLOYMENT_NAME_MAP: ${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:-}
+      AZURE_OPENAI_RESOURCE_NAME: ${AZURE_OPENAI_RESOURCE_NAME:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_KEY: ${CLOUDFLARE_API_KEY:-}
+      CLOUDFLARE_GATEWAY_ID: ${CLOUDFLARE_GATEWAY_ID:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      FIREWORKS_API_KEY: ${FIREWORKS_API_KEY:-}
+      GCLOUD_PROJECT: ${GCLOUD_PROJECT:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GOOGLE_CLOUD_API_KEY: ${GOOGLE_CLOUD_API_KEY:-}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_CN_API_KEY: ${MINIMAX_CN_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      INCEPTION_API_KEY: ${INCEPTION_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      UPLOADTHING_API_KEY: ${UPLOADTHING_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+    ports:
+      - "443:443"
+    volumes:
+      - metidos-data:/data
+      - ${METIDOS_HOST_SSH_DIR:-${HOME}/.ssh}:/home/metidos/.ssh:ro
+      - ${METIDOS_HOST_SSH_DIR:-${HOME}/.ssh}:/root/.ssh:ro
+      - ${CODEX_AUTH_JSON:-${HOME}/.codex/auth.json}:/data/plugins/codex/.data/auth.json:ro
+      - ${GITHUB_COPILOT_AUTH_JSON:-${HOME}/.pi/agent/auth.json}:/data/plugins/github_copilot/.data/auth.json:ro
+
+volumes:
+  metidos-data:

@@ -1,0 +1,49 @@
+{
+  "id": "codex",
+  "name": "Codex",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Stores Codex CLI auth.json for Pi's built-in OpenAI Codex provider.",
+  "color": "#10a37f",
+  "permissions": ["storage:read"],
+  "env": [
+    {
+      "key": "CODEX_AUTH_JSON_PATH",
+      "description": "Optional fallback path to Codex CLI auth.json when the plugin .data auth.json is not present.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "auth_json_path",
+      "label": "Codex auth.json path",
+      "description": "Path to the Codex CLI auth.json file. Relative .data paths are resolved inside this plugin's data folder.",
+      "kind": "string",
+      "default": ".data/auth.json",
+      "required": false
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 1048576,
+      "maxFileBytes": 1048576,
+      "maxFiles": 10
+    }
+  },
+  "piAuth": [
+    {
+      "kind": "codex_auth",
+      "provider": "openai-codex",
+      "source": "setting",
+      "value": "auth_json_path"
+    },
+    {
+      "kind": "codex_auth",
+      "provider": "openai-codex",
+      "source": "env",
+      "value": "CODEX_AUTH_JSON_PATH"
+    }
+  ]
+}

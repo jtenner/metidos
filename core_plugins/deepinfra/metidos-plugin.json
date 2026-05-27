@@ -1,0 +1,68 @@
+{
+  "id": "deepinfra",
+  "name": "DeepInfra",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers DeepInfra as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#3867ff",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.deepinfra.com/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "DEEPINFRA_TOKEN",
+      "description": "Fallback DeepInfra API token used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "DEEPINFRA_API_KEY",
+      "description": "Alternate fallback DeepInfra API key used when no api_key Plugin Setting or DEEPINFRA_TOKEN is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "DeepInfra API key",
+      "description": "DeepInfra API key used for model discovery and inference. Falls back to DEEPINFRA_TOKEN, then DEEPINFRA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "deepinfra",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "deepinfra",
+      "source": "env",
+      "value": "DEEPINFRA_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "deepinfra",
+      "source": "env",
+      "value": "DEEPINFRA_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "deepinfra",
+      "name": "DeepInfra",
+      "description": "Refreshes DeepInfra chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

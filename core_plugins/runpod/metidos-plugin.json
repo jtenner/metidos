@@ -1,0 +1,83 @@
+{
+  "id": "runpod",
+  "name": "Runpod",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Runpod Serverless OpenAI-compatible endpoints as first-party chat providers with endpoint-scoped model discovery.",
+  "color": "#673ab7",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.runpod.ai/v2/**/openai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "RUNPOD_API_KEY",
+      "description": "Fallback Runpod API key used for endpoint-scoped model discovery and OpenAI-compatible inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "RUNPOD_ENDPOINT_ID",
+      "description": "Fallback Runpod Serverless endpoint ID used when no endpoint_id Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "RUNPOD_MODEL_IDS",
+      "description": "Optional comma-separated model IDs exposed by the configured Runpod endpoint when discovery is unavailable or returns no models.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Runpod API key",
+      "description": "Runpod API key used for endpoint-scoped model discovery and OpenAI-compatible inference. Falls back to RUNPOD_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "endpoint_id",
+      "label": "Runpod endpoint ID",
+      "description": "Runpod Serverless endpoint ID for an endpoint that exposes OpenAI-compatible /openai/v1 routes. Falls back to RUNPOD_ENDPOINT_ID.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "Runpod model IDs",
+      "description": "Optional model IDs to expose when discovery is unavailable or returns no models. Falls back to comma-separated RUNPOD_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "runpod",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "runpod",
+      "source": "env",
+      "value": "RUNPOD_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "runpod",
+      "name": "Runpod",
+      "description": "Refreshes models from a configured Runpod Serverless OpenAI-compatible /models endpoint and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

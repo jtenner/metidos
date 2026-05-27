@@ -1,0 +1,58 @@
+{
+  "id": "zai",
+  "name": "Z.AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Z.AI as a first-party OpenAI-compatible provider with selectable general API or Coding Plan endpoint auth.",
+  "color": "#14b8a6",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "ZAI_API_KEY",
+      "description": "Fallback Z.AI key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Z.AI API key or Coding Plan token",
+      "description": "Z.AI credential used for inference. Falls back to ZAI_API_KEY. Use a console API key with the General API endpoint, or a Coding Plan token with the Coding Plan endpoint.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "endpoint",
+      "label": "Z.AI endpoint",
+      "description": "Choose General API for long-lived Z.AI console API keys, or Coding Plan for tokens issued for the coding endpoint.",
+      "kind": "enum",
+      "options": ["general_api", "coding_plan"],
+      "default": "general_api",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "zai",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "zai",
+      "source": "env",
+      "value": "ZAI_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "zai",
+      "name": "Z.AI",
+      "description": "Registers Z.AI GLM chat/coding models through Pi's OpenAI-compatible transport using the configured Z.AI endpoint.",
+      "timeoutMs": 30000
+    }
+  ]
+}

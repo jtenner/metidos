@@ -1,0 +1,68 @@
+{
+  "id": "github_models",
+  "name": "GitHub Models",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers GitHub Models as a first-party chat-completions provider with upstream catalog discovery.",
+  "color": "#24292f",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://models.github.ai/catalog/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "GITHUB_MODELS_TOKEN",
+      "description": "Fallback GitHub Models token used for catalog discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "GITHUB_TOKEN",
+      "description": "Secondary fallback GitHub token used when GITHUB_MODELS_TOKEN and api_key are not configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "GitHub Models token",
+      "description": "GitHub token with Models access used for catalog discovery and inference. Falls back to GITHUB_MODELS_TOKEN, then GITHUB_TOKEN.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "github_models",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "github_models",
+      "source": "env",
+      "value": "GITHUB_MODELS_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "github_models",
+      "source": "env",
+      "value": "GITHUB_TOKEN"
+    }
+  ],
+  "providers": [
+    {
+      "id": "github_models",
+      "name": "GitHub Models",
+      "description": "Refreshes GitHub Models chat-capable models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

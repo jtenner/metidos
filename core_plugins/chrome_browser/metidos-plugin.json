@@ -1,0 +1,109 @@
+{
+  "id": "chrome_browser",
+  "name": "Chrome Browser",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds Chrome DevTools Protocol browser-control tools for approved threads using the container-local Chromium instance.",
+  "color": "#2563eb",
+  "permissions": [
+    "log:write",
+    "network:fetch",
+    "network:websocket",
+    "storage:read",
+    "storage:write",
+    "storage:delete",
+    "unsafe"
+  ],
+  "access": [
+    {
+      "id": "browser_tools",
+      "name": "Browser tools",
+      "description": "Expose Chrome browser navigation, screenshot, input, viewport, and CDP tools to selected threads.",
+      "tools": [
+        {
+          "name": "browser_open",
+          "description": "Open a new managed Chromium session owned by the current thread context. Required: url, an http or https URL. Optional: sessionId to choose a stable session id, width and height viewport integers from 100 to 10000, waitUntilLoad boolean to wait for the page load event, and idleTimeoutMs from 60000 to 3600000, default 900000. Returns the session id for later browser_* calls from the same thread context.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "browser_navigate",
+          "description": "Navigate an existing browser session owned by the current thread context. Required: sessionId from browser_open and url, an http or https URL. Optional: waitUntilLoad boolean, default true, to wait for the page load event before returning.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "browser_markdown",
+          "description": "Return Markdown converted from the current page HTML in an existing browser session owned by the current thread context. Required: sessionId. Conversion is host-backed, does not execute page HTML, and rejects inputs over 10 MiB.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "browser_screenshot",
+          "description": "Capture a screenshot from a browser session owned by the current thread context and return it as an image file. Required: sessionId. Optional: format, either png or jpeg, default png; fullPage boolean, default false; quality integer from 1 to 100 for jpeg only.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "browser_type",
+          "description": "Type text into the currently focused element in a browser session owned by the current thread context. Required: sessionId and text. Focus an element first with browser_click or JavaScript evaluation when needed. Text is inserted as literal text, not keyboard shortcuts.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_key",
+          "description": "Send one key press or keyboard shortcut to a browser session owned by the current thread context. Required: sessionId and key, such as Enter, Tab, Escape, Backspace, ArrowDown, or a single character. Optional: modifiers CDP bitmask, where Alt=1, Ctrl=2, Meta=4, Shift=8.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_click",
+          "description": "Click at viewport coordinates in a browser session owned by the current thread context. Required: sessionId, x, and y integer coordinates relative to the top-left of the viewport. Optional: button left, middle, or right, default left; clickCount integer from 1 to 5, default 1.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_resize",
+          "description": "Resize the viewport for a browser session owned by the current thread context. Required: sessionId, width, and height integers from 100 to 10000. The viewport uses deviceScaleFactor 1 and desktop, non-mobile emulation.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_eval",
+          "description": "Evaluate JavaScript in the page for a browser session owned by the current thread context and return the CDP Runtime.evaluate result as JSON. Required: sessionId and expression JavaScript source. Optional: awaitPromise boolean, default true. Prefer returning JSON-serializable values.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_cdp",
+          "description": "Call a raw Chrome DevTools Protocol method on a browser session owned by the current thread context. Required: sessionId and method, such as Runtime.evaluate or DOM.getDocument. Optional: params object for the method arguments. Browser.* and Target.* methods are rejected, and shared cache/cookie methods are rejected: Network.clearBrowserCache, Network.clearBrowserCookies, Network.getCookies, Network.setCookie, Network.setCookies, and Network.deleteCookies. Use this for advanced page-scoped CDP features not covered by the higher-level tools.",
+          "timeoutMs": 15000
+        },
+        {
+          "name": "browser_status",
+          "description": "List browser sessions owned by the current thread context and Chrome version/status. Optional: includeChromeTargets boolean, default false, to also include the raw current CDP target list. Use this to discover your active session ids, dimensions, titles, URLs, and idle timeouts before acting on a session.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "browser_close",
+          "description": "Close browser sessions owned by the current thread context. Required: sessionId to close one session unless all is true. Optional: all boolean; when true, closes every managed session owned by the current thread context only and ignores sessionId. It will not close sessions owned by other threads.",
+          "timeoutMs": 10000
+        }
+      ]
+    }
+  ],
+  "network": {
+    "allow": ["http://127.0.0.1:9222/**"],
+    "webSocketAllow": ["ws://127.0.0.1:9222/**"],
+    "enforceHttps": false
+  },
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 52428800,
+      "maxFileBytes": 10485760,
+      "maxFiles": 1000
+    }
+  },
+  "gc": {
+    "enabled": true,
+    "timeoutMs": 30000
+  },
+  "limits": {
+    "maxTextResultBytes": 262144,
+    "maxWebSocketConnections": 8,
+    "maxWebSocketMessageBytes": 1048576,
+    "maxWebSocketQueuedMessages": 128
+  }
+}

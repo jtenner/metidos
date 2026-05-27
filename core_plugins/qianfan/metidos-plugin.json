@@ -1,0 +1,80 @@
+{
+  "id": "qianfan",
+  "name": "Baidu Qianfan",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Baidu Qianfan chat models as a first-party OpenAI-compatible provider using Qianfan API-key auth.",
+  "color": "#2563eb",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "QIANFAN_API_KEY",
+      "description": "Fallback Baidu Qianfan API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "BAIDU_QIANFAN_API_KEY",
+      "description": "Alternate fallback Baidu Qianfan API key used for inference when no api_key Plugin Setting or QIANFAN_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "BAIDU_API_KEY",
+      "description": "Legacy fallback Baidu API key used for Qianfan inference when no more-specific key is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Qianfan API key",
+      "description": "Baidu Qianfan API key used for inference. Falls back to QIANFAN_API_KEY, BAIDU_QIANFAN_API_KEY, then BAIDU_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "app_id",
+      "label": "Qianfan app ID",
+      "description": "Optional Baidu Qianfan appid header value for applications that require app routing.",
+      "kind": "string",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "qianfan",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "qianfan",
+      "source": "env",
+      "value": "QIANFAN_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "qianfan",
+      "source": "env",
+      "value": "BAIDU_QIANFAN_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "qianfan",
+      "source": "env",
+      "value": "BAIDU_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "qianfan",
+      "name": "Baidu Qianfan",
+      "description": "Registers a conservative static Baidu Qianfan chat catalog through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

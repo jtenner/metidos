@@ -1,0 +1,73 @@
+# Generated build and dependency outputs
+node_modules/
+dist/
+build/
+out/
+coverage/
+.cache/
+.next/
+.nuxt/
+.svelte-kit/
+.docusaurus/
+.turbo/
+.vercel/
+parcel-cache/
+.vite/
+.eslintcache
+.parcel-cache/
+.tmp*
+
+# Package and compiler artifacts
+target/
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.pid
+*.seed
+*.pid.lock
+*.out
+*.err
+*.stackdump
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Bundler / TypeScript / Bun outputs
+bun.lockb
+*.tsbuildinfo
+*.d.ts
+.metidos-build/
+src/mainview/index.css
+
+# Test and tool caches
+coverage/
+.nyc_output/
+playwright-report/
+playwright/.cache/
+# Derived Metidos cache state.
+.metidos/cache/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local deployment files. Keep personal deployment manifests in-place, but do
+# not publish them; commit only sanitized examples/templates.
+deploy/podman/compose*.yml
+!deploy/podman/compose.example.yml
+deploy/podman/LOCAL.md
+deploy/podman/*erryn*
+scripts/restart-podman-metidos.sh
+
+# OS and editor artifacts
+automation/
+.codex
+.DS_Store
+Thumbs.db
+reports/*

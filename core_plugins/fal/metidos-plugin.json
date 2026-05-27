@@ -1,0 +1,42 @@
+{
+  "id": "fal",
+  "name": "fal.ai",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers fal.ai's OpenRouter router as a first-party OpenAI-compatible chat provider with narrow upstream model discovery.",
+  "color": "#ff6b35",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://openrouter.ai/api/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "FAL_KEY",
+      "description": "Fallback fal.ai API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "fal.ai API key",
+      "description": "fal.ai API key used for inference. Falls back to FAL_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "fal",
+      "name": "fal.ai OpenRouter",
+      "description": "Refreshes chat model IDs from OpenRouter's catalog and serves them through fal.ai's OpenAI-compatible OpenRouter router using fal.ai Key authentication.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880
+  }
+}

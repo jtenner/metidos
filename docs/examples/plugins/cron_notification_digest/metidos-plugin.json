@@ -1,0 +1,31 @@
+{
+  "id": "cron_notification_digest",
+  "name": "Cron Notification Digest",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Demonstrates a global plugin cron that sends a Metidos notification and records delivery diagnostics.",
+  "color": "#a855f7",
+  "permissions": ["cron:create", "notification:send", "log:write"],
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Enable digest cron",
+      "description": "When disabled, the cron records a skipped run without sending a notification.",
+      "kind": "boolean",
+      "default": true,
+      "required": true
+    },
+    {
+      "key": "title_prefix",
+      "label": "Notification title prefix",
+      "description": "Short prefix added to the cron notification title.",
+      "kind": "string",
+      "default": "Metidos",
+      "required": true
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

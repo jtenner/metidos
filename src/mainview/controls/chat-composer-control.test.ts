@@ -1,0 +1,241 @@
+/**
+ * @file src/mainview/controls/chat-composer-control.test.ts
+ * @description Focused tests for chat composer accessibility helpers.
+ */
+
+import { beforeEach, describe, expect, it } from "bun:test";
+
+import { APP_TITLE } from "../app/mainview-ui-state";
+import {
+  chatComposerTextareaLabel,
+  createImageAttachmentId,
+  fileLooksLikeChatImage,
+} from "./chat-composer-control";
+import {
+  CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS,
+  clearChatComposerImageAttachments,
+  finishChatComposerImageAttachmentRead,
+  migrateChatComposerImageAttachmentKey,
+  readChatComposerImageAttachments,
+  readChatComposerPendingImageAttachmentReads,
+  resetChatComposerImageAttachmentStoreForTest,
+  waitForChatComposerImageAttachments,
+  setChatComposerImageAttachments,
+  startChatComposerImageAttachmentRead,
+} from "./chat-composer-image-attachments";
+import {
+  filterChatComposerSkills,
+  matchChatComposerSkillsTrigger,
+} from "./chat-composer-skills";
+
+describe("chatComposerTextareaLabel", () => {
+  it("labels the composer as a message field when a thread is selected", () => {
+    expect(chatComposerTextareaLabel(true)).toBe(`Message ${APP_TITLE}`);
+  });
+
+  it("explains that a thread is required before sending when no thread is selected", () => {
+    expect(chatComposerTextareaLabel(false)).toBe(
+      `Draft message for ${APP_TITLE} (create a thread to send)`,
+    );
+  });
+});
+
+describe("chat composer image attachment store", () => {
+  beforeEach(() => {
+    resetChatComposerImageAttachmentStoreForTest();
+  });
+
+  it("stores and clears pasted image attachments", () => {
+    setChatComposerImageAttachments([
+      {
+        byteSize: 12,
+        data: "aGVsbG8=",
+        id: "image-1",
+        mimeType: "image/png",
+        type: "image",
+      },
+    ]);
+
+    expect(readChatComposerImageAttachments()).toHaveLength(1);
+    clearChatComposerImageAttachments();
+    expect(readChatComposerImageAttachments()).toEqual([]);
+  });
+
+  it("keeps image attachments isolated by draft key", () => {
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 12,
+          data: "aGVsbG8=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      "thread:1",
+    );
+
+    expect(readChatComposerImageAttachments("thread:1")).toHaveLength(1);
+    expect(readChatComposerImageAttachments("thread:2")).toEqual([]);
+  });
+
+  it("migrates image attachments from optimistic to persisted thread keys", () => {
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 12,
+          data: "aGVsbG8=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      "thread:-1",
+    );
+
+    migrateChatComposerImageAttachmentKey("thread:-1", "thread:31");
+
+    expect(readChatComposerImageAttachments("thread:-1")).toHaveLength(1);
+    expect(readChatComposerImageAttachments("thread:31")).toHaveLength(1);
+  });
+
+  it("migrates pending image reads so late file loads land on the persisted thread", async () => {
+    startChatComposerImageAttachmentRead("thread:-1");
+    migrateChatComposerImageAttachmentKey("thread:-1", "thread:31");
+
+    let settled = false;
+    const waitForSettled = waitForChatComposerImageAttachments(
+      "thread:31",
+    ).then(() => {
+      settled = true;
+    });
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 12,
+          data: "aGVsbG8=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      "thread:-1",
+    );
+    expect(readChatComposerPendingImageAttachmentReads("thread:31")).toBe(1);
+
+    finishChatComposerImageAttachmentRead("thread:-1");
+    await waitForSettled;
+
+    expect(settled).toBeTrue();
+    expect(readChatComposerImageAttachments("thread:31")).toHaveLength(1);
+    expect(readChatComposerPendingImageAttachmentReads("thread:31")).toBe(0);
+  });
+
+  it("waits for pending image attachment reads to settle", async () => {
+    startChatComposerImageAttachmentRead();
+
+    let settled = false;
+    const waitForSettled = waitForChatComposerImageAttachments().then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+    expect(settled).toBeFalse();
+
+    finishChatComposerImageAttachmentRead();
+    await waitForSettled;
+    expect(settled).toBeTrue();
+  });
+
+  it("settles stalled image attachment reads after a timeout", async () => {
+    startChatComposerImageAttachmentRead("thread:stalled", { timeoutMs: 1 });
+
+    let settled = false;
+    const waitForSettled = waitForChatComposerImageAttachments(
+      "thread:stalled",
+    ).then(() => {
+      settled = true;
+    });
+
+    await waitForSettled;
+    expect(settled).toBeTrue();
+  });
+
+  it("bounds retained image attachment draft keys", () => {
+    for (
+      let index = 0;
+      index <= CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS;
+      index += 1
+    ) {
+      setChatComposerImageAttachments(
+        [
+          {
+            byteSize: 1,
+            data: "aA==",
+            id: `image-${index}`,
+            mimeType: "image/png",
+            type: "image",
+          },
+        ],
+        `thread:${index}`,
+      );
+    }
+
+    expect(readChatComposerImageAttachments("thread:0")).toEqual([]);
+    expect(
+      readChatComposerImageAttachments(
+        `thread:${CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS}`,
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+describe("chat composer image attachment ids", () => {
+  it("uses crypto UUIDs instead of timestamp and Math.random ids", () => {
+    const id = createImageAttachmentId();
+
+    expect(id).toStartWith("image-");
+    expect(id.slice("image-".length)).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+  });
+});
+
+describe("chat composer image file detection", () => {
+  it("accepts image-looking file selections even when the browser MIME type is empty", () => {
+    expect(
+      fileLooksLikeChatImage({ name: "camera-upload.jpg", type: "" }),
+    ).toBeTrue();
+    expect(
+      fileLooksLikeChatImage({ name: "clipboard.bin", type: "image/png" }),
+    ).toBeTrue();
+  });
+
+  it("rejects non-image file selections", () => {
+    expect(fileLooksLikeChatImage({ name: "notes.txt", type: "" })).toBeFalse();
+  });
+});
+
+describe("chat composer skill matching", () => {
+  it("matches skills trigger text at the cursor", () => {
+    expect(
+      matchChatComposerSkillsTrigger("please /skills:comm", 20, ["commit"]),
+    ).toEqual({
+      endIndex: 20,
+      filter: "comm",
+      startIndex: 7,
+    });
+  });
+
+  it("filters available skills by the trigger filter", () => {
+    const match = matchChatComposerSkillsTrigger("/skills:co", 10, [
+      "commit",
+      "grill-me",
+      "to-prd",
+    ]);
+
+    expect(
+      filterChatComposerSkills(["commit", "grill-me", "to-prd"], match),
+    ).toEqual(["commit"]);
+  });
+});

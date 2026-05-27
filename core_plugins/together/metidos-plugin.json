@@ -1,0 +1,56 @@
+{
+  "id": "together",
+  "name": "Together AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Together AI as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#111827",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.together.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "TOGETHER_API_KEY",
+      "description": "Fallback Together API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Together API key",
+      "description": "Together API key used for model discovery and inference. Falls back to TOGETHER_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "together",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "together",
+      "source": "env",
+      "value": "TOGETHER_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "together",
+      "name": "Together AI",
+      "description": "Refreshes Together chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

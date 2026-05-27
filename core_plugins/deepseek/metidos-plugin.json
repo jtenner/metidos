@@ -1,0 +1,56 @@
+{
+  "id": "deepseek",
+  "name": "DeepSeek",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers DeepSeek as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#4d6bfe",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.deepseek.com/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "DEEPSEEK_API_KEY",
+      "description": "Fallback DeepSeek API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "DeepSeek API key",
+      "description": "DeepSeek API key used for model discovery and inference. Falls back to DEEPSEEK_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "deepseek",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "deepseek",
+      "source": "env",
+      "value": "DEEPSEEK_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "description": "Refreshes DeepSeek chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

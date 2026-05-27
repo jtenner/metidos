@@ -1,0 +1,548 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-app: #0a0b0c;
+  --color-bg-app-elevated: #0e0f10;
+  --color-bg-canvas: #111315;
+  --color-surface-1: #15191c;
+  --color-surface-2: #1a1f24;
+  --color-surface-3: #20272d;
+  --color-hover-surface: #242d33;
+  --color-surface-overlay: rgb(17 21 24 / 0.96);
+  --color-border-subtle: #263038;
+  --color-border-default: #2f3b43;
+  --color-border-strong: #3a4a55;
+  --color-text-primary: #f2f0ef;
+  --color-text-secondary: #cfdae2;
+  --color-text-muted: #93a1ab;
+  --color-text-faint: #74818a;
+  --color-accent: #8fb5cd;
+  --color-accent-strong: #bdd5e6;
+  --color-accent-emphasis: #7aa5c4;
+  --color-accent-surface: #18222a;
+  --color-focus-ring: #9fc1da;
+  --color-danger-text: #ffb1bf;
+  --color-danger-border: #7a2030;
+  --color-danger-surface: #2b1118;
+  --color-warning-text: #f2d79b;
+  --color-warning-border: #6d5930;
+  --color-warning-surface: #261f12;
+  --color-info-text: #bdd5e6;
+  --color-info-border: #416276;
+  --color-info-surface: #14202a;
+  --color-success-text: #9fe2b1;
+  --color-success-border: #215233;
+  --color-success-surface: #112118;
+  --color-access-git: #f0a15f;
+  --color-access-metidos: #c6a7ff;
+  --color-shadow-overlay: 0 18px 42px rgb(0 0 0 / 0.56);
+  --color-shadow-subtle: 0 8px 18px rgb(0 0 0 / 0.28);
+  --shadow-overlay: var(--color-shadow-overlay);
+  --shadow-subtle: var(--color-shadow-subtle);
+  --color-user-bubble: #1e2022;
+  --color-user-bubble-text: #f2f0ef;
+  --color-composer-bar: #0e0f10;
+  --color-composer-border: #1e2328;
+  --color-background: var(--color-bg-canvas);
+  --color-foreground: var(--color-text-primary);
+  --color-muted: var(--color-surface-2);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-border: var(--color-border-default);
+  --color-sidebar: var(--color-surface-1);
+  --color-primary: var(--color-accent);
+  --color-primary-foreground: var(--color-bg-canvas);
+  --radius-sm: 0px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --composer-max-height: 240px;
+  --desktop-composer-min-height: 96px;
+  --mobile-composer-min-height: 44px;
+}
+
+@source "../**/*.{html,js,jsx,ts,tsx}";
+
+@layer components {
+  .desktop-sidebar {
+    width: var(--desktop-sidebar-width);
+    will-change: width;
+  }
+
+  .list-row-active-accent {
+    box-shadow: inset 3px 0 0 0 var(--color-accent-emphasis);
+  }
+
+  .desktop-interaction-panel {
+    height: var(--desktop-interaction-panel-height, auto);
+  }
+
+  .chat-transcript-scroll-container {
+    margin-left: var(--chat-transcript-scroll-margin-left, 0px);
+    margin-right: var(--chat-transcript-scroll-margin-right, 0px);
+    overflow-anchor: none;
+    padding-left: var(--chat-transcript-scroll-padding-left, 0px);
+    padding-right: var(--chat-transcript-scroll-padding-right, 0px);
+    scroll-padding-bottom: var(--chat-transcript-scroll-padding-bottom, 0px);
+    scroll-padding-top: var(--chat-transcript-scroll-padding-top, 0px);
+  }
+
+  .chat-transcript-padding-top {
+    padding-top: var(--chat-transcript-padding-top, 0px);
+  }
+
+  .chat-transcript-virtual-row {
+    transform: translateY(var(--chat-transcript-row-y, 0px));
+  }
+
+  .chat-transcript-virtual-height {
+    height: var(--chat-transcript-virtual-height, 0px);
+  }
+
+  .chat-transcript-bottom-inset {
+    height: var(--chat-transcript-bottom-inset, 0px);
+  }
+
+  .calendar-color-swatch {
+    background-color: var(--calendar-swatch-color);
+  }
+
+  .calendar-event-button {
+    border-left-color: var(--calendar-event-border-color);
+  }
+
+  .calendar-timed-layout {
+    height: var(--calendar-timed-height);
+    left: var(--calendar-timed-left);
+    top: var(--calendar-timed-top);
+    width: var(--calendar-timed-width);
+  }
+
+  .toolbar-date-input {
+    color-scheme: dark;
+  }
+
+  .toolbar-date-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(1);
+    opacity: 0.72;
+  }
+
+  .toolbar-date-input:focus::-webkit-calendar-picker-indicator,
+  .toolbar-date-input:hover::-webkit-calendar-picker-indicator {
+    opacity: 1;
+  }
+
+  .diff-tree-indented-row {
+    padding-left: var(--diff-tree-indent, 12px);
+  }
+
+  .git-history-virtual-height {
+    height: var(--git-history-virtual-height, 0px);
+  }
+
+  .git-history-row {
+    height: var(--git-history-row-height, auto);
+    transform: translateY(var(--git-history-row-y, 0px));
+  }
+
+  .thread-list-virtual-height {
+    height: var(--thread-list-virtual-height, 0px);
+  }
+
+  .thread-list-row {
+    height: var(--thread-list-row-height, auto);
+    transform: translateY(var(--thread-list-row-y, 0px));
+  }
+
+  .diff-scroll-container {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .diff-virtual-height {
+    height: var(--diff-virtual-height, 0px);
+  }
+
+  .diff-virtual-row {
+    transform: translateY(var(--diff-virtual-row-y, 0px));
+  }
+
+  .popover-surface {
+    bottom: var(--popover-bottom, auto);
+    height: var(--popover-height, auto);
+    left: var(--popover-left, auto);
+    max-height: var(--popover-max-height, none);
+    max-width: var(--popover-max-width, none);
+    min-height: var(--popover-min-height, 0px);
+    min-width: var(--popover-min-width, 0px);
+    pointer-events: var(--popover-pointer-events, none);
+    position: var(--popover-position, absolute);
+    right: var(--popover-right, auto);
+    top: var(--popover-top, auto);
+    transform: var(--popover-transform, none);
+    visibility: var(--popover-visibility, hidden);
+    width: var(--popover-width, auto);
+  }
+
+  .command-preview-popover {
+    left: var(--command-preview-left, 0px);
+    top: var(--command-preview-top, 0px);
+    transform: translate(-13px, -14px);
+    width: var(--command-preview-width, auto);
+  }
+
+  .thread-access-icon {
+    color: var(--thread-access-icon-color);
+  }
+
+  .tinted-checkbox-row {
+    background-color: var(--tinted-checkbox-row-background);
+    border-color: var(--tinted-checkbox-row-border);
+  }
+
+  .tinted-checkbox-box {
+    background-color: var(--tinted-checkbox-box-background);
+    border-color: var(--tinted-checkbox-box-border);
+    color: var(--tinted-checkbox-box-color);
+  }
+
+  .context-usage-progress {
+    background: conic-gradient(
+      from -90deg,
+      var(--color-accent-strong) 0deg var(--context-usage-progress-deg, 0deg),
+      var(--color-border-subtle) var(--context-usage-progress-deg, 0deg) 360deg
+    );
+  }
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-app);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+:root {
+  --app-scrollbar-size: 10px;
+  --app-scrollbar-track: var(--color-surface-1);
+  --app-scrollbar-thumb-color: var(--color-border-strong);
+  --app-scrollbar-thumb-start: var(--color-accent-emphasis);
+  --app-scrollbar-thumb-end: var(--color-border-strong);
+  --app-scrollbar-thumb-hover-start: var(--color-accent);
+  --app-scrollbar-thumb-hover-end: var(--color-text-muted);
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/inter-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Shared transcript/status marker primitive; kept global so message components do
+   not each invent local badge recipes. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-2);
+  padding: 2px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-accent);
+}
+
+@font-face {
+  font-family: "Fira Code";
+  src: url("./fonts/fira-code-vf.woff2") format("woff2-variations");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Floating overlays only. Do not use for static panels.
+   Modal backdrops may still use Tailwind bg-black opacity utilities because
+   they are viewport scrims, not component-local surface palettes. */
+.floating-overlay-surface {
+  background: var(--color-surface-overlay);
+  backdrop-filter: blur(20px);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mainview owns the full viewport, so scrollbar styling is intentionally app-wide
+   rather than limited to individual panes. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb-color) var(--app-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--app-scrollbar-size);
+  height: var(--app-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--app-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid var(--app-scrollbar-track);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--app-scrollbar-thumb-start) 0%,
+    var(--app-scrollbar-thumb-end) 100%
+  );
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    var(--app-scrollbar-thumb-hover-start) 0%,
+    var(--app-scrollbar-thumb-hover-end) 100%
+  );
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--app-scrollbar-track);
+}
+
+.processing-dot-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.processing-dot-loader > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--color-accent-strong);
+  animation: processing-dot-bounce 0.85s infinite ease-in-out both;
+}
+
+.processing-dot-loader > span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.processing-dot-loader > span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes processing-dot-bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.001ms;
+  }
+}
+
+/* Font aliases intentionally only select families; size/weight stay with each
+   semantic component so the approved type scale remains explicit in JSX.
+   font-headline is an alias for Inter, not a separate typography system. */
+.font-headline,
+.font-body,
+.font-label {
+  font-family: var(--font-sans);
+}
+
+.uppercase-label {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.uppercase-label-sm {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.message-markdown {
+  overflow-wrap: anywhere;
+}
+
+.message-markdown > :first-child {
+  margin-top: 0;
+}
+
+.message-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.message-markdown p,
+.message-markdown ul,
+.message-markdown ol,
+.message-markdown blockquote,
+.message-markdown hr {
+  margin: 0.95rem 0;
+}
+
+.message-markdown h1,
+.message-markdown h2,
+.message-markdown h3,
+.message-markdown h4 {
+  margin: 1rem 0 0.65rem;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.message-markdown h1 {
+  font-size: 1.35rem;
+}
+
+.message-markdown h2 {
+  font-size: 1.15rem;
+}
+
+.message-markdown h3,
+.message-markdown h4 {
+  font-size: 1rem;
+}
+
+.message-markdown ul,
+.message-markdown ol {
+  list-style-position: outside;
+  padding-left: 1.25rem;
+}
+
+.message-markdown ul {
+  list-style-type: disc;
+}
+
+.message-markdown ol {
+  list-style-type: decimal;
+}
+
+.message-markdown li::marker {
+  color: var(--color-text-secondary);
+}
+
+.message-markdown li + li {
+  margin-top: 0.35rem;
+}
+
+.message-markdown li > p {
+  margin: 0;
+}
+
+.message-markdown blockquote {
+  border-left: 2px solid
+    color-mix(in srgb, var(--color-accent) 45%, transparent);
+  padding-left: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.message-markdown hr {
+  border: 0;
+  border-top: 1px solid
+    color-mix(in srgb, var(--color-border-default) 75%, transparent);
+}
+
+.message-markdown img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.message-markdown input[type="checkbox"] {
+  margin-right: 0.5rem;
+  accent-color: var(--color-accent-strong);
+}
+
+.message-markdown-code-block {
+  margin: 0.75rem 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  font-family:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  padding: 0.75rem 1rem;
+  white-space: pre;
+}
+
+.message-markdown-table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.message-markdown-table th,
+.message-markdown-table td {
+  border: 1px solid
+    color-mix(in srgb, var(--color-border-default) 85%, transparent);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.message-markdown-table th {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  font-weight: 700;
+}

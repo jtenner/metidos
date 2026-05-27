@@ -1,0 +1,35 @@
+{
+  "id": "himalayas_jobs",
+  "name": "Himalayas Jobs",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds a remote job search tool powered by the free Himalayas Remote Jobs API for approved threads.",
+  "color": "#14b8a6",
+  "permissions": ["network:fetch", "log:write"],
+  "network": {
+    "allow": [
+      "https://himalayas.app/jobs/api",
+      "https://himalayas.app/jobs/api/search"
+    ],
+    "enforceHttps": true
+  },
+  "access": [
+    {
+      "id": "job_search_tools",
+      "name": "Job search",
+      "description": "Expose Himalayas remote job search tools to selected threads.",
+      "tools": [
+        {
+          "name": "search_remote_jobs",
+          "description": "Search remote jobs through the Himalayas API and return a markdown table. Required: query (q accepted as alias). Optional filters: country, worldwide, excludeWorldwide, seniority, employmentType, company, timezone, sort (relevant, recent, salaryAsc, salaryDesc, nameAToZ, nameZToA, jobs), page. Results preserve applicationLink as the canonical apply URL and include Himalayas attribution.",
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880,
+    "maxTextResultBytes": 262144
+  }
+}

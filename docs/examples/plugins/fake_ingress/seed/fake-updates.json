@@ -1,0 +1,14 @@
+[
+  {
+    "id": "fake-update-0001",
+    "user_id": "fake-user-ada",
+    "conversation_id": "fake-user-ada",
+    "message": "Please summarize the current project status."
+  },
+  {
+    "id": "fake-update-0002",
+    "user_id": "fake-user-grace",
+    "conversation_id": "fake-user-grace",
+    "message": "Create a safe follow-up task for tomorrow."
+  }
+]

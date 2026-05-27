@@ -1,0 +1,91 @@
+{
+  "id": "dashscope",
+  "name": "Alibaba Cloud Model Studio (DashScope)",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Alibaba Cloud Model Studio / DashScope as a first-party OpenAI-compatible provider with region-scoped Qwen chat and embedding models.",
+  "color": "#ff6a00",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings"
+  ],
+  "network": {
+    "allow": [
+      "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
+      "https://cn-hongkong.dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
+      "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "DASHSCOPE_API_KEY",
+      "description": "Fallback DashScope API key used for embeddings and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "QWEN_API_KEY",
+      "description": "Alternative fallback Qwen/DashScope API key used when no api_key Plugin Setting or DASHSCOPE_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "DashScope API key",
+      "description": "DashScope API key used for embeddings and inference. Falls back to DASHSCOPE_API_KEY, then QWEN_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "region",
+      "label": "DashScope endpoint region",
+      "description": "Choose the fixed Alibaba Cloud Model Studio compatible-mode endpoint for this plugin configuration.",
+      "kind": "enum",
+      "options": ["international", "us", "china", "hong_kong"],
+      "default": "international",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "dashscope",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "dashscope",
+      "source": "env",
+      "value": "DASHSCOPE_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "dashscope",
+      "source": "env",
+      "value": "QWEN_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "dashscope",
+      "name": "Alibaba Cloud Model Studio",
+      "description": "Registers region-scoped Qwen chat models through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "dashscope_embeddings",
+      "name": "Alibaba Cloud Model Studio Embeddings",
+      "description": "Provides text embeddings using DashScope's OpenAI-compatible embeddings endpoint for supported regions.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

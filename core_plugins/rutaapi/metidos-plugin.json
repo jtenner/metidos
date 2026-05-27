@@ -1,0 +1,53 @@
+{
+  "id": "rutaapi",
+  "name": "RutaAPI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers RutaAPI as a first-party OpenAI-compatible model gateway using RUTAAPI_API_KEY or a Plugin Setting.",
+  "color": "#0891b2",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.rutaapi.com/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "RUTAAPI_API_KEY",
+      "description": "Fallback RutaAPI API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "RutaAPI API key",
+      "description": "RutaAPI API key used for model discovery and inference. Falls back to RUTAAPI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "rutaapi",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "rutaapi",
+      "source": "env",
+      "value": "RUTAAPI_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "rutaapi",
+      "name": "RutaAPI",
+      "description": "Runs RutaAPI chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

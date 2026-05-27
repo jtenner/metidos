@@ -1,0 +1,53 @@
+{
+  "id": "writer",
+  "name": "Writer",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Writer Palmyra as a first-party OpenAI-compatible chat provider using WRITER_API_KEY or a Plugin Setting.",
+  "color": "#111827",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.writer.com/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "WRITER_API_KEY",
+      "description": "Fallback Writer API key used for Palmyra inference and model discovery when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Writer API key",
+      "description": "Writer API key used for Palmyra inference and model discovery. Falls back to WRITER_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "writer",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "writer",
+      "source": "env",
+      "value": "WRITER_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "writer",
+      "name": "Writer Palmyra",
+      "description": "Runs Writer Palmyra chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

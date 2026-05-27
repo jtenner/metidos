@@ -1,0 +1,68 @@
+{
+  "id": "stepfun",
+  "name": "StepFun",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers StepFun as a first-party OpenAI-compatible chat provider with upstream model discovery.",
+  "color": "#4f46e5",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.stepfun.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "STEPFUN_API_KEY",
+      "description": "Fallback StepFun API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "STEP_API_KEY",
+      "description": "Official StepFun API key environment variable used for model discovery and inference when no api_key Plugin Setting or STEPFUN_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "StepFun API key",
+      "description": "StepFun API key used for model discovery and inference. Falls back to STEPFUN_API_KEY or STEP_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "stepfun",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "stepfun",
+      "source": "env",
+      "value": "STEPFUN_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "stepfun",
+      "source": "env",
+      "value": "STEP_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "stepfun",
+      "name": "StepFun",
+      "description": "Refreshes StepFun OpenAI-compatible chat models from the upstream /v1/models catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 2097152
+  }
+}

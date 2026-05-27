@@ -1,0 +1,61 @@
+{
+  "id": "rss_feed_indexer",
+  "name": "RSS Feed Indexer",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Indexes the local operator's configured RSS and OPML feeds daily into plugin-owned LanceDB vector storage and exposes an RSS query tool.",
+  "color": "#f97316",
+  "permissions": [
+    "cron:create",
+    "metidos:can_embed",
+    "metidos:lancedb",
+    "network:fetch",
+    "unsafe",
+    "storage:read",
+    "storage:write",
+    "log:write"
+  ],
+  "network": {
+    "allow": ["https://**/**"],
+    "enforceHttps": true
+  },
+  "settings": [
+    {
+      "key": "list_url",
+      "label": "RSS or OPML URLs",
+      "description": "List of HTTPS RSS feed URLs or OPML subscription-list URLs to index. This plugin uses unsafe all-domain HTTPS access and must treat fetched content as untrusted.",
+      "kind": "list",
+      "items": {
+        "kind": "url"
+      },
+      "default": [],
+      "required": false
+    }
+  ],
+  "access": [
+    {
+      "id": "rss_query",
+      "name": "RSS: Query",
+      "description": "Expose semantic and date-range search over the local RSS index.",
+      "tools": [
+        {
+          "name": "rss_query",
+          "description": "Search indexed RSS items by optional startDate, endDate, and/or semantic query q. At least one option is required.",
+          "timeoutMs": 15000
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 268435456,
+      "maxFileBytes": 10485760,
+      "maxFiles": 20000
+    }
+  },
+  "limits": {
+    "maxNetworkResponseBytes": 10485760,
+    "maxTextResultBytes": 262144
+  }
+}

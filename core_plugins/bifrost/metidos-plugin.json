@@ -1,0 +1,104 @@
+{
+  "id": "bifrost",
+  "name": "Bifrost Gateway",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a local Bifrost AI Gateway OpenAI-compatible server as a first-party chat provider using configured model IDs.",
+  "color": "#38bdf8",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "BIFROST_BASE_URL",
+      "description": "Optional fallback loopback Bifrost OpenAI-compatible base URL. Defaults to http://localhost:8080/v1.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "BIFROST_API_KEY",
+      "description": "Optional fallback Bifrost bearer token, provider API key, or virtual key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "BIFROST_TOKEN",
+      "description": "Optional fallback Bifrost bearer token used for inference when no api_key Plugin Setting or BIFROST_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "BIFROST_VIRTUAL_KEY",
+      "description": "Optional fallback Bifrost virtual key used for inference when no api_key Plugin Setting, BIFROST_API_KEY, or BIFROST_TOKEN is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "BIFROST_MODEL_IDS",
+      "description": "Optional comma-separated Bifrost model IDs exposed by the local gateway when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "Bifrost Gateway base URL",
+      "description": "Loopback OpenAI-compatible base URL for Bifrost Gateway. Defaults to http://localhost:8080/v1 and is restricted by the plugin to localhost, 127.0.0.1, or ::1 URLs with either /v1 or /openai/v1 routes.",
+      "kind": "url",
+      "required": false,
+      "default": "http://localhost:8080/v1"
+    },
+    {
+      "key": "api_key",
+      "label": "Bifrost API key or token",
+      "description": "Optional Bifrost bearer token, provider API key, or virtual key. Falls back to BIFROST_API_KEY, BIFROST_TOKEN, and then BIFROST_VIRTUAL_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "Bifrost model IDs",
+      "description": "Model IDs to expose for the local Bifrost Gateway. Use provider-prefixed IDs returned by /v1/models or configured aliases. Falls back to comma-separated BIFROST_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "bifrost",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "bifrost",
+      "source": "env",
+      "value": "BIFROST_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "bifrost",
+      "source": "env",
+      "value": "BIFROST_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "bifrost",
+      "source": "env",
+      "value": "BIFROST_VIRTUAL_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "bifrost",
+      "name": "Bifrost Gateway",
+      "description": "Registers configured local Bifrost Gateway OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

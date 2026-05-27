@@ -1,0 +1,36 @@
+{
+  "id": "fake_ingress",
+  "name": "Fake Ingress",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a provider-agnostic fake request ingress source for local testing without network credentials.",
+  "permissions": [
+    "storage:read",
+    "storage:write",
+    "plugin:request-ingress",
+    "plugin:reply-to-source",
+    "log:write"
+  ],
+  "ingressSources": [
+    {
+      "id": "fake_dm",
+      "name": "Fake direct messages",
+      "description": "Reads fake external direct messages from plugin storage for local ingress testing.",
+      "pollIntervalMs": 5000,
+      "timeoutMs": 5000,
+      "supportsReplyToSource": true
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 1048576,
+      "maxFileBytes": 262144,
+      "maxFiles": 20
+    }
+  },
+  "limits": {
+    "maxRpcPayloadBytes": 65536,
+    "maxTextResultBytes": 32768
+  }
+}

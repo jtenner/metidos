@@ -1,0 +1,67 @@
+{
+  "id": "openrouter",
+  "name": "OpenRouter",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers OpenRouter as a first-party OpenAI-compatible provider with upstream chat, image-generation, and embedding model discovery.",
+  "color": "#8b5cf6",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": ["https://openrouter.ai/api/v1/**"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "OPENROUTER_API_KEY",
+      "description": "Fallback OpenRouter API key used for discovery, inference, and embeddings when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "OpenRouter API key",
+      "description": "OpenRouter API key used for model discovery, inference, and embeddings. Falls back to OPENROUTER_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "openrouter",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "openrouter",
+      "source": "env",
+      "value": "OPENROUTER_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "description": "Refreshes OpenRouter chat and image-generation models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 120000
+    },
+    {
+      "id": "openrouter_embeddings",
+      "name": "OpenRouter Embeddings",
+      "description": "Refreshes OpenRouter embedding models and embeds text through OpenRouter's embeddings API.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880
+  }
+}

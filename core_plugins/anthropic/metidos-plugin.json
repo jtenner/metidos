@@ -1,0 +1,41 @@
+{
+  "id": "anthropic",
+  "name": "Anthropic",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Stores Anthropic API key settings for Pi's built-in Anthropic provider.",
+  "color": "#d97757",
+  "permissions": [],
+  "env": [
+    {
+      "key": "ANTHROPIC_API_KEY",
+      "description": "Fallback Anthropic API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Anthropic API key",
+      "description": "Anthropic API key used for Pi's built-in Anthropic provider. Falls back to ANTHROPIC_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "anthropic",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "anthropic",
+      "source": "env",
+      "value": "ANTHROPIC_API_KEY"
+    }
+  ]
+}

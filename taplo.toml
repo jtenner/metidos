@@ -1,0 +1,21 @@
+include = ["**/*.toml"]
+exclude = ["node_modules/**", ".metidos/cache/**", ".metidos-build/**"]
+
+[formatting]
+align_entries = false
+array_trailing_comma = false
+column_width = 160
+compact_arrays = true
+reorder_keys = false
+
+[[rule]]
+include = ["taplo.toml"]
+
+[rule.schema]
+url = "taplo://taplo.toml"
+
+[[rule]]
+include = ["bunfig.toml"]
+
+[rule.schema]
+path = "docs/bunfig.schema.json"

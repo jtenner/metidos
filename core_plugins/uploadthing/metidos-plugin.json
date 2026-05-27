@@ -1,0 +1,92 @@
+{
+  "id": "uploadthing",
+  "name": "UploadThing",
+  "version": "1.0.3",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds simple UploadThing file-management tools for approved threads.",
+  "color": "#ec4899",
+  "permissions": [
+    "storage:read",
+    "storage:write",
+    "files:read",
+    "files:write",
+    "network:fetch"
+  ],
+  "env": [
+    {
+      "key": "UPLOADTHING_API_KEY",
+      "description": "Fallback UploadThing API key used when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "UploadThing API key",
+      "description": "UploadThing API key used for REST API requests. Falls back to UPLOADTHING_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "network": {
+    "allow": [
+      "https://api.uploadthing.com/**",
+      "https://eor9ytlmha.ufs.sh/**",
+      "https://ufs.sh/**",
+      "https://utfs.io/**",
+      "https://bom1.ingest.uploadthing.com/**",
+      "https://can1.ingest.uploadthing.com/**",
+      "https://cle1.ingest.uploadthing.com/**",
+      "https://dub1.ingest.uploadthing.com/**",
+      "https://fra1.ingest.uploadthing.com/**",
+      "https://icn1.ingest.uploadthing.com/**",
+      "https://pdx1.ingest.uploadthing.com/**",
+      "https://sea1.ingest.uploadthing.com/**",
+      "https://sfo1.ingest.uploadthing.com/**",
+      "https://syd1.ingest.uploadthing.com/**",
+      "https://zrh1.ingest.uploadthing.com/**"
+    ],
+    "enforceHttps": true
+  },
+  "files": {
+    "allow": {
+      "read": ["./**"],
+      "write": ["./**"]
+    }
+  },
+  "access": [
+    {
+      "id": "uploadthing_tools",
+      "name": "UploadThing",
+      "description": "Expose UploadThing file listing, project download, project upload, and delete tools to selected threads.",
+      "tools": [
+        {
+          "name": "list_files",
+          "description": "List files in the configured UploadThing app. Parameters: optional limit number (default 500, max 100000) and optional offset number (default 0).",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "get_file",
+          "description": "Download an UploadThing file into the current project. Parameters: provide fileKey string or customId string; optional fileName for a root-level output file, optional path project output path (defaults to ./<UploadThing filename>), and expiresIn number in seconds (default 3600, max 604800).",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "upload_file",
+          "description": "Upload a readable project file to UploadThing using /v7/prepareUpload. Parameters: required path string starting with ./; optional acl (public-read or private), contentDisposition (inline or attachment), customId string, slug string, expiresIn number, metadata JSON value, and type MIME string.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "delete_file",
+          "description": "Delete UploadThing files. Parameters: provide at least one non-empty string array: fileKeys, customIds, or deprecated files legacy IDs.",
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 26214400,
+    "maxTextResultBytes": 262144
+  }
+}

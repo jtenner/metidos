@@ -1,0 +1,15 @@
+[Unit]
+Description=Metidos Podman container
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/path/to/metidos
+ExecStart=/usr/bin/podman compose --env-file deploy/podman/.env.podman -f deploy/podman/compose.yml up
+ExecStop=/usr/bin/podman compose --env-file deploy/podman/.env.podman -f deploy/podman/compose.yml down
+Restart=always
+RestartSec=5
+TimeoutStopSec=70
+
+[Install]
+WantedBy=default.target

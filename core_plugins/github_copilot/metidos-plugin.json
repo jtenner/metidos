@@ -1,0 +1,49 @@
+{
+  "id": "github_copilot",
+  "name": "GitHub Copilot",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Imports Pi GitHub Copilot OAuth credentials for Pi's built-in github-copilot provider.",
+  "color": "#8957e5",
+  "permissions": ["storage:read"],
+  "env": [
+    {
+      "key": "GITHUB_COPILOT_AUTH_JSON_PATH",
+      "description": "Optional fallback path to a Pi auth.json containing the github-copilot OAuth entry when the plugin .data auth.json is not present.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "auth_json_path",
+      "label": "GitHub Copilot auth.json path",
+      "description": "Path to a Pi auth.json file containing github-copilot OAuth credentials. Relative .data paths are resolved inside this plugin's data folder.",
+      "kind": "string",
+      "default": ".data/auth.json",
+      "required": false
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 1048576,
+      "maxFileBytes": 1048576,
+      "maxFiles": 10
+    }
+  },
+  "piAuth": [
+    {
+      "kind": "pi_oauth_file",
+      "provider": "github-copilot",
+      "source": "setting",
+      "value": "auth_json_path"
+    },
+    {
+      "kind": "pi_oauth_file",
+      "provider": "github-copilot",
+      "source": "env",
+      "value": "GITHUB_COPILOT_AUTH_JSON_PATH"
+    }
+  ]
+}

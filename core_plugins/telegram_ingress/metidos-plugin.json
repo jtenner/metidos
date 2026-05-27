@@ -1,0 +1,55 @@
+{
+  "id": "telegram_ingress",
+  "name": "Telegram Ingress",
+  "version": "1.0.1",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Polls Telegram Bot API updates as Metidos request ingress and supports explicit replies to the verified source chat.",
+  "color": "#229ED9",
+  "permissions": [
+    "plugin:request-ingress",
+    "plugin:reply-to-source",
+    "network:fetch",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://api.telegram.org/bot*/getUpdates",
+      "https://api.telegram.org/bot*/getFile",
+      "https://api.telegram.org/bot*/sendMessage",
+      "https://api.telegram.org/file/bot*/**"
+    ]
+  },
+  "env": [
+    {
+      "key": "TELEGRAM_BOT_TOKEN",
+      "description": "Default Telegram bot token. This matches the Telegram notification provider env var so one deployment secret can be reused without sharing Plugin Settings.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "bot_token",
+      "label": "Telegram bot token",
+      "description": "Fallback Telegram bot token for Telegram ingress only when TELEGRAM_BOT_TOKEN is not set. Plugin settings are scoped secrets; this value is not read from or shared with the Telegram notification provider.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "ingressSources": [
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "description": "Long-polls Telegram Bot API text messages and image attachments for linked chats.",
+      "pollIntervalMs": 5000,
+      "timeoutMs": 30000,
+      "supportsReplyToSource": true
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880,
+    "maxRpcPayloadBytes": 8388608,
+    "maxTextResultBytes": 32768
+  }
+}

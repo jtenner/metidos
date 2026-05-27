@@ -1,0 +1,110 @@
+{
+  "id": "ntfy_notification_provider",
+  "name": "ntfy Notification Provider",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Sends Metidos notifications to an ntfy topic.",
+  "color": "#65a30d",
+  "permissions": ["network:fetch", "notification:provider"],
+  "network": {
+    "allow": ["https://ntfy.sh/**"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "NTFY_TOPIC",
+      "description": "Optional fallback ntfy topic when no plugin topic setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "NTFY_TOKEN",
+      "description": "Optional bearer token for protected ntfy topics.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Enabled",
+      "description": "Send notifications through ntfy.",
+      "kind": "boolean",
+      "default": false,
+      "required": false
+    },
+    {
+      "key": "server_url",
+      "label": "ntfy server URL",
+      "description": "Base URL for the ntfy server. The default manifest allowlist permits only https://ntfy.sh/.",
+      "kind": "url",
+      "default": "https://ntfy.sh",
+      "required": true
+    },
+    {
+      "key": "topic",
+      "label": "ntfy topic",
+      "description": "Private ntfy topic used for notifications. Falls back to NTFY_TOPIC.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "default_topic",
+      "label": "Default ntfy topic",
+      "description": "Compatibility fallback topic when NTFY_TOPIC and topic are not set. Use a private, unguessable topic.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "auth_type",
+      "label": "Authentication type",
+      "description": "Authentication method for the configured ntfy topic.",
+      "kind": "enum",
+      "options": ["none", "bearer", "basic"],
+      "default": "none",
+      "required": false
+    },
+    {
+      "key": "token",
+      "label": "Bearer token",
+      "description": "Bearer token for protected ntfy topics.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "username",
+      "label": "Username",
+      "description": "Basic-auth username for protected ntfy topics.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "password",
+      "label": "Password",
+      "description": "Basic-auth password for protected ntfy topics.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "priority",
+      "label": "Priority",
+      "description": "Default priority when the notification request does not specify one.",
+      "kind": "enum",
+      "options": ["min", "low", "default", "high", "urgent"],
+      "default": "low",
+      "required": false
+    }
+  ],
+  "notificationProviders": [
+    {
+      "id": "ntfy",
+      "name": "ntfy",
+      "description": "Sends Metidos notifications to an ntfy topic and returns provider receipts.",
+      "timeoutMs": 10000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 262144
+  }
+}

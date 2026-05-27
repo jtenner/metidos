@@ -1,0 +1,70 @@
+{
+  "id": "tokenmix",
+  "name": "TokenMix",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers TokenMix as a first-party OpenAI-compatible provider with upstream chat and embedding model discovery.",
+  "color": "#6366f1",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://api.tokenmix.ai/v1/models",
+      "https://api.tokenmix.ai/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "TOKENMIX_API_KEY",
+      "description": "Fallback TokenMix API key used for discovery, inference, and embeddings when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "TokenMix API key",
+      "description": "TokenMix API key used for model discovery, inference, and embeddings. Falls back to TOKENMIX_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "tokenmix",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "tokenmix",
+      "source": "env",
+      "value": "TOKENMIX_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "tokenmix",
+      "name": "TokenMix",
+      "description": "Refreshes TokenMix chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 60000
+    },
+    {
+      "id": "tokenmix_embeddings",
+      "name": "TokenMix Embeddings",
+      "description": "Refreshes TokenMix embedding models and embeds text through TokenMix's embeddings API.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880
+  }
+}

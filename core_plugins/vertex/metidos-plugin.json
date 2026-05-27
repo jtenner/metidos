@@ -1,0 +1,102 @@
+{
+  "id": "vertex",
+  "name": "Google Vertex AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Google Vertex AI as a first-party OpenAI-compatible Gemini chat provider with project-scoped auth handoff.",
+  "color": "#4285f4",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "GOOGLE_VERTEX_ACCESS_TOKEN",
+      "description": "Fallback Google Cloud OAuth access token used for Vertex AI inference when no access_token Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "VERTEX_AI_ACCESS_TOKEN",
+      "description": "Alternate fallback Google Cloud OAuth access token used for Vertex AI inference.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "GOOGLE_VERTEX_PROJECT_ID",
+      "description": "Fallback Google Cloud project ID used when no project_id Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "GOOGLE_VERTEX_LOCATION",
+      "description": "Fallback Vertex AI location used when no location Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "access_token",
+      "label": "Google Cloud OAuth access token",
+      "description": "Google Cloud OAuth access token authorized for Vertex AI inference. Falls back to GOOGLE_VERTEX_ACCESS_TOKEN or VERTEX_AI_ACCESS_TOKEN.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "project_id",
+      "label": "Google Cloud project ID",
+      "description": "Google Cloud project ID containing the Vertex AI endpoint. Falls back to GOOGLE_VERTEX_PROJECT_ID.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "location",
+      "label": "Vertex AI location",
+      "description": "Vertex AI location used in the OpenAI-compatible endpoint path. Falls back to GOOGLE_VERTEX_LOCATION, then global.",
+      "kind": "enum",
+      "required": false,
+      "default": "global",
+      "options": [
+        "global",
+        "us-central1",
+        "us-east1",
+        "us-east4",
+        "us-west1",
+        "europe-west1",
+        "europe-west4",
+        "asia-northeast1",
+        "asia-southeast1"
+      ]
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "vertex",
+      "source": "setting",
+      "value": "access_token"
+    },
+    {
+      "kind": "api_key",
+      "provider": "vertex",
+      "source": "env",
+      "value": "GOOGLE_VERTEX_ACCESS_TOKEN"
+    },
+    {
+      "kind": "api_key",
+      "provider": "vertex",
+      "source": "env",
+      "value": "VERTEX_AI_ACCESS_TOKEN"
+    }
+  ],
+  "providers": [
+    {
+      "id": "vertex",
+      "name": "Google Vertex AI",
+      "description": "Registers a conservative static Gemini chat model catalog for Vertex AI's OpenAI-compatible endpoint and serves it through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

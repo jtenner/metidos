@@ -1,0 +1,102 @@
+{
+  "id": "serpapi_jobs",
+  "name": "SerpApi Jobs",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds Google Jobs, Google Search, YouTube search, and YouTube transcript tools powered by SerpApi for approved threads.",
+  "color": "#ec4899",
+  "permissions": ["network:fetch", "log:write"],
+  "env": [
+    {
+      "key": "SERPAPI_API_KEY",
+      "description": "Fallback SerpApi API key used when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "SerpApi API key",
+      "description": "SerpApi API key used for search requests. Falls back to SERPAPI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "google_domain",
+      "label": "Google domain",
+      "description": "Default Google domain for Google searches, such as google.com. Can be overridden per tool call.",
+      "kind": "string",
+      "default": "google.com",
+      "required": false
+    },
+    {
+      "key": "gl",
+      "label": "Google country",
+      "description": "Default two-letter Google country code for Google searches, such as us, uk, or fr. Can be overridden per tool call.",
+      "kind": "string",
+      "default": "us",
+      "required": false
+    },
+    {
+      "key": "hl",
+      "label": "Google language",
+      "description": "Default two-letter Google language code for Google searches, such as en, es, or fr. Can be overridden per tool call.",
+      "kind": "string",
+      "default": "en",
+      "required": false
+    }
+  ],
+  "network": {
+    "allow": ["https://serpapi.com/search.json"],
+    "enforceHttps": true
+  },
+  "access": [
+    {
+      "id": "job_search_tools",
+      "name": "Job search",
+      "description": "Expose SerpApi Google Jobs search tools to selected threads.",
+      "tools": [
+        {
+          "name": "search_jobs",
+          "description": "Search Google Jobs through SerpApi using URL search parameters. Required: q (search query; query is also accepted as an alias). Optional geographic parameters: location (origin city/region; mutually exclusive with uule) or uule (Google encoded location). Optional localization parameters: google_domain (for example google.com), gl (two-letter country code such as us, uk, fr), hl (two-letter language code such as en, es, fr). Optional pagination: next_page_token from serpapi_pagination.next_page_token; Google discontinued start/offset and returns up to 10 results per page. Optional advanced Google Jobs parameters: chips (deprecated Google chip filters), lrad (radius in kilometers; not strict), ltype (true filters work-from-home; deprecated by Google), uds (Google-provided filter string from filters). Plugin settings provide defaults for google_domain, gl, and hl; tool-call values override settings.",
+          "timeoutMs": 30000
+        }
+      ]
+    },
+    {
+      "id": "google_search_tools",
+      "name": "Google search",
+      "description": "Expose SerpApi Google Light web search tools to selected threads.",
+      "tools": [
+        {
+          "name": "search_google",
+          "description": "Search Google via SerpApi Google Light using URL search parameters. Required: q (search query; query is also accepted as an alias). Optional geographic parameters: location (origin city/region; mutually exclusive with uule) or uule (Google encoded location). Optional localization parameters: google_domain (for example google.com), gl (two-letter country code such as us, uk, fr), hl (two-letter language code such as en, es, fr), lr (language restrict such as lang_en). Optional pagination: start (result offset). Optional search controls: device (desktop, mobile, tablet), safe (active or off), filter (duplicate filter), nfpr (exclude auto-corrected results), no_cache, zero_trace. Plugin settings provide defaults for google_domain, gl, and hl; tool-call values override settings.",
+          "timeoutMs": 30000
+        }
+      ]
+    },
+    {
+      "id": "youtube_tools",
+      "name": "YouTube",
+      "description": "Expose SerpApi YouTube search and transcript tools to selected threads.",
+      "tools": [
+        {
+          "name": "search_youtube",
+          "description": "Search YouTube through SerpApi YouTube Search using URL search parameters. Required: search_query (q or query aliases accepted). Optional localization: gl (two-letter country code), hl (two-letter language code); plugin gl/hl settings are defaults. Optional advanced YouTube parameter: sp (pagination token from serpapi_pagination.next_page_token or pagination.next_page_token; also accepts YouTube filter values such as upload date, 4K, exact spelling, etc.). Optional SerpApi parameters: no_cache (true forces a fresh fetch; do not combine with async), zero_trace (enterprise mode). async and output are intentionally not exposed by this tool. Returned video_id values can be passed to fetch_youtube_transcript as v.",
+          "timeoutMs": 30000
+        },
+        {
+          "name": "fetch_youtube_transcript",
+          "description": "Fetch a YouTube video transcript through SerpApi YouTube Video Transcript using URL search parameters. Required: v (YouTube video ID; video_id or url aliases accepted). Optional localization: language_code (for example en, es-ES, zh-Hans; defaults to English and may fall back to first available language). Optional advanced parameters: title (specific transcript title such as Twitch Chat - Simple), type (transcript type such as asr for auto-generated), no_cache (true forces a fresh fetch; do not combine with async), zero_trace (enterprise mode). async and output are intentionally not exposed by this tool.",
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880,
+    "maxTextResultBytes": 262144
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "id": "volcengine",
+  "name": "Volcengine Ark",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers ByteDance Volcengine Ark / Doubao as a first-party OpenAI-compatible model provider using ARK_API_KEY, VOLCENGINE_API_KEY, or a Plugin Setting.",
+  "color": "#ea580c",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "ARK_API_KEY",
+      "description": "Fallback Volcengine Ark API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "VOLCENGINE_API_KEY",
+      "description": "Alternate fallback Volcengine Ark API key used for inference when no api_key Plugin Setting or ARK_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Volcengine Ark API key",
+      "description": "Volcengine Ark API key used for inference. Falls back to ARK_API_KEY, then VOLCENGINE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "volcengine",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "volcengine",
+      "source": "env",
+      "value": "ARK_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "volcengine",
+      "source": "env",
+      "value": "VOLCENGINE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "volcengine",
+      "name": "Volcengine Ark",
+      "description": "Runs documented Volcengine Ark Doubao chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

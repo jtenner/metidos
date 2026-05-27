@@ -1,0 +1,42 @@
+{
+  "id": "nvidia_build",
+  "name": "Build NVIDIA",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Build NVIDIA / NVIDIA API Catalog models as a first-party OpenAI-compatible provider with authenticated model discovery.",
+  "color": "#76b900",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://integrate.api.nvidia.com/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "NVIDIA_API_KEY",
+      "description": "Fallback Build NVIDIA API key used for model discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Build NVIDIA API key",
+      "description": "Build NVIDIA API key used for model discovery and inference. Falls back to NVIDIA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "nvidia_build",
+      "name": "Build NVIDIA",
+      "description": "Discovers and runs NVIDIA-hosted API Catalog models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880
+  }
+}

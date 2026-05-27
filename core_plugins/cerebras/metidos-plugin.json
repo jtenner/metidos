@@ -1,0 +1,56 @@
+{
+  "id": "cerebras",
+  "name": "Cerebras",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Cerebras Inference as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#ff6b00",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.cerebras.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "CEREBRAS_API_KEY",
+      "description": "Fallback Cerebras API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Cerebras API key",
+      "description": "Cerebras API key used for model discovery and inference. Falls back to CEREBRAS_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "cerebras",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "cerebras",
+      "source": "env",
+      "value": "CEREBRAS_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "cerebras",
+      "name": "Cerebras",
+      "description": "Refreshes Cerebras chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

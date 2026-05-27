@@ -1,0 +1,56 @@
+{
+  "id": "novita",
+  "name": "Novita AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Novita AI as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#7f52ff",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.novita.ai/openai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "NOVITA_API_KEY",
+      "description": "Fallback Novita API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Novita API key",
+      "description": "Novita API key used for model discovery and inference. Falls back to NOVITA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "novita",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "novita",
+      "source": "env",
+      "value": "NOVITA_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "novita",
+      "name": "Novita AI",
+      "description": "Refreshes Novita chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "id": "modal",
+  "name": "Modal OpenAI-Compatible Endpoint",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a configured Modal Web Function that serves an OpenAI-compatible chat endpoint using configured model IDs.",
+  "color": "#7f52ff",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "MODAL_BASE_URL",
+      "description": "Optional fallback Modal Web Function base URL when no base_url Plugin Setting is configured. The plugin accepts HTTPS modal.run endpoint origins or /v1 base URLs.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "MODAL_BEARER_TOKEN",
+      "description": "Optional fallback bearer token for Modal endpoints that implement conventional Authorization: Bearer authentication. Modal proxy Modal-Key/Modal-Secret auth is not handled by this safe slice.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "MODAL_MODEL_IDS",
+      "description": "Optional comma-separated model IDs exposed by the deployed Modal endpoint when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "Modal base URL",
+      "description": "Modal Web Function URL for a deployed OpenAI-compatible endpoint. The plugin accepts provider-owned HTTPS modal.run origins or /v1 base URLs, and appends /v1 when only the origin is supplied.",
+      "kind": "url",
+      "required": false
+    },
+    {
+      "key": "api_key",
+      "label": "Modal bearer token",
+      "description": "Optional bearer token for endpoints that implement Authorization: Bearer authentication. Falls back to MODAL_BEARER_TOKEN.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "Modal model IDs",
+      "description": "Model IDs to expose for the Modal endpoint. Use IDs returned by the deployed endpoint /v1/models response or the served model name. Falls back to comma-separated MODAL_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "modal",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "modal",
+      "source": "env",
+      "value": "MODAL_BEARER_TOKEN"
+    }
+  ],
+  "providers": [
+    {
+      "id": "modal",
+      "name": "Modal OpenAI-Compatible Endpoint",
+      "description": "Registers configured Modal OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "hacker_news",
+  "name": "Hacker News",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds Hacker News top, new, and Ask HN story table tools for approved threads.",
+  "color": "#ff6600",
+  "permissions": ["network:fetch"],
+  "network": {
+    "allow": ["https://hacker-news.firebaseio.com/v0/**"],
+    "enforceHttps": true
+  },
+  "access": [
+    {
+      "id": "top_stories",
+      "name": "Hacker News - Top Stories",
+      "description": "Expose the top_stories tool to selected threads.",
+      "tools": [
+        {
+          "name": "top_stories",
+          "description": "Fetch all current Hacker News top story IDs, load their item metadata, and return a markdown table.",
+          "timeoutMs": 60000
+        }
+      ]
+    },
+    {
+      "id": "new_stories",
+      "name": "Hacker News - New Stories",
+      "description": "Expose the new_stores tool to selected threads.",
+      "tools": [
+        {
+          "name": "new_stores",
+          "description": "Fetch all current Hacker News new story IDs, load their item metadata, and return a markdown table. The tool id keeps the requested new_stores spelling.",
+          "timeoutMs": 60000
+        }
+      ]
+    },
+    {
+      "id": "ask_stories",
+      "name": "Hacker News - Ask Stories",
+      "description": "Expose the ask_stories tool to selected threads.",
+      "tools": [
+        {
+          "name": "ask_stories",
+          "description": "Fetch all current Hacker News Ask HN story IDs, load their item metadata, and return a markdown table.",
+          "timeoutMs": 60000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880,
+    "maxTextResultBytes": 262144
+  }
+}

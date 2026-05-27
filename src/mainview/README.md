@@ -1,0 +1,159 @@
+# mainview
+
+This folder contains the browser-facing React UI layer for Metidos’s Pi-backed main application view, including the workspace screen composition, routing-free panel orchestration, and all chat/thread/project interaction surfaces used by the desktop and mobile experiences.
+
+Files in this folder are split by responsibility: app bootstrap, global UI styling, and stateful workspace components.
+
+## Top-level entry files
+
+`App.tsx` mounts the full multi-panel application shell and wires application-level providers, feature panels, and command dispatch boundaries. It now keeps the source-of-truth project and thread collections in indexed stores so hot mutation paths can update incrementally while memoized ordered arrays remain available for component APIs, and it also owns the browser-side Pi extension UI bridge state for prompts, notifications, widgets, and composer synchronization.
+
+`auth-shell.tsx` gates the workspace behind setup/login/recovery screens, including the lost-device recovery-code login path.
+
+`auth-client.ts` wraps the backend `/auth/*` HTTP endpoints used by setup, TOTP login, recovery-code login, logout, and status polling.
+
+`auth-shell-connect.ts` isolates the shared authenticated-bootstrap logic used when the UI opens an existing session or transitions into a newly authenticated session and the first RPC transport connect needs transient recovery.
+
+`project-close.ts` isolates the rollback-safe project-collapse sequencing so the UI only commits local close state after the backend confirms the project has closed.
+
+`project-lifecycle.ts` isolates the per-project lifecycle request tracker used to invalidate stale expand, collapse, and worktree-list completions once a newer transition wins.
+
+`project-worktree-refresh.ts` isolates the freshness heuristic used when opening the project action menu so recent cached worktree lists are reused and only stale or incomplete lists trigger a background refresh.
+
+`frontend-memory-telemetry.ts` owns browser-side memory sampling helpers used by development/audit flows without coupling telemetry collection to individual panels.
+
+`html-bootstrap.ts` reads the server-injected runtime bootstrap so auth, health, and websocket endpoints stay centralized.
+
+`startup-project-restore.ts` isolates startup restore reconciliation for project reopen state so the UI keeps projects closed until batch restore confirms them and can roll back failed restore targets cleanly.
+
+`startup-worktree-restore.ts` isolates startup worktree-restore filtering and selection fallback so stale persisted worktree paths are pruned before the rest of the UI starts reading git history or active-worktree state from them.
+
+`thread-workspace-selection.ts` isolates the thread-driven workspace-target derivation used when a selected thread needs to reopen its project and worktree context before diff or history panels can load live worktree data.
+
+`thread-extension-ui.ts` isolates the browser-side reducer/selectors used to project Pi extension UI websocket events into React dialog, notification, status, widget, and editor state.
+
+`rpc-errors.ts` defines the typed RPC error surface used by the frontend to classify request failures.
+
+`index.ts` is the JS entry point that wires runtime initialization and React mounting, including reading the server-injected JSON runtime bootstrap used for auth, health, and websocket endpoint discovery.
+
+`index.html` provides the host document, mount point, static stylesheet/script tags, and static metadata required by the frontend bundle.
+
+`index.css` contains shared component and layout styles used across the top-level views.
+
+`input.css` contains base/reset style inputs used by the chat and control surfaces.
+
+## `app/` subfolder
+
+This contains the workspace feature modules that implement every visible workspace state, list, and panel in the main UI.
+
+`app/action-menus.tsx` defines context/action menus for project and thread operations.
+
+`app/calendar-workspace.tsx`, `app/calendar-*-dialog.tsx`, `app/calendar-state.ts`, and `app/calendar-notifications.ts` implement the calendar/event workspace, editing dialogs, permission dialog, layout helpers, and notification scheduling UI.
+
+`app/cronjob-workspace.tsx` implements cron listing, description-driven creation, explicit editing, run-now actions, and scheduler state presentation.
+
+`app/terminal-workspace.tsx` implements the managed terminal workspace for unsafe terminal sessions.
+
+`app/chat-workspace.tsx` implements the chat screen composition for desktop and mobile, coordinates composer + message flow, now caches transcript row measurements so unchanged virtualized rows can reuse prior heights across ordinary rerenders, and surfaces the active provider billing/policy scope directly under the composer model selector before send.
+
+`app/thread-extension-ui-dialog.tsx` renders the shared Pi extension prompt dialog used for browser-backed confirm/select/input/editor requests.
+
+`app/desktop-sidebar.tsx` defines the desktop layout shell and sidebar affordances for wide screens.
+
+`app/desktop-sidebar-content.tsx` composes the desktop-only navigation sidebar content, including pinned threads, project/worktree navigation, and git history.
+
+`app/desktop-thread-switcher.tsx` renders the explicit desktop worktree thread-switcher popover and owns the pure search/partition helper used by tests.
+
+`app/diff-workspace.tsx` renders file patches and supports diff tree construction and state for patch inspection, including worker-backed preparation for very large diffs.
+
+`app/diff-parsing.ts` contains the shared diff parse/summarize helpers and the threshold used to decide when to move large diff preparation off the main thread.
+
+`app/diff-parsing-client.ts` exposes the cached diff-parsing request manager and React hook that coordinate large-diff worker requests.
+
+`app/diff-parsing-worker.ts` is the dedicated web worker entrypoint for parsing and summarizing large diffs away from the UI thread.
+
+`app/git-history-panel.tsx` displays per-thread and project git history in a dedicated sidebar panel.
+
+`app/invalidation-events.ts` coalesces websocket-driven worktree invalidations and cron-list refresh signals into batched in-process subscriptions consumed by the app shell.
+
+`app/message-markdown.tsx` contains the lazily loaded rich markdown renderer and Metidos-specific link, code, image, and table overrides used only for markdown-heavy transcript content.
+
+`app/message-markdown-loader.ts` exposes the shared dynamic-import loader used to defer and warm the rich markdown renderer after initial app mount, including the prepared-block renderer for huge worker-preprocessed transcript messages.
+
+`app/message-markdown-routing.ts` isolates the plain-text versus rich-markdown routing heuristics and bare-link splitting used by transcript message rendering.
+
+`app/message-preprocessing.ts` contains the shared preprocessing plan and threshold used to segment huge assistant responses before rendering.
+
+`app/message-preprocessing-client.ts` exposes the cached request manager and hook that offload huge markdown/code-heavy assistant-response preprocessing to a browser worker.
+
+`app/message-preprocessing-worker.ts` is the dedicated web worker entrypoint for preparing very large assistant responses away from the UI thread.
+
+`app/message-ui.tsx` hosts all message display components and modal/preview helpers for tool calls, processing states, errors, notices, and the shared diff viewer used across transcript and history surfaces.
+
+`app/tool-call-rendering.ts` isolates Pi tool-call preview parsing so core tools render compact message headers with path/pattern/command context before the details accordion is opened, including native LanceDB tool previews.
+
+`app/projects-panel.tsx` renders project cards/lists and project-level workspace selection behavior.
+
+`app/pinned-folders-panel.tsx` renders pinned folder shortcuts alongside project/worktree navigation.
+
+`app/pinned-threads-panel.tsx` renders the desktop thread section with pinned shortcuts plus the five most recent unpinned threads.
+
+`app/settings-panel.tsx` renders the top-right settings popover shell for app, local, notification, terminal, and plugin administration settings. Model provider setup is plugin-owned and is not configured through the main app settings surface.
+
+`app/sidebar-content.tsx` composes the shared mobile drawer sidebar sections and keeps the project/worktree search path separate from the desktop navigation shell.
+
+`app/sidebar-panels-state.ts` owns persisted sidebar panel open/closed state and cross-panel toggle synchronization.
+
+`app/state.ts` defines shared mainview state shapes, indexed store helpers, formatting helpers, and state-caching utilities used across panels and hooks, including the indexed per-project worktree cache shape used by `App.tsx` and derived-state helpers.
+
+`app/project-store.ts`, `app/thread-store.ts`, `app/project-worktree-state.ts`, `app/thread-ui-state.ts`, and `app/persisted-mainview-state.ts` hold focused indexed-store and persisted-UI-state helpers so hot updates avoid full collection rewrites.
+
+`app/thread-list-row.tsx` renders a single thread row and handles row-level status/actions behavior.
+
+`app/threads-panel.tsx` assembles the thread list, preview previews, and selection wiring.
+
+`app/use-add-project-form.ts` encapsulates project creation form validation and submission orchestration.
+
+`app/use-mainview-derived-state.ts` derives stable derived state from raw RPC/project data before it reaches presentation components.
+
+`app/use-thread-previews.ts` prepares compact thread preview data for sidebar/message rendering.
+
+`app/use-worktree-diff.ts` pulls and transforms worktree diff data for diff viewers and history tooling.
+
+`app/workspace-panel.tsx` contains the workspace-level shell for switching among the major workspace panes.
+
+## `controls/` subfolder
+
+`controls/` contains reusable, reusable UI controls and selectors consumed by app-level components. It already has its own `README.md` with component-level details.
+
+`controls/README.md` documents control component contracts and usage patterns.
+
+`controls/chat-composer-control.tsx` renders the message composer and send/compose interactions.
+
+`controls/codex-model-selector.tsx` drives `Provider -> Model -> Thinking level` selection for chat and cron routing from the backend model catalog, preserving provider availability metadata supplied by Pi and plugins.
+
+`controls/codex-utils.ts` provides shared utility helpers used by the provider/model controls, including provider grouping, search filtering, active-model lookup, and reasoning-effort presentation.
+
+`controls/dropdown.tsx` is the shared dropdown primitive used by action and selection controls, and now renders through the shared floating popover layer instead of local absolute positioning.
+
+`controls/popover.tsx` owns the shared floating surface used by hover previews, context menus, and selector panels, including viewport clamping, overflow escape via portals, and hide-state detection when anchors become clipped.
+
+`controls/icons.tsx` centralizes icon exports used by controls and panels.
+
+`controls/reasoning-effort-selector.tsx` remains available for standalone thinking-level tuning when a surface does not want the full stepped model selector.
+
+`controls/search-utils.ts` contains search/filter helpers used by sidebar and workspace find surfaces.
+
+`controls/sidebar-search-control.tsx` renders and manages sidebar search/filter input behavior.
+
+`controls/sidebar-section-header.tsx` draws consistent section headers and controls in sidebar cards.
+
+`controls/thread-access-control.tsx` renders the reusable upward-opening dropdown for thread and cron access flags, including web, Git/GitHub, SQLite, LanceDB, calendar, notifications, coordination, plugin access groups, hidden internal prompt-injection filtering, and Unsafe toggles.
+
+## Why this folder exists
+
+`src/mainview` is the boundary between data/services and user-facing UI logic for Metidos’s primary screen. The folder ensures:
+
+1. All main UI panels are discoverable and co-located.
+2. Feature modules stay decoupled from backend bootstrap (`src/bun`) and from styling/asset-only docs.
+3. Shared state and hook-based view-models are available for both desktop and mobile layouts without duplicating logic.

@@ -1,0 +1,49 @@
+{
+  "id": "ai21",
+  "name": "AI21 Labs",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers AI21 Jamba as a first-party OpenAI-compatible chat provider using AI21_API_KEY or a Plugin Setting.",
+  "color": "#6d28d9",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "AI21_API_KEY",
+      "description": "Fallback AI21 API key used for Jamba inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "AI21 API key",
+      "description": "AI21 API key used for Jamba inference. Falls back to AI21_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "ai21",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "ai21",
+      "source": "env",
+      "value": "AI21_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "ai21",
+      "name": "AI21 Jamba",
+      "description": "Registers AI21 Jamba chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

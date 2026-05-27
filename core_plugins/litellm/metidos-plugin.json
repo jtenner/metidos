@@ -1,0 +1,104 @@
+{
+  "id": "litellm",
+  "name": "LiteLLM Proxy",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a local LiteLLM Proxy OpenAI-compatible server as a first-party chat provider using configured model IDs.",
+  "color": "#22c55e",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "LITELLM_BASE_URL",
+      "description": "Optional fallback loopback LiteLLM Proxy OpenAI-compatible base URL. Defaults to http://localhost:4000/v1.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "LITELLM_API_KEY",
+      "description": "Optional fallback LiteLLM bearer token or virtual key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "LITELLM_VIRTUAL_KEY",
+      "description": "Optional fallback LiteLLM virtual key used for inference when no api_key Plugin Setting or LITELLM_API_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "LITELLM_MASTER_KEY",
+      "description": "Optional fallback LiteLLM master key used for local proxy inference when no api_key Plugin Setting, LITELLM_API_KEY, or LITELLM_VIRTUAL_KEY is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "LITELLM_MODEL_IDS",
+      "description": "Optional comma-separated LiteLLM model IDs exposed by the local proxy when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "LiteLLM Proxy base URL",
+      "description": "Loopback OpenAI-compatible base URL for LiteLLM Proxy. Defaults to http://localhost:4000/v1 and is restricted by the plugin to localhost, 127.0.0.1, or ::1 /v1 URLs.",
+      "kind": "url",
+      "required": false,
+      "default": "http://localhost:4000/v1"
+    },
+    {
+      "key": "api_key",
+      "label": "LiteLLM API key",
+      "description": "Optional LiteLLM bearer token, virtual key, or local master key. Falls back to LITELLM_API_KEY, LITELLM_VIRTUAL_KEY, and then LITELLM_MASTER_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "LiteLLM model IDs",
+      "description": "Model IDs to expose for the local LiteLLM Proxy. Use IDs returned by /v1/models or model_name values from the proxy config. Falls back to comma-separated LITELLM_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "litellm",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "litellm",
+      "source": "env",
+      "value": "LITELLM_API_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "litellm",
+      "source": "env",
+      "value": "LITELLM_VIRTUAL_KEY"
+    },
+    {
+      "kind": "api_key",
+      "provider": "litellm",
+      "source": "env",
+      "value": "LITELLM_MASTER_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "litellm",
+      "name": "LiteLLM Proxy",
+      "description": "Registers configured local LiteLLM Proxy OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

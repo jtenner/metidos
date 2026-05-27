@@ -1,0 +1,16 @@
+.git/
+.metidos-build/
+.metidos/cache/
+.codex
+node_modules/
+output.log
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+deploy/podman/.env.podman
+.env
+.env.*
+!.env.example
+!.env.*.example

@@ -1,0 +1,40 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds a National Weather Service forecast agent tool.",
+  "color": "#38bdf8",
+  "permissions": ["network:fetch"],
+  "network": {
+    "allow": ["https://api.weather.gov/**"]
+  },
+  "settings": [
+    {
+      "key": "coordinates",
+      "label": "Weather coordinates",
+      "description": "Google Maps latitude, longitude string used by the weather_forecast tool.",
+      "kind": "string",
+      "required": true
+    }
+  ],
+  "access": [
+    {
+      "id": "weather_tools",
+      "name": "Weather",
+      "description": "Expose the weather_forecast tool to selected threads.",
+      "tools": [
+        {
+          "name": "weather_forecast",
+          "description": "Fetch the configured National Weather Service forecast and return a vertical markdown table.",
+          "timeoutMs": 10000
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 5242880,
+    "maxTextResultBytes": 262144
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "id": "baseten",
+  "name": "Baseten",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Baseten Model APIs as a first-party OpenAI-compatible provider with upstream model and embedding discovery.",
+  "color": "#ff5c35",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://inference.baseten.co/v1/models",
+      "https://inference.baseten.co/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "BASETEN_API_KEY",
+      "description": "Fallback Baseten API key used for discovery, inference, and embeddings when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Baseten API key",
+      "description": "Baseten API key used for model discovery, inference, and embeddings. Falls back to BASETEN_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "baseten",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "baseten",
+      "source": "env",
+      "value": "BASETEN_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "baseten",
+      "name": "Baseten",
+      "description": "Refreshes Baseten Model APIs chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "baseten_embeddings",
+      "name": "Baseten Embeddings",
+      "description": "Refreshes Baseten embedding models from the upstream catalog and provides embeddings through Baseten's OpenAI-compatible embeddings endpoint.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

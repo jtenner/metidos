@@ -1,0 +1,56 @@
+{
+  "id": "xai",
+  "name": "xAI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers xAI as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#64748b",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.x.ai/v1/**"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "XAI_API_KEY",
+      "description": "Fallback xAI API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "xAI API key",
+      "description": "xAI API key used for model discovery and inference. Falls back to XAI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "xai",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "xai",
+      "source": "env",
+      "value": "XAI_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "xai",
+      "name": "xAI",
+      "description": "Refreshes xAI chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

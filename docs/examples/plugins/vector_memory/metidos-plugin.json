@@ -1,0 +1,44 @@
+{
+  "id": "vector_memory",
+  "name": "Vector Memory",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Adds simple note memory tools backed by Metidos embeddings and plugin-scoped LanceDB storage.",
+  "color": "#8b5cf6",
+  "permissions": [
+    "metidos:can_embed",
+    "metidos:lancedb",
+    "storage:write",
+    "log:write"
+  ],
+  "access": [
+    {
+      "id": "memory_tools",
+      "name": "Memory tools",
+      "description": "Expose vector-backed note memory tools to selected threads.",
+      "tools": [
+        {
+          "name": "remember_note",
+          "description": "Embed and store a note in plugin-owned vector memory.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "search_notes",
+          "description": "Embed a query and search stored vector notes.",
+          "timeoutMs": 10000
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 104857600,
+      "maxFileBytes": 10485760,
+      "maxFiles": 10000
+    }
+  },
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}

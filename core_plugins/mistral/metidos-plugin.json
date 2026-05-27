@@ -1,0 +1,56 @@
+{
+  "id": "mistral",
+  "name": "Mistral AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Mistral AI as a first-party OpenAI-compatible provider with upstream model discovery.",
+  "color": "#ff7000",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.mistral.ai/v1/models"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "MISTRAL_API_KEY",
+      "description": "Fallback Mistral API key used for discovery and inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Mistral API key",
+      "description": "Mistral API key used for model discovery and inference. Falls back to MISTRAL_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "mistral",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "mistral",
+      "source": "env",
+      "value": "MISTRAL_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "mistral",
+      "name": "Mistral AI",
+      "description": "Refreshes Mistral chat models from the upstream catalog and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

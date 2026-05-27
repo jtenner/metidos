@@ -1,0 +1,848 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://metidos.local/schemas/metidos-plugin-v1.schema.json",
+  "title": "Metidos Plugin Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "metidosApiVersion",
+    "description",
+    "main"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$",
+      "not": { "enum": ["metidos"] },
+      "description": "Stable plugin id. It must match the installation folder identity and cannot use reserved host ids such as metidos."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "not": { "pattern": "^\\s*[Mm][Ee][Tt][Ii][Dd][Oo][Ss]\\s*$" }
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "metidosApiVersion": { "const": "v1" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "color": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^;{}<>]+$",
+      "description": "Optional CSS color used to tint this plugin's access groups in access controls."
+    },
+    "main": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 260,
+      "pattern": "^\\./(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)(?:\\.data|\\.logs|\\.data-bak-[^/]*)(?:/|$)).+$",
+      "description": "Plugin source entry file relative to the plugin root. TypeScript/JavaScript entries are bundled directly; Python entries must use the .py extension and run in the safe Pyodide plugin host."
+    },
+    "telemetry": { "type": "boolean", "default": true },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "default": [],
+      "items": { "$ref": "#/definitions/permission" }
+    },
+    "access": {
+      "type": "array",
+      "maxItems": 25,
+      "default": [],
+      "items": { "$ref": "#/definitions/accessGroup" }
+    },
+    "ingressSources": {
+      "type": "array",
+      "maxItems": 25,
+      "default": [],
+      "items": { "$ref": "#/definitions/ingressSource" }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "$ref": "#/definitions/projectFileAccess" },
+        "deny": { "$ref": "#/definitions/projectFileAccess" }
+      },
+      "default": {}
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/urlPattern" }
+        },
+        "webSocketAllow": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/urlPattern" }
+        },
+        "enforceHttps": { "type": "boolean", "default": true }
+      }
+    },
+    "env": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/definitions/envVar" }
+    },
+    "settings": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/definitions/setting" }
+    },
+    "providers": {
+      "type": "array",
+      "maxItems": 10,
+      "default": [],
+      "items": { "$ref": "#/definitions/provider" }
+    },
+    "notificationProviders": {
+      "type": "array",
+      "maxItems": 10,
+      "default": [],
+      "items": { "$ref": "#/definitions/provider" }
+    },
+    "oauthProviders": {
+      "type": "array",
+      "maxItems": 10,
+      "default": [],
+      "items": { "$ref": "#/definitions/provider" }
+    },
+    "piAuth": {
+      "type": "array",
+      "maxItems": 10,
+      "default": [],
+      "items": { "$ref": "#/definitions/piAuthBinding" }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaults": { "$ref": "#/definitions/storageDefaults" }
+      },
+      "default": {}
+    },
+    "gc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "timeoutMs"],
+      "properties": {
+        "enabled": { "const": true },
+        "timeoutMs": { "$ref": "#/definitions/timeoutMs" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxRpcPayloadBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8388608,
+          "default": 8388608
+        },
+        "maxTextResultBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 262144,
+          "default": 262144
+        },
+        "maxNetworkResponseBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 26214400,
+          "default": 26214400
+        },
+        "sidecarMemoryBytes": {
+          "type": "integer",
+          "minimum": 16777216,
+          "maximum": 536870912,
+          "default": 134217728
+        },
+        "maxWebSocketConnections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "default": 4
+        },
+        "maxWebSocketMessageBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576,
+          "default": 65536
+        },
+        "maxWebSocketQueuedMessages": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 32
+        }
+      },
+      "default": {}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "contains": { "const": "sqlite" } } }
+      },
+      "then": {
+        "properties": {
+          "permissions": { "contains": { "const": "storage:write" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "terminal:create" } }
+        }
+      },
+      "then": {
+        "properties": { "permissions": { "contains": { "const": "unsafe" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "terminal:kill" } }
+        }
+      },
+      "then": {
+        "properties": { "permissions": { "contains": { "const": "unsafe" } } }
+      }
+    },
+    {
+      "if": { "required": ["ingressSources"] },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "plugin:request-ingress" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["ingressSources"],
+        "properties": {
+          "ingressSources": {
+            "contains": {
+              "required": ["supportsReplyToSource"],
+              "properties": { "supportsReplyToSource": { "const": true } }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "plugin:reply-to-source" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "network:fetch" } }
+        }
+      },
+      "then": {
+        "required": ["network"],
+        "properties": {
+          "network": {
+            "required": ["allow"],
+            "properties": { "allow": { "minItems": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["network"],
+        "properties": {
+          "network": {
+            "anyOf": [
+              {
+                "required": ["allow"],
+                "properties": {
+                  "allow": {
+                    "contains": {
+                      "type": "string",
+                      "pattern": "^(?:(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//)?\\*\\*?(?:[/?#:]|$)"
+                    }
+                  }
+                }
+              },
+              {
+                "required": ["webSocketAllow"],
+                "properties": {
+                  "webSocketAllow": {
+                    "contains": {
+                      "type": "string",
+                      "pattern": "^(?:(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?//)?\\*\\*?(?:[/?#:]|$)"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "unsafe" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["files"],
+        "properties": {
+          "files": {
+            "required": ["allow"],
+            "properties": {
+              "allow": {
+                "required": ["read"],
+                "properties": { "read": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "files:read" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["files"],
+        "properties": {
+          "files": {
+            "required": ["allow"],
+            "properties": {
+              "allow": {
+                "required": ["write"],
+                "properties": { "write": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "files:write" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["files"],
+        "properties": {
+          "files": {
+            "required": ["allow"],
+            "properties": {
+              "allow": {
+                "required": ["delete"],
+                "properties": { "delete": { "minItems": 1 } }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "files:delete" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "network:websocket" } }
+        }
+      },
+      "then": {
+        "required": ["network"],
+        "properties": {
+          "network": {
+            "required": ["webSocketAllow"],
+            "properties": { "webSocketAllow": { "minItems": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["providers"],
+        "properties": { "providers": { "minItems": 1 } }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "provider:register" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["notificationProviders"],
+        "properties": { "notificationProviders": { "minItems": 1 } }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "notification:provider" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["oauthProviders"],
+        "properties": { "oauthProviders": { "minItems": 1 } }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "oauth:register" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["piAuth"],
+        "properties": {
+          "piAuth": {
+            "contains": {
+              "required": ["kind"],
+              "properties": {
+                "kind": { "enum": ["codex_auth", "pi_oauth_file"] }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["permissions"],
+        "properties": {
+          "permissions": { "contains": { "const": "storage:read" } }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "permission": {
+      "type": "string",
+      "enum": [
+        "storage:read",
+        "storage:write",
+        "storage:delete",
+        "files:read",
+        "files:write",
+        "files:delete",
+        "network:fetch",
+        "network:websocket",
+        "cron:create",
+        "metidos:can_embed",
+        "metidos:lancedb",
+        "metidos:prompt_inject",
+        "metidos:provides_embeddings",
+        "plugin:request-ingress",
+        "plugin:reply-to-source",
+        "notification:send",
+        "notification:provider",
+        "oauth:register",
+        "provider:register",
+        "calendar:list",
+        "calendar:create",
+        "calendar:modify",
+        "calendar:delete",
+        "events:list",
+        "events:get",
+        "events:create",
+        "events:modify",
+        "events:delete",
+        "terminal:create",
+        "terminal:read",
+        "terminal:grep",
+        "terminal:kill",
+        "sqlite",
+        "log:write",
+        "unsafe"
+      ]
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "snakeToolName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$",
+      "maxLength": 64,
+      "description": "Plugin-local tool id. It must be snake_case and cannot contain ':'."
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 600000
+    },
+    "ingressSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "description": "Plugin-local stable ingress source id."
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 300000
+        },
+        "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+        "supportsReplyToSource": { "type": "boolean", "default": false }
+      }
+    },
+    "accessGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/definitions/identifier" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "tools": {
+          "type": "array",
+          "maxItems": 30,
+          "default": [],
+          "items": { "$ref": "#/definitions/toolDeclaration" }
+        },
+        "injects": {
+          "type": "array",
+          "maxItems": 25,
+          "default": [],
+          "items": { "$ref": "#/definitions/injectionDeclaration" }
+        }
+      }
+    },
+    "toolDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "timeoutMs"],
+      "properties": {
+        "name": { "$ref": "#/definitions/snakeToolName" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "timeoutMs": { "$ref": "#/definitions/timeoutMs" }
+      }
+    },
+    "injectionDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "timeoutMs"],
+      "properties": {
+        "name": { "$ref": "#/definitions/snakeToolName" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "timeoutMs": { "$ref": "#/definitions/timeoutMs" }
+      }
+    },
+    "projectPattern": {
+      "type": "string",
+      "pattern": "^\\./"
+    },
+    "projectPatterns": {
+      "type": "array",
+      "uniqueItems": true,
+      "default": [],
+      "items": { "$ref": "#/definitions/projectPattern" }
+    },
+    "projectFileAccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "read": { "$ref": "#/definitions/projectPatterns" },
+        "write": { "$ref": "#/definitions/projectPatterns" },
+        "delete": { "$ref": "#/definitions/projectPatterns" }
+      },
+      "default": {}
+    },
+    "urlPattern": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "^(?:[a-zA-Z][a-zA-Z0-9+.-]*://)?[^/?#]*[:@][^/?#]*@"
+      }
+    },
+    "envVar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
+        "description": { "type": "string", "maxLength": 1000 },
+        "required": { "type": "boolean", "default": false },
+        "secret": { "type": "boolean", "default": false },
+        "default": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "secret": { "const": true } },
+            "required": ["secret"]
+          },
+          "then": { "not": { "required": ["default"] } }
+        }
+      ]
+    },
+    "setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "kind"],
+      "properties": {
+        "key": { "$ref": "#/definitions/identifier" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "enum",
+            "secret",
+            "url",
+            "date",
+            "list"
+          ]
+        },
+        "required": { "type": "boolean", "default": false },
+        "default": {},
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["string", "number", "url", "email"]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "string" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": { "default": { "type": "string" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "number" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": { "default": { "type": "number" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "boolean" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": { "default": { "type": "boolean" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "secret" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": {
+              "default": { "type": ["string", "number", "boolean", "null"] }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "list" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["items"],
+            "not": { "required": ["options"] },
+            "properties": {
+              "default": {
+                "type": "array",
+                "items": { "type": ["number", "string"] }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "enum" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["options"],
+            "not": { "required": ["items"] },
+            "properties": { "default": { "type": "string" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "date" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": {
+              "default": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "url" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["items"] }, { "required": ["options"] }]
+            },
+            "properties": {
+              "default": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9+.-]*://[^\\s]+$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "timeoutMs"],
+      "properties": {
+        "id": { "$ref": "#/definitions/identifier" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*(?:/[a-z][a-z0-9_-]*)*$",
+          "maxLength": 128
+        },
+        "timeoutMs": { "$ref": "#/definitions/timeoutMs" }
+      }
+    },
+    "piAuthBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "provider", "source", "value"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["api_key", "codex_auth", "pi_oauth_file"]
+        },
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*(?:/[a-z][a-z0-9_-]*)*$",
+          "maxLength": 128
+        },
+        "source": { "type": "string", "enum": ["env", "setting"] },
+        "value": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source": { "const": "env" } },
+            "required": ["source"]
+          },
+          "then": {
+            "properties": { "value": { "pattern": "^[A-Z_][A-Z0-9_]*$" } }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source": { "const": "setting" }
+            },
+            "required": ["source"]
+          },
+          "then": {
+            "properties": { "value": { "$ref": "#/definitions/identifier" } }
+          }
+        }
+      ]
+    },
+    "storageDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxDataBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 104857600
+        },
+        "maxFileBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10485760
+        },
+        "maxFiles": { "type": "integer", "minimum": 1, "default": 10000 }
+      }
+    }
+  }
+}

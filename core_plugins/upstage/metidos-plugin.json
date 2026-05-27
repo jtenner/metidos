@@ -1,0 +1,49 @@
+{
+  "id": "upstage",
+  "name": "Upstage",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Upstage Solar as a first-party OpenAI-compatible chat provider using UPSTAGE_API_KEY or a Plugin Setting.",
+  "color": "#2563eb",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "UPSTAGE_API_KEY",
+      "description": "Fallback Upstage API key used for Solar inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Upstage API key",
+      "description": "Upstage API key used for Solar inference. Falls back to UPSTAGE_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "upstage",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "upstage",
+      "source": "env",
+      "value": "UPSTAGE_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "upstage",
+      "name": "Upstage Solar",
+      "description": "Runs Upstage Solar chat models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

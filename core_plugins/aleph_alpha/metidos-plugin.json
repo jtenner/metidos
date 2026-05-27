@@ -1,0 +1,53 @@
+{
+  "id": "aleph_alpha",
+  "name": "Aleph Alpha",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Aleph Alpha Pharia chat models as a first-party provider using ALEPH_ALPHA_API_KEY or a Plugin Setting.",
+  "color": "#0f172a",
+  "permissions": ["network:fetch", "provider:register", "log:write"],
+  "network": {
+    "allow": ["https://api.aleph-alpha.com/v1/model-settings"],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "ALEPH_ALPHA_API_KEY",
+      "description": "Fallback Aleph Alpha API key used for Pharia inference and model discovery when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Aleph Alpha API key",
+      "description": "Aleph Alpha API key used for Pharia inference and model discovery. Falls back to ALEPH_ALPHA_API_KEY.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "aleph_alpha",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "aleph_alpha",
+      "source": "env",
+      "value": "ALEPH_ALPHA_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "aleph_alpha",
+      "name": "Aleph Alpha Pharia",
+      "description": "Discovers Aleph Alpha model settings and runs chat-capable Pharia models through Pi's OpenAI-compatible completions transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

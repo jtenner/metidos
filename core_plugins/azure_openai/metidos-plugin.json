@@ -1,0 +1,79 @@
+{
+  "id": "azure_openai",
+  "name": "Azure OpenAI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Azure OpenAI as a first-party deployment-based Responses API provider using AZURE_OPENAI_API_KEY and a configured Azure OpenAI resource name.",
+  "color": "#0078d4",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "AZURE_OPENAI_API_KEY",
+      "description": "Fallback Azure OpenAI API key used for inference when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "AZURE_OPENAI_RESOURCE_NAME",
+      "description": "Fallback Azure OpenAI resource name used to build https://{resource}.openai.azure.com/openai/v1 when no resource_name Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "AZURE_OPENAI_DEPLOYMENTS",
+      "description": "Fallback comma-separated Azure OpenAI deployment names exposed as models when deployment_names is not configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "api_key",
+      "label": "Azure OpenAI API key",
+      "description": "Azure OpenAI API key used for inference. Falls back to AZURE_OPENAI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "resource_name",
+      "label": "Azure OpenAI resource name",
+      "description": "Azure OpenAI resource DNS label used to build https://{resource}.openai.azure.com/openai/v1. Falls back to AZURE_OPENAI_RESOURCE_NAME.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "deployment_names",
+      "label": "Azure OpenAI deployment names",
+      "description": "Azure OpenAI deployment names to expose as models. Azure v1 requests use deployment names in the model field. Falls back to comma-separated AZURE_OPENAI_DEPLOYMENTS.",
+      "kind": "list",
+      "items": {
+        "kind": "string"
+      },
+      "default": [],
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "azure_openai",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "azure_openai",
+      "source": "env",
+      "value": "AZURE_OPENAI_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "azure_openai",
+      "name": "Azure OpenAI",
+      "description": "Runs configured Azure OpenAI deployments through Pi's Azure OpenAI Responses API transport.",
+      "timeoutMs": 30000
+    }
+  ]
+}

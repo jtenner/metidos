@@ -1,0 +1,83 @@
+{
+  "id": "cloudflare",
+  "name": "Cloudflare Workers AI",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers Cloudflare Workers AI as a first-party OpenAI-compatible provider with account-scoped model discovery and embeddings.",
+  "color": "#f48120",
+  "permissions": [
+    "network:fetch",
+    "provider:register",
+    "metidos:provides_embeddings",
+    "log:write"
+  ],
+  "network": {
+    "allow": [
+      "https://api.cloudflare.com/client/v4/accounts/*/ai/models/search",
+      "https://api.cloudflare.com/client/v4/accounts/*/ai/v1/embeddings"
+    ],
+    "enforceHttps": true
+  },
+  "env": [
+    {
+      "key": "CLOUDFLARE_ACCOUNT_ID",
+      "description": "Fallback Cloudflare account ID used to build the account-scoped Workers AI OpenAI-compatible base URL when no account_id Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "CLOUDFLARE_API_TOKEN",
+      "description": "Fallback Cloudflare API token used for Workers AI model discovery, inference, and embeddings when no api_token Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    }
+  ],
+  "settings": [
+    {
+      "key": "account_id",
+      "label": "Cloudflare account ID",
+      "description": "Cloudflare account ID used to build the account-scoped Workers AI OpenAI-compatible base URL. Falls back to CLOUDFLARE_ACCOUNT_ID.",
+      "kind": "string",
+      "required": false
+    },
+    {
+      "key": "api_token",
+      "label": "Cloudflare API token",
+      "description": "Cloudflare API token used for model discovery, inference, and embeddings. Falls back to CLOUDFLARE_API_TOKEN.",
+      "kind": "secret",
+      "required": false
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "cloudflare",
+      "source": "setting",
+      "value": "api_token"
+    },
+    {
+      "kind": "api_key",
+      "provider": "cloudflare",
+      "source": "env",
+      "value": "CLOUDFLARE_API_TOKEN"
+    }
+  ],
+  "providers": [
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare Workers AI",
+      "description": "Refreshes Cloudflare Workers AI text-generation models from the account-scoped model search API and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "cloudflare_embeddings",
+      "name": "Cloudflare Workers AI Embeddings",
+      "description": "Refreshes Cloudflare Workers AI text-embedding models and provides embedding vectors through the OpenAI-compatible embeddings endpoint.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxNetworkResponseBytes": 1048576
+  }
+}

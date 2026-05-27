@@ -1,0 +1,80 @@
+{
+  "id": "tgi",
+  "name": "TGI OpenAI Server",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Registers a local TGI OpenAI-compatible server as a first-party chat provider using configured model IDs.",
+  "color": "#f97316",
+  "permissions": ["provider:register"],
+  "env": [
+    {
+      "key": "TGI_BASE_URL",
+      "description": "Optional fallback loopback TGI OpenAI-compatible base URL. Defaults to http://localhost:8080/v1.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "TGI_API_KEY",
+      "description": "Optional fallback bearer token for protected local TGI-compatible deployments when no api_key Plugin Setting is configured.",
+      "required": false,
+      "secret": true
+    },
+    {
+      "key": "TGI_MODEL_IDS",
+      "description": "Optional comma-separated TGI model IDs exposed by the local server when no model_ids Plugin Setting is configured.",
+      "required": false,
+      "secret": false
+    }
+  ],
+  "settings": [
+    {
+      "key": "base_url",
+      "label": "TGI base URL",
+      "description": "Loopback OpenAI-compatible base URL for TGI. Defaults to http://localhost:8080/v1 and is restricted by the plugin to localhost, 127.0.0.1, or ::1 /v1 URLs.",
+      "kind": "url",
+      "required": false,
+      "default": "http://localhost:8080/v1"
+    },
+    {
+      "key": "api_key",
+      "label": "TGI API token",
+      "description": "Optional bearer token for protected local TGI-compatible deployments. Falls back to TGI_API_KEY.",
+      "kind": "secret",
+      "required": false
+    },
+    {
+      "key": "model_ids",
+      "label": "TGI model IDs",
+      "description": "Model IDs to expose for the local TGI server. Use IDs returned by TGI /v1/models or the loaded model ID. Falls back to comma-separated TGI_MODEL_IDS.",
+      "kind": "list",
+      "required": false,
+      "items": { "kind": "string" }
+    }
+  ],
+  "piAuth": [
+    {
+      "kind": "api_key",
+      "provider": "tgi",
+      "source": "setting",
+      "value": "api_key"
+    },
+    {
+      "kind": "api_key",
+      "provider": "tgi",
+      "source": "env",
+      "value": "TGI_API_KEY"
+    }
+  ],
+  "providers": [
+    {
+      "id": "tgi",
+      "name": "TGI OpenAI Server",
+      "description": "Registers configured local TGI OpenAI-compatible chat models and serves them through Pi's OpenAI-compatible transport.",
+      "timeoutMs": 30000
+    }
+  ],
+  "limits": {
+    "maxTextResultBytes": 262144
+  }
+}
