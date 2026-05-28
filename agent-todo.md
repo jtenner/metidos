@@ -11,10 +11,8 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Update `.gitignore` to exclude unsafe local files, generated files, caches, logs, local databases, plugin runtime output, temporary screenshots, and other non-source artifacts.
 - [ ] Review dependency declarations and lockfiles for private packages, unpublished packages, local path dependencies, private registry URLs, or non-public references.
 - [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
-- [ ] Add or update `.env.example` with safe placeholder values only and no real secrets, tokens, hostnames, personal paths, or internal service names.
 - [ ] Add a repository metadata checklist covering GitHub description, topics, social preview image, homepage URL, and default branch naming.
 - [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
-- [ ] Verify all paths and examples in docs use generic placeholders instead of user-specific home directories or machine names.
 
 ## 2. License, Governance, and Community Files
 
@@ -39,14 +37,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Run a full working-tree secret scan using at least one dedicated tool and review every finding.
 - [ ] Run a full Git-history secret scan before publishing the repository and decide whether history rewrite is required.
 - [ ] Rotate any exposed, suspicious, stale, or unverifiable credentials found during the audit, even if they appear unused.
-- [ ] Document how secrets are stored, configured, redacted in logs, redacted in diagnostics, and passed to model providers or plugins.
-- [ ] Document what users should never paste into GitHub issues, including API keys, recovery codes, session tokens, `.env` contents, private repo URLs, local database files, and unredacted logs.
-- [ ] Add `docs/security/threat-model.md` describing assets, trust boundaries, attacker capabilities, major abuse cases, and current mitigations.
-- [ ] Document local authentication, TOTP, recovery codes, sessions, step-up authentication, and WebSocket ticket behavior.
-- [ ] Document plugin approval, review hashes, permission prompts, sidecar execution, unsafe capabilities, and how users can revoke or reset plugin access.
-- [ ] Document filesystem boundaries, denied paths, symlink handling, path normalization, and traversal protections.
-- [ ] Document network allowlist behavior, blocked destinations, HTTPS/WSS expectations, and how network policy failures are surfaced.
-- [ ] Document reverse proxy, TLS, origin, cookie, WebSocket, and remote-access safety guidance.
 - [ ] Add or improve tests around sensitive settings redaction.
 - [ ] Add or improve tests around plugin permission enforcement.
 - [ ] Add or improve tests around filesystem path validation, denied paths, symlink handling, and traversal attempts.
@@ -63,9 +53,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add CodeQL or an equivalent code scanning workflow if appropriate for the stack.
 - [ ] Add Dependabot configuration for npm/Bun dependencies and GitHub Actions.
 - [ ] Add release-note configuration under `.github/release.yml`.
-- [ ] Add branch protection or GitHub ruleset notes to this TODO file or release docs for post-public setup.
-- [ ] Add a release checklist for tagging `v0.1.0-alpha.1` or another chosen first public version.
-- [ ] Add `CHANGELOG.md` or document a changelog generation workflow.
 - [ ] Verify every package script referenced in README, docs, workflows, and templates still exists and works.
 - [ ] Verify CI does not require private secrets for normal pull request validation.
 - [ ] Verify CI artifacts, logs, and test outputs do not expose secrets or machine-specific paths.
@@ -88,58 +75,16 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify all README commands work from a clean clone.
 - [ ] Verify README terminology matches `UBIQUITOUS_LANGUAGE.md` after public terminology is finalized.
 
-## 6. Documentation
-
-- [ ] Create or improve `docs/getting-started.md` with a short path from clone to first project and first agent thread.
-- [ ] Create or improve `docs/installation.md` or update existing `INSTALLATION.md` so there is one canonical install entry point.
-- [ ] Create or improve `docs/architecture.md` describing backend, mainview, runtime, persistence, plugin system, and major data flows.
-- [ ] Create or improve `docs/backend.md` with backend services, runtime assumptions, data directories, RPC surfaces, and validation commands.
-- [ ] Create or improve `docs/mainview.md` with frontend architecture, design system references, state management, and UI development workflow.
-- [ ] Create or improve `docs/rpc.md` documenting public/internal RPC concepts, request/response expectations, auth/session behavior, and error handling.
-- [ ] Create or improve `docs/plugin-system.md` as the canonical plugin system overview.
-- [ ] Create or improve `docs/security-model.md` summarizing auth, secrets, plugins, filesystem, network, and remote access safety.
-- [ ] Create or improve `docs/cron.md` documenting scheduled jobs, run-now behavior, disabling, deletion, failure handling, and plugin interactions.
-- [ ] Create or improve `docs/model-providers.md` documenting provider setup, secrets, local/private providers, and safety expectations.
-- [ ] Create or improve `docs/troubleshooting.md` with common install, runtime, auth, plugin, provider, and WebSocket problems.
-- [ ] Create or improve `docs/development.md` with local dev setup, validation, tests, code style, docs workflow, and recommended debugging.
-- [ ] Create or improve `docs/release-process.md` with versioning, changelog, tagging, release notes, validation, and rollback expectations.
-- [ ] Create or improve `docs/glossary.md` using canonical terms for projects, worktrees, threads, diffs, cron jobs, plugins, providers, approvals, and unsafe mode.
-- [ ] Ensure docs explain the required Bun version and how to verify it.
-- [ ] Ensure docs explain clean clone setup without private knowledge.
-- [ ] Ensure docs explain the local development workflow.
-- [ ] Ensure docs explain the local production workflow.
-- [ ] Ensure docs explain the container workflow if containers are supported.
-- [ ] Ensure docs explain first-run auth setup.
-- [ ] Ensure docs explain provider configuration with placeholders only.
-- [ ] Ensure docs explain adding a first project.
-- [ ] Ensure docs explain starting an agent thread.
-- [ ] Ensure docs explain reviewing diffs.
-- [ ] Ensure docs explain creating scheduled jobs.
-- [ ] Ensure docs explain installing, reviewing, approving, disabling, and resetting plugins.
-- [ ] Ensure docs explain backup, restore, and reset behavior.
-- [ ] Ensure docs explain log locations and safe issue-reporting guidance.
-- [ ] Verify documentation links are not broken after files are added or renamed.
-
-## 7. Plugin System Public Readiness
+## 6. Plugin System Public Readiness
 
 - [ ] Document the plugin manifest format with required fields, optional fields, examples, validation rules, and common errors.
 - [ ] Document plugin permissions, including each permission name, capability granted, risk level, and user-facing explanation.
-- [ ] Document plugin lifecycle states from discovery through review, approval, enabled use, disabled state, reset, and removal.
-- [ ] Document review and approval behavior, including review hashes, what changes invalidate approval, and how users can inspect changes.
 - [ ] Document plugin settings and secret fields, including how secret values are stored, displayed, redacted, reset, and reported in diagnostics.
-- [ ] Document filesystem API behavior for plugins, including allowed roots, denied paths, symlink handling, and unsafe capabilities.
-- [ ] Document network API behavior for plugins, including allowlists, HTTPS/WSS expectations, blocked destinations, and error behavior.
 - [ ] Document notification provider behavior for plugins, including registration, user configuration, permissions, and failure states.
 - [ ] Document model provider registration behavior for plugins, including provider metadata, credentials, request flow, and user approval expectations.
-- [ ] Document cron behavior for plugins, including schedule registration, execution context, disabling, and failure handling.
-- [ ] Add a minimal example plugin that demonstrates manifest structure, safe permissions, settings, and a small working action.
 - [ ] Add a plugin tutorial that walks from empty folder to installed and approved plugin.
-- [ ] Add plugin testing guidance for manifest validation, permission boundaries, settings, and failure handling.
-- [ ] Add plugin security guidance for authors and users.
-- [ ] Mark plugin API stability clearly as experimental, alpha, or stable in the README and plugin docs.
-- [ ] Verify plugin docs use fake secrets and safe example URLs only.
 
-## 8. Install and First-Run Experience
+## 7. Install and First-Run Experience
 
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.
 - [ ] Verify `bun run dev` works from a clean clone after documented setup only.
@@ -148,15 +93,10 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify local auth setup and reset flow are documented and work as described.
 - [ ] Verify missing dependencies produce readable errors with next-step guidance.
 - [ ] Verify setup docs do not require private knowledge, private package access, personal paths, or internal services.
-- [ ] Verify provider setup docs use placeholder values only.
-- [ ] Verify logs and app-data paths are documented for development and local production.
 - [ ] Verify backup and restore paths are documented and tested.
-- [ ] Verify reverse proxy, TLS, and Tailscale-style remote access docs are clearly marked advanced.
-- [ ] Simplify the first-run path so new users can see value quickly without configuring every advanced feature.
-- [ ] Add a first-run smoke test checklist covering auth, provider setup, project creation, first thread, and diff review.
 - [ ] Verify installation failure paths do not leave behind confusing or unsafe partial state.
 
-## 9. Visual Assets and Repo-Hosted Website
+## 8. Visual Assets and Repo-Hosted Website
 
 - [ ] Add or polish logo files in appropriate source and export formats.
 - [ ] Add or polish mascot/icon files if they are part of the project identity.
@@ -184,7 +124,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a changelog page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for screenshot/demo sections that use safe data only.
 
-## 10. Product Hardening
+## 9. Product Hardening
 
 - [ ] Verify project creation, opening, closing, and error handling work from a clean setup.
 - [ ] Verify Git worktree listing, opening, switching, and failure states work with small and realistic repositories.
@@ -202,7 +142,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify diagnostics exports exclude secrets, recovery codes, session tokens, provider keys, and private file contents.
 - [ ] Verify settings screens distinguish safe display values from secret or sensitive values.
 
-## 11. Testing
+## 10. Testing
 
 - [ ] Identify critical backend tests missing before public release and file or add TODOs for each gap.
 - [ ] Identify critical mainview tests missing before public release and file or add TODOs for each gap.
@@ -216,7 +156,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify tests use fixtures and fake data instead of real repositories, secrets, or personal paths.
 - [ ] Verify failing tests produce enough context for outside contributors to debug.
 
-## 12. GitHub Public Repository Setup Notes
+## 11. GitHub Public Repository Setup Notes
 
 - [ ] Confirm the repository description is accurate, concise, and aligned with the README tagline.
 - [ ] Confirm the repository homepage URL points to the correct docs or repo-hosted website if one exists.
@@ -233,7 +173,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Confirm default branch naming is intentional and documented where needed.
 - [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
 
-## 13. Final Pre-Public Checklist
+## 12. Final Pre-Public Checklist
 
 - [ ] All required community files exist.
 - [ ] License exists and GitHub detects it correctly.

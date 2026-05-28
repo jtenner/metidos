@@ -42,12 +42,11 @@ The UI and backend communicate through a typed WebSocket RPC layer, which keeps 
 
 ## Installation
 
-Installation and deployment guidance lives in:
+Start with the canonical install docs:
 
-- [`INSTALLATION.md`](INSTALLATION.md)
-- [`.pi/skills/metidos-installation/SKILL.md`](.pi/skills/metidos-installation/SKILL.md)
-
-Those guides cover local setup, provider configuration, integrations, reverse proxies, and Tailscale-style access.
+- [`docs/getting-started.md`](docs/getting-started.md) for the shortest clean-clone path.
+- [`docs/installation.md`](docs/installation.md) for local development, local production, containers, first-run auth, providers, backups, reverse proxies, and Tailscale-style access.
+- [`INSTALLATION.md`](INSTALLATION.md) as a root-level pointer to the same canonical install entry point.
 
 ## Common development commands
 
@@ -65,9 +64,18 @@ bun run typecheck    # run TypeScript checks
 
 - `src/bun/` — backend, persistence, Git, RPC handlers, plugins, cron, and runtime orchestration.
 - `src/mainview/` — browser UI.
-- `docs/` — operator notes, plugin guides, decisions, and design references.
+- `docs/` — getting started, installation, architecture, security, plugin, development, and release docs.
 - `.pi/skills/` — repo-local agent skills for workflows such as commits, QA, research, installation, and plugin authoring.
 - `.wiki/` — durable project knowledge and research notes.
+
+## Documentation
+
+- [`docs/README.md`](docs/README.md) — documentation index.
+- [`docs/architecture.md`](docs/architecture.md) — backend, Mainview, Pi runtime, persistence, plugin system, and data flows.
+- [`docs/security-model.md`](docs/security-model.md) — auth, secrets, plugins, filesystem, network, remote access, backups, and safe issue reporting.
+- [`docs/plugin-system.md`](docs/plugin-system.md) — Plugin System v1 overview.
+- [`docs/development.md`](docs/development.md) — local contributor workflow and validation.
+- [`docs/release-process.md`](docs/release-process.md) — release validation, tagging, notes, and rollback.
 
 ## Contributing
 

@@ -1,0 +1,160 @@
+# Plugin system
+
+Plugin System v1 is Metidos' local, review-first extension system. It lets a Local Operator install plugin folders, inspect their declared capabilities, approve the current review hash, and run approved code in sidecars.
+
+This page is the overview. Detailed authoring rules live in:
+
+- [Plugin authoring guide](./metidos-plugin-authoring-guide.md)
+- [Plugin AGENTS.md guide](./metidos-plugin-agents-guide.md)
+- [Plugin decisions](./metidos-plugin-decisions.md)
+- [Plugin manifest schema](./metidos-plugin.schema.json)
+- [Copyable examples](./examples/plugins/README.md)
+
+## Status
+
+Plugin System v1 is experimental and local-operator-approved. Plugin APIs, manifest fields, and lifecycle details may still change before a stable public release. Treat plugins as code you review before running.
+
+## Install location and folder shape
+
+Plugins live under App Data:
+
+```text
+APP_DATA/plugins/{plugin_id}/
+  metidos-plugin.json
+  AGENTS.md
+  index.ts
+  seed/
+  .data/
+  .logs/
+```
+
+`metidos-plugin.json`, `AGENTS.md`, and the manifest `main` file are required. Runtime data and logs are not source and should not be committed.
+
+## Lifecycle
+
+1. **Discovery** — Backend lists immediate child folders under `APP_DATA/plugins/` without executing code.
+2. **Inventory** — Backend reads manifest summary and runtime data summaries safely for Settings -> Plugins.
+3. **Needs Review** — new or changed source must be reviewed by the Local Operator.
+4. **Approval** — the Local Operator approves the current deterministic review hash.
+5. **Activation** — approved code runs in a per-plugin sidecar and registers declared capabilities.
+6. **Active use** — selected Threads can enable plugin access groups; host APIs enforce manifest permissions.
+7. **Disable** — disables future use and may require restart to fully remove v1 registered capabilities.
+8. **Reset Plugin Data** — moves or replaces plugin-owned `.data` according to reset behavior and seed files.
+9. **Removal** — stop Metidos, remove or archive the plugin folder, and start again.
+
+Changes outside excluded runtime paths invalidate the previous approval hash and require review again.
+
+## Review and approval
+
+Before approval, inspect:
+
+- plugin identity and folder name,
+- manifest permissions,
+- access groups and tools exposed to Threads,
+- settings and secret fields,
+- environment declarations,
+- network allowlists,
+- filesystem allowlists and denied paths,
+- provider registrations,
+- crons and callback timeouts,
+- ingress sources and reply behavior,
+- notification provider registration,
+- `AGENTS.md` repair/reset guidance,
+- review hash and changed files.
+
+Enable, Re-approve, Retry Plugin, and Run Plugin GC require recent step-up authentication because they can approve or execute plugin code.
+
+## Permissions and access groups
+
+A manifest **Permission** grants a host capability to approved plugin code. An **Access Group** controls which plugin tools are visible to a selected Thread.
+
+Access groups do not grant host APIs by themselves. For example, selecting an access group that exposes a tool does not grant `files:read` unless the manifest also has the relevant file permission and allowlist.
+
+Common capability areas include:
+
+- storage read/write in plugin `.data`,
+- plugin logging,
+- project file read/write through `./` virtual paths,
+- network fetch and websocket access,
+- SQLite in plugin storage,
+- notification provider registration,
+- model provider registration,
+- embedding consumption or provision,
+- agent tools,
+- global plugin crons,
+- plugin GC callbacks,
+- request ingress,
+- prompt injection.
+
+See the authoring guide and JSON schema for exact permission names and validation rules.
+
+## Settings and secrets
+
+Plugin Settings are one per-plugin map stored in App Data. Secret fields should be redacted when displayed, omitted from diagnostics, and reset deliberately.
+
+Rules:
+
+- Use fake values in docs and examples.
+- Do not paste real Plugin Settings into issues.
+- Prefer settings/env declarations over hard-coded secrets.
+- Remember plugin-authored logs and tool results may include whatever the plugin writes; review plugins accordingly.
+
+## Filesystem behavior
+
+Plugin filesystem APIs use virtual roots:
+
+- `~/` maps to plugin-owned `.data`.
+- `./` maps to the current Thread/project Worktree when available and permitted.
+
+The Backend rejects traversal, symlink escapes, sensitive denied paths such as `.git` and `.ssh`, and attempts to read plugin source/manifest through project file access. Project file access requires both thread context and manifest allowlist coverage.
+
+## Network behavior
+
+Network fetch/websocket APIs require explicit permissions and manifest allowlists. HTTPS/WSS is expected by default. Private-network or broad-domain access should be treated as high risk and approved only when the plugin's purpose requires it.
+
+Network policy failures should surface as plugin-visible errors without exposing unrelated host details.
+
+## Plugin crons
+
+A plugin can declare global scheduled callbacks. Plugin crons run under plugin lifecycle control and do not automatically receive a selected Project or Worktree. They should be bounded, idempotent, and safe to retry.
+
+Plugin crons are different from operator-created Cron Jobs, which create Pi-powered child Threads tied to a Project and Worktree.
+
+## Minimal example path
+
+Start from the examples index:
+
+- `hello_tool` — minimal TypeScript agent tool.
+- `python_hello_tool` — minimal Python agent tool.
+- `cron_notification_digest` — global crons and notification sending.
+- `ollama_model_provider` — model provider registration.
+- `ntfy_notification_provider` — notification provider registration.
+- `fake_ingress` — request ingress fixture.
+- `vector_memory` — plugin-scoped vector storage.
+- `rss_feed_indexer` — RSS/OPML refresh and vector indexing.
+
+Copy the entire example folder to `APP_DATA/plugins/{plugin_id}/`, rename ids and settings, start Metidos, review in Settings -> Plugins, approve, and enable access groups only for Threads that need them.
+
+## Testing guidance
+
+Plugin authors should validate:
+
+- manifest schema and required fields,
+- folder identity matches manifest id,
+- no root `node_modules/`,
+- no committed `.data`, `.logs`, or reset backups,
+- declared registrations match code,
+- permission failures are clear,
+- settings validation and secret redaction,
+- network allowlists reject unexpected hosts,
+- file allowlists reject traversal and symlink escapes,
+- failure states are safe and recoverable.
+
+## Security guidance for users
+
+- Approve only plugins you understand or trust.
+- Re-review after source changes.
+- Keep Unsafe Mode and private-network access rare.
+- Read plugin `AGENTS.md` before manual data repair.
+- Reset plugin data instead of hand-editing unless the plugin docs provide a safe repair path.
+- Do not share plugin `.data`, `.logs`, settings, secrets, or unredacted diagnostics publicly.
