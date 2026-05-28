@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a Metidos improvement or new behavior.
+title: "Feature: "
+labels: [help-wanted]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user problem or operational pain should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed behavior
+      description: Describe the behavior you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or other designs did you consider?
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Affected areas
+      multiple: true
+      options:
+        - backend
+        - mainview
+        - plugin-system
+        - cron
+        - providers
+        - docs
+        - install
+        - security
+        - unknown
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add sanitized screenshots, examples, or links when helpful. Use fake/demo data only.

@@ -27,7 +27,18 @@ This directory contains the public operator and contributor documentation for Me
 
 - [Development](./development.md) — local dev setup, validation, tests, style, docs workflow, and debugging.
 - [Release process](./release-process.md) — versioning, changelog, tagging, release notes, validation, and rollback expectations.
+- [Repository publication checklist](./repository-publication-checklist.md) — GitHub metadata, public-readiness, safety, and repository settings checklist.
 - [Glossary](./glossary.md) — canonical terms for projects, worktrees, threads, diffs, cron jobs, plugins, providers, approvals, and unsafe mode.
+
+## Community and governance
+
+- [Contributing](../CONTRIBUTING.md)
+- [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [Security](../SECURITY.md)
+- [Support](../SUPPORT.md)
+- [Privacy](../PRIVACY.md)
+- [Roadmap](../ROADMAP.md)
+- [License](../LICENSE)
 
 ## Existing specialist references
 

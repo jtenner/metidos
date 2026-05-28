@@ -1,0 +1,72 @@
+name: Plugin issue
+description: Report Plugin System v1 behavior, plugin lifecycle, permissions, or plugin docs problems.
+title: "Plugin: "
+labels: [plugin-system, needs-repro]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not share plugin `.data`, plugin `.logs`, provider keys, OAuth tokens, private URLs, local databases, or screenshots with sensitive data unless fully reviewed and redacted.
+  - type: input
+    id: plugin_name
+    attributes:
+      label: Plugin name or id
+    validations:
+      required: true
+  - type: input
+    id: metidos_version
+    attributes:
+      label: Metidos version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: manifest
+    attributes:
+      label: Manifest details
+      description: Paste only non-secret manifest fields relevant to the issue.
+      render: json
+  - type: textarea
+    id: permissions
+    attributes:
+      label: Permissions requested
+      description: List manifest permissions and access groups involved.
+  - type: dropdown
+    id: lifecycle
+    attributes:
+      label: Lifecycle state
+      options:
+        - Uninitialized
+        - Needs Review
+        - Active
+        - Failed/Degraded
+        - Disabled/Restart Required
+        - Missing/Unavailable
+        - Unknown
+  - type: dropdown
+    id: unsafe_mode
+    attributes:
+      label: Was Unsafe Mode involved?
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or diagnostics
+      description: Redact secrets, private paths, hostnames, usernames, private repository names, and tokens.
+      render: shell

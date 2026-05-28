@@ -1,0 +1,80 @@
+name: Bug report
+description: Report a reproducible Metidos defect or regression.
+title: "Bug: "
+labels: [bug, needs-repro]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include secrets, full `.env` files, provider keys, OAuth tokens, recovery codes, session cookies, private repository URLs, local databases, plugin `.data`, plugin `.logs`, or unsafe screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Metidos version or commit
+      placeholder: "0.0.1, commit SHA, or branch"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15, Ubuntu 24.04, Windows 11 + WSL, etc."
+    validations:
+      required: true
+  - type: input
+    id: bun
+    attributes:
+      label: Bun version
+      placeholder: "bun --version"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest set of steps that reproduce the problem.
+      placeholder: |
+        1. Start Metidos with ...
+        2. Open ...
+        3. Click ...
+        4. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove secrets, tokens, private paths, private repo names, hostnames, usernames, and customer/user data before posting.
+      render: shell
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - backend
+        - mainview
+        - plugin-system
+        - cron
+        - install
+        - docs
+        - unknown
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Redaction checklist
+      options:
+        - label: I removed secrets, tokens, private URLs, local databases, plugin runtime data, and unsafe screenshots.
+          required: true

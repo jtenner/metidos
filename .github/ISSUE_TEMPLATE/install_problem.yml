@@ -1,0 +1,79 @@
+name: Install problem
+description: Report setup, clean-clone, Bun, container, or first-run auth problems.
+title: "Install: "
+labels: [install, needs-repro]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please use placeholders for environment variables and redact secrets before posting logs.
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15, Ubuntu 24.04, Windows 11 + WSL, etc."
+    validations:
+      required: true
+  - type: input
+    id: bun
+    attributes:
+      label: Bun version
+      placeholder: "bun --version"
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Metidos version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: install_path
+    attributes:
+      label: Install path
+      options:
+        - local development
+        - local production
+        - container
+        - reverse proxy or remote access
+        - first-run auth
+        - provider setup
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Install/start command
+      description: Paste the command with secrets replaced by placeholders.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: clean_clone
+    attributes:
+      label: Clean clone?
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment variables used
+      description: Use placeholders only, for example `OPENAI_API_KEY=<redacted>`.
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove secrets, private paths, hostnames, usernames, and tokens.
+      render: shell
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: Expected vs actual behavior
+    validations:
+      required: true

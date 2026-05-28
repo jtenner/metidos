@@ -11,26 +11,26 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Update `.gitignore` to exclude unsafe local files, generated files, caches, logs, local databases, plugin runtime output, temporary screenshots, and other non-source artifacts.
 - [ ] Review dependency declarations and lockfiles for private packages, unpublished packages, local path dependencies, private registry URLs, or non-public references.
 - [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
-- [ ] Add a repository metadata checklist covering GitHub description, topics, social preview image, homepage URL, and default branch naming.
+- [x] Add a repository metadata checklist covering GitHub description, topics, social preview image, homepage URL, and default branch naming.
 - [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
 
 ## 2. License, Governance, and Community Files
 
-- [ ] Choose an open source license and add a root-level `LICENSE` file.
-- [ ] Add `CONTRIBUTING.md` with development setup, branch/PR expectations, validation commands, documentation expectations, and contribution boundaries.
-- [ ] Add `CODE_OF_CONDUCT.md` with a standard community conduct policy and reporting contact.
-- [ ] Add `SECURITY.md` with supported versions, private vulnerability reporting instructions, expected response process, and what not to disclose publicly.
-- [ ] Add `SUPPORT.md` explaining where users should ask usage questions, file install problems, and report bugs.
-- [ ] Add `ROADMAP.md` describing current status, near-term priorities, deferred work, and non-goals.
-- [ ] Add `PRIVACY.md` if telemetry, model-provider behavior, agent execution, logs, or local data handling need to be explained for users.
-- [ ] Add `.github/PULL_REQUEST_TEMPLATE.md` with checklist items for tests, docs, security impact, screenshots when UI changes, and validation commands.
-- [ ] Add `.github/ISSUE_TEMPLATE/bug_report.yml` with fields for version, environment, reproduction steps, expected behavior, actual behavior, logs with redaction guidance, and screenshots if safe.
-- [ ] Add `.github/ISSUE_TEMPLATE/feature_request.yml` with fields for problem statement, proposed behavior, alternatives, and affected areas.
-- [ ] Add `.github/ISSUE_TEMPLATE/install_problem.yml` with fields for OS, Bun version, install command, logs, environment variables used as placeholders, and clean-clone status.
-- [ ] Add `.github/ISSUE_TEMPLATE/plugin_issue.yml` with fields for plugin name, manifest details, permissions requested, lifecycle state, logs, and whether unsafe mode was involved.
+- [x] Choose an open source license and add a root-level `LICENSE` file.
+- [x] Add `CONTRIBUTING.md` with development setup, branch/PR expectations, validation commands, documentation expectations, and contribution boundaries.
+- [x] Add `CODE_OF_CONDUCT.md` with the project’s intentionally simple conduct policy.
+- [x] Add `SECURITY.md` with supported versions, private vulnerability reporting instructions, expected response process, and what not to disclose publicly.
+- [x] Add `SUPPORT.md` explaining where users should ask usage questions, file install problems, and report bugs.
+- [x] Add `ROADMAP.md` describing current status, near-term priorities, deferred work, and non-goals.
+- [x] Add `PRIVACY.md` if telemetry, model-provider behavior, agent execution, logs, or local data handling need to be explained for users.
+- [x] Add `.github/PULL_REQUEST_TEMPLATE.md` with checklist items for tests, docs, security impact, screenshots when UI changes, and validation commands.
+- [x] Add `.github/ISSUE_TEMPLATE/bug_report.yml` with fields for version, environment, reproduction steps, expected behavior, actual behavior, logs with redaction guidance, and screenshots if safe.
+- [x] Add `.github/ISSUE_TEMPLATE/feature_request.yml` with fields for problem statement, proposed behavior, alternatives, and affected areas.
+- [x] Add `.github/ISSUE_TEMPLATE/install_problem.yml` with fields for OS, Bun version, install command, logs, environment variables used as placeholders, and clean-clone status.
+- [x] Add `.github/ISSUE_TEMPLATE/plugin_issue.yml` with fields for plugin name, manifest details, permissions requested, lifecycle state, logs, and whether unsafe mode was involved.
 - [ ] Add `.github/CODEOWNERS` covering backend, mainview, docs, plugin system, security-sensitive code, and release files.
-- [ ] Add or document GitHub labels for `bug`, `install`, `docs`, `backend`, `mainview`, `plugin-system`, `cron`, `security-hardening`, `good-first-issue`, `help-wanted`, and `needs-repro`.
-- [ ] Ensure all community files use current project terminology and link to the correct docs once those docs exist.
+- [x] Add or document GitHub labels for `bug`, `install`, `docs`, `backend`, `mainview`, `plugin-system`, `cron`, `security-hardening`, `good-first-issue`, `help-wanted`, and `needs-repro`.
+- [x] Ensure all community files use current project terminology and link to the correct docs once those docs exist.
 
 ## 3. Security and Secret Handling
 
@@ -60,18 +60,18 @@ This checklist is for repository improvements only before making Metidos public/
 ## 5. README Improvements
 
 - [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
-- [ ] Add a clear one-sentence project tagline.
-- [ ] Add an alpha/beta/stability status section that sets expectations for production use, API stability, and data safety.
-- [ ] Add a short “What Metidos is” section explaining the local Bun backend, Pi-powered agent runtime, and React/Tailwind mainview.
-- [ ] Add a short “What Metidos is not” section clarifying non-goals and boundaries.
-- [ ] Add a quick-start install path that gets a new user from clean clone to first useful screen.
-- [ ] Add links to installation, architecture, plugin, security, roadmap, and contributing docs.
+- [x] Add a clear one-sentence project tagline.
+- [x] Add an alpha/beta/stability status section that sets expectations for production use, API stability, and data safety.
+- [x] Add a short “What Metidos is” section explaining the local Bun backend, Pi-powered agent runtime, and React/Tailwind mainview.
+- [x] Add a short “What Metidos is not” section clarifying non-goals and boundaries.
+- [x] Add a quick-start install path that gets a new user from clean clone to first useful screen.
+- [x] Add links to installation, architecture, plugin, security, roadmap, and contributing docs.
 - [ ] Add a screenshot gallery or visual feature section with safe demo data.
 - [ ] Add a concise security model summary covering local auth, plugins, filesystem/network boundaries, and unsafe mode.
-- [ ] Add a “Core concepts” section covering projects, worktrees, threads, diffs, cron jobs, plugins, and providers.
+- [x] Add a “Core concepts” section covering projects, worktrees, threads, diffs, cron jobs, plugins, and providers.
 - [ ] Add badges only after the underlying CI, license, release, and status items are real.
-- [ ] Add a license section that matches the root `LICENSE` file.
-- [ ] Add a “Known limitations” or “Alpha status” section with specific constraints and expected rough edges.
+- [x] Add a license section that matches the root `LICENSE` file.
+- [x] Add a “Known limitations” or “Alpha status” section with specific constraints and expected rough edges.
 - [ ] Verify all README commands work from a clean clone.
 - [ ] Verify README terminology matches `UBIQUITOUS_LANGUAGE.md` after public terminology is finalized.
 

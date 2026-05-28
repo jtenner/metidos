@@ -10,6 +10,18 @@ It helps you keep projects, Git worktrees, agent threads, diffs, tasks, plugins,
 
 The name comes from *mētis*: practical wisdom, good judgment, and knowing the right move at the right time.
 
+## Project status
+
+Metidos is pre-1.0 local developer tooling. Expect rough edges, changing APIs, and incomplete public-release polish. Keep backups of important local data, review plugin and provider access carefully, and do not treat Unsafe Mode or unreviewed plugins as safe defaults.
+
+## What Metidos is
+
+Metidos is a local Bun backend, a Pi-powered agent runtime adapter, and a React/Tailwind Mainview for coordinating AI-assisted software work across projects and Git worktrees.
+
+## What Metidos is not
+
+Metidos is not a hosted multi-tenant service, a sandbox for arbitrary untrusted code, a replacement for code review and tests, or a stable plugin API platform yet.
+
 ## What you can do with it
 
 - Open and manage multiple projects and Git worktrees.
@@ -39,6 +51,23 @@ Metidos has two main parts:
 - **A browser UI** built with React. It gives you the project, thread, task, plugin, cron, and diff views.
 
 The UI and backend communicate through a typed WebSocket RPC layer, which keeps the app responsive while work happens in the background.
+
+## Core concepts
+
+- **Projects** are high-level entries for one or more Git worktrees.
+- **Worktrees** are Git checkout contexts where Threads and tools operate.
+- **Threads** are Pi-powered agent execution sessions attached to a selected Project and Worktree.
+- **Diffs** show file changes so you can review agent or human edits before they land.
+- **Cron Jobs** schedule future agent work.
+- **Plugins** are local, review-first extension folders approved by the Local Operator.
+- **Providers** connect Metidos and Pi to model services, including local, built-in, and plugin-backed providers.
+
+## Known limitations
+
+- Metidos is pre-1.0 and APIs may change.
+- Plugin System v1 is experimental and requires careful review before approval.
+- Install, release, and CI polish are still being hardened for public use.
+- Diagnostics and plugin-authored logs should be reviewed before sharing because local development data can be sensitive.
 
 ## Installation
 
@@ -76,6 +105,13 @@ bun run typecheck    # run TypeScript checks
 - [`docs/plugin-system.md`](docs/plugin-system.md) — Plugin System v1 overview.
 - [`docs/development.md`](docs/development.md) — local contributor workflow and validation.
 - [`docs/release-process.md`](docs/release-process.md) — release validation, tagging, notes, and rollback.
+- [`SECURITY.md`](SECURITY.md) — responsible disclosure and security reporting.
+- [`SUPPORT.md`](SUPPORT.md) — where to ask questions, report bugs, and file install problems.
+- [`ROADMAP.md`](ROADMAP.md) — current status, priorities, deferred work, and non-goals.
+
+## License
+
+Metidos is released under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).
 
 ## Contributing
 
