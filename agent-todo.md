@@ -1,483 +1,252 @@
-# Agent TODO
-
-This file records architecture-improvement epics discussed in thread 6099 so future agents do not lose context or misinterpret the intent.
-
-## Shared architecture vocabulary
-
-Use the terms from `.pi/skills/improve-codebase-architecture/LANGUAGE.md` when working these epics:
-
-- **Module** — anything with an interface and an implementation.
-- **Interface** — everything a caller must know to use the module correctly: types, invariants, ordering constraints, error modes, configuration, and performance characteristics.
-- **Implementation** — the code inside a module.
-- **Depth** — leverage at the interface. A **deep** module hides a lot of behavior behind a small interface; a **shallow** module has an interface nearly as complex as its implementation.
-- **Seam** — where an interface lives; a place behavior can be altered without editing in place.
-- **Adapter** — a concrete thing satisfying an interface at a seam.
-- **Leverage** — what callers get from depth.
-- **Locality** — what maintainers get from depth: change, bugs, knowledge, and verification concentrated in one place.
-
-Important principles:
-
-- **Deletion test:** imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across many callers, it was earning its keep.
-- **The interface is the test surface.**
-- **One adapter = hypothetical seam. Two adapters = real seam.**
-
-## Domain vocabulary to preserve
-
-Use project terms from `UBIQUITOUS_LANGUAGE.md`, especially:
-
-- **Metidos** — the local IDE application.
-- **Local Operator** — the single authenticated person using one installation.
-- **Project** — high-level entry point for one or more Git Worktrees.
-- **Worktree** — Git checkout context used as root for Thread tools.
-- **Thread** — Pi-powered agent execution session attached to selected Project/Worktree context.
-- **Backend** — Bun server layer.
-- **Mainview** — React/Tailwind browser UI.
-- **RPC** — typed WebSocket request/response contract between Mainview and Backend.
-- **Plugin System v1**, **Plugin**, **Sidecar**, **Manifest**, **Access Group**, **Permission**, **Plugin Settings**, **Plugin Data**.
-- **Pi Runtime**, **Pi Session**, **Provider**, **Model Catalog**, **Provider-qualified Model ID**.
-
-## Relevant existing decision notes
-
-- `docs/backend-rpc-transport-invariants.md` records the current Backend RPC transport extraction. Preserve its invariants if touching `src/bun/rpc-transport.ts` or `src/bun/index.ts`.
-- `docs/metidos-plugin-decisions.md` records Plugin System v1 decisions. Important for these epics:
-  - PLUG-003: exactly one sidecar process per activated plugin.
-  - PLUG-004: execute plugin code in QuickJS, not main Bun runtime.
-  - PLUG-005: custom typed JSON RPC over stdio between host and sidecar.
-  - PLUG-009: Thread Access Control controls tool visibility only.
-  - PLUG-014: provider and notification provider registration are initialization-only.
-  - PLUG-020: model provider identities are stable composite keys.
-  - PLUG-021: Python plugin entrypoints are part of Plugin System v1 through the safe Pyodide host. QuickJS remains the TypeScript/JavaScript adapter; deepen the multi-adapter runtime path for `.py` manifests.
-  - PLUG-022: embedding providers and embedding consumers use separate permissions.
-
----
-
-# Epics
-
-## Epic 1 — Complete or delete the Mainview Shell Controller extraction
-
-**Status:** done
-
-**Completed slice:** Wired the existing `useMainviewShellController` into `src/mainview/App.tsx` for shell-owned selection state, navigation refs/commands, sidebar collapse state, mobile/completed indicators, session readiness, and persisted shell-state flushing. App no longer carries a duplicate shell persistence/navigation implementation.
-
-**Follow-up notes:**
-
-1. Add hook-level tests for `useMainviewShellController` if/when the Mainview test harness supports React hook lifecycle tests without broad setup churn.
-2. Revisit the `setThreadMessagesForNavigation` seam during the Thread workspace workflow extraction in Epic 2 so Thread message ownership does not continue to leak into shell navigation.
-
-### Files / modules involved
-
-- `src/mainview/App.tsx`
-- `src/mainview/app/use-mainview-shell-controller.ts`
-- `src/mainview/app/mainview-shell-state.ts`
-- `src/mainview/app/mainview-shell-state.test.ts`
-
-### Problem
-
-`src/mainview/app/use-mainview-shell-controller.ts` looks like an intended deepened Mainview shell module, but it appears unused. Meanwhile `src/mainview/App.tsx` still directly owns the same shell state, refs, persistence writer, navigation update commands, and derived shell state.
-
-Duplicated Mainview shell implementation currently exists in `App.tsx`, including:
-
-- `persistedMainviewStateWriterRef`
-- `flushPersistedMainviewStateWrite`
-- `schedulePersistedMainviewStateWrite`
-- selected refs such as `selectedThreadIdRef`, `selectedProjectIdRef`, `selectedWorktreePathRef`
-- `commitShellNavigationUpdate`
-- `setSelectedProjectIdForNavigation`
-- `setSelectedWorktreePathForNavigation`
-- `setSelectedThreadIdForNavigation`
-- `setThreadMessagesForNavigation`
-- `setPrimaryViewForNavigation`
-- `mainviewShellState`
-- `persistedMainviewState`
-- persistence effects for unload/pagehide/visibility changes
-
-That creates a misleading seam: callers must still understand the App-level state machinery, and future agents may believe the controller is active when it is not.
-
-By the deletion test, the current unused controller likely fails today: deleting it probably removes confusion because the active complexity already exists in `App.tsx`.
-
-### Recommendation from thread
-
-The **concept** is useful, but the **current unused module** is not earning its keep yet.
-
-`use-mainview-shell-controller.ts` captures a real and coherent seam:
-
-- selected Project / Worktree / Thread
-- primary Workspace Panel view
-- shell navigation updates
-- persisted Mainview shell state
-- before-unload/pagehide/visibility persistence flushing
-- sidebar collapsed state
-- mobile/completed Thread indicators
-
-This could improve **locality** because shell navigation and persistence bugs would live in one module instead of being mixed through `App.tsx`.
-
-However, do **not** keep it as-is indefinitely. Dead unused architecture modules hurt AI-navigability more than a large but honest `App.tsx`.
-
-### Solution
-
-Either:
-
-1. **Finish the extraction immediately** so Mainview shell selection/navigation/persistence actually lives behind `useMainviewShellController`; or
-2. **Delete the unused controller** if this extraction is not going to happen soon.
-
-Preferred path: keep the module only if we immediately wire it into `App.tsx`.
-
-Focused refactor path:
-
-1. Replace the duplicated shell state/persistence block in `App.tsx` with `useMainviewShellController`.
-2. Keep `mainview-shell-state.ts` as the pure helper module.
-3. Add or adjust tests for the hook seam if test harness support is already present.
-4. If integration reveals missing shell state, expand the hook only for shell-owned concerns.
-5. Do not let the shell controller absorb Thread message fetching, Git history, notifications, or other non-shell workflows.
-
-### Caution
-
-The hook currently accepts `setThreadMessages`, which slightly leaks Thread workspace behavior into the shell module. It may be acceptable because navigation transitions clear/swap messages, but watch the seam carefully. If it grows, it could become another shallow orchestration module.
-
-### Benefits
-
-- **Locality:** shell navigation and persistence bugs concentrate in one module.
-- **Leverage:** Mainview gets shell state and commands from one place.
-- **Tests:** hook-level tests can exercise the same seam Mainview actually uses, rather than only testing pure helper functions.
-
-### Done when
-
-- `useMainviewShellController` is used by `App.tsx`, or the unused file is deleted.
-- There is no duplicated shell persistence/navigation implementation in both `App.tsx` and `use-mainview-shell-controller.ts`.
-- Existing `mainview-shell-state` tests still pass, and new/updated tests cover the active shell controller seam if the module is kept.
-
----
-
-## Epic 2 — Deepen the Mainview App orchestration module
-
-**Status:** done
-
-**Completed slices:**
-
-1. Moved selected Thread message-history replacement, merge, and paginated backfill ownership out of `App.tsx` into `src/mainview/app/use-thread-message-history-controller.ts`. App no longer owns the selected message-history pagination cursor, backfill abort controller, retention/merge ordering, or selected detail refresh-key updates for history loads.
-2. Moved selected Thread turn send/stop busy state, optimistic user-message id ownership, and optimistic stop handling into `src/mainview/app/use-thread-turn-controller.ts`. App now asks the Thread turn workflow seam to post, stop, and report empty-thread discard protection instead of owning those send/stop internals.
-3. Moved selected Thread settings update workflows (model, reasoning effort, and Access Control) into `src/mainview/app/use-thread-settings-controller.ts`. App now delegates settings sync, optimistic pending values, busy flags, RPC updates, rollback/error handling, and stale-selection guards to that seam.
-4. Added `src/mainview/app/use-thread-workspace-controller.ts` as the App-facing Thread workspace seam for selected Thread message history, status refresh side effects, send/stop commands, and settings update commands. `App.tsx` now consumes one composed Thread workspace controller for those workflow slices instead of importing/calling each controller separately.
-5. Moved Thread workspace selection into `useThreadWorkspaceController`. The composed seam now owns selected Thread open/create/clear commands, Thread start request approval/dismissal, selected Worktree synchronization, and context-focus side effects; `App.tsx` no longer imports the selection controller directly.
-6. Added hook-level workflow tests for the consolidated Thread workspace seam covering Thread open/history replacement and selected Thread model updates through the App-facing controller interface.
-
-**Remaining slices:** none.
-
-### Files / modules involved
-
-- `src/mainview/App.tsx`
-- `src/mainview/app/use-mainview-startup-controller.ts`
-- `src/mainview/app/use-mainview-derived-state.ts`
-- `src/mainview/app/use-project-worktree-controller.ts`
-- `src/mainview/app/use-thread-workspace-selection-controller.ts`
-- `src/mainview/app/use-thread-status-controller.ts`
-- `src/mainview/app/use-worktree-diff.ts`
-- `src/mainview/app/use-git-history-controller.ts`
-
-### Problem
-
-`App.tsx` is still the Mainview coordination hub for many unrelated concerns:
-
-- Project/Worktree state
-- Thread state
-- Model Catalog refresh
-- notification trays
-- terminal state
-- Git history
-- shell navigation
-- transcript media payload retention
-- Thread Start Requests
-- workspace rendering
-
-Some deepened modules already exist, but their leverage is limited because `App.tsx` still wires huge parameter bags and owns many cross-concern invariants. The interfaces to those modules are often nearly as complex as their implementations.
-
-### Solution
-
-Pick one vertical Mainview workflow and move both its state and commands behind a deeper module.
-
-Best first candidate: the **Thread workspace workflow**, including:
-
-- selected Thread detail
-- message loading
-- send/stop commands
-- Thread status updates
-- Thread settings updates
-- transcript retention
-- selection side effects
-
-Avoid extracting pure helper functions only for testability. The goal is a deeper module with a smaller, behavior-rich interface.
-
-### Benefits
-
-- **Locality:** Thread workspace bugs concentrate in a Thread workspace module instead of requiring navigation through `App.tsx` plus several hooks.
-- **Leverage:** Mainview can get “current Thread workspace state + commands” from one seam.
-- **Tests:** tests can exercise real user workflows through one module instead of validating scattered helper functions.
-
-### Done when
-
-- One vertical Mainview workflow is owned by a deeper module with state and commands behind a smaller interface.
-- `App.tsx` no longer needs to understand the workflow’s internal ordering/state invariants.
-- Tests cover the workflow through the same interface used by `App.tsx`.
-
----
-
-## Epic 3 — Deepen Thread Turn execution around one workflow module
-
-**Status:** done
-
-**Completed slices:**
-
-1. Moved active-run status lookup inside `ThreadTurnRunner` so queue/stop workflows use the `ThreadRuntimeLifecycle` seam directly instead of requiring `project-procedures.ts` to pass a separate `currentRunStatus` callback.
-2. Moved runtime acquisition/session sync behind `ThreadTurnRuntimeCoordinator` so `ThreadTurnRunner` depends on a smaller runtime-manager seam instead of wiring `createRuntime`, `syncRuntimeSessionState`, and lifecycle runtime storage directly.
-3. Moved Thread Turn persistence/readback dependencies behind `ThreadTurnPersistenceCoordinator`, giving `ThreadTurnRunner` one persistence-manager seam for queued user-message persistence, stopped/interrupted settlement, Thread detail invalidation, cron-run cleanup, and detail readback.
-4. Moved startup interrupted-turn recovery inputs and stale-active-turn rules behind `ThreadTurnRunner`. Startup recovery now asks the Thread Turn module to recover without coordinating Thread/message store reads or lifecycle helper recovery decisions in `project-procedures.ts`.
-5. Added broader queue/stop/recover workflow tests through the deepened Thread Turn module interface, covering queued-message persistence failures, runtime abort during stop, idle-stop readback, missing-controller stop protection, and interrupted cron-turn cleanup.
-
-**Remaining slices:** none.
-
-### Files / modules involved
-
-- `src/bun/project-procedures.ts`
-- `src/bun/project-procedures/thread-turn-runner.ts`
-- `src/bun/project-procedures/thread-runtime-lifecycle.ts`
-- `src/bun/project-procedures/thread-activity-persistence.ts`
-- `src/bun/project-procedures/work-context-lifecycle.ts`
-
-### Problem
-
-`ThreadTurnRunner` is useful, but its interface is a long dependency bundle that exposes much of the Thread Turn implementation:
-
-- runtime creation
-- persistence
-- stop persistence
-- detail reads
-- status lookup
-- recovery decisions
-- session sync
-- provider validation
-- background execution
-
-That makes the seam somewhat shallow. Callers still need to know how Thread runtime, Thread detail cache, activity persistence, provider validation, and Pi Runtime lifecycle fit together.
-
-### Solution
-
-Deepen the Thread Turn module so queue/stop/recover behavior owns more of the Thread Turn workflow, not just the middle of it.
-
-The Backend procedure layer should mostly say:
-
-- “queue this Thread Turn”
-- “stop this Thread Turn”
-- “recover interrupted Thread Turns”
-
-The module should internally handle:
-
-- persistence
-- lifecycle status
-- runtime acquisition
-- recovery
-- detail invalidation/readback
-- provider validation
-- active-run status rules
-
-### Benefits
-
-- **Locality:** Thread Turn race conditions, stop/recovery bugs, and active-run status rules concentrate in one module.
-- **Leverage:** Cron Runner, Mainview send, ingress, and future Thread callers can reuse the same behavior.
-- **Tests:** tests can assert full queue/stop/recover workflows through the Thread Turn module instead of mocking many small callbacks.
-
-### Done when
-
-- `ThreadTurnRunner` or a successor module exposes a smaller interface with more behavior behind it.
-- `project-procedures.ts` passes fewer callback bundles and owns fewer Thread Turn ordering details.
-- Existing Thread Turn tests remain green and new tests cover full queue/stop/recover workflows through the deepened interface.
-
----
-
-## Epic 4 — Split the Work Context Lifecycle helper bag into deeper modules
-
-**Status:** done
-
-**Completed slices:**
-
-1. Extracted Work Context event construction/publication into `src/bun/project-procedures/work-context-events.ts` while preserving the existing `workContextLifecycle.events` compatibility seam for current callers.
-2. Extracted Project Worktree lifecycle/listing/polling behavior into `src/bun/project-procedures/project-worktree-lifecycle.ts` with workflow-oriented tests while preserving the existing `workContextLifecycle.projectWorktrees` compatibility seam for current callers.
-3. Extracted Thread lifecycle/create/detail/turn behavior into `src/bun/project-procedures/thread-lifecycle.ts` with focused queue/create/read/stop workflow tests while preserving the existing `workContextLifecycle.threads` compatibility seam for current callers.
-4. Rewired `src/bun/project-procedures.ts` to import and call the focused Work Context event, Project Worktree lifecycle, and Thread lifecycle modules directly. The aggregate `workContextLifecycle` compatibility object remains available for other callers, but the Backend procedure layer no longer routes these workflows through the helper-bag seam.
-
-**Remaining slices:** none.
-
-### Files / modules involved
-
-- `src/bun/project-procedures/work-context-lifecycle.ts`
-- `src/bun/project-procedures.ts`
-- `src/bun/project-procedures/work-context-lifecycle.test.ts`
-- `src/bun/project-procedures/project-worktrees.ts`
-- `src/bun/project-procedures/git-history.ts`
-
-### Problem
-
-`workContextLifecycle` groups Project Worktree lifecycle, Thread lifecycle, and event helpers under one exported object.
-
-Its interface is large and mirrors the implementation:
-
-- many methods
-- many input types
-- callers still pass dependency bundles for polling, Git history, snapshots, Thread Turn runners, and publishing
-
-This is shallow in places: the caller still has to understand almost every moving part.
-
-### Solution
-
-Deepen by domain workflow:
-
-1. Project Worktree lifecycle/polling
-2. Thread lifecycle/turns
-3. Work Context event publication
-
-Each module should hide more of its own ordering and state transitions instead of requiring `project-procedures.ts` to supply many callback-shaped dependencies.
-
-### Benefits
-
-- **Locality:** Project Worktree polling bugs do not share a module with Thread Turn recovery logic.
-- **Leverage:** each workflow module can provide a smaller, more behavior-rich interface.
-- **Tests:** tests become workflow-oriented, such as “open Worktree starts polling and warms Git history,” not “given this callback bundle, helper X mutates field Y.”
-
-### Done when
-
-- Project Worktree lifecycle, Thread lifecycle, and Work Context event publication are separated into focused modules or otherwise made deeper.
-- `project-procedures.ts` supplies fewer low-level callbacks to lifecycle helpers.
-- Tests assert domain workflows through deepened interfaces.
-
----
-
-## Epic 5 — Deepen Plugin Runtime host operations across QuickJS and Python adapters
-
-**Status:** done
-
-**Completed slices:**
-
-1. Extracted shared structured-data host operation semantics into `src/bun/plugin/host-structured-data.ts`, used by both QuickJS and Python adapters for TOML/YAML/HTML/XML operation dispatch and fallback TOML stringification. Added adapter-independent tests for the shared operation path.
-2. Extracted shared language-neutral host capability operations into `src/bun/plugin/host-capabilities.ts` for fetch, notifications, calendar/events, terminal, SQLite, LanceDB, embeddings, fs, WebSocket, and log dispatch. QuickJS and Python adapters now preserve adapter-specific value conversion and callback wiring while delegating permission checks, host API availability errors, metadata forwarding, and common request normalization to the shared operation path. Added adapter-independent permission/capability tests and kept adapter integration tests focused on bridge behavior.
-
-**Remaining slices:** none.
-
-### Files / modules involved
-
-- `src/bun/plugin/quickjs-runtime.ts`
-- `src/bun/plugin/python-runtime.ts`
-- `src/bun/plugin/plugin-runtime.ts`
-- `src/bun/plugin/plugin-runtime-contract.ts`
-- `src/bun/plugin/startup-registrations.ts`
-- `src/bun/plugin/sidecar-capability-seams.ts`
-- `docs/metidos-plugin-decisions.md`
-
-### Problem
-
-Plugin System v1 decision PLUG-021 says Python plugin entrypoints are part of v1 through the safe Pyodide host, while QuickJS remains the JavaScript adapter. This means multi-adapter behavior is no longer hypothetical.
-
-Currently, QuickJS and Python runtime modules both contain language-adapter code mixed with host operation rules, including:
-
-- permissions
-- operation classification
-- startup registration validation
-- callback context
-- fetch
-- notifications
-- calendar events
-- terminal operations
-- SQLite/LanceDB-like operation handling
-- structured data helpers
-- XML/HTML utilities
-
-That risks drift between adapters. The seam between “language adapter” and “Plugin host capability behavior” is not deep enough.
-
-### Solution
-
-Move language-neutral Plugin host operation behavior behind a shared module used by both runtime adapters.
-
-QuickJS and Python should primarily adapt values/callbacks into the common host operation path.
-
-This aligns with PLUG-021 rather than contradicting it.
-
-### Benefits
-
-- **Locality:** permission bugs and capability semantics are fixed once for both adapters.
-- **Leverage:** adding another Plugin runtime adapter would reuse the same host behavior.
-- **Tests:** shared capability tests can validate adapter-independent rules, while adapter tests focus on value conversion and callback invocation.
-
-### Done when
-
-- QuickJS and Python runtime modules delegate shared host operation semantics to a common module.
-- Adapter modules focus mostly on language/runtime value conversion and callback invocation.
-- Shared tests cover adapter-independent permission/capability behavior.
-- Adapter-specific tests cover QuickJS/Pyodide integration details.
-
----
-
-## Epic 6 — Deepen the Backend RPC procedure registration seam
-
-**Status:** done
-
-**Completed slices:**
-
-1. Extracted Cron RPC procedure registration from the giant inline `rpcHandlers` map in `src/bun/index.ts` into `src/bun/rpc-handlers/cron.ts`, including cron scheduler side effects and focused handler-map tests.
-2. Extracted Settings RPC procedure registration into `src/bun/rpc-handlers/settings.ts`, including timezone-change cron scheduler synchronization and focused handler-map tests.
-3. Extracted Plugin Administration RPC registration into `src/bun/rpc-handlers/plugin-admin.ts`, including plugin runtime reconciliation, model-provider refreshes, sidecar diagnostics, lifecycle side effects, and admin runtime hooks. Added focused registrar tests for those side effects.
-4. Extracted Model Catalog and Terminal RPC registration into `src/bun/rpc-handlers/model-catalog.ts` and `src/bun/rpc-handlers/terminal.ts`, including model-provider refresh side effects and focused handler-map tests.
-5. Extracted Calendar RPC registration into `src/bun/rpc-handlers/calendar.ts` with focused handler-map tests covering the calendar handler map delegation.
-6. Extracted Thread RPC registration into `src/bun/rpc-handlers/thread.ts` with focused handler-map tests covering exact Thread method registration and procedure delegation.
-7. Extracted Work Context RPC registration into `src/bun/rpc-handlers/work-context.ts`, including Project/Worktree directory, selection, file, Git history, skill, and focus-context handlers. Added focused handler-map tests covering exact Work Context method registration and procedure delegation.
-8. Replaced the remaining inline `rpcHandlers` object in `src/bun/index.ts` with the composed Backend RPC registrar in `src/bun/rpc-handlers/backend.ts`, added the App bootstrap/logging registrar, and added broader registration tests covering the complete RPC surface plus cross-domain side effects.
-
-**Remaining slices:** none.
-
-### Files / modules involved
-
-- `src/bun/index.ts`
-- `src/bun/rpc-schema.ts`
-- `src/bun/rpc-schema/*`
-- `src/bun/project-procedures.ts`
-- `src/bun/rpc-transport.ts`
-
-### Problem
-
-`src/bun/rpc-transport.ts` is now a real seam. It hides request lifecycle, client registries, cancellation, backpressure, and publishing.
-
-However, `src/bun/index.ts` still owns a very large `rpcHandlers` object, plus domain side effects such as:
-
-- plugin runtime reconciliation
-- cron scheduler syncing
-- model catalog refresh logic
-- procedure wiring
-
-The transport extraction is deep, but procedure registration remains a shallow central map. Adding a new domain procedure requires editing a high-churn bootstrap module and knowing which post-procedure side effects belong there.
-
-### Solution
-
-Group procedure registration by domain workflow:
-
-- Plugin Administration
-- Calendar
-- Thread
-- Work Context
-- Terminal
-- Settings
-- Cron
-- Model Catalog
-
-Each domain registrar should own its procedure handlers and their immediate side effects. `index.ts` should compose registrars rather than listing every handler inline.
-
-Preserve `docs/backend-rpc-transport-invariants.md` if touching transport behavior.
-
-### Benefits
-
-- **Locality:** plugin lifecycle side effects live near Plugin Administration procedures, cron side effects near Cron procedures, etc.
-- **Leverage:** Backend bootstrap becomes mostly HTTP/WebSocket composition.
-- **Tests:** domain handler maps can be tested without importing the whole server bootstrap.
-
-### Done when
-
-- `index.ts` no longer owns one giant inline `rpcHandlers` object.
-- Domain registrar modules own procedure handlers and immediate side effects.
-- Backend RPC transport invariants remain preserved.
-- Handler registration tests can exercise domain-specific handler maps without server bootstrap.
+# Metidos Open Source Launch TODO
+
+This checklist is for repository improvements only before making Metidos public/open source. Do not treat this as a marketing or launch-promotion plan. Work through items in small, reviewable PRs or commits.
+
+## 1. Repository Hygiene and Public Readiness
+
+- [ ] Audit all currently tracked files for private data, local filesystem paths, secrets, credentials, tokens, internal URLs, personal notes, and unsafe demo data.
+- [ ] Audit `.wiki/` and decide which research notes, durable project knowledge, logs, or internal context should remain public, be rewritten, or be removed before launch.
+- [ ] Audit `.pi/skills/` and decide which skills are appropriate to ship publicly, which need redaction, and which should be excluded.
+- [ ] Audit generated files, caches, build artifacts, logs, local database files, plugin runtime output, screenshots, temporary files, and derived outputs for accidental check-in.
+- [ ] Update `.gitignore` to exclude unsafe local files, generated files, caches, logs, local databases, plugin runtime output, temporary screenshots, and other non-source artifacts.
+- [ ] Review dependency declarations and lockfiles for private packages, unpublished packages, local path dependencies, private registry URLs, or non-public references.
+- [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
+- [ ] Add or update `.env.example` with safe placeholder values only and no real secrets, tokens, hostnames, personal paths, or internal service names.
+- [ ] Add a repository metadata checklist covering GitHub description, topics, social preview image, homepage URL, and default branch naming.
+- [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
+- [ ] Verify all paths and examples in docs use generic placeholders instead of user-specific home directories or machine names.
+
+## 2. License, Governance, and Community Files
+
+- [ ] Choose an open source license and add a root-level `LICENSE` file.
+- [ ] Add `CONTRIBUTING.md` with development setup, branch/PR expectations, validation commands, documentation expectations, and contribution boundaries.
+- [ ] Add `CODE_OF_CONDUCT.md` with a standard community conduct policy and reporting contact.
+- [ ] Add `SECURITY.md` with supported versions, private vulnerability reporting instructions, expected response process, and what not to disclose publicly.
+- [ ] Add `SUPPORT.md` explaining where users should ask usage questions, file install problems, and report bugs.
+- [ ] Add `ROADMAP.md` describing current status, near-term priorities, deferred work, and non-goals.
+- [ ] Add `PRIVACY.md` if telemetry, model-provider behavior, agent execution, logs, or local data handling need to be explained for users.
+- [ ] Add `.github/PULL_REQUEST_TEMPLATE.md` with checklist items for tests, docs, security impact, screenshots when UI changes, and validation commands.
+- [ ] Add `.github/ISSUE_TEMPLATE/bug_report.yml` with fields for version, environment, reproduction steps, expected behavior, actual behavior, logs with redaction guidance, and screenshots if safe.
+- [ ] Add `.github/ISSUE_TEMPLATE/feature_request.yml` with fields for problem statement, proposed behavior, alternatives, and affected areas.
+- [ ] Add `.github/ISSUE_TEMPLATE/install_problem.yml` with fields for OS, Bun version, install command, logs, environment variables used as placeholders, and clean-clone status.
+- [ ] Add `.github/ISSUE_TEMPLATE/plugin_issue.yml` with fields for plugin name, manifest details, permissions requested, lifecycle state, logs, and whether unsafe mode was involved.
+- [ ] Add `.github/CODEOWNERS` covering backend, mainview, docs, plugin system, security-sensitive code, and release files.
+- [ ] Add or document GitHub labels for `bug`, `install`, `docs`, `backend`, `mainview`, `plugin-system`, `cron`, `security-hardening`, `good-first-issue`, `help-wanted`, and `needs-repro`.
+- [ ] Ensure all community files use current project terminology and link to the correct docs once those docs exist.
+
+## 3. Security and Secret Handling
+
+- [ ] Run a full working-tree secret scan using at least one dedicated tool and review every finding.
+- [ ] Run a full Git-history secret scan before publishing the repository and decide whether history rewrite is required.
+- [ ] Rotate any exposed, suspicious, stale, or unverifiable credentials found during the audit, even if they appear unused.
+- [ ] Document how secrets are stored, configured, redacted in logs, redacted in diagnostics, and passed to model providers or plugins.
+- [ ] Document what users should never paste into GitHub issues, including API keys, recovery codes, session tokens, `.env` contents, private repo URLs, local database files, and unredacted logs.
+- [ ] Add `docs/security/threat-model.md` describing assets, trust boundaries, attacker capabilities, major abuse cases, and current mitigations.
+- [ ] Document local authentication, TOTP, recovery codes, sessions, step-up authentication, and WebSocket ticket behavior.
+- [ ] Document plugin approval, review hashes, permission prompts, sidecar execution, unsafe capabilities, and how users can revoke or reset plugin access.
+- [ ] Document filesystem boundaries, denied paths, symlink handling, path normalization, and traversal protections.
+- [ ] Document network allowlist behavior, blocked destinations, HTTPS/WSS expectations, and how network policy failures are surfaced.
+- [ ] Document reverse proxy, TLS, origin, cookie, WebSocket, and remote-access safety guidance.
+- [ ] Add or improve tests around sensitive settings redaction.
+- [ ] Add or improve tests around plugin permission enforcement.
+- [ ] Add or improve tests around filesystem path validation, denied paths, symlink handling, and traversal attempts.
+- [ ] Add or improve tests around network policy enforcement and allowlist/denylist behavior.
+- [ ] Verify security-sensitive error messages are actionable without leaking secrets or sensitive local paths.
+
+## 4. CI, Validation, and Release Automation
+
+- [ ] Add `.github/workflows/ci.yml` for pull requests and pushes to the default branch.
+- [ ] Ensure CI runs `bun install --frozen-lockfile` from a clean checkout.
+- [ ] Ensure CI runs `bun run validate`.
+- [ ] Ensure CI runs backend tests, mainview tests, typecheck, style checks, TOML validation, and formatting checks.
+- [ ] Add a dependency review workflow if appropriate for the repository and license/security posture.
+- [ ] Add CodeQL or an equivalent code scanning workflow if appropriate for the stack.
+- [ ] Add Dependabot configuration for npm/Bun dependencies and GitHub Actions.
+- [ ] Add release-note configuration under `.github/release.yml`.
+- [ ] Add branch protection or GitHub ruleset notes to this TODO file or release docs for post-public setup.
+- [ ] Add a release checklist for tagging `v0.1.0-alpha.1` or another chosen first public version.
+- [ ] Add `CHANGELOG.md` or document a changelog generation workflow.
+- [ ] Verify every package script referenced in README, docs, workflows, and templates still exists and works.
+- [ ] Verify CI does not require private secrets for normal pull request validation.
+- [ ] Verify CI artifacts, logs, and test outputs do not expose secrets or machine-specific paths.
+
+## 5. README Improvements
+
+- [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
+- [ ] Add a clear one-sentence project tagline.
+- [ ] Add an alpha/beta/stability status section that sets expectations for production use, API stability, and data safety.
+- [ ] Add a short “What Metidos is” section explaining the local Bun backend, Pi-powered agent runtime, and React/Tailwind mainview.
+- [ ] Add a short “What Metidos is not” section clarifying non-goals and boundaries.
+- [ ] Add a quick-start install path that gets a new user from clean clone to first useful screen.
+- [ ] Add links to installation, architecture, plugin, security, roadmap, and contributing docs.
+- [ ] Add a screenshot gallery or visual feature section with safe demo data.
+- [ ] Add a concise security model summary covering local auth, plugins, filesystem/network boundaries, and unsafe mode.
+- [ ] Add a “Core concepts” section covering projects, worktrees, threads, diffs, cron jobs, plugins, and providers.
+- [ ] Add badges only after the underlying CI, license, release, and status items are real.
+- [ ] Add a license section that matches the root `LICENSE` file.
+- [ ] Add a “Known limitations” or “Alpha status” section with specific constraints and expected rough edges.
+- [ ] Verify all README commands work from a clean clone.
+- [ ] Verify README terminology matches `UBIQUITOUS_LANGUAGE.md` after public terminology is finalized.
+
+## 6. Documentation
+
+- [ ] Create or improve `docs/getting-started.md` with a short path from clone to first project and first agent thread.
+- [ ] Create or improve `docs/installation.md` or update existing `INSTALLATION.md` so there is one canonical install entry point.
+- [ ] Create or improve `docs/architecture.md` describing backend, mainview, runtime, persistence, plugin system, and major data flows.
+- [ ] Create or improve `docs/backend.md` with backend services, runtime assumptions, data directories, RPC surfaces, and validation commands.
+- [ ] Create or improve `docs/mainview.md` with frontend architecture, design system references, state management, and UI development workflow.
+- [ ] Create or improve `docs/rpc.md` documenting public/internal RPC concepts, request/response expectations, auth/session behavior, and error handling.
+- [ ] Create or improve `docs/plugin-system.md` as the canonical plugin system overview.
+- [ ] Create or improve `docs/security-model.md` summarizing auth, secrets, plugins, filesystem, network, and remote access safety.
+- [ ] Create or improve `docs/cron.md` documenting scheduled jobs, run-now behavior, disabling, deletion, failure handling, and plugin interactions.
+- [ ] Create or improve `docs/model-providers.md` documenting provider setup, secrets, local/private providers, and safety expectations.
+- [ ] Create or improve `docs/troubleshooting.md` with common install, runtime, auth, plugin, provider, and WebSocket problems.
+- [ ] Create or improve `docs/development.md` with local dev setup, validation, tests, code style, docs workflow, and recommended debugging.
+- [ ] Create or improve `docs/release-process.md` with versioning, changelog, tagging, release notes, validation, and rollback expectations.
+- [ ] Create or improve `docs/glossary.md` using canonical terms for projects, worktrees, threads, diffs, cron jobs, plugins, providers, approvals, and unsafe mode.
+- [ ] Ensure docs explain the required Bun version and how to verify it.
+- [ ] Ensure docs explain clean clone setup without private knowledge.
+- [ ] Ensure docs explain the local development workflow.
+- [ ] Ensure docs explain the local production workflow.
+- [ ] Ensure docs explain the container workflow if containers are supported.
+- [ ] Ensure docs explain first-run auth setup.
+- [ ] Ensure docs explain provider configuration with placeholders only.
+- [ ] Ensure docs explain adding a first project.
+- [ ] Ensure docs explain starting an agent thread.
+- [ ] Ensure docs explain reviewing diffs.
+- [ ] Ensure docs explain creating scheduled jobs.
+- [ ] Ensure docs explain installing, reviewing, approving, disabling, and resetting plugins.
+- [ ] Ensure docs explain backup, restore, and reset behavior.
+- [ ] Ensure docs explain log locations and safe issue-reporting guidance.
+- [ ] Verify documentation links are not broken after files are added or renamed.
+
+## 7. Plugin System Public Readiness
+
+- [ ] Document the plugin manifest format with required fields, optional fields, examples, validation rules, and common errors.
+- [ ] Document plugin permissions, including each permission name, capability granted, risk level, and user-facing explanation.
+- [ ] Document plugin lifecycle states from discovery through review, approval, enabled use, disabled state, reset, and removal.
+- [ ] Document review and approval behavior, including review hashes, what changes invalidate approval, and how users can inspect changes.
+- [ ] Document plugin settings and secret fields, including how secret values are stored, displayed, redacted, reset, and reported in diagnostics.
+- [ ] Document filesystem API behavior for plugins, including allowed roots, denied paths, symlink handling, and unsafe capabilities.
+- [ ] Document network API behavior for plugins, including allowlists, HTTPS/WSS expectations, blocked destinations, and error behavior.
+- [ ] Document notification provider behavior for plugins, including registration, user configuration, permissions, and failure states.
+- [ ] Document model provider registration behavior for plugins, including provider metadata, credentials, request flow, and user approval expectations.
+- [ ] Document cron behavior for plugins, including schedule registration, execution context, disabling, and failure handling.
+- [ ] Add a minimal example plugin that demonstrates manifest structure, safe permissions, settings, and a small working action.
+- [ ] Add a plugin tutorial that walks from empty folder to installed and approved plugin.
+- [ ] Add plugin testing guidance for manifest validation, permission boundaries, settings, and failure handling.
+- [ ] Add plugin security guidance for authors and users.
+- [ ] Mark plugin API stability clearly as experimental, alpha, or stable in the README and plugin docs.
+- [ ] Verify plugin docs use fake secrets and safe example URLs only.
+
+## 8. Install and First-Run Experience
+
+- [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.
+- [ ] Verify `bun run dev` works from a clean clone after documented setup only.
+- [ ] Verify `bun run start` works from a clean clone after documented setup only.
+- [ ] Verify `bun run validate` passes from a clean clone.
+- [ ] Verify local auth setup and reset flow are documented and work as described.
+- [ ] Verify missing dependencies produce readable errors with next-step guidance.
+- [ ] Verify setup docs do not require private knowledge, private package access, personal paths, or internal services.
+- [ ] Verify provider setup docs use placeholder values only.
+- [ ] Verify logs and app-data paths are documented for development and local production.
+- [ ] Verify backup and restore paths are documented and tested.
+- [ ] Verify reverse proxy, TLS, and Tailscale-style remote access docs are clearly marked advanced.
+- [ ] Simplify the first-run path so new users can see value quickly without configuring every advanced feature.
+- [ ] Add a first-run smoke test checklist covering auth, provider setup, project creation, first thread, and diff review.
+- [ ] Verify installation failure paths do not leave behind confusing or unsafe partial state.
+
+## 9. Visual Assets and Repo-Hosted Website
+
+- [ ] Add or polish logo files in appropriate source and export formats.
+- [ ] Add or polish mascot/icon files if they are part of the project identity.
+- [ ] Add a GitHub social preview image using safe, repo-owned assets.
+- [ ] Add an Open Graph image for the website if the website lives in the repository.
+- [ ] Add favicon and app icon files if the app or website uses them.
+- [ ] Add README screenshots with fake/demo data only.
+- [ ] Add feature screenshots for project/worktree view using fake/demo data only.
+- [ ] Add feature screenshots for agent threads using fake/demo data only.
+- [ ] Add feature screenshots for diff review using fake/demo data only.
+- [ ] Add feature screenshots for cron workspace using fake/demo data only.
+- [ ] Add feature screenshots for plugin administration using fake/demo data only.
+- [ ] Add feature screenshots for settings/provider setup using fake/demo data only.
+- [ ] Ensure all screenshots hide usernames, hostnames, tokens, internal repositories, local paths, private branches, and real customer/user data.
+- [ ] Add an architecture diagram showing backend, mainview, agent runtime, persistence, plugins, providers, and external boundaries.
+- [ ] Add a plugin lifecycle diagram showing discovery, review, approval, enabled use, disabled state, reset, and removal.
+- [ ] Add an install flow diagram showing clean clone, dependencies, configuration, first auth, provider setup, and first project.
+- [ ] Add a small brand asset folder if appropriate, with source files, exported images, and licensing/provenance notes.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a home page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a docs landing page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a getting started page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a plugin page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a security page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a roadmap page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for a changelog page.
+- [ ] If a repo-hosted website exists or will be added, create TODOs for screenshot/demo sections that use safe data only.
+
+## 10. Product Hardening
+
+- [ ] Verify project creation, opening, closing, and error handling work from a clean setup.
+- [ ] Verify Git worktree listing, opening, switching, and failure states work with small and realistic repositories.
+- [ ] Verify agent thread creation, monitoring, stopping, and resuming behavior.
+- [ ] Verify diff review with small diffs, large diffs, binary files, deleted files, renamed files, and conflict-like scenarios.
+- [ ] Verify cron job creation, editing, run-now, disabling, and deletion.
+- [ ] Verify plugin discovery, review, approval, disable, reset-data, and failure states.
+- [ ] Verify local auth session behavior, including login, logout, expiration, refresh, and invalid session handling.
+- [ ] Verify step-up authentication protects sensitive actions and fails safely.
+- [ ] Verify unsafe-mode warnings are visible, specific, and tied to the relevant risky action.
+- [ ] Verify unsafe-mode boundaries are documented and enforced where applicable.
+- [ ] Verify the app remains usable during long-running agent work, large logs, slow providers, and background cron activity.
+- [ ] Verify major error paths produce actionable messages with next steps.
+- [ ] Add or improve diagnostics export with redaction if feasible.
+- [ ] Verify diagnostics exports exclude secrets, recovery codes, session tokens, provider keys, and private file contents.
+- [ ] Verify settings screens distinguish safe display values from secret or sensitive values.
+
+## 11. Testing
+
+- [ ] Identify critical backend tests missing before public release and file or add TODOs for each gap.
+- [ ] Identify critical mainview tests missing before public release and file or add TODOs for each gap.
+- [ ] Identify plugin permission tests missing before public release and file or add TODOs for each gap.
+- [ ] Identify auth/session tests missing before public release and file or add TODOs for each gap.
+- [ ] Identify cron tests missing before public release and file or add TODOs for each gap.
+- [ ] Identify install/setup smoke tests missing before public release and file or add TODOs for each gap.
+- [ ] Add a documented manual QA checklist covering install, auth, provider setup, project creation, threads, diffs, cron, plugins, settings, and diagnostics.
+- [ ] Add a documented release validation checklist with commands, manual checks, docs checks, security checks, and artifact checks.
+- [ ] Verify tests can run locally without private services or credentials.
+- [ ] Verify tests use fixtures and fake data instead of real repositories, secrets, or personal paths.
+- [ ] Verify failing tests produce enough context for outside contributors to debug.
+
+## 12. GitHub Public Repository Setup Notes
+
+- [ ] Confirm the repository description is accurate, concise, and aligned with the README tagline.
+- [ ] Confirm the repository homepage URL points to the correct docs or repo-hosted website if one exists.
+- [ ] Confirm repository topics include relevant public discovery terms and avoid internal jargon.
+- [ ] Confirm the social preview image is uploaded and renders correctly.
+- [ ] Confirm issue templates render correctly in GitHub’s new issue flow.
+- [ ] Confirm license detection works after adding `LICENSE`.
+- [ ] Confirm CI runs publicly on pull requests and pushes without private secrets.
+- [ ] Confirm branch protection or rulesets are enabled for the default branch.
+- [ ] Confirm required checks match the actual CI workflow names.
+- [ ] Confirm Discussions are enabled only if the project intends to support them.
+- [ ] Confirm GitHub Wiki is disabled unless intentionally used.
+- [ ] Confirm private security reporting is configured if available for the repository.
+- [ ] Confirm default branch naming is intentional and documented where needed.
+- [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
+
+## 13. Final Pre-Public Checklist
+
+- [ ] All required community files exist.
+- [ ] License exists and GitHub detects it correctly.
+- [ ] CI passes on the default branch.
+- [ ] `bun run validate` passes from a clean clone.
+- [ ] Working-tree and Git-history secret scans are completed and findings are resolved.
+- [ ] README is updated and accurate.
+- [ ] Install docs are tested on a clean machine or container.
+- [ ] Security docs are present and linked from README.
+- [ ] Plugin docs are present and linked from README.
+- [ ] Roadmap and project status are clear.
+- [ ] Screenshots and visual assets are safe, owned, and license-compatible.
+- [ ] First release draft is prepared.
+- [ ] Known limitations are documented.
+- [ ] Public repository settings have been reviewed.
+- [ ] No external social media, launch-posting, newsletter, Discord, Product Hunt, Hacker News, Reddit, LinkedIn, YouTube promotion, or other off-repo marketing tasks are included in this checklist.
