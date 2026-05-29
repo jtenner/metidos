@@ -4,11 +4,11 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 1. Repository Hygiene and Public Readiness
 
-- [ ] Audit all currently tracked files for private data, local filesystem paths, secrets, credentials, tokens, internal URLs, personal notes, and unsafe demo data.
-- [ ] Audit `.wiki/` and decide which research notes, durable project knowledge, logs, or internal context should remain public, be rewritten, or be removed before launch.
+- [x] Audit all currently tracked files for private data, local filesystem paths, secrets, credentials, tokens, internal URLs, personal notes, and unsafe demo data.
+- [x] Audit `.wiki/` and decide which research notes, durable project knowledge, logs, or internal context should remain public, be rewritten, or be removed before launch.
 - [ ] Audit `.pi/skills/` and decide which skills are appropriate to ship publicly, which need redaction, and which should be excluded.
 - [ ] Audit generated files, caches, build artifacts, logs, local database files, plugin runtime output, screenshots, temporary files, and derived outputs for accidental check-in.
-- [ ] Update `.gitignore` to exclude unsafe local files, generated files, caches, logs, local databases, plugin runtime output, temporary screenshots, and other non-source artifacts.
+- [x] Update `.gitignore` to exclude unsafe local files, generated files, caches, logs, local databases, plugin runtime output, temporary screenshots, and other non-source artifacts.
 - [ ] Review dependency declarations and lockfiles for private packages, unpublished packages, local path dependencies, private registry URLs, or non-public references.
 - [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
 - [x] Add a repository metadata checklist covering GitHub description, topics, social preview image, homepage URL, and default branch naming.

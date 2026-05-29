@@ -45,7 +45,9 @@ App Data is resolved from `METIDOS_APP_DATA_DIR` or the OS default. It contains 
 - local settings,
 - optional telemetry sidecar databases.
 
-Backend-created App Data directories use owner-only permissions where POSIX chmod semantics are available.
+Backend-created App Data directories use owner-only permissions where POSIX chmod semantics are available. Auth secret handling also warns when same-owner parent directories are group/other-accessible, and Windows operators should verify equivalent ACLs manually.
+
+Keep `auth-secret.key` with the corresponding auth database in backups. If the key is missing or mismatched, encrypted TOTP secrets cannot be decrypted and the supported recovery path is restoring the original key or performing a full local auth reset.
 
 Do not commit App Data, copied database files, auth files, telemetry files, plugin `.data`, or plugin `.logs`.
 
@@ -120,6 +122,8 @@ Cron mutations should invalidate or refresh the Mainview cron workspace and upda
 ## Diagnostics and telemetry
 
 Backend runtime stats track request timings, websocket pushes, SQLite retry loops, cron queue pressure, tool calls, cache counters, and selected pressure signals. Optional telemetry writes coarse snapshots to a local sidecar SQLite database.
+
+Use [Performance validation](./performance-validation.md) for repeatable local runtime and bounded-tool checks. In starvation-harness output, `pressure.failedCount` represents unexpected failures, while `pressure.preemptedCount` usually represents Git scheduler backpressure.
 
 Diagnostics must stay low-cardinality and should not include secrets, recovery codes, session tokens, provider keys, or private file contents.
 

@@ -20,7 +20,7 @@ The benchmark intentionally measured:
 - one local server process
 - dev mode in an isolated temporary app-data directory
 - an isolated temporary `METIDOS_APP_DATA_DIR`
-- the current repository worktree at `/home/metidos/Projects/jt-ide`
+- the current repository worktree at `<path-to-local-metidos-worktree>`
 - a short warmup and short pressure window
 
 This means the baseline is best interpreted as an observed local internal-regression check for Metidos internals.
@@ -33,7 +33,7 @@ Observed benchmark environment from the source:
 - public port: `7611`
 - app data: temporary isolated `METIDOS_APP_DATA_DIR`
 - harness mode: JSON report mode
-- target project: the current Metidos worktree at `/home/metidos/Projects/jt-ide`
+- target project: the current Metidos worktree at `<path-to-local-metidos-worktree>`
 
 Durable workflow shape preserved from the source:
 1. build CSS with dev-mode environment and temporary app data

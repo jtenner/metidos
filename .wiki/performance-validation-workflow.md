@@ -78,7 +78,7 @@ Observed command from the source:
 ```bash
 bun run harness:starvation \
   --port 7611 \
-  --project-path /home/metidos/Projects/jt-ide \
+  --project-path <path-to-a-safe-local-test-project> \
   --workers 3 \
   --warmup-ms 300 \
   --duration-ms 3000 \

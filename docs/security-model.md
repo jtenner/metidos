@@ -25,6 +25,15 @@ Local Auth protects browser access to one installation. It includes:
 
 A WebSocket Ticket is short-lived and is consumed during `/rpc` upgrade. The Backend revalidates the Session for each non-terminal RPC message.
 
+Current Local Auth hardening expectations:
+
+- new or rotated PINs must be at least 8 digits and not obvious repeated or ascending/descending patterns,
+- new or rotated passwords/passphrases must be at least 12 characters,
+- repeated setup/login/recovery/step-up failures are rate-limited and may return `429` with `Retry-After`,
+- failed primary-factor attempts count toward lockout transactionally,
+- successful browser PIN/password resets revoke sessions, close authenticated WebSockets, terminate affected terminal PTYs, and abort active thread turns on a best-effort basis,
+- TOTP currently uses 6 digits, 30-second periods, and a +/-1 period verification window.
+
 Step-up authentication is required before plugin actions that approve or execute plugin code, such as Enable, Re-approve, Retry Plugin, and Run Plugin GC.
 
 ## Secrets
@@ -147,6 +156,10 @@ Safe Cron Jobs cannot create unsafe child Threads or unsafe Cron Jobs unless exp
 ## Backups and restore
 
 Back up App Data and private config before destructive actions. Protect backups as sensitive because they may contain auth material, provider credentials, plugin data, logs, and thread history.
+
+`auth-secret.key` must be backed up with the auth database. Restoring the database without the matching key is not a supported recovery path for encrypted TOTP secrets; restore the original key or perform a full local auth reset and re-enroll TOTP.
+
+On Windows, verify App Data and `auth-secret.key` ACLs with file security settings or administrative tooling. Runtime chmod behavior cannot prove owner-only ACLs on Windows.
 
 Do not publish backups or attach them to issues. If a maintainer needs a reproduction, create a small fake-data fixture instead.
 

@@ -15,6 +15,7 @@ This directory contains the public operator and contributor documentation for Me
 - [Mainview](./mainview.md) — React/Tailwind architecture, design-system references, state management, and UI workflow.
 - [RPC](./rpc.md) — typed WebSocket contract, auth/session behavior, request expectations, and errors.
 - [Cron jobs](./cron.md) — scheduled agent jobs, run-now, disabling, deletion, failures, and plugin interactions.
+- [Performance validation](./performance-validation.md) — repeatable local runtime and bounded-tool checks for performance-sensitive changes.
 
 ## Configuration and safety
 

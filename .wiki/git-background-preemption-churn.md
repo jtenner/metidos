@@ -67,7 +67,7 @@ Likely mitigations remain conservative: per-worktree cooldown before restarting 
 For future checks, run the standard workflow from [performance-validation-workflow](./performance-validation-workflow.md):
 
 ```bash
-bun run harness:starvation --port <port> --project-path /home/metidos/Projects/jt-ide --workers 3 --warmup-ms 300 --duration-ms 3000 --json
+bun run harness:starvation --port <port> --project-path <path-to-a-safe-local-test-project> --workers 3 --warmup-ms 300 --duration-ms 3000 --json
 ```
 
 Then inspect:

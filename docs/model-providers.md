@@ -69,7 +69,19 @@ Local providers are useful but can cross sensitive network boundaries. Before en
 - understand whether prompts or project content leave the machine,
 - document container network routing if Metidos runs in a container.
 
-For an Ollama-style setup, use the safe placeholder pattern from `.env.example` and approve any plugin/private-network requirements explicitly.
+For Ollama-style setup, prefer the first-party `ollama` core plugin and use Plugin Settings or `.env.example` placeholders such as `OLLAMA_BASE_URL` and `OLLAMA_API_KEY`. The provider discovers installed local models from the configured endpoint and should not require manual edits to Pi's standalone model registry.
+
+Local/private Ollama endpoints require explicit private-network/unsafe approval because localhost and private LAN services may expose sensitive local resources.
+
+## First-party plugin-backed providers
+
+Some provider integrations are shipped as core plugins so catalog refresh and provider-specific behavior stay inside the plugin boundary:
+
+- `ollama` registers a local/private Ollama-compatible chat provider and discovers installed models from the configured endpoint.
+- `openrouter` registers both chat and embedding providers and prefers upstream catalog discovery over hardcoded model lists.
+- `nvidia_build` registers NVIDIA-hosted chat models from NVIDIA's API catalog when credentials and discovery are available.
+
+If discovery fails, these providers should surface unavailable/no-model states rather than silently inventing fallback models.
 
 ## Embeddings
 

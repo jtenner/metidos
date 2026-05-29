@@ -1,5 +1,11 @@
 # Wiki Log
 
+## [2026-05-28] audit | Wiki public-readiness pass
+- Sifted `.wiki/` and `.wiki/raw/` for obvious public-readiness concerns before open-source publication.
+- Replaced benchmark examples that named a local Metidos worktree path with placeholder paths.
+- Promoted durable auth, App Data, provider, and performance-validation guidance into public docs.
+- Recorded the pass in `docs/wiki-public-readiness-audit-2026-05-28.md`.
+
 ## [2026-05-23] implementation | Auth secret parent directory warnings
 - Updated `.wiki/local-auth-hardening.md` to record the auth secret parent-directory warning boundary for same-owner POSIX ancestors.
 - Clarified that sticky shared directories and differently-owned directories are treated as trust boundaries rather than warning targets.
