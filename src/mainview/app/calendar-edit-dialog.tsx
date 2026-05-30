@@ -145,6 +145,7 @@ export function CalendarEditDialog({
                 Title
               </span>
               <input
+                aria-label="Calendar title"
                 className="h-8 w-full border border-border-default bg-surface-2 px-2 text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                 disabled={busy}
                 name="calendar-title"
@@ -158,6 +159,7 @@ export function CalendarEditDialog({
                 Color
               </span>
               <input
+                aria-label="Calendar color"
                 className="h-8 w-14 border border-border-default bg-surface-2 p-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                 disabled={busy}
                 name="calendar-color"

@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@source "./**/*.html";
+
+/*
+ * Website-only utilities. The product app owns its own `@layer components`
+ * recipes in `src/mainview/input.css`; the landing page only needs a small set
+ * of helpers for the uppercase eyebrow labels and the workspace mock chrome.
+ * No `@font-face` is declared here: the `--font-sans` / `--font-mono` stacks
+ * fall back to system fonts so the page ships without binary assets.
+ */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@layer components {
+  .eyebrow {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+  }
+
+  .font-label {
+    font-family: var(--font-sans);
+  }
+
+  .list-row-active-accent {
+    box-shadow: inset 3px 0 0 0 var(--color-accent-emphasis);
+  }
+
+  .mock-icon-btn {
+    display: grid;
+    height: 2rem;
+    width: 2rem;
+    place-items: center;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-surface-1);
+    color: var(--color-text-muted);
+  }
+
+  /*
+   * Hero workspace preview: fluid width with a fixed desktop aspect ratio.
+   * Avoid transform:scale() — it fights layout height and leaves empty bands.
+   */
+  .workspace-mock {
+    width: 100%;
+    aspect-ratio: 1000 / 500;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+  }
+
+  .workspace-mock-shell {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .workspace-mock-body {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .workspace-mock-sidebar {
+    width: 33.6%;
+    min-width: 11.5rem;
+    max-width: 21rem;
+  }
+
+  /* Problem section: cron workspace preview (list-heavy, no sidebar). */
+  .problem-cron-mock {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+  }
+
+  .problem-cron-mock-list {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

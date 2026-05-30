@@ -28,7 +28,8 @@ Keep private values in `.env`. Do not commit `.env`, App Data, plugin runtime ou
 ## Common commands
 
 ```bash
-bun run dev                 # local development server
+bun run dev                 # local development supervisor (Tailwind watch + backend)
+METIDOS_DEV=1 bun run dev   # local development with backend dev-mode reload/fallback behavior
 bun run start               # production-style local server
 bun run build:dev           # development Mainview bundle
 bun run build:prod          # production Mainview bundle

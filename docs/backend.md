@@ -15,7 +15,8 @@ The Backend is the Bun server layer under `src/bun/`. It owns HTTP startup, RPC 
 Common scripts:
 
 ```bash
-bun run dev                 # build assets, sync core plugins, run dev supervisor
+bun run dev                 # build assets, sync core plugins, run the dev supervisor
+METIDOS_DEV=1 bun run dev   # additionally enable backend dev-mode reload/fallback behavior
 bun run start               # build assets, sync core plugins, start Backend
 bun run start:tls           # Backend mode for trusted reverse-proxy TLS
 bun run start:telemetry     # start with local runtime telemetry sidecar

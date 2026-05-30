@@ -32,7 +32,7 @@ Do not copy local `.env`, app databases, plugin `.data`, or other ignored runtim
 cp .env.example .env
 ```
 
-Edit `.env` with placeholders replaced by values for your machine. Keep secrets out of screenshots and issue reports. Useful first-run values:
+Edit `.env` with placeholders replaced by values for your machine. For a localhost-only first run, leave reverse-proxy/public-origin settings unset or commented; set them only when you intentionally run behind a trusted proxy. Keep secrets out of screenshots and issue reports. Useful first-run values:
 
 ```bash
 # Optional explicit app-data root. If omitted, Metidos uses the OS app-data location.
@@ -49,13 +49,13 @@ OPENROUTER_API_KEY=replace-with-your-key
 
 `METIDOS_APP_DATA_DIR` stores local databases, auth material, Pi runtime sessions, plugin installations, plugin data, logs, and optional telemetry. Do not put it inside a repository you commit.
 
-## 3. Start the development server
+## 3. Start the development supervisor
 
 ```bash
 bun run dev
 ```
 
-Open the printed localhost URL in your browser. For a production-like local run, use:
+Open the printed localhost URL in your browser. For backend dev-mode reload/fallback behavior while developing Metidos itself, run `METIDOS_DEV=1 bun run dev`. For a production-like local run, use:
 
 ```bash
 bun run start

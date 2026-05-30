@@ -215,6 +215,7 @@ export function CalendarEventDialog({
               Title
             </span>
             <input
+              aria-label="Event title"
               className="w-full border border-border-default bg-surface-2 px-3 py-2"
               name="calendar-event-title"
               ref={titleInputRef}

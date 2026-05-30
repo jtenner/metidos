@@ -529,6 +529,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                 <div className="relative mt-2 space-y-2">
                   <div className="flex items-start gap-2">
                     <input
+                      aria-label="Project folder"
                       className={`min-w-0 flex-1 select-text border px-3 py-2 text-sm outline-none transition-all placeholder:text-text-faint focus:border-focus-ring ${
                         addProjectInputIsPreviewing
                           ? "border-focus-ring bg-surface-2 text-text-primary"

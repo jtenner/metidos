@@ -311,6 +311,7 @@ function PluginSettingControl({
       <label className="grid gap-1 border-t border-border-subtle py-2 first:border-t-0">
         <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
           <input
+            aria-label={label}
             checked={pluginSettingBooleanControlChecked(value)}
             className="h-4 w-4 accent-accent"
             name={`plugin-setting-${declaration.key}`}

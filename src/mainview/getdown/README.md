@@ -28,6 +28,8 @@ Raw HTML is not injected. HTML-like markdown is rendered as escaped text by defa
 
 ## Development
 
+Run these from `src/mainview/getdown/`, where the local `package.json` defines the typecheck and performance scripts:
+
 ```bash
 bun test
 bun run typecheck

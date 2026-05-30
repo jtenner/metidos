@@ -23,7 +23,7 @@ Use these checks before accessibility-sensitive UI work is accepted:
 3. Confirm dialogs, popovers, and dropdowns have keyboard dismissal, focus behavior, and stable semantics.
 4. Confirm transcript messages, tool calls, errors, screenshots, and markdown content remain readable and navigable at zoom.
 5. Confirm status changes are conveyed with text, not color alone.
-6. Run `bun run style:check`; for accessibility-heavy UI changes, add focused manual keyboard and screen-reader checks.
+6. Run `bun run style:check` plus the relevant `bun test`/`bun run test` coverage for touched Mainview surfaces; for accessibility-heavy UI changes, add focused manual keyboard and screen-reader checks.
 
 ## Known documentation gap
 

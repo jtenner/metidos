@@ -286,6 +286,7 @@ function TerminalRow({
             Title
           </span>
           <input
+            aria-label="Terminal title"
             className="mt-1.5 h-8 w-full border border-border-default bg-surface-1 px-2 text-xs text-text-primary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
             name="terminal-session-title"
             onChange={(event) => {

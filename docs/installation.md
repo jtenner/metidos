@@ -10,7 +10,7 @@ Metidos is intended to run as a local, operator-owned application.
 
 | Shape | Use when | Command |
 | --- | --- | --- |
-| Local development | You are changing source or using a live checkout. | `bun run dev` |
+| Local development | You are changing source or using a live checkout. | `bun run dev` (`METIDOS_DEV=1 bun run dev` for backend dev-mode reload/fallback behavior) |
 | Local production-style | You want the normal built UI and server from a checkout. | `bun run start` |
 | Reverse-proxy TLS | HTTPS is terminated by a trusted proxy in front of Bun. | `bun run start:tls` |
 | Telemetry sidecar | You need local runtime diagnostics snapshots. | `bun run start:telemetry` or `bun run start:tls:telemetry` |
@@ -63,7 +63,22 @@ METIDOS_PUBLIC_ORIGIN=https://metidos.example.com
 
 # Extra allowed browser origins for /rpc WebSocket upgrades.
 METIDOS_ALLOWED_WS_ORIGINS=https://metidos.example.com
+
+# Trust reverse-proxy forwarded headers only when the proxy is the only public path.
+METIDOS_TRUST_PROXY=true
+
+# Extra allowed forwarded origins when trust-proxy mode needs more than PUBLIC_ORIGIN.
+METIDOS_ALLOWED_FORWARDED_ORIGINS=https://metidos.example.com
+
+# Optional proxy peer IP/CIDR allowlist when the trusted proxy is not loopback.
+METIDOS_TRUSTED_PROXY_PEERS=127.0.0.1
+
+# Optional static web-server share bind host/port for thread-hosted sites.
+METIDOS_WEB_SERVER_SHARE_HOST=127.0.0.1
+METIDOS_WEB_SERVER_SHARE_PORT=7600
 ```
+
+Use `.env.example` as the current reference for provider keys, plugin-specific variables, reverse-proxy settings, web-server share settings, and other common runtime knobs. Do not set reverse-proxy or public-host variables unless you are intentionally exposing Metidos through a trusted proxy or private network.
 
 When `METIDOS_APP_DATA_DIR` is omitted, Metidos chooses an OS app-data location:
 

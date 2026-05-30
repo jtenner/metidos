@@ -29,6 +29,7 @@ export const ToolbarDateInput = forwardRef<
 ) {
   return (
     <input
+      aria-label="Date"
       {...props}
       className={mergeClassNames(
         toolbarDateInputClassName,

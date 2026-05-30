@@ -841,6 +841,7 @@ export function MainviewCronWorkspaceController({
             ) : (
               <div className="space-y-3">
                 <input
+                  aria-label="Cron title"
                   className="w-full border border-border-default bg-surface-2 px-3 py-2 text-sm text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                   placeholder="Optional title"
                   value={cronEditTitle}
@@ -856,6 +857,7 @@ export function MainviewCronWorkspaceController({
                   }
                 />
                 <input
+                  aria-label="Cron expression"
                   className="w-full border border-border-default bg-surface-2 px-3 py-2 text-sm text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                   placeholder="cron expression, e.g. */5 * * * *"
                   value={cronEditSchedule}

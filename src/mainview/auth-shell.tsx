@@ -193,8 +193,9 @@ function AuthInput(props: {
       </span>
       <div className="mt-4 border border-border-default bg-surface-1 px-4 py-3 transition focus-within:border-focus-ring focus-within:bg-surface-2">
         <input
+          aria-label={props.label}
           autoComplete={props.autoComplete}
-          className={`w-full bg-transparent text-base text-text-primary outline-none placeholder:text-text-faint ${
+          className={`w-full bg-transparent text-base text-text-primary outline-none placeholder:text-text-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring ${
             props.monospace ? "font-mono tracking-[0.16em]" : ""
           }`}
           inputMode={props.inputMode}

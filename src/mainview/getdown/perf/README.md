@@ -1,6 +1,6 @@
 # Performance baselines
 
-Run the internal performance harness from the repository root:
+Run the internal performance harness from `src/mainview/getdown/`:
 
 ```bash
 bun run perf:baseline

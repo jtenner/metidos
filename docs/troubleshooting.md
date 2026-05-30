@@ -99,7 +99,8 @@ Likely causes:
 - Session expired or was revoked,
 - WebSocket Ticket was stale,
 - browser used a different origin than expected,
-- reverse proxy did not forward cookies or upgrade headers correctly.
+- reverse proxy did not forward cookies or upgrade headers correctly,
+- `METIDOS_PUBLIC_ORIGIN` or `METIDOS_ALLOWED_WS_ORIGINS` was set for a host you are not actually using.
 
 Fix: sign in again, then check origin/proxy settings if it repeats.
 
@@ -112,7 +113,9 @@ Check:
 - proxy forwards WebSocket upgrade headers,
 - browser origin exactly matches `METIDOS_PUBLIC_ORIGIN`,
 - additional origins are listed in `METIDOS_ALLOWED_WS_ORIGINS`,
+- forwarded origins are listed in `METIDOS_ALLOWED_FORWARDED_ORIGINS` if trust-proxy mode needs more than `METIDOS_PUBLIC_ORIGIN`,
 - `METIDOS_TRUST_PROXY=true` is set only when the proxy is trusted and overwrites forwarded headers,
+- `METIDOS_TRUSTED_PROXY_PEERS` includes the proxy peer when it is not loopback,
 - Backend is started with `bun run start:tls` when operating behind TLS termination.
 
 ### Tailscale URL fails

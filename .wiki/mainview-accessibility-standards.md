@@ -5,7 +5,7 @@
 This page is the maintained accessibility baseline for `src/mainview/` and `src/mainview/auth-shell.tsx` after the 2026-04-16 accessibility audit.
 
 - **Observed:** the same high-signal risk clusters are concentrated in dialogs/popovers, choosers, transcript semantics, and dense controls.
-- **Observed:** this repo already has dedicated a11y automation entrypoints (`bun run test:a11y`) and Biome jsx-a11y coverage via `bun run validate`.
+- **Observed:** this repo currently has no dedicated `test:a11y` script in the root package; accessibility risk review relies on the main test suite plus manual checks. Biome jsx-a11y rules are still enforced through `bun run validate`.
 - **Recommended:** treat this document as a durable review contract for every mainview UI change, not a one-time note.
 
 ## Scope and intent
@@ -22,7 +22,7 @@ This standard is for both code review and PR acceptance.
 
 ### What is currently in place
 
-- `bun run test:a11y` exists and targets auth-shell, settings, desktop thread switching, transcript semantics, diff workspace, chooser helpers, and dialog naming.
+- `bun run test` is the standard automated test entrypoint; run focused mainview suites (for example `bun test src/mainview/auth-shell-connect.test.ts src/mainview/app/desktop-thread-switcher.test.ts src/mainview/app/diff-workspace.test.ts`) as needed for the touched surfaces, and use full validation for broader UI risk changes.
 - `bun run validate` runs Biome checks, typechecking, and the main test suite.
 - The repository has already completed a one-time accessibility audit and follow-up planning in these pages:
   - [2026-04-16-mainview-accessibility-audit](./2026-04-16-mainview-accessibility-audit.md)
@@ -124,7 +124,7 @@ Required:
 
 Run before shipping accessibility-sensitive UI work:
 
-1. `bun run test:a11y`
+1. `bun run test` (or targeted `bun test` for touched mainview surfaces)
 2. `bun run validate`
 
 ### Manual checklists
@@ -157,7 +157,7 @@ Before approving mainview UI changes, reviewers should ask:
 4. Is state exposed semantically (not just by color/icon)?
 5. Are typography and target sizes still operable at zoom and narrow widths?
 6. Are core scroll regions discoverable and not hidden?
-7. Were `bun run test:a11y` and (for code changes) `bun run validate` run?
+7. Were accessibility-sensitive mainview suites in `bun run test` and (for code changes) `bun run validate` run?
 
 ## Relationship to audit
 
@@ -170,5 +170,5 @@ Related pages:
 
 ## Source note
 
-Ingested from `docs/mainview-accessibility-standards.md` on 2026-04-19.
+Ingested from the 2026-04-16 accessibility audit and maintained in this wiki page on 2026-04-19.
 This file is now the canonical maintained wiki artifact for mainview accessibility standards.

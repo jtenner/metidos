@@ -133,8 +133,10 @@ Remote access is advanced. For reverse-proxy deployments:
 - terminate TLS at the proxy,
 - forward WebSocket upgrades for `/rpc`,
 - set `METIDOS_PUBLIC_ORIGIN` exactly to the browser-facing origin,
-- set `METIDOS_ALLOWED_WS_ORIGINS` only for additional legitimate origins,
+- set `METIDOS_ALLOWED_WS_ORIGINS` only for additional legitimate browser origins,
 - set `METIDOS_TRUST_PROXY=true` only when a trusted proxy is the only public path to Bun and overwrites forwarded headers,
+- set `METIDOS_ALLOWED_FORWARDED_ORIGINS` only when trust-proxy mode needs forwarded origins beyond `METIDOS_PUBLIC_ORIGIN`,
+- set `METIDOS_TRUSTED_PROXY_PEERS` when the trusted proxy peer is not loopback,
 - keep Bun bound to loopback where possible,
 - prefer Tailscale or equivalent private access over public exposure for early deployments.
 

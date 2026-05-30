@@ -20,13 +20,12 @@ Compact guide for coding agents working in this repository.
 - `src/react/GetDown.tsx` — Public React renderer and HTML escaping/rendering helpers.
 - `src/getdown.test.tsx` — Main GFM rendering test matrix.
 - `src/core/document.test.ts` — Structural sharing tests.
-- `tests/streaming-markdown.test.tsx` — Public component smoke test.
 - `perf/baseline.tsx` — Internal performance/GC baseline harness.
 - `perf/README.md` — Perf run instructions and current baseline numbers.
 
 ## Commands
 
-Run from the repository root:
+Run from `src/mainview/getdown/`, where this package's local `package.json` defines the typecheck and performance scripts:
 
 ```bash
 bun test

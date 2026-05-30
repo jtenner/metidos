@@ -106,6 +106,7 @@ export function ThreadExtensionUiDialog({
               Value
             </span>
             <input
+              aria-label="Value"
               className="w-full rounded-sm border border-border-default bg-surface-2 px-3 py-2 text-sm text-text-primary outline-none transition focus:border-focus-ring"
               name="thread-extension-input"
               ref={inputRef}

@@ -168,6 +168,7 @@ function TimezoneAutocompleteInput({
       <input
         aria-activedescendant={activeOptionId}
         aria-autocomplete="list"
+        aria-label={label}
         aria-controls={open && options.length > 0 ? listboxId : undefined}
         aria-expanded={open && options.length > 0}
         autoCapitalize="none"

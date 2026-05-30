@@ -75,13 +75,15 @@ Local/private Ollama endpoints require explicit private-network/unsafe approval 
 
 ## First-party plugin-backed providers
 
-Some provider integrations are shipped as core plugins so catalog refresh and provider-specific behavior stay inside the plugin boundary:
+Many provider integrations are shipped as core plugins under `core_plugins/` so catalog refresh and provider-specific behavior stay inside the plugin boundary. The checked-in plugin folders are the authoritative inventory; examples include:
 
-- `ollama` registers a local/private Ollama-compatible chat provider and discovers installed models from the configured endpoint.
-- `openrouter` registers both chat and embedding providers and prefers upstream catalog discovery over hardcoded model lists.
-- `nvidia_build` registers NVIDIA-hosted chat models from NVIDIA's API catalog when credentials and discovery are available.
+- `ollama` for local/private Ollama-compatible chat models discovered from the configured endpoint.
+- `openrouter` for chat and embedding models from OpenRouter's catalog.
+- `nvidia_build` for NVIDIA-hosted chat models from NVIDIA's API catalog.
+- `anthropic`, `openai`, `gemini`, `groq`, `mistral`, `deepseek`, `xai`, `github_copilot`, `github_models`, and other provider folders for their corresponding upstream APIs.
+- compatibility or routing providers such as `custom_openai`, `litellm`, `llamacpp`, `lmstudio`, `localai`, `vllm`, `sglang`, and `tgi`.
 
-If discovery fails, these providers should surface unavailable/no-model states rather than silently inventing fallback models.
+If discovery fails, provider plugins should surface unavailable/no-model states rather than silently inventing fallback models.
 
 ## Embeddings
 

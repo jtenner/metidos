@@ -1,5 +1,10 @@
 # Wiki Log
 
+## [2026-05-30] maintenance | Documentation accuracy pass
+- Corrected `.wiki/mainview-accessibility-standards.md` so it no longer claims a non-existent `bun run test:a11y` script.
+- Reframed accessibility automation around the current root `bun run test`, focused Mainview test files, manual keyboard/screen-reader checks, and `bun run validate`.
+- Updated `.wiki/mainview-accessibility-status.md` review posture to match the current test surface.
+
 ## [2026-05-28] audit | Wiki public-readiness pass
 - Sifted `.wiki/` and `.wiki/raw/` for obvious public-readiness concerns before open-source publication.
 - Replaced benchmark examples that named a local Metidos worktree path with placeholder paths.

@@ -9,6 +9,7 @@ compatibility: Project skill for this repository. Use from the repository root w
 Use this skill when the user wants to install Metidos, rebuild an installation guide, generate an installer plan, or configure Docker/Podman deployment.
 
 The installer is a **wizard**, not a one-shot script. Ask the questions in order, branch based on answers, summarize before applying changes, and export the final plan to `metidos-config.md`.
+On start, greet the user warmly by saying: "Hello, this is the metidos installer wizard."
 
 ## Prime directive
 
@@ -71,7 +72,7 @@ The file should be human-readable Markdown and include:
 - selected install mode,
 - image/container names,
 - unsupported-harness requests and refusal decisions,
-- services/tools defaults and calendar bootstrap notes,
+- core-plugin defaults for services/tools and calendar bootstrap notes,
 - browser preference and browser-core plugin selection (`chrome_browser`) details,
 - browser/Chromium capability and runtime prerequisites,
 - custom API notes for non-provider integrations,
@@ -81,11 +82,12 @@ The file should be human-readable Markdown and include:
 - selected core plugins,
 - Codex import/install decision,
 - custom model providers and generated plugin ids,
-- env var names, with secret values masked or omitted,
+- env var names (including source/import mode), with secret values masked or omitted,
 - Telegram/Gmail decisions,
 - permission/safety profile,
 - cron/background-agent settings,
 - update/backup settings,
+- calendar bootstrap URLs + manual import/store plan,
 - validation checklist,
 - next steps.
 
@@ -130,7 +132,7 @@ Use this order unless the user explicitly asks to focus elsewhere:
 11. Discover and select core plugins.
 12. Add custom APIs and model providers.
 13. Generate custom provider plugins when needed.
-14. Ask service/tool access and browser-internet settings.
+14. Ask which core plugin sets should be installed for service/tool defaults, then gather browser and calendar settings.
 15. Add API keys and environment variable sources.
 16. Configure Telegram integration, if requested.
 17. Configure Gmail integration, if requested.
@@ -140,9 +142,16 @@ Use this order unless the user explicitly asks to focus elsewhere:
 21. Export `metidos-config.md`.
 22. Apply installation only after explicit approval.
 23. Start container and run health checks (or confirm source startup).
-24. Show next steps (final handoff).
+24. Run manual post-install work tasks (including calendar insertion if provided).
+25. Show next steps (final handoff).
 
 ## Step 1 — Confirm install intent and wizard mode
+
+Begin with:
+
+```text
+Hello, this is the metidos installer wizard.
+```
 
 Ask:
 
@@ -356,20 +365,15 @@ Default to localhost-only unless the user chooses a remote/private access option
 
 ## Step 8 — Base container image with Bun/Zig
 
-Before plugins and provider setup, prepare a base image plan that contains:
+Before plugins and provider setup, define a base image plan that **must** include Bun and Zig (installed or preinstalled) so the image can build and run Metidos.
 
-- Bun,
-- Zig,
-- Metidos runtime dependencies,
-- enough build tooling to run the backend and plugin runtime,
-- entrypoint/startup scripts,
-- mounted app data and plugins directories.
+Defaults are fixed for plan-first operation unless the user explicitly requests advanced build customization:
 
-Ask in advanced mode:
+- Bun: installer-known good default version.
+- Zig: installer-known good default version.
+- Include required Metidos runtime dependencies, build tooling, entrypoint/startup scripts, and mounted app data/plugins directories.
 
-```text
-Do you want to pin Bun and Zig versions, or use the installer's known-good defaults?
-```
+In advanced mode, ask only for optional base-OS / build-cache preferences (not Bun/Zig versions).
 
 Record:
 
@@ -384,7 +388,7 @@ Do not build yet. Include the planned image details in the final review.
 Installation reference notes:
 
 - Bun can be installed from the official script/package manager or by using Bun's official Docker image. Verify inside the image with `bun --version`.
-- Zig's official guidance recommends downloading a self-contained archive or using a package manager. Multiple Zig versions can coexist; pin one version for reproducible image builds. Verify with `zig version`.
+- Zig's official guidance recommends downloading a self-contained archive or using a package manager. Verify with `zig version`.
 - Record the selected Bun and Zig versions in `metidos-config.md`.
 
 ## Step 9 — Codex subscription
@@ -619,38 +623,36 @@ Record:
 - whether harness requests were rejected, and
 - whether a non-model integration note was recorded.
 
-## Step 12-b — Services, tool access, browser access, and calendar feeds
+## Step 12-b — Core plugin defaults for service/tool capabilities, browser access, and calendar feeds
 
 Ask:
 
 ```text
-What services and tools should Metidos agents be able to use by default?
+Which core plugin bundles should be installed for service/tool defaults?
 ```
 
-Collect a checklist (or single list) across these categories:
+Collect a checklist (or single list) across these capability areas:
 
-- Web search
-- Browser tools / web navigation
-- Git
-- GitHub
+- Web search and browsing support
+- Git and GitHub tools
 - SQLite
-- Calendar (calendar create/list/edit)
+- Calendar
 - Notifications
 - Threads/Cron coordination
-- Plugin tools (approved plugin access groups)
+- Plugin tool groups
 - Unsafe actions (high-risk)
 
 Ask:
 
 ```text
-Do you want your agents to browse the internet using Chromium? [Y/n]
+Do you want to include Chromium browser support? [Y/n]
 ```
 
 If yes:
 
 - Install and enable the provided browser core plugin:
   - `chrome_browser` (plugin id) must be selected for this install (or added to custom plugins if missing).
-  - Require `chrome_browser:browser_tools` in thread access controls and plugin approval before running browser automation.
+  - Require `chrome_browser:browser_tools` in core plugin defaults and plugin approval before browser automation.
 - Source install: confirm Chromium/CDP support is available in the host/container where the runtime executes, and capture any manual launch/setup note needed.
 - Docker install: note that the provided Docker template path does not bundle Chromium by default; either switch to Podman or defer browser automation with a documented follow-up.
 - Podman install: confirm the runtime can launch Chromium/CDP in-container and record the method used by the `chrome_browser` plugin to create sessions.
@@ -658,22 +660,17 @@ If yes:
 Ask:
 
 ```text
-Do you have any calendar (ICS) URLs you want to import?
-1. No
-2. Yes, one or more
+List the External ICS calendar URLs you want imported now (or `none`).
+Format each entry as: `url|display_name`.
+Example: `https://example.com/calendar.ics|Work`
 ```
-
-If yes:
-
-- Ask for each ICS feed URL and optional display name.
-- Ask whether each feed should be imported as read-only.
-- Ask if import should happen immediately after first install login.
 
 Record:
 
-- default allowed service/tool groups for the first-thread profile,
+- default core plugin capability plan for the first-thread/operator profile,
 - browser access preference and required runtime prerequisites,
-- ICS URL list and any manual follow-up required after first login.
+- ICS URL list with titles,
+- a required manual post-install insertion step (do not rely on UI for first-time calendar import).
 
 ## Step 13 — Custom provider plugin generation
 
@@ -711,6 +708,22 @@ Then follow Plugin System v1 authoring rules:
 - install generated plugin into the configured plugin directory only after approval.
 ## Step 14 — API keys and environment variables
 
+Ask first:
+
+```text
+How should environment variables be imported by default for this install?
+1. Current shell environment
+2. `.env` file
+3. Both shell env and `.env` file
+4. Placeholders only (no imports)
+```
+
+If `.env` file import is chosen, confirm the path:
+
+```text
+Which .env file should be used for imports? [~/.metidos/.env]
+```
+
 Ask exactly:
 
 ```text
@@ -721,7 +734,7 @@ For each variable, ask:
 
 ```text
 How should {ENV_VAR} be supplied?
-1. Pass through from the host environment at container start.
+1. Use the selected import source(s) above.
 2. Store in the Metidos env file as a local secret.
 3. Write a placeholder only and fill it in later.
 ```
@@ -739,6 +752,7 @@ Rules:
 
 - Do not echo or log raw secret values.
 - `metidos-config.md` may list env var names and masked status only.
+- Record whether each variable comes from host env, `.env`, both, or placeholder.
 - Prefer least exposure: selected plugins only when practical.
 - If a selected plugin declares required env vars, make sure each one has a source.
 
@@ -1383,7 +1397,7 @@ Validation checklist:
 
 Record both access paths and which integrations use each one.
 
-## Step 19 — Review final plan
+## Step 20 — Review final plan
 
 Before applying any changes, show a final plan with:
 
@@ -1397,7 +1411,8 @@ Before applying any changes, show a final plan with:
 - selected core plugins,
 - Codex status,
 - custom providers/plugins,
-- env var names and source type,
+- env var names, import method, and source type,
+- calendar bootstrap URLs and manual store method,
 - Telegram/Gmail status,
 - safety profile,
 - cron settings,
@@ -1415,7 +1430,7 @@ Proceed with this plan?
 4. Cancel.
 ```
 
-## Step 20 — Export metidos-config.md
+## Step 21 — Export metidos-config.md
 
 Write `metidos-config.md` after the user approves the plan or chooses export-only.
 
@@ -1458,6 +1473,8 @@ Generated: YYYY-MM-DD HH:mm TZ
 
 ## Updates, backups, diagnostics
 
+## Calendar bootstrap and manual import plan
+
 ## Installation actions
 
 ## Validation checklist
@@ -1472,7 +1489,7 @@ Secret handling requirements:
 - Never include full secret values.
 - Mask any accidental visible values before writing.
 
-## Step 21 — Apply installation
+## Step 22 — Apply installation
 
 Only after explicit approval:
 
@@ -1488,7 +1505,7 @@ Only after explicit approval:
 
 If plan-only mode was selected, do not perform these actions.
 
-## Step 22 — Health checks
+## Step 23 — Start container and run health checks
 
 After startup, validate:
 
@@ -1505,7 +1522,18 @@ After startup, validate:
 - reverse proxy or Tailscale access works per Step 18,
 - background/cron jobs are registered if enabled.
 
-## Step 24 — Final handoff
+## Step 24 — Post-install manual tasks (calendar insertion)
+
+If ICS calendars were collected in Step 12-b:
+
+1. Do not require UI calendar setup.
+2. Use a local authenticated maintenance command or script (or backend admin helper) to call `createExternalIcsCalendar` for each requested ICS URL.
+3. Store each feed's `url` and `title` in the handoff notes immediately before first run.
+4. Verify each calendar appears in bootstrap data on first startup.
+
+If no ICS URLs were supplied, mark this task as complete and skipped.
+
+## Step 25 — Final handoff
 
 Show:
 
@@ -1518,7 +1546,7 @@ Show:
 - how to start/stop/restart the container,
 - how to update,
 - how to add more plugins/providers later,
-- known manual steps remaining.
+- pending manual steps remaining (if any).
 
 ## Local source install, provider, and startup reference
 
@@ -1594,7 +1622,7 @@ Metidos runs one Bun server that serves the browser app, auth routes, websocket 
 |------|---------|----------|
 | Local HTTP | `bun run start` | Normal local use on `http://localhost:7599`. |
 | Local HTTP + telemetry | `bun run start:telemetry` | Same as above, but also persists runtime telemetry snapshots. |
-| Local dev | `bun run dev` | Active local development with CSS watch and dev reload behavior. |
+| Local dev | `bun run dev` | Active local development supervisor with CSS watch and backend server. Use `METIDOS_DEV=1 bun run dev` when backend dev-mode reload/fallback behavior is needed. |
 | Custom port | `METIDOS_PORT=7605 bun run start` or `bun run src/bun/index.ts --port 7605` | You want the Bun backend on a different loopback port. |
 | Reverse-proxy TLS | `bun run start:tls` | Nginx or another reverse proxy terminates TLS and forwards to Bun over loopback HTTP. |
 | Reverse-proxy TLS + telemetry | `bun run start:tls:telemetry` | Reverse-proxy TLS mode plus runtime telemetry persistence. |
@@ -1625,6 +1653,7 @@ Then open `http://localhost:7599` in your browser. After startup, open **Setting
 - `METIDOS_ALLOWED_WS_ORIGINS` for extra browser origins when you proxy through a non-default host or port.
 - `METIDOS_PUBLIC_ORIGIN` as the primary browser-facing origin used by reverse-proxy TLS mode; the backend automatically adds it to the websocket allowlist. The built-in localhost websocket origins are for same-host development and trusted local proxy defaults, not a replacement for this public origin.
 - `METIDOS_TRUST_PROXY=true` to trust `X-Forwarded-Host` and `X-Forwarded-Proto` from a reverse proxy that is the only public path to Bun. Leave unset for direct/local HTTP.
+- `METIDOS_ALLOWED_FORWARDED_ORIGINS` when trust-proxy mode needs forwarded origins beyond `METIDOS_PUBLIC_ORIGIN`.
 - `METIDOS_TRUSTED_PROXY_PEERS` when `METIDOS_TRUST_PROXY=true` and the proxy peer is not loopback. Set this to the explicit proxy IP/CIDR allowlist before relying on forwarded client IPs for public-route rate limits.
 - `METIDOS_APP_DATA_DIR` for an explicit application data location for this local installation.
 - `METIDOS_MAINVIEW_SOURCEMAP=1` to emit and serve the versioned mainview sourcemap path (for example `/assets/mainview/<version>/index.js.map`) for non-dev builds when you need production bundle debugging.
@@ -1656,6 +1685,7 @@ Example `.env` for TLS:
 METIDOS_PUBLIC_ORIGIN=https://metidos.example.com
 METIDOS_TRUST_PROXY=true
 METIDOS_TRUSTED_PROXY_PEERS=127.0.0.1
+# METIDOS_ALLOWED_FORWARDED_ORIGINS=https://metidos-alt.example.com
 # METIDOS_ALLOWED_WS_ORIGINS=https://metidos-alt.example.com https://metidos.example.net
 # METIDOS_PORT=7599
 ```
@@ -1770,7 +1800,7 @@ Common mistakes and symptoms:
 
 | Symptom | Likely cause |
 |---------|--------------|
-| `Auth request origin not allowed.` | `METIDOS_PUBLIC_ORIGIN` does not match the real browser origin, or `METIDOS_TRUST_PROXY=true` is missing when nginx is expected to supply `X-Forwarded-Host` / `X-Forwarded-Proto`. |
+| `Auth request origin not allowed.` | `METIDOS_PUBLIC_ORIGIN` does not match the real browser origin, `METIDOS_ALLOWED_FORWARDED_ORIGINS` is missing an intentional alternate forwarded origin, or `METIDOS_TRUST_PROXY=true` is missing when nginx is expected to supply `X-Forwarded-Host` / `X-Forwarded-Proto`. |
 | `WebSocket origin not allowed` on `/rpc` | Same as above, or you are serving from an alternate browser origin without adding it to `METIDOS_ALLOWED_WS_ORIGINS`. The implicit localhost websocket origins only cover same-host development/trusted local proxies. |
 | The app loads but never connects to `/rpc` | nginx is not sending websocket upgrade headers, or `/rpc` is not using `proxy_http_version 1.1`. |
 | Login/session cookies behave incorrectly behind HTTPS | Bun was not started with `start:tls` / `--tls`, or `METIDOS_TRUST_PROXY=true` is missing when nginx is expected to supply `X-Forwarded-Proto=https`. |
@@ -1799,7 +1829,7 @@ Use this as the canonical installer prompt list.
 15. Project mount mode: read/write or read-only?
 16. Host port?
 17. Bind address?
-18. Bun/Zig version pinning?
+18. Bun/Zig defaults are fixed for the plan; confirm only advanced base-image customizations.
 19. Do you have an active Codex subscription?
 20. Import existing Codex or install via npm?
 21. Enable Codex plugin by default?
@@ -1810,23 +1840,24 @@ Use this as the canonical installer prompt list.
 26. Provide one comma-separated list of built-in model provider plugin IDs (or `none`).
 27. If custom model/chat APIs are needed, provide one compact list of specs now (or `none`).
 28. Generate a custom provider plugin if needed?
-29. What services and tools should agents be able to use?
+29. Which core plugin bundles should be enabled for default service/tool capability?
 30. Do you want Chromium web browsing support?
-31. Do you have any ICS URLs to import?
-32. Which API key/env var names should be available?
-33. For each env var: pass-through, env file, or placeholder?
-34. Which plugins/services receive each env var?
-35. Integrate Telegram?
-36. Telegram mode: polling/webhook, chat ids, capabilities?
-37. Integrate Gmail?
-38. Gmail mode, OAuth credentials, scopes, account, approval policy?
-39. Default safety/permission profile?
-40. Enable cron/background agents?
-41. Updates, backups, logs, telemetry?
-42. Access method: localhost, reverse proxy, Tailscale, or both?
-43. Reverse proxy details, if selected?
-44. Tailscale details, if selected?
-45. Review final plan: install, export only, edit, or cancel?
+31. Which External ICS calendar URLs should be imported now?
+32. How should env vars be imported (host env, .env file, both, or placeholders)?
+33. Which API key/env var names should be available?
+34. For each env var: selected import source(s) / env file / placeholder?
+35. Which plugins/services receive each env var?
+36. Integrate Telegram?
+37. Telegram mode: polling/webhook, chat ids, capabilities?
+38. Integrate Gmail?
+39. Gmail mode, OAuth credentials, scopes, account, approval policy?
+40. Default safety/permission profile?
+41. Enable cron/background agents?
+42. Updates, backups, logs, telemetry?
+43. Access method: localhost, reverse proxy, Tailscale, or both?
+44. Reverse proxy details, if selected?
+45. Tailscale details, if selected?
+46. Review final plan: install, export only, edit, or cancel?
 
 ## Failure and recovery guidance
 

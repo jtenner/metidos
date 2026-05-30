@@ -617,7 +617,7 @@ export function CodexModelSelector({
           ref={searchInputRef}
           aria-controls={activeListboxId}
           aria-label="Search providers or models"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-muted"
+          className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring"
           data-chooser-search="true"
           name="model-selector-search"
           placeholder={placeholder}

@@ -685,6 +685,7 @@ export function ChatComposerControl({
   const imageFilePicker = (
     <input
       accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+      aria-label="Attach image files"
       className="sr-only"
       multiple
       onChange={onImageFileInputChange}

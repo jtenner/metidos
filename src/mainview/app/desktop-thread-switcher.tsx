@@ -228,9 +228,10 @@ export function DesktopThreadSwitcherPanelContent({
             <input
               ref={searchInputRef}
               aria-controls={listboxId}
+              aria-label="Search threads"
               autoCapitalize="none"
               autoCorrect="off"
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring"
               data-chooser-search="true"
               name="thread-search"
               onChange={(event) => {

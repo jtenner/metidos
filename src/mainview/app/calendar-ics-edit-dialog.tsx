@@ -196,6 +196,7 @@ export function CalendarIcsEditDialog({
                 Title
               </span>
               <input
+                aria-label="Calendar title"
                 className="h-8 w-full border border-border-default bg-surface-2 px-2 text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                 disabled={busy}
                 name="calendar-ics-title"
@@ -209,6 +210,7 @@ export function CalendarIcsEditDialog({
                 URL
               </span>
               <input
+                aria-label="Calendar URL"
                 autoCapitalize="none"
                 autoCorrect="off"
                 className="h-8 w-full border border-border-default bg-surface-2 px-2 font-mono text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
@@ -245,6 +247,7 @@ export function CalendarIcsEditDialog({
                   Color
                 </span>
                 <input
+                  aria-label="Calendar color"
                   className="h-8 w-14 border border-border-default bg-surface-2 p-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                   disabled={busy}
                   name="calendar-ics-color"
@@ -257,6 +260,7 @@ export function CalendarIcsEditDialog({
             <div className="space-y-2 border-t border-border-subtle pt-3 text-xs text-text-secondary">
               <label className="flex items-center gap-2">
                 <input
+                  aria-label="Enable notifications"
                   checked={notificationsEnabled}
                   disabled={busy}
                   name="calendar-ics-notifications-enabled"
@@ -273,6 +277,7 @@ export function CalendarIcsEditDialog({
               </label>
               <label className="flex items-center gap-2">
                 <input
+                  aria-label="Notify source attendees"
                   checked={sourceNotificationsEnabled}
                   disabled={busy || !notificationsEnabled}
                   name="calendar-ics-source-notifications-enabled"

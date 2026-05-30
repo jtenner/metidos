@@ -7,6 +7,8 @@
   "scripts": {
     "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
     "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
+    "website:build": "tailwindcss -i ./website/input.css -o ./website/styles.css --minify",
+    "website:watch": "tailwindcss -i ./website/input.css -o ./website/styles.css --watch",
     "sync:core-plugins": "bun run src/bun/sync-core-plugins.ts",
     "start": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/start.ts",
     "start:telemetry": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/start.ts --track-telemetry",
@@ -18,6 +20,8 @@
     "test:build:prod-guards": "bun test src/bun/build-mainview.test.ts",
     "style:check": "bun run src/bun/mainview-style-enforcement.ts",
     "style:check:strict": "bun run src/bun/mainview-style-enforcement.ts --fail-on-violations",
+    "a11y:check": "bun run src/bun/a11y-check.ts",
+    "a11y:check:strict": "bun run src/bun/a11y-check.ts --strict",
     "setup:otp": "bun run .pi/skills/metidos-installation/setup-otp.js",
     "auth:reset": "bun run src/bun/auth/reset.ts",
     "audit:log": "bun run src/bun/security-audit-cli.ts",

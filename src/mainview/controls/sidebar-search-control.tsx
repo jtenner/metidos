@@ -65,7 +65,8 @@ export const SidebarSearchControl = memo(function SidebarSearchControl({
       <div className="flex items-center gap-2 border border-border-default bg-surface-1 px-3 py-2">
         {materialSymbol("search", "text-[17px] text-accent")}
         <input
-          className="min-w-0 flex-1 select-text bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint"
+          aria-label="Search projects and worktrees"
+          className="min-w-0 flex-1 select-text bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring"
           type="search"
           name="metidos-sidebar-search-query"
           placeholder="Search projects and worktrees..."

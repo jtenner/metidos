@@ -16,8 +16,8 @@ Holds backend orchestration and server entry logic that powers local project, wo
   - Git-facing utilities used for worktree listing, history, and diff operations.
 - `index.ts`
   - Bun-side entrypoint that wires RPC and process-level handlers.
-  - Default local server entrypoint used by `bun start`, `bun start:tls`, and `bun run src/bun/index.ts`.
-  - Also exposes the `--wipe-user-data` maintenance flag for a confirmed local database wipe before server startup.
+  - Default local server entrypoint used by `bun run start`, `bun run start:tls`, and direct `bun run src/bun/index.ts` invocations.
+  - Also exposes runtime flags such as `--dev`, `--port`, `--backend-only`, `--track-telemetry`, and the destructive `--wipe-user-data` maintenance flag for a confirmed local database wipe before server startup.
 - `plugin/`
   - Plugin System v1 discovery, inventory, lifecycle, QuickJS sidecar runtime, settings, storage, filesystem, network, notification, provider, calendar/event, terminal, SQLite, logging, and tool-access host APIs.
 - `pi/thread-tool-policy.ts`
@@ -47,7 +47,7 @@ Holds backend orchestration and server entry logic that powers local project, wo
 - `rpc-schema.ts`
   - Shared RPC typings/contracts used across Bun/browser boundaries.
 - `starvation-harness.ts`
-  - Guard/utility for starvation/retry scenarios in background loops or polling.
+  - Local benchmark/diagnostics harness for startup, HTTP/RPC pressure, git-cache behavior, SQLite retry metrics, and runtime pressure summaries.
 - `terminal-manager.ts`
   - Managed terminal session lifecycle used by unsafe Metidos terminal tools.
 

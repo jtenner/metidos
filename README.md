@@ -29,7 +29,7 @@ Metidos is not a hosted multi-tenant service, a sandbox for arbitrary untrusted 
 - Review file changes and diffs without leaving the app.
 - Run project tasks and keep track of results.
 - Create scheduled agent jobs with the cron workspace.
-- Add approved local plugins for tools, notifications, model providers, browser helpers, GitHub, SQLite, vector search, and more.
+- Add approved local plugins for tools, notifications, model providers, browser helpers, plugin-owned SQLite, vector search, request ingress, and more.
 
 ## Who it is for
 
@@ -80,8 +80,8 @@ Start with the canonical install docs:
 ## Common development commands
 
 ```bash
-bun run dev          # start the local development server
-bun run start        # run the local server
+bun run dev          # start the local development supervisor
+bun run start        # run the local production-style server
 bun run build:dev    # build an unminified development bundle
 bun run build:prod   # build a production bundle
 bun run validate     # run formatting, style, type, and test checks

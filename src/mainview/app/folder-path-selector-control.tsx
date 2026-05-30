@@ -82,6 +82,7 @@ export function FolderPathSelectorControl({
           <div className="relative mt-2 space-y-2">
             <div className="flex items-start gap-2">
               <input
+                aria-label={label}
                 className={`min-w-0 flex-1 select-text border px-3 py-2 text-sm outline-none transition-all placeholder:text-text-muted focus:border-focus-ring ${
                   addProjectInputIsPreviewing
                     ? "border-focus-ring bg-surface-2 text-text-primary"

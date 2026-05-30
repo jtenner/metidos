@@ -15,7 +15,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Tracks overload telemetry and startup/shutdown behavior around those runtime services.
 
 - `start.ts`
-  - Package-script bootstrap for the default `bun start`, `bun start:telemetry`, `bun start:tls`, and `bun start:tls:telemetry` scripts.
+  - Package-script bootstrap for the default `bun run start`, `bun run start:telemetry`, `bun run start:tls`, and `bun run start:tls:telemetry` scripts.
   - Clears display environment variables before dynamically importing `index.ts`, unless `METIDOS_BACKEND_NATIVE_CLIPBOARD=1` is set, so the backend does not load Pi's optional native clipboard addon just from root Pi imports.
 
 - `tls-config.ts`
