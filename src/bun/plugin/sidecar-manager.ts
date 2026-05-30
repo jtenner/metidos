@@ -97,6 +97,7 @@ import {
 } from "./ingress-capability";
 import {
   buildPluginInventoryWithLifecycle,
+  computePluginReviewHash,
   recordPluginRuntimeActivation,
   recordPluginRuntimeFailure,
 } from "./lifecycle";
@@ -926,6 +927,10 @@ export class PluginSidecarProcessManager {
           this.ingressCapability.removePlugin(plugin.pluginId);
         }
         this.cachedModelProviderSessions.delete(plugin.directoryName);
+        const ineligibleSession = this.sessions.get(plugin.directoryName);
+        if (ineligibleSession) {
+          await this.stopSession(ineligibleSession, "plugin_disabled");
+        }
         continue;
       }
       const reviewHash = plugin.approvedReviewHash;
@@ -2119,6 +2124,10 @@ export class PluginSidecarProcessManager {
         plugin,
         `Unsafe plugin private-network access requested by ${PLUGIN_UNSAFE_PRIVATE_NETWORK_ALLOWLIST_ENV} for ${plugin.pluginId ?? plugin.directoryName} but denied because the plugin manifest does not include unsafe permission.`,
       );
+    }
+    const currentReviewHash = await computePluginReviewHash(plugin.folderPath);
+    if (!currentReviewHash.hash || currentReviewHash.hash !== reviewHash) {
+      throw new Error("Plugin files differ from the approved review hash.");
     }
     const process = this.spawnSidecar({ capturedEnv, plugin, reviewHash });
     const session: PluginSidecarSession = {

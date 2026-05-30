@@ -12,6 +12,7 @@ import {
   type PluginCapabilityGateContext,
 } from "./capability-gate";
 import { buildPluginEntrypoint } from "./entrypoint-build";
+import { computePluginReviewHash } from "./lifecycle";
 import {
   type PluginFsReadContext,
   pluginFsExists,
@@ -1572,6 +1573,14 @@ export async function handlePluginSidecarProtocolFrame(
       try {
         activeRuntime?.dispose();
         activeRuntime = null;
+        const currentReviewHash =
+          await computePluginReviewHash(EXPECTED_PLUGIN_ROOT);
+        if (
+          !currentReviewHash.hash ||
+          currentReviewHash.hash !== startupPayload.reviewHash
+        ) {
+          throw new Error("Plugin files differ from the approved review hash.");
+        }
         const buildResult = await buildPluginEntrypoint({
           pluginRoot: EXPECTED_PLUGIN_ROOT,
         });
