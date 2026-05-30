@@ -228,7 +228,7 @@ export class PluginIngressBatchProcessor {
       batch.sourceId,
       message.id,
     );
-    if (existing && existing.status !== "verified") {
+    if (existing) {
       return;
     }
 

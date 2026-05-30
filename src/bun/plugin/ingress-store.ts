@@ -178,6 +178,7 @@ export type PluginIngressLinkCodeRecord = {
   pluginId: string;
   sourceId: string;
   codeSha256: string;
+  metidosUserId: number | null;
   expiresAt: string;
   consumedAt: string | null;
   consumedExternalUserId: string | null;
@@ -340,6 +341,12 @@ export function initPluginIngressMessageSchema(database: Database): void {
   });
   database.run(`CREATE INDEX IF NOT EXISTS idx_plugin_ingress_link_codes_lookup
     ON plugin_ingress_link_codes(plugin_id, source_id, code_sha256)`);
+  ensurePluginIngressColumn(
+    database,
+    "plugin_ingress_link_codes",
+    "metidos_user_id",
+    "metidos_user_id INTEGER",
+  );
   rebuildPluginIngressTableIfPresent(database, {
     createSql: `CREATE TABLE IF NOT EXISTS plugin_ingress_external_bindings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -356,6 +363,12 @@ export function initPluginIngressMessageSchema(database: Database): void {
   });
   database.run(`CREATE INDEX IF NOT EXISTS idx_plugin_ingress_external_bindings_lookup
     ON plugin_ingress_external_bindings(plugin_id, source_id, enabled)`);
+  ensurePluginIngressColumn(
+    database,
+    "plugin_ingress_external_bindings",
+    "metidos_user_id",
+    "metidos_user_id INTEGER",
+  );
   rebuildPluginIngressTableIfPresent(database, {
     createSql: `CREATE TABLE IF NOT EXISTS plugin_ingress_route_configs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -642,13 +655,14 @@ export function createPluginIngressLinkCode(
   ).toISOString();
   const insertResult = database
     .query(
-      `INSERT INTO plugin_ingress_link_codes (plugin_id, source_id, code_sha256, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO plugin_ingress_link_codes (plugin_id, source_id, code_sha256, metidos_user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.pluginId,
       input.sourceId,
       hashLinkCode(code),
+      input.metidosUserId ?? null,
       expiresAt,
       now.toISOString(),
     );
@@ -756,9 +770,10 @@ function consumePluginIngressLinkCodeRecord(
       .run(nowIso, input.externalUserId, record.id);
     database
       .query(
-        `INSERT INTO plugin_ingress_external_bindings (plugin_id, source_id, external_user_id, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, 1, ?, ?)
+        `INSERT INTO plugin_ingress_external_bindings (plugin_id, source_id, external_user_id, metidos_user_id, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 1, ?, ?)
          ON CONFLICT(plugin_id, source_id, external_user_id) DO UPDATE SET
+           metidos_user_id = excluded.metidos_user_id,
            enabled = 1,
            updated_at = excluded.updated_at`,
       )
@@ -766,6 +781,7 @@ function consumePluginIngressLinkCodeRecord(
         record.pluginId,
         record.sourceId,
         input.externalUserId,
+        record.metidosUserId,
         nowIso,
         nowIso,
       );
@@ -1345,6 +1361,10 @@ function mapLinkCode(
     pluginId: String(row.plugin_id),
     sourceId: String(row.source_id),
     codeSha256: String(row.code_sha256),
+    metidosUserId:
+      row.metidos_user_id === null || row.metidos_user_id === undefined
+        ? null
+        : Number(row.metidos_user_id),
     expiresAt: String(row.expires_at),
     consumedAt: row.consumed_at === null ? null : String(row.consumed_at),
     consumedExternalUserId:
@@ -1359,14 +1379,17 @@ function mapExternalBinding(
   row: Record<string, unknown>,
 ): PluginIngressExternalBindingRecord {
   // External bindings are now plugin/source/external-user scoped for the local
-  // operator installation; metidosUserId remains nullable for compatibility with
-  // earlier multi-user RPC shapes.
+  // operator installation; metidosUserId records the operator who linked the
+  // external identity when available.
   return {
     id: Number(row.id),
     pluginId: String(row.plugin_id),
     sourceId: String(row.source_id),
     externalUserId: String(row.external_user_id),
-    metidosUserId: null,
+    metidosUserId:
+      row.metidos_user_id === null || row.metidos_user_id === undefined
+        ? null
+        : Number(row.metidos_user_id),
     enabled: Number(row.enabled) === 1,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
