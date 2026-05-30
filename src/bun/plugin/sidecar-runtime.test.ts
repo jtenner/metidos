@@ -14,7 +14,7 @@ import {
 
 describe("plugin sidecar runtime", () => {
   it("resolves the explicit plugin sidecar runtime kind", () => {
-    expect(resolvePluginSidecarRuntimeKind()).toBe("worker");
+    expect(resolvePluginSidecarRuntimeKind()).toBe("process");
     expect(resolvePluginSidecarRuntimeKind("worker")).toBe("worker");
     expect(resolvePluginSidecarRuntimeKind(" process ")).toBe("process");
     expect(() => resolvePluginSidecarRuntimeKind("isolated")).toThrow(

@@ -60,7 +60,7 @@ export function resolvePluginSidecarRuntimeKind(
 ): PluginSidecarRuntimeKind {
   const normalizedRuntimeKind = configuredRuntimeKind?.trim().toLowerCase();
   if (!normalizedRuntimeKind) {
-    return "worker";
+    return "process";
   }
   if (
     normalizedRuntimeKind === "process" ||
