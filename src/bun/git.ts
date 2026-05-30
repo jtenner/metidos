@@ -887,7 +887,9 @@ function assertPathInsideWorktree(
   try {
     realCandidatePath = realpathSync(existingPath);
   } catch {
-    return;
+    throw new Error(
+      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
+    );
   }
 
   if (pathEscapesRoot(realWorktreePath, realCandidatePath)) {
