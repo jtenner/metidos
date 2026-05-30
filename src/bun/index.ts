@@ -4384,9 +4384,25 @@ async function bootstrap(): Promise<void> {
             415,
           );
         }
-        const authFailure = authorizeRuntimeStatsRequest(request);
-        if (authFailure) {
-          return authFailure;
+        const providedRuntimeStatsSecret =
+          request.headers.get("x-metidos-runtime-stats-secret") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+        if (
+          !isRuntimeStatsSecretMatch(
+            RUNTIME_STATS_SHARED_SECRET,
+            providedRuntimeStatsSecret,
+          )
+        ) {
+          const authFailure = authorizeRuntimeStatsRequest(request);
+          if (authFailure) {
+            return authFailure;
+          }
+          const peerAddress = readRequestPeerAddress(request, serverInstance);
+          enforceAuthMutationRequestSecurity(request, {
+            expectedOrigin:
+              resolveTrustedForwardedOrigin(request, { peerAddress }) ??
+              requestUrl.origin,
+          });
         }
 
         resetRuntimeStats();
