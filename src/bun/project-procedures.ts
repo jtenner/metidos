@@ -1564,7 +1564,7 @@ export function createPiToolRequestContext(
 
   return {
     auth: {
-      isAdmin: ownerUser?.isAdmin ?? false,
+      isAdmin: false,
       sessionId: null,
       userId: ownerUserId,
       username: ownerUser?.username ?? null,
@@ -2582,6 +2582,9 @@ export async function listDirectorySuggestionsProcedure(
   params: AppRPCSchema["requests"]["listDirectorySuggestions"]["params"],
   context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["listDirectorySuggestions"]["response"]> {
+  if (params.query.includes("\0")) {
+    throw new Error("Directory suggestion query cannot contain NUL bytes.");
+  }
   const scope = workspacePathScopeForContext(context);
   return {
     directories: listDirectorySuggestions(
@@ -3651,6 +3654,7 @@ export async function createTerminalProcedure(
   const settings = getPersistedTerminalSettings(db);
   const terminal = terminalManager.createTerminal({
     ...params,
+    ownerSessionId: context?.auth.sessionId ?? null,
     projectName: project.name,
     settings,
     worktreePath,
@@ -4897,6 +4901,10 @@ export async function getWorktreeSnapshotProcedure(
       params.worktreePath,
       context,
     );
+    assertWorkspacePathAllowed(
+      worktreePath,
+      workspacePathScopeForContext(context),
+    );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
     });
@@ -4930,6 +4938,10 @@ export async function listProjectSkillsProcedure(
       params.worktreePath,
       context,
     );
+    assertWorkspacePathAllowed(
+      worktreePath,
+      workspacePathScopeForContext(context),
+    );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...gitCommandOptionsFromRequest(context),
     });
@@ -4949,6 +4961,10 @@ export async function readWorktreeFileContentPageProcedure(
     const worktreePath = normalizeRequestedWorkspacePath(
       params.worktreePath,
       context,
+    );
+    assertWorkspacePathAllowed(
+      worktreePath,
+      workspacePathScopeForContext(context),
     );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
@@ -4990,6 +5006,10 @@ export async function readWorktreeFileDiffProcedure(
     const worktreePath = normalizeRequestedWorkspacePath(
       params.worktreePath,
       context,
+    );
+    assertWorkspacePathAllowed(
+      worktreePath,
+      workspacePathScopeForContext(context),
     );
     await ensureTrackedProjectWorktree(project, state, worktreePath, {
       ...requestGitOptions,
@@ -5478,6 +5498,7 @@ export async function deleteProjectProcedure(
   params: AppRPCSchema["requests"]["deleteProject"]["params"],
   context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["deleteProject"]["response"]> {
+  requireManageApp(context);
   requireRecentStepUp(context);
   const project = projectByIdForPath(params.projectId, context);
   const projectThreads = threadStore
