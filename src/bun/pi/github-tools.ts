@@ -5,6 +5,8 @@
 
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { buildGitSpawnEnv } from "../git";
 import {
   type AgentToolResult,
   defineTool,
@@ -433,6 +435,7 @@ async function runGitHubCliCommand(
   const proc = Bun.spawn({
     cmd: [resolveGitHubCliPath(), ...args],
     cwd,
+    env: buildGitSpawnEnv(process.env),
     stderr: "pipe",
     stdout: "pipe",
     ...(signal ? { signal } : {}),
