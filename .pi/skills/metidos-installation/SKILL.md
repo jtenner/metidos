@@ -67,8 +67,14 @@ The file should be human-readable Markdown and include:
 
 - install date/time,
 - container runtime and version,
+- selected install target (Docker/Podman/source),
 - selected install mode,
 - image/container names,
+- unsupported-harness requests and refusal decisions,
+- services/tools defaults and calendar bootstrap notes,
+- browser preference and browser-core plugin selection (`chrome_browser`) details,
+- browser/Chromium capability and runtime prerequisites,
+- custom API notes for non-provider integrations,
 - host paths and mounts,
 - ports and access method,
 - reverse proxy or Tailscale configuration,
@@ -98,32 +104,43 @@ How detailed should the installer be?
 
 Default to **Recommended install** when the user is unsure.
 
+## Wizard behavior contract
+
+Ask one question at a time and require an answer before moving on.
+
+- Ask only one question per interaction.
+- Do not assume any answer for the user.
+- Branch immediately on security-sensitive answers (unsupported harnesses, browser access, ICS imports, etc.).
+- Pause for user confirmation before any filesystem/runtime actions.
+
 ## Wizard flow overview
 
 Use this order unless the user explicitly asks to focus elsewhere:
 
 1. Confirm install intent and wizard mode.
-2. Detect Docker/Podman.
-3. Choose runtime, install mode, and container names.
-4. Choose host paths and persistence.
-5. Choose project/workspace access.
-6. Choose port and basic networking.
-7. Prepare base container image with Bun/Zig.
-8. Ask about active Codex subscription.
-9. Import or install Codex, if requested.
-10. Discover and select core plugins.
-11. Add model providers.
-12. Generate custom provider plugins when needed.
-13. Add env variables and secret sources.
-14. Configure Telegram integration, if requested.
-15. Configure Gmail integration, if requested.
-16. Configure safety, permissions, cron, updates, backups, and diagnostics.
-17. Choose remote/private access: **reverse proxy** or **Tailscale**.
-18. Review final plan.
-19. Export `metidos-config.md`.
-20. Apply installation only after explicit approval.
-21. Start container and run health checks.
-22. Show next steps.
+2. Choose install method: Docker, Podman, or source.
+3. Detect Docker/Podman runtime version/status (container path only).
+4. Choose container runtime, install mode, and container names.
+5. Choose host paths and persistence.
+6. Choose project/workspace access.
+7. Choose port and basic networking.
+8. Prepare base container image with Bun/Zig.
+9. Ask about active Codex subscription.
+10. Import or install Codex, if requested.
+11. Discover and select core plugins.
+12. Add custom APIs and model providers.
+13. Generate custom provider plugins when needed.
+14. Ask service/tool access and browser-internet settings.
+15. Add API keys and environment variable sources.
+16. Configure Telegram integration, if requested.
+17. Configure Gmail integration, if requested.
+18. Configure safety, permissions, cron, updates, backups, and diagnostics.
+19. Choose remote/private access: **reverse proxy** or **Tailscale**.
+20. Review final plan.
+21. Export `metidos-config.md`.
+22. Apply installation only after explicit approval.
+23. Start container and run health checks (or confirm source startup).
+24. Show next steps (final handoff).
 
 ## Step 1 — Confirm install intent and wizard mode
 
@@ -140,16 +157,35 @@ Record:
 - fresh install vs update/reinstall,
 - plan-only vs apply changes,
 - recommended vs advanced mode,
-- whether the user wants Docker or Podman if already known.
+- whether the user wants Docker, Podman, or source mode if already known.
 
-## Step 2 — Detect Docker/Podman
+## Step 2 — Choose install target
 
-Check whether Docker or Podman is installed on the host.
-
-If neither exists, stop and instruct the user to install one:
+Ask exactly one question:
 
 ```text
-I could not find Docker or Podman.
+How would you like to install Metidos? (Docker, Podman, or run from source) [Docker]
+```
+
+If `source`:
+
+1. Confirm this is a clean checkout of this repo.
+2. Record source mode in `metidos-config.md`.
+3. Ask for confirmation of source path (default `.`), and skip all container-specific steps (runtime detection, container image, compose, volumes, mounts).
+4. Continue to Step 12 (model/API/provider choices) using source-mode defaults.
+
+If `docker` or `podman`:
+
+Proceed to Step 3 to detect the selected runtime and then continue with container steps.
+
+## Step 3 — Detect Docker/Podman
+
+Check whether the requested runtime is installed on the host.
+
+If neither exists, stop and instruct the user to install the selected runtime:
+
+```text
+I could not find the selected runtime ({Docker|Podman}).
 Install one of these, then rerun the wizard:
 
 Docker:
@@ -169,13 +205,13 @@ Podman:
 After installing, make sure your user can run containers and build images without unexpected permission errors.
 ```
 
-If exactly one exists, ask:
+If exactly one matching runtime exists, ask:
 
 ```text
 I found {Docker|Podman}. Use it for this install? [Y/n]
 ```
 
-If both exist, ask:
+If both exist and container mode is selected, ask:
 
 ```text
 I found Docker and Podman. Which should Metidos use?
@@ -185,12 +221,12 @@ I found Docker and Podman. Which should Metidos use?
 
 Record:
 
-- runtime: `docker` or `podman`,
+- requested/selected runtime (`docker` or `podman`),
 - runtime version,
 - whether rootless mode is available,
 - whether the daemon/machine is running.
 
-## Step 3 — Runtime, install mode, and container names
+## Step 4 — Runtime, install mode, and container names
 
 Ask:
 
@@ -220,7 +256,7 @@ Defaults:
 - restart policy: unless stopped,
 - architecture: auto-detect.
 
-## Step 4 — Host paths and persistence
+## Step 5 — Host paths and persistence
 
 Ask:
 
@@ -258,7 +294,7 @@ Where should persistent logs be written? [~/.metidos/logs]
 
 Record all paths and whether each path should be created by the installer.
 
-## Step 5 — Project/workspace access
+## Step 6 — Project/workspace access
 
 Ask:
 
@@ -293,7 +329,7 @@ Record:
 
 Default excludes should include dependency/build/cache directories where appropriate, such as `node_modules`, `.metidos/cache`, `.next`, `dist`, and `build`.
 
-## Step 6 — Port and basic networking
+## Step 7 — Port and basic networking
 
 Ask:
 
@@ -316,9 +352,9 @@ Record:
 - bind address,
 - local URL.
 
-Default to localhost-only unless the user chooses a remote/private access option in Step 17.
+Default to localhost-only unless the user chooses a remote/private access option in Step 18.
 
-## Step 7 — Base container image with Bun/Zig
+## Step 8 — Base container image with Bun/Zig
 
 Before plugins and provider setup, prepare a base image plan that contains:
 
@@ -351,7 +387,7 @@ Installation reference notes:
 - Zig's official guidance recommends downloading a self-contained archive or using a package manager. Multiple Zig versions can coexist; pin one version for reproducible image builds. Verify with `zig version`.
 - Record the selected Bun and Zig versions in `metidos-config.md`.
 
-## Step 8 — Codex subscription
+## Step 9 — Codex subscription
 
 Ask exactly:
 
@@ -361,9 +397,9 @@ Do you have an active Codex subscription? [y/N]
 
 If no, record `codex: skipped` and continue to core plugins.
 
-If yes, continue to Step 9.
+If yes, continue to Step 10.
 
-## Step 9 — Codex import/install branch
+## Step 10 — Codex import/install branch
 
 Check whether Codex is installed on the host.
 
@@ -424,7 +460,7 @@ Record:
 - enabled by default yes/no,
 - requested permissions.
 
-## Step 10 — Core plugin selection
+## Step 11 — Core plugin selection
 
 Discover bundled/core plugins from the repository or release bundle. Then present a checklist.
 
@@ -463,61 +499,183 @@ For each selected plugin, record:
 
 Make sure all requested core plugins are copied into the container/plugin directory or included in the image according to the selected install mode.
 
-## Step 11 — Model providers
+## Step 12 — API discovery and model providers
 
-Ask:
+Known model-provider plugins currently in-repo (plugin-backed providers):
+
+- `ai21`
+- `aleph_alpha`
+- `anthropic`
+- `anyscale`
+- `azure_openai`
+- `baseten`
+- `bedrock`
+- `bifrost`
+- `cerebras`
+- `chutes`
+- `cloudflare`
+- `codex` (provider ID: `openai-codex`)
+- `cohere`
+- `custom_openai`
+- `dashscope`
+- `deepinfra`
+- `deepseek`
+- `fal`
+- `fireworks`
+- `github_copilot` (provider ID: `github-copilot`)
+- `github_models`
+- `gemini`
+- `groq`
+- `huggingface`
+- `inceptionlabs`
+- `inflection`
+- `localai`
+- `lepton`
+- `llamacpp`
+- `lmstudio`
+- `litellm`
+- `mistral`
+- `minimax`
+- `moonshot`
+- `modal`
+- `nebius`
+- `novita`
+- `nvidia_build`
+- `ollama`
+- `openai`
+- `openrouter`
+- `perplexity`
+- `qianfan`
+- `replicate`
+- `runpod`
+- `rutaapi`
+- `sagemaker`
+- `sambanova`
+- `sglang`
+- `siliconflow`
+- `stepfun`
+- `therouter`
+- `together`
+- `tokenhub`
+- `tokenmix`
+- `upstage`
+- `vertex`
+- `vllm`
+- `volcengine`
+- `writer`
+- `xai`
+- `yi`
+- `zai`
+
+Use this list when helping users pick from built-in providers before asking for custom ones.
+
+Ask exactly one question:
 
 ```text
-Do you have any model providers you would like to add? [y/N]
+Which model providers should be enabled now?
+Reply with `none` or one comma-separated list of plugin IDs from the list above.
+Examples:
+- `openai,openrouter`
+- `ollama`
+- `custom_openai,localai,replicate`
 ```
 
-If yes, repeat this provider questionnaire for each provider:
+Record provider plugin IDs as `selected_model_provider_plugins`.
+
+If the answer contains any provider-like identifiers that are not in this list (for example, `claude`/`claude_code`/`cursor`):
+- Treat those as custom APIs/harness requests.
+- If they are harnesses (for example, Claude Code or Cursor), state: **not supported by this installer pass** and ask:
 
 ```text
-Provider display name:
-Provider type:
-1. Built-in/supported hosted provider
-2. OpenAI-compatible endpoint
-3. Local server such as Ollama or LM Studio
-4. Custom provider requiring a generated plugin
+Harness integrations (for example, Claude Code/Cursor) are not supported in this installer pass. Continue with supported model/tooling options only? [Y/n]
 ```
 
-Ask:
+- If the user declines, set `install: blocked-by-unsupported-harness-request` and stop before applying changes.
+
+For any non-plugin model/chat endpoints the user still wants, ask one compact question:
 
 ```text
-What env var should hold the API key, if any? Example: OPENAI_API_KEY
+List custom model/chat APIs (or `none`), one per item in this format: `name|type|base_url|auth_model|api_var|default_models`.
+Allowed type: `openai_compatible` or `local`.
 ```
 
-Ask:
+For non-model integrations (for example, calendar/repo/internal tools) ask:
 
 ```text
-What base URL should the provider use, if any?
+List non-model integrations you want noted in the plan (or `none`).
 ```
 
-Ask:
+Important compatibility note: supported provider paths are only
+- built-in plugin providers,
+- OpenAI-compatible/local endpoints,
+- custom provider plugins built through Plugin System v1.
 
-```text
-Which models should be available? Include default chat/coding/fast/embedding models if known.
-```
-
-Ask:
-
-```text
-Should the installer test this provider after setup? [Y/n]
-```
+When custom entries are present, branch into Step 13 (custom provider plugin generation) as needed.
 
 Record:
 
-- provider id/name,
-- type,
-- base URL,
-- env var names,
-- model list,
-- default model roles,
-- capabilities: streaming, tools, JSON, vision, embeddings, long context,
-- whether validation should be run.
+- provider plugin IDs selected,
+- custom API specs (name/type/base_url/auth/api_var/models),
+- whether harness requests were rejected, and
+- whether a non-model integration note was recorded.
 
-## Step 12 — Custom provider plugin generation
+## Step 12-b — Services, tool access, browser access, and calendar feeds
+
+Ask:
+
+```text
+What services and tools should Metidos agents be able to use by default?
+```
+
+Collect a checklist (or single list) across these categories:
+
+- Web search
+- Browser tools / web navigation
+- Git
+- GitHub
+- SQLite
+- Calendar (calendar create/list/edit)
+- Notifications
+- Threads/Cron coordination
+- Plugin tools (approved plugin access groups)
+- Unsafe actions (high-risk)
+
+Ask:
+
+```text
+Do you want your agents to browse the internet using Chromium? [Y/n]
+```
+
+If yes:
+
+- Install and enable the provided browser core plugin:
+  - `chrome_browser` (plugin id) must be selected for this install (or added to custom plugins if missing).
+  - Require `chrome_browser:browser_tools` in thread access controls and plugin approval before running browser automation.
+- Source install: confirm Chromium/CDP support is available in the host/container where the runtime executes, and capture any manual launch/setup note needed.
+- Docker install: note that the provided Docker template path does not bundle Chromium by default; either switch to Podman or defer browser automation with a documented follow-up.
+- Podman install: confirm the runtime can launch Chromium/CDP in-container and record the method used by the `chrome_browser` plugin to create sessions.
+
+Ask:
+
+```text
+Do you have any calendar (ICS) URLs you want to import?
+1. No
+2. Yes, one or more
+```
+
+If yes:
+
+- Ask for each ICS feed URL and optional display name.
+- Ask whether each feed should be imported as read-only.
+- Ask if import should happen immediately after first install login.
+
+Record:
+
+- default allowed service/tool groups for the first-thread profile,
+- browser access preference and required runtime prerequisites,
+- ICS URL list and any manual follow-up required after first login.
+
+## Step 13 — Custom provider plugin generation
 
 When a requested provider does not already exist as a core/supported provider, create a plugin plan and then invoke/follow the `metidos-plugin-authoring` skill.
 
@@ -551,8 +709,7 @@ Then follow Plugin System v1 authoring rules:
 - document secrets and logs,
 - validate manifest,
 - install generated plugin into the configured plugin directory only after approval.
-
-## Step 13 — API keys and environment variables
+## Step 14 — API keys and environment variables
 
 Ask exactly:
 
@@ -585,7 +742,7 @@ Rules:
 - Prefer least exposure: selected plugins only when practical.
 - If a selected plugin declares required env vars, make sure each one has a source.
 
-## Step 14 — Telegram integration
+## Step 15 — Telegram integration
 
 Ask:
 
@@ -623,7 +780,7 @@ Should Telegram be notification-only, or should it be allowed to trigger actions
 
 Record token env var name, allowed chat ids source, polling/webhook mode, plugin id, and permissions.
 
-## Step 15 — Gmail integration
+## Step 16 — Gmail integration
 
 Ask:
 
@@ -643,7 +800,7 @@ If yes, walk the user through:
 3. Enable the Gmail API.
 4. Configure OAuth consent screen.
 5. Create OAuth client credentials.
-6. Configure redirect URI using the final access URL from Step 17.
+6. Configure redirect URI using the final access URL from Step 18.
 7. Download/copy client credentials through a local secret path or env file; do not paste secrets into chat.
 8. Choose minimal OAuth scopes.
 9. Install/copy the Gmail plugin.
@@ -663,7 +820,7 @@ What Gmail permissions should Metidos request?
 
 Record OAuth client env vars/paths, scopes, allowed accounts, plugin id, and whether sends require approval.
 
-## Step 16 — Safety, permissions, cron, updates, backups, diagnostics
+## Step 17 — Safety, permissions, cron, updates, backups, diagnostics
 
 Ask:
 
@@ -727,7 +884,7 @@ Record:
 - log level,
 - telemetry/metrics choice.
 
-## Step 17 — Remote/private access: reverse proxy or Tailscale
+## Step 18 — Remote/private access: reverse proxy or Tailscale
 
 This step replaces generic public deployment. The installer must explicitly ask whether the user wants a **reverse proxy** or **Tailscale** for access beyond localhost.
 
@@ -1226,7 +1383,7 @@ Validation checklist:
 
 Record both access paths and which integrations use each one.
 
-## Step 18 — Review final plan
+## Step 19 — Review final plan
 
 Before applying any changes, show a final plan with:
 
@@ -1258,7 +1415,7 @@ Proceed with this plan?
 4. Cancel.
 ```
 
-## Step 19 — Export metidos-config.md
+## Step 20 — Export metidos-config.md
 
 Write `metidos-config.md` after the user approves the plan or chooses export-only.
 
@@ -1315,7 +1472,7 @@ Secret handling requirements:
 - Never include full secret values.
 - Mask any accidental visible values before writing.
 
-## Step 20 — Apply installation
+## Step 21 — Apply installation
 
 Only after explicit approval:
 
@@ -1331,7 +1488,7 @@ Only after explicit approval:
 
 If plan-only mode was selected, do not perform these actions.
 
-## Step 21 — Health checks
+## Step 22 — Health checks
 
 After startup, validate:
 
@@ -1345,10 +1502,10 @@ After startup, validate:
 - env vars are visible only where intended,
 - Telegram test message works if enabled,
 - Gmail OAuth flow works if enabled,
-- reverse proxy or Tailscale access works per Step 17,
+- reverse proxy or Tailscale access works per Step 18,
 - background/cron jobs are registered if enabled.
 
-## Step 22 — Final handoff
+## Step 24 — Final handoff
 
 Show:
 
@@ -1625,50 +1782,58 @@ For a different loopback port, change both startup and nginx upstream, for examp
 
 Use this as the canonical installer prompt list.
 
-1. Installing now, exporting a plan, or updating an existing install?
-2. Recommended or advanced wizard mode?
-3. Docker or Podman? If missing, install one first.
-4. Container name?
-5. Image tag?
-6. Production-style or development container?
-7. App data path?
-8. Plugin path?
-9. Cache path?
-10. Env file path?
-11. Backup/log paths?
-12. Which project directories may Metidos access?
-13. Project mount mode: read/write or read-only?
-14. Host port?
-15. Bind address?
-16. Bun/Zig version pinning?
-17. Do you have an active Codex subscription?
-18. If yes, import existing Codex or install via npm?
-19. Enable Codex plugin by default?
-20. Which core plugins: recommended, minimal, or manual?
-21. Do you have model providers to add?
-22. For each provider: type, base URL, env var, models, capabilities, test?
-23. Generate a custom provider plugin if unsupported?
-24. Which API key/env var names should be available?
-25. For each env var: pass-through, env file, or placeholder?
-26. Which plugins receive each env var?
-27. Integrate Telegram?
-28. Telegram mode: polling/webhook, chat ids, capabilities?
-29. Integrate Gmail?
-30. Gmail mode, OAuth credentials, scopes, account, approval policy?
-31. Default safety/permission profile?
-32. Enable cron/background agents?
-33. Updates, backups, logs, telemetry?
-34. Access method: localhost, reverse proxy, Tailscale, or both?
-35. Reverse proxy details, if selected?
-36. Tailscale details, if selected?
-37. Review final plan: install, export only, edit, or cancel?
+1. Are we installing now, exporting a plan, or updating an existing install?
+2. Recommended or advanced mode?
+3. How would you like to install: Docker, Podman, or source?
+4. If container selected, which one to use: Docker or Podman?
+5. Source path (source mode) or checkout path to use?
+6. Container name?
+7. Image tag?
+8. Production-style or development container?
+9. App data path?
+10. Plugin path?
+11. Cache path?
+12. Env file path?
+13. Backup/log paths?
+14. Which project directories may Metidos access?
+15. Project mount mode: read/write or read-only?
+16. Host port?
+17. Bind address?
+18. Bun/Zig version pinning?
+19. Do you have an active Codex subscription?
+20. Import existing Codex or install via npm?
+21. Enable Codex plugin by default?
+22. Which core plugins: recommended, minimal, or manual?
+23. Do you have custom APIs to connect now?
+24. Did you request unsupported harnesses (Claude Code, Cursor, etc.)?
+25. How should unsupported harness requests be handled?
+26. Provide one comma-separated list of built-in model provider plugin IDs (or `none`).
+27. If custom model/chat APIs are needed, provide one compact list of specs now (or `none`).
+28. Generate a custom provider plugin if needed?
+29. What services and tools should agents be able to use?
+30. Do you want Chromium web browsing support?
+31. Do you have any ICS URLs to import?
+32. Which API key/env var names should be available?
+33. For each env var: pass-through, env file, or placeholder?
+34. Which plugins/services receive each env var?
+35. Integrate Telegram?
+36. Telegram mode: polling/webhook, chat ids, capabilities?
+37. Integrate Gmail?
+38. Gmail mode, OAuth credentials, scopes, account, approval policy?
+39. Default safety/permission profile?
+40. Enable cron/background agents?
+41. Updates, backups, logs, telemetry?
+42. Access method: localhost, reverse proxy, Tailscale, or both?
+43. Reverse proxy details, if selected?
+44. Tailscale details, if selected?
+45. Review final plan: install, export only, edit, or cancel?
 
 ## Failure and recovery guidance
 
 - If Docker/Podman is unavailable, stop and install it first.
-- If image build fails, keep `metidos-config.md`, fix base image dependencies, and rerun from Step 7.
+- If image build fails, keep `metidos-config.md`, fix base image dependencies, and rerun from the correct container step.
 - If plugin validation fails, do not install that plugin; return to plugin authoring workflow.
 - If a secret is missing, write a placeholder and mark validation blocked.
 - If reverse proxy TLS fails, fall back to localhost or Tailscale while DNS/certificates are fixed.
 - If Tailscale access fails, verify login, ACLs, MagicDNS, host firewall, and bind strategy.
-- If OAuth callback validation fails, revisit Step 17 and align external URL, callback path, and provider console settings.
+- If OAuth callback validation fails, revisit Step 18 and align external URL, callback path, and provider console settings.
