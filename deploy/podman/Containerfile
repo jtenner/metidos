@@ -1,5 +1,14 @@
 FROM oven/bun:1.3.13-debian
 
+ARG INSTALL_CHROMIUM=false
+ARG INSTALL_GH=false
+ARG INSTALL_LATEX=false
+ARG INSTALL_RUST=false
+ARG INSTALL_MOONBIT=false
+ARG INSTALL_WASM_TOOLS=false
+ARG WASM_TOOLS_VERSION=1.248.0
+ARG BINARYEN_VERSION=129
+
 ENV HOME=/home/metidos
 ENV OPAMROOT=/opt/opam
 ENV OPAMSWITCH=moonbit-proof
@@ -7,12 +16,17 @@ ENV CARGO_HOME=/home/metidos/.cargo
 ENV RUSTUP_HOME=/home/metidos/.rustup
 
 RUN apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates chromium chromium-sandbox emscripten gh git nodejs openssh-client python3 ripgrep rustup tini wget \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends autoconf libgmp-dev m4 opam pkg-config poppler-utils z3 zlib1g-dev \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y latexmk texlive-fonts-extra texlive-fonts-recommended texlive-latex-base texlive-latex-extra texlive-latex-recommended texlive-pictures \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates git nodejs openssh-client python3 ripgrep tini wget \
+  && if [ "$INSTALL_CHROMIUM" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium chromium-sandbox; fi \
+  && if [ "$INSTALL_GH" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh; fi \
+  && if [ "$INSTALL_RUST" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends rustup; fi \
+  && if [ "$INSTALL_MOONBIT" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends autoconf libgmp-dev m4 opam pkg-config z3 zlib1g-dev; fi \
+  && if [ "$INSTALL_WASM_TOOLS" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends emscripten; fi \
+  && if [ "$INSTALL_LATEX" = "true" ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends latexmk poppler-utils texlive-fonts-extra texlive-fonts-recommended texlive-latex-base texlive-latex-extra texlive-latex-recommended texlive-pictures; fi \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
+  if [ "$INSTALL_RUST" != "true" ]; then echo "Skipping optional Rust toolchain"; exit 0; fi; \
   mkdir -p "$HOME"; \
   rustup toolchain install stable --profile minimal; \
   rustup default stable; \
@@ -23,6 +37,7 @@ RUN set -eux; \
   rustup target list --installed
 
 RUN set -eux; \
+  if [ "$INSTALL_MOONBIT" != "true" ]; then echo "Skipping optional MoonBit/proof toolchain"; exit 0; fi; \
   mkdir -p "$HOME"; \
   opam init --bare --disable-sandboxing --yes; \
   opam switch create "$OPAMSWITCH" ocaml-base-compiler.5.1.1 --yes; \
@@ -32,9 +47,8 @@ RUN set -eux; \
   why3 --version; \
   alt-ergo --version
 
-ARG WASM_TOOLS_VERSION=1.248.0
-ARG BINARYEN_VERSION=129
 RUN set -eux; \
+  if [ "$INSTALL_WASM_TOOLS" != "true" ]; then echo "Skipping optional wasm-tools"; exit 0; fi; \
   arch="$(uname -m)"; \
   case "$arch" in \
     x86_64) asset="wasm-tools-${WASM_TOOLS_VERSION}-x86_64-linux.tar.gz" ;; \
@@ -51,6 +65,7 @@ RUN set -eux; \
   wasm-tools --version
 
 RUN set -eux; \
+  if [ "$INSTALL_WASM_TOOLS" != "true" ]; then echo "Skipping optional Binaryen tools"; exit 0; fi; \
   arch="$(uname -m)"; \
   case "$arch" in \
     x86_64) asset="binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz" ;; \

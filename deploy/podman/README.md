@@ -4,41 +4,47 @@ This is the reusable rootless Podman deployment guide. It runs Metidos in rootle
 
 Machine-specific values belong in ignored local files such as `LOCAL.md`, `.env.podman`, and `compose.yml`. Use the checked-in `*.example` files as starting points.
 
-## Shape
+## Deployment shape
 
-- App data in the container: `/data`
-- Host app-data storage: Podman named volume `metidos-data`
-- Host project mount: `${METIDOS_HOST_PROJECTS_DIR}:${METIDOS_CONTAINER_PROJECTS_DIR}` in the compose template. The example defaults the container Projects directory to `/home/metidos/Projects`; adjust it in your ignored local `compose.yml` if your image uses a different home.
-- Runtime source checkout: `${METIDOS_CONTAINER_SOURCE_DIR}` when self-updating from the mounted checkout, otherwise `/app` as the image snapshot fallback.
-- Container dependency storage: Podman named volume `metidos-source-node-modules`
-- Codex auth mount: `${CODEX_AUTH_JSON}:/data/plugins/codex/.data/auth.json:ro`
-- GitHub CLI auth storage: `/data/gh` inside the app-data volume, imported
-  from the host with `gh auth token` when needed.
-- GitHub Copilot auth mount: `${GITHUB_COPILOT_AUTH_JSON}:/data/plugins/github_copilot/.data/auth.json:ro` when the Copilot provider plugin is used.
-- MoonBit compiler path: `MOONBIT_BIN_DIR` can be wired into your local compose `PATH` when you want Metidos, spawned terminals, and login shells to find an already installed compiler.
-- Interactive shell default: the entrypoint creates `$HOME/.bashrc` when it is
-  missing, keeps `MOONBIT_BIN_DIR` available to interactive shells, and sets a
-  prompt that includes the current working directory.
-- Image GitHub tooling: GitHub CLI `gh` from the Debian package repository.
-- Image browser tooling: Debian `chromium` and `chromium-sandbox`, with
-  `BUN_CHROME_PATH=/usr/bin/chromium` and a headless Chrome DevTools Protocol
-  listener for browser-control plugins.
-- Image document toolchain: `latexmk`, TeX Live LaTeX packages, and
-  `poppler-utils`
-- Image MoonBit proof dependencies: an image-global `/opt/opam` root with the
-  `moonbit-proof` switch active by default, containing Why3 1.7.2 and Alt-Ergo
-  2.4.3. Startup runs `why3 config detect` from that switch when
-  `$HOME/.why3.conf` is missing, and primes MoonBit's registry index
-  when a command starts inside a MoonBit module without a registry cache.
-- Image WebAssembly tooling: `wasm-tools 1.248.0` from the upstream
-  Bytecode Alliance GitHub release tarball, plus Binaryen `version_129`
-  installed under `/opt/binaryen-version_129` with tools such as `wasm-opt`
-  symlinked into `/usr/local/bin`.
-- Local container port: `127.0.0.1:7599`
-- Container Chrome DevTools Protocol port: `127.0.0.1:9222` inside the
-  container only
-- Tailscale origin: your `https://device.tailnet.ts.net` DNS name.
-- Container listener: `0.0.0.0:7599`, published only on host loopback
+| Fact | Value |
+|------|-------|
+| App data inside container | `/data` (backed by Podman named volume `metidos-data`) |
+| Host project mount | `${METIDOS_HOST_PROJECTS_DIR}:${METIDOS_CONTAINER_PROJECTS_DIR}` (defaults to `/home/metidos/Projects` inside the container) |
+| Runtime source checkout | `${METIDOS_CONTAINER_SOURCE_DIR}` when self-updating; otherwise `/app` as a build-time snapshot fallback |
+| Container `node_modules` | Podman named volume `metidos-source-node-modules` |
+| Local container port | `127.0.0.1:7599` |
+| Container listener | `0.0.0.0:7599`, published only on host loopback |
+| Tailscale origin | your `https://device.tailnet.ts.net` DNS name |
+
+Auth mounts (enable only the ones you need in your ignored local `compose.yml`):
+
+- Codex: `${CODEX_AUTH_JSON}:/data/plugins/codex/.data/auth.json:ro`
+- GitHub Copilot: `${GITHUB_COPILOT_AUTH_JSON}:/data/plugins/github_copilot/.data/auth.json:ro`
+- GitHub CLI: `/data/gh` inside the app-data volume, imported from the host with `gh auth token` when needed.
+
+## Optional image toolchains
+
+The base image always includes Bun, Git, Node.js, Python, basic build tools, and the interactive shell. You can optionally include additional toolchains at build time so agents do not need to install them at runtime:
+
+- **Browser automation** — Debian `chromium` and `chromium-sandbox`, with `BUN_CHROME_PATH=/usr/bin/chromium` and a headless Chrome DevTools Protocol listener on container loopback (`127.0.0.1:9222`).
+- **GitHub CLI** — `gh` from the Debian package repository.
+- **Document toolchain** — `latexmk`, TeX Live LaTeX packages, and `poppler-utils`.
+- **MoonBit proof dependencies** — an image-global `/opt/opam` root with the `moonbit-proof` switch active by default, containing Why3 1.7.2 and Alt-Ergo 2.4.3. Startup runs `why3 config detect` when `$HOME/.why3.conf` is missing.
+- **WebAssembly tooling** — `wasm-tools 1.248.0` and Binaryen `version_129` under `/opt/binaryen-version_129` with tools such as `wasm-opt` symlinked into `/usr/local/bin`.
+- **Interactive shell** — the entrypoint creates `$HOME/.bashrc` when missing and sets a prompt that includes the current working directory. If you use MoonBit, wire `MOONBIT_BIN_DIR` into the compose `PATH` so terminals and login shells can find the compiler.
+
+Choose which toolchains to include when running the installer or editing `deploy/podman/.env.podman`. The compose template passes these build args to the `Containerfile` and they all default to `false`:
+
+```env
+INSTALL_CHROMIUM=false
+INSTALL_GH=false
+INSTALL_LATEX=false
+INSTALL_RUST=false
+INSTALL_MOONBIT=false
+INSTALL_WASM_TOOLS=false
+```
+
+Only install the toolchains your projects need. Set `BUN_CHROME_PATH=/usr/bin/chromium` and `METIDOS_CHROME_DEBUG_PORT=9222` only when `INSTALL_CHROMIUM=true` and browser automation is approved.
 
 If you migrate an existing host database, prune or rewrite project paths so they still exist inside the container after the Projects mount is applied. Record machine-specific retained paths in `deploy/podman/LOCAL.md`, not in this generic guide.
 

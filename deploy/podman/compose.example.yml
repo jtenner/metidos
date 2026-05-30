@@ -8,6 +8,13 @@ services:
     build:
       context: ../..
       dockerfile: deploy/podman/Containerfile
+      args:
+        INSTALL_CHROMIUM: ${INSTALL_CHROMIUM:-false}
+        INSTALL_GH: ${INSTALL_GH:-false}
+        INSTALL_LATEX: ${INSTALL_LATEX:-false}
+        INSTALL_RUST: ${INSTALL_RUST:-false}
+        INSTALL_MOONBIT: ${INSTALL_MOONBIT:-false}
+        INSTALL_WASM_TOOLS: ${INSTALL_WASM_TOOLS:-false}
     image: localhost/metidos:podman
     container_name: ${METIDOS_CONTAINER_NAME:-metidos}
     restart: unless-stopped
@@ -24,7 +31,7 @@ services:
       AZURE_OPENAI_DEPLOYMENT_NAME_MAP: ${AZURE_OPENAI_DEPLOYMENT_NAME_MAP:-}
       AZURE_OPENAI_RESOURCE_NAME: ${AZURE_OPENAI_RESOURCE_NAME:-}
       BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
-      BUN_CHROME_PATH: /usr/bin/chromium
+      BUN_CHROME_PATH: ${BUN_CHROME_PATH:-}
       CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_KEY: ${CLOUDFLARE_API_KEY:-}
@@ -46,7 +53,7 @@ services:
       KIMI_API_KEY: ${KIMI_API_KEY:-}
       METIDOS_APP_DATA_DIR: /data
       METIDOS_CHROME_DEBUG_BACKEND_PORT: ${METIDOS_CHROME_DEBUG_BACKEND_PORT:-19222}
-      METIDOS_CHROME_DEBUG_PORT: ${METIDOS_CHROME_DEBUG_PORT:-9222}
+      METIDOS_CHROME_DEBUG_PORT: ${METIDOS_CHROME_DEBUG_PORT:-}
       METIDOS_CHROME_DEBUG_USER_DATA_DIR: ${METIDOS_CHROME_DEBUG_USER_DATA_DIR:-/data/chrome-debug}
       METIDOS_INSTALL_DEPS_ON_START: ${METIDOS_INSTALL_DEPS_ON_START:-1}
       METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS: ${METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS:-ollama}
@@ -69,7 +76,7 @@ services:
       OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      PATH: ${MOONBIT_BIN_DIR:-}:/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       UPLOADTHING_API_KEY: ${UPLOADTHING_API_KEY:-}

@@ -74,8 +74,8 @@ The UI and backend communicate through a typed WebSocket RPC layer, which keeps 
 Start with the canonical install docs:
 
 - [`docs/getting-started.md`](docs/getting-started.md) for the shortest clean-clone path.
-- [`docs/installation.md`](docs/installation.md) for local development, local production, containers, first-run auth, providers, backups, reverse proxies, and Tailscale-style access.
-- [`INSTALLATION.md`](INSTALLATION.md) as a root-level pointer to the same canonical install entry point.
+- [`docs/installation.md`](docs/installation.md) for full setup, containers, first-run auth, providers, backups, and remote access.
+- [`INSTALLATION.md`](INSTALLATION.md) is a root-level redirect to the docs above.
 
 ## Common development commands
 

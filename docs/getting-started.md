@@ -55,7 +55,7 @@ OPENROUTER_API_KEY=replace-with-your-key
 bun run dev
 ```
 
-Open the printed localhost URL in your browser. For backend dev-mode reload/fallback behavior while developing Metidos itself, run `METIDOS_DEV=1 bun run dev`. For a production-like local run, use:
+Open the printed localhost URL in your browser. The default URL is `http://localhost:7599`. For backend dev-mode reload/fallback behavior while developing Metidos itself, run `METIDOS_DEV=1 bun run dev`. For a production-like local run, use:
 
 ```bash
 bun run start
@@ -77,6 +77,8 @@ Save recovery codes somewhere private. Do not paste primary factors, TOTP secret
 
 Open Settings and configure the provider or plugin-backed provider you want to use. Use placeholder examples in docs and real values only in your private local configuration.
 
+If you added provider keys to `.env`, restart Metidos so they are picked up.
+
 For local/private providers, confirm the provider endpoint is reachable from the Metidos process. For plugin-backed providers, approve the plugin before expecting it in the model catalog.
 
 See [Model providers](./model-providers.md) for details.
@@ -93,7 +95,7 @@ Metidos treats a **Project** as the high-level entry point and a **Worktree** as
 
 1. Select the project and worktree.
 2. Choose a provider-qualified model from the model selector.
-3. Leave unsafe mode off for the first run.
+3. Leave **Unsafe Mode** off for the first run.
 4. Type a small request, for example: "Inspect this repository and summarize the test commands. Do not edit files."
 5. Send the message and watch the Thread status.
 

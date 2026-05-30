@@ -12,7 +12,7 @@ Metidos is intended to run as a local, operator-owned application.
 | --- | --- | --- |
 | Local development | You are changing source or using a live checkout. | `bun run dev` (`METIDOS_DEV=1 bun run dev` for backend dev-mode reload/fallback behavior) |
 | Local production-style | You want the normal built UI and server from a checkout. | `bun run start` |
-| Reverse-proxy TLS | HTTPS is terminated by a trusted proxy in front of Bun. | `bun run start:tls` |
+| Reverse-proxy TLS | Metidos treats the public transport as HTTPS/wss while a trusted proxy handles certificates. Bun still listens on loopback HTTP. | `bun run start:tls` |
 | Telemetry sidecar | You need local runtime diagnostics snapshots. | `bun run start:telemetry` or `bun run start:tls:telemetry` |
 | Container | You want an isolated runtime with explicit mounts and env. | Use the checked-in deploy examples or the installer skill. |
 
@@ -131,7 +131,7 @@ Telemetry data is local runtime diagnostics output. Do not commit telemetry data
 
 ## Container workflow
 
-Container support should be explicit and plan-driven:
+Container support should be explicit and plan-driven. See [`deploy/podman/README.md`](../deploy/podman/README.md) for a complete rootless Podman example.
 
 1. Choose Docker or Podman.
 2. Mount a durable App Data directory.

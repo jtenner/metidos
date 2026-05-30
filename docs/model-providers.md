@@ -40,7 +40,7 @@ Never paste real provider keys, OAuth refresh tokens, auth JSON files, or `.env`
 
 1. Copy `.env.example` to `.env`.
 2. Set only the provider variables you need.
-3. Start Metidos.
+3. Restart Metidos so env changes are picked up.
 4. Open Settings or the model selector and confirm the provider appears.
 5. Start a small safe Thread to validate the model.
 

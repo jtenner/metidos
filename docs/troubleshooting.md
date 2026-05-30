@@ -55,6 +55,16 @@ Fix:
 
 ## Runtime startup problems
 
+### Wrong URL or port
+
+Symptom: browser shows nothing or a connection error after startup.
+
+Fix:
+
+- confirm the URL matches the port Metidos printed (default is `http://localhost:7599`),
+- check that `METIDOS_PORT` in `.env` matches the URL you are using,
+- make sure no other process is bound to the same port.
+
 ### Mainview assets stale or missing
 
 Fix:

@@ -71,6 +71,7 @@ The file should be human-readable Markdown and include:
 - selected install target (Docker/Podman/source),
 - selected install mode,
 - image/container names,
+- optional container toolchains selected for agent shell access,
 - unsupported-harness requests and refusal decisions,
 - core-plugin defaults for services/tools and calendar bootstrap notes,
 - browser preference and browser-core plugin selection (`chrome_browser`) details,
@@ -127,23 +128,24 @@ Use this order unless the user explicitly asks to focus elsewhere:
 6. Choose project/workspace access.
 7. Choose port and basic networking.
 8. Prepare base container image with Bun/Zig.
-9. Ask about active Codex subscription.
-10. Import or install Codex, if requested.
-11. Discover and select core plugins.
-12. Add custom APIs and model providers.
-13. Generate custom provider plugins when needed.
-14. Ask which core plugin sets should be installed for service/tool defaults, then gather browser and calendar settings.
-15. Add API keys and environment variable sources.
-16. Configure Telegram integration, if requested.
-17. Configure Gmail integration, if requested.
-18. Configure safety, permissions, cron, updates, backups, and diagnostics.
-19. Choose remote/private access: **reverse proxy** or **Tailscale**.
-20. Review final plan.
-21. Export `metidos-config.md`.
-22. Apply installation only after explicit approval.
-23. Start container and run health checks (or confirm source startup).
-24. Run manual post-install work tasks (including calendar insertion if provided).
-25. Show next steps (final handoff).
+9. Choose optional container toolchains for agents.
+10. Ask about active Codex subscription.
+11. Import or install Codex, if requested.
+12. Discover and select core plugins.
+13. Add custom APIs and model providers.
+14. Generate custom provider plugins when needed.
+15. Ask which core plugin sets should be installed for service/tool defaults, then gather browser and calendar settings.
+16. Add API keys and environment variable sources.
+17. Configure Telegram integration, if requested.
+18. Configure Gmail integration, if requested.
+19. Configure safety, permissions, cron, updates, backups, and diagnostics.
+20. Choose remote/private access: **reverse proxy** or **Tailscale**.
+21. Review final plan.
+22. Export `metidos-config.md`.
+23. Apply installation only after explicit approval.
+24. Start container and run health checks (or confirm source startup).
+25. Run manual post-install work tasks (including calendar insertion if provided).
+26. Show next steps (final handoff).
 
 ## Step 1 — Confirm install intent and wizard mode
 
@@ -181,7 +183,7 @@ If `source`:
 1. Confirm this is a clean checkout of this repo.
 2. Record source mode in `metidos-config.md`.
 3. Ask for confirmation of source path (default `.`), and skip all container-specific steps (runtime detection, container image, compose, volumes, mounts).
-4. Continue to Step 12 (model/API/provider choices) using source-mode defaults.
+4. Continue to Step 13 (model/API/provider choices) using source-mode defaults.
 
 If `docker` or `podman`:
 
@@ -343,7 +345,7 @@ Default excludes should include dependency/build/cache directories where appropr
 Ask:
 
 ```text
-Which host port should Metidos listen on? [7331]
+Which host port should Metidos listen on? [7599]
 ```
 
 Ask:
@@ -361,7 +363,7 @@ Record:
 - bind address,
 - local URL.
 
-Default to localhost-only unless the user chooses a remote/private access option in Step 18.
+Default to localhost-only unless the user chooses a remote/private access option in Step 20.
 
 ## Step 8 — Base container image with Bun/Zig
 
@@ -391,7 +393,34 @@ Installation reference notes:
 - Zig's official guidance recommends downloading a self-contained archive or using a package manager. Verify with `zig version`.
 - Record the selected Bun and Zig versions in `metidos-config.md`.
 
-## Step 9 — Codex subscription
+## Step 9 — Choose optional container toolchains for agents
+
+Ask:
+
+```text
+Which developer and command line tools would you like your agents to have access to?
+```
+
+Present the following optional build-time toolchains. Default to **none** unless the user explicitly requests them:
+
+- **Chromium browser** — for browser automation and web scraping (requires `chrome_browser` plugin).
+- **GitHub CLI (`gh`)** — for GitHub operations from agent shell commands.
+- **LaTeX toolchain** — for document compilation and PDF generation.
+- **Rust toolchain** — for building or interacting with Rust projects.
+- **MoonBit toolchain** — for MoonBit language support and WASM targets.
+- **WASM tools (`wasm-tools`, Binaryen, Emscripten)** — for WebAssembly build and optimization workflows.
+
+For each selected toolchain, record:
+
+- toolchain name,
+- whether it is installed at image build time or mounted from the host,
+- any additional env vars or paths required.
+
+If the user selects **none**, record `toolchains: none` and continue.
+
+If the user selects any toolchains, note that these increase image build time and size. Prefer mounting host toolchains when available rather than building them into the image.
+
+## Step 10 — Codex subscription
 
 Ask exactly:
 
@@ -401,9 +430,9 @@ Do you have an active Codex subscription? [y/N]
 
 If no, record `codex: skipped` and continue to core plugins.
 
-If yes, continue to Step 10.
+If yes, continue to Step 11.
 
-## Step 10 — Codex import/install branch
+## Step 11 — Codex import/install branch
 
 Check whether Codex is installed on the host.
 
@@ -464,7 +493,7 @@ Record:
 - enabled by default yes/no,
 - requested permissions.
 
-## Step 11 — Core plugin selection
+## Step 12 — Core plugin selection
 
 Discover bundled/core plugins from the repository or release bundle. Then present a checklist.
 
@@ -503,7 +532,7 @@ For each selected plugin, record:
 
 Make sure all requested core plugins are copied into the container/plugin directory or included in the image according to the selected install mode.
 
-## Step 12 — API discovery and model providers
+## Step 13 — API discovery and model providers
 
 Known model-provider plugins currently in-repo (plugin-backed providers):
 
@@ -614,7 +643,7 @@ Important compatibility note: supported provider paths are only
 - OpenAI-compatible/local endpoints,
 - custom provider plugins built through Plugin System v1.
 
-When custom entries are present, branch into Step 13 (custom provider plugin generation) as needed.
+When custom entries are present, branch into Step 14 (custom provider plugin generation) as needed.
 
 Record:
 
@@ -623,7 +652,42 @@ Record:
 - whether harness requests were rejected, and
 - whether a non-model integration note was recorded.
 
-## Step 12-b — Core plugin defaults for service/tool capabilities, browser access, and calendar feeds
+## Step 14 — Custom provider plugin generation
+
+When a requested provider does not already exist as a core/supported provider, create a plugin plan and then invoke/follow the `metidos-plugin-authoring` skill.
+
+Ask:
+
+```text
+This provider needs a plugin. Should I generate a Metidos Plugin System v1 provider plugin for it? [Y/n]
+```
+
+If yes, collect:
+
+- plugin id,
+- plugin display name,
+- protocol: OpenAI-compatible, Anthropic-compatible, custom REST, local command, or other,
+- base URL,
+- auth style: bearer token, custom header, query param, no auth,
+- env vars,
+- model ids,
+- tool-calling support,
+- streaming support,
+- embeddings support,
+- network allowlist,
+- test prompt.
+
+Then follow Plugin System v1 authoring rules:
+
+- read plugin authoring docs/skill,
+- choose closest example,
+- generate manifest and entrypoint,
+- request only required permissions,
+- document secrets and logs,
+- validate manifest,
+- install generated plugin into the configured plugin directory only after approval.
+
+## Step 15 — Core plugin defaults for service/tool capabilities, browser access, and calendar feeds
 
 Ask:
 
@@ -672,41 +736,7 @@ Record:
 - ICS URL list with titles,
 - a required manual post-install insertion step (do not rely on UI for first-time calendar import).
 
-## Step 13 — Custom provider plugin generation
-
-When a requested provider does not already exist as a core/supported provider, create a plugin plan and then invoke/follow the `metidos-plugin-authoring` skill.
-
-Ask:
-
-```text
-This provider needs a plugin. Should I generate a Metidos Plugin System v1 provider plugin for it? [Y/n]
-```
-
-If yes, collect:
-
-- plugin id,
-- plugin display name,
-- protocol: OpenAI-compatible, Anthropic-compatible, custom REST, local command, or other,
-- base URL,
-- auth style: bearer token, custom header, query param, no auth,
-- env vars,
-- model ids,
-- tool-calling support,
-- streaming support,
-- embeddings support,
-- network allowlist,
-- test prompt.
-
-Then follow Plugin System v1 authoring rules:
-
-- read plugin authoring docs/skill,
-- choose closest example,
-- generate manifest and entrypoint,
-- request only required permissions,
-- document secrets and logs,
-- validate manifest,
-- install generated plugin into the configured plugin directory only after approval.
-## Step 14 — API keys and environment variables
+## Step 16 — API keys and environment variables
 
 Ask first:
 
@@ -756,7 +786,7 @@ Rules:
 - Prefer least exposure: selected plugins only when practical.
 - If a selected plugin declares required env vars, make sure each one has a source.
 
-## Step 15 — Telegram integration
+## Step 17 — Telegram integration
 
 Ask:
 
@@ -794,7 +824,7 @@ Should Telegram be notification-only, or should it be allowed to trigger actions
 
 Record token env var name, allowed chat ids source, polling/webhook mode, plugin id, and permissions.
 
-## Step 16 — Gmail integration
+## Step 18 — Gmail integration
 
 Ask:
 
@@ -814,7 +844,7 @@ If yes, walk the user through:
 3. Enable the Gmail API.
 4. Configure OAuth consent screen.
 5. Create OAuth client credentials.
-6. Configure redirect URI using the final access URL from Step 18.
+6. Configure redirect URI using the final access URL from Step 20.
 7. Download/copy client credentials through a local secret path or env file; do not paste secrets into chat.
 8. Choose minimal OAuth scopes.
 9. Install/copy the Gmail plugin.
@@ -834,7 +864,7 @@ What Gmail permissions should Metidos request?
 
 Record OAuth client env vars/paths, scopes, allowed accounts, plugin id, and whether sends require approval.
 
-## Step 17 — Safety, permissions, cron, updates, backups, diagnostics
+## Step 19 — Safety, permissions, cron, updates, backups, diagnostics
 
 Ask:
 
@@ -898,7 +928,7 @@ Record:
 - log level,
 - telemetry/metrics choice.
 
-## Step 18 — Remote/private access: reverse proxy or Tailscale
+## Step 20 — Remote/private access: reverse proxy or Tailscale
 
 This step replaces generic public deployment. The installer must explicitly ask whether the user wants a **reverse proxy** or **Tailscale** for access beyond localhost.
 
@@ -984,7 +1014,7 @@ For Caddy, instruct:
 
    ```caddyfile
    metidos.example.com {
-     reverse_proxy 127.0.0.1:7331
+     reverse_proxy 127.0.0.1:7599
    }
    ```
 
@@ -1202,7 +1232,7 @@ Tailnet access-control instructions for private app hosting:
        {
          "src": ["group:metidos-admins"],
          "dst": ["tag:metidos"],
-         "ip": ["tcp:7331"]
+         "ip": ["tcp:7599"]
        }
      ]
    }
@@ -1397,13 +1427,14 @@ Validation checklist:
 
 Record both access paths and which integrations use each one.
 
-## Step 20 — Review final plan
+## Step 21 — Review final plan
 
 Before applying any changes, show a final plan with:
 
 - runtime and version,
 - image/container names,
 - base image Bun/Zig versions,
+- optional container toolchains selected for agent shell access,
 - host paths,
 - mounted projects,
 - port/bind/access URLs,
@@ -1430,7 +1461,7 @@ Proceed with this plan?
 4. Cancel.
 ```
 
-## Step 21 — Export metidos-config.md
+## Step 22 — Export metidos-config.md
 
 Write `metidos-config.md` after the user approves the plan or chooses export-only.
 
@@ -1446,6 +1477,8 @@ Generated: YYYY-MM-DD HH:mm TZ
 ## Container runtime
 
 ## Base image
+
+## Optional container toolchains
 
 ## Paths and mounts
 
@@ -1489,13 +1522,13 @@ Secret handling requirements:
 - Never include full secret values.
 - Mask any accidental visible values before writing.
 
-## Step 22 — Apply installation
+## Step 23 — Apply installation
 
 Only after explicit approval:
 
 1. Create host directories.
 2. Write/update env file with placeholders or locally supplied secrets.
-3. Build base image with Bun/Zig.
+3. Build base image with Bun/Zig and only the approved optional toolchains.
 4. Copy selected core plugins.
 5. Copy only the Codex plugin if imported.
 6. Generate/copy custom provider plugins after plugin-authoring validation.
@@ -1505,7 +1538,7 @@ Only after explicit approval:
 
 If plan-only mode was selected, do not perform these actions.
 
-## Step 23 — Start container and run health checks
+## Step 24 — Start container and run health checks
 
 After startup, validate:
 
@@ -1519,12 +1552,12 @@ After startup, validate:
 - env vars are visible only where intended,
 - Telegram test message works if enabled,
 - Gmail OAuth flow works if enabled,
-- reverse proxy or Tailscale access works per Step 18,
+- reverse proxy or Tailscale access works per Step 20,
 - background/cron jobs are registered if enabled.
 
-## Step 24 — Post-install manual tasks (calendar insertion)
+## Step 25 — Post-install manual tasks (calendar insertion)
 
-If ICS calendars were collected in Step 12-b:
+If ICS calendars were collected in Step 15:
 
 1. Do not require UI calendar setup.
 2. Use a local authenticated maintenance command or script (or backend admin helper) to call `createExternalIcsCalendar` for each requested ICS URL.
@@ -1533,7 +1566,7 @@ If ICS calendars were collected in Step 12-b:
 
 If no ICS URLs were supplied, mark this task as complete and skipped.
 
-## Step 25 — Final handoff
+## Step 26 — Final handoff
 
 Show:
 
@@ -1867,4 +1900,4 @@ Use this as the canonical installer prompt list.
 - If a secret is missing, write a placeholder and mark validation blocked.
 - If reverse proxy TLS fails, fall back to localhost or Tailscale while DNS/certificates are fixed.
 - If Tailscale access fails, verify login, ACLs, MagicDNS, host firewall, and bind strategy.
-- If OAuth callback validation fails, revisit Step 18 and align external URL, callback path, and provider console settings.
+- If OAuth callback validation fails, revisit Step 20 and align external URL, callback path, and provider console settings.

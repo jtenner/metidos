@@ -12,6 +12,8 @@ cp .env.example .env
 bun run dev
 ```
 
+Then open `http://localhost:7599` in your browser.
+
 Keep private values in `.env`. Do not commit `.env`, App Data, plugin runtime output, logs, or generated bundles.
 
 ## Repository orientation

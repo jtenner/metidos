@@ -30,6 +30,7 @@ bun run toml:check
 
 Before opening a pull request:
 
+- see [`docs/development.md`](docs/development.md) for detailed debugging and validation guidance,
 - keep the change focused and reviewable,
 - update docs when behavior, setup, security posture, public terminology, or user-visible workflows change,
 - use fake/demo data in screenshots and fixtures,
