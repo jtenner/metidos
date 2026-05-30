@@ -3,7 +3,15 @@
  * @description Worker thread that hosts a project-scoped static HTTP server.
  */
 
-import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  openSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { basename, resolve } from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 import { pathIsWithinRoot } from "../../project-procedures/shared";
@@ -46,6 +54,18 @@ const configuredWorktreeRootPath =
   configuredWorkerData.worktreeRootPath?.trim() ?? "";
 const configuredHost = configuredWorkerData.host?.trim() || "127.0.0.1";
 const MAX_DIRECTORY_LISTING_ENTRIES = 500;
+
+function isHiddenStaticPathSegment(segment: string): boolean {
+  return segment.startsWith(".");
+}
+
+function pathContainsHiddenSegment(pathname: string): boolean {
+  const trimmedPathname = pathname.replace(/^\/+/u, "");
+  if (!trimmedPathname) {
+    return false;
+  }
+  return trimmedPathname.split("/").some(isHiddenStaticPathSegment);
+}
 const rootPath = resolve(configuredRootPath);
 const worktreeRootPath = configuredWorktreeRootPath
   ? resolve(configuredWorktreeRootPath)
@@ -118,6 +138,7 @@ function directoryListingHtml(directoryPath: string, pathname: string): string {
       isDirectory: entry.isDirectory(),
       name: entry.name,
     }))
+    .filter((entry) => !isHiddenStaticPathSegment(entry.name))
     .sort((left, right) => {
       if (left.isDirectory !== right.isDirectory) {
         return left.isDirectory ? -1 : 1;
@@ -158,11 +179,19 @@ function directoryListingHtml(directoryPath: string, pathname: string): string {
 }
 
 function buildFileResponse(filePath: string): Response {
+  const handle = openSync(filePath, staticFileOpenFlags());
+  closeSync(handle);
   return new Response(Bun.file(filePath), {
     headers: {
       "cache-control": "no-store",
     },
   });
+}
+
+function staticFileOpenFlags(): number {
+  return process.platform === "win32"
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
 }
 
 function readCurrentRootState(): CurrentRootState {
@@ -217,6 +246,9 @@ function resolveDirectoryTarget(
   pathname: string,
 ): string | null {
   const decodedPathname = decodeURIComponent(pathname);
+  if (pathContainsHiddenSegment(decodedPathname)) {
+    return null;
+  }
   const trimmedPathname = decodedPathname.replace(/^\/+/, "");
   return resolveExistingTarget(
     realRootPath,
