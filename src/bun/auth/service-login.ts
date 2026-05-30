@@ -13,7 +13,7 @@ import {
   markAuthRecoveryCodeUsed,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
-  setTotpLastUsedCounter,
+  tryAdvanceTotpLastUsedCounter,
   type UserRecord,
   upsertAuthSettings,
 } from "../db";
@@ -329,10 +329,7 @@ export async function verifyPrimaryFactorAndTotp(
     );
     totpValid =
       matchedCounter !== null &&
-      matchedCounter > (settings.totpLastUsedCounter ?? -1);
-    if (totpValid && matchedCounter !== null) {
-      setTotpLastUsedCounter(database, matchedCounter, user.id);
-    }
+      tryAdvanceTotpLastUsedCounter(database, matchedCounter, user.id);
   } else if (primaryFactorValid) {
     // This branch deliberately appears only after a valid primary factor: the
     // setup-required response is an authenticated recovery path, not a username

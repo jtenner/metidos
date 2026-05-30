@@ -2274,6 +2274,31 @@ export function setTotpLastUsedCounter(
     counter,
   );
 }
+
+export function tryAdvanceTotpLastUsedCounter(
+  database: Database,
+  counter: number,
+  userId?: number | null,
+): boolean {
+  resolveRequiredAuthUserId(database, userId);
+  if (!Number.isInteger(counter) || counter < 0) {
+    throw new Error("TOTP last-used counter must be a non-negative integer.");
+  }
+  const result = runStatement(
+    database,
+    `
+			UPDATE auth_settings
+			SET
+				totp_last_used_counter = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = 1
+				AND COALESCE(totp_last_used_counter, -1) < ?
+		`,
+    counter,
+    counter,
+  );
+  return Number(result.changes) > 0;
+}
 /**
  * Resets auth failure state.
  * @param database - Database instance used to clear failure state.

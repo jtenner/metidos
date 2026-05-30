@@ -930,10 +930,10 @@ describe("auth service", () => {
     });
     await stepUpSession(database, {
       appDataDir,
-      nowMs: nowMs + 2_000,
+      nowMs: nowMs + 35_000,
       primaryFactor: TEST_ADMIN_PIN,
       sessionId: loginResult.session.id,
-      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 2_000),
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 35_000),
     });
     logout(database, loginResult.session.id);
 

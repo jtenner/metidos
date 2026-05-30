@@ -15,7 +15,7 @@ import {
   getAuthWebSocketTicket,
   resetAuthFailureState,
   setAuthSessionStepUpValidUntil,
-  setTotpLastUsedCounter,
+  tryAdvanceTotpLastUsedCounter,
   touchAuthSessionIfExpiresAfter,
 } from "../db";
 import {
@@ -398,7 +398,7 @@ export async function stepUpSession(
   );
   const totpValid =
     matchedCounter !== null &&
-    matchedCounter > (settings.totpLastUsedCounter ?? -1);
+    tryAdvanceTotpLastUsedCounter(database, matchedCounter, session.userId);
   if (!totpValid) {
     const failure = incrementFailedAttempts(database, session.userId, now);
     recordInvalidAuthAttempt(database, {
@@ -426,9 +426,6 @@ export async function stepUpSession(
   }
 
   resetAuthFailureState(database, session.userId);
-  if (matchedCounter !== null) {
-    setTotpLastUsedCounter(database, matchedCounter, session.userId);
-  }
   const stepUpValidUntil = addMilliseconds(
     now,
     DEFAULT_STEP_UP_LIFETIME_MS,
