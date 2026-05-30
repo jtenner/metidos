@@ -1826,15 +1826,12 @@ export function createPiMetidosToolHost(
       ).then((result) => result.worktrees),
     listProjects: () =>
       listProjectsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
-    listTerminals: () =>
-      listTerminalsProcedure(
-        undefined,
-        createPiToolRequestContext(ownerUserId),
-      ),
+    listTerminals: (access) =>
+      Promise.resolve(terminalManager.listTerminals(access)),
     listThreads: () =>
       listThreadsProcedure(undefined, createPiToolRequestContext(ownerUserId)),
-    killTerminal: async (terminalIndex) => {
-      terminalManager.killTerminalByIndex(terminalIndex);
+    killTerminal: async (terminalIndex, access) => {
+      terminalManager.killTerminalByIndex(terminalIndex, access);
     },
     newCron: async (params) => {
       const cron = await newCronProcedure(
@@ -1869,14 +1866,20 @@ export function createPiMetidosToolHost(
         params,
         createPiToolRequestContext(ownerUserId),
       ),
-    viewTerminal: async (terminalIndex, lineOffset, lineCount) =>
-      terminalManager.viewTerminal(terminalIndex, lineOffset, lineCount),
-    grepTerminal: async (terminalIndex, pattern, options) =>
+    viewTerminal: async (terminalIndex, lineOffset, lineCount, access) =>
+      terminalManager.viewTerminal(
+        terminalIndex,
+        lineOffset,
+        lineCount,
+        access,
+      ),
+    grepTerminal: async (terminalIndex, pattern, options, access) =>
       terminalManager.grepTerminal(
         terminalIndex,
         pattern,
         options?.ignoreCase,
         options?.maxMatches,
+        access,
       ),
   };
 }

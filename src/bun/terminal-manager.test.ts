@@ -78,6 +78,7 @@ function addMockTerminalSession(
     exitSignal: null,
     exitedCleanupTimer: null,
     outputBuffer: new TerminalOutputBuffer(1024),
+    ownerSessionId: "session-1",
     pendingSocketOutput: "pending",
     projectId: 1,
     projectName: "Project",
@@ -160,13 +161,6 @@ describe("terminal websocket message validation", () => {
         },
       },
     );
-    (
-      manager as unknown as {
-        sessions: Map<string, { terminalId: string }>;
-      }
-    ).sessions.set("terminal-1", {
-      terminalId: "terminal-1",
-    });
     const closeReasons: string[] = [];
     const socket = {
       close: (_code: number, reason: string) => {
@@ -181,6 +175,7 @@ describe("terminal websocket message validation", () => {
       },
       send: () => {},
     };
+    addMockTerminalSession(manager, "terminal-1", [socket]);
 
     manager.handleSocketMessage(
       socket as never,
@@ -538,6 +533,39 @@ describe("terminal session limits", () => {
       running: 0,
       starting: 0,
     });
+  });
+});
+
+describe("terminal access scoping", () => {
+  it("denies read, grep, and kill when the caller thread does not own the terminal", () => {
+    const manager = new TerminalManager({
+      limitConfig: {
+        exitedIdleTtlMs: 60_000,
+        maxGlobalTerminals: 10,
+        maxTerminalsPerOwner: 10,
+      },
+    });
+    const terminal = manager.createTerminal({
+      command: "echo hi",
+      createdFromThreadId: 10,
+      ownerSessionId: "thread:10",
+      projectId: 1,
+      projectName: "Project",
+      settings: { defaultShell: "", replayBufferBytes: 1024 },
+      title: "Owned",
+      worktreePath: "/tmp",
+    });
+    const access = { createdFromThreadId: 99 };
+
+    expect(() =>
+      manager.viewTerminal(terminal.terminalIndex, 0, 10, access),
+    ).toThrow("Terminal access is denied for the current context.");
+    expect(() =>
+      manager.grepTerminal(terminal.terminalIndex, "hi", false, 5, access),
+    ).toThrow("Terminal access is denied for the current context.");
+    expect(() =>
+      manager.killTerminalByIndex(terminal.terminalIndex, access),
+    ).toThrow("Terminal access is denied for the current context.");
   });
 });
 

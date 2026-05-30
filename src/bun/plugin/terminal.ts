@@ -61,15 +61,15 @@ export type PluginTerminalHost = {
     request: PluginTerminalCreateRequest,
   ): Promise<RpcTerminal> | RpcTerminal;
   grepTerminal(
-    ownerUserId: number | null,
+    context: PluginTerminalThreadContext,
     request: PluginTerminalGrepRequest,
   ): Promise<string> | string;
   killTerminal(
-    ownerUserId: number | null,
+    context: PluginTerminalThreadContext,
     request: PluginTerminalKillRequest,
   ): Promise<void> | void;
   readTerminal(
-    ownerUserId: number | null,
+    context: PluginTerminalThreadContext,
     request: PluginTerminalReadRequest,
   ): Promise<string> | string;
 };
@@ -328,17 +328,17 @@ export async function executePluginTerminalOperation(input: {
       );
     case "terminal.read":
       return await input.host.readTerminal(
-        context.ownerUserId ?? null,
+        context,
         normalizeReadRequest(params),
       );
     case "terminal.grep":
       return await input.host.grepTerminal(
-        context.ownerUserId ?? null,
+        context,
         normalizeGrepRequest(params),
       );
     case "terminal.kill": {
       const request = normalizeKillRequest(params);
-      await input.host.killTerminal(context.ownerUserId ?? null, request);
+      await input.host.killTerminal(context, request);
       return { success: true, terminalIndex: request.terminalIndex };
     }
   }

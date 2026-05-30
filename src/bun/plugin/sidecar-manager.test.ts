@@ -2053,15 +2053,15 @@ add_agent_tool({
             worktreePath: context.worktreePath,
           };
         },
-        grepTerminal(ownerUserId, request) {
-          terminalCalls.push({ operation: "grep", ownerUserId, request });
+        grepTerminal(context, request) {
+          terminalCalls.push({ context, operation: "grep", request });
           return `grep:${request.pattern}`;
         },
-        killTerminal(ownerUserId, request) {
-          terminalCalls.push({ operation: "kill", ownerUserId, request });
+        killTerminal(context, request) {
+          terminalCalls.push({ context, operation: "kill", request });
         },
-        readTerminal(ownerUserId, request) {
-          terminalCalls.push({ operation: "read", ownerUserId, request });
+        readTerminal(context, request) {
+          terminalCalls.push({ context, operation: "read", request });
           return `terminal:${request.terminalIndex}`;
         },
       },

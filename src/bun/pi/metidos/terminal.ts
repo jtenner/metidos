@@ -137,6 +137,10 @@ function terminalTable(terminals: RpcTerminal[]): string {
   ].join("\n");
 }
 
+function terminalAccess(scope: PiMetidosToolScope) {
+  return { createdFromThreadId: scope.threadIdContext };
+}
+
 export function createPiMetidosTerminalTools(
   scope: PiMetidosToolScope,
   host: PiMetidosToolHost,
@@ -180,7 +184,7 @@ export function createPiMetidosTerminalTools(
           if (!host.listTerminals) {
             throw new Error("Terminal host is unavailable.");
           }
-          const terminals = await host.listTerminals();
+          const terminals = await host.listTerminals(terminalAccess(scope));
           return textToolResult(terminalTable(terminals), {
             terminals: terminals.map(terminalPayload),
           });
@@ -198,7 +202,7 @@ export function createPiMetidosTerminalTools(
           if (!host.killTerminal) {
             throw new Error("Terminal host is unavailable.");
           }
-          await host.killTerminal(params.terminalIndex);
+          await host.killTerminal(params.terminalIndex, terminalAccess(scope));
           return textToolResult(`Closed terminal ${params.terminalIndex}.`, {
             terminalIndex: params.terminalIndex,
           });
@@ -221,6 +225,7 @@ export function createPiMetidosTerminalTools(
             params.terminalIndex,
             params.lineOffset,
             params.lineCount,
+            terminalAccess(scope),
           );
           return textToolResult(text, {
             lineCount: params.lineCount ?? 200,
@@ -253,6 +258,7 @@ export function createPiMetidosTerminalTools(
             params.terminalIndex,
             params.pattern,
             grepOptions,
+            terminalAccess(scope),
           );
           return textToolResult(text, {
             ignoreCase: params.ignoreCase ?? false,

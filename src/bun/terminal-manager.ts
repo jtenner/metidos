@@ -496,6 +496,51 @@ export type TerminalCreateInput = RpcCreateTerminalRequest & {
   settings: RpcTerminalSettings;
 };
 
+export type TerminalAccessScope = {
+  createdFromThreadId?: number | null;
+  ownerSessionId?: string | null;
+};
+
+export function terminalOwnerSessionKeyForThread(threadId: number): string {
+  return `thread:${threadId}`;
+}
+
+function assertTerminalAccess(
+  session: TerminalSession,
+  access?: TerminalAccessScope,
+): void {
+  if (!access) {
+    return;
+  }
+
+  if (
+    typeof access.ownerSessionId === "string" &&
+    access.ownerSessionId.length > 0 &&
+    session.ownerSessionId === access.ownerSessionId
+  ) {
+    return;
+  }
+
+  if (
+    typeof access.createdFromThreadId === "number" &&
+    Number.isInteger(access.createdFromThreadId) &&
+    session.createdFromThreadId === access.createdFromThreadId
+  ) {
+    return;
+  }
+
+  if (
+    typeof access.createdFromThreadId === "number" &&
+    Number.isInteger(access.createdFromThreadId) &&
+    session.ownerSessionId ===
+      terminalOwnerSessionKeyForThread(access.createdFromThreadId)
+  ) {
+    return;
+  }
+
+  throw new Error("Terminal access is denied for the current context.");
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -1401,7 +1446,7 @@ export class TerminalManager {
     session.exitedCleanupTimer.unref?.();
   }
 
-  listTerminals(): RpcTerminal[] {
+  listTerminals(access?: TerminalAccessScope): RpcTerminal[] {
     return this.terminalOrder
       .flatMap((id) => {
         if (!id) {
@@ -1409,6 +1454,17 @@ export class TerminalManager {
         }
         const session = this.sessions.get(id);
         return session ? [session] : [];
+      })
+      .filter((session) => {
+        if (!access) {
+          return true;
+        }
+        try {
+          assertTerminalAccess(session, access);
+          return true;
+        } catch {
+          return false;
+        }
       })
       .map(toRpcTerminal);
   }
@@ -1455,8 +1511,12 @@ export class TerminalManager {
     return terminal;
   }
 
-  killTerminalByIndex(terminalIndex: number): void {
+  killTerminalByIndex(
+    terminalIndex: number,
+    access?: TerminalAccessScope,
+  ): void {
     const session = this.resolveTerminalByIndex(terminalIndex);
+    assertTerminalAccess(session, access);
     this.closeSession(session, false);
   }
 
@@ -1540,8 +1600,9 @@ export class TerminalManager {
     return (
       !!session &&
       typeof socket.data.sessionId === "string" &&
-      (session.ownerSessionId === null ||
-        socket.data.sessionId === session.ownerSessionId)
+      typeof session.ownerSessionId === "string" &&
+      session.ownerSessionId.length > 0 &&
+      socket.data.sessionId === session.ownerSessionId
     );
   }
 
@@ -1739,8 +1800,10 @@ export class TerminalManager {
     terminalIndex: number,
     lineOffset = 0,
     lineCount = TERMINAL_VIEW_DEFAULT_LINE_COUNT,
+    access?: TerminalAccessScope,
   ): string {
     const session = this.resolveTerminalByIndex(terminalIndex);
+    assertTerminalAccess(session, access);
     const safeOffset = Math.max(0, Math.floor(lineOffset));
     const safeCount = Math.max(
       1,
@@ -1764,8 +1827,10 @@ export class TerminalManager {
     pattern: string,
     ignoreCase = false,
     maxMatches = TERMINAL_GREP_DEFAULT_MATCH_LIMIT,
+    access?: TerminalAccessScope,
   ): string {
     const session = this.resolveTerminalByIndex(terminalIndex);
+    assertTerminalAccess(session, access);
     const regex = createSafeTerminalGrepRegex(pattern, ignoreCase);
     const cap = Math.max(
       1,

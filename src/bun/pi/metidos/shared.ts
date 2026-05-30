@@ -86,9 +86,14 @@ export type PiMetidosToolHost = {
     signal?: AbortSignal,
   ) => Promise<RpcWorktree[]>;
   listProjects: () => Promise<RpcProject[]>;
-  listTerminals?: () => Promise<RpcTerminal[]>;
+  listTerminals?: (access?: {
+    createdFromThreadId: number;
+  }) => Promise<RpcTerminal[]>;
   listThreads: () => Promise<RpcThread[]>;
-  killTerminal?: (terminalIndex: number) => Promise<void>;
+  killTerminal?: (
+    terminalIndex: number,
+    access: { createdFromThreadId: number },
+  ) => Promise<void>;
   newCron: (
     params: AppRPCSchema["requests"]["newCron"]["params"],
   ) => Promise<RpcCronJob>;
@@ -115,13 +120,15 @@ export type PiMetidosToolHost = {
   ) => Promise<RpcThread>;
   viewTerminal?: (
     terminalIndex: number,
-    lineOffset?: number,
-    lineCount?: number,
+    lineOffset: number | undefined,
+    lineCount: number | undefined,
+    access: { createdFromThreadId: number },
   ) => Promise<string>;
   grepTerminal?: (
     terminalIndex: number,
     pattern: string,
-    options?: { ignoreCase?: boolean; maxMatches?: number },
+    options: { ignoreCase?: boolean; maxMatches?: number } | undefined,
+    access: { createdFromThreadId: number },
   ) => Promise<string>;
 };
 

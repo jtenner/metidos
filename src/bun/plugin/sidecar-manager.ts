@@ -40,7 +40,11 @@ import type {
   RpcPluginSidecarFailureDiagnostic,
   RpcPluginSidecarStderrLine,
 } from "../rpc-schema/plugin";
-import { terminalManager } from "../terminal-manager";
+import {
+  terminalManager,
+  terminalOwnerSessionKeyForThread,
+  type TerminalAccessScope,
+} from "../terminal-manager";
 import type { PluginCalendarEventsHost } from "./calendar-events";
 import {
   isStaticModelProviderOnlyRegistration,
@@ -172,7 +176,11 @@ import {
   type PluginStartupRegistrations,
   validatePluginStartupRegistrations,
 } from "./startup-registrations";
-import { PluginTerminalError, type PluginTerminalHost } from "./terminal";
+import {
+  PluginTerminalError,
+  type PluginTerminalHost,
+  type PluginTerminalThreadContext,
+} from "./terminal";
 import { PluginWebSocketRegistry } from "./websocket";
 
 export {
@@ -413,6 +421,15 @@ function createDefaultPluginUsersHost(): PluginUsersHost {
   };
 }
 
+function pluginTerminalAccessScope(
+  context: PluginTerminalThreadContext,
+): TerminalAccessScope {
+  return {
+    createdFromThreadId: context.threadId,
+    ownerSessionId: terminalOwnerSessionKeyForThread(context.threadId),
+  };
+}
+
 function createDefaultPluginTerminalHost(): PluginTerminalHost {
   return {
     createTerminal: (context, request) => {
@@ -428,6 +445,7 @@ function createDefaultPluginTerminalHost(): PluginTerminalHost {
         command: request.command ?? null,
         createdFromThreadId: context.threadId,
         dir: request.dir ?? null,
+        ownerSessionId: terminalOwnerSessionKeyForThread(context.threadId),
         projectId: context.projectId,
         projectName: project.name,
         settings: getTerminalSettings(database),
@@ -435,21 +453,26 @@ function createDefaultPluginTerminalHost(): PluginTerminalHost {
         worktreePath: context.worktreePath,
       });
     },
-    grepTerminal: (_ownerUserId, request) =>
+    grepTerminal: (context, request) =>
       terminalManager.grepTerminal(
         request.terminalIndex,
         request.pattern,
         request.ignoreCase ?? false,
         request.maxMatches ?? 20,
+        pluginTerminalAccessScope(context),
       ),
-    killTerminal: (_ownerUserId, request) => {
-      terminalManager.killTerminalByIndex(request.terminalIndex);
+    killTerminal: (context, request) => {
+      terminalManager.killTerminalByIndex(
+        request.terminalIndex,
+        pluginTerminalAccessScope(context),
+      );
     },
-    readTerminal: (_ownerUserId, request) =>
+    readTerminal: (context, request) =>
       terminalManager.viewTerminal(
         request.terminalIndex,
         request.lineOffset ?? 0,
         request.lineCount ?? 200,
+        pluginTerminalAccessScope(context),
       ),
   };
 }

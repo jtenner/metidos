@@ -43,15 +43,15 @@ function makeHost(calls: unknown[] = []): PluginTerminalHost {
         title: request.title ?? "Terminal",
       });
     },
-    grepTerminal(ownerUserId, request) {
-      calls.push({ operation: "terminal.grep", ownerUserId, request });
+    grepTerminal(context, request) {
+      calls.push({ context, operation: "terminal.grep", request });
       return `grep:${request.pattern}`;
     },
-    killTerminal(ownerUserId, request) {
-      calls.push({ operation: "terminal.kill", ownerUserId, request });
+    killTerminal(context, request) {
+      calls.push({ context, operation: "terminal.kill", request });
     },
-    readTerminal(ownerUserId, request) {
-      calls.push({ operation: "terminal.read", ownerUserId, request });
+    readTerminal(context, request) {
+      calls.push({ context, operation: "terminal.read", request });
       return `terminal:${request.terminalIndex}`;
     },
   };
@@ -130,13 +130,23 @@ describe("executePluginTerminalOperation", () => {
         request: { command: "bun test", dir: null, title: "Tests" },
       },
       {
+        context: {
+          ownerUserId: 7,
+          projectId: 3,
+          threadId: 42,
+          worktreePath: "/repo",
+        },
         operation: "terminal.read",
-        ownerUserId: 7,
         request: { lineCount: 10, lineOffset: 0, terminalIndex: 0 },
       },
       {
+        context: {
+          ownerUserId: 7,
+          projectId: 3,
+          threadId: 42,
+          worktreePath: "/repo",
+        },
         operation: "terminal.grep",
-        ownerUserId: 7,
         request: {
           ignoreCase: false,
           maxMatches: 20,
@@ -145,8 +155,13 @@ describe("executePluginTerminalOperation", () => {
         },
       },
       {
+        context: {
+          ownerUserId: 7,
+          projectId: 3,
+          threadId: 42,
+          worktreePath: "/repo",
+        },
         operation: "terminal.kill",
-        ownerUserId: 7,
         request: { terminalIndex: 0 },
       },
     ]);
