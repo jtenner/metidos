@@ -1584,6 +1584,14 @@ export async function handlePluginSidecarProtocolFrame(
         const buildResult = await buildPluginEntrypoint({
           pluginRoot: EXPECTED_PLUGIN_ROOT,
         });
+        const postBuildReviewHash =
+          await computePluginReviewHash(EXPECTED_PLUGIN_ROOT);
+        if (
+          !postBuildReviewHash.hash ||
+          postBuildReviewHash.hash !== startupPayload.reviewHash
+        ) {
+          throw new Error("Plugin files differ from the approved review hash.");
+        }
         runtimeResult = await startPluginRuntime(buildResult, {
           ...(QUICKJS_MEMORY_LIMIT_BYTES === undefined
             ? {}
