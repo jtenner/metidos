@@ -167,13 +167,19 @@ function createThreadScopedWebServerTools(worktreePath: string) {
 
 async function claimShareSession(
   shareOpenUrl: string,
-  claimToken: string,
+  claimToken?: string,
 ): Promise<{
   cookie: string;
   redirectUrl: string;
 }> {
+  const resolvedClaimToken =
+    claimToken ??
+    new URLSearchParams(new URL(shareOpenUrl).hash.slice(1)).get("claimToken");
+  if (!resolvedClaimToken) {
+    throw new Error("Share claim token was not available.");
+  }
   const response = await fetch(shareOpenUrl, {
-    body: JSON.stringify({ claimToken }),
+    body: JSON.stringify({ claimToken: resolvedClaimToken }),
     headers: {
       "content-type": "application/json",
       origin: new URL(shareOpenUrl).origin,
@@ -277,9 +283,10 @@ describe("web-server share host binding", () => {
     ).toThrow("METIDOS_WEB_SERVER_SHARE_ALLOW_PUBLIC_HOST=true");
   });
 
-  it("allows non-loopback host configuration with explicit unsafe opt-in", () => {
+  it("allows non-loopback host configuration with explicit unsafe opt-in and TLS", () => {
     expect(
       resolveWebServerShareHost({
+        METIDOS_TLS: "1",
         METIDOS_WEB_SERVER_SHARE_ALLOW_PUBLIC_HOST: "true",
         METIDOS_WEB_SERVER_SHARE_HOST: "192.168.1.10",
       }),
@@ -477,10 +484,13 @@ describe("stable web-server share URLs", () => {
       id: number;
       port: number;
       serverInstanceId: string;
-      shareClaimToken: string;
       shareOpenUrl: string;
       shareRouteUrl: string;
     };
+    const claimToken = new URLSearchParams(
+      new URL(hostedDetails.shareOpenUrl).hash.slice(1),
+    ).get("claimToken");
+    expect(claimToken).toBeTruthy();
 
     expect(resultText(hosted)).toContain("- Preferred share link: [");
     expect(resultText(hosted)).toContain(hostedDetails.shareOpenUrl);
@@ -489,7 +499,7 @@ describe("stable web-server share URLs", () => {
     );
     expect(hostedDetails.serverInstanceId).toMatch(/^[0-9a-f-]{36}$/u);
     expect(new URL(hostedDetails.shareOpenUrl).hash).toBe(
-      `#claimToken=${hostedDetails.shareClaimToken}`,
+      `#claimToken=${claimToken}`,
     );
     const openPageResponse = await fetch(hostedDetails.shareOpenUrl);
     expect(openPageResponse.status).toBe(200);
@@ -520,7 +530,6 @@ describe("stable web-server share URLs", () => {
 
     const { cookie, redirectUrl } = await claimShareSession(
       hostedDetails.shareOpenUrl,
-      hostedDetails.shareClaimToken,
     );
     expect(new URL(redirectUrl).pathname).toBe(
       new URL(hostedDetails.shareRouteUrl).pathname,
@@ -1247,14 +1256,10 @@ describe("stable web-server share URLs", () => {
     );
     const hostedDetails = hosted.details as {
       id: number;
-      shareClaimToken: string;
       shareOpenUrl: string;
       shareRouteUrl: string;
     };
-    const { cookie } = await claimShareSession(
-      hostedDetails.shareOpenUrl,
-      hostedDetails.shareClaimToken,
-    );
+    const { cookie } = await claimShareSession(hostedDetails.shareOpenUrl);
 
     const stopped = await stopTool.execute(
       "call-2",
@@ -1273,8 +1278,11 @@ describe("stable web-server share URLs", () => {
     });
     expect(routeResponse.status).toBe(403);
 
+    const claimToken = new URLSearchParams(
+      new URL(hostedDetails.shareOpenUrl).hash.slice(1),
+    ).get("claimToken");
     const openResponse = await fetch(hostedDetails.shareOpenUrl, {
-      body: JSON.stringify({ claimToken: hostedDetails.shareClaimToken }),
+      body: JSON.stringify({ claimToken }),
       headers: {
         "content-type": "application/json",
         origin: new URL(hostedDetails.shareOpenUrl).origin,
@@ -1322,14 +1330,10 @@ describe("stable web-server share URLs", () => {
       { cwd: worktreePath } as never,
     );
     const hostedDetails = hosted.details as {
-      shareClaimToken: string;
       shareOpenUrl: string;
       shareRouteUrl: string;
     };
-    const { cookie } = await claimShareSession(
-      hostedDetails.shareOpenUrl,
-      hostedDetails.shareClaimToken,
-    );
+    const { cookie } = await claimShareSession(hostedDetails.shareOpenUrl);
 
     manager.dispose();
 
@@ -1341,8 +1345,11 @@ describe("stable web-server share URLs", () => {
     });
     expect(routeResponse.status).toBe(403);
 
+    const claimToken = new URLSearchParams(
+      new URL(hostedDetails.shareOpenUrl).hash.slice(1),
+    ).get("claimToken");
     const openResponse = await fetch(hostedDetails.shareOpenUrl, {
-      body: JSON.stringify({ claimToken: hostedDetails.shareClaimToken }),
+      body: JSON.stringify({ claimToken }),
       headers: {
         "content-type": "application/json",
         origin: new URL(hostedDetails.shareOpenUrl).origin,

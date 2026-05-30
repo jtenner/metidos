@@ -52,7 +52,7 @@ type PiWebServerHostResult = {
   path: string;
   port: number;
   serverInstanceId: string;
-  shareClaimToken: string | null;
+  shareClaimToken?: string | null;
   shareOpenUrl: string | null;
   shareRouteUrl: string | null;
   url: string;
@@ -532,7 +532,6 @@ export function createPiWebServerManager(
       path: displayPath,
       port: readyMessage.port,
       serverInstanceId,
-      shareClaimToken: claimToken,
       shareOpenUrl: shareUrls.shareOpenUrl,
       shareRouteUrl: shareUrls.shareRouteUrl,
       url: formatHttpUrl(readyMessage.host, readyMessage.port),

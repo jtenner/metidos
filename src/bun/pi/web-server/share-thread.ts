@@ -13,6 +13,8 @@ import {
   getActiveWebServerShareByClaimToken,
   getActiveWebServerShareByServerInstanceId,
   resolveActiveWebServerShareSession,
+  revokeWebServerShareSessionsByServerInstanceId,
+  rotateWebServerShareClaimToken,
   SQL_BUSY_TIMEOUT_MS,
   stopWebServerShareByServerInstanceId,
 } from "../../db";
@@ -595,7 +597,7 @@ function rewriteProxyLocationHeader(options: {
     if (
       !locationTargetsUpstreamOrigin(parsedLocation, options.upstreamOrigin)
     ) {
-      return options.locationHeader;
+      return options.requestUrl.origin;
     }
     return new URL(
       buildWebServerShareRoutePath(
@@ -693,10 +695,7 @@ async function handleOpenRoute(
   const expiresAt = new Date(
     Date.now() + WEB_SERVER_SHARE_SESSION_LIFETIME_MS,
   ).toISOString();
-  // Do not rotate this share-session token again on first route access: the
-  // claim-token exchange already creates a fresh session, and rotating during
-  // initial page load can race concurrent HTML/CSS/JS asset requests for the
-  // same route-scoped cookie.
+  revokeWebServerShareSessionsByServerInstanceId(db, share.serverInstanceId);
   createWebServerShareSession(db, {
     expiresAt,
     serverId: share.serverId,
@@ -704,6 +703,7 @@ async function handleOpenRoute(
     sessionTokenHash: hashWebServerShareOpaqueToken(sessionToken),
     threadId: share.threadId,
   });
+  rotateWebServerShareClaimToken(db, share.id);
   const redirectLocation = buildWebServerShareRoutePath(
     share.threadId,
     share.serverId,
