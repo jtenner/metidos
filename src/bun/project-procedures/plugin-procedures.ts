@@ -4,7 +4,6 @@ import {
   getProjectById,
   initAppDatabase,
   listProjectWorktreesMetadata,
-  type ProjectRecord,
 } from "../db";
 import {
   createPluginIngressLinkCode,
@@ -42,13 +41,15 @@ import type {
 } from "../rpc-schema";
 import {
   getLocalOperatorProfile,
+  getLocalOperatorState,
   requireLocalOperatorCapability,
   requireLocalOperatorUserId,
 } from "./local-operator";
 import {
   assertWorkspacePathAllowed,
+  isProjectPathVisibleToOperator,
   normalizeRequestedWorkspacePath,
-  workspacePathScopeForProject,
+  workspacePathScopeForLocalOperator,
 } from "./workspace-path-policy";
 
 function pluginLifecycleActionRequiresStepUp(
@@ -244,9 +245,11 @@ export async function createPluginIngressLinkCodeProcedure(
   AppRPCSchema["requests"]["createPluginIngressLinkCode"]["response"]
 > {
   requireLocalOperatorUserId(context);
+  const metidosUserId = getLocalOperatorProfile(context).userId;
   const { code, record } = createPluginIngressLinkCode(initAppDatabase(), {
     pluginId: params.pluginId,
     sourceId: params.sourceId,
+    metidosUserId,
   });
   return {
     pluginId: record.pluginId,
@@ -280,10 +283,12 @@ export async function listPluginIngressRouteConfigsProcedure(
 }
 
 function normalizeIngressRouteWorktreePath(
-  project: ProjectRecord,
   requestedWorktreePath: string,
+  context?: RpcRequestContext,
 ): string {
-  const scope = workspacePathScopeForProject(project);
+  const scope = workspacePathScopeForLocalOperator(
+    getLocalOperatorState(context),
+  );
   const normalizedWorktreePath = normalizeRequestedWorkspacePath(
     requestedWorktreePath,
     scope,
@@ -301,7 +306,13 @@ export async function upsertPluginIngressRouteConfigProcedure(
   requireLocalOperatorUserId(context);
   const database = initAppDatabase();
   const project = getProjectById(database, params.projectId);
-  if (!project) {
+  if (
+    !project ||
+    !isProjectPathVisibleToOperator(
+      project.path,
+      getLocalOperatorState(context),
+    )
+  ) {
     throw new AuthServiceError(
       "forbidden",
       "Ingress route project is not available to the current user.",
@@ -309,8 +320,8 @@ export async function upsertPluginIngressRouteConfigProcedure(
     );
   }
   const normalizedWorktreePath = normalizeIngressRouteWorktreePath(
-    project,
     params.worktreePath,
+    context,
   );
   const knownWorktree = listProjectWorktreesMetadata(database, project.id).some(
     (worktree) => worktree.worktreePath === normalizedWorktreePath,

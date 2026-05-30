@@ -100,6 +100,19 @@ export function workspacePathScopeForProject(
   return adminWorkspacePathScopeForInternalCall();
 }
 
+export function isProjectPathVisibleToOperator(
+  projectPath: string,
+  operator: WorkspacePathOperatorState,
+): boolean {
+  if (operator.canManageApp) {
+    return true;
+  }
+  return isWorkspacePathAllowed(
+    projectPath,
+    workspacePathScopeForLocalOperator(operator),
+  );
+}
+
 export function normalizeRequestedWorkspacePath(
   value: string,
   scope: WorkspacePathScope,
