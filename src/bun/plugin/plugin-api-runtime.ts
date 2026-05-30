@@ -64,7 +64,7 @@ export default { definePlugin, metidos, atob, btoa };
 `;
 
 const QUICKJS_FORBIDDEN_GLOBALS_SOURCE = `
-for (const forbiddenGlobal of ["Bun", "fetch", "process", "require", "setTimeout"]) {
+for (const forbiddenGlobal of ["Bun", "fetch", "process", "require", "setTimeout", "setInterval", "queueMicrotask", "eval", "Function"]) {
   Object.defineProperty(globalThis, forbiddenGlobal, {
     configurable: false,
     enumerable: false,
