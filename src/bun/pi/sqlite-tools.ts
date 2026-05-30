@@ -4,12 +4,26 @@
  */
 
 import { Database } from "bun:sqlite";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  lstatSync,
+  openSync,
+  realpathSync,
+} from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { defineTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { pathIsWithinRoot } from "../project-procedures/shared";
 import { splitTopLevelSqlStatements } from "../sql-statement-split";
+import {
+  containsSqlFunctionCall,
+  findSqlIdentifier,
+  getFirstSqlIdentifier,
+  getSqlIdentifierAt,
+  skipSqlWhitespaceAndComments,
+} from "../sql-first-identifier";
 import { textToolResult } from "./metidos/shared";
 
 const SQLITE_MAX_RENDER_ROWS = 200;
@@ -48,7 +62,7 @@ export function createPiSqliteTools(
   return [
     defineTool<typeof SqliteToolParameters, SqliteQueryResultDetails>({
       description:
-        "Execute one SQLite statement against a database file inside the current project. The database path must be relative to the project root. Query results are returned as markdown tables; write statements return a rows-affected summary.",
+        "Execute one read-only SQLite statement against a database file inside the current project. The database path must be relative to the project root. Query results are returned as markdown tables.",
       execute: async (_toolCallId, params) => {
         let resolvedPath = resolveRelativeSqliteToolPath(
           scope.worktreePathContext,
@@ -56,6 +70,7 @@ export function createPiSqliteTools(
         );
         const statementText = requireSingleSqlStatement(params.query);
         assertSqliteStatementAllowed(statementText);
+        assertSqliteReadStatementAllowed(statementText);
         if (!existsSync(resolvedPath)) {
           throw new Error(
             "SQLite database file must already exist for this tool.",
@@ -90,17 +105,9 @@ export function createPiSqliteTools(
             });
           }
 
-          statement.run();
-          const rowsAffected = readSqliteDirectChanges(database);
-          return textToolResult(`Rows affected (${rowsAffected})`, {
-            columns: [],
-            path: resolvedPath,
-            relativePath: params.path.trim(),
-            rowCount: 0,
-            rowsAffected,
-            statementKind: "write",
-            truncated: false,
-          });
+          throw new Error(
+            "Only read-only SQLite statements are allowed by the sqlite tool.",
+          );
         } finally {
           database.close(false);
         }
@@ -109,12 +116,12 @@ export function createPiSqliteTools(
       name: "sqlite",
       parameters: SqliteToolParameters,
       promptGuidelines: [
-        "Use this when you need to inspect or modify a project-local SQLite database without using bash.",
+        "Use this when you need to inspect a project-local SQLite database without using bash.",
         "The database path must stay relative to the current project root.",
-        "Execute exactly one SQLite statement per tool call.",
+        "Execute exactly one read-only SQLite statement per tool call.",
       ],
       promptSnippet:
-        "Run one SQLite statement against a project-local database file",
+        "Run one read-only SQLite statement against a project-local database file",
     }),
   ];
 }
@@ -137,15 +144,6 @@ function collectSqliteRowsForRendering(
     rows.length = SQLITE_MAX_RENDER_ROWS;
   }
   return { rows, truncated };
-}
-
-function readSqliteDirectChanges(database: Database): number {
-  const row = database.query("SELECT changes() AS changes").get() as {
-    changes?: unknown;
-  } | null;
-  return typeof row?.changes === "number" && Number.isFinite(row.changes)
-    ? row.changes
-    : 0;
 }
 
 function resolveRelativeSqliteToolPath(
@@ -192,7 +190,16 @@ function resolveRelativeSqliteToolPath(
     );
   }
 
+  const databaseHandle = openSync(realDatabasePath, sqliteDatabaseOpenFlags());
+  closeSync(databaseHandle);
+
   return realDatabasePath;
+}
+
+function sqliteDatabaseOpenFlags(): number {
+  return process.platform === "win32"
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
 }
 
 function requireSingleSqlStatement(query: string): string {
@@ -207,33 +214,58 @@ function requireSingleSqlStatement(query: string): string {
 }
 
 function assertSqliteStatementAllowed(statementText: string): void {
-  const normalized = statementText.toLowerCase();
-  assertSqlitePragmaAllowed(normalized);
-  const blockedPatterns: Array<[RegExp, string]> = [
-    [/^\s*attach\b/u, "ATTACH is not allowed by the sqlite tool."],
-    [/^\s*detach\b/u, "DETACH is not allowed by the sqlite tool."],
-    [
-      /^\s*vacuum\b[\s\S]*\binto\b/u,
-      "VACUUM INTO is not allowed by the sqlite tool.",
-    ],
-    [
-      /\bload_extension\s*\(/u,
-      "load_extension() is not allowed by the sqlite tool.",
-    ],
-  ];
+  const firstIdentifier = getFirstSqlIdentifier(statementText);
+  const firstKeyword = firstIdentifier?.value.toLowerCase() ?? "";
 
-  for (const [pattern, message] of blockedPatterns) {
-    if (pattern.test(normalized)) {
-      throw new Error(message);
-    }
+  if (firstKeyword === "attach") {
+    throw new Error("ATTACH is not allowed by the sqlite tool.");
+  }
+
+  if (firstKeyword === "detach") {
+    throw new Error("DETACH is not allowed by the sqlite tool.");
+  }
+
+  if (
+    firstKeyword === "vacuum" &&
+    firstIdentifier &&
+    findSqlIdentifier(statementText, firstIdentifier.nextIndex, "into")
+  ) {
+    throw new Error("VACUUM INTO is not allowed by the sqlite tool.");
+  }
+
+  if (containsSqlFunctionCall(statementText, "load_extension")) {
+    throw new Error("load_extension() is not allowed by the sqlite tool.");
+  }
+
+  assertSqlitePragmaAllowed(statementText);
+}
+
+function assertSqliteReadStatementAllowed(statementText: string): void {
+  const firstKeyword =
+    getFirstSqlIdentifier(statementText)?.value.toLowerCase() ?? "";
+  if (firstKeyword !== "select" && firstKeyword !== "with") {
+    throw new Error(
+      "Only read-only SELECT statements are allowed by the sqlite tool.",
+    );
   }
 }
 
-function assertSqlitePragmaAllowed(normalizedStatementText: string): void {
-  if (!/^\s*pragma\b/u.test(normalizedStatementText)) {
+function assertSqlitePragmaAllowed(statementText: string): void {
+  const firstIdentifier = getFirstSqlIdentifier(statementText);
+  if (firstIdentifier?.value.toLowerCase() !== "pragma") {
     return;
   }
-  if (/=/u.test(normalizedStatementText)) {
+
+  const assignmentIndex = skipSqlWhitespaceAndComments(
+    statementText,
+    firstIdentifier.nextIndex,
+  );
+  if ((statementText[assignmentIndex] ?? "") === "=") {
+    throw new Error(
+      "Writable PRAGMA statements are not allowed by the sqlite tool.",
+    );
+  }
+  if (containsSqlFunctionCall(statementText, "journal_mode")) {
     throw new Error(
       "Writable PRAGMA statements are not allowed by the sqlite tool.",
     );
@@ -248,10 +280,12 @@ function assertSqlitePragmaAllowed(normalizedStatementText: string): void {
     "table_info",
     "table_xinfo",
   ];
-  const pragmaName = /^\s*pragma\s+(?<name>[a-z_][a-z0-9_]*)/u.exec(
-    normalizedStatementText,
-  )?.groups?.name;
-  if (!pragmaName || !allowedReadOnlyPragmas.includes(pragmaName)) {
+  const pragmaNameIdentifier = getSqlIdentifierAt(
+    statementText,
+    firstIdentifier.nextIndex,
+  );
+  const pragmaName = pragmaNameIdentifier?.value.toLowerCase() ?? "";
+  if (!allowedReadOnlyPragmas.includes(pragmaName)) {
     throw new Error(
       "Only read-only schema PRAGMA statements are allowed by the sqlite tool.",
     );

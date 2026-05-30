@@ -132,7 +132,7 @@ describe("createPiSqliteTools", () => {
     });
   });
 
-  it("reports directly affected rows for write statements", async () => {
+  it("rejects write statements", async () => {
     const worktreePath = makeWorktree();
     const databasePath = join(worktreePath, "state.sqlite");
     const database = new Database(databasePath, { create: true });
@@ -140,32 +140,19 @@ describe("createPiSqliteTools", () => {
       database.run(
         "CREATE TABLE flags (id INTEGER PRIMARY KEY, enabled INTEGER)",
       );
-      database.run("CREATE TABLE flag_audit (flag_id INTEGER)");
-      database.run(`
-        CREATE TRIGGER flags_audit_after_update
-        AFTER UPDATE ON flags
-        BEGIN
-          INSERT INTO flag_audit (flag_id) VALUES (NEW.id);
-        END
-      `);
       database.run("INSERT INTO flags (enabled) VALUES (0), (0), (1)");
     } finally {
       database.close(false);
     }
 
-    const result = await executeSqliteTool(worktreePath, {
-      path: "state.sqlite",
-      query: "UPDATE flags SET enabled = 1 WHERE enabled = 0",
-    });
-
-    expect(resultText(result)).toBe("Rows affected (2)");
-    expect(result.details).toMatchObject({
-      columns: [],
-      rowCount: 0,
-      rowsAffected: 2,
-      statementKind: "write",
-      truncated: false,
-    });
+    await expect(
+      executeSqliteTool(worktreePath, {
+        path: "state.sqlite",
+        query: "UPDATE flags SET enabled = 1 WHERE enabled = 0",
+      }),
+    ).rejects.toThrow(
+      "Only read-only SELECT statements are allowed by the sqlite tool.",
+    );
   });
 
   it("rejects missing database files instead of creating them", async () => {
@@ -231,7 +218,7 @@ describe("createPiSqliteTools", () => {
     await expect(
       executeSqliteTool(worktreePath, {
         path: "db.sqlite",
-        query: "ATTACH DATABASE '/tmp/other.sqlite' AS other",
+        query: "-- x\nATTACH DATABASE '/tmp/other.sqlite' AS other",
       }),
     ).rejects.toThrow("ATTACH is not allowed by the sqlite tool.");
     await expect(
@@ -239,9 +226,13 @@ describe("createPiSqliteTools", () => {
         path: "db.sqlite",
         query: "PRAGMA journal_mode = OFF",
       }),
-    ).rejects.toThrow(
-      "Writable PRAGMA statements are not allowed by the sqlite tool.",
-    );
+    ).rejects.toThrow(/not allowed by the sqlite tool\./);
+    await expect(
+      executeSqliteTool(worktreePath, {
+        path: "db.sqlite",
+        query: "PRAGMA journal_mode(WAL)",
+      }),
+    ).rejects.toThrow(/not allowed by the sqlite tool\./);
     await expect(
       executeSqliteTool(worktreePath, {
         path: "db.sqlite",
