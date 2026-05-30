@@ -477,6 +477,13 @@ function resolveServerHostname(envHostname?: string): string {
   if (!envHostname) {
     return LOOPBACK_HOSTNAME;
   }
+  if (envHostname === "0.0.0.0" || envHostname === "::") {
+    if (!readEnvFlag("METIDOS_SERVER_ALLOW_PUBLIC_BIND")) {
+      throw new Error(
+        `METIDOS_SERVER_HOST="${envHostname}" requires METIDOS_SERVER_ALLOW_PUBLIC_BIND=1.`,
+      );
+    }
+  }
   if (
     envHostname !== LOOPBACK_HOSTNAME &&
     envHostname !== "0.0.0.0" &&
