@@ -1074,6 +1074,12 @@ export function migrateAppSchema(
 			);
 		`,
   );
+  ensureAppSchemaColumn(
+    db,
+    "auth_settings",
+    "totp_last_used_counter",
+    "totp_last_used_counter INTEGER",
+  );
   runStatement(
     db,
     `

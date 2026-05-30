@@ -42,7 +42,10 @@ export {
 } from "./db-context";
 
 import { computeNextRunDateForLocalCronSchedule } from "./cron-schedules";
-import { hashWebServerShareOpaqueToken } from "./pi/web-server/share";
+import {
+  generateWebServerShareOpaqueToken,
+  hashWebServerShareOpaqueToken,
+} from "./pi/web-server/share";
 import {
   parseThreadPluginAccessGroups,
   serializeThreadPluginAccessGroups,
@@ -370,6 +373,7 @@ export type AuthSettingsRecord = {
   primaryFactorType: AuthPrimaryFactorType;
   primaryFactorHash: string;
   totpSecretCiphertext: string;
+  totpLastUsedCounter: number | null;
   sessionLifetimeDays: number;
   failedPrimaryFactorAttempts: number;
   lockedUntil: string | null;
@@ -2148,6 +2152,7 @@ export function getAuthSettings(
 				primary_factor_type AS primaryFactorType,
 				primary_factor_hash AS primaryFactorHash,
 				totp_secret_ciphertext AS totpSecretCiphertext,
+				totp_last_used_counter AS totpLastUsedCounter,
 				session_lifetime_days AS sessionLifetimeDays,
 				failed_primary_factor_attempts AS failedPrimaryFactorAttempts,
 				locked_until AS lockedUntil,
@@ -2245,6 +2250,28 @@ export function setAuthFailureState(
 		`,
     failedPrimaryFactorAttempts,
     lockedUntil,
+  );
+}
+
+export function setTotpLastUsedCounter(
+  database: Database,
+  counter: number,
+  userId?: number | null,
+): void {
+  resolveRequiredAuthUserId(database, userId);
+  if (!Number.isInteger(counter) || counter < 0) {
+    throw new Error("TOTP last-used counter must be a non-negative integer.");
+  }
+  runStatement(
+    database,
+    `
+			UPDATE auth_settings
+			SET
+				totp_last_used_counter = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = 1
+		`,
+    counter,
   );
 }
 /**
@@ -5390,6 +5417,29 @@ export function revokeWebServerShareSessionsByServerInstanceId(
     serverInstanceId,
   );
   return result.changes;
+}
+
+export function rotateWebServerShareClaimToken(
+  database: Database,
+  shareId: number,
+): void {
+  const nextClaimTokenHash = hashWebServerShareOpaqueToken(
+    generateWebServerShareOpaqueToken(),
+  );
+  runStatement(
+    database,
+    `
+			UPDATE web_server_shares
+			SET
+				claim_token_hash = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+				AND stopped_at IS NULL
+				AND revoked_at IS NULL
+		`,
+    nextClaimTokenHash,
+    shareId,
+  );
 }
 
 export function stopWebServerShareByServerInstanceId(

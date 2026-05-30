@@ -15,6 +15,7 @@ import {
   getAuthWebSocketTicket,
   resetAuthFailureState,
   setAuthSessionStepUpValidUntil,
+  setTotpLastUsedCounter,
   touchAuthSessionIfExpiresAfter,
 } from "../db";
 import {
@@ -26,7 +27,7 @@ import {
   generateWebSocketTicketId,
   parseStoredTotpSecret,
   verifyPrimaryFactor,
-  verifyTotpCode,
+  verifyTotpMatchedCounter,
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
@@ -387,7 +388,7 @@ export async function stepUpSession(
     rethrowAuthSecretError(error);
   }
   const parsedTotpSecret = parseStoredTotpSecret(totpSecret);
-  const totpValid = await verifyTotpCode(
+  const matchedCounter = await verifyTotpMatchedCounter(
     parsedTotpSecret.secret,
     input.totpCode,
     {
@@ -395,6 +396,9 @@ export async function stepUpSession(
       atMs: now.getTime(),
     },
   );
+  const totpValid =
+    matchedCounter !== null &&
+    matchedCounter > (settings.totpLastUsedCounter ?? -1);
   if (!totpValid) {
     const failure = incrementFailedAttempts(database, session.userId, now);
     recordInvalidAuthAttempt(database, {
@@ -422,6 +426,9 @@ export async function stepUpSession(
   }
 
   resetAuthFailureState(database, session.userId);
+  if (matchedCounter !== null) {
+    setTotpLastUsedCounter(database, matchedCounter, session.userId);
+  }
   const stepUpValidUntil = addMilliseconds(
     now,
     DEFAULT_STEP_UP_LIFETIME_MS,

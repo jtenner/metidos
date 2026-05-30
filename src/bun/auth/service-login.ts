@@ -13,6 +13,7 @@ import {
   markAuthRecoveryCodeUsed,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
+  setTotpLastUsedCounter,
   type UserRecord,
   upsertAuthSettings,
 } from "../db";
@@ -28,6 +29,7 @@ import {
   verifyPrimaryFactor,
   verifyRecoveryCode,
   verifyTotpCode,
+  verifyTotpMatchedCounter,
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
@@ -317,10 +319,20 @@ export async function verifyPrimaryFactorAndTotp(
       rethrowAuthSecretError(error);
     }
     const parsedTotpSecret = parseStoredTotpSecret(totpSecret);
-    totpValid = await verifyTotpCode(parsedTotpSecret.secret, input.totpCode, {
-      algorithm: parsedTotpSecret.algorithm,
-      atMs: now.getTime(),
-    });
+    const matchedCounter = await verifyTotpMatchedCounter(
+      parsedTotpSecret.secret,
+      input.totpCode,
+      {
+        algorithm: parsedTotpSecret.algorithm,
+        atMs: now.getTime(),
+      },
+    );
+    totpValid =
+      matchedCounter !== null &&
+      matchedCounter > (settings.totpLastUsedCounter ?? -1);
+    if (totpValid && matchedCounter !== null) {
+      setTotpLastUsedCounter(database, matchedCounter, user.id);
+    }
   } else if (primaryFactorValid) {
     // This branch deliberately appears only after a valid primary factor: the
     // setup-required response is an authenticated recovery path, not a username
@@ -415,11 +427,23 @@ export async function verifyPrimaryFactorAndRecoveryCode(
         );
       }
     } else {
+      const failure = incrementFailedAttempts(database, user.id, now);
       recordInvalidAuthAttempt(database, {
-        lockedUntil: null,
+        lockedUntil: failure.lockedUntil,
         method: "recovery_code",
         primaryFactorType: settings.primaryFactorType,
       });
+
+      if (failure.lockedUntil) {
+        throw new AuthServiceError(
+          "auth_locked",
+          "Too many failed authentication attempts. Try again later.",
+          423,
+          {
+            lockedUntil: failure.lockedUntil,
+          },
+        );
+      }
     }
 
     if (primaryFactorValid && !hasTotpEnrollment(settings)) {

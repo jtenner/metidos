@@ -514,15 +514,11 @@ export async function generateTotpCode(
   return hotp(secret, counter, digits, algorithm);
 }
 
-/**
- * Verify a TOTP code within a small +/- window of time steps.
- */
-
-export async function verifyTotpCode(
+export async function verifyTotpMatchedCounter(
   secret: string,
   code: string,
   options: VerifyTotpOptions = {},
-): Promise<boolean> {
+): Promise<number | null> {
   const algorithm = options.algorithm ?? DEFAULT_TOTP_ALGORITHM;
   const digits = options.digits ?? DEFAULT_TOTP_DIGITS;
   const periodSeconds = options.periodSeconds ?? DEFAULT_TOTP_PERIOD_SECONDS;
@@ -534,7 +530,7 @@ export async function verifyTotpCode(
 
   const normalizedCode = code.replace(/\s+/g, "");
   if (!new RegExp(`^\\d{${digits}}$`).test(normalizedCode)) {
-    return false;
+    return null;
   }
 
   const currentCounter = Math.floor(atMs / 1000 / periodSeconds);
@@ -550,10 +546,22 @@ export async function verifyTotpCode(
       algorithm,
     );
     if (timingSafeTextEqual(normalizedCode, expected)) {
-      return true;
+      return candidateCounter;
     }
   }
-  return false;
+  return null;
+}
+
+/**
+ * Verify a TOTP code within a small +/- window of time steps.
+ */
+
+export async function verifyTotpCode(
+  secret: string,
+  code: string,
+  options: VerifyTotpOptions = {},
+): Promise<boolean> {
+  return (await verifyTotpMatchedCounter(secret, code, options)) !== null;
 }
 
 /**
