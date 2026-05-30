@@ -9,10 +9,14 @@ import {
   isForwardedHeaderPeerTrusted,
   isForwardedHeaderTrustEnabled,
   readTrustedForwardedForPeer,
+  resolveTrustedForwardedOrigin,
 } from "./http-forwarded";
 
 const ORIGINAL_TRUST_PROXY = process.env.METIDOS_TRUST_PROXY;
 const ORIGINAL_TRUSTED_PROXY_PEERS = process.env.METIDOS_TRUSTED_PROXY_PEERS;
+const ORIGINAL_PUBLIC_ORIGIN = process.env.METIDOS_PUBLIC_ORIGIN;
+const ORIGINAL_ALLOWED_FORWARDED_ORIGINS =
+  process.env.METIDOS_ALLOWED_FORWARDED_ORIGINS;
 
 afterEach(() => {
   if (typeof ORIGINAL_TRUST_PROXY === "undefined") {
@@ -24,6 +28,17 @@ afterEach(() => {
     delete process.env.METIDOS_TRUSTED_PROXY_PEERS;
   } else {
     process.env.METIDOS_TRUSTED_PROXY_PEERS = ORIGINAL_TRUSTED_PROXY_PEERS;
+  }
+  if (typeof ORIGINAL_PUBLIC_ORIGIN === "undefined") {
+    delete process.env.METIDOS_PUBLIC_ORIGIN;
+  } else {
+    process.env.METIDOS_PUBLIC_ORIGIN = ORIGINAL_PUBLIC_ORIGIN;
+  }
+  if (typeof ORIGINAL_ALLOWED_FORWARDED_ORIGINS === "undefined") {
+    delete process.env.METIDOS_ALLOWED_FORWARDED_ORIGINS;
+  } else {
+    process.env.METIDOS_ALLOWED_FORWARDED_ORIGINS =
+      ORIGINAL_ALLOWED_FORWARDED_ORIGINS;
   }
 });
 
@@ -131,5 +146,49 @@ describe("forwarded HTTP helpers", () => {
     expect(
       isForwardedHeaderPeerTrusted({ peerAddress: "10.0.0.2" }),
     ).toBeFalse();
+  });
+
+  it("rejects forwarded origins when no allowlist is configured", () => {
+    process.env.METIDOS_TRUST_PROXY = "true";
+    delete process.env.METIDOS_PUBLIC_ORIGIN;
+    delete process.env.METIDOS_ALLOWED_FORWARDED_ORIGINS;
+
+    const request = new Request("http://127.0.0.1/test", {
+      headers: {
+        "x-forwarded-host": "metidos.example.test",
+        "x-forwarded-proto": "https",
+      },
+    });
+
+    expect(
+      resolveTrustedForwardedOrigin(request, { peerAddress: "127.0.0.1" }),
+    ).toBeNull();
+  });
+
+  it("accepts forwarded origins only when pinned in the allowlist", () => {
+    process.env.METIDOS_TRUST_PROXY = "true";
+    process.env.METIDOS_PUBLIC_ORIGIN = "https://metidos.example.test";
+
+    const request = new Request("http://127.0.0.1/test", {
+      headers: {
+        "x-forwarded-host": "metidos.example.test",
+        "x-forwarded-proto": "https",
+      },
+    });
+
+    expect(
+      resolveTrustedForwardedOrigin(request, { peerAddress: "127.0.0.1" }),
+    ).toBe("https://metidos.example.test");
+    expect(
+      resolveTrustedForwardedOrigin(
+        new Request("http://127.0.0.1/test", {
+          headers: {
+            "x-forwarded-host": "evil.example.test",
+            "x-forwarded-proto": "https",
+          },
+        }),
+        { peerAddress: "127.0.0.1" },
+      ),
+    ).toBeNull();
   });
 });

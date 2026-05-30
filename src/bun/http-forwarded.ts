@@ -266,7 +266,7 @@ export function resolveTrustedForwardedOrigin(
   }
 
   const allowedOrigins = readAllowedForwardedOrigins();
-  if (allowedOrigins.size > 0 && !allowedOrigins.has(forwardedOrigin)) {
+  if (allowedOrigins.size === 0 || !allowedOrigins.has(forwardedOrigin)) {
     return null;
   }
 
