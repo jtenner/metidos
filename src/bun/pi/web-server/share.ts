@@ -5,6 +5,8 @@
 
 import { createHash } from "node:crypto";
 
+import { isPublicTlsEnabled, TLS_PUBLIC_TRANSPORT_ENV } from "../../tls-config";
+
 export const DEFAULT_WEB_SERVER_SHARE_PORT = 7600;
 export const WEB_SERVER_SHARE_PORT_ENV = "METIDOS_WEB_SERVER_SHARE_PORT";
 export const WEB_SERVER_SHARE_ORIGIN_ENV = "METIDOS_WEB_SERVER_SHARE_ORIGIN";
@@ -252,6 +254,11 @@ export function resolveWebServerShareHost(
   if (
     env[WEB_SERVER_SHARE_ALLOW_PUBLIC_HOST_ENV]?.trim().toLowerCase() === "true"
   ) {
+    if (!isPublicTlsEnabled([], env)) {
+      throw new Error(
+        `Refusing ${WEB_SERVER_SHARE_HOST_ENV} value "${configuredHost}" on a non-loopback interface without TLS. Set ${TLS_PUBLIC_TRANSPORT_ENV}=1 or pass --tls when exposing share routes publicly.`,
+      );
+    }
     return configuredHost;
   }
   throw new Error(
