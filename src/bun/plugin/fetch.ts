@@ -271,6 +271,7 @@ function pluginFetchTimeoutError(
 async function readResponseBodyBytes(
   response: Response,
   maxBytes: number,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> {
   const contentLength = response.headers.get("content-length");
   if (contentLength !== null) {
@@ -299,6 +300,13 @@ async function readResponseBodyBytes(
   let receivedBytes = 0;
 
   for (;;) {
+    if (signal?.aborted) {
+      await reader.cancel().catch(() => undefined);
+      throw new PluginFetchError({
+        code: "timeout",
+        message: "Plugin fetch timed out while reading the response body.",
+      });
+    }
     const { done, value } = await reader.read();
     if (done) {
       const output = new Uint8Array(receivedBytes);
@@ -487,6 +495,7 @@ export async function executePluginFetch(input: {
           bodyBytes = await readResponseBodyBytes(
             response,
             maxResponseBodyBytes,
+            abortController.signal,
           );
         } catch (error) {
           if (error instanceof PluginFetchError) {
