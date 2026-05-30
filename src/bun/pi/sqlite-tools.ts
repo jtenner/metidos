@@ -243,6 +243,9 @@ function assertSqliteStatementAllowed(statementText: string): void {
 function assertSqliteReadStatementAllowed(statementText: string): void {
   const firstKeyword =
     getFirstSqlIdentifier(statementText)?.value.toLowerCase() ?? "";
+  if (firstKeyword === "pragma") {
+    return;
+  }
   if (firstKeyword !== "select" && firstKeyword !== "with") {
     throw new Error(
       "Only read-only SELECT statements are allowed by the sqlite tool.",

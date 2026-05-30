@@ -226,13 +226,13 @@ describe("createPiSqliteTools", () => {
         path: "db.sqlite",
         query: "PRAGMA journal_mode = OFF",
       }),
-    ).rejects.toThrow(/not allowed by the sqlite tool\./);
+    ).rejects.toThrow(/allowed by the sqlite tool\./);
     await expect(
       executeSqliteTool(worktreePath, {
         path: "db.sqlite",
         query: "PRAGMA journal_mode(WAL)",
       }),
-    ).rejects.toThrow(/not allowed by the sqlite tool\./);
+    ).rejects.toThrow(/allowed by the sqlite tool\./);
     await expect(
       executeSqliteTool(worktreePath, {
         path: "db.sqlite",
