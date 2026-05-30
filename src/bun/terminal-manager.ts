@@ -464,6 +464,7 @@ type TerminalSession = {
   command: string | null;
   createdAt: string;
   createdFromThreadId: number | null;
+  ownerSessionId: string | null;
   cwd: string;
   exitCode: number | null;
   exitSignal: string | null;
@@ -490,6 +491,7 @@ type TerminalSession = {
 };
 
 export type TerminalCreateInput = RpcCreateTerminalRequest & {
+  ownerSessionId?: string | null;
   projectName: string;
   settings: RpcTerminalSettings;
 };
@@ -1261,6 +1263,7 @@ export class TerminalManager {
       createdAt: now,
       exitedCleanupTimer: null,
       createdFromThreadId: input.createdFromThreadId ?? null,
+      ownerSessionId: input.ownerSessionId ?? null,
       cwd,
       exitCode: null,
       exitSignal: null,
@@ -1534,7 +1537,12 @@ export class TerminalManager {
     session: TerminalSession | undefined,
     socket: TerminalSocket,
   ): session is TerminalSession {
-    return !!session && typeof socket.data.sessionId === "string";
+    return (
+      !!session &&
+      typeof socket.data.sessionId === "string" &&
+      (session.ownerSessionId === null ||
+        socket.data.sessionId === session.ownerSessionId)
+    );
   }
 
   connectSocket(socket: TerminalSocket): void {
