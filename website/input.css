@@ -64,7 +64,7 @@ body {
    */
   .workspace-mock {
     width: 100%;
-    aspect-ratio: 1000 / 500;
+    aspect-ratio: 1000 / 600;
     overflow: hidden;
     border-radius: var(--radius-lg);
   }

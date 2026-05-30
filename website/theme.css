@@ -47,6 +47,8 @@
   --color-access-metidos: #c6a7ff;
   --color-composer-bar: #0e0f10;
   --color-composer-border: #1e2328;
+  --color-user-bubble: #1e2022;
+  --color-user-bubble-text: #f2f0ef;
   --color-shadow-overlay: 0 18px 42px rgb(0 0 0 / 0.56);
   --color-shadow-subtle: 0 8px 18px rgb(0 0 0 / 0.28);
   --shadow-overlay: var(--color-shadow-overlay);
