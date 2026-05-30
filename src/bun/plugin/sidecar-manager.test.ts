@@ -735,7 +735,7 @@ add_agent_tool({
       },
     });
     testServers.push(server);
-    const origin = `ws://localhost:${server.port}`;
+    const origin = `ws://127.0.0.1:${server.port}`;
     const pluginPath = join(pluginsDirectoryPath, "python_websocket_plugin");
     mkdirSync(pluginPath, { recursive: true });
     writeFileSync(
@@ -2172,7 +2172,7 @@ add_agent_tool({
       },
     });
     testServers.push(server);
-    const origin = `ws://localhost:${server.port}`;
+    const origin = `ws://127.0.0.1:${server.port}`;
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
         network: {

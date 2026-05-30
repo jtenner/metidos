@@ -6,6 +6,7 @@
 import { isIP } from "node:net";
 
 import {
+  assertPrivateNetworkOutboundHttpUrl,
   assertSafeOutboundHttpUrl,
   type ResolveHostname,
 } from "../outbound-url-security";
@@ -213,7 +214,24 @@ async function assertSafePluginWebSocketUrl(
   url: URL,
   context: PluginWebSocketContext,
 ): Promise<URL> {
+  const urlOptions = {
+    label: "Plugin WebSocket URL",
+    ...(context.resolveHostname
+      ? { resolveHostname: context.resolveHostname }
+      : {}),
+  };
+  const httpUrl = new URL(url.toString());
+  httpUrl.protocol = url.protocol === "wss:" ? "https:" : "http:";
+
   if (context.unsafeAllowPrivateNetwork) {
+    if (!isIpLiteralHostname(url.hostname)) {
+      throw new PluginWebSocketError({
+        code: "network_websocket_failed",
+        message:
+          "Plugin WebSocket DNS hostnames are denied until DNS-pinned WebSocket dialing is available.",
+      });
+    }
+    await assertPrivateNetworkOutboundHttpUrl(httpUrl.toString(), urlOptions);
     return url;
   }
   if (!isIpLiteralHostname(url.hostname)) {
@@ -223,14 +241,7 @@ async function assertSafePluginWebSocketUrl(
         "Plugin WebSocket DNS hostnames require unsafe private-network access until DNS-pinned WebSocket dialing is available.",
     });
   }
-  const httpUrl = new URL(url.toString());
-  httpUrl.protocol = url.protocol === "wss:" ? "https:" : "http:";
-  await assertSafeOutboundHttpUrl(httpUrl.toString(), {
-    label: "Plugin WebSocket URL",
-    ...(context.resolveHostname
-      ? { resolveHostname: context.resolveHostname }
-      : {}),
-  });
+  await assertSafeOutboundHttpUrl(httpUrl.toString(), urlOptions);
   return url;
 }
 

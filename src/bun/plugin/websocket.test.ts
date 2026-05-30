@@ -96,6 +96,47 @@ describe("PluginWebSocketRegistry", () => {
     });
   });
 
+  it("rejects DNS WebSocket hostnames even in unsafe private-network mode", async () => {
+    const registry = new PluginWebSocketRegistry({
+      network: {
+        allow: [],
+        enforceHttps: false,
+        webSocketAllow: ["ws://api.example.test/**"],
+      },
+      permissions: ["network:websocket"],
+      resolveHostname: async () => ["127.0.0.1"],
+      unsafeAllowPrivateNetwork: true,
+    });
+
+    await expect(
+      registry.connect({ url: "ws://api.example.test/socket" }),
+    ).rejects.toMatchObject({
+      code: "network_websocket_failed",
+      message:
+        "Plugin WebSocket DNS hostnames are denied until DNS-pinned WebSocket dialing is available.",
+    });
+  });
+
+  it("keeps cloud metadata hosts blocked in unsafe private-network mode", async () => {
+    const registry = new PluginWebSocketRegistry({
+      network: {
+        allow: [],
+        enforceHttps: false,
+        webSocketAllow: ["ws://169.254.169.254/**"],
+      },
+      permissions: ["network:websocket"],
+      unsafeAllowPrivateNetwork: true,
+    });
+
+    await expect(
+      registry.connect({ url: "ws://169.254.169.254/latest/meta-data" }),
+    ).rejects.toMatchObject({
+      code: "network_websocket_failed",
+      message:
+        "Plugin WebSocket URL unsafe private-network mode cannot access cloud metadata hosts.",
+    });
+  });
+
   it("rejects private WebSocket targets before connecting", async () => {
     const registry = new PluginWebSocketRegistry({
       network: {
@@ -117,7 +158,7 @@ describe("PluginWebSocketRegistry", () => {
 
   it("connects, sends, receives, reports state, and closes", async () => {
     const server = createEchoServer();
-    const origin = `ws://localhost:${server.port}`;
+    const origin = `ws://127.0.0.1:${server.port}`;
     const registry = new PluginWebSocketRegistry({
       network: {
         allow: [],
@@ -150,7 +191,7 @@ describe("PluginWebSocketRegistry", () => {
 
   it("dispatches operation payloads through executePluginWebSocketOperation", async () => {
     const server = createEchoServer();
-    const origin = `ws://localhost:${server.port}`;
+    const origin = `ws://127.0.0.1:${server.port}`;
     const registry = new PluginWebSocketRegistry({
       network: {
         allow: [],
@@ -178,7 +219,7 @@ describe("PluginWebSocketRegistry", () => {
 
   it("bounds message size and connection count", async () => {
     const server = createEchoServer();
-    const origin = `ws://localhost:${server.port}`;
+    const origin = `ws://127.0.0.1:${server.port}`;
     const registry = new PluginWebSocketRegistry({
       limits: {
         maxConnections: 1,
