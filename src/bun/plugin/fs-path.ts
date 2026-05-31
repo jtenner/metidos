@@ -326,7 +326,11 @@ async function assertOutsidePluginSource(input: {
   try {
     realPluginPath = await realpathExistingPath(input.pluginPath);
   } catch {
-    return;
+    throw pluginFsPathError({
+      code: "plugin_source_denied",
+      message: "Plugin fs access to plugin source files is denied.",
+      virtualPath: input.virtualPath,
+    });
   }
 
   if (pathIsContainedByDirectory(realPluginPath, input.realPath)) {

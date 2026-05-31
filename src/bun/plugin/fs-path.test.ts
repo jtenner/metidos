@@ -311,6 +311,23 @@ describe("plugin fs virtual path resolver", () => {
     });
   });
 
+  it("denies ./ project paths when the plugin installation path cannot be resolved", async () => {
+    const { pluginPath, projectPath } = createPluginFixture();
+    rmSync(pluginPath, { force: true, recursive: true });
+
+    const denied = await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        projectRootPath: projectPath,
+        virtualPath: "./src/inside.txt",
+      }),
+    );
+    expect(denied).toMatchObject({
+      code: "plugin_source_denied",
+      virtualPath: "./src/inside.txt",
+    });
+  });
+
   it("opens validated plugin paths with a synchronous lstat/open pair", async () => {
     const { pluginPath } = createPluginFixture();
     const resolved = await resolvePluginFsVirtualPath({
