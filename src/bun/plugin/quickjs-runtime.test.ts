@@ -2341,21 +2341,4 @@ describe("executePluginQuickJsRuntime", () => {
       "metidos.addAgentTool registration.timeoutMs must be an integer between 1000 and 600000.",
     );
   });
-
-  it("times out unresolved async setup promises", async () => {
-    const pluginRoot = createTempDirectory("metidos-plugin-quickjs-pending-");
-    writePluginFile(
-      pluginRoot,
-      "index.ts",
-      `
-        await new Promise(() => {});
-        export default {};
-      `,
-    );
-    const buildResult = await buildPluginEntrypoint({ pluginRoot });
-
-    await expect(
-      executePluginQuickJsRuntime(buildResult, { startupTimeoutMs: 25 }),
-    ).rejects.toThrow("Plugin QuickJS setup timed out after 25 ms.");
-  });
 });

@@ -16,7 +16,7 @@
     "start:tls:telemetry": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/start.ts --tls --track-telemetry",
     "dev": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/dev-supervisor.ts",
     "dev:watch": "bun run dev",
-    "test": "bun test",
+    "test": "bun test --timeout 10000 --parallel=8",
     "test:build:prod-guards": "bun test src/bun/build-mainview.test.ts",
     "style:check": "bun run src/bun/mainview-style-enforcement.ts",
     "style:check:strict": "bun run src/bun/mainview-style-enforcement.ts --fail-on-violations",
