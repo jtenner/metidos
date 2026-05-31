@@ -623,6 +623,8 @@ describe("executePluginSqliteOperation", () => {
       "-- comment\nvacuum into 'copy.sqlite'",
       "select load_extension('extension')",
       "select/**/load_extension('extension')",
+      "pragma journal_mode = wal",
+      "pragma table_info(notes)",
       "begin transaction",
       "commit",
       "rollback",

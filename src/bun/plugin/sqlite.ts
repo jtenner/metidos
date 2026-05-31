@@ -672,6 +672,13 @@ function assertSqliteStatementAllowed(statementText: string): void {
       message: "load_extension() is not allowed in plugin SQLite.",
     });
   }
+
+  if (firstKeyword === "pragma") {
+    throw sqliteError({
+      code: "disallowed_plugin_sqlite_statement",
+      message: "PRAGMA is not allowed in plugin SQLite run statements.",
+    });
+  }
 }
 
 async function resolvePluginSqliteDatabasePath(input: {
