@@ -4,6 +4,7 @@
  */
 
 import { Database, type SQLQueryBindings } from "bun:sqlite";
+import { timingSafeEqual } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 import {
@@ -5290,6 +5291,106 @@ export function getActiveWebServerShareByServerInstanceId(
     )
     .get(serverInstanceId);
   return share ? hydrateWebServerShareFromSqlRow(share) : null;
+}
+
+export type ClaimWebServerShareSessionInput = {
+  claimToken: string;
+  sessionExpiresAt: string;
+  sessionTokenHash: string;
+};
+
+const INVALID_WEB_SERVER_SHARE_CLAIM_TOKEN_HASH =
+  "0000000000000000000000000000000000000000000000000000000000000000";
+
+export function claimWebServerShareSession(
+  database: Database,
+  input: ClaimWebServerShareSessionInput,
+): WebServerShareRecord | null {
+  return runInTransaction(database, () => {
+    const claimTokenHash = hashWebServerShareOpaqueToken(input.claimToken);
+    const share = database
+      .query<WebServerShareRecord, [string]>(
+        `
+			SELECT
+				id,
+				claim_token_hash AS claimTokenHash,
+				thread_id AS threadId,
+				server_id AS serverId,
+				server_instance_id AS serverInstanceId,
+				target_port AS targetPort,
+				project_id AS projectId,
+				worktree_path AS worktreePath,
+				created_at AS createdAt,
+				updated_at AS updatedAt,
+				stopped_at AS stoppedAt,
+				revoked_at AS revokedAt
+			FROM web_server_shares
+			WHERE claim_token_hash = ?
+				AND stopped_at IS NULL
+				AND revoked_at IS NULL
+			LIMIT 1
+		`,
+      )
+      .get(claimTokenHash);
+    const referenceClaimTokenHash =
+      share?.claimTokenHash ?? INVALID_WEB_SERVER_SHARE_CLAIM_TOKEN_HASH;
+    if (
+      !timingSafeShareTokenHashEqual(claimTokenHash, referenceClaimTokenHash)
+    ) {
+      return null;
+    }
+    if (!share) {
+      return null;
+    }
+
+    const nextClaimTokenHash = hashWebServerShareOpaqueToken(
+      generateWebServerShareOpaqueToken(),
+    );
+    const rotateResult = runStatement(
+      database,
+      `
+			UPDATE web_server_shares
+			SET
+				claim_token_hash = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+				AND claim_token_hash = ?
+				AND stopped_at IS NULL
+				AND revoked_at IS NULL
+		`,
+      nextClaimTokenHash,
+      share.id,
+      claimTokenHash,
+    );
+    if (rotateResult.changes === 0) {
+      return null;
+    }
+
+    revokeWebServerShareSessionsByServerInstanceId(
+      database,
+      share.serverInstanceId,
+    );
+    createWebServerShareSession(database, {
+      expiresAt: input.sessionExpiresAt,
+      serverId: share.serverId,
+      serverInstanceId: share.serverInstanceId,
+      sessionTokenHash: input.sessionTokenHash,
+      threadId: share.threadId,
+    });
+    return hydrateWebServerShareFromSqlRow(share);
+  });
+}
+
+function timingSafeShareTokenHashEqual(
+  leftHash: string,
+  rightHash: string,
+): boolean {
+  const left = Buffer.from(leftHash, "hex");
+  const right = Buffer.from(rightHash, "hex");
+  if (left.length !== right.length) {
+    return false;
+  }
+  return timingSafeEqual(left, right);
 }
 
 export function getActiveWebServerShareByClaimToken(

@@ -8,13 +8,10 @@ import { parentPort, workerData } from "node:worker_threads";
 
 import {
   applyAppDatabasePragmas,
-  createWebServerShareSession,
+  claimWebServerShareSession,
   deleteExpiredWebServerShareSessions,
-  getActiveWebServerShareByClaimToken,
   getActiveWebServerShareByServerInstanceId,
   resolveActiveWebServerShareSession,
-  revokeWebServerShareSessionsByServerInstanceId,
-  rotateWebServerShareClaimToken,
   SQL_BUSY_TIMEOUT_MS,
   stopWebServerShareByServerInstanceId,
 } from "../../db";
@@ -686,24 +683,18 @@ async function handleOpenRoute(
   const db = resolveDatabase();
   deleteExpiredWebServerShareSessions(db);
 
-  const share = getActiveWebServerShareByClaimToken(db, claimToken);
-  if (!share) {
-    return textResponse("Share not found.", 404);
-  }
-
   const sessionToken = generateWebServerShareOpaqueToken();
   const expiresAt = new Date(
     Date.now() + WEB_SERVER_SHARE_SESSION_LIFETIME_MS,
   ).toISOString();
-  revokeWebServerShareSessionsByServerInstanceId(db, share.serverInstanceId);
-  createWebServerShareSession(db, {
-    expiresAt,
-    serverId: share.serverId,
-    serverInstanceId: share.serverInstanceId,
+  const share = claimWebServerShareSession(db, {
+    claimToken,
+    sessionExpiresAt: expiresAt,
     sessionTokenHash: hashWebServerShareOpaqueToken(sessionToken),
-    threadId: share.threadId,
   });
-  rotateWebServerShareClaimToken(db, share.id);
+  if (!share) {
+    return textResponse("Share not found.", 404);
+  }
   const redirectLocation = buildWebServerShareRoutePath(
     share.threadId,
     share.serverId,

@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  claimWebServerShareSession,
   closeAppDatabase,
   createThread,
   createWebServerShare,
@@ -397,6 +398,72 @@ describe("stable web-server share URLs", () => {
     ).toBeNull();
     expect(
       resolveActiveWebServerShareSession(database, sessionToken),
+    ).toBeNull();
+  });
+
+  it("claims a share token atomically and rejects reuse", () => {
+    const appDataDir = createTempDirectory(
+      "metidos-pi-web-server-share-claim-",
+    );
+    const worktreePath = createTempDirectory(
+      "metidos-pi-web-server-share-claim-worktree-",
+    );
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Claim project",
+      projectPath: worktreePath,
+    });
+    const thread = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: DEFAULT_THREAD_MODEL,
+      projectId: project.id,
+      reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+      title: "Claim thread",
+      unsafeMode: false,
+      webServerAccess: true,
+      worktreePath,
+    });
+    const claimToken = generateWebServerShareOpaqueToken();
+    const serverInstanceId = crypto.randomUUID();
+    createWebServerShare(database, {
+      claimTokenHash: hashWebServerShareOpaqueToken(claimToken),
+      projectId: thread.projectId,
+      serverId: 1,
+      serverInstanceId,
+      targetPort: 43123,
+      threadId: thread.id,
+      worktreePath,
+    });
+
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    const firstSessionToken = generateWebServerShareOpaqueToken();
+    const claimed = claimWebServerShareSession(database, {
+      claimToken,
+      sessionExpiresAt: expiresAt,
+      sessionTokenHash: hashWebServerShareOpaqueToken(firstSessionToken),
+    });
+    expect(claimed?.threadId).toBe(thread.id);
+    expect(
+      getActiveWebServerShareByClaimToken(database, claimToken),
+    ).toBeNull();
+    expect(
+      resolveActiveWebServerShareSession(database, firstSessionToken)?.id,
+    ).toBeTruthy();
+
+    const secondSessionToken = generateWebServerShareOpaqueToken();
+    expect(
+      claimWebServerShareSession(database, {
+        claimToken,
+        sessionExpiresAt: expiresAt,
+        sessionTokenHash: hashWebServerShareOpaqueToken(secondSessionToken),
+      }),
+    ).toBeNull();
+    expect(
+      resolveActiveWebServerShareSession(database, secondSessionToken),
     ).toBeNull();
   });
 
