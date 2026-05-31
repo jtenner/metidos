@@ -2130,11 +2130,15 @@ async function handleAuthRequest(
   }
 }
 
-function authorizeRuntimeStatsRequest(request: Request): Response | null {
+function runtimeStatsRequestUsesSharedSecret(request: Request): boolean {
   const providedSecret =
     request.headers.get("x-metidos-runtime-stats-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (isRuntimeStatsSecretMatch(RUNTIME_STATS_SHARED_SECRET, providedSecret)) {
+  return isRuntimeStatsSecretMatch(RUNTIME_STATS_SHARED_SECRET, providedSecret);
+}
+
+function authorizeRuntimeStatsRequest(request: Request): Response | null {
+  if (runtimeStatsRequestUsesSharedSecret(request)) {
     return null;
   }
 
@@ -4319,6 +4323,18 @@ async function bootstrap(): Promise<void> {
         const authFailure = authorizeRuntimeStatsRequest(request);
         if (authFailure) {
           return authFailure;
+        }
+        if (!runtimeStatsRequestUsesSharedSecret(request)) {
+          try {
+            enforceAuthReadRequestSecurity(request, {
+              expectedOrigin:
+                resolveTrustedForwardedOrigin(request, {
+                  peerAddress: readRequestPeerAddress(request, serverInstance),
+                }) ?? requestUrl.origin,
+            });
+          } catch (error) {
+            return authErrorResponse(request, error);
+          }
         }
         const runtimeStatsRateLimitResponse =
           enforceRuntimeStatsSnapshotRateLimit(
