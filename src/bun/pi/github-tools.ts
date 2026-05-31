@@ -6,7 +6,7 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { buildGitSpawnEnv } from "../git";
+import { buildGitSpawnEnv, readGitTextStream } from "../git";
 import {
   type AgentToolResult,
   defineTool,
@@ -400,6 +400,8 @@ function resolveGitHubCliPath(): string {
   );
 }
 
+const GITHUB_CLI_MAX_STDIO_BYTES = 32 * 1024 * 1024;
+
 function createGitHubCliFailureMessage(result: {
   exitCode: number;
   stderr: string;
@@ -441,8 +443,11 @@ async function runGitHubCliCommand(
     ...(signal ? { signal } : {}),
   });
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    readGitTextStream(proc.stdout, { maxBytes: GITHUB_CLI_MAX_STDIO_BYTES }),
+    readGitTextStream(proc.stderr, {
+      maxBytes: GITHUB_CLI_MAX_STDIO_BYTES,
+      swallowAbort: true,
+    }),
     proc.exited,
   ]);
 
