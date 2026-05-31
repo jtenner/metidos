@@ -249,6 +249,32 @@ describe("executePluginFetch", () => {
     expect(requestReachedServer).toBe(false);
   });
 
+  it("rejects malformed base64 byte request bodies", async () => {
+    let requestReachedServer = false;
+    const server = startServer(() => {
+      requestReachedServer = true;
+      return new Response("unexpected");
+    });
+    const url = `http://localhost:${server.port}/upload`;
+
+    await expect(
+      executePluginFetch({
+        context: {
+          network: { allow: [url], enforceHttps: false },
+          permissions: ["network:fetch"],
+        },
+        fetch: localTestFetch,
+        options: {
+          body: { __metidosBytesBase64: "not valid base64!" },
+          method: "PUT",
+        },
+        unsafeAllowPrivateNetwork: true,
+        url,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_request_options" });
+    expect(requestReachedServer).toBe(false);
+  });
+
   it("sends byte request bodies", async () => {
     let received = "";
     const server = startServer(async (request) => {

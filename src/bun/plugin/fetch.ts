@@ -26,6 +26,8 @@ export { PluginPermissionError };
 export const DEFAULT_PLUGIN_FETCH_TIMEOUT_MS = 30_000;
 export const MAX_PLUGIN_FETCH_RESPONSE_BODY_BYTES = 25 * 1024 * 1024;
 export const MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES = 1024 * 1024;
+const BASE64_BYTES_PAYLOAD_PATTERN =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 const REDIRECT_LIMIT = 5;
 const REDIRECT_SENSITIVE_REQUEST_HEADERS = new Set([
   "authorization",
@@ -168,6 +170,12 @@ function normalizeRequestHeaders(input: unknown): Record<string, string> {
 }
 
 function decodeBase64Bytes(value: string): Uint8Array {
+  if (value.length % 4 !== 0 || !BASE64_BYTES_PAYLOAD_PATTERN.test(value)) {
+    throw new PluginFetchError({
+      code: "invalid_request_options",
+      message: "Plugin fetch byte body must be valid base64.",
+    });
+  }
   try {
     return new Uint8Array(Buffer.from(value, "base64"));
   } catch (error) {
