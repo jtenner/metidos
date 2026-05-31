@@ -251,6 +251,7 @@ export const APP_SCHEMA_MIGRATION_REQUIRED_COLUMNS = {
     "embedding_model",
     "updated_at",
   ],
+  auth_settings: ["totp_last_used_counter"],
   app_notification_deliveries: [
     "id",
     "plugin_id",

@@ -50,6 +50,7 @@ import {
   getPluginExternalIdentityBinding,
   getPluginIngressCursor,
   getProjectById,
+  getAuthSettings,
   getThreadById,
   getTimezoneSettings,
   getUserRuntimeSettings,
@@ -1713,6 +1714,43 @@ describe("app database storage", () => {
       expect(cronColumns).not.toContain("calendar_access");
     } finally {
       database.close(false);
+    }
+  });
+
+  it("re-runs app migrations when auth replay counter column is missing despite a current schema marker", () => {
+    const tempDirectory = createTempDirectory();
+    const databasePath = join(tempDirectory, "app.db");
+    const setupDatabase = new Database(databasePath);
+    migrateDatabase(setupDatabase);
+
+    try {
+      upsertAuthSettings(setupDatabase, {
+        primaryFactorHash: "hash",
+        primaryFactorType: "password",
+        sessionLifetimeDays: 14,
+        totpSecretCiphertext: "totp-secret",
+        userId: null,
+      });
+      setupDatabase.run(
+        "ALTER TABLE auth_settings DROP COLUMN totp_last_used_counter",
+      );
+    } finally {
+      setupDatabase.close(false);
+    }
+
+    const upgradedDatabase = new Database(databasePath);
+    try {
+      migrateDatabase(upgradedDatabase);
+
+      const settings = getAuthSettings(upgradedDatabase);
+      const authColumns = upgradedDatabase
+        .query<{ name: string }, []>("PRAGMA table_info(auth_settings)")
+        .all()
+        .map((column) => column.name);
+      expect(settings?.totpLastUsedCounter).toBeNull();
+      expect(authColumns).toContain("totp_last_used_counter");
+    } finally {
+      upgradedDatabase.close(false);
     }
   });
 

@@ -300,8 +300,9 @@ The JSON response should include a `webSocketDebuggerUrl`.
 - If `curl -v https://device.tailnet.ts.net/` shows `server: nginx` or a
   certificate with `CN=localhost`, nginx is still intercepting HTTPS on `443`.
 - If `curl http://127.0.0.1:7599/` resets while the container logs say Metidos
-  is listening, confirm the Compose service sets `METIDOS_SERVER_HOST=0.0.0.0`.
-  The host port should still be published only on `127.0.0.1`.
+  is listening, confirm the Compose service sets `METIDOS_SERVER_HOST=0.0.0.0`
+  and `METIDOS_SERVER_ALLOW_PUBLIC_BIND=1`. The host port should still be
+  published only on `127.0.0.1`.
 - If an admin terminal shows only `#` or `$`, check `$HOME/.bashrc` inside the
   container. Recreate the container if the file is missing, or update the custom
   file so interactive `PS1` includes the current working directory.
