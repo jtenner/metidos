@@ -206,7 +206,7 @@ This checklist is for repository improvements only before making Metidos public/
 ### Plugin administration, access, and terminal bugs
 
 - [x] Implement or remove the no-op `setWeatherAccess` path in `src/mainview/app/use-access-permissions.ts` so a future weather toggle cannot silently fail.
-- [ ] Add a `loadGhostty().catch(...)` error path in `src/mainview/app/terminal-workspace.tsx` that shows actionable feedback instead of leaving a blank pane on WASM/import failure.
+- [x] Add a `loadGhostty().catch(...)` error path in `src/mainview/app/terminal-workspace.tsx` that shows actionable feedback instead of leaving a blank pane on WASM/import failure.
 - [x] Replace unstable diagnostic keys in `src/mainview/app/plugin-administration-panel.tsx` with stable unique keys instead of `key={String(item)}`.
 
 ### Composer bugs

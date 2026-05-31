@@ -48,10 +48,15 @@ let ghosttyInitPromise: Promise<LoadedGhostty> | null = null;
 
 function loadGhostty(): Promise<LoadedGhostty> {
   if (!ghosttyInitPromise) {
-    ghosttyInitPromise = import("ghostty-web").then(async (module) => ({
-      ghostty: await module.Ghostty.load("/ghostty-vt.wasm"),
-      module,
-    }));
+    ghosttyInitPromise = import("ghostty-web")
+      .then(async (module) => ({
+        ghostty: await module.Ghostty.load("/ghostty-vt.wasm"),
+        module,
+      }))
+      .catch((error: unknown) => {
+        ghosttyInitPromise = null;
+        throw error;
+      });
   }
   return ghosttyInitPromise;
 }
@@ -82,6 +87,7 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
   const fitRef = useRef<{ fit: () => void; observeResize?: () => void } | null>(
     null,
   );
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -89,78 +95,93 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
     let term: InstanceType<GhosttyModule["Terminal"]> | null = null;
     const disposables: Array<{ dispose?: () => void }> = [];
 
-    void loadGhostty().then(({ ghostty, module }) => {
-      if (disposed || !containerRef.current) {
-        return;
-      }
-      const nextTerm = new module.Terminal({
-        ghostty,
-        cursorBlink: true,
-        fontFamily: readCssVariable("--font-mono", "monospace"),
-        fontSize: 13,
-        scrollback: CLIENT_TERMINAL_SCROLLBACK_LINES,
-        theme: {
-          background: readCssVariable("--color-bg-app"),
-          cursor: readCssVariable("--color-accent-strong"),
-          foreground: readCssVariable("--color-text-primary"),
-          selectionBackground: readCssVariable("--color-accent-surface"),
-        },
-      });
-      const fitAddon = new module.FitAddon();
-      fitRef.current = fitAddon;
-      nextTerm.loadAddon(fitAddon);
-      nextTerm.open(containerRef.current);
-      term = nextTerm;
-      fitAddon.fit();
-      fitAddon.observeResize?.();
-
-      void (async () => {
-        try {
-          await issueWebSocketTicket();
-          if (disposed) {
-            return;
-          }
-          socket = new WebSocket(terminalWebSocketUrl(terminal.terminalId));
-          socket.onmessage = (event) => {
-            try {
-              const message = JSON.parse(String(event.data)) as {
-                type: string;
-                data?: string;
-              };
-              if (message.type === "output" || message.type === "replay") {
-                nextTerm.write(message.data ?? "");
-              }
-            } catch {
-              // Terminal messages are JSON envelopes; ignore malformed frames.
-            }
-          };
-        } catch (error) {
-          if (isAuthRequiredError(error)) {
-            dispatchAuthRequired("terminal websocket authentication failed");
-            return;
-          }
-          logClientError("Failed to open terminal websocket", error, {
-            context: `terminalId:${terminal.terminalId}`,
-          });
+    setLoadError(null);
+    void loadGhostty()
+      .then(({ ghostty, module }) => {
+        if (disposed || !containerRef.current) {
+          return;
         }
-      })();
-      disposables.push(
-        nextTerm.onData((data) => {
-          if (socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "input", data }));
+        const nextTerm = new module.Terminal({
+          ghostty,
+          cursorBlink: true,
+          fontFamily: readCssVariable("--font-mono", "monospace"),
+          fontSize: 13,
+          scrollback: CLIENT_TERMINAL_SCROLLBACK_LINES,
+          theme: {
+            background: readCssVariable("--color-bg-app"),
+            cursor: readCssVariable("--color-accent-strong"),
+            foreground: readCssVariable("--color-text-primary"),
+            selectionBackground: readCssVariable("--color-accent-surface"),
+          },
+        });
+        const fitAddon = new module.FitAddon();
+        fitRef.current = fitAddon;
+        nextTerm.loadAddon(fitAddon);
+        nextTerm.open(containerRef.current);
+        term = nextTerm;
+        fitAddon.fit();
+        fitAddon.observeResize?.();
+
+        void (async () => {
+          try {
+            await issueWebSocketTicket();
+            if (disposed) {
+              return;
+            }
+            socket = new WebSocket(terminalWebSocketUrl(terminal.terminalId));
+            socket.onmessage = (event) => {
+              try {
+                const message = JSON.parse(String(event.data)) as {
+                  type: string;
+                  data?: string;
+                };
+                if (message.type === "output" || message.type === "replay") {
+                  nextTerm.write(message.data ?? "");
+                }
+              } catch {
+                // Terminal messages are JSON envelopes; ignore malformed frames.
+              }
+            };
+          } catch (error) {
+            if (isAuthRequiredError(error)) {
+              dispatchAuthRequired("terminal websocket authentication failed");
+              return;
+            }
+            logClientError("Failed to open terminal websocket", error, {
+              context: `terminalId:${terminal.terminalId}`,
+            });
           }
-        }),
-      );
-      if (nextTerm.onResize) {
+        })();
         disposables.push(
-          nextTerm.onResize((size) => {
+          nextTerm.onData((data) => {
             if (socket?.readyState === WebSocket.OPEN) {
-              socket.send(JSON.stringify({ type: "resize", ...size }));
+              socket.send(JSON.stringify({ type: "input", data }));
             }
           }),
         );
-      }
-    });
+        if (nextTerm.onResize) {
+          disposables.push(
+            nextTerm.onResize((size) => {
+              if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "resize", ...size }));
+              }
+            }),
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        if (disposed) {
+          return;
+        }
+        logClientError("Failed to load terminal renderer", error, {
+          context: `terminalId:${terminal.terminalId}`,
+        });
+        setLoadError(
+          error instanceof Error && error.message
+            ? error.message
+            : "Terminal renderer failed to load.",
+        );
+      });
 
     return () => {
       disposed = true;
@@ -194,6 +215,12 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
         className="h-full w-full overflow-hidden p-2 caret-transparent [&_textarea]:caret-transparent"
         ref={containerRef}
       />
+      {loadError ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-bg-app px-4 text-center text-sm text-danger-text">
+          Terminal renderer failed to load. Refresh the window and try again.
+          <span className="sr-only"> {loadError}</span>
+        </div>
+      ) : null}
     </div>
   );
 });
