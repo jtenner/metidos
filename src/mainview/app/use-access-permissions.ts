@@ -185,7 +185,6 @@ export function useAccessPermissions({
       setNotificationsAccess: (value: boolean) => {
         setAccessPermission("notificationsAccess", value);
       },
-      setWeatherAccess: (_value: boolean) => {},
       setThreadsAccess: (value: boolean) => {
         setAccessPermission("threadsAccess", value);
       },
