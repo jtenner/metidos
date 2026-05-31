@@ -295,6 +295,7 @@ function useSurfaceFocusManagement({
 }: SurfaceFocusManagementOptions): void {
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
   const restoreFocusOnCloseRef = useRef(true);
+  const restoreFocusRafIdRef = useRef<number | null>(null);
   const onRequestCloseRef = useRef(onRequestClose);
   const targetWithinSurfaceRef = useRef(targetWithinSurface);
 
@@ -302,8 +303,22 @@ function useSurfaceFocusManagement({
   targetWithinSurfaceRef.current = targetWithinSurface;
 
   useEffect(() => {
+    return () => {
+      if (restoreFocusRafIdRef.current !== null) {
+        window.cancelAnimationFrame(restoreFocusRafIdRef.current);
+        restoreFocusRafIdRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!open || typeof document === "undefined") {
       return;
+    }
+
+    if (restoreFocusRafIdRef.current !== null) {
+      window.cancelAnimationFrame(restoreFocusRafIdRef.current);
+      restoreFocusRafIdRef.current = null;
     }
 
     restoreFocusOnCloseRef.current = true;
@@ -387,6 +402,10 @@ function useSurfaceFocusManagement({
       document.removeEventListener("pointerdown", handlePointerDown);
       const currentSurfaceElement = surfaceRef.current;
       const surfaceStillMounted = currentSurfaceElement?.isConnected === true;
+      if (restoreFocusRafIdRef.current !== null) {
+        window.cancelAnimationFrame(restoreFocusRafIdRef.current);
+        restoreFocusRafIdRef.current = null;
+      }
       if (
         restoreFocus &&
         restoreFocusOnCloseRef.current &&
@@ -394,7 +413,8 @@ function useSurfaceFocusManagement({
       ) {
         const restoreTarget =
           restoreFocusReference ?? previousActiveElementRef.current;
-        window.requestAnimationFrame(() => {
+        restoreFocusRafIdRef.current = window.requestAnimationFrame(() => {
+          restoreFocusRafIdRef.current = null;
           restoreSurfaceFocus(restoreTarget);
         });
       }

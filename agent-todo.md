@@ -234,7 +234,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add a hover bridge or equivalent stable open behavior for the help tooltip in `src/mainview/controls/thread-access-control.tsx` so users can move from the “?” trigger to the tooltip without it closing.
 - [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
 - [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
-- [ ] Cancel the focus-restore `requestAnimationFrame` during cleanup in `src/mainview/controls/popover.tsx`.
+- [x] Cancel the focus-restore `requestAnimationFrame` during cleanup in `src/mainview/controls/popover.tsx`.
 - [ ] Cancel outstanding `requestAnimationFrame` work in `src/mainview/controls/chat-composer-control.tsx` during cleanup.
 - [ ] Guard late FileReader rejection handling in `src/mainview/controls/chat-composer-control.tsx` so it cannot call `setPasteError` after unmount or draft switch.
 
