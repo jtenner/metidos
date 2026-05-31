@@ -502,6 +502,10 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     ServerWebSocket<RpcWebSocketSocketData>,
     Map<number, PendingRpcRequest>
   >();
+  const clientMessageQueueTail = new WeakMap<
+    ServerWebSocket<RpcWebSocketSocketData>,
+    Promise<void>
+  >();
   const rateLimitBuckets = new WeakMap<
     ServerWebSocket<RpcWebSocketSocketData>,
     RpcRateLimitBucket
@@ -722,6 +726,7 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
 
   function open(client: ServerWebSocket<RpcWebSocketSocketData>): void {
     clients.add(client);
+    clientMessageQueueTail.set(client, Promise.resolve());
     refreshClientIndexes(client);
   }
 
@@ -730,6 +735,7 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     reason: string,
   ): void {
     clients.delete(client);
+    clientMessageQueueTail.delete(client);
     removeClientIndexes(client);
     abortAllPendingRequests(client, reason);
   }
@@ -880,6 +886,124 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     );
   }
 
+  async function executeRegisteredRpcRequest(input: {
+    client: ServerWebSocket<RpcWebSocketSocketData>;
+    finalizeRpcMeasurement: (
+      outcome: "canceled" | "failed" | "succeeded" | "timedOut",
+      responseBytes?: number,
+    ) => void;
+    handler: (
+      params: RpcRequestMap[RpcMethodName]["params"],
+      context: RpcRequestContext,
+    ) => Promise<RpcRequestMap[RpcMethodName]["response"]>;
+    messageStartedAt: number;
+    pending: PendingRpcRequest;
+    pendingRequests: Map<number, PendingRpcRequest>;
+    request: Extract<RpcClientMessage, { type: "request" }>;
+  }): Promise<void> {
+    const {
+      client,
+      finalizeRpcMeasurement,
+      handler,
+      messageStartedAt,
+      pending,
+      pendingRequests,
+      request,
+    } = input;
+    const { signal } = pending;
+    try {
+      const result = await awaitRequestResult(
+        handler(request.params, {
+          auth: client.data,
+          signal,
+          priority: request.priority,
+          timeoutMs: pending.timeoutMs,
+        }),
+        signal,
+      );
+      if (signal.aborted) {
+        finalizeRpcMeasurement("canceled");
+        return;
+      }
+
+      const response: RpcResponseMessage = {
+        id: request.id,
+        ok: true,
+        result,
+        type: "response",
+      };
+      const rawResponse = await encodeRpcServerFrame(response, {
+        maxUncompressedServerBinaryFrameBytes:
+          options.maxUncompressedServerBinaryFrameBytes,
+      });
+      const responseBytes = webSocketRawByteLength(rawResponse);
+      if (!sendWebSocketMessage(client, rawResponse)) {
+        finalizeRpcMeasurement("failed", responseBytes);
+        return;
+      }
+      finalizeRpcMeasurement("succeeded", responseBytes);
+      options.logger.trace({
+        message: "RPC request completed",
+        requestId: request.id,
+        method: request.method,
+        durationMs: Date.now() - messageStartedAt,
+        sessionId: client.data.sessionId,
+      });
+    } catch (error) {
+      if (pending.canceledByClient) {
+        finalizeRpcMeasurement("canceled");
+        return;
+      }
+
+      const isTimeout =
+        isAbortError(error) &&
+        pending.timeoutMs !== null &&
+        isTimeoutAbort(pending.signal);
+      const rpcError = isTimeout
+        ? toRpcAbortMessage(request, pending, error)
+        : options.normalizeErrorDescription(error);
+      options.logger.warning({
+        message: isTimeout ? "RPC request timed out" : "RPC request failed",
+        requestId: request.id,
+        method: request.method,
+        durationMs: Date.now() - messageStartedAt,
+        error: rpcError,
+      });
+
+      const response: RpcResponseMessage = {
+        id: request.id,
+        ok: false,
+        ...(isAbortError(error) && signal.aborted
+          ? {
+              error: toRpcAbortMessage(request, pending, error),
+            }
+          : options.toErrorPayload(error)),
+        type: "response",
+      };
+      const rawResponse = await encodeRpcServerFrame(response, {
+        maxUncompressedServerBinaryFrameBytes:
+          options.maxUncompressedServerBinaryFrameBytes,
+      });
+      finalizeRpcMeasurement(
+        isTimeout ? "timedOut" : "failed",
+        webSocketRawByteLength(rawResponse),
+      );
+      sendWebSocketMessage(client, rawResponse);
+    } finally {
+      pending.clearTimeout();
+      if (pendingRequests.get(request.id) === pending) {
+        pendingRequests.delete(request.id);
+        decrementPendingRequestCount();
+        options.logger.trace({
+          message: "RPC request cleaned up",
+          requestId: request.id,
+          globalPending: pendingRequestCount,
+          pendingForClient: pendingRequests.size,
+        });
+      }
+    }
+  }
+
   async function handleMessageAsync(
     client: ServerWebSocket<RpcWebSocketSocketData>,
     rawMessage: string | Buffer,
@@ -1004,97 +1128,23 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
         params: RpcRequestMap[RpcMethodName]["params"],
         context: RpcRequestContext,
       ) => Promise<RpcRequestMap[RpcMethodName]["response"]>;
-      try {
-        const result = await awaitRequestResult(
-          handler(request.params, {
-            auth: client.data,
-            signal,
-            priority: request.priority,
-            timeoutMs: pending.timeoutMs,
-          }),
-          signal,
-        );
-        if (signal.aborted) {
-          finalizeRpcMeasurement("canceled");
-          return;
-        }
-
-        const response: RpcResponseMessage = {
-          id: request.id,
-          ok: true,
-          result,
-          type: "response",
-        };
-        const rawResponse = await encodeRpcServerFrame(response, {
-          maxUncompressedServerBinaryFrameBytes:
-            options.maxUncompressedServerBinaryFrameBytes,
-        });
-        const responseBytes = webSocketRawByteLength(rawResponse);
-        if (!sendWebSocketMessage(client, rawResponse)) {
-          finalizeRpcMeasurement("failed", responseBytes);
-          return;
-        }
-        finalizeRpcMeasurement("succeeded", responseBytes);
-        options.logger.trace({
-          message: "RPC request completed",
+      void executeRegisteredRpcRequest({
+        client,
+        finalizeRpcMeasurement,
+        handler,
+        messageStartedAt,
+        pending,
+        pendingRequests,
+        request,
+      }).catch((error: unknown) => {
+        options.logger.error({
+          message: "Unhandled RPC request execution failure",
           requestId: request.id,
           method: request.method,
-          durationMs: Date.now() - messageStartedAt,
           sessionId: client.data.sessionId,
+          error: options.normalizeErrorDescription(error),
         });
-      } catch (error) {
-        if (pending.canceledByClient) {
-          finalizeRpcMeasurement("canceled");
-          return;
-        }
-
-        const isTimeout =
-          isAbortError(error) &&
-          pending.timeoutMs !== null &&
-          isTimeoutAbort(pending.signal);
-        const rpcError = isTimeout
-          ? toRpcAbortMessage(request, pending, error)
-          : options.normalizeErrorDescription(error);
-        options.logger.warning({
-          message: isTimeout ? "RPC request timed out" : "RPC request failed",
-          requestId: request.id,
-          method: request.method,
-          durationMs: Date.now() - messageStartedAt,
-          error: rpcError,
-        });
-
-        const response: RpcResponseMessage = {
-          id: request.id,
-          ok: false,
-          ...(isAbortError(error) && signal.aborted
-            ? {
-                error: toRpcAbortMessage(request, pending, error),
-              }
-            : options.toErrorPayload(error)),
-          type: "response",
-        };
-        const rawResponse = await encodeRpcServerFrame(response, {
-          maxUncompressedServerBinaryFrameBytes:
-            options.maxUncompressedServerBinaryFrameBytes,
-        });
-        finalizeRpcMeasurement(
-          isTimeout ? "timedOut" : "failed",
-          webSocketRawByteLength(rawResponse),
-        );
-        sendWebSocketMessage(client, rawResponse);
-      } finally {
-        pending.clearTimeout();
-        if (pendingRequests.get(request.id) === pending) {
-          pendingRequests.delete(request.id);
-          decrementPendingRequestCount();
-          options.logger.trace({
-            message: "RPC request cleaned up",
-            requestId: request.id,
-            globalPending: pendingRequestCount,
-            pendingForClient: pendingRequests.size,
-          });
-        }
-      }
+      });
     } catch (error) {
       if (requestId < 0) {
         // No safe client correlation id was parsed. Do not synthesize or echo
@@ -1140,23 +1190,23 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     close,
     drain,
     handleMessage(client, rawMessage) {
-      // handleMessageAsync has per-request error serialization. This detached
-      // task catch is only for failures that escape that layer after the Bun
-      // websocket callback has returned, so closing here is not duplicate
-      // request handling; it is the last-resort socket cleanup path.
-      void handleMessageAsync(client, rawMessage).catch((error: unknown) => {
-        options.logger.error({
-          message: "Unhandled RPC websocket message task failure",
-          sessionId: client.data.sessionId,
-          error: options.normalizeErrorDescription(error),
+      const previous = clientMessageQueueTail.get(client) ?? Promise.resolve();
+      const next = previous
+        .then(() => handleMessageAsync(client, rawMessage))
+        .catch((error: unknown) => {
+          options.logger.error({
+            message: "Unhandled RPC websocket message task failure",
+            sessionId: client.data.sessionId,
+            error: options.normalizeErrorDescription(error),
+          });
+          close(client, "Unhandled RPC websocket message task failure.");
+          try {
+            client.close(1011, "RPC websocket message handling failed.");
+          } catch {
+            // The socket may already be closing; unregistering above handles server state.
+          }
         });
-        close(client, "Unhandled RPC websocket message task failure.");
-        try {
-          client.close(1011, "RPC websocket message handling failed.");
-        } catch {
-          // The socket may already be closing; unregistering above handles server state.
-        }
-      });
+      clientMessageQueueTail.set(client, next);
     },
     closeSession(sessionId, reason) {
       let closedCount = 0;
