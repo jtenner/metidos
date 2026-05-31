@@ -3480,7 +3480,8 @@ function buildRpcErrorPayload(error: unknown): RpcErrorPayload {
   }
 
   return {
-    error: toErrorMessage(error),
+    error: "The requested operation failed.",
+    errorCode: "internal_error",
   };
 }
 
