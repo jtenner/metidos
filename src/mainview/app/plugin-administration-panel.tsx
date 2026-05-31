@@ -21,6 +21,7 @@ import type {
   RpcPluginIngressSourceDescriptor,
   RpcPluginInventory,
   RpcPluginInventoryGroupLabel,
+  RpcPluginInventoryIssue,
   RpcPluginInventoryPlugin,
   RpcPluginLifecycleAction,
   RpcPluginManifestSettingSummary,
@@ -206,12 +207,43 @@ function pluginDiagnosticsForSelection(
   );
 }
 
+type PluginDetailListItem = {
+  content: ReactNode;
+  key: string;
+};
+
+function pluginInventoryIssueListItem(
+  issue: RpcPluginInventoryIssue,
+  index: number,
+): PluginDetailListItem {
+  return {
+    content: pluginInventoryIssueText(issue),
+    key: [
+      issue.path,
+      issue.fileName ?? "",
+      issue.code,
+      issue.message,
+      index,
+    ].join("\u0000"),
+  };
+}
+
 function pluginDiagnosticsFailureItems(
   diagnostics: RpcPluginSidecarDiagnostics | null,
-): ReactNode[] {
+): PluginDetailListItem[] {
   return (
-    diagnostics?.failures.items.slice(-5).map((failure) => {
-      return `${failure.observedAt} · ${failure.operation} · ${failure.code}: ${failure.message}`;
+    diagnostics?.failures.items.slice(-5).map((failure, index) => {
+      const content = `${failure.observedAt} · ${failure.operation} · ${failure.code}: ${failure.message}`;
+      return {
+        content,
+        key: [
+          failure.observedAt,
+          failure.operation,
+          failure.code,
+          failure.message,
+          index,
+        ].join("\u0000"),
+      };
     }) ?? []
   );
 }
@@ -221,7 +253,7 @@ function PluginDetailList({
   items,
 }: {
   emptyText?: string;
-  items: ReactNode[];
+  items: PluginDetailListItem[];
 }): JSX.Element {
   if (items.length === 0) {
     return <span className="text-text-muted">{emptyText}</span>;
@@ -229,8 +261,8 @@ function PluginDetailList({
   return (
     <ul className="space-y-1">
       {items.map((item) => (
-        <li className="min-w-0 break-words" key={String(item)}>
-          {item}
+        <li className="min-w-0 break-words" key={item.key}>
+          {item.content}
         </li>
       ))}
     </ul>
@@ -1568,7 +1600,7 @@ function PluginManagerDialog({
           <div className="border-b border-border-subtle px-3 py-2 text-xs leading-5 text-danger-text last:border-b-0">
             <div className="font-semibold">Activation-blocking errors</div>
             <PluginDetailList
-              items={blockingErrors.map(pluginInventoryIssueText)}
+              items={blockingErrors.map(pluginInventoryIssueListItem)}
             />
           </div>
         ) : null}
@@ -1576,7 +1608,7 @@ function PluginManagerDialog({
           <div className="px-3 py-2 text-xs leading-5 text-warning-text">
             <div className="font-semibold">Review warnings</div>
             <PluginDetailList
-              items={plugin.reviewWarnings.map(pluginInventoryIssueText)}
+              items={plugin.reviewWarnings.map(pluginInventoryIssueListItem)}
             />
           </div>
         ) : null}
