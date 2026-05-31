@@ -79,6 +79,7 @@ for (const dynamicConstructor of [
   (function () {}).constructor,
   (async function () {}).constructor,
   (function* () {}).constructor,
+  (async function* () {}).constructor,
 ]) {
   if (typeof dynamicConstructor !== "function") {
     continue;

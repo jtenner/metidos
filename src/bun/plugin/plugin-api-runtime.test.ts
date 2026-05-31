@@ -90,6 +90,7 @@ describe("shared plugin API runtime bootstrap", () => {
     });
     expect(source).toContain("__metidosBlockDynamicCode");
     expect(source).toContain("(async function () {}).constructor");
+    expect(source).toContain("(async function* () {}).constructor");
   });
 
   it("lazily decodes base64 fetch payloads for text and JSON callers", async () => {
