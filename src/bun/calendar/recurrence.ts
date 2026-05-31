@@ -341,7 +341,6 @@ function collectRRuleBetween(
   rule: ReturnType<typeof rrulestr>,
   after: Date,
   before: Date,
-  maxOccurrences: number | null | undefined,
 ): Date[] {
   const output: Date[] = [];
   const withIterator = rule as unknown as {
@@ -354,12 +353,22 @@ function collectRRuleBetween(
   };
   withIterator.between(after, before, true, (date) => {
     output.push(date);
-    if (typeof maxOccurrences === "number" && output.length > maxOccurrences) {
-      throw recurrenceExpansionLimitError(maxOccurrences);
-    }
     return true;
   });
   return output;
+}
+
+function enforceExpandedOccurrenceLimit<T>(
+  occurrences: T[],
+  maxOccurrences: number | null | undefined,
+): T[] {
+  if (
+    typeof maxOccurrences === "number" &&
+    occurrences.length > maxOccurrences
+  ) {
+    throw recurrenceExpansionLimitError(maxOccurrences);
+  }
+  return occurrences;
 }
 
 export function expandCalendarOccurrences(
@@ -406,15 +415,19 @@ export function expandCalendarOccurrences(
       rule,
       new Date(floatingWindowStart.getTime() - duration),
       floatingWindowEnd,
+    );
+    return enforceExpandedOccurrenceLimit(
+      between
+        .map((start) =>
+          occurrenceFromZonedFloatingStart(input, start, timezone),
+        )
+        .filter(
+          (occurrence) =>
+            !exclusionSet.has(occurrence.originalStart) &&
+            occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
+        ),
       options.maxOccurrences,
     );
-    return between
-      .map((start) => occurrenceFromZonedFloatingStart(input, start, timezone))
-      .filter(
-        (occurrence) =>
-          !exclusionSet.has(occurrence.originalStart) &&
-          occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
-      );
   }
 
   const rule = rrulestr(recurrenceRule, {
@@ -426,15 +439,17 @@ export function expandCalendarOccurrences(
       windowStart.getTime() - Math.max(MS_PER_DAY, occurrenceDurationMs(input)),
     ),
     windowEnd,
+  );
+  return enforceExpandedOccurrenceLimit(
+    between
+      .map((start) => occurrenceFromStart(input, start))
+      .filter(
+        (occurrence) =>
+          !exclusionSet.has(occurrence.originalStart) &&
+          occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
+      ),
     options.maxOccurrences,
   );
-  return between
-    .map((start) => occurrenceFromStart(input, start))
-    .filter(
-      (occurrence) =>
-        !exclusionSet.has(occurrence.originalStart) &&
-        occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
-    );
 }
 
 export function buildRRuleFromUi(input: {

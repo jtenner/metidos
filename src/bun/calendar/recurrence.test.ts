@@ -103,6 +103,44 @@ describe("calendar recurrence", () => {
     ).toThrow(/ambiguous/);
   });
 
+  test("applies occurrence limits after EXDATE filtering", () => {
+    expect(() =>
+      expandCalendarOccurrences(
+        {
+          eventId: 1,
+          startAt: "2026-05-01T15:00:00.000Z",
+          endAt: "2026-05-01T16:00:00.000Z",
+          startDate: null,
+          endDate: null,
+          allDay: false,
+          recurrenceRule: "RRULE:FREQ=DAILY;COUNT=4",
+          exdates: ["2026-05-01T15:00:00.000Z", "2026-05-02T15:00:00.000Z"],
+        },
+        "2026-05-01T00:00:00.000Z",
+        "2026-05-06T00:00:00.000Z",
+        { maxOccurrences: 2 },
+      ),
+    ).not.toThrow();
+
+    expect(() =>
+      expandCalendarOccurrences(
+        {
+          eventId: 1,
+          startAt: "2026-05-01T15:00:00.000Z",
+          endAt: "2026-05-01T16:00:00.000Z",
+          startDate: null,
+          endDate: null,
+          allDay: false,
+          recurrenceRule: "RRULE:FREQ=DAILY;COUNT=4",
+          exdates: ["2026-05-01T15:00:00.000Z"],
+        },
+        "2026-05-01T00:00:00.000Z",
+        "2026-05-06T00:00:00.000Z",
+        { maxOccurrences: 2 },
+      ),
+    ).toThrow("more than 2 occurrences");
+  });
+
   test("filters recurrences that only match the one-day lookback window", () => {
     const occurrences = expandCalendarOccurrences(
       {
