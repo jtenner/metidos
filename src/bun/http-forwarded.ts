@@ -108,9 +108,12 @@ function ipv4PeerMatchesCidr(address: string, cidr: string): boolean {
   if (typeof baseAddress !== "string" || typeof prefixText !== "string") {
     return false;
   }
+  const trimmedPrefix = prefixText.trim();
   const peer = parseIpv4Address(address);
   const base = parseIpv4Address(baseAddress.trim());
-  const prefixLength = Number.parseInt(prefixText.trim(), 10);
+  const prefixLength = /^\d{1,2}$/u.test(trimmedPrefix)
+    ? Number.parseInt(trimmedPrefix, 10)
+    : Number.NaN;
   if (
     peer === null ||
     base === null ||

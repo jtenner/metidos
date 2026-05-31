@@ -148,6 +148,22 @@ describe("forwarded HTTP helpers", () => {
     ).toBeFalse();
   });
 
+  it("rejects malformed trusted proxy CIDR prefixes", () => {
+    process.env.METIDOS_TRUST_PROXY = "true";
+    process.env.METIDOS_TRUSTED_PROXY_PEERS =
+      "192.168.0.0/16junk 10.0.0.0/-1 172.16.0.0/33";
+
+    expect(
+      isForwardedHeaderPeerTrusted({ peerAddress: "192.168.12.34" }),
+    ).toBeFalse();
+    expect(
+      isForwardedHeaderPeerTrusted({ peerAddress: "10.0.0.1" }),
+    ).toBeFalse();
+    expect(
+      isForwardedHeaderPeerTrusted({ peerAddress: "172.16.0.1" }),
+    ).toBeFalse();
+  });
+
   it("rejects forwarded origins when no allowlist is configured", () => {
     process.env.METIDOS_TRUST_PROXY = "true";
     delete process.env.METIDOS_PUBLIC_ORIGIN;
