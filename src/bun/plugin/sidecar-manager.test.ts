@@ -120,6 +120,7 @@ async function approvePlugin(
     {
       appDataDir,
       now: () => new Date("2026-04-28T12:00:00.000Z"),
+      stepUpVerified: true,
       username: "admin",
     },
   );
@@ -409,7 +410,10 @@ async function waitForPluginStatus(
   status: string,
 ) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    const inventory = await buildPluginInventoryWithLifecycle({ appDataDir });
+    const inventory = await buildPluginInventoryWithLifecycle({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const plugin = inventory.plugins.find(
       (item) => item.directoryName === directoryName,
     );
@@ -457,7 +461,10 @@ describe("plugin sidecar process manager", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-write-fail-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -545,7 +552,10 @@ describe("plugin sidecar process manager", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-write-timeout-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -599,7 +609,10 @@ describe("plugin sidecar process manager", () => {
 
   it("starts approved plugins with the default worker-thread runtime", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-worker-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -624,7 +637,10 @@ describe("plugin sidecar process manager", () => {
 
   it("starts and invokes a Python plugin through the default worker-thread runtime", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-python-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = join(pluginsDirectoryPath, "python_plugin");
     mkdirSync(pluginPath, { recursive: true });
@@ -715,7 +731,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-python-websocket-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const server = Bun.serve({
       fetch(request, bunServer) {
@@ -842,7 +861,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-worker-startup-host-request-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["log:write"] },
@@ -875,7 +897,10 @@ add_agent_tool({
 
   it("starts exactly one sidecar for each approved active plugin", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-active-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     writePlugin(pluginsDirectoryPath, "bravo_plugin");
@@ -934,7 +959,10 @@ add_agent_tool({
 
   it("registers plugin cron callbacks and invokes them with global context", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-cron-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["cron:create"] },
@@ -1033,7 +1061,10 @@ add_agent_tool({
 
   it("runs plugin cron callbacks once with general settings", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-user-cron-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const userSetting = {
       defaultValue: [],
@@ -1068,7 +1099,7 @@ add_agent_tool({
       directoryName: "alpha_plugin",
       patch: { feeds: ["https://example.test/feed.xml"] },
       pluginId: "alpha_plugin",
-      options: { appDataDir },
+      options: { appDataDir, stepUpVerified: true },
     });
 
     let process: ControllableFakeSidecarProcess | null = null;
@@ -1136,7 +1167,10 @@ add_agent_tool({
     process.env.METIDOS_APP_DATA_DIR = appDataDir;
     closeAppDatabase();
     try {
-      const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+      const pluginsDirectoryPath = getPluginsDirectoryPath({
+        appDataDir,
+        stepUpVerified: true,
+      });
       mkdirSync(pluginsDirectoryPath, { recursive: true });
       writePlugin(pluginsDirectoryPath, "alpha_plugin", {
         manifest: {
@@ -1231,7 +1265,10 @@ add_agent_tool({
     closeAppDatabase();
     resetResolvedAppDataDirectory();
     try {
-      const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+      const pluginsDirectoryPath = getPluginsDirectoryPath({
+        appDataDir,
+        stepUpVerified: true,
+      });
       mkdirSync(pluginsDirectoryPath, { recursive: true });
       writePlugin(pluginsDirectoryPath, "alpha_plugin", {
         manifest: {
@@ -1379,7 +1416,10 @@ add_agent_tool({
     process.env.METIDOS_APP_DATA_DIR = appDataDir;
     closeAppDatabase();
     try {
-      const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+      const pluginsDirectoryPath = getPluginsDirectoryPath({
+        appDataDir,
+        stepUpVerified: true,
+      });
       mkdirSync(pluginsDirectoryPath, { recursive: true });
       writePlugin(pluginsDirectoryPath, "alpha_plugin", {
         manifest: {
@@ -1534,7 +1574,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-cron-failure-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["cron:create", "log:write"] },
@@ -1662,7 +1705,10 @@ add_agent_tool({
 
   it("answers sidecar notification send requests with receipts", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-notify-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["notification:send"] },
@@ -1744,7 +1790,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-cron-notify-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["cron:create", "notification:send"] },
@@ -1863,7 +1912,10 @@ add_agent_tool({
 
   it("answers sidecar log requests by writing enabled plugin log files", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-log-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["log:write"] },
@@ -1922,7 +1974,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-log-diagnostics-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["log:write"] },
@@ -2010,7 +2065,10 @@ add_agent_tool({
 
   it("handles permissioned terminal host requests", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-terminal-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["terminal:create", "terminal:read", "unsafe"] },
@@ -2152,7 +2210,10 @@ add_agent_tool({
     globalThis.process.env.METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS =
       "alpha_plugin";
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-websocket-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const server = Bun.serve({
       fetch(request, bunServer) {
@@ -2253,7 +2314,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-terminal-deny-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["terminal:grep"] },
@@ -2315,7 +2379,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-static-model-provider-cache-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "model_plugin", {
       manifest: {
@@ -2389,7 +2456,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-model-provider-execute-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "model_plugin", {
       manifest: {
@@ -2432,7 +2502,7 @@ add_agent_tool({
       directoryName: "model_plugin",
       patch: { mode: "verbose" },
       pluginId: "model_plugin",
-      options: { appDataDir },
+      options: { appDataDir, stepUpVerified: true },
     });
 
     let process: ControllableFakeSidecarProcess | null = null;
@@ -2507,7 +2577,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-model-provider-pi-auth-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "model_plugin", {
       manifest: {
@@ -2550,7 +2623,7 @@ add_agent_tool({
     await updatePluginSettings({
       declarations: generalDeclarations,
       directoryName: "model_plugin",
-      options: { appDataDir },
+      options: { appDataDir, stepUpVerified: true },
       patch: { api_key: "Bearer general-key" },
       pluginId: "model_plugin",
     });
@@ -2626,7 +2699,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-model-provider-pending-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "openrouter", {
       manifest: {
@@ -2688,7 +2764,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-mixed-embedding-provider-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "openrouter", {
       manifest: {
@@ -2775,7 +2854,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-model-provider-refresh-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "model_plugin", {
       manifest: {
@@ -2965,7 +3047,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-provider-dispatch-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "provider_plugin", {
       manifest: {
@@ -3060,7 +3145,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-provider-skipped-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "provider_plugin", {
       manifest: {
@@ -3149,7 +3237,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-provider-failure-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "provider_plugin", {
       manifest: {
@@ -3234,7 +3325,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-notify-deny-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -3285,7 +3379,10 @@ add_agent_tool({
 
   it("captures only declared env vars for startup frames", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-env-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -3355,7 +3452,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-unsafe-network-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "safe_network_plugin", {
       manifest: {
@@ -3431,7 +3531,10 @@ add_agent_tool({
 
   it("sends runtime general settings to sidecars", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-settings-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "settings_plugin", {
       manifest: {
@@ -3517,7 +3620,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-settings-restart-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "settings_plugin", {
       manifest: {
@@ -3551,7 +3657,10 @@ add_agent_tool({
     });
 
     await manager.startApprovedPlugins();
-    const inventory = await buildPluginInventoryWithLifecycle({ appDataDir });
+    const inventory = await buildPluginInventoryWithLifecycle({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const plugin = inventory.plugins.find(
       (candidate) => candidate.directoryName === "settings_plugin",
     );
@@ -3559,7 +3668,7 @@ add_agent_tool({
     await updatePluginSettings({
       declarations: plugin?.manifest.settings ?? [],
       directoryName: "settings_plugin",
-      options: { appDataDir },
+      options: { appDataDir, stepUpVerified: true },
       patch: { enabled: true },
       pluginId: plugin?.pluginId ?? null,
     });
@@ -3591,7 +3700,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-missing-settings-call-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "settings_plugin", {
       manifest: {
@@ -3642,7 +3754,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-env-missing-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -3698,7 +3813,10 @@ add_agent_tool({
 
   it("seeds plugin .data only before the first successful activation", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-data-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin");
     mkdirSync(join(pluginPath, "seed", "config"), { recursive: true });
@@ -3746,7 +3864,10 @@ add_agent_tool({
 
   it("skips unapproved, disabled, needs-review, and missing plugins", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-skip-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "active_plugin");
     writePlugin(pluginsDirectoryPath, "disabled_plugin");
@@ -3765,7 +3886,7 @@ add_agent_tool({
     await approvePlugin(appDataDir, "needs_review_plugin");
     await runPluginLifecycleAction(
       { action: "disable", directoryName: "disabled_plugin" },
-      { appDataDir },
+      { appDataDir, stepUpVerified: true },
     );
     rmSync(missingPluginPath, { force: true, recursive: true });
     writeFileSync(
@@ -3806,7 +3927,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-refresh-snapshot-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -3843,7 +3967,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-refresh-restart-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: { permissions: ["files:read"] },
@@ -3876,11 +4003,11 @@ add_agent_tool({
     );
     await runPluginLifecycleAction(
       { action: "review_changes", directoryName: "alpha_plugin" },
-      { appDataDir },
+      { appDataDir, stepUpVerified: true },
     );
     const reapproval = await runPluginLifecycleAction(
       { action: "reapprove", directoryName: "alpha_plugin" },
-      { appDataDir },
+      { appDataDir, stepUpVerified: true },
     );
 
     const restart = await manager.startApprovedPlugins(reapproval.inventory);
@@ -3896,7 +4023,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-registrations-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -3947,7 +4077,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-duplicate-registration-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -4009,7 +4142,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-duplicate-gc-registration-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -4052,7 +4188,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-out-of-manifest-registration-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -4103,7 +4242,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-timeout-registration-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -4154,7 +4296,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-startup-timeout-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "slow_plugin");
     await approvePlugin(appDataDir, "slow_plugin");
@@ -4192,7 +4337,10 @@ add_agent_tool({
 
   it("marks one plugin startup failure without blocking unrelated sidecars", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-failure-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "bad_plugin");
     writePlugin(pluginsDirectoryPath, "good_plugin");
@@ -4213,7 +4361,10 @@ add_agent_tool({
     });
 
     const result = await manager.startApprovedPlugins();
-    const inventory = await buildPluginInventoryWithLifecycle({ appDataDir });
+    const inventory = await buildPluginInventoryWithLifecycle({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const statusByDirectoryName = new Map(
       inventory.plugins.map((plugin) => [plugin.directoryName, plugin.status]),
     );
@@ -4232,7 +4383,10 @@ add_agent_tool({
 
   it("restarts crashed sidecars while below the crash-loop threshold", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-restart-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4271,7 +4425,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-crash-loop-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4326,7 +4483,7 @@ add_agent_tool({
 
     const retryResult = await runPluginLifecycleAction(
       { action: "retry", directoryName: "alpha_plugin" },
-      { appDataDir },
+      { appDataDir, stepUpVerified: true },
     );
     const retryStart = await manager.retryPlugin("alpha_plugin");
     const retriedPlugin = await waitForPluginStatus(
@@ -4356,7 +4513,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-crash-prune-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4405,7 +4565,10 @@ add_agent_tool({
 
   it("retains the last 200 stderr lines with plugin identity", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-stderr-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4487,7 +4650,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-stderr-truncate-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4542,7 +4708,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-stdout-truncate-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4571,7 +4740,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-telemetry-opt-out-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "quiet_plugin", { telemetry: false });
     await approvePlugin(appDataDir, "quiet_plugin");
@@ -4616,7 +4788,10 @@ add_agent_tool({
 
   it("correlates sidecar responses by request id", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-rpc-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4668,7 +4843,10 @@ add_agent_tool({
     const appDataDir = createTempDirectory(
       "metidos-plugin-sidecar-operation-diagnostics-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "alpha_plugin");
     mkdirSync(join(pluginPath, ".data"), { recursive: true });
@@ -4755,7 +4933,10 @@ add_agent_tool({
 
   it("invokes the registered plugin GC callback with only the ~/ virtual root", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-gc-rpc-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       manifest: {
@@ -4814,7 +4995,10 @@ add_agent_tool({
 
   it("times out in-flight requests, sends cancellation, and terminates stale callbacks", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-timeout-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4850,7 +5034,10 @@ add_agent_tool({
 
   it("propagates caller cancellation to the sidecar", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-cancel-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4896,7 +5083,10 @@ add_agent_tool({
 
   it("fails all in-flight operations as unavailable when the sidecar exits", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-exit-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");
@@ -4937,7 +5127,10 @@ add_agent_tool({
 
   it("fails in-flight operations on wrong response ids", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-wrong-id-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin");
     await approvePlugin(appDataDir, "alpha_plugin");

@@ -145,7 +145,10 @@ describe("plugin inventory", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-inventory-examples-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(
       pluginsDirectoryPath,
@@ -158,7 +161,10 @@ describe("plugin inventory", () => {
       readExampleManifest("metidos-plugin-provider.json"),
     );
 
-    const inventory = await buildPluginInventory({ appDataDir });
+    const inventory = await buildPluginInventory({
+      appDataDir,
+      stepUpVerified: true,
+    });
 
     expect(inventory.plugins.map((plugin) => plugin.directoryName)).toEqual([
       "hello_tool",
@@ -194,7 +200,10 @@ describe("plugin inventory", () => {
 
   it("reports activation-blocking core manifest validation errors", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-inventory-core-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "missing_description", {
       id: "missing_description",
@@ -279,7 +288,10 @@ describe("plugin inventory", () => {
     });
     writeFileSync(join(invalidJsonPath, "metidos-plugin.json"), "{\n");
 
-    const inventory = await buildPluginInventory({ appDataDir });
+    const inventory = await buildPluginInventory({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const errorsByDirectory = new Map(
       inventory.plugins.map((plugin) => [
         plugin.directoryName,
@@ -354,7 +366,10 @@ describe("plugin inventory", () => {
 
   it("summarizes env declarations with masked secret review values", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-inventory-env-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const originalAlphaToken = process.env.ALPHA_TOKEN;
     const originalAlphaRegion = process.env.ALPHA_REGION;
@@ -373,7 +388,10 @@ describe("plugin inventory", () => {
         version: "1.0.0",
       });
 
-      const inventory = await buildPluginInventory({ appDataDir });
+      const inventory = await buildPluginInventory({
+        appDataDir,
+        stepUpVerified: true,
+      });
       expect(inventory.plugins[0]?.manifest.env).toEqual([
         {
           defaultValue: null,
@@ -413,7 +431,10 @@ describe("plugin inventory", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-inventory-declarations-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const manifest = (id: string, extra: Record<string, unknown>) => ({
       id,
@@ -500,7 +521,10 @@ describe("plugin inventory", () => {
       }),
     );
 
-    const inventory = await buildPluginInventory({ appDataDir });
+    const inventory = await buildPluginInventory({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const errorCodesByDirectory = new Map(
       inventory.plugins.map((plugin) => [
         plugin.directoryName,
@@ -545,7 +569,10 @@ describe("plugin inventory", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-inventory-v1-declarations-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const manifest = (id: string, extra: Record<string, unknown>) => ({
       id,
@@ -713,7 +740,10 @@ describe("plugin inventory", () => {
       }),
     );
 
-    const inventory = await buildPluginInventory({ appDataDir });
+    const inventory = await buildPluginInventory({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const errorCodesByDirectory = new Map(
       inventory.plugins.map((plugin) => [
         plugin.directoryName,
@@ -781,7 +811,10 @@ describe("plugin inventory", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-lifecycle-declarations-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "sqlite_plugin", {
       id: "sqlite_plugin",
@@ -806,7 +839,7 @@ describe("plugin inventory", () => {
           action: "enable",
           directoryName: "sqlite_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("storage:write");
     await expect(
@@ -815,14 +848,17 @@ describe("plugin inventory", () => {
           action: "enable",
           directoryName: "terminal_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("unsafe");
   });
 
   it("rejects lifecycle approval and review actions when core manifest validation fails", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-lifecycle-core-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "invalid_plugin", {
       id: "invalid_plugin",
@@ -839,7 +875,7 @@ describe("plugin inventory", () => {
             action,
             directoryName: "invalid_plugin",
           },
-          { appDataDir },
+          { appDataDir, stepUpVerified: true },
         ),
       ).rejects.toThrow(
         /metidosApiVersion.*#\/metidosApiVersion.*invalid_manifest_field_value/,
@@ -849,7 +885,10 @@ describe("plugin inventory", () => {
 
   it("groups discovered plugins by the v1 inventory labels and includes safe manifest summaries", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-inventory-groups-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "alpha_plugin", {
       id: "alpha_plugin",
@@ -1012,7 +1051,10 @@ describe("plugin inventory", () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-inventory-lifecycle-",
     );
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     for (const directoryName of [
       "active_plugin",
@@ -1031,7 +1073,10 @@ describe("plugin inventory", () => {
       });
     }
 
-    const snapshot = await discoverPluginCandidates({ appDataDir });
+    const snapshot = await discoverPluginCandidates({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const inventory = await buildPluginInventoryFromDiscoverySnapshot(
       snapshot,
       {
@@ -1060,10 +1105,15 @@ describe("plugin inventory", () => {
 
   it("reflects plugin folder additions and removals on subsequent inventory fetches", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-inventory-refresh-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
 
-    await expect(buildPluginInventory({ appDataDir })).resolves.toMatchObject({
+    await expect(
+      buildPluginInventory({ appDataDir, stepUpVerified: true }),
+    ).resolves.toMatchObject({
       plugins: [],
     });
 
@@ -1074,12 +1124,16 @@ describe("plugin inventory", () => {
       metidosApiVersion: "v1",
       description: "Appears after refresh.",
     });
-    await expect(buildPluginInventory({ appDataDir })).resolves.toMatchObject({
+    await expect(
+      buildPluginInventory({ appDataDir, stepUpVerified: true }),
+    ).resolves.toMatchObject({
       plugins: [expect.objectContaining({ directoryName: "refresh_plugin" })],
     });
 
     rmSync(pluginPath, { recursive: true, force: true });
-    await expect(buildPluginInventory({ appDataDir })).resolves.toMatchObject({
+    await expect(
+      buildPluginInventory({ appDataDir, stepUpVerified: true }),
+    ).resolves.toMatchObject({
       plugins: [],
     });
   });
@@ -1132,7 +1186,10 @@ describe("plugin inventory", () => {
 
   it("blocks plugin approval when root node_modules is present", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-node-modules-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(
       pluginsDirectoryPath,
@@ -1153,7 +1210,7 @@ describe("plugin inventory", () => {
           action: "enable",
           directoryName: "node_modules_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("node_modules");
   });
@@ -1167,7 +1224,10 @@ describe("plugin inventory", () => {
       const outsidePath = createTempDirectory(
         "metidos-plugin-symlink-outside-",
       );
-      const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+      const pluginsDirectoryPath = getPluginsDirectoryPath({
+        appDataDir,
+        stepUpVerified: true,
+      });
       mkdirSync(pluginsDirectoryPath, { recursive: true });
       const pluginPath = writePlugin(pluginsDirectoryPath, "symlink_plugin", {
         id: "symlink_plugin",
@@ -1194,7 +1254,7 @@ describe("plugin inventory", () => {
             action: "enable",
             directoryName: "symlink_plugin",
           },
-          { appDataDir },
+          { appDataDir, stepUpVerified: true },
         ),
       ).rejects.toThrow("symlink");
     },
@@ -1202,7 +1262,10 @@ describe("plugin inventory", () => {
 
   it("persists admin lifecycle approval, review, disable, and retry state without executing plugin code", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-lifecycle-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "review_plugin", {
       id: "review_plugin",
@@ -1219,6 +1282,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:00:00Z"),
         username: "admin",
       },
@@ -1294,6 +1358,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:05:00Z"),
         username: "admin",
       },
@@ -1310,6 +1375,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:06:00Z"),
         username: "admin",
       },
@@ -1327,6 +1393,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:07:00Z"),
         username: "admin",
       },
@@ -1344,6 +1411,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:08:00Z"),
         username: "admin",
       },
@@ -1356,7 +1424,10 @@ describe("plugin inventory", () => {
 
   it("restores approved lifecycle records across inventory rebuilds and preserves activated-once through review", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-lifecycle-restore-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "restore_plugin", {
       id: "restore_plugin",
@@ -1373,6 +1444,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:10:00Z"),
         username: "admin",
       },
@@ -1425,6 +1497,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:12:00Z"),
         username: "admin",
       },
@@ -1441,6 +1514,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:13:00Z"),
         username: "admin",
       },
@@ -1471,7 +1545,10 @@ describe("plugin inventory", () => {
 
   it("clears retryable runtime crash-loop state without changing the approval hash", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-retry-state-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "retry_plugin", {
       id: "retry_plugin",
@@ -1488,6 +1565,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T04:00:00Z"),
         username: "admin",
       },
@@ -1526,6 +1604,7 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T04:02:00Z"),
         username: "admin",
       },
@@ -1566,7 +1645,10 @@ describe("plugin inventory", () => {
 
   it("keeps missing approved plugin folders visible as unavailable lifecycle records", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-missing-record-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "missing_plugin", {
       id: "missing_plugin",
@@ -1583,13 +1665,17 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T03:30:00Z"),
         username: "admin",
       },
     );
     rmSync(pluginPath, { recursive: true, force: true });
 
-    const inventory = await buildPluginInventoryWithLifecycle({ appDataDir });
+    const inventory = await buildPluginInventoryWithLifecycle({
+      appDataDir,
+      stepUpVerified: true,
+    });
     expect(inventory.groups.map((group) => [group.label, group.count])).toEqual(
       [
         ["Uninitialized", 0],
@@ -1629,7 +1715,10 @@ describe("plugin inventory", () => {
 
   it("exposes admin data and log entry points with storage reset and GC capability reasons", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-admin-actions-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     const pluginPath = writePlugin(pluginsDirectoryPath, "admin_plugin", {
       id: "admin_plugin",
@@ -1670,12 +1759,16 @@ describe("plugin inventory", () => {
       },
       {
         appDataDir,
+        stepUpVerified: true,
         now: () => new Date("2026-04-28T04:00:00Z"),
         username: "admin",
       },
     );
 
-    const inventory = await buildPluginInventoryWithLifecycle({ appDataDir });
+    const inventory = await buildPluginInventoryWithLifecycle({
+      appDataDir,
+      stepUpVerified: true,
+    });
     const plugin = inventory.plugins[0];
     expect(plugin).toMatchObject({
       dataUsage: {
@@ -1723,7 +1816,7 @@ describe("plugin inventory", () => {
           action: "open_data",
           directoryName: "admin_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).resolves.toMatchObject({
       path: join(pluginPath, ".data"),
@@ -1735,7 +1828,7 @@ describe("plugin inventory", () => {
           action: "reset_data",
           directoryName: "admin_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("typing the plugin folder name");
     await expect(
@@ -1744,7 +1837,7 @@ describe("plugin inventory", () => {
           action: "run_gc",
           directoryName: "admin_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("Plugin GC runtime hook is not available");
 
@@ -1758,6 +1851,7 @@ describe("plugin inventory", () => {
         },
         {
           appDataDir,
+          stepUpVerified: true,
           runPluginGc: (directoryName) => {
             runtimeEvents.push(`gc:${directoryName}`);
           },
@@ -1838,14 +1932,17 @@ describe("plugin inventory", () => {
           action: "open_data",
           directoryName: "../admin_plugin",
         },
-        { appDataDir },
+        { appDataDir, stepUpVerified: true },
       ),
     ).rejects.toThrow("invalid");
   });
 
   it("allows only admin callers to fetch or mutate local plugin lifecycle details", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-inventory-auth-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "auth_plugin", {
       id: "auth_plugin",
@@ -1901,7 +1998,10 @@ describe("plugin inventory", () => {
 
   it("uses step-up only for plugin actions that approve or run code", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-step-up-policy-");
-    const pluginsDirectoryPath = getPluginsDirectoryPath({ appDataDir });
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
     mkdirSync(pluginsDirectoryPath, { recursive: true });
     writePlugin(pluginsDirectoryPath, "step_policy_plugin", {
       gc: { enabled: true, timeoutMs: 1000 },

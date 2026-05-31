@@ -41,7 +41,7 @@ function useTempAppData(): string {
 
 function writeTestPlugin(appDataDir: string, directoryName: string): void {
   const pluginPath = join(
-    getPluginsDirectoryPath({ appDataDir }),
+    getPluginsDirectoryPath({ appDataDir, stepUpVerified: true }),
     directoryName,
   );
   mkdirSync(pluginPath, { recursive: true });
@@ -76,6 +76,7 @@ async function approveTestPlugin(
     { action: "enable", directoryName },
     {
       appDataDir,
+      stepUpVerified: true,
       now: () => new Date("2026-05-08T18:00:00.000Z"),
       username: "admin",
     },

@@ -138,8 +138,64 @@ type PluginReviewHashResult = PluginReviewHashFailure | PluginReviewHashSuccess;
 
 type LifecycleActionContext = {
   now?: () => Date;
+  stepUpVerified?: boolean;
   username?: string | null;
 };
+
+export function pluginLifecycleActionRequiresStepUp(
+  action: RpcPluginLifecycleAction,
+): boolean {
+  switch (action) {
+    case "enable":
+    case "reapprove":
+    case "retry":
+      return true;
+    case "disable":
+    case "review_changes":
+      return false;
+  }
+}
+
+export function pluginAdminActionRequiresStepUp(
+  action: RpcPluginAdminAction,
+): boolean {
+  switch (action) {
+    case "run_gc":
+      return true;
+    case "open_data":
+    case "open_logs":
+    case "reset_data":
+      return false;
+  }
+}
+
+function assertLifecycleStepUpVerified(
+  action: RpcPluginLifecycleAction,
+  options: LifecycleActionContext,
+): void {
+  if (!pluginLifecycleActionRequiresStepUp(action)) {
+    return;
+  }
+  if (options.stepUpVerified !== true) {
+    throw new Error(
+      "Plugin lifecycle action requires recent step-up authentication.",
+    );
+  }
+}
+
+function assertPluginAdminStepUpVerified(
+  action: RpcPluginAdminAction,
+  options: LifecycleActionContext,
+): void {
+  if (!pluginAdminActionRequiresStepUp(action)) {
+    return;
+  }
+  if (options.stepUpVerified !== true) {
+    throw new Error(
+      "Plugin local action requires recent step-up authentication.",
+    );
+  }
+}
 
 export type PluginAdminRuntimeHooks = {
   recordPluginDataResetAudit?: (input: {
@@ -1466,6 +1522,7 @@ export async function runPluginLifecycleAction(
   },
   options: AppDataPathOptions & LifecycleActionContext = {},
 ): Promise<RpcPluginLifecycleActionResult> {
+  assertLifecycleStepUpVerified(params.action, options);
   const { plugin, reviewHash, stateFile } = await (params.action === "disable"
     ? loadLifecycleDisableTarget(params.directoryName, options)
     : loadLifecycleActionTarget(params.directoryName, options));
@@ -1655,6 +1712,7 @@ export async function runPluginAdminAction(
     LifecycleActionContext &
     PluginAdminRuntimeHooks = {},
 ): Promise<RpcPluginAdminActionResult> {
+  assertPluginAdminStepUpVerified(params.action, options);
   assertDirectoryName(params.directoryName);
   const snapshot = await discoverPluginCandidates(options);
   const candidate = snapshot.candidates.find(

@@ -18,6 +18,8 @@ import {
 } from "../plugin/ingress-store";
 import {
   buildPluginInventoryWithLifecycle,
+  pluginAdminActionRequiresStepUp,
+  pluginLifecycleActionRequiresStepUp,
   type PluginAdminRuntimeHooks,
   runPluginAdminAction,
   runPluginLifecycleAction,
@@ -35,8 +37,6 @@ import {
 } from "../thread-permissions";
 import type {
   AppRPCSchema,
-  RpcPluginAdminAction,
-  RpcPluginLifecycleAction,
   RpcRequestContext,
 } from "../rpc-schema";
 import {
@@ -52,32 +52,10 @@ import {
   workspacePathScopeForLocalOperator,
 } from "./workspace-path-policy";
 
-function pluginLifecycleActionRequiresStepUp(
-  action: RpcPluginLifecycleAction,
-): boolean {
-  switch (action) {
-    case "enable":
-    case "reapprove":
-    case "retry":
-      return true;
-    case "disable":
-    case "review_changes":
-      return false;
-  }
-}
-
-function pluginAdminActionRequiresStepUp(
-  action: RpcPluginAdminAction,
-): boolean {
-  switch (action) {
-    case "run_gc":
-      return true;
-    case "open_data":
-    case "open_logs":
-    case "reset_data":
-      return false;
-  }
-}
+export {
+  pluginAdminActionRequiresStepUp,
+  pluginLifecycleActionRequiresStepUp,
+} from "../plugin/lifecycle";
 
 export async function getPluginInventoryProcedure(
   _params: AppRPCSchema["requests"]["getPluginInventory"]["params"],
@@ -409,6 +387,7 @@ export async function runPluginLifecycleActionProcedure(
     requireLocalOperatorCapability(context, "recent_step_up");
   }
   return await runPluginLifecycleAction(params, {
+    stepUpVerified: true,
     username: getLocalOperatorProfile(context).username,
   });
 }
@@ -424,6 +403,7 @@ export async function runPluginAdminActionProcedure(
   }
   return await runPluginAdminAction(params, {
     ...runtimeHooks,
+    stepUpVerified: true,
     recordPluginDataResetAudit: async (input) => {
       await runtimeHooks.recordPluginDataResetAudit?.(input);
       createSecurityAuditEvent(initAppDatabase(), {
