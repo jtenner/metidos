@@ -553,7 +553,7 @@ describe("auth service", () => {
     } satisfies Partial<AuthServiceError>);
   });
 
-  it("does not lock out for invalid recovery code when the primary factor is correct", async () => {
+  it("locks out after repeated invalid recovery codes when the primary factor is correct", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();
     const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
@@ -594,14 +594,16 @@ describe("auth service", () => {
         primaryFactor: TEST_ADMIN_PIN,
         recoveryCode: "INVALID-CODE-3",
       }),
-    ).rejects.toThrow("The provided credentials are invalid.");
+    ).rejects.toThrow(
+      "Too many failed authentication attempts. Try again later.",
+    );
 
-    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(0);
+    expect(getAuthSettings(database)?.lockedUntil).not.toBeNull();
     expect(
       listSecurityAuditEvents(database).some(
         (event) => event.eventType === "auth_lockout_started",
       ),
-    ).toBeFalse();
+    ).toBeTrue();
   });
 
   it("rejects additional legacy provisioning after the local operator is configured", async () => {

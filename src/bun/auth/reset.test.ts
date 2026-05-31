@@ -110,11 +110,11 @@ describe("auth reset CLI helpers", () => {
     await expect(
       login(database, {
         appDataDir,
-        nowMs: setupTimeMs + 2_000,
+        nowMs: setupTimeMs + 35_000,
         primaryFactor: TEST_ADMIN_PIN,
         totpCode: await generateTotpCode(
           enrollment.totpSecret,
-          setupTimeMs + 2_000,
+          setupTimeMs + 35_000,
         ),
         username: TEST_USERNAME,
       }),
@@ -122,11 +122,11 @@ describe("auth reset CLI helpers", () => {
 
     const loginResult = await login(database, {
       appDataDir,
-      nowMs: setupTimeMs + 3_000,
+      nowMs: setupTimeMs + 70_000,
       primaryFactor: "correct horse battery staple",
       totpCode: await generateTotpCode(
         enrollment.totpSecret,
-        setupTimeMs + 3_000,
+        setupTimeMs + 70_000,
       ),
       username: TEST_USERNAME,
     });
@@ -181,11 +181,11 @@ describe("auth reset CLI helpers", () => {
     await expect(
       login(database, {
         appDataDir,
-        nowMs: setupTimeMs + 2_000,
+        nowMs: setupTimeMs + 35_000,
         primaryFactor: TEST_ADMIN_PIN,
         totpCode: await generateTotpCode(
           enrollment.totpSecret,
-          setupTimeMs + 2_000,
+          setupTimeMs + 35_000,
         ),
         username: TEST_USERNAME,
       }),
@@ -193,11 +193,11 @@ describe("auth reset CLI helpers", () => {
 
     const loginResult = await login(database, {
       appDataDir,
-      nowMs: setupTimeMs + 3_000,
+      nowMs: setupTimeMs + 70_000,
       primaryFactor: "931857",
       totpCode: await generateTotpCode(
         enrollment.totpSecret,
-        setupTimeMs + 3_000,
+        setupTimeMs + 70_000,
       ),
       username: TEST_USERNAME,
     });

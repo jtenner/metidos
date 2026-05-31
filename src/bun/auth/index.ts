@@ -9,6 +9,8 @@ import type { AuthPrimaryFactorType } from "../db";
 
 const PRIMARY_FACTOR_HASH_OPTIONS = {
   algorithm: "argon2id",
+  memoryCost: 19_456,
+  timeCost: 2,
 } as const;
 const RFC4648_BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

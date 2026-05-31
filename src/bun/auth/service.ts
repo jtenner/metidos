@@ -6,6 +6,10 @@
 export {
   AUTH_CSRF_COOKIE_NAME,
   AUTH_CSRF_TOKEN_MAX_AGE_SECONDS,
+  appendAllClearedSessionCookies,
+  appendAllClearedWebSocketTicketCookies,
+  buildAllClearedSessionCookieHeaders,
+  buildAllClearedWebSocketTicketCookieHeaders,
   buildAuthCsrfCookieHeader,
   buildClearedSessionCookieHeader,
   buildClearedWebSocketTicketCookieHeader,

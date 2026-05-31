@@ -34,9 +34,9 @@ import { resetPrimaryFactorFromSession } from "./auth/reset";
 import { migrateTotpAuthSecretsOnStartup } from "./auth/secret-migration";
 import {
   AuthServiceError,
+  appendAllClearedSessionCookies,
+  appendAllClearedWebSocketTicketCookies,
   buildAuthCsrfCookieHeader,
-  buildClearedSessionCookieHeader,
-  buildClearedWebSocketTicketCookieHeader,
   buildLogoutClearSiteDataHeader,
   buildSessionCookieHeader,
   buildWebSocketTicketCookieHeader,
@@ -1524,20 +1524,10 @@ function authErrorResponse(
 ): Response {
   const headers = new Headers();
   if (options?.clearSessionCookie) {
-    headers.append(
-      "set-cookie",
-      buildClearedSessionCookieHeader(
-        isSecureRequest(request, { publicTls: TLS_RUNTIME.publicTls }),
-      ),
-    );
+    appendAllClearedSessionCookies(headers);
   }
   if (options?.clearWebSocketTicketCookie) {
-    headers.append(
-      "set-cookie",
-      buildClearedWebSocketTicketCookieHeader(
-        isSecureRequest(request, { publicTls: TLS_RUNTIME.publicTls }),
-      ),
-    );
+    appendAllClearedWebSocketTicketCookies(headers);
   }
 
   if (error instanceof AuthServiceError) {
@@ -1749,9 +1739,11 @@ async function handleAuthRequest(
         },
         200,
         sessionId && !status.authenticated
-          ? {
-              "set-cookie": buildClearedSessionCookieHeader(secureCookie),
-            }
+          ? (() => {
+              const headers = new Headers();
+              appendAllClearedSessionCookies(headers);
+              return headers;
+            })()
           : undefined,
       );
     }
@@ -1979,14 +1971,8 @@ async function handleAuthRequest(
       await shutdownActiveThreadTurns();
 
       const headers = new Headers();
-      headers.append(
-        "set-cookie",
-        buildClearedSessionCookieHeader(secureCookie),
-      );
-      headers.append(
-        "set-cookie",
-        buildClearedWebSocketTicketCookieHeader(secureCookie),
-      );
+      appendAllClearedSessionCookies(headers);
+      appendAllClearedWebSocketTicketCookies(headers);
       return respondAuthJson(
         {
           ok: true,
@@ -2041,14 +2027,8 @@ async function handleAuthRequest(
       await shutdownActiveThreadTurns();
 
       const headers = new Headers();
-      headers.append(
-        "set-cookie",
-        buildClearedSessionCookieHeader(secureCookie),
-      );
-      headers.append(
-        "set-cookie",
-        buildClearedWebSocketTicketCookieHeader(secureCookie),
-      );
+      appendAllClearedSessionCookies(headers);
+      appendAllClearedWebSocketTicketCookies(headers);
       return respondAuthJson(
         {
           ok: true,
@@ -2068,14 +2048,8 @@ async function handleAuthRequest(
         );
       }
       const headers = new Headers();
-      headers.append(
-        "set-cookie",
-        buildClearedSessionCookieHeader(secureCookie),
-      );
-      headers.append(
-        "set-cookie",
-        buildClearedWebSocketTicketCookieHeader(secureCookie),
-      );
+      appendAllClearedSessionCookies(headers);
+      appendAllClearedWebSocketTicketCookies(headers);
       headers.set("clear-site-data", buildLogoutClearSiteDataHeader());
       return respondAuthJson(
         {

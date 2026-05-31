@@ -242,6 +242,32 @@ export function buildClearedWebSocketTicketCookieHeader(
   return parts.join("; ");
 }
 
+export function buildAllClearedSessionCookieHeaders(): string[] {
+  return [
+    buildClearedSessionCookieHeader(false),
+    buildClearedSessionCookieHeader(true),
+  ];
+}
+
+export function buildAllClearedWebSocketTicketCookieHeaders(): string[] {
+  return [
+    buildClearedWebSocketTicketCookieHeader(false),
+    buildClearedWebSocketTicketCookieHeader(true),
+  ];
+}
+
+export function appendAllClearedSessionCookies(headers: Headers): void {
+  for (const cookie of buildAllClearedSessionCookieHeaders()) {
+    headers.append("set-cookie", cookie);
+  }
+}
+
+export function appendAllClearedWebSocketTicketCookies(headers: Headers): void {
+  for (const cookie of buildAllClearedWebSocketTicketCookieHeaders()) {
+    headers.append("set-cookie", cookie);
+  }
+}
+
 /**
  * Serialize Clear-Site-Data for logout responses so browser caches and storage
  * are dropped alongside explicit cookie expiration.

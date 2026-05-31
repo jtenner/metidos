@@ -17,6 +17,7 @@ import {
   listKnownAuthUsernames,
   replaceAuthRecoveryCodeHashes,
   resetAuthFailureState,
+  tryAdvanceTotpLastUsedCounter,
   type UserRecord,
   upsertAuthSettings,
 } from "../db";
@@ -25,7 +26,7 @@ import {
   hashPrimaryFactor,
   hashRecoveryCode,
   parseStoredTotpSecret,
-  verifyTotpCode,
+  verifyTotpMatchedCounter,
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
@@ -361,7 +362,7 @@ export async function resetPrimaryFactorFromSession(
   }
 
   const parsedTotpSecret = parseStoredTotpSecret(totpSecret);
-  const totpValid = await verifyTotpCode(
+  const matchedCounter = await verifyTotpMatchedCounter(
     parsedTotpSecret.secret,
     input.totpCode,
     {
@@ -369,6 +370,9 @@ export async function resetPrimaryFactorFromSession(
       atMs: now.getTime(),
     },
   );
+  const totpValid =
+    matchedCounter !== null &&
+    tryAdvanceTotpLastUsedCounter(database, matchedCounter, session.userId);
   if (!totpValid) {
     const failure = incrementFailedAttempts(database, session.userId, now);
     recordInvalidAuthAttempt(database, {
