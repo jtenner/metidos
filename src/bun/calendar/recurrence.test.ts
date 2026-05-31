@@ -103,6 +103,25 @@ describe("calendar recurrence", () => {
     ).toThrow(/ambiguous/);
   });
 
+  test("filters recurrences that only match the one-day lookback window", () => {
+    const occurrences = expandCalendarOccurrences(
+      {
+        eventId: 1,
+        startAt: "2026-06-01T14:00:00.000Z",
+        endAt: "2026-06-01T15:00:00.000Z",
+        startDate: null,
+        endDate: null,
+        allDay: false,
+        recurrenceRule: "RRULE:FREQ=DAILY;COUNT=3",
+      },
+      "2026-06-02T12:00:00.000Z",
+      "2026-06-03T12:00:00.000Z",
+    );
+    expect(occurrences.map((item) => item.originalStart)).toEqual([
+      "2026-06-02T14:00:00.000Z",
+    ]);
+  });
+
   test("keeps UTC recurrence expansion unchanged", () => {
     const occurrences = expandCalendarOccurrences(
       {

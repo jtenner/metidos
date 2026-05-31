@@ -162,6 +162,21 @@ function baseStartDate(input: RecurrenceExpansionInput): Date {
     : parseIsoDate(input.startAt ?? "");
 }
 
+function occurrenceOverlapsWindow(
+  input: RecurrenceExpansionInput,
+  occurrence: ExpandedOccurrenceTime,
+  windowStart: Date,
+  windowEnd: Date,
+): boolean {
+  const comparableStart = input.allDay
+    ? parseAllDayDate(occurrence.startDate ?? "")
+    : parseIsoDate(occurrence.startAt ?? "");
+  const comparableEnd = input.allDay
+    ? parseAllDayDate(occurrence.endDate ?? occurrence.startDate ?? "")
+    : parseIsoDate(occurrence.endAt ?? occurrence.startAt ?? "");
+  return comparableEnd > windowStart && comparableStart < windowEnd;
+}
+
 function validTimezone(timezone: string | null | undefined): string {
   const value = timezone?.trim() || "UTC";
   try {
@@ -395,7 +410,11 @@ export function expandCalendarOccurrences(
     );
     return between
       .map((start) => occurrenceFromZonedFloatingStart(input, start, timezone))
-      .filter((occurrence) => !exclusionSet.has(occurrence.originalStart));
+      .filter(
+        (occurrence) =>
+          !exclusionSet.has(occurrence.originalStart) &&
+          occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
+      );
   }
 
   const rule = rrulestr(recurrenceRule, {
@@ -411,7 +430,11 @@ export function expandCalendarOccurrences(
   );
   return between
     .map((start) => occurrenceFromStart(input, start))
-    .filter((occurrence) => !exclusionSet.has(occurrence.originalStart));
+    .filter(
+      (occurrence) =>
+        !exclusionSet.has(occurrence.originalStart) &&
+        occurrenceOverlapsWindow(input, occurrence, windowStart, windowEnd),
+    );
 }
 
 export function buildRRuleFromUi(input: {
