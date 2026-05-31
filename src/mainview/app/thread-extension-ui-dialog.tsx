@@ -52,7 +52,6 @@ export function ThreadExtensionUiDialog({
     <ModalDialogSurface
       aria-describedby={descriptionId}
       aria-labelledby={titleId}
-      backdropClassName="absolute inset-0 bg-black/72"
       backdropLabel="Cancel extension prompt"
       className="w-full max-w-xl rounded-md border border-border-default bg-bg-canvas p-0 text-text-primary shadow-overlay"
       initialFocusRef={dialog.method === "editor" ? editorRef : inputRef}
@@ -70,7 +69,7 @@ export function ThreadExtensionUiDialog({
           Pi Extension
         </div>
         <div
-          className="mb-2 text-lg font-semibold text-text-primary"
+          className="mb-2 text-base font-semibold text-text-primary"
           id={titleId}
         >
           {dialog.title}

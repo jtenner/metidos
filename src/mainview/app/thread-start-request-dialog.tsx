@@ -53,7 +53,7 @@ export function ThreadStartRequestDialog({
       <AppButton
         unstyled
         aria-label="Dismiss new thread request"
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-bg-app/80"
         disabled={busy}
         onClick={onDismiss}
         type="button"
@@ -76,7 +76,7 @@ export function ThreadStartRequestDialog({
           New Thread Request
         </div>
         <div
-          className="mb-2 text-lg font-semibold text-text-primary"
+          className="mb-2 text-base font-semibold text-text-primary"
           id={titleId}
         >
           Create a thread for this workspace?

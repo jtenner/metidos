@@ -240,8 +240,8 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Style: type scale, focus, and tab semantics
 
-- [ ] Replace `text-lg` with `text-base` in `src/mainview/app/thread-start-request-dialog.tsx` to stay within the approved 16px max text scale.
-- [ ] Replace `text-lg` with `text-base` in `src/mainview/app/thread-extension-ui-dialog.tsx` to stay within the approved 16px max text scale.
+- [x] Replace `text-lg` with `text-base` in `src/mainview/app/thread-start-request-dialog.tsx` to stay within the approved 16px max text scale.
+- [x] Replace `text-lg` with `text-base` in `src/mainview/app/thread-extension-ui-dialog.tsx` to stay within the approved 16px max text scale.
 - [ ] Add consistent `focus-visible` styling to the interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`.
 - [ ] Complete the ARIA tab pattern for interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`: roving `tabIndex`, arrow-key handling, and `aria-controls`.
 
@@ -260,8 +260,8 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Style: semantic backdrops, cards, blur, badges, and spacing
 
-- [ ] Replace raw `bg-black/60` backdrop in `src/mainview/app/thread-start-request-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
-- [ ] Replace raw `bg-black/72` backdrop in `src/mainview/app/thread-extension-ui-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
+- [x] Replace raw `bg-black/60` backdrop in `src/mainview/app/thread-start-request-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
+- [x] Replace raw `bg-black/72` backdrop in `src/mainview/app/thread-extension-ui-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
 - [ ] Remove card-like/decorative styling from the inline folder suggestion list in `src/mainview/app/projects-panel.tsx`, including sidebar `shadow-overlay`/`backdrop-blur-xl` drift.
 - [ ] Remove card-like bordered `bg-surface-1` treatment from the add-project form in `src/mainview/app/projects-panel.tsx` or align it with approved non-card primitives.
 - [ ] Replace decorative icon tiles in `src/mainview/app/settings-panel.tsx` with approved icon/section styling.
