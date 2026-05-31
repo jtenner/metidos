@@ -64,11 +64,34 @@ export default { definePlugin, metidos, atob, btoa };
 `;
 
 const QUICKJS_FORBIDDEN_GLOBALS_SOURCE = `
+const __metidosBlockDynamicCode = () => {
+  throw new Error("Dynamic code execution is not allowed in plugin QuickJS.");
+};
 for (const forbiddenGlobal of ["Bun", "fetch", "process", "require", "setTimeout", "setInterval", "queueMicrotask", "eval", "Function"]) {
   Object.defineProperty(globalThis, forbiddenGlobal, {
     configurable: false,
     enumerable: false,
     value: undefined,
+    writable: false,
+  });
+}
+for (const dynamicConstructor of [
+  (function () {}).constructor,
+  (async function () {}).constructor,
+  (function* () {}).constructor,
+]) {
+  if (typeof dynamicConstructor !== "function") {
+    continue;
+  }
+  Object.defineProperty(dynamicConstructor, "constructor", {
+    configurable: false,
+    enumerable: false,
+    value: __metidosBlockDynamicCode,
+    writable: false,
+  });
+  Object.defineProperty(dynamicConstructor, "prototype", {
+    configurable: false,
+    value: dynamicConstructor.prototype,
     writable: false,
   });
 }

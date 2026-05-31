@@ -84,6 +84,14 @@ describe("shared plugin API runtime bootstrap", () => {
     });
   });
 
+  it("includes constructor hardening in shared bootstrap source", () => {
+    const source = metidosPluginApiRuntimeSource({
+      callbackInvocationToken: "token",
+    });
+    expect(source).toContain("__metidosBlockDynamicCode");
+    expect(source).toContain("(async function () {}).constructor");
+  });
+
   it("lazily decodes base64 fetch payloads for text and JSON callers", async () => {
     const response = createFetchResponse({
       bodyBase64: "eyJvayI6dHJ1ZX0=",
