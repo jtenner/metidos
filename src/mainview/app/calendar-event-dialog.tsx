@@ -126,7 +126,16 @@ export function CalendarEventDialog({
     });
     let startAt: string | null = null;
     let endAt: string | null = null;
-    if (!allDay) {
+    if (allDay) {
+      if (!startDate || !endDate) {
+        setFormError("Choose a start and end date before saving.");
+        return;
+      }
+      if (endDate < startDate) {
+        setFormError("End date must be the same as or after the start date.");
+        return;
+      }
+    } else {
       try {
         startAt = datetimeLocalInputToIso(start);
         endAt = datetimeLocalInputToIso(end);
@@ -134,6 +143,10 @@ export function CalendarEventDialog({
         setFormError(
           dateError instanceof Error ? dateError.message : String(dateError),
         );
+        return;
+      }
+      if (Date.parse(endAt) < Date.parse(startAt)) {
+        setFormError("End time must be the same as or after the start time.");
         return;
       }
     }

@@ -197,7 +197,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Fix recurrence data loss on edit in `src/mainview/app/calendar-event-form-helpers.ts`: add a read-only/custom repeat option, avoid substring-only RRULE classification, and preserve unsupported or rich recurrence rules unless the user explicitly selects a supported preset.
 - [ ] Fix day-grouping timezone inconsistency in `src/mainview/app/calendar-layout.ts`: choose one date-key strategy for all-day and timed events so same-date events do not land in different visible day columns for non-UTC viewers.
-- [ ] Add end-date/end-time validation in `src/mainview/app/calendar-event-dialog.tsx`: reject timed and all-day ranges where end is before start before calling `onSave`.
+- [x] Add end-date/end-time validation in `src/mainview/app/calendar-event-dialog.tsx`: reject timed and all-day ranges where end is before start before calling `onSave`.
 - [ ] Fix month focus highlight desync in `src/mainview/app/calendar-workspace.tsx`: update `focusedCalendarDateValue` when Prev, Next, Today, or the date input changes the visible month/date.
 - [ ] Add an in-flight save guard in `src/mainview/app/calendar-workspace.tsx` so double-submit cannot create duplicate events.
 - [x] Route the header close button through the busy-aware close handler in `src/mainview/app/calendar-edit-dialog.tsx` so dialogs cannot close mid-save/delete.
