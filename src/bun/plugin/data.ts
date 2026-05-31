@@ -28,6 +28,24 @@ export const PLUGIN_SEED_DIRECTORY_NAME = "seed";
 const MAX_PLUGIN_DATA_QUOTA_SCAN_FILES = 50_000;
 const MAX_PLUGIN_DATA_QUOTA_SCAN_ENTRIES = 100_000;
 const MAX_PLUGIN_DATA_QUOTA_SCAN_BYTES = 512 * 1024 * 1024;
+const pluginDataQuotaQueues = new Map<string, Promise<void>>();
+
+export async function withPluginDataQuotaLock<T>(
+  pluginPath: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const key = resolve(pluginPath);
+  const previous = pluginDataQuotaQueues.get(key) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  pluginDataQuotaQueues.set(
+    key,
+    current.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return current;
+}
 const MAX_PLUGIN_DATA_QUOTA_SCAN_DEPTH = 64;
 
 export type PluginDataProvisionResult = {
@@ -473,23 +491,25 @@ async function enforceQuotaForPlannedStorageChange(input: {
   replacedUsage: PluginDataQuotaUsage;
   runGc?: PluginDataGcRunner | undefined;
 }): Promise<void> {
-  try {
-    await assertQuotaForPlannedStorageChange(input);
-  } catch (error) {
-    if (
-      !(error instanceof PluginDataQuotaError) ||
-      error.code !== "plugin_data_quota_exceeded" ||
-      !input.runGc
-    ) {
-      throw error;
+  return withPluginDataQuotaLock(input.pluginPath, async () => {
+    try {
+      await assertQuotaForPlannedStorageChange(input);
+    } catch (error) {
+      if (
+        !(error instanceof PluginDataQuotaError) ||
+        error.code !== "plugin_data_quota_exceeded" ||
+        !input.runGc
+      ) {
+        throw error;
+      }
+      await runPluginDataGc({
+        pluginPath: input.pluginPath,
+        reason: "quota_preflight",
+        runGc: input.runGc,
+      });
+      await assertQuotaForPlannedStorageChange(input);
     }
-    await runPluginDataGc({
-      pluginPath: input.pluginPath,
-      reason: "quota_preflight",
-      runGc: input.runGc,
-    });
-    await assertQuotaForPlannedStorageChange(input);
-  }
+  });
 }
 
 function byteLengthOfContents(contents: string | Uint8Array): number {

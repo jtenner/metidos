@@ -14,6 +14,7 @@ import {
   calculatePluginDataQuotaUsage,
   PluginDataQuotaError,
   type PluginDataQuotaSettings,
+  withPluginDataQuotaLock,
 } from "./data";
 import {
   pruneLruMapToMaxEntries,
@@ -1224,35 +1225,37 @@ async function runPluginSqliteStatementWithQuotaGuard(input: {
   statement: ReturnType<Database["prepare"]>;
   virtualPath: string;
 }): Promise<ReturnType<ReturnType<Database["prepare"]>["run"]>> {
-  input.database.run(`SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`);
-  let savepointOpen = true;
-  try {
-    const runResult = input.statement.run(...input.bindings);
-    await maybeAssertPluginSqliteQuotaAfterWrite({
-      cacheKey: input.cacheKey,
-      pluginPath: input.pluginPath,
-      quota: input.quota,
-      virtualPath: input.virtualPath,
-    });
-    input.database.run(
-      `RELEASE SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
-    );
-    savepointOpen = false;
-    return runResult;
-  } catch (error) {
-    if (savepointOpen) {
-      try {
-        input.database.run(
-          `ROLLBACK TO SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
-        );
-      } finally {
-        input.database.run(
-          `RELEASE SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
-        );
+  return withPluginDataQuotaLock(input.pluginPath, async () => {
+    input.database.run(`SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`);
+    let savepointOpen = true;
+    try {
+      const runResult = input.statement.run(...input.bindings);
+      await maybeAssertPluginSqliteQuotaAfterWrite({
+        cacheKey: input.cacheKey,
+        pluginPath: input.pluginPath,
+        quota: input.quota,
+        virtualPath: input.virtualPath,
+      });
+      input.database.run(
+        `RELEASE SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
+      );
+      savepointOpen = false;
+      return runResult;
+    } catch (error) {
+      if (savepointOpen) {
+        try {
+          input.database.run(
+            `ROLLBACK TO SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
+          );
+        } finally {
+          input.database.run(
+            `RELEASE SAVEPOINT ${PLUGIN_SQLITE_QUOTA_SAVEPOINT_NAME}`,
+          );
+        }
       }
+      throw error;
     }
-    throw error;
-  }
+  });
 }
 
 export async function executePluginSqliteOperation(input: {
