@@ -3,7 +3,8 @@
  * @description Best-effort project favicon discovery for sidebar folder icons.
  */
 
-import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, readdir, readFile, realpath, stat } from "node:fs/promises";
 import {
   dirname,
   extname,
@@ -141,28 +142,40 @@ async function readIconDataUrl(
   if (!mimeType) {
     return null;
   }
-  const iconStat = await lstat(iconPath).catch(() => null);
-  if (
-    !iconStat?.isFile() ||
-    iconStat.isSymbolicLink() ||
-    iconStat.size <= 0 ||
-    iconStat.size > MAX_ICON_BYTES
-  ) {
+  const iconHandle = await open(
+    iconPath,
+    constants.O_RDONLY | constants.O_NOFOLLOW,
+  ).catch(() => null);
+  if (!iconHandle) {
     return null;
   }
-  const iconRealPath = await realpath(iconPath).catch(() => null);
-  if (
-    !iconRealPath ||
-    (iconRealPath !== projectRealPath &&
-      !isInsideDirectory(projectRealPath, iconRealPath))
-  ) {
-    return null;
+  try {
+    const iconStat = await iconHandle.stat().catch(() => null);
+    if (
+      !iconStat?.isFile() ||
+      iconStat.size <= 0 ||
+      iconStat.size > MAX_ICON_BYTES
+    ) {
+      return null;
+    }
+    const iconRealPath = await realpath(`/proc/self/fd/${iconHandle.fd}`).catch(
+      () => null,
+    );
+    if (
+      !iconRealPath ||
+      (iconRealPath !== projectRealPath &&
+        !isInsideDirectory(projectRealPath, iconRealPath))
+    ) {
+      return null;
+    }
+    const data = await iconHandle.readFile().catch(() => null);
+    if (!data || data.byteLength > MAX_ICON_BYTES) {
+      return null;
+    }
+    return `data:${mimeType};base64,${data.toString("base64")}`;
+  } finally {
+    await iconHandle.close().catch(() => undefined);
   }
-  const data = await readFile(iconPath).catch(() => null);
-  if (!data || data.byteLength > MAX_ICON_BYTES) {
-    return null;
-  }
-  return `data:${mimeType};base64,${data.toString("base64")}`;
 }
 
 async function readFaviconFromHtml(
