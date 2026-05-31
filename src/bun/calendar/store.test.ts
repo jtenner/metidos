@@ -203,6 +203,26 @@ describe("calendar store", () => {
         timezone: "UTC",
       }),
     ).toThrow("endDate after startDate");
+    expect(() =>
+      createCalendarEvent(db, owner.id, {
+        calendarId: calendar.id,
+        title: "Invalid all-day date",
+        allDay: true,
+        startDate: "2026-02-30",
+        endDate: "2026-03-01",
+        timezone: "UTC",
+      }),
+    ).toThrow("startDate must be a real calendar date");
+    expect(() =>
+      createCalendarEvent(db, owner.id, {
+        calendarId: calendar.id,
+        title: "Invalid all-day shape",
+        allDay: true,
+        startDate: "2026-6-1",
+        endDate: "2026-06-02",
+        timezone: "UTC",
+      }),
+    ).toThrow("startDate must be a valid YYYY-MM-DD date");
   });
 
   test("blocks stale optimistic concurrency edits", () => {

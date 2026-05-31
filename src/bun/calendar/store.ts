@@ -61,6 +61,8 @@ export const CALENDAR_PUBLIC_SLUG_RESERVED_WORDS = new Set([
   "terminal",
 ]);
 
+const STRICT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
+
 const DEFAULT_NOTIFICATION_CHANNELS: CalendarNotificationChannel[] =
   Object.freeze(["in_app"]) as CalendarNotificationChannel[];
 const CHANNEL_SET = new Set<CalendarNotificationChannel>([
@@ -111,6 +113,24 @@ function boolFromSql(value: unknown): boolean {
 
 function normalizeText(value: string | null | undefined): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseStrictCalendarDate(value: string, fieldName: string): number {
+  if (!STRICT_DATE_RE.test(value)) {
+    throw new Error(`${fieldName} must be a valid YYYY-MM-DD date.`);
+  }
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error(`${fieldName} must be a real calendar date.`);
+  }
+  return date.getTime();
 }
 
 function normalizeNtfyAuthType(
@@ -1318,13 +1338,9 @@ function validateEventInput(
     if (!input.startDate || !input.endDate) {
       throw new Error("All-day events require startDate and endDate.");
     }
-    const startMs = new Date(`${input.startDate}T00:00:00.000Z`).getTime();
-    const endMs = new Date(`${input.endDate}T00:00:00.000Z`).getTime();
-    if (
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      endMs <= startMs
-    ) {
+    const startMs = parseStrictCalendarDate(input.startDate, "startDate");
+    const endMs = parseStrictCalendarDate(input.endDate, "endDate");
+    if (endMs <= startMs) {
       throw new Error("All-day events require endDate after startDate.");
     }
   } else if (!input.startAt || !input.endAt) {
