@@ -30,6 +30,8 @@ const TEST_APP_DATABASE_SYNCHRONOUS = "FULL";
 
 export type AppDataPathOptions = {
   appDataDir?: string;
+  /** @deprecated Ignored compatibility flag from lifecycle/admin call sites. */
+  stepUpVerified?: boolean;
 };
 
 function buildDefaultAppDataDirPath(appName: string): string {
@@ -203,7 +205,9 @@ export function resetResolvedAppDataDirectory(): void {
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
   const configuredDatabasePath = process.env.METIDOS_APP_DATABASE_PATH?.trim();
   if (!options?.appDataDir && configuredDatabasePath) {
-    return configuredDatabasePath;
+    return isInMemoryAppDatabasePath(configuredDatabasePath)
+      ? configuredDatabasePath
+      : resolve(configuredDatabasePath);
   }
   return resolve(getAppDataDirectoryPath(options), DB_FILE_NAME);
 }

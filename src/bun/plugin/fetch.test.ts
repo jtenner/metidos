@@ -423,7 +423,7 @@ describe("executePluginFetch", () => {
   });
 
   it("returns large textual responses as base64 to avoid oversized strings", async () => {
-    const largeJson = `{\"payload\":\"${"x".repeat(MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES)}\"}`;
+    const largeJson = `{"payload":"${"x".repeat(MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES)}"}`;
 
     const response = await executePluginFetch({
       context: {

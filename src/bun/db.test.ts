@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import {
   canSkipAppSchemaMigration,
@@ -85,6 +85,7 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
+const originalAppDatabasePath = process.env.METIDOS_APP_DATABASE_PATH;
 const originalAllowCustomTerminalShell =
   process.env.METIDOS_ALLOW_CUSTOM_TERMINAL_SHELL;
 
@@ -267,6 +268,11 @@ afterEach(() => {
   } else {
     delete process.env.METIDOS_APP_DATA_DIR;
   }
+  if (typeof originalAppDatabasePath === "string") {
+    process.env.METIDOS_APP_DATABASE_PATH = originalAppDatabasePath;
+  } else {
+    delete process.env.METIDOS_APP_DATABASE_PATH;
+  }
   if (typeof originalAllowCustomTerminalShell === "string") {
     process.env.METIDOS_ALLOW_CUSTOM_TERMINAL_SHELL =
       originalAllowCustomTerminalShell;
@@ -281,6 +287,35 @@ afterEach(() => {
     });
   }
   tempDirectories.clear();
+});
+
+describe("app database path configuration", () => {
+  it("resolves relative METIDOS_APP_DATABASE_PATH values before opening the database", () => {
+    const databaseDirectory = createTempDirectory();
+    const relativeDatabasePath = relative(
+      process.cwd(),
+      join(databaseDirectory, "configured", "app.db"),
+    );
+    process.env.METIDOS_APP_DATABASE_PATH = relativeDatabasePath;
+
+    expect(getAppDatabasePath()).toBe(resolve(relativeDatabasePath));
+
+    initAppDatabase();
+    try {
+      expect(existsSync(resolve(relativeDatabasePath))).toBeTrue();
+    } finally {
+      closeAppDatabase();
+    }
+  });
+
+  it("preserves in-memory METIDOS_APP_DATABASE_PATH values", () => {
+    process.env.METIDOS_APP_DATABASE_PATH =
+      "file:metidos-test?mode=memory&cache=shared";
+
+    expect(getAppDatabasePath()).toBe(
+      "file:metidos-test?mode=memory&cache=shared",
+    );
+  });
 });
 
 describe("terminal settings", () => {

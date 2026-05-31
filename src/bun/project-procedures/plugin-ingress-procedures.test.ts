@@ -198,7 +198,7 @@ describe("plugin ingress binding procedures", () => {
       name: "Ingress Project",
       projectPath,
     });
-    const context = contextFor({ userId: 1, username: "owner" });
+    const context = contextFor({ isAdmin: true, userId: 1, username: "owner" });
 
     const result = await upsertPluginIngressRouteConfigProcedure(
       {
@@ -226,7 +226,7 @@ describe("plugin ingress binding procedures", () => {
     });
     const worktreePath = join(projectPath, "feature");
     ensureProjectWorktreeVisible(database, project.id, worktreePath);
-    const context = contextFor({ userId: 1, username: "owner" });
+    const context = contextFor({ isAdmin: true, userId: 1, username: "owner" });
 
     await expect(
       upsertPluginIngressRouteConfigProcedure(

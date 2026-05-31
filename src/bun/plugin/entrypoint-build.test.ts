@@ -19,6 +19,7 @@ import {
   buildPluginEntrypoint,
   DEFAULT_PLUGIN_SOURCE_FILE_MAX_BYTES,
 } from "./entrypoint-build";
+import { computePluginReviewHash } from "./lifecycle";
 import {
   decodePluginSidecarRpcEnvelope,
   encodePluginSidecarRpcEnvelope,
@@ -120,14 +121,21 @@ async function readStreamLine(
   throw new Error("Stream ended before a line was available.");
 }
 
-function encodeHostStartup(pluginId: string): string {
+async function encodeHostStartup(
+  pluginId: string,
+  pluginRoot: string,
+): Promise<string> {
+  const reviewHash = await computePluginReviewHash(pluginRoot);
+  if (!reviewHash.hash) {
+    throw new Error("Expected plugin review hash to be computable.");
+  }
   const encoded = encodePluginSidecarRpcEnvelope({
     id: "startup-test",
     payload: {
       apiVersion: "v1",
       env: [],
       protocolVersion: PLUGIN_SIDECAR_RPC_PROTOCOL_VERSION,
-      reviewHash: "sha256:test",
+      reviewHash: reviewHash.hash,
     },
     pluginId,
     type: "host.startup",
@@ -407,7 +415,10 @@ describe("buildPluginEntrypoint", () => {
       throw new Error("Sidecar process did not expose standard streams.");
     }
 
-    await writeSidecarInput(sidecarProcess.stdin, encodeHostStartup(pluginId));
+    await writeSidecarInput(
+      sidecarProcess.stdin,
+      await encodeHostStartup(pluginId, pluginRoot),
+    );
 
     const stdoutLine = await readStreamLine(sidecarProcess.stdout);
     const decoded = decodePluginSidecarRpcEnvelope(stdoutLine, {
@@ -461,7 +472,10 @@ describe("buildPluginEntrypoint", () => {
       throw new Error("Sidecar process did not expose standard streams.");
     }
 
-    await writeSidecarInput(sidecarProcess.stdin, encodeHostStartup(pluginId));
+    await writeSidecarInput(
+      sidecarProcess.stdin,
+      await encodeHostStartup(pluginId, pluginRoot),
+    );
 
     const stdoutLine = await readStreamLine(sidecarProcess.stdout);
     const decoded = decodePluginSidecarRpcEnvelope(stdoutLine, {
@@ -506,7 +520,10 @@ describe("buildPluginEntrypoint", () => {
       throw new Error("Sidecar process did not expose standard streams.");
     }
 
-    await writeSidecarInput(sidecarProcess.stdin, encodeHostStartup(pluginId));
+    await writeSidecarInput(
+      sidecarProcess.stdin,
+      await encodeHostStartup(pluginId, pluginRoot),
+    );
 
     const stdoutLine = await readStreamLine(sidecarProcess.stdout);
     const decoded = decodePluginSidecarRpcEnvelope(stdoutLine, {

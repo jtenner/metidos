@@ -954,6 +954,57 @@ describe("createPiMetidosTools", () => {
     });
   });
 
+  it("resolves omitted new_thread project/worktree targeting from the current tracked worktree", async () => {
+    const scope = makeScope({
+      projectIdContext: 1,
+      worktreePathContext: "/repo/alpha/feature-a",
+    });
+    let createdParams: Record<string, unknown> | null = null;
+    const host = createHost({
+      createThread: async (params) => {
+        createdParams = params;
+        return makeThreadDetail({
+          thread: makeThread({
+            id: 46,
+            projectId: params.projectId,
+            worktreePath: params.worktreePath,
+          }),
+        });
+      },
+      listProjectWorktrees: async (params) => {
+        if (params.projectId === 1) {
+          throw new Error("Project not currently tracked: 1");
+        }
+        return [makeWorktree({ path: "/repo/alpha/feature-a" })];
+      },
+      listProjects: async () => [makeProject({ id: 7, path: "/repo/alpha" })],
+      sendThreadMessage: async (params) =>
+        makeThreadDetail({
+          thread: makeThread({
+            id: params.threadId,
+            projectId: 7,
+            runStatus: {
+              error: null,
+              hasUnreadError: false,
+              startedAt: NOW,
+              state: "working",
+              updatedAt: NOW,
+            },
+            worktreePath: "/repo/alpha/feature-a",
+          }),
+        }),
+    });
+
+    await executeTool(scope, host, "new_thread", {
+      input: "Use default target",
+    });
+
+    expect(requireValue(createdParams)).toMatchObject({
+      projectId: 7,
+      worktreePath: "/repo/alpha/feature-a",
+    });
+  });
+
   it("inherits the current thread model and reasoning when new_thread omits them", async () => {
     const scope = makeScope({
       modelContext: "openai:gpt-5.5",

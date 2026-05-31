@@ -3394,17 +3394,6 @@ export function parseRpcClientMessage(
   return parseRpcRequestMessage(parsed);
 }
 
-/**
- * Convert exceptions into user-facing string payloads.
- * @param error - Error value to process.
- */
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
 type RpcErrorPayload = Pick<
   Extract<RpcResponseMessage, { ok: false }>,
   "error" | "errorCode" | "errorDetails"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { RpcRequestContext } from "../rpc-schema";
+import type { RpcRequestHandlerMap } from "../rpc-transport";
 import {
   createBackendRpcHandlers,
   type BackendRpcHandlerDependencies,
@@ -37,6 +38,14 @@ function createDependencies(
 }
 
 describe("createBackendRpcHandlers", () => {
+  it("returns a complete RPC request handler map", () => {
+    const { dependencies } = createDependencies();
+    const handlers: RpcRequestHandlerMap =
+      createBackendRpcHandlers(dependencies);
+
+    expect(handlers).toBeDefined();
+  });
+
   it("preserves cross-domain side effects from composed registrars", async () => {
     const sideEffects: string[] = [];
     const { dependencies } = createDependencies({

@@ -250,9 +250,11 @@ async function resolveProjectIdForWorktreePath(
   preferredProjectId?: number | null,
 ): Promise<number> {
   if (typeof preferredProjectId === "number") {
-    const worktrees = await host.listProjectWorktrees({
-      projectId: preferredProjectId,
-    });
+    const worktrees = await host
+      .listProjectWorktrees({
+        projectId: preferredProjectId,
+      })
+      .catch(() => []);
     if (
       worktrees.some((worktree) => samePath(worktree.path, worktreePath, scope))
     ) {
@@ -261,9 +263,11 @@ async function resolveProjectIdForWorktreePath(
   }
 
   if (scope.projectIdContext !== preferredProjectId) {
-    const worktrees = await host.listProjectWorktrees({
-      projectId: scope.projectIdContext,
-    });
+    const worktrees = await host
+      .listProjectWorktrees({
+        projectId: scope.projectIdContext,
+      })
+      .catch(() => []);
     if (
       worktrees.some((worktree) => samePath(worktree.path, worktreePath, scope))
     ) {
@@ -336,12 +340,27 @@ export async function resolveWorktreeTarget(
     };
   }
 
+  const worktreePath = canonicalPath(scope.worktreePathContext, scope);
+  let projectId: number;
+  try {
+    projectId = await resolveProjectIdForWorktreePath(
+      worktreePath,
+      host,
+      scope,
+      scope.projectIdContext,
+    );
+  } catch (error) {
+    throw new Error(
+      `Current worktree context is not tracked: ${scope.worktreePathContext}. Reopen or re-track the project/worktree, or pass projectPath and worktreePath explicitly.`,
+      { cause: error },
+    );
+  }
+  const projectPath =
+    (await host.listProjects()).find((project) => project.id === projectId)
+      ?.path ?? null;
   return {
-    projectId: scope.projectIdContext,
-    projectPath:
-      (await host.listProjects()).find(
-        (project) => project.id === scope.projectIdContext,
-      )?.path ?? null,
-    worktreePath: scope.worktreePathContext,
+    projectId,
+    projectPath,
+    worktreePath,
   };
 }

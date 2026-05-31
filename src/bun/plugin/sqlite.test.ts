@@ -250,6 +250,13 @@ describe("executePluginSqliteOperation", () => {
     }
     expect(getPluginSqliteConnectionCacheStats().entries).toBe(64);
 
+    const hotFixture = fixtures[0];
+    const evictedFixture = fixtures[1];
+    const newFixture = fixtures[64];
+    if (!hotFixture || !evictedFixture || !newFixture) {
+      throw new Error("Expected SQLite cache pruning fixtures to be present.");
+    }
+
     await executePluginSqliteOperation({
       operation: "sqlite.run",
       params: {
@@ -257,7 +264,7 @@ describe("executePluginSqliteOperation", () => {
         statement: "insert into notes (title) values ('still hot')",
       },
       permissions,
-      pluginPath: fixtures[0]!.pluginPath,
+      pluginPath: hotFixture.pluginPath,
     });
 
     await executePluginSqliteOperation({
@@ -267,20 +274,20 @@ describe("executePluginSqliteOperation", () => {
         statement: "create table notes (title text not null)",
       },
       permissions,
-      pluginPath: fixtures[64]!.pluginPath,
+      pluginPath: newFixture.pluginPath,
     });
 
     const stats = getPluginSqliteConnectionCacheStats();
     expect(stats.entries).toBe(64);
+    expect(stats.keys.some((key) => key.includes(hotFixture.pluginPath))).toBe(
+      true,
+    );
     expect(
-      stats.keys.some((key) => key.includes(fixtures[0]!.pluginPath)),
-    ).toBe(true);
-    expect(
-      stats.keys.some((key) => key.includes(fixtures[1]!.pluginPath)),
+      stats.keys.some((key) => key.includes(evictedFixture.pluginPath)),
     ).toBe(false);
-    expect(
-      stats.keys.some((key) => key.includes(fixtures[64]!.pluginPath)),
-    ).toBe(true);
+    expect(stats.keys.some((key) => key.includes(newFixture.pluginPath))).toBe(
+      true,
+    );
   });
 
   it("requires both sqlite and storage:write permissions", async () => {

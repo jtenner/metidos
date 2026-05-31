@@ -539,11 +539,9 @@ describe("terminal session limits", () => {
 describe("terminal access scoping", () => {
   it("denies read, grep, and kill when the caller thread does not own the terminal", () => {
     const manager = new TerminalManager({
-      limitConfig: {
-        exitedIdleTtlMs: 60_000,
-        maxGlobalTerminals: 10,
-        maxTerminalsPerOwner: 10,
-      },
+      exitedIdleTtlMs: 60_000,
+      maxGlobalTerminals: 10,
+      maxTerminalsPerOwner: 10,
     });
     const terminal = manager.createTerminal({
       command: "echo hi",

@@ -818,7 +818,7 @@ function findNodeBinaryOnPath(pathValue: string | undefined): string | null {
         accessSync(candidatePath, constants.X_OK);
         return candidatePath;
       } catch {
-        continue;
+        // Try the next PATH entry.
       }
     }
   }

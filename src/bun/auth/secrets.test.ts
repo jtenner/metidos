@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -15,6 +16,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { resetResolvedAppDataDirectory } from "../db";
 
 import {
   type AuthSecretAccessError,
@@ -26,6 +29,8 @@ import {
 } from "./secrets";
 
 const tempDirectories = new Set<string>();
+const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
+const originalAppDatabasePath = process.env.METIDOS_APP_DATABASE_PATH;
 
 function createTempDirectory(): string {
   const path = mkdtempSync(join(tmpdir(), "metidos-auth-secret-"));
@@ -34,6 +39,18 @@ function createTempDirectory(): string {
 }
 
 afterEach(() => {
+  resetResolvedAppDataDirectory();
+  if (typeof originalAppDataDir === "string") {
+    process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
+  } else {
+    delete process.env.METIDOS_APP_DATA_DIR;
+  }
+  if (typeof originalAppDatabasePath === "string") {
+    process.env.METIDOS_APP_DATABASE_PATH = originalAppDatabasePath;
+  } else {
+    delete process.env.METIDOS_APP_DATABASE_PATH;
+  }
+
   for (const path of tempDirectories) {
     rmSync(path, {
       force: true,
@@ -101,6 +118,35 @@ describe("auth secret encryption", () => {
         appDataDir,
       }),
     ).rejects.toThrow("could not be decrypted");
+  });
+
+  it("stores auth-secret.key in app data when the configured database is in memory", async () => {
+    const appDataDir = createTempDirectory();
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
+
+    await encryptAuthSecret("totp-secret-1", {
+      additionalData: testAdditionalData,
+    });
+
+    const keyPath = getAuthSecretKeyPath();
+    expect(keyPath).toBe(join(appDataDir, "auth-secret.key"));
+    expect(existsSync(keyPath)).toBeTrue();
+  });
+
+  it("stores auth-secret.key in app data for SQLite memory URI databases", async () => {
+    const appDataDir = createTempDirectory();
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    process.env.METIDOS_APP_DATABASE_PATH =
+      "file:metidos-auth?mode=memory&cache=shared";
+
+    await encryptAuthSecret("totp-secret-1", {
+      additionalData: testAdditionalData,
+    });
+
+    const keyPath = getAuthSecretKeyPath();
+    expect(keyPath).toBe(join(appDataDir, "auth-secret.key"));
+    expect(existsSync(keyPath)).toBeTrue();
   });
 
   it("reuses the same stored key across operations", async () => {

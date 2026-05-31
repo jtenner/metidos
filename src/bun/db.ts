@@ -35,6 +35,7 @@ export type { AppDataPathOptions } from "./db-context";
 export {
   APP_DATABASE_JOURNAL_MODE,
   APP_DATABASE_SYNCHRONOUS,
+  getAppDatabaseDirectoryPath,
   getAppDatabasePath,
   getAppDataDirectoryPath,
   resetResolvedAppDataDirectory,

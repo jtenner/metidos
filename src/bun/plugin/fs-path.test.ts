@@ -16,11 +16,9 @@ import { join } from "node:path";
 
 import {
   closeValidatedPluginFsFileDescriptor,
-  mkdirValidatedPluginFsPathSync,
   openValidatedPluginFsPathSync,
   PluginFsPathError,
   pluginFsReadOpenFlags,
-  pluginFsWriteOpenFlags,
   readValidatedPluginFsFileDescriptor,
   resolvePluginFsVirtualPath,
   splitRelativePathSegments,
@@ -155,11 +153,13 @@ describe("plugin fs virtual path resolver", () => {
     }
     const { pluginPath } = createPluginFixture();
 
-    await expectPluginFsPathError(
-      resolvePluginFsVirtualPath({
-        pluginPath,
-        virtualPath: "~/.git\\config",
-      }),
+    await expect(
+      expectPluginFsPathError(
+        resolvePluginFsVirtualPath({
+          pluginPath,
+          virtualPath: "~/.git\\config",
+        }),
+      ),
     ).resolves.toMatchObject({
       code: "forbidden_directory",
       virtualPath: "~/.git/config",

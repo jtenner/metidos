@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { getAppDatabasePath } from "../db";
+import { getAppDatabaseDirectoryPath } from "../db";
 
 const AUTH_SECRET_KEY_FILE_NAME = "auth-secret.key";
 const AUTH_SECRET_LEGACY_VERSION = "v1";
@@ -100,7 +100,7 @@ function buildUndecryptableAuthSecretMessage(path: string): string {
  */
 
 function authSecretDirectory(options?: AuthSecretOptions): string {
-  return options?.appDataDir ?? dirname(getAppDatabasePath());
+  return getAppDatabaseDirectoryPath(options);
 }
 /**
  * Get the full path to the auth secret key file.

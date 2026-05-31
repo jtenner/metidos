@@ -1564,7 +1564,7 @@ export function createPiToolRequestContext(
 
   return {
     auth: {
-      isAdmin: false,
+      isAdmin: ownerUser?.isAdmin ?? false,
       sessionId: null,
       userId: ownerUserId,
       username: ownerUser?.username ?? null,

@@ -1,6 +1,7 @@
 /**
  * @file src/bun/sidecar-cron-thread.ts
- * @description Worker thread that registers Bun.cron jobs for cron rows.
+ * @description Legacy worker-thread prototype for cron registrations.
+ * Runtime scheduling currently uses sidecar-cron-scheduler.ts in-process.
  */
 
 import { Database } from "bun:sqlite";

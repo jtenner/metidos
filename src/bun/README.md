@@ -370,13 +370,12 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Verifies that cron-created threads persist Pi session identity and source-cron provenance, that overlapping launches for the same cron are blocked, that stale in-progress cron state is only cleared when a user manually restarts the cron, and that the scheduled-launch limiter plus cron runtime telemetry expose active versus pending queue pressure under bursty schedule fires.
 
 - `sidecar-cron-scheduler.ts`
-  - Main-process wrapper around the cron worker thread.
-  - Starts or stops the worker, syncs cron registrations after DB changes, and exposes the on-demand “run now” entrypoint used by RPC.
-  - Receives due-fire notifications from the worker and runs scheduled cron executions in the main process so cron-created threads use the same runtime ownership, stop path, and live-update behavior as frontend-created threads.
+  - Owns the current in-process `Bun.cron` registration set for enabled cron jobs.
+  - Starts or stops registrations, syncs cron handles after DB changes, monitors timezone offset changes, and hands due fires to `sidecar-cron-runner.ts` so cron-created threads use the same runtime ownership, stop path, and live-update behavior as frontend-created threads.
 
 - `sidecar-cron-thread.ts`
-  - Worker module that registers active cron jobs with `Bun.cron`.
-  - Reconciles enabled cron rows into active registrations and forwards due fires back to the main process instead of executing thread runtime state inside the worker.
+  - Legacy worker-thread prototype retained only for focused historical tests while runtime cron scheduling uses `sidecar-cron-scheduler.ts` directly.
+  - Do not wire new production behavior through this module unless the scheduler is intentionally moved back out of process.
 
 - `auth/index.ts`
   - Provides the core auth primitives used by setup/login/logout and password/TOTP setup flows.
