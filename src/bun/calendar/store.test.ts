@@ -467,6 +467,38 @@ describe("calendar store", () => {
     ).toEqual(Array.from({ length: 5 }, () => 60 * 60_000));
   });
 
+  test("rolls back after-this splits when the future event is invalid", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    const calendar = createCalendar(db, owner.id, { title: "Recurring" });
+    const event = createCalendarEvent(db, owner.id, {
+      calendarId: calendar.id,
+      title: "Base",
+      startAt: "2026-06-01T10:00:00.000Z",
+      endAt: "2026-06-01T11:00:00.000Z",
+      timezone: "UTC",
+      recurrenceRule: "RRULE:FREQ=DAILY;COUNT=5",
+    });
+
+    expect(() =>
+      updateCalendarEvent(db, owner.id, {
+        eventId: event.id,
+        occurrenceStart: "2026-06-03T10:00:00.000Z",
+        scope: "after_this",
+        timezone: "Not/AZone",
+      }),
+    ).toThrow("Calendar timezone is invalid: Not/AZone");
+
+    const rows = db
+      .query<{ recurrenceRule: string | null; title: string }, []>(
+        `SELECT recurrence_rule AS recurrenceRule, title FROM calendar_events ORDER BY id ASC`,
+      )
+      .all();
+    expect(rows).toEqual([
+      { recurrenceRule: "RRULE:FREQ=DAILY;COUNT=5", title: "Base" },
+    ]);
+  });
+
   test("dedupes reminder deliveries by delivery key", () => {
     const db = setupDb();
     const owner = createUser(db, { username: "owner", isAdmin: true });

@@ -1703,50 +1703,53 @@ export function updateCalendarEvent(
     return getCalendarEvent(database, userId, row.id) as RpcCalendarEvent;
   }
   if (scope === "after_this" && row.recurrenceRule) {
+    const recurrenceRule = row.recurrenceRule;
     const selected = findOccurrenceTimeForStart(row, occurrenceStart);
     if (!selected) {
       throw new Error("Occurrence not found for split.");
     }
-    const truncated = truncateRRuleBeforeOccurrence(
-      row.recurrenceRule,
-      occurrenceStart,
-      boolFromSql(row.allDay),
-    );
-    run(
-      database,
-      `UPDATE calendar_events SET recurrence_rule = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-      truncated,
-      nowIso(),
-      row.id,
-    );
-    deleteLocalEventNotificationDeliveries(database, row.id);
-    const adjustedFutureRule =
-      input.recurrenceRule === undefined
-        ? adjustRRuleCountAfterSplit(
-            row.recurrenceRule,
-            row.startAt ?? row.startDate ?? occurrenceStart,
-            occurrenceStart,
-            boolFromSql(row.allDay),
-          )
-        : input.recurrenceRule;
-    if (input.recurrenceRule === undefined && adjustedFutureRule === null) {
-      return getCalendarEvent(database, userId, row.id) as RpcCalendarEvent;
-    }
-    const newInput: CalendarEventInput = {
-      calendarId: row.calendarId,
-      title: input.title ?? row.title,
-      description: input.description ?? row.description,
-      location: input.location ?? row.location,
-      startAt: input.startAt ?? selected.startAt,
-      endAt: input.endAt ?? selected.endAt,
-      startDate: input.startDate ?? selected.startDate,
-      endDate: input.endDate ?? selected.endDate,
-      allDay: input.allDay ?? boolFromSql(row.allDay),
-      timezone: input.timezone ?? row.timezone,
-      recurrenceRule: adjustedFutureRule,
-      reminders: input.reminders ?? eventReminders(database, row.id),
-    };
-    return createCalendarEvent(database, userId, newInput);
+    return database.transaction(() => {
+      const truncated = truncateRRuleBeforeOccurrence(
+        recurrenceRule,
+        occurrenceStart,
+        boolFromSql(row.allDay),
+      );
+      run(
+        database,
+        `UPDATE calendar_events SET recurrence_rule = ?, version = version + 1, updated_at = ? WHERE id = ?`,
+        truncated,
+        nowIso(),
+        row.id,
+      );
+      deleteLocalEventNotificationDeliveries(database, row.id);
+      const adjustedFutureRule =
+        input.recurrenceRule === undefined
+          ? adjustRRuleCountAfterSplit(
+              recurrenceRule,
+              row.startAt ?? row.startDate ?? occurrenceStart,
+              occurrenceStart,
+              boolFromSql(row.allDay),
+            )
+          : input.recurrenceRule;
+      if (input.recurrenceRule === undefined && adjustedFutureRule === null) {
+        return getCalendarEvent(database, userId, row.id) as RpcCalendarEvent;
+      }
+      const newInput: CalendarEventInput = {
+        calendarId: row.calendarId,
+        title: input.title ?? row.title,
+        description: input.description ?? row.description,
+        location: input.location ?? row.location,
+        startAt: input.startAt ?? selected.startAt,
+        endAt: input.endAt ?? selected.endAt,
+        startDate: input.startDate ?? selected.startDate,
+        endDate: input.endDate ?? selected.endDate,
+        allDay: input.allDay ?? boolFromSql(row.allDay),
+        timezone: input.timezone ?? row.timezone,
+        recurrenceRule: adjustedFutureRule,
+        reminders: input.reminders ?? eventReminders(database, row.id),
+      };
+      return createCalendarEvent(database, userId, newInput);
+    })();
   }
   const next: CalendarEventInput = {
     calendarId: input.calendarId ?? row.calendarId,
