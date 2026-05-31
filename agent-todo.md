@@ -211,10 +211,10 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Composer bugs
 
-- [ ] Fix stale closure in image removal in `src/mainview/controls/chat-composer-control.tsx`: read fresh attachments with `readChatComposerImageAttachments(draftKey)` before removing.
-- [ ] Reset `pasteError` when `draftKey` changes in `src/mainview/controls/chat-composer-control.tsx` so one thread's image error does not leak into another thread.
-- [ ] Recompute skills autocomplete when the textarea caret moves in `src/mainview/controls/chat-composer-control.tsx`, not only when `draft` or `availableSkills` changes.
-- [ ] Show mobile “Preparing image…” status in `src/mainview/controls/chat-composer-control.tsx` even before `imageAttachmentPreview` exists by including `isReadingImageAttachments` in the status-row condition.
+- [x] Fix stale closure in image removal in `src/mainview/controls/chat-composer-control.tsx`: read fresh attachments with `readChatComposerImageAttachments(draftKey)` before removing.
+- [x] Reset `pasteError` when `draftKey` changes in `src/mainview/controls/chat-composer-control.tsx` so one thread's image error does not leak into another thread.
+- [x] Recompute skills autocomplete when the textarea caret moves in `src/mainview/controls/chat-composer-control.tsx`, not only when `draft` or `availableSkills` changes.
+- [x] Show mobile “Preparing image…” status in `src/mainview/controls/chat-composer-control.tsx` even before `imageAttachmentPreview` exists by including `isReadingImageAttachments` in the status-row condition.
 
 ### Plugin administration UI races
 
@@ -235,8 +235,8 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
 - [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
 - [x] Cancel the focus-restore `requestAnimationFrame` during cleanup in `src/mainview/controls/popover.tsx`.
-- [ ] Cancel outstanding `requestAnimationFrame` work in `src/mainview/controls/chat-composer-control.tsx` during cleanup.
-- [ ] Guard late FileReader rejection handling in `src/mainview/controls/chat-composer-control.tsx` so it cannot call `setPasteError` after unmount or draft switch.
+- [x] Cancel outstanding `requestAnimationFrame` work in `src/mainview/controls/chat-composer-control.tsx` during cleanup.
+- [x] Guard late FileReader rejection handling in `src/mainview/controls/chat-composer-control.tsx` so it cannot call `setPasteError` after unmount or draft switch.
 
 ### Style: type scale, focus, and tab semantics
 

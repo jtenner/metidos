@@ -241,18 +241,41 @@ export function ChatComposerControl({
   const [skillsPopoverOpen, setSkillsPopoverOpen] = useState(false);
   const [activeSkillIndex, setActiveSkillIndex] = useState(0);
   const [pasteError, setPasteError] = useState("");
+  const [caretSelectionVersion, setCaretSelectionVersion] = useState(0);
   const [caretReference, setCaretReference] = useState<ReturnType<
     typeof createPointReference
   > | null>(null);
   const skillsPopoverOpenRef = useRef(false);
   const activeSkillIndexRef = useRef(0);
   const suppressSkillsAutocompleteRef = useRef(false);
+  const applySkillRafIdRef = useRef<number | null>(null);
+  const currentDraftKeyRef = useRef<string | null | undefined>(draftKey);
+  const mountedRef = useRef(true);
   const caretReferenceRectRef = useRef<{
     height: number;
     width: number;
     x: number;
     y: number;
   } | null>(null);
+
+  useEffect(() => {
+    currentDraftKeyRef.current = draftKey;
+  }, [draftKey]);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (applySkillRafIdRef.current !== null) {
+        window.cancelAnimationFrame(applySkillRafIdRef.current);
+        applySkillRafIdRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    void draftKey;
+    setPasteError("");
+  }, [draftKey]);
 
   useEffect(() => {
     skillsPopoverOpenRef.current = skillsPopoverOpen;
@@ -263,6 +286,7 @@ export function ChatComposerControl({
   }, [activeSkillIndex]);
 
   const skillsMatch = useMemo(() => {
+    void caretSelectionVersion;
     const textarea = textareaRef.current;
     if (!textarea || !availableSkills || availableSkills.length === 0) {
       return null;
@@ -272,7 +296,7 @@ export function ChatComposerControl({
       textarea.selectionStart,
       availableSkills,
     );
-  }, [draft, availableSkills]);
+  }, [draft, availableSkills, caretSelectionVersion]);
 
   const filteredSkills = useMemo(() => {
     return filterChatComposerSkills(availableSkills, skillsMatch);
@@ -347,10 +371,17 @@ export function ChatComposerControl({
       const cursorPos =
         skillsMatch.startIndex +
         `/skills:${skillName}${trailingSeparator}`.length;
-      requestAnimationFrame(() => {
-        textarea.selectionStart = cursorPos;
-        textarea.selectionEnd = cursorPos;
-        textarea.focus();
+      if (applySkillRafIdRef.current !== null) {
+        window.cancelAnimationFrame(applySkillRafIdRef.current);
+      }
+      applySkillRafIdRef.current = window.requestAnimationFrame(() => {
+        applySkillRafIdRef.current = null;
+        if (mountedRef.current && currentDraftKeyRef.current === draftKey) {
+          textarea.selectionStart = cursorPos;
+          textarea.selectionEnd = cursorPos;
+          textarea.focus();
+          setCaretSelectionVersion((version) => version + 1);
+        }
         suppressSkillsAutocompleteRef.current = false;
       });
     },
@@ -371,15 +402,21 @@ export function ChatComposerControl({
     [draftKey, fillHeight, minHeightPx, onDraftChange],
   );
 
+  const refreshSkillsAutocompleteForCaret = useCallback((): void => {
+    setCaretSelectionVersion((version) => version + 1);
+  }, []);
+
   const removeImageAttachment = useCallback(
     (imageId: string): void => {
       setPasteError("");
       setChatComposerImageAttachments(
-        imageAttachments.filter((image) => image.id !== imageId),
+        readChatComposerImageAttachments(draftKey).filter(
+          (image) => image.id !== imageId,
+        ),
         draftKey,
       );
     },
-    [draftKey, imageAttachments],
+    [draftKey],
   );
 
   const appendImageFiles = useCallback(
@@ -473,11 +510,18 @@ export function ChatComposerControl({
         })),
       });
       setPasteError("");
-      startChatComposerImageAttachmentRead(draftKey);
+      const readDraftKey = draftKey;
+      startChatComposerImageAttachmentRead(readDraftKey);
       void Promise.all(acceptedFiles.map(readImageFileAsAttachment))
         .then((attachments) => {
+          if (
+            !mountedRef.current ||
+            currentDraftKeyRef.current !== readDraftKey
+          ) {
+            return;
+          }
           const nextAttachments = [
-            ...readChatComposerImageAttachments(draftKey),
+            ...readChatComposerImageAttachments(readDraftKey),
             ...attachments,
           ].slice(0, MAX_CHAT_IMAGE_ATTACHMENTS);
           logChatImageComposerEvent("Stored image attachments in composer", {
@@ -490,19 +534,25 @@ export function ChatComposerControl({
               type: attachment.type,
             })),
           });
-          setChatComposerImageAttachments(nextAttachments, draftKey);
+          setChatComposerImageAttachments(nextAttachments, readDraftKey);
         })
         .catch((error) => {
           warnChatImageComposerEvent("Failed to read/store image attachment", {
             error: error instanceof Error ? error.message : String(error),
           });
+          if (
+            !mountedRef.current ||
+            currentDraftKeyRef.current !== readDraftKey
+          ) {
+            return;
+          }
           setPasteError(error instanceof Error ? error.message : String(error));
         })
         .finally(() => {
           logChatImageComposerEvent("Finished image attachment read", {
-            draftKey: draftKey ?? null,
+            draftKey: readDraftKey ?? null,
           });
-          finishChatComposerImageAttachmentRead(draftKey);
+          finishChatComposerImageAttachmentRead(readDraftKey);
         });
     },
     [draftKey, supportsImageInput],
@@ -772,10 +822,13 @@ export function ChatComposerControl({
             rows={3}
             value={draft}
             onChange={onChatInputChange}
+            onClick={refreshSkillsAutocompleteForCaret}
             onDragOver={onImageFileDragOver}
             onKeyDown={onComposerKeyDown}
+            onKeyUp={refreshSkillsAutocompleteForCaret}
             onDrop={onImageFileDrop}
             onPaste={onPaste}
+            onSelect={refreshSkillsAutocompleteForCaret}
             disabled={disabled}
           />
           {skillsPopover}
@@ -808,7 +861,7 @@ export function ChatComposerControl({
   return (
     <div className="relative bg-surface-2 px-2 py-2">
       {imageFilePicker}
-      {imageAttachmentPreview || pasteErrorMessage ? (
+      {imageAttachmentPreview || imageLoadingMessage || pasteErrorMessage ? (
         <div className="mb-2 space-y-2">
           {imageAttachmentPreview}
           {imageLoadingMessage}
@@ -828,10 +881,13 @@ export function ChatComposerControl({
           rows={1}
           value={draft}
           onChange={onChatInputChange}
+          onClick={refreshSkillsAutocompleteForCaret}
           onDragOver={onImageFileDragOver}
           onKeyDown={onComposerKeyDown}
+          onKeyUp={refreshSkillsAutocompleteForCaret}
           onDrop={onImageFileDrop}
           onPaste={onPaste}
+          onSelect={refreshSkillsAutocompleteForCaret}
           disabled={disabled}
         />
         {skillsPopover}
