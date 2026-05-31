@@ -4,10 +4,10 @@ Thanks for helping make Metidos safer, clearer, and easier to operate.
 
 ## Development setup
 
-Start with the install docs:
+Start with the setup and contributor docs:
 
-- [`docs/getting-started.md`](docs/getting-started.md)
-- [`docs/installation.md`](docs/installation.md)
+- [`INSTALLATION.md`](INSTALLATION.md) for installation and the first-run tutorial.
+- [`docs/development.md`](docs/development.md) for contributor workflow, validation, and debugging.
 
 Common commands:
 

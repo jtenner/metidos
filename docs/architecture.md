@@ -73,7 +73,7 @@ Safe Threads keep scoped file/search/edit/write operations but do not get `bash`
 
 App Data is the local installation state root. It contains SQLite databases, auth secrets, runtime state, plugin installations, plugin data/logs, settings, and optional telemetry sidecar output.
 
-Default App Data paths are described in [Installation](./installation.md). Operators can override the path with `METIDOS_APP_DATA_DIR`.
+Default App Data paths are described in [Installation](../INSTALLATION.md). Operators can override the path with `METIDOS_APP_DATA_DIR`.
 
 Tracked source and App Data have different ownership:
 

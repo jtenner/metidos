@@ -1,11 +1,12 @@
 # Metidos documentation
 
-This directory contains the public operator and contributor documentation for Metidos.
+This directory contains the public operator and contributor documentation for Metidos. The root README is intentionally a concise overview; setup, tutorial, and installer details belong in `INSTALLATION.md` and the installer skill.
 
 ## Start here
 
-- [Getting started](./getting-started.md) — shortest path from clean clone to first project and first agent thread.
-- [Installation](./installation.md) — canonical setup, first-run auth, local production, and container notes.
+- [Project overview](../README.md) — concise overview of what Metidos is and how the repository is organized.
+- [Installation and first-run tutorial](../INSTALLATION.md) — canonical setup, first-run auth, local production, containers, providers, backups, and remote access.
+- [Installer wizard skill](../.pi/skills/metidos-installation/SKILL.md) — plan-first interactive Docker/Podman/source installer workflow.
 - [Troubleshooting](./troubleshooting.md) — common install, auth, provider, plugin, WebSocket, and runtime problems.
 
 ## How Metidos works

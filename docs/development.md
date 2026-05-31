@@ -4,15 +4,7 @@ This guide covers local development setup, validation, tests, code style, docume
 
 ## Setup
 
-```bash
-git clone https://github.com/YOUR_ORG_OR_USER/metidos.git
-cd metidos
-bun install --frozen-lockfile
-cp .env.example .env
-bun run dev
-```
-
-Then open `http://localhost:7599` in your browser.
+Use [`../INSTALLATION.md`](../INSTALLATION.md) for the clean-clone install path, first-run Local Auth, provider setup, and local run modes. This contributor guide starts after that environment exists.
 
 Keep private values in `.env`. Do not commit `.env`, App Data, plugin runtime output, logs, or generated bundles.
 

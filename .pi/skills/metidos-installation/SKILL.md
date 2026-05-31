@@ -17,6 +17,7 @@ On start, greet the user warmly by saying: "Hello, this is the metidos installer
 - Ask only the next relevant question. Do not dump every advanced option unless the user asks for advanced mode.
 - Never ask the user to paste secrets into chat. Prefer local terminal prompts, existing host environment variables, or placeholder env names in `metidos-config.md`.
 - If a tool or runtime is missing, stop that branch and give installation instructions.
+- Keep the root README overview-only. Put setup procedures, first-run tutorials, and installer guidance in `../../../INSTALLATION.md` and this skill. Keep `../../../docs/installation.md` and `../../../docs/getting-started.md` as compatibility pointers unless the documentation structure intentionally changes again.
 - Containerized Metidos must be built from a base image that includes **Bun** and **Zig**.
 - If Codex is configured, copy **only** the Codex plugin into the container/plugin directory. Do not copy arbitrary Codex cache, unrelated host config, or broad home-directory state.
 - For any custom model provider that is not already a core/supported provider, use the `metidos-plugin-authoring` skill and follow Plugin System v1 rules.
@@ -29,7 +30,7 @@ Before editing installer code, docs, Docker assets, or plugin manifests, read th
 2. `../../../UBIQUITOUS_LANGUAGE.md` for canonical domain terms when naming user-facing concepts.
 3. `../../../docs/metidos-plugin-authoring-guide.md` and `../metidos-plugin-authoring/SKILL.md` before generating or modifying provider/integration plugins.
 4. Existing Docker/Podman assets in this skill folder, especially `assets/docker/`, before changing container instructions.
-5. `../../../INSTALLATION.md` before updating user-facing install docs.
+5. `../../../INSTALLATION.md` before updating user-facing install docs; also check `../../../docs/installation.md` and `../../../docs/getting-started.md` if changing compatibility pointers.
 
 If the docs, implementation, and this skill disagree, treat implementation tests and public docs as source of truth, then update this skill in the same change.
 
