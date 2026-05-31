@@ -91,7 +91,10 @@ export function logClientEvent(payload: RpcClientLogRequest): void {
     return;
   }
   void configuredProcedures
-    .logClientEvent(normalizeClientLogPayload(payload))
+    .logClientEvent(normalizeClientLogPayload(payload), {
+      priority: "background",
+      timeoutMs: 10_000,
+    })
     .catch(() => {
       // Avoid recursive logging if the production-safe logging path itself fails.
     });

@@ -56,6 +56,7 @@ import {
   normalizeRpcErrorDetails,
   RpcError,
 } from "./rpc-errors";
+import { RpcRequestQueue } from "./rpc-request-queue";
 
 type RpcRequestMap = AppRPCSchema["requests"];
 type RpcMethodName = keyof RpcRequestMap;
@@ -183,6 +184,7 @@ const USER_NOTIFICATION_SENT_EVENT_NAME = "metidos:user-notification-sent";
 const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 const DEFAULT_RPC_REQUEST_TIMEOUT_MS = 120_000;
+const MAX_IN_FLIGHT_RPC_REQUESTS = 48;
 
 declare global {
   interface WindowEventMap {
@@ -342,6 +344,7 @@ const socketBaseUrl =
   `${socketProtocol}//${window.location.host}/rpc`;
 const healthUrl = runtimeConfig.healthUrl ?? "/health";
 const pendingRequests = new Map<number, PendingRequest>();
+const rpcRequestQueue = new RpcRequestQueue(MAX_IN_FLIGHT_RPC_REQUESTS);
 let socket: WebSocket | null = null;
 let nextRequestId = 1;
 let resolveConnection = () => {};
@@ -977,6 +980,14 @@ async function sendRequest<K extends RpcMethodName>(
   const id = nextRequestId++;
   const timeoutMs = resolveRequestTimeoutMs(options);
   const priority = options?.priority ?? "default";
+  const permit = await rpcRequestQueue.acquire(priority, signal);
+  if (signal?.aborted) {
+    permit.release();
+    throw createAbortError(
+      signal.reason,
+      `RPC request "${String(method)}" aborted.`,
+    );
+  }
 
   const response = new Promise<RpcRequestMap[K]["response"]>(
     (resolve, reject) => {
@@ -992,6 +1003,7 @@ async function sendRequest<K extends RpcMethodName>(
         }
         settled = true;
         pendingRequests.delete(id);
+        permit.release();
         removeAbortListener();
         callback();
       };
