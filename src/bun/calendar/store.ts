@@ -115,6 +115,18 @@ function normalizeText(value: string | null | undefined): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeCalendarTimezone(value: string): string {
+  const timezone = normalizeText(value) || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+  } catch (error) {
+    throw new Error(`Calendar timezone is invalid: ${timezone}`, {
+      cause: error,
+    });
+  }
+  return timezone;
+}
+
 function parseStrictCalendarDate(value: string, fieldName: string): number {
   if (!STRICT_DATE_RE.test(value)) {
     throw new Error(`${fieldName} must be a valid YYYY-MM-DD date.`);
@@ -1333,7 +1345,7 @@ function validateEventInput(
 ): Required<CalendarEventInput> {
   const allDay = input.allDay === true;
   const title = normalizeText(input.title) || "Untitled event";
-  const timezone = normalizeText(input.timezone) || "UTC";
+  const timezone = normalizeCalendarTimezone(input.timezone ?? "UTC");
   if (allDay) {
     if (!input.startDate || !input.endDate) {
       throw new Error("All-day events require startDate and endDate.");

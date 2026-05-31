@@ -180,6 +180,22 @@ describe("calendar store", () => {
     expect(event.createdByUserId).toBe(operator.id);
   });
 
+  test("rejects events with invalid timezones", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    const calendar = createCalendar(db, owner.id, { title: "Validation" });
+
+    expect(() =>
+      createCalendarEvent(db, owner.id, {
+        calendarId: calendar.id,
+        title: "Bad zone",
+        startAt: "2026-06-01T10:00:00.000Z",
+        endAt: "2026-06-01T11:00:00.000Z",
+        timezone: "Not/AZone",
+      }),
+    ).toThrow("Calendar timezone is invalid: Not/AZone");
+  });
+
   test("rejects events whose end is not after the start", () => {
     const db = setupDb();
     const owner = createUser(db, { username: "owner", isAdmin: true });
