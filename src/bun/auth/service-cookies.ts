@@ -71,6 +71,26 @@ function assertSafeCookieValue(value: string, label: string): void {
   }
 }
 
+function readCookieMatch(
+  cookieHeader: string,
+  name: string,
+): { present: boolean; value: string | null } {
+  let value: string | null = null;
+  let matchCount = 0;
+  for (const entry of cookieHeader.split(";")) {
+    const [rawName, ...rawValueParts] = entry.trim().split("=");
+    if (rawName !== name) {
+      continue;
+    }
+    matchCount += 1;
+    if (matchCount > 1) {
+      return { present: true, value: null };
+    }
+    value = rawValueParts.join("=") || null;
+  }
+  return { present: matchCount > 0, value };
+}
+
 function readPreferredCookieValue(
   cookieHeader: string,
   preferredName: string,
@@ -78,11 +98,12 @@ function readPreferredCookieValue(
 ): string | null {
   // Secure deployments prefer the __Host- cookie, while plain loopback HTTP and
   // migrated browsers may still carry the fallback name. The fallback is not a
-  // downgrade path when both are present: the host-prefixed value wins, and
-  // readUniqueCookieValue rejects duplicates for each individual cookie name.
-  const preferredValue = readUniqueCookieValue(cookieHeader, preferredName);
-  if (preferredValue) {
-    return preferredValue;
+  // downgrade path when both are present: any host-prefixed cookie presence wins,
+  // and duplicated or empty host-prefixed values reject the request instead of
+  // falling back to the legacy name.
+  const preferred = readCookieMatch(cookieHeader, preferredName);
+  if (preferred.present) {
+    return preferred.value;
   }
   return readUniqueCookieValue(cookieHeader, fallbackName);
 }

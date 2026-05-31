@@ -1170,6 +1170,16 @@ describe("auth service", () => {
         "metidos_ws_ticket=stale-rpc-path; metidos_ws_ticket=ticket-1",
       ),
     ).toBeNull();
+    expect(
+      readSessionCookie(
+        "__Host-metidos_session=stale; metidos_session=session-1; __Host-metidos_session=session-2",
+      ),
+    ).toBeNull();
+    expect(
+      readWebSocketTicketCookie(
+        "__Host-metidos_ws_ticket=; metidos_ws_ticket=ticket-1",
+      ),
+    ).toBeNull();
     expect(ticketCookie).toContain("Path=/;");
     expect(buildClearedSessionCookieHeader(false)).toContain("Max-Age=0");
     expect(buildClearedSessionCookieHeader(true)).toContain(
