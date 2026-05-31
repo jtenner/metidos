@@ -190,3 +190,92 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Known limitations are documented.
 - [ ] Public repository settings have been reviewed.
 - [ ] No external social media, launch-posting, newsletter, Discord, Product Hunt, Hacker News, Reddit, LinkedIn, YouTube promotion, or other off-repo marketing tasks are included in this checklist.
+
+## 13. Frontend Review: Bugs, UI Races, and Style Violations
+
+### Calendar bugs
+
+- [ ] Fix recurrence data loss on edit in `src/mainview/app/calendar-event-form-helpers.ts`: add a read-only/custom repeat option, avoid substring-only RRULE classification, and preserve unsupported or rich recurrence rules unless the user explicitly selects a supported preset.
+- [ ] Fix day-grouping timezone inconsistency in `src/mainview/app/calendar-layout.ts`: choose one date-key strategy for all-day and timed events so same-date events do not land in different visible day columns for non-UTC viewers.
+- [ ] Add end-date/end-time validation in `src/mainview/app/calendar-event-dialog.tsx`: reject timed and all-day ranges where end is before start before calling `onSave`.
+- [ ] Fix month focus highlight desync in `src/mainview/app/calendar-workspace.tsx`: update `focusedCalendarDateValue` when Prev, Next, Today, or the date input changes the visible month/date.
+- [ ] Add an in-flight save guard in `src/mainview/app/calendar-workspace.tsx` so double-submit cannot create duplicate events.
+- [x] Route the header close button through the busy-aware close handler in `src/mainview/app/calendar-edit-dialog.tsx` so dialogs cannot close mid-save/delete.
+- [x] Route the header close button through the busy-aware close handler in `src/mainview/app/calendar-ics-edit-dialog.tsx` so dialogs cannot close mid-save/delete.
+
+### Plugin administration, access, and terminal bugs
+
+- [ ] Implement or remove the no-op `setWeatherAccess` path in `src/mainview/app/use-access-permissions.ts` so a future weather toggle cannot silently fail.
+- [ ] Add a `loadGhostty().catch(...)` error path in `src/mainview/app/terminal-workspace.tsx` that shows actionable feedback instead of leaving a blank pane on WASM/import failure.
+- [ ] Replace unstable diagnostic keys in `src/mainview/app/plugin-administration-panel.tsx` with stable unique keys instead of `key={String(item)}`.
+
+### Composer bugs
+
+- [ ] Fix stale closure in image removal in `src/mainview/controls/chat-composer-control.tsx`: read fresh attachments with `readChatComposerImageAttachments(draftKey)` before removing.
+- [ ] Reset `pasteError` when `draftKey` changes in `src/mainview/controls/chat-composer-control.tsx` so one thread's image error does not leak into another thread.
+- [ ] Recompute skills autocomplete when the textarea caret moves in `src/mainview/controls/chat-composer-control.tsx`, not only when `draft` or `availableSkills` changes.
+- [ ] Show mobile “Preparing image…” status in `src/mainview/controls/chat-composer-control.tsx` even before `imageAttachmentPreview` exists by including `isReadingImageAttachments` in the status-row condition.
+
+### Plugin administration UI races
+
+- [ ] Serialize or generation-guard plugin settings auto-save in `src/mainview/app/use-plugin-administration-controller.ts` so inventory/settings reload cannot race with `savePluginSettings` and PATCH stale form values.
+- [ ] Serialize ingress route draft access/model saves in `src/mainview/app/use-plugin-administration-controller.ts`; add in-flight guards and prevent stale state commits after navigation/close.
+- [ ] Scope plugin admin/lifecycle disabled states in `src/mainview/app/plugin-administration-panel.tsx` and `src/mainview/app/plugin-lifecycle-action-state.ts` to the matching action key instead of globally disabling unrelated buttons.
+
+### Async lifecycle and stale-write races
+
+- [ ] Add mount/abort/request-id guards around blur-commit timeouts and settings loads in `src/mainview/app/settings-panel.tsx`.
+- [ ] Add mount/abort/request-id guards around run/delete/describe flows and delayed `loadCronJobs` calls in `src/mainview/app/mainview-cron-workspace-controller.tsx`.
+- [ ] Add mount/abort/request-id guards around terminal refresh and rename flows in `src/mainview/app/use-terminals-controller.ts`.
+- [ ] Reduce thread-discovery churn in `src/mainview/app/use-thread-status-controller.ts` by depending on a stable derived thread key instead of the whole `options.threads` array, while preserving existing in-flight dedupe/equivalence safeguards.
+
+### Focus, hover, and popover races
+
+- [ ] Add a hover bridge or equivalent stable open behavior for the help tooltip in `src/mainview/controls/thread-access-control.tsx` so users can move from the “?” trigger to the tooltip without it closing.
+- [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
+- [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
+- [ ] Cancel the focus-restore `requestAnimationFrame` during cleanup in `src/mainview/controls/popover.tsx`.
+- [ ] Cancel outstanding `requestAnimationFrame` work in `src/mainview/controls/chat-composer-control.tsx` during cleanup.
+- [ ] Guard late FileReader rejection handling in `src/mainview/controls/chat-composer-control.tsx` so it cannot call `setPasteError` after unmount or draft switch.
+
+### Style: type scale, focus, and tab semantics
+
+- [ ] Replace `text-lg` with `text-base` in `src/mainview/app/thread-start-request-dialog.tsx` to stay within the approved 16px max text scale.
+- [ ] Replace `text-lg` with `text-base` in `src/mainview/app/thread-extension-ui-dialog.tsx` to stay within the approved 16px max text scale.
+- [ ] Add consistent `focus-visible` styling to the interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`.
+- [ ] Complete the ARIA tab pattern for interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`: roving `tabIndex`, arrow-key handling, and `aria-controls`.
+
+### Style: shared primitives and one-off controls
+
+- [ ] Refactor cron mode tabs and “New Cron” in `src/mainview/app/mainview-cron-workspace-controller.tsx` to use approved shared primitives such as `AppButton`, `IconButton`, `ListOptionButton`, or `TabButton`.
+- [ ] Refactor terminal buttons in `src/mainview/app/terminal-workspace.tsx` to use approved shared button primitives.
+- [ ] Refactor calendar event dialog inputs in `src/mainview/app/calendar-event-dialog.tsx` to avoid local one-off `focus:ring-accent/25` recipes and use shared input/focus styling.
+- [ ] Refactor calendar edit dialog controls in `src/mainview/app/calendar-edit-dialog.tsx` to avoid local one-off focus/input/button styling.
+- [ ] Refactor calendar ICS edit dialog controls in `src/mainview/app/calendar-ics-edit-dialog.tsx` to avoid local one-off focus/input/button styling.
+- [ ] Refactor extension dialog primary/cancel/select controls in `src/mainview/app/thread-extension-ui-dialog.tsx` to use shared primitives.
+- [ ] Refactor skills menu controls in `src/mainview/controls/chat-composer-control.tsx` to use shared primitives or approved shared recipes.
+- [ ] Refactor choice dropdown options in `src/mainview/controls/choice-dropdown-control.tsx` to use shared primitives or approved shared recipes.
+- [ ] Refactor Codex model selector controls in `src/mainview/controls/codex-model-selector.tsx` to use shared primitives or approved shared recipes.
+- [ ] Refactor settings close/reset controls in `src/mainview/app/settings-panel.tsx` to use shared button primitives.
+
+### Style: semantic backdrops, cards, blur, badges, and spacing
+
+- [ ] Replace raw `bg-black/60` backdrop in `src/mainview/app/thread-start-request-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
+- [ ] Replace raw `bg-black/72` backdrop in `src/mainview/app/thread-extension-ui-dialog.tsx` with the semantic modal backdrop token/recipe used by `ModalDialogSurface`.
+- [ ] Remove card-like/decorative styling from the inline folder suggestion list in `src/mainview/app/projects-panel.tsx`, including sidebar `shadow-overlay`/`backdrop-blur-xl` drift.
+- [ ] Remove card-like bordered `bg-surface-1` treatment from the add-project form in `src/mainview/app/projects-panel.tsx` or align it with approved non-card primitives.
+- [ ] Replace decorative icon tiles in `src/mainview/app/settings-panel.tsx` with approved icon/section styling.
+- [ ] Replace decorative icon tiles in `src/mainview/app/cronjob-workspace.tsx` with approved icon/section styling.
+- [ ] Replace boxed loading/empty/error panels in `src/mainview/app/cronjob-workspace.tsx` with approved empty/error/loading primitives or inline treatments.
+- [ ] Remove `backdrop-blur-sm` from the tooltip in `src/mainview/controls/codex-model-selector.tsx` unless it is converted to an approved overlay recipe.
+- [ ] Introduce or use a shared badge primitive for the “Unread” badge in `src/mainview/app/thread-list-row.tsx`.
+- [ ] Introduce or use a shared badge primitive for the secret badge in `src/mainview/app/plugin-administration-panel.tsx`.
+- [ ] Replace off-grid spacing in `src/mainview/controls/codex-model-selector.tsx` (`py-px`, `ml-[10px]`, `pl-[10px]`, `mt-[1px]`) with 4px-grid-compliant spacing.
+- [ ] Replace off-grid spacing/tracking in `src/mainview/controls/thread-access-control.tsx` (`space-y-1.5`, `tracking-[0.12em]`) with approved spacing and type tokens.
+- [ ] Replace off-grid spacing/tracking in `src/mainview/app/mainview-cron-workspace-controller.tsx` with approved spacing and type tokens.
+- [ ] Replace `mt-1.5` in `src/mainview/app/settings-panel.tsx` with 4px-grid-compliant spacing.
+- [ ] Bring mobile chat-bubble spacing in `src/mainview/app/chat-workspace.tsx` back onto the 4px grid instead of `px-[10px]`, `py-[10px]`, and `px-[2px]` recipes.
+- [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/controls/chat-composer-control.tsx`.
+- [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/app/calendar-workspace.tsx`.
+- [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/controls/list-row.tsx`.
+- [ ] Fix invalid notification tray markup in `src/mainview/App.tsx` by avoiding block-level `<div>` nesting inside an unstyled `AppButton`/`<button>`.

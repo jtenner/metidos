@@ -180,7 +180,7 @@ export function CalendarIcsEditDialog({
               buttonStyle="muted"
               disabled={busy}
               iconOnly
-              onClick={onClose}
+              onClick={handleRequestClose}
             >
               {materialSymbol("close", "text-[15px]")}
             </AppButton>
@@ -308,7 +308,11 @@ export function CalendarIcsEditDialog({
             >
               Delete
             </AppButton>
-            <AppButton buttonStyle="muted" disabled={busy} onClick={onClose}>
+            <AppButton
+              buttonStyle="muted"
+              disabled={busy}
+              onClick={handleRequestClose}
+            >
               Cancel
             </AppButton>
             <AppButton buttonStyle="primary" disabled={busy} type="submit">
