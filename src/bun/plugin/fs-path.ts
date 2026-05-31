@@ -196,7 +196,11 @@ function parsePluginFsVirtualPath(input: ResolvePluginFsVirtualPathInput): {
   }
 
   const segments: string[] = [];
-  for (const segment of remainder.split("/")) {
+  const segmentSource =
+    process.platform === "win32"
+      ? splitRelativePathSegments(remainder)
+      : remainder.split("/");
+  for (const segment of segmentSource) {
     if (!segment || segment === ".") {
       continue;
     }

@@ -143,6 +143,23 @@ describe("plugin fs virtual path resolver", () => {
     });
   });
 
+  it("rejects backslash-separated traversal in virtual paths on Windows", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+    const { pluginPath } = createPluginFixture();
+
+    await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        virtualPath: "~/.git\\config",
+      }),
+    ).resolves.toMatchObject({
+      code: "forbidden_directory",
+      virtualPath: "~/.git/config",
+    });
+  });
+
   it("normalizes virtual paths and exposes virtual paths for absolute results", async () => {
     const { pluginPath } = createPluginFixture();
 
