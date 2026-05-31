@@ -727,6 +727,7 @@ export async function runGitCommandResult(
           },
         }),
         readGitTextStream(proc.stderr, {
+          maxBytes: maxStdoutBytes,
           signal: stderrAbortController.signal,
           swallowAbort: true,
         }),
