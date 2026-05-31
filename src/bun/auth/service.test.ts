@@ -962,7 +962,7 @@ describe("auth service", () => {
     ).toBe("Completed optional step-up authentication.");
   });
 
-  it("caches resolved sessions briefly and falls back to SQLite after the TTL", async () => {
+  it("revalidates cached sessions against SQLite before returning them", async () => {
     const database = createTestDatabase();
     const session = createAuthSession(database, {
       expiresAt: "2026-04-10T00:00:00.000Z",
@@ -983,8 +983,8 @@ describe("auth service", () => {
       resolveSession(database, {
         nowMs: Date.parse("2026-04-03T00:00:01.000Z"),
         sessionId: session.id,
-      })?.id,
-    ).toBe(session.id);
+      }),
+    ).toBeNull();
     expect(
       resolveSession(database, {
         nowMs: Date.parse("2026-04-03T00:00:06.000Z"),

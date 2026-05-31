@@ -239,13 +239,24 @@ export function resolveSession(
   // ids are high-entropy bearer tokens, and auth/WebSocket routes already rate
   // limit access, so hiding row-existence timing would add database churn
   // without materially reducing a practical enumeration risk.
-  const session =
-    readCachedResolvedAuthSession(database, input.sessionId, nowMs) ??
-    getAuthSession(database, input.sessionId);
-  if (!session) {
-    authSessionLastTouchedAtCache.delete(input.sessionId);
-    deleteResolvedAuthSession(database, input.sessionId);
-    return null;
+  const cachedSession = readCachedResolvedAuthSession(
+    database,
+    input.sessionId,
+    nowMs,
+  );
+  let session: AuthSessionRecord | null;
+  if (cachedSession !== null) {
+    session = getAuthSession(database, input.sessionId);
+    if (!session) {
+      authSessionLastTouchedAtCache.delete(input.sessionId);
+      deleteResolvedAuthSession(database, input.sessionId);
+      return null;
+    }
+  } else {
+    session = getAuthSession(database, input.sessionId);
+    if (!session) {
+      return null;
+    }
   }
   recordResolvedAuthSession(database, session, nowMs);
 
