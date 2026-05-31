@@ -128,8 +128,8 @@ describe("discoverProjectFaviconDataUrl", () => {
     expect(discoveredDataUrl).toBe(dataUrl("image/x-icon", ICON_BYTES));
   });
 
-  it("resolves Metidos asset-root favicon placeholders to root png files", async () => {
-    const root = await makeTempProject("metidos-asset-root");
+  it("resolves asset-root favicon placeholders to root png files", async () => {
+    const root = await makeTempProject("asset-root");
     await mkdir(join(root, "src", "mainview"), { recursive: true });
     await writeFile(join(root, "bird.png"), PNG_BYTES);
     await writeFile(
@@ -142,7 +142,21 @@ describe("discoverProjectFaviconDataUrl", () => {
     expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
   });
 
-  it("does not fall back to favicon files when html files exist without a usable favicon link", async () => {
+  it("resolves common public-url favicon placeholders to root files", async () => {
+    const root = await makeTempProject("public-url");
+    await mkdir(join(root, "public"), { recursive: true });
+    await writeFile(join(root, "favicon.ico"), ICON_BYTES);
+    await writeFile(
+      join(root, "public", "index.html"),
+      '<link rel="icon" href="%PUBLIC_URL%/favicon.ico">',
+    );
+
+    const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
+
+    expect(discoveredDataUrl).toBe(dataUrl("image/x-icon", ICON_BYTES));
+  });
+
+  it("falls back to favicon files when html files exist without a usable favicon link", async () => {
     const root = await makeTempProject("html-without-icon");
     await writeFile(join(root, "favicon.png"), PNG_BYTES);
     await writeFile(
@@ -152,12 +166,54 @@ describe("discoverProjectFaviconDataUrl", () => {
 
     const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
 
-    expect(discoveredDataUrl).toBeNull();
+    expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
   });
 
   it("falls back to root favicon.png when no html files exist", async () => {
     const root = await makeTempProject("favicon-png");
     await writeFile(join(root, "favicon.png"), PNG_BYTES);
+
+    const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
+
+    expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
+  });
+
+  it("falls back to common project icon filenames when there is no favicon-prefixed file", async () => {
+    const root = await makeTempProject("common-icon-names");
+    await mkdir(join(root, "app"), { recursive: true });
+    await writeFile(join(root, "app", "icon.png"), PNG_BYTES);
+
+    const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
+
+    expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
+  });
+
+  it("reads web app manifest icon entries referenced from html", async () => {
+    const root = await makeTempProject("manifest-icons");
+    await mkdir(join(root, "public"), { recursive: true });
+    await writeFile(join(root, "public", "icon-192.png"), PNG_BYTES);
+    await writeFile(
+      join(root, "site.webmanifest"),
+      JSON.stringify({ icons: [{ src: "public/icon-192.png" }] }),
+    );
+    await writeFile(
+      join(root, "index.html"),
+      '<link rel="manifest" href="site.webmanifest">',
+    );
+
+    const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
+
+    expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
+  });
+
+  it("reads web app manifest icon entries without an html link", async () => {
+    const root = await makeTempProject("direct-manifest-icons");
+    await mkdir(join(root, "icons"), { recursive: true });
+    await writeFile(join(root, "icons", "icon-192.png"), PNG_BYTES);
+    await writeFile(
+      join(root, "manifest.json"),
+      JSON.stringify({ icons: [{ src: "icons/icon-192.png" }] }),
+    );
 
     const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
 

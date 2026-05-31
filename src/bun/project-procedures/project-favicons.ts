@@ -35,12 +35,19 @@ const ICON_MIME_TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+type FallbackIconCandidate = {
+  path: string;
+  priority: number;
+};
+
 type FaviconCandidateIndex = {
   htmlPaths: string[];
-  nestedFaviconImagePath: string | null;
+  nestedFallbackIconPaths: FallbackIconCandidate[];
   nestedIndexHtmlPaths: string[];
-  rootFaviconImagePath: string | null;
+  nestedManifestPaths: string[];
+  rootFallbackIconPaths: FallbackIconCandidate[];
   rootIndexHtmlPath: string | null;
+  rootManifestPaths: string[];
 };
 
 type FaviconCacheEntry = {
@@ -89,9 +96,15 @@ function resolveFaviconHref(
   }
 
   const decodedHref = decodeHrefPath(href);
-  const metidosAssetRootPrefix = "__METIDOS_ASSET_ROOT__/";
-  const candidatePath = decodedHref.startsWith(metidosAssetRootPrefix)
-    ? resolve(projectPath, decodedHref.slice(metidosAssetRootPrefix.length))
+  const rootRelativePrefix = [
+    "__METIDOS_ASSET_ROOT__/",
+    "%PUBLIC_URL%/",
+    "%PUBLIC_URL%",
+    "%BASE_URL%/",
+    "%BASE_URL%",
+  ].find((prefix) => decodedHref.startsWith(prefix));
+  const candidatePath = rootRelativePrefix
+    ? resolve(projectPath, decodedHref.slice(rootRelativePrefix.length))
     : decodedHref.startsWith("/")
       ? resolve(projectPath, `.${decodedHref}`)
       : resolve(dirname(htmlPath), decodedHref);
@@ -109,28 +122,137 @@ function isFaviconRelValue(relValue: string): boolean {
   return relValue
     .split(/\s+/u)
     .map((token) => token.trim().toLowerCase())
-    .some((token) => token === "icon" || token.endsWith("-icon"));
+    .some(
+      (token) =>
+        token === "icon" || token.endsWith("-icon") || token === "mask-icon",
+    );
 }
 
-function extractFaviconHrefs(html: string): string[] {
-  const hrefs: string[] = [];
+function isManifestFileName(fileName: string): boolean {
+  const lowerName = fileName.toLowerCase();
+  return (
+    lowerName.endsWith(".webmanifest") || lowerName.endsWith("manifest.json")
+  );
+}
+
+function getFallbackIconFilePriority(fileName: string): number | null {
+  const lowerName = fileName.toLowerCase();
+  const extension = extname(lowerName);
+  if (ICON_MIME_TYPES[extension] === undefined) {
+    return null;
+  }
+
+  const baseName = lowerName.slice(0, -extension.length);
+  if (baseName === "favicon") {
+    return 0;
+  }
+  if (baseName.startsWith("favicon-")) {
+    return 1;
+  }
+  if (baseName === "icon") {
+    return 2;
+  }
+  if (
+    baseName === "apple-touch-icon" ||
+    baseName.startsWith("apple-touch-icon-") ||
+    baseName === "apple-icon" ||
+    baseName.startsWith("apple-icon-")
+  ) {
+    return 3;
+  }
+  if (
+    baseName.startsWith("android-chrome-") ||
+    baseName.startsWith("mstile-") ||
+    baseName === "mask-icon"
+  ) {
+    return 4;
+  }
+  if (baseName.endsWith("-icon") || baseName.endsWith("_icon")) {
+    return 5;
+  }
+  return null;
+}
+
+function isManifestRelValue(relValue: string): boolean {
+  return relValue
+    .split(/\s+/u)
+    .map((token) => token.trim().toLowerCase())
+    .some((token) => token === "manifest");
+}
+
+type ExtractedIconHrefs = {
+  iconHrefs: string[];
+  manifestHrefs: string[];
+};
+
+function extractIconHrefs(html: string): ExtractedIconHrefs {
+  const iconHrefs: string[] = [];
+  const manifestHrefs: string[] = [];
 
   new HTMLRewriter()
     .on("link[rel][href]", {
       element(link) {
-        if (!isFaviconRelValue(link.getAttribute("rel") ?? "")) {
+        const rel = link.getAttribute("rel") ?? "";
+        const href = link.getAttribute("href")?.trim() ?? "";
+        if (!href) {
           return;
         }
-
-        const href = link.getAttribute("href")?.trim() ?? "";
-        if (href) {
-          hrefs.push(href);
+        if (isFaviconRelValue(rel)) {
+          iconHrefs.push(href);
+        } else if (isManifestRelValue(rel)) {
+          manifestHrefs.push(href);
         }
       },
     })
     .transform(html);
 
-  return hrefs;
+  return { iconHrefs, manifestHrefs };
+}
+
+async function readManifestIconHrefs(
+  projectRealPath: string,
+  manifestPath: string,
+): Promise<string[]> {
+  const manifestHandle = await open(
+    manifestPath,
+    constants.O_RDONLY | constants.O_NOFOLLOW,
+  ).catch(() => null);
+  if (!manifestHandle) {
+    return [];
+  }
+  try {
+    const manifestStat = await manifestHandle.stat().catch(() => null);
+    if (!manifestStat?.isFile() || manifestStat.size > 128 * 1024) {
+      return [];
+    }
+    const manifestRealPath = await realpath(
+      `/proc/self/fd/${manifestHandle.fd}`,
+    ).catch(() => null);
+    if (
+      !manifestRealPath ||
+      (manifestRealPath !== projectRealPath &&
+        !isInsideDirectory(projectRealPath, manifestRealPath))
+    ) {
+      return [];
+    }
+    const manifestText = await manifestHandle.readFile("utf8").catch(() => "");
+    try {
+      const manifest = JSON.parse(manifestText) as {
+        icons?: Array<{ src?: unknown }>;
+      };
+      return Array.isArray(manifest.icons)
+        ? manifest.icons
+            .map((icon) =>
+              typeof icon.src === "string" ? icon.src.trim() : "",
+            )
+            .filter(Boolean)
+        : [];
+    } catch {
+      return [];
+    }
+  } finally {
+    await manifestHandle.close().catch(() => undefined);
+  }
 }
 
 async function readIconDataUrl(
@@ -188,7 +310,8 @@ async function readFaviconFromHtml(
     return null;
   }
   const html = await readFile(htmlPath, "utf8").catch(() => "");
-  for (const href of extractFaviconHrefs(html)) {
+  const { iconHrefs, manifestHrefs } = extractIconHrefs(html);
+  for (const href of iconHrefs) {
     const iconPath = resolveFaviconHref(projectPath, htmlPath, href);
     if (!iconPath) {
       continue;
@@ -196,6 +319,29 @@ async function readFaviconFromHtml(
     const dataUrl = await readIconDataUrl(projectRealPath, iconPath);
     if (dataUrl) {
       return dataUrl;
+    }
+  }
+  for (const manifestHref of manifestHrefs) {
+    const manifestPath = resolveFaviconHref(
+      projectPath,
+      htmlPath,
+      manifestHref,
+    );
+    if (!manifestPath) {
+      continue;
+    }
+    for (const iconHref of await readManifestIconHrefs(
+      projectRealPath,
+      manifestPath,
+    )) {
+      const iconPath = resolveFaviconHref(projectPath, manifestPath, iconHref);
+      if (!iconPath) {
+        continue;
+      }
+      const dataUrl = await readIconDataUrl(projectRealPath, iconPath);
+      if (dataUrl) {
+        return dataUrl;
+      }
     }
   }
   return null;
@@ -206,10 +352,12 @@ async function collectFaviconCandidates(
 ): Promise<FaviconCandidateIndex> {
   const candidates: FaviconCandidateIndex = {
     htmlPaths: [],
-    nestedFaviconImagePath: null,
+    nestedFallbackIconPaths: [],
     nestedIndexHtmlPaths: [],
-    rootFaviconImagePath: null,
+    nestedManifestPaths: [],
+    rootFallbackIconPaths: [],
     rootIndexHtmlPath: null,
+    rootManifestPaths: [],
   };
   const queue: Array<{ depth: number; path: string }> = [
     { depth: 0, path: projectPath },
@@ -260,20 +408,36 @@ async function collectFaviconCandidates(
       } else if (lowerName.endsWith(".html")) {
         candidates.htmlPaths.push(entryPath);
       }
-
-      const isSupportedIconImage =
-        ICON_MIME_TYPES[extname(lowerName)] !== undefined;
-      if (lowerName.startsWith("favicon.") && isSupportedIconImage) {
+      if (isManifestFileName(lowerName)) {
         if (current.depth === 0) {
-          candidates.rootFaviconImagePath ??= entryPath;
+          candidates.rootManifestPaths.push(entryPath);
         } else {
-          candidates.nestedFaviconImagePath ??= entryPath;
+          candidates.nestedManifestPaths.push(entryPath);
+        }
+      }
+
+      const fallbackIconPriority = getFallbackIconFilePriority(lowerName);
+      if (fallbackIconPriority !== null) {
+        const iconPath = { path: entryPath, priority: fallbackIconPriority };
+        if (current.depth === 0) {
+          candidates.rootFallbackIconPaths.push(iconPath);
+        } else {
+          candidates.nestedFallbackIconPaths.push(iconPath);
         }
       }
     }
   }
 
   return candidates;
+}
+
+function sortFallbackIconCandidates(
+  candidates: FallbackIconCandidate[],
+): FallbackIconCandidate[] {
+  return [...candidates].sort(
+    (left, right) =>
+      left.priority - right.priority || left.path.localeCompare(right.path),
+  );
 }
 
 function resolveCandidateHtmlPaths(
@@ -311,23 +475,35 @@ async function discoverProjectFaviconDataUrlUncached(
         return dataUrl;
       }
     }
-    return null;
   }
 
-  if (candidates.rootFaviconImagePath) {
-    const dataUrl = await readIconDataUrl(
+  for (const manifestPath of [
+    ...candidates.rootManifestPaths,
+    ...candidates.nestedManifestPaths,
+  ]) {
+    for (const iconHref of await readManifestIconHrefs(
       projectRealPath,
-      candidates.rootFaviconImagePath,
-    );
+      manifestPath,
+    )) {
+      const iconPath = resolveFaviconHref(projectPath, manifestPath, iconHref);
+      if (!iconPath) {
+        continue;
+      }
+      const dataUrl = await readIconDataUrl(projectRealPath, iconPath);
+      if (dataUrl) {
+        return dataUrl;
+      }
+    }
+  }
+
+  for (const iconCandidate of [
+    ...sortFallbackIconCandidates(candidates.rootFallbackIconPaths),
+    ...sortFallbackIconCandidates(candidates.nestedFallbackIconPaths),
+  ]) {
+    const dataUrl = await readIconDataUrl(projectRealPath, iconCandidate.path);
     if (dataUrl) {
       return dataUrl;
     }
-  }
-  if (candidates.nestedFaviconImagePath) {
-    return await readIconDataUrl(
-      projectRealPath,
-      candidates.nestedFaviconImagePath,
-    );
   }
   return null;
 }
