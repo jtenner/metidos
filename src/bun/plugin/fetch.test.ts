@@ -192,6 +192,42 @@ describe("executePluginFetch", () => {
     ).rejects.toMatchObject({ code: "redirect_limit_exceeded" });
   });
 
+  it("drops sensitive headers on redirect hops", async () => {
+    const seenHeaders: string[] = [];
+    const server = startServer((request) => {
+      const requestUrl = new URL(request.url);
+      if (requestUrl.pathname === "/start") {
+        return new Response(null, {
+          headers: { location: "/final" },
+          status: 302,
+        });
+      }
+      seenHeaders.push(request.headers.get("authorization") ?? "");
+      return new Response("done");
+    });
+    const origin = `http://localhost:${server.port}`;
+    const context = {
+      network: {
+        allow: [`${origin}/**`],
+        enforceHttps: false,
+      },
+      permissions: ["network:fetch"],
+    };
+
+    await expect(
+      executePluginFetch({
+        context,
+        fetch: localTestFetch,
+        options: {
+          headers: { Authorization: "Bearer secret-token" },
+        },
+        unsafeAllowPrivateNetwork: true,
+        url: `${origin}/start`,
+      }),
+    ).resolves.toMatchObject({ body: "done", redirected: true });
+    expect(seenHeaders).toEqual([""]);
+  });
+
   it("blocks dangerous request headers before sending the request", async () => {
     let requestReachedServer = false;
     const server = startServer(() => {

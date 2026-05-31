@@ -27,6 +27,12 @@ export const DEFAULT_PLUGIN_FETCH_TIMEOUT_MS = 30_000;
 export const MAX_PLUGIN_FETCH_RESPONSE_BODY_BYTES = 25 * 1024 * 1024;
 export const MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES = 1024 * 1024;
 const REDIRECT_LIMIT = 5;
+const REDIRECT_SENSITIVE_REQUEST_HEADERS = new Set([
+  "authorization",
+  "cookie",
+  "cookie2",
+  "proxy-authorization",
+]);
 const BLOCKED_PLUGIN_FETCH_REQUEST_HEADERS = new Set([
   "connection",
   "content-length",
@@ -249,6 +255,21 @@ function normalizeRequestOptions(
   return output;
 }
 
+function stripRedirectSensitiveHeaders(
+  headers: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!headers) {
+    return undefined;
+  }
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (!REDIRECT_SENSITIVE_REQUEST_HEADERS.has(key.toLowerCase())) {
+      output[key] = value;
+    }
+  }
+  return output;
+}
+
 function diagnosticPluginFetchUrl(url: string | URL): string {
   const parsedUrl = url instanceof URL ? new URL(url) : new URL(url);
   parsedUrl.username = "";
@@ -449,15 +470,21 @@ export async function executePluginFetch(input: {
 
   try {
     for (let redirectCount = 0; ; redirectCount += 1) {
+      const outboundHeaders =
+        redirectCount === 0
+          ? requestOptions.headers
+          : stripRedirectSensitiveHeaders(
+              requestOptions.headers as Record<string, string> | undefined,
+            );
       let response: Response;
       try {
         response = await fetchUrl(requestUrl, {
           ...(requestOptions.body === undefined
             ? {}
             : { body: requestOptions.body }),
-          ...(requestOptions.headers === undefined
+          ...(outboundHeaders === undefined
             ? {}
-            : { headers: requestOptions.headers }),
+            : { headers: outboundHeaders }),
           ...(requestOptions.method === undefined
             ? {}
             : { method: requestOptions.method }),
