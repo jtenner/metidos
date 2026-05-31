@@ -21,6 +21,7 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
+const originalAppDatabasePath = process.env.METIDOS_APP_DATABASE_PATH;
 const originalBunCron = Bun.cron;
 
 function createTempDirectory(prefix: string): string {
@@ -40,13 +41,16 @@ afterEach(async () => {
   } else {
     delete process.env.METIDOS_APP_DATA_DIR;
   }
+  if (typeof originalAppDatabasePath === "string") {
+    process.env.METIDOS_APP_DATABASE_PATH = originalAppDatabasePath;
+  } else {
+    delete process.env.METIDOS_APP_DATABASE_PATH;
+  }
 });
 
 describe("sidecar cron scheduler", () => {
   it("registers enabled cron jobs and stops them on shutdown", async () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-scheduler-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-scheduler-repo-");
     mkdirSync(repoPath, {
       recursive: true,
@@ -114,9 +118,7 @@ describe("sidecar cron scheduler", () => {
   });
 
   it("re-registers updated cron jobs and removes disabled ones on sync", () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-scheduler-sync-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-scheduler-sync-repo-");
     mkdirSync(repoPath, {
       recursive: true,
@@ -178,9 +180,7 @@ describe("sidecar cron scheduler", () => {
   });
 
   it("removes jobs that leave the timezone scheduler sync set", () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-scheduler-timezone-sync-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory(
       "metidos-cron-scheduler-timezone-sync-repo-",
     );

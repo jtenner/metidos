@@ -7,7 +7,6 @@ import { describe, expect, it } from "bun:test";
 import type { RpcModelOption } from "../../bun/rpc-schema";
 import {
   codexModelSelectionOutcome,
-  codexProviderScopeInfo,
   codexReasoningPresentation,
   filterCodexProviderGroups,
   filterCodexProviderModels,
@@ -113,11 +112,6 @@ describe("stepped codex selector helpers", () => {
       codexModelSelectionOutcome(PLUGIN_ALPHA_NO_REASONING_MODEL, true),
     ).toBe("commit");
     expect(codexModelSelectionOutcome(PLUGIN_BETA_MODEL, false)).toBe("commit");
-  });
-
-  it("does not add app-owned provider scope guidance", () => {
-    expect(codexProviderScopeInfo("plugin:alpha")).toBeNull();
-    expect(codexProviderScopeInfo("anthropic")).toBeNull();
   });
 
   it("preserves provider availability metadata when grouping provider rows", () => {

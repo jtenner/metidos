@@ -15,6 +15,7 @@ type ProjectProceduresModule = typeof import("./project-procedures");
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
+const originalAppDatabasePath = process.env.METIDOS_APP_DATABASE_PATH;
 
 function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
@@ -36,6 +37,11 @@ afterEach(() => {
   } else {
     delete process.env.METIDOS_APP_DATA_DIR;
   }
+  if (typeof originalAppDatabasePath === "string") {
+    process.env.METIDOS_APP_DATABASE_PATH = originalAppDatabasePath;
+  } else {
+    delete process.env.METIDOS_APP_DATABASE_PATH;
+  }
   for (const path of tempDirectories) {
     rmSync(path, { force: true, recursive: true });
   }
@@ -44,9 +50,7 @@ afterEach(() => {
 
 describe("cron procedure validation", () => {
   it("rejects invalid cron schedules before persisting them", async () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-procedure-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-procedure-repo-");
     mkdirSync(repoPath, { recursive: true });
     const database = initAppDatabase();
@@ -72,9 +76,7 @@ describe("cron procedure validation", () => {
   });
 
   it("rejects invalid cron schedule updates without changing the job", async () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-update-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-update-repo-");
     mkdirSync(repoPath, { recursive: true });
     const database = initAppDatabase();

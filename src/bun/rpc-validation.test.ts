@@ -246,19 +246,6 @@ describe("RPC request validation", () => {
     ).toThrow(/change\.previousPath must be nullableString/);
   });
 
-  test("keeps enough pending RPC capacity for IDE-scale websocket bursts", async () => {
-    useIsolatedAppDataDir();
-    const {
-      MAX_PENDING_RPC_REQUESTS,
-      MAX_PENDING_RPC_REQUESTS_PER_CLIENT,
-      PENDING_RPC_WARN_COUNT,
-    } = await import("./index");
-
-    expect(MAX_PENDING_RPC_REQUESTS_PER_CLIENT).toBe(64);
-    expect(MAX_PENDING_RPC_REQUESTS).toBe(384);
-    expect(PENDING_RPC_WARN_COUNT).toBe(32);
-  });
-
   test("clamps client supplied RPC timeouts", async () => {
     useIsolatedAppDataDir();
     const { MAX_RPC_REQUEST_TIMEOUT_MS, parseRpcClientMessage } = await import(

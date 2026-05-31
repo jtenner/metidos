@@ -69,7 +69,23 @@ type BunCronRegister = (
   title: string,
 ) => Promise<void>;
 
-const registerCron = Bun.cron as unknown as BunCronRegister;
+type BunCronRemove = (title: string) => Promise<void>;
+
+function registerCron(
+  schedule: string,
+  handler: () => Promise<void> | void,
+  title: string,
+): Promise<void> {
+  return (Bun.cron as unknown as BunCronRegister)(schedule, handler, title);
+}
+
+function removeCron(title: string): Promise<void> {
+  const remove = (Bun.cron as unknown as { remove?: BunCronRemove }).remove;
+  if (typeof remove !== "function") {
+    return Promise.resolve();
+  }
+  return remove(title);
+}
 
 /**
  * Convert a cron title into a stable, filesystem-safe token for Bun.cron labels.
@@ -119,7 +135,7 @@ function postError(error: unknown): void {
 async function unregisterAllCronJobs(): Promise<void> {
   for (const title of cronJobTitles) {
     try {
-      await Bun.cron.remove(title);
+      await removeCron(title);
     } catch {
       // Ignore when registration is already gone.
     }
@@ -138,7 +154,7 @@ async function unregisterCronJobsForCronId(cronJobId: number): Promise<void> {
       continue;
     }
     try {
-      await Bun.cron.remove(title);
+      await removeCron(title);
     } catch {
       // Ignore when registration is already gone.
     }
@@ -167,7 +183,7 @@ async function registerCronJob(
       const title = buildCronJobTitle(cronJob, index);
       cronJobTitles.add(title);
       registeredTitles.push(title);
-      await Bun.cron.remove(title).catch(() => undefined);
+      await removeCron(title).catch(() => undefined);
       await registerCron(
         schedule,
         () => {
@@ -182,7 +198,7 @@ async function registerCronJob(
     }
   } catch (error) {
     for (const title of registeredTitles) {
-      await Bun.cron.remove(title).catch(() => undefined);
+      await removeCron(title).catch(() => undefined);
       cronJobTitles.delete(title);
     }
     throw error;
@@ -235,6 +251,20 @@ async function registerCronJobs(): Promise<void> {
   }
 }
 
+export async function __testingRegisterCronJobsForOpenDatabase(
+  testDatabase: Database,
+): Promise<() => Promise<void>> {
+  await unregisterAllCronJobs();
+  database = testDatabase;
+  await registerCronJobs();
+  return async () => {
+    await unregisterAllCronJobs();
+    if (database === testDatabase) {
+      database = null;
+    }
+  };
+}
+
 async function runSchedulerCommandWithTimeout(
   command: () => Promise<void>,
 ): Promise<void> {
@@ -250,6 +280,7 @@ async function runSchedulerCommandWithTimeout(
             ),
           );
         }, SCHEDULER_COMMAND_TIMEOUT_MS);
+        timeoutHandle.unref?.();
       }),
     ]);
   } finally {
@@ -304,7 +335,7 @@ async function closeDatabase(): Promise<void> {
   if (!database) {
     return;
   }
-  database.close(false);
+  database.close(true);
   database = null;
 }
 

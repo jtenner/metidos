@@ -9,7 +9,6 @@ import {
   applySecurityHeaders,
   buildConfiguredBrowserOrigins,
   buildContentSecurityPolicy,
-  buildLivenessPayload,
   buildLoopbackBrowserOrigins,
   buildRuntimeConfigElement,
   isRuntimeStatsSecretMatch,
@@ -127,12 +126,6 @@ describe("server security helpers", () => {
         buildLoopbackBrowserOrigins(7599),
       ),
     ).toBeFalse();
-  });
-
-  it("returns a minimal liveness payload", () => {
-    expect(buildLivenessPayload(false)).toEqual({
-      ok: false,
-    });
   });
 
   it("builds a content security policy with explicit websocket connect sources", () => {

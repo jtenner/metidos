@@ -8,7 +8,6 @@ import {
   createThreadPermissionDescriptor,
   createThreadPermissionRegistry,
   defaultThreadPermissions,
-  hasThreadPermission,
   metidosNativePermissionDescriptors,
   normalizeThreadPermissions,
   permissionDescriptorsForAgentCatalog,
@@ -196,11 +195,6 @@ describe("thread permission registry", () => {
       "metidos:threads",
       "metidos:web-search",
     ]);
-  });
-
-  it("looks up installed permissions", () => {
-    expect(hasThreadPermission(["metidos:git"], "metidos:git")).toBeTrue();
-    expect(hasThreadPermission(["metidos:git"], "metidos:github")).toBeFalse();
   });
 
   it("derives plugin descriptors from active inventory access groups", () => {

@@ -16,9 +16,10 @@ const TEXT_ENCODER = new TextEncoder();
 export const DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024;
 // This is a virtual-memory ceiling for the Bun sidecar host process, not a
 // target RSS allocation. Bun/JSC reserves substantially more address space than
-// it commits; OpenRouter startup currently needs >640 MiB of virtual address
-// space while resident memory stays around 50-60 MiB.
-export const DEFAULT_PLUGIN_SIDECAR_MEMORY_LIMIT_BYTES = 768 * 1024 * 1024;
+// it commits; Bun 1.3.13 plugin sidecar startup in the Podman image can need a
+// multi-GiB virtual address ceiling for heavier plugins while resident memory
+// stays around tens of MiB.
+export const DEFAULT_PLUGIN_SIDECAR_MEMORY_LIMIT_BYTES = 4 * 1024 * 1024 * 1024;
 export const PLUGIN_SIDECAR_TRUNCATED_LINE_SUFFIX = "… [truncated by host]";
 
 const PLUGIN_SIDECAR_ENTRYPOINT_PATH = fileURLToPath(

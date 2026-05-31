@@ -35,10 +35,7 @@ import {
   normalizeThreadPermissions,
   pluginPermissionDescriptorsFromInventory,
 } from "../thread-permissions";
-import type {
-  AppRPCSchema,
-  RpcRequestContext,
-} from "../rpc-schema";
+import type { AppRPCSchema, RpcRequestContext } from "../rpc-schema";
 import {
   getLocalOperatorProfile,
   getLocalOperatorState,

@@ -201,7 +201,15 @@ export function resetResolvedAppDataDirectory(): void {
 }
 
 export function getAppDatabasePath(options?: AppDataPathOptions): string {
+  const configuredDatabasePath = process.env.METIDOS_APP_DATABASE_PATH?.trim();
+  if (!options?.appDataDir && configuredDatabasePath) {
+    return configuredDatabasePath;
+  }
   return resolve(getAppDataDirectoryPath(options), DB_FILE_NAME);
+}
+
+export function isInMemoryAppDatabasePath(dbPath: string): boolean {
+  return dbPath === ":memory:" || /[?&]mode=memory(?:&|$)/.test(dbPath);
 }
 
 export function deleteAppDatabaseFiles(options?: AppDataPathOptions): string[] {
@@ -275,7 +283,11 @@ export function applyAppDatabasePragmas(
 export function getAppDatabaseDirectoryPath(
   options?: AppDataPathOptions,
 ): string {
-  return dirname(getAppDatabasePath(options));
+  const dbPath = getAppDatabasePath(options);
+  if (isInMemoryAppDatabasePath(dbPath)) {
+    return getAppDataDirectoryPath(options);
+  }
+  return dirname(dbPath);
 }
 
 export function applyAppDatabasePermissions(dbPath: string): void {

@@ -68,7 +68,7 @@ describe("plugin sidecar runtime", () => {
     expect(command.slice(0, 4)).toEqual([
       "sh",
       "-c",
-      'ulimit -v 786432; exec "$@"',
+      'ulimit -v 4194304; exec "$@"',
       "metidos-plugin-sidecar",
     ]);
     expect(command.slice(4)).toEqual([

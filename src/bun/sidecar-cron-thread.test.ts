@@ -6,7 +6,6 @@ import { join } from "node:path";
 import {
   closeAppDatabase,
   createCronJob,
-  getAppDatabasePath,
   initAppDatabase,
   resetResolvedAppDataDirectory,
   upsertProject,
@@ -14,6 +13,7 @@ import {
 
 const tempDirectories = new Set<string>();
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
+const originalAppDatabasePath = process.env.METIDOS_APP_DATABASE_PATH;
 const originalWorkerOnMessage = (globalThis as { onmessage?: unknown })
   .onmessage;
 const originalWorkerPostMessage = (globalThis as { postMessage?: unknown })
@@ -33,12 +33,6 @@ function createTempDirectory(prefix: string): string {
   const path = mkdtempSync(join(tmpdir(), prefix));
   tempDirectories.add(path);
   return path;
-}
-
-function waitForWorkerQueue(): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
 }
 
 afterEach(() => {
@@ -61,6 +55,11 @@ afterEach(() => {
   } else {
     delete process.env.METIDOS_APP_DATA_DIR;
   }
+  if (typeof originalAppDatabasePath === "string") {
+    process.env.METIDOS_APP_DATABASE_PATH = originalAppDatabasePath;
+  } else {
+    delete process.env.METIDOS_APP_DATABASE_PATH;
+  }
 });
 
 afterAll(() => {
@@ -75,9 +74,7 @@ afterAll(() => {
 
 describe("sidecar cron worker", () => {
   it("forwards due cron fires back to the main process instead of running threads in-worker", async () => {
-    process.env.METIDOS_APP_DATA_DIR = createTempDirectory(
-      "metidos-cron-thread-db-",
-    );
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-thread-repo-");
     mkdirSync(repoPath, {
       recursive: true,
@@ -103,8 +100,6 @@ describe("sidecar cron worker", () => {
       unsafeMode: false,
       worktreePath: repoPath,
     });
-    const databasePath = getAppDatabasePath();
-
     const postedMessages: WorkerStatusMessage[] = [];
     const registrations: Array<{
       handler: () => Promise<void> | void;
@@ -138,26 +133,11 @@ describe("sidecar cron worker", () => {
     (Bun as { cron: typeof Bun.cron }).cron =
       fakeCron as unknown as typeof Bun.cron;
 
-    await import(`./sidecar-cron-thread?sidecar-cron-thread=${Date.now()}`);
-
-    const workerOnMessage = (
-      globalThis as unknown as {
-        onmessage?: (event: {
-          data: { dbPath: string; type: "start" };
-        }) => void;
-      }
-    ).onmessage;
-    if (!workerOnMessage) {
-      throw new Error("Expected cron worker to register an onmessage handler.");
-    }
-
-    workerOnMessage({
-      data: {
-        dbPath: databasePath,
-        type: "start",
-      },
-    });
-    await waitForWorkerQueue();
+    const { __testingRegisterCronJobsForOpenDatabase } = await import(
+      `./sidecar-cron-thread?sidecar-cron-thread=${Date.now()}`
+    );
+    const cleanupCronWorker =
+      await __testingRegisterCronJobsForOpenDatabase(database);
 
     expect(registrations).toHaveLength(1);
     expect(registrations[0]).toMatchObject({
@@ -172,5 +152,7 @@ describe("sidecar cron worker", () => {
       scheduledTime: expect.any(Number),
       type: "fire",
     });
+
+    await cleanupCronWorker();
   });
 });

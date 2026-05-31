@@ -16,6 +16,7 @@ import {
   ensureAppDirectory,
   getAppDatabaseDirectoryPath,
   getAppDatabasePath,
+  isInMemoryAppDatabasePath,
   SQL_BUSY_TIMEOUT_MS,
 } from "./db-context";
 import {
@@ -1459,16 +1460,21 @@ export function initAppDatabase(): Database {
   }
 
   const dbPath = getAppDatabasePath();
-  ensureAppDirectory(getAppDatabaseDirectoryPath());
-  assertAppDatabaseFilesAreRegular(dbPath);
-  applyAppDatabasePermissions(dbPath);
+  const isInMemoryDatabase = isInMemoryAppDatabasePath(dbPath);
+  if (!isInMemoryDatabase) {
+    ensureAppDirectory(getAppDatabaseDirectoryPath());
+    assertAppDatabaseFilesAreRegular(dbPath);
+    applyAppDatabasePermissions(dbPath);
+  }
 
   const db = new Database(dbPath);
   applyAppDatabasePragmas(db, {
     busyTimeoutMs: SQL_BUSY_TIMEOUT_MS,
   });
   migrateDatabase(db);
-  applyAppDatabasePermissions(dbPath);
+  if (!isInMemoryDatabase) {
+    applyAppDatabasePermissions(dbPath);
+  }
   appDatabase = db;
   return db;
 }

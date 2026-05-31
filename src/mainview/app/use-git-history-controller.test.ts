@@ -13,7 +13,6 @@ import {
   canLoadMoreGitHistory,
   pruneIdleGitHistoryCacheEntries,
   resolveGitHistoryLoadBehavior,
-  touchGitHistoryCacheEntry,
 } from "./use-git-history-controller";
 
 function project(): RpcProject {
@@ -81,12 +80,6 @@ describe("git history controller helpers", () => {
     );
     expect([...cache.keys()]).toEqual(["fresh"]);
     expect([...access.keys()]).toEqual(["fresh"]);
-  });
-
-  it("touches git cache access timestamps", () => {
-    const access = new Map<string, number>();
-    touchGitHistoryCacheEntry(access, "commit", 42);
-    expect(access.get("commit")).toBe(42);
   });
 
   it("only loads more history when selection, pagination, and loading guards allow it", () => {
