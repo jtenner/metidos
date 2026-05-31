@@ -3,8 +3,7 @@
  * @description Safe Plugin System v1 metidos.fs read operations.
  */
 
-import { constants as fsConstants } from "node:fs";
-import { type FileHandle, open, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { evaluatePluginCapability } from "./capability-gate";
@@ -15,10 +14,14 @@ import {
   PluginContextError,
 } from "./context";
 import {
+  closeValidatedPluginFsFileDescriptor,
+  openValidatedPluginFsPathSync,
   PluginFsPathError,
   type PluginFsRootKind,
+  pluginFsReadOpenFlags,
   pluginFsVirtualRootForPath,
   type ResolvedPluginFsPath,
+  readValidatedPluginFsFileDescriptor,
   resolvePluginFsVirtualPath,
   revalidateResolvedPluginFsPath,
   toPluginFsVirtualPath,
@@ -30,7 +33,6 @@ const FORBIDDEN_DIRECTORY_NAMES = new Set([".git", ".ssh"]);
 export const MAX_PLUGIN_FS_READ_BYTES = 5 * 1024 * 1024;
 export const MAX_PLUGIN_FS_GLOB_CANDIDATES = 10_000;
 export const MAX_PLUGIN_FS_GLOB_RESULTS = 2_000;
-const PLUGIN_FS_READ_CHUNK_BYTES = 64 * 1024;
 const MAX_PLUGIN_FS_GLOB_RECURSION_DEPTH = 64;
 
 export type PluginFsReadContextKind = PluginCallbackContextKind;
@@ -615,17 +617,33 @@ export async function pluginFsStat(
   return await statReadableResolvedPath(resolved);
 }
 
-async function readResolvedRegularFileWithLimit(
-  resolved: ResolvedPluginFsPath,
-): Promise<Uint8Array> {
-  const openFlags =
-    process.platform === "win32"
-      ? fsConstants.O_RDONLY
-      : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
-  let handle: FileHandle;
+async function readResolvedRegularFileWithLimit(input: {
+  access?: "read" | "write";
+  context: PluginFsReadContext;
+  resolved: ResolvedPluginFsPath;
+}): Promise<Uint8Array> {
+  const resolved = await revalidateReadablePath({
+    ...(input.access === undefined ? {} : { access: input.access }),
+    context: input.context,
+    resolved: input.resolved,
+  });
+
+  let fd: number;
   try {
-    handle = await open(resolved.realPath, openFlags);
+    fd = openValidatedPluginFsPathSync({
+      flags: pluginFsReadOpenFlags(),
+      resolved,
+    });
   } catch (error) {
+    if (error instanceof PluginFsPathError) {
+      throw readError({
+        code: error.message.includes("requires a file")
+          ? "not_a_file"
+          : "read_failed",
+        message: error.message,
+        virtualPath: resolved.virtualPath,
+      });
+    }
     throw readError({
       cause: error,
       code: "read_failed",
@@ -635,57 +653,29 @@ async function readResolvedRegularFileWithLimit(
   }
 
   try {
-    const stats = await handle.stat();
-    if (!stats.isFile()) {
+    return readValidatedPluginFsFileDescriptor({
+      fd,
+      maxBytes: MAX_PLUGIN_FS_READ_BYTES,
+      virtualPath: resolved.virtualPath,
+    });
+  } catch (error) {
+    if (error instanceof PluginFsPathError) {
       throw readError({
-        code: "not_a_file",
-        message: "Plugin fs read requires a file path.",
+        code: error.message.includes("requires a file")
+          ? "not_a_file"
+          : "read_failed",
+        message: error.message,
         virtualPath: resolved.virtualPath,
       });
     }
-    if (stats.size > MAX_PLUGIN_FS_READ_BYTES) {
-      throw readError({
-        code: "read_failed",
-        message: `Plugin fs read is limited to ${MAX_PLUGIN_FS_READ_BYTES} bytes.`,
-        virtualPath: resolved.virtualPath,
-      });
-    }
-
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    const buffer = Buffer.allocUnsafe(
-      Math.min(PLUGIN_FS_READ_CHUNK_BYTES, MAX_PLUGIN_FS_READ_BYTES + 1),
-    );
-    while (true) {
-      const { bytesRead } = await handle.read(
-        buffer,
-        0,
-        Math.min(buffer.byteLength, MAX_PLUGIN_FS_READ_BYTES + 1 - totalBytes),
-        null,
-      );
-      if (bytesRead === 0) {
-        break;
-      }
-      totalBytes += bytesRead;
-      if (totalBytes > MAX_PLUGIN_FS_READ_BYTES) {
-        throw readError({
-          code: "read_failed",
-          message: `Plugin fs read is limited to ${MAX_PLUGIN_FS_READ_BYTES} bytes.`,
-          virtualPath: resolved.virtualPath,
-        });
-      }
-      chunks.push(Uint8Array.from(buffer.subarray(0, bytesRead)));
-    }
-
-    const output = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      output.set(chunk, offset);
-      offset += chunk.byteLength;
-    }
-    return output;
+    throw readError({
+      cause: error,
+      code: "read_failed",
+      message: "Plugin fs file could not be read.",
+      virtualPath: resolved.virtualPath,
+    });
   } finally {
-    await handle.close();
+    closeValidatedPluginFsFileDescriptor(fd);
   }
 }
 
@@ -693,11 +683,10 @@ export async function pluginFsRead(
   context: PluginFsReadContext,
   virtualPath: string,
 ): Promise<Uint8Array> {
-  const resolved = await revalidateReadablePath({
+  return await readResolvedRegularFileWithLimit({
     context,
     resolved: await resolveReadablePath(context, virtualPath),
   });
-  return await readResolvedRegularFileWithLimit(resolved);
 }
 
 export async function pluginFsReadText(

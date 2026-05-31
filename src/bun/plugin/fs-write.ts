@@ -3,13 +3,10 @@
  * @description Safe Plugin System v1 metidos.fs write, copy, move, and delete operations.
  */
 
-import { constants as fsConstants } from "node:fs";
+import { fstatSync, ftruncateSync, readSync, writeSync } from "node:fs";
 import {
   cp,
-  type FileHandle,
   lstat,
-  open,
-  mkdir,
   readdir,
   rmdir as removeDirectory,
   rename,
@@ -33,9 +30,15 @@ import {
   type PluginDataQuotaSettings,
 } from "./data";
 import {
+  closeValidatedPluginFsFileDescriptor,
+  mkdirValidatedPluginFsPathSync,
+  openValidatedPluginFsPathSync,
+  pluginFsReadOpenFlags,
+  pluginFsWriteOpenFlags,
   type ResolvedPluginFsPath,
   revalidateResolvedPluginFsPath,
   toPluginFsVirtualPath,
+  writeValidatedPluginFsFileDescriptor,
 } from "./fs-path";
 
 const REQUIRED_STORAGE_READ_PERMISSION = "storage:read";
@@ -568,79 +571,75 @@ async function assertProjectPathNotDenied(input: {
   return virtualPath;
 }
 
-function pluginFsReadOpenFlags(): number {
-  return process.platform === "win32"
-    ? fsConstants.O_RDONLY
-    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+function resolvedPathAtAbsolutePath(input: {
+  absolutePath: string;
+  resolved: ResolvedPluginFsPath;
+}): ResolvedPluginFsPath {
+  return {
+    ...input.resolved,
+    absolutePath: input.absolutePath,
+    exists: true,
+    realPath: input.absolutePath,
+    virtualPath: toPluginFsVirtualPath({
+      absolutePath: input.absolutePath,
+      rootKind: input.resolved.rootKind,
+      rootPath: input.resolved.rootPath,
+    }),
+  };
 }
 
-function pluginFsWriteOpenFlags(): number {
-  const flags =
-    fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC;
-  return process.platform === "win32" ? flags : flags | fsConstants.O_NOFOLLOW;
-}
-
-async function writeAllToFileHandle(
-  handle: FileHandle,
-  contents: Uint8Array,
-  position = 0,
-): Promise<void> {
-  let offset = 0;
-  while (offset < contents.byteLength) {
-    const { bytesWritten } = await handle.write(
-      contents,
-      offset,
-      contents.byteLength - offset,
-      position + offset,
-    );
-    if (bytesWritten <= 0) {
-      throw new Error("Plugin fs write made no progress.");
-    }
-    offset += bytesWritten;
-  }
-}
-
-async function writeFileNoFollow(
-  targetPath: string,
+function writeValidatedPluginFsFile(
+  resolved: ResolvedPluginFsPath,
   contents: string | Uint8Array,
-): Promise<void> {
+): void {
   const bytes =
     typeof contents === "string"
       ? new TextEncoder().encode(contents)
       : contents;
-  const handle = await open(targetPath, pluginFsWriteOpenFlags(), 0o666);
+  const fd = openValidatedPluginFsPathSync({
+    createIfMissing: true,
+    flags: pluginFsWriteOpenFlags(),
+    resolved,
+  });
   try {
-    const stats = await handle.stat();
-    if (!stats.isFile()) {
-      throw new Error("Plugin fs write target is not a regular file.");
-    }
-    await writeAllToFileHandle(handle, bytes);
-    await handle.truncate(bytes.byteLength);
+    writeValidatedPluginFsFileDescriptor({
+      contents: bytes,
+      fd,
+      virtualPath: resolved.virtualPath,
+    });
   } finally {
-    await handle.close();
+    closeValidatedPluginFsFileDescriptor(fd);
   }
 }
 
-async function copyRegularFileNoFollow(
-  sourcePath: string,
-  targetPath: string,
-): Promise<void> {
-  const source = await open(sourcePath, pluginFsReadOpenFlags());
-  let target: FileHandle | null = null;
+function copyRegularFileNoFollow(
+  source: ResolvedPluginFsPath,
+  target: ResolvedPluginFsPath,
+): void {
+  const sourceFd = openValidatedPluginFsPathSync({
+    flags: pluginFsReadOpenFlags(),
+    resolved: source,
+  });
+  let targetFd: number | null = null;
   try {
-    const sourceStats = await source.stat();
+    const sourceStats = fstatSync(sourceFd);
     if (!sourceStats.isFile()) {
       throw new Error("Plugin fs copy source is not a regular file.");
     }
-    target = await open(targetPath, pluginFsWriteOpenFlags(), sourceStats.mode);
-    const targetStats = await target.stat();
+    targetFd = openValidatedPluginFsPathSync({
+      createIfMissing: true,
+      flags: pluginFsWriteOpenFlags(),
+      resolved: target,
+    });
+    const targetStats = fstatSync(targetFd);
     if (!targetStats.isFile()) {
       throw new Error("Plugin fs copy target is not a regular file.");
     }
-    let offset = 0;
     const buffer = Buffer.allocUnsafe(PLUGIN_FS_COPY_CHUNK_BYTES);
+    let offset = 0;
     while (offset < sourceStats.size) {
-      const { bytesRead } = await source.read(
+      const bytesRead = readSync(
+        sourceFd,
         buffer,
         0,
         Math.min(buffer.byteLength, sourceStats.size - offset),
@@ -649,13 +648,15 @@ async function copyRegularFileNoFollow(
       if (bytesRead === 0) {
         break;
       }
-      await writeAllToFileHandle(target, buffer.subarray(0, bytesRead), offset);
+      writeSync(targetFd, buffer.subarray(0, bytesRead), 0, bytesRead, offset);
       offset += bytesRead;
     }
-    await target.truncate(offset);
+    ftruncateSync(targetFd, offset);
   } finally {
-    await source.close();
-    await target?.close();
+    closeValidatedPluginFsFileDescriptor(sourceFd);
+    if (targetFd !== null) {
+      closeValidatedPluginFsFileDescriptor(targetFd);
+    }
   }
 }
 
@@ -681,10 +682,25 @@ async function copyProjectSubtreeSafely(input: {
     });
   }
   if (!stats.isDirectory()) {
-    await copyRegularFileNoFollow(input.sourcePath, input.targetPath);
+    copyRegularFileNoFollow(
+      resolvedPathAtAbsolutePath({
+        absolutePath: input.sourcePath,
+        resolved: input.source,
+      }),
+      resolvedPathAtAbsolutePath({
+        absolutePath: input.targetPath,
+        resolved: input.source,
+      }),
+    );
     return;
   }
-  await mkdir(input.targetPath, { recursive: true });
+  mkdirValidatedPluginFsPathSync({
+    options: { recursive: true },
+    resolved: resolvedPathAtAbsolutePath({
+      absolutePath: input.targetPath,
+      resolved: input.source,
+    }),
+  });
   for (const entry of await readdir(input.sourcePath, {
     withFileTypes: true,
   })) {
@@ -786,7 +802,7 @@ export async function pluginFsWrite(
     resolved,
   });
   try {
-    await writeFileNoFollow(revalidated.realPath, contents);
+    writeValidatedPluginFsFile(revalidated, contents);
   } catch (error) {
     throw writeError({
       cause: error,
@@ -823,8 +839,9 @@ export async function pluginFsMkdir(
     resolved,
   });
   try {
-    await mkdir(revalidated.realPath, {
-      recursive: options?.recursive ?? false,
+    mkdirValidatedPluginFsPathSync({
+      options: { recursive: options?.recursive ?? false },
+      resolved: revalidated,
     });
   } catch (error) {
     throw writeError({
@@ -974,10 +991,7 @@ export async function pluginFsCopy(
       });
       return;
     }
-    await copyRegularFileNoFollow(
-      revalidatedSource.realPath,
-      revalidatedTarget.realPath,
-    );
+    await copyRegularFileNoFollow(revalidatedSource, revalidatedTarget);
   } catch (error) {
     if (error instanceof PluginFsWriteError) {
       throw error;

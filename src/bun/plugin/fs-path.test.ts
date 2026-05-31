@@ -15,7 +15,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  closeValidatedPluginFsFileDescriptor,
+  mkdirValidatedPluginFsPathSync,
+  openValidatedPluginFsPathSync,
   PluginFsPathError,
+  pluginFsReadOpenFlags,
+  pluginFsWriteOpenFlags,
+  readValidatedPluginFsFileDescriptor,
   resolvePluginFsVirtualPath,
   splitRelativePathSegments,
   toPluginFsVirtualPath,
@@ -303,5 +309,50 @@ describe("plugin fs virtual path resolver", () => {
       code: "plugin_source_denied",
       virtualPath: "./index.ts",
     });
+  });
+
+  it("opens validated plugin paths with a synchronous lstat/open pair", async () => {
+    const { pluginPath } = createPluginFixture();
+    const resolved = await resolvePluginFsVirtualPath({
+      pluginPath,
+      virtualPath: "~/nested/note.txt",
+    });
+    const fd = openValidatedPluginFsPathSync({
+      flags: pluginFsReadOpenFlags(),
+      resolved,
+    });
+    try {
+      expect(
+        new TextDecoder().decode(
+          readValidatedPluginFsFileDescriptor({
+            fd,
+            maxBytes: 1024,
+            virtualPath: resolved.virtualPath,
+          }),
+        ),
+      ).toBe("note\n");
+    } finally {
+      closeValidatedPluginFsFileDescriptor(fd);
+    }
+  });
+
+  it("rejects symlink leaves during validated plugin fs open", async () => {
+    const { pluginPath } = createPluginFixture();
+    const targetPath = join(pluginPath, ".data", "nested", "note.txt");
+    const resolved = await resolvePluginFsVirtualPath({
+      pluginPath,
+      virtualPath: "~/nested/note.txt",
+    });
+    rmSync(targetPath);
+    const outsidePath = createTempDirectory("metidos-plugin-fs-open-outside-");
+    writeFileSync(join(outsidePath, "secret.txt"), "secret\n");
+    symlinkSync(join(outsidePath, "secret.txt"), targetPath);
+
+    expect(() =>
+      openValidatedPluginFsPathSync({
+        flags: pluginFsReadOpenFlags(),
+        resolved,
+      }),
+    ).toThrow(PluginFsPathError);
   });
 });

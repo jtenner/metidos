@@ -3,6 +3,18 @@
  * @description Shared virtual path resolution and containment checks for Plugin System v1 metidos.fs operations.
  */
 
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  ftruncateSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  type Stats,
+  writeSync,
+} from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 
@@ -464,4 +476,204 @@ export function pluginFsVirtualRootForPath(
   rootKind: PluginFsRootKind,
 ): "~/" | "./" {
   return rootKind === "pluginData" ? "~/" : "./";
+}
+
+export function pluginFsReadOpenFlags(): number {
+  return process.platform === "win32"
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+}
+
+export function pluginFsWriteOpenFlags(): number {
+  const flags =
+    fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC;
+  return process.platform === "win32" ? flags : flags | fsConstants.O_NOFOLLOW;
+}
+
+function assertPluginFsLstatIsNotSymlink(input: {
+  stats: Stats;
+  virtualPath: string;
+}): void {
+  if (input.stats.isSymbolicLink()) {
+    throw pluginFsPathError({
+      code: "path_outside_root",
+      message: "Plugin fs symlink access is denied.",
+      virtualPath: input.virtualPath,
+    });
+  }
+}
+
+function pluginFsPathOpenUnavailableError(
+  virtualPath: string,
+): PluginFsPathError {
+  return pluginFsPathError({
+    code: "path_unavailable",
+    message: "Plugin fs path could not be opened safely.",
+    virtualPath,
+  });
+}
+
+export type OpenValidatedPluginFsPathInput = {
+  /**
+   * When true, a missing leaf path is permitted before open (write/create).
+   */
+  createIfMissing?: boolean;
+  flags: number;
+  resolved: ResolvedPluginFsPath;
+};
+
+/**
+ * Opens a validated plugin fs path with a synchronous lstat/open pair so the
+ * async revalidation window cannot be widened by additional awaits before open.
+ * On platforms without O_NOFOLLOW, lstat rejects symlink leaves first.
+ */
+export function openValidatedPluginFsPathSync(
+  input: OpenValidatedPluginFsPathInput,
+): number {
+  const { realPath, virtualPath } = input.resolved;
+  let stats: Stats | undefined;
+  try {
+    stats = lstatSync(realPath);
+    assertPluginFsLstatIsNotSymlink({ stats, virtualPath });
+  } catch (error) {
+    if (
+      input.createIfMissing &&
+      isMissingFileSystemError(error) &&
+      (input.flags & fsConstants.O_CREAT) !== 0
+    ) {
+      stats = undefined;
+    } else if (error instanceof PluginFsPathError) {
+      throw error;
+    } else if (isMissingFileSystemError(error)) {
+      throw pluginFsPathError({
+        code: "path_unavailable",
+        message: "Plugin fs path is unavailable.",
+        virtualPath,
+      });
+    } else {
+      throw error;
+    }
+  }
+
+  try {
+    return openSync(
+      realPath,
+      input.flags,
+      (input.flags & fsConstants.O_CREAT) !== 0 ? 0o666 : undefined,
+    );
+  } catch {
+    throw pluginFsPathOpenUnavailableError(virtualPath);
+  }
+}
+
+export function mkdirValidatedPluginFsPathSync(input: {
+  options?: { recursive?: boolean | undefined };
+  resolved: ResolvedPluginFsPath;
+}): void {
+  const { realPath, virtualPath } = input.resolved;
+  try {
+    const stats = lstatSync(realPath);
+    assertPluginFsLstatIsNotSymlink({ stats, virtualPath });
+    if (stats.isDirectory()) {
+      return;
+    }
+  } catch (error) {
+    if (error instanceof PluginFsPathError) {
+      throw error;
+    }
+    if (!isMissingFileSystemError(error)) {
+      throw error;
+    }
+  }
+
+  try {
+    mkdirSync(realPath, { recursive: input.options?.recursive ?? false });
+  } catch {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: "Plugin fs directory could not be created safely.",
+      virtualPath,
+    });
+  }
+}
+
+export function readValidatedPluginFsFileDescriptor(input: {
+  fd: number;
+  maxBytes: number;
+  virtualPath: string;
+}): Uint8Array {
+  const stats = fstatSync(input.fd);
+  if (!stats.isFile()) {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: "Plugin fs read requires a file path.",
+      virtualPath: input.virtualPath,
+    });
+  }
+  if (stats.size > input.maxBytes) {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: `Plugin fs read is limited to ${input.maxBytes} bytes.`,
+      virtualPath: input.virtualPath,
+    });
+  }
+
+  const output = new Uint8Array(stats.size);
+  let offset = 0;
+  while (offset < stats.size) {
+    const bytesRead = readSync(
+      input.fd,
+      output,
+      offset,
+      Math.min(stats.size - offset, 64 * 1024),
+      offset,
+    );
+    if (bytesRead === 0) {
+      break;
+    }
+    offset += bytesRead;
+  }
+  if (offset > input.maxBytes) {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: `Plugin fs read is limited to ${input.maxBytes} bytes.`,
+      virtualPath: input.virtualPath,
+    });
+  }
+  return output.subarray(0, offset);
+}
+
+export function writeValidatedPluginFsFileDescriptor(input: {
+  contents: Uint8Array;
+  fd: number;
+  virtualPath: string;
+}): void {
+  const stats = fstatSync(input.fd);
+  if (!stats.isFile()) {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: "Plugin fs write target is not a regular file.",
+      virtualPath: input.virtualPath,
+    });
+  }
+
+  let offset = 0;
+  while (offset < input.contents.byteLength) {
+    const bytesWritten = writeSync(
+      input.fd,
+      input.contents,
+      offset,
+      input.contents.byteLength - offset,
+      offset,
+    );
+    if (bytesWritten <= 0) {
+      throw new Error("Plugin fs write made no progress.");
+    }
+    offset += bytesWritten;
+  }
+  ftruncateSync(input.fd, input.contents.byteLength);
+}
+
+export function closeValidatedPluginFsFileDescriptor(fd: number): void {
+  closeSync(fd);
 }
