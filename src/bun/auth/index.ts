@@ -201,6 +201,12 @@ function validateTotpPeriodSeconds(periodSeconds: number): void {
   }
 }
 
+function validateTotpWindow(window: number): void {
+  if (!Number.isInteger(window) || window < 0 || window > 10) {
+    throw new Error("TOTP window must be an integer between 0 and 10.");
+  }
+}
+
 function validateTotpAlgorithm(algorithm: TotpAlgorithm): void {
   if (
     algorithm !== "SHA-1" &&
@@ -529,6 +535,7 @@ export async function verifyTotpMatchedCounter(
   validateTotpAlgorithm(algorithm);
   validateTotpDigits(digits);
   validateTotpPeriodSeconds(periodSeconds);
+  validateTotpWindow(window);
 
   const normalizedCode = code.replace(/\s+/g, "");
   if (!new RegExp(`^\\d{${digits}}$`).test(normalizedCode)) {

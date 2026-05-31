@@ -135,6 +135,19 @@ describe("auth helpers", () => {
     ).toBeTrue();
   });
 
+  it("rejects invalid TOTP verification windows", async () => {
+    const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+    await expect(
+      verifyTotpCode(secret, "94287082", { atMs: 59_000, window: -1 }),
+    ).rejects.toThrow("TOTP window must be an integer between 0 and 10.");
+    await expect(
+      verifyTotpCode(secret, "94287082", { atMs: 59_000, window: 0.5 }),
+    ).rejects.toThrow("TOTP window must be an integer between 0 and 10.");
+    await expect(
+      verifyTotpCode(secret, "94287082", { atMs: 59_000, window: Infinity }),
+    ).rejects.toThrow("TOTP window must be an integer between 0 and 10.");
+  });
+
   it("generates SHA-256 TOTP codes by default", async () => {
     const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA";
     const code = await generateTotpCode(secret, 59_000, {
