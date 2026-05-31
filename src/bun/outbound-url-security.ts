@@ -117,19 +117,19 @@ function parseIpv6Hextets(hostname: string): number[] | null {
     return null;
   }
 
-  const parseSide = (side: string): number[] => {
+  const parseSide = (side: string): number[] | null => {
     if (!side) {
       return [];
     }
-    return side.split(":").map((part) => Number.parseInt(part, 16));
+    const parts = side.split(":");
+    if (parts.some((part) => !/^[0-9a-f]{1,4}$/u.test(part))) {
+      return null;
+    }
+    return parts.map((part) => Number.parseInt(part, 16));
   };
   const left = parseSide(doubleColonParts[0] ?? "");
   const right = parseSide(doubleColonParts[1] ?? "");
-  if (
-    [...left, ...right].some(
-      (part) => Number.isNaN(part) || part < 0 || part > 0xffff,
-    )
-  ) {
+  if (!left || !right) {
     return null;
   }
 

@@ -139,6 +139,7 @@ describe("outbound URL security", () => {
     expect(isBlockedOutboundAddress("2001:67c:4e8:f004::9")).toBeFalse();
     expect(isBlockedOutboundAddress("8.8.8.8")).toBeFalse();
     expect(isBlockedOutboundAddress("2001:4860:4860::8888")).toBeFalse();
+    expect(isBlockedOutboundAddress("2001:4860:4860::8888junk")).toBeTrue();
     expect(isBlockedOutboundAddress("")).toBeTrue();
     expect(isBlockedOutboundAddress("example.com")).toBeTrue();
   });
