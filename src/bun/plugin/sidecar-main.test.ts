@@ -10,6 +10,7 @@ import { join } from "node:path";
 import {
   assertSidecarHostOperationAllowed,
   executeSidecarLocalFsOperation,
+  handleHostCancel,
   PLUGIN_HOST_REQUEST_TIMEOUT_MAX_MS,
   normalizeSidecarHostRequestDeadlineMs,
 } from "./sidecar-main";
@@ -233,5 +234,21 @@ describe("plugin sidecar local fs execution", () => {
         startup,
       }),
     ).rejects.toMatchObject({ name: "PluginContextError" });
+  });
+});
+
+describe("plugin sidecar host cancellation", () => {
+  it("accepts host.cancel envelopes without throwing", () => {
+    expect(() =>
+      handleHostCancel({
+        id: "plugin-a:cancel:1",
+        payload: {
+          reason: "timeout",
+          targetId: "plugin-a:host-request:99",
+        },
+        pluginId: "plugin-a",
+        type: "host.cancel",
+      }),
+    ).not.toThrow();
   });
 });

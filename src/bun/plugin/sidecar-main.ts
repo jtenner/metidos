@@ -96,6 +96,8 @@ const pendingHostRequests = new Map<
     timer: ReturnType<typeof setTimeout>;
   }
 >();
+const cancelledHostRequestIds = new Set<string>();
+const activeHostRequestAbortControllers = new Map<string, AbortController>();
 
 class PluginSidecarHostRequestError extends Error {
   readonly code: string;
@@ -162,6 +164,58 @@ function writeSidecarError(input: {
     pluginId: input.pluginId ?? EXPECTED_PLUGIN_ID,
     type: "sidecar.error",
   });
+}
+
+function isHostRequestCancelled(requestId: string): boolean {
+  return cancelledHostRequestIds.has(requestId);
+}
+
+function writeHostRequestResponse(input: {
+  pluginId: string;
+  requestId: string;
+  result: unknown;
+}): void {
+  if (isHostRequestCancelled(input.requestId)) {
+    return;
+  }
+  writeProtocolEnvelope({
+    id: `${input.requestId}:response`,
+    payload: {
+      requestId: input.requestId,
+      result: input.result,
+    },
+    pluginId: input.pluginId,
+    type: "sidecar.response",
+  });
+}
+
+function waitForHostRequestAbort(signal: AbortSignal): Promise<never> {
+  if (signal.aborted) {
+    return Promise.reject(
+      signal.reason ?? new Error("Plugin host request was cancelled."),
+    );
+  }
+  return new Promise((_, reject) => {
+    signal.addEventListener(
+      "abort",
+      () => {
+        reject(
+          signal.reason ?? new Error("Plugin host request was cancelled."),
+        );
+      },
+      { once: true },
+    );
+  });
+}
+
+export function handleHostCancel(
+  envelope: Extract<PluginSidecarHostEnvelope, { type: "host.cancel" }>,
+): void {
+  const targetId = envelope.payload.targetId;
+  cancelledHostRequestIds.add(targetId);
+  activeHostRequestAbortControllers
+    .get(targetId)
+    ?.abort(envelope.payload.reason ?? "cancelled");
 }
 
 function isHostEnvelope(
@@ -291,14 +345,48 @@ function nextHostRequestId(): string {
 async function withActiveHostRequest<T>(
   requestId: string,
   callback: () => Promise<T>,
-): Promise<T> {
+): Promise<T | undefined> {
+  const controller = new AbortController();
+  activeHostRequestAbortControllers.set(requestId, controller);
   const previousRequestId = activeHostRequestId;
   activeHostRequestId = requestId;
   try {
-    return await callback();
+    return await Promise.race([
+      callback(),
+      waitForHostRequestAbort(controller.signal),
+    ]);
+  } catch (error) {
+    if (
+      controller.signal.aborted ||
+      isHostRequestCancelled(requestId) ||
+      isAbortLikeError(error)
+    ) {
+      const message =
+        typeof controller.signal.reason === "string"
+          ? controller.signal.reason
+          : error instanceof Error
+            ? error.message
+            : "Plugin host request was cancelled.";
+      writeSidecarError({
+        code: "host_request_cancelled",
+        message,
+        requestId,
+      });
+      return undefined;
+    }
+    throw error;
   } finally {
+    activeHostRequestAbortControllers.delete(requestId);
+    cancelledHostRequestIds.delete(requestId);
     activeHostRequestId = previousRequestId;
   }
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.name === "AbortError" || error.message.includes("cancelled");
 }
 
 export function normalizeSidecarHostRequestDeadlineMs(
@@ -817,14 +905,10 @@ async function handleModelProviderRefreshRequest(
       handle,
       label: `Plugin model provider ${providerId} refresh`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result: normalizeModelProviderConfigurations(providerId, result),
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result: normalizeModelProviderConfigurations(providerId, result),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -891,14 +975,10 @@ async function handleModelProviderCallbackRequest(
       handle,
       label: `Plugin model provider ${providerId} ${input.label}`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result,
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -959,14 +1039,10 @@ async function handleCronRunRequest(
       handle: actionHandle,
       label: `Plugin cron ${fullKey}`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result,
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1026,14 +1102,10 @@ async function handleNotificationProviderSendRequest(
       handle: sendHandle,
       label: `Plugin notification provider ${providerId} send`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result,
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1098,14 +1170,10 @@ async function handleOAuthProviderRequest(
       handle,
       label: `Plugin OAuth provider ${providerId}`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result: normalizeOAuthCredential(result),
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result: normalizeOAuthCredential(result),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1210,14 +1278,10 @@ async function handleToolCallRequest(
         handle: actionHandle,
         label: "Plugin GC",
       });
-      writeProtocolEnvelope({
-        id: `${envelope.id}:response`,
-        payload: {
-          requestId: envelope.id,
-          result,
-        },
+      writeHostRequestResponse({
         pluginId: envelope.pluginId,
-        type: "sidecar.response",
+        requestId: envelope.id,
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1266,11 +1330,10 @@ async function handleToolCallRequest(
         handle: pollHandle,
         label: `Plugin ingress source ${sourceId} poll`,
       });
-      writeProtocolEnvelope({
-        id: `${envelope.id}:response`,
-        payload: { requestId: envelope.id, result },
+      writeHostRequestResponse({
         pluginId: envelope.pluginId,
-        type: "sidecar.response",
+        requestId: envelope.id,
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1322,11 +1385,10 @@ async function handleToolCallRequest(
         handle: promptTemplateHandle,
         label: `Plugin ingress source ${sourceId} prompt template`,
       });
-      writeProtocolEnvelope({
-        id: `${envelope.id}:response`,
-        payload: { requestId: envelope.id, result },
+      writeHostRequestResponse({
         pluginId: envelope.pluginId,
-        type: "sidecar.response",
+        requestId: envelope.id,
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1378,11 +1440,10 @@ async function handleToolCallRequest(
         handle: respondHandle,
         label: `Plugin ingress source ${sourceId} respond`,
       });
-      writeProtocolEnvelope({
-        id: `${envelope.id}:response`,
-        payload: { requestId: envelope.id, result },
+      writeHostRequestResponse({
         pluginId: envelope.pluginId,
-        type: "sidecar.response",
+        requestId: envelope.id,
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1433,11 +1494,10 @@ async function handleToolCallRequest(
         handle: promptHandle,
         label: `Plugin prompt injection ${inject}`,
       });
-      writeProtocolEnvelope({
-        id: `${envelope.id}:response`,
-        payload: { requestId: envelope.id, result },
+      writeHostRequestResponse({
         pluginId: envelope.pluginId,
-        type: "sidecar.response",
+        requestId: envelope.id,
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1501,14 +1561,10 @@ async function handleToolCallRequest(
       handle: actionHandle,
       label: `Plugin tool ${tool} action`,
     });
-    writeProtocolEnvelope({
-      id: `${envelope.id}:response`,
-      payload: {
-        requestId: envelope.id,
-        result,
-      },
+    writeHostRequestResponse({
       pluginId: envelope.pluginId,
-      type: "sidecar.response",
+      requestId: envelope.id,
+      result,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1759,6 +1815,7 @@ export async function handlePluginSidecarProtocolFrame(
       activeRuntime = null;
       return false;
     case "host.cancel":
+      handleHostCancel(decoded.envelope);
       return true;
     case "host.response":
       handleHostResponse(decoded.envelope);
