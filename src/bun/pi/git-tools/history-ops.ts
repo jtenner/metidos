@@ -382,6 +382,7 @@ export function createPiGitHistoryOperationTools(
                 ? ["--allow-unrelated-histories"]
                 : []),
               ...(message ? ["-m", message] : []),
+              "--",
               ...resolvedRevisions,
             ],
             typeof signal === "undefined" ? undefined : { signal },

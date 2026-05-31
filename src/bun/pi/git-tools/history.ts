@@ -281,7 +281,7 @@ export function createPiGitHistoryTools(
             "show-ref",
             ...(includeHead ? ["--head"] : []),
             ...(dereference ? ["--dereference"] : []),
-            ...patterns,
+            ...(patterns.length > 0 ? ["--", ...patterns] : []),
           ];
           const rawRefs = await runGitCommand(
             scope.worktreePathContext,

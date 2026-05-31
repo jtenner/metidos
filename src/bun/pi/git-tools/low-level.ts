@@ -640,7 +640,7 @@ function buildGitForEachRefArgs(params: {
       : []),
     "--format",
     GIT_FOR_EACH_REF_FORMAT,
-    ...(params.patterns.length > 0 ? params.patterns : ["refs"]),
+    ...(params.patterns.length > 0 ? ["--", ...params.patterns] : ["refs"]),
   ];
 
   return args;
@@ -711,7 +711,9 @@ function buildGitShowBranchArgs(params: {
   if (params.topics) {
     args.push("--topics");
   }
-  args.push(...params.revisions);
+  if (params.revisions.length > 0) {
+    args.push("--", ...params.revisions);
+  }
   return args;
 }
 
@@ -744,7 +746,7 @@ function buildGitFsckArgs(params: {
     ...(params.connectivityOnly ? ["--connectivity-only"] : []),
     ...(params.nameObjects ? ["--name-objects"] : []),
     ...(params.progress ? ["--progress"] : ["--no-progress"]),
-    ...params.objects,
+    ...(params.objects.length > 0 ? ["--", ...params.objects] : []),
   ];
 }
 
