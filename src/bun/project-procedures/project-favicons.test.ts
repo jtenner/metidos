@@ -188,6 +188,23 @@ describe("discoverProjectFaviconDataUrl", () => {
     expect(discoveredDataUrl).toBe(dataUrl("image/png", PNG_BYTES));
   });
 
+  it("can force refresh instead of reusing the cached favicon", async () => {
+    const root = await makeTempProject("force-refresh-cache");
+    const faviconPath = join(root, "favicon.ico");
+    await writeFile(faviconPath, ICON_BYTES);
+
+    const cachedDataUrl = await discoverProjectFaviconDataUrl(root);
+    await writeFile(faviconPath, NESTED_ICON_BYTES);
+    const reusedDataUrl = await discoverProjectFaviconDataUrl(root);
+    const refreshedDataUrl = await discoverProjectFaviconDataUrl(root, {
+      forceRefresh: true,
+    });
+
+    expect(cachedDataUrl).toBe(dataUrl("image/x-icon", ICON_BYTES));
+    expect(reusedDataUrl).toBe(cachedDataUrl);
+    expect(refreshedDataUrl).toBe(dataUrl("image/x-icon", NESTED_ICON_BYTES));
+  });
+
   it("reads web app manifest icon entries referenced from html", async () => {
     const root = await makeTempProject("manifest-icons");
     await mkdir(join(root, "public"), { recursive: true });

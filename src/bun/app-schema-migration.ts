@@ -1173,6 +1173,7 @@ export function migrateAppSchema(
 				name TEXT NOT NULL,
 				git_remote TEXT,
 				is_open INTEGER NOT NULL DEFAULT 1,
+				favicon_data_url TEXT,
 				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 				last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -1182,6 +1183,7 @@ export function migrateAppSchema(
   );
   rebuildProjectsTableForOwnerless(db);
   ensureProjectColumn(db, "deleted_at", "deleted_at INTEGER");
+  ensureProjectColumn(db, "favicon_data_url", "favicon_data_url TEXT");
   runStatement(
     db,
     `

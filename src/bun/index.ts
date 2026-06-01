@@ -2809,7 +2809,11 @@ function boundedThreadStatusesParams(): RpcParamValidator {
 
 function boundedProjectFaviconsParams(): RpcParamValidator {
   return (params, method) => {
-    const value = objectParams({ projectIds: "array" })(params, method) as {
+    const value = objectParams({
+      "forceRefresh?": "boolean",
+      projectIds: "array",
+    })(params, method) as {
+      forceRefresh?: boolean;
       projectIds: unknown[];
     };
     assertRpcArrayLength(value.projectIds, `${String(method)}.projectIds`, 100);

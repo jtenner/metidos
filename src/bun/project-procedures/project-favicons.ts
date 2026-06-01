@@ -55,6 +55,10 @@ type FaviconCacheEntry = {
   request: Promise<string | null>;
 };
 
+type DiscoverProjectFaviconOptions = {
+  forceRefresh?: boolean;
+};
+
 const faviconCache = new Map<string, FaviconCacheEntry>();
 
 function isInsideDirectory(parentPath: string, candidatePath: string): boolean {
@@ -510,11 +514,16 @@ async function discoverProjectFaviconDataUrlUncached(
 
 export async function discoverProjectFaviconDataUrl(
   projectPath: string,
+  options: DiscoverProjectFaviconOptions = {},
 ): Promise<string | null> {
   const normalizedPath = resolve(projectPath);
   const cached = faviconCache.get(normalizedPath);
   const now = Date.now();
-  if (cached && now - cached.checkedAt < FAVICON_CACHE_TTL_MS) {
+  if (
+    !options.forceRefresh &&
+    cached &&
+    now - cached.checkedAt < FAVICON_CACHE_TTL_MS
+  ) {
     return cached.request;
   }
 

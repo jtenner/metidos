@@ -17,6 +17,7 @@ export type ProjectRecord = {
   name: string;
   gitRemote: string | null;
   isOpen: 1 | 0;
+  faviconDataUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
@@ -34,6 +35,7 @@ const PROJECT_COLUMNS = `
 	name,
 	git_remote AS gitRemote,
 	is_open AS isOpen,
+	favicon_data_url AS faviconDataUrl,
 	created_at AS createdAt,
 	updated_at AS updatedAt,
 	last_opened_at AS lastOpenedAt
@@ -147,6 +149,26 @@ export function listOpenProjects(database: Database): ProjectRecord[] {
 		`,
     )
     .all();
+}
+
+export function setProjectFaviconDataUrl(
+  database: Database,
+  projectId: number,
+  faviconDataUrl: string,
+): void {
+  runStatement(
+    database,
+    `
+			UPDATE projects
+			SET
+				favicon_data_url = ?,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE id = ?
+				AND deleted_at IS NULL
+		`,
+    faviconDataUrl,
+    projectId,
+  );
 }
 
 export function setProjectClosed(database: Database, projectId: number): void {

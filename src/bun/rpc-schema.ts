@@ -408,7 +408,7 @@ export type AppRPCSchema = {
       response: RpcProject[];
     };
     listProjectFavicons: {
-      params: { projectIds: number[] };
+      params: { forceRefresh?: boolean; projectIds: number[] };
       response: RpcProjectFavicon[];
     };
     logClientEvent: {

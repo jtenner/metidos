@@ -107,6 +107,7 @@ import {
   listProjectWorktreesMetadata,
   type ProjectRecord,
   setProjectClosed,
+  setProjectFaviconDataUrl,
   setProjectWorktreePinned,
 } from "./project-store";
 
@@ -576,11 +577,19 @@ export async function listProjectFaviconsProcedure(
       .filter((projectId) => visibleProjectById.has(projectId))
       .map(async (projectId) => {
         const project = visibleProjectById.get(projectId);
+        if (!project) {
+          return { projectId, dataUrl: null } satisfies RpcProjectFavicon;
+        }
+        const discoveredDataUrl = await discoverProjectFaviconDataUrl(
+          project.path,
+          params.forceRefresh ? { forceRefresh: true } : undefined,
+        );
+        if (discoveredDataUrl) {
+          setProjectFaviconDataUrl(db, projectId, discoveredDataUrl);
+        }
         return {
           projectId,
-          dataUrl: project
-            ? await discoverProjectFaviconDataUrl(project.path)
-            : null,
+          dataUrl: discoveredDataUrl ?? project.faviconDataUrl ?? null,
         } satisfies RpcProjectFavicon;
       }),
   );

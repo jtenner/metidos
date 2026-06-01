@@ -435,6 +435,17 @@ declare global {
  */
 
 const PROJECT_FAVICON_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const PROJECT_FAVICON_REQUEST_BATCH_SIZE = 100;
+
+function mergeProjectFaviconDataUrl(
+  project: RpcProject,
+  fallbackDataUrl: string | null | undefined,
+): RpcProject {
+  const faviconDataUrl = project.faviconDataUrl ?? fallbackDataUrl;
+  return faviconDataUrl === undefined
+    ? project
+    : { ...project, faviconDataUrl };
+}
 
 function estimateLoadedTranscriptMediaBytes(
   payloads: ReadonlyMap<string, TranscriptMediaPayloadCacheEntry>,
@@ -1433,12 +1444,21 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   }, []);
 
   const replaceProjects = useCallback((items: RpcProject[]): void => {
-    const nextProjectStore = createProjectStore(items);
-    setProjectStore(nextProjectStore);
+    const nextProjectIds = createProjectStore(items).orderedIds;
+    setProjectStore((prevProjectStore) =>
+      createProjectStore(
+        items.map((item) =>
+          mergeProjectFaviconDataUrl(
+            item,
+            prevProjectStore.byId[item.id]?.faviconDataUrl,
+          ),
+        ),
+      ),
+    );
     setProjectStates((prevProjectStates) => {
       const nextProjectStates = pruneProjectStates(
         prevProjectStates,
-        nextProjectStore.orderedIds,
+        nextProjectIds,
       );
       setWorktreeStates((prevWorktreeStates) =>
         pruneWorktreeStates(prevWorktreeStates, nextProjectStates),
@@ -1448,7 +1468,15 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   }, []);
 
   const upsertProject = useCallback((project: RpcProject): void => {
-    setProjectStore((prev) => upsertProjectStore(prev, project));
+    setProjectStore((prev) =>
+      upsertProjectStore(
+        prev,
+        mergeProjectFaviconDataUrl(
+          project,
+          prev.byId[project.id]?.faviconDataUrl,
+        ),
+      ),
+    );
   }, []);
 
   useEffect(() => {
@@ -1461,6 +1489,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   }, []);
 
   useEffect(() => {
+    const shouldForceFaviconRefresh = projectFaviconRefreshRequestedAt === 0;
     const now = projectFaviconRefreshRequestedAt || Date.now();
     const projectsNeedingFavicons = projectStoreItems(projectStore).filter(
       (project) => {
@@ -1483,9 +1512,30 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
       requestedProjectFaviconIdsRef.current.add(projectId);
     }
 
-    void procedures
-      .listProjectFavicons({ projectIds }, { priority: "background" })
-      .then((favicons) => {
+    const projectIdBatches: number[][] = [];
+    for (
+      let index = 0;
+      index < projectIds.length;
+      index += PROJECT_FAVICON_REQUEST_BATCH_SIZE
+    ) {
+      projectIdBatches.push(
+        projectIds.slice(index, index + PROJECT_FAVICON_REQUEST_BATCH_SIZE),
+      );
+    }
+
+    void Promise.all(
+      projectIdBatches.map((batchProjectIds) =>
+        procedures.listProjectFavicons(
+          {
+            forceRefresh: shouldForceFaviconRefresh,
+            projectIds: batchProjectIds,
+          },
+          { priority: "background" },
+        ),
+      ),
+    )
+      .then((faviconBatches) => {
+        const favicons = faviconBatches.flat();
         const checkedAt = Date.now();
         for (const projectId of projectIds) {
           projectFaviconCheckedAtRef.current.set(projectId, checkedAt);
@@ -1497,7 +1547,11 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
           let next = prev;
           for (const favicon of favicons) {
             const project = next.byId[favicon.projectId];
-            if (!project || project.faviconDataUrl === favicon.dataUrl) {
+            if (
+              !project ||
+              !favicon.dataUrl ||
+              project.faviconDataUrl === favicon.dataUrl
+            ) {
               continue;
             }
             next = upsertProjectStore(next, {
