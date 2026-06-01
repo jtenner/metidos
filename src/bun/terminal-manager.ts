@@ -156,13 +156,12 @@ class BridgeManagedPty implements ManagedPty {
   }
 
   kill(signal?: NodeJS.Signals): void {
-    this.send({ type: "kill", signal });
-    if (this.child.killed) {
-      return;
+    if (!this.child.killed) {
+      this.child.kill(signal ?? "SIGTERM");
     }
     safeSetTimeout(() => {
-      if (!this.exited && !this.child.killed) {
-        this.child.kill(signal);
+      if (!this.exited) {
+        this.child.kill("SIGKILL");
       }
     }, TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS);
   }
