@@ -1077,6 +1077,61 @@ function stringResponse(
   });
 }
 
+function isWebServerSharePath(pathname: string): boolean {
+  return (
+    pathname === "/share/open" ||
+    pathname === "/share/open/client.js" ||
+    pathname.startsWith("/share/open/") ||
+    pathname.startsWith("/s/")
+  );
+}
+
+async function proxyWebServerShareRequest(request: Request): Promise<Response> {
+  const requestUrl = new URL(request.url);
+  const upstreamHost = WEB_SERVER_SHARE_HOST.includes(":")
+    ? `[${WEB_SERVER_SHARE_HOST}]`
+    : WEB_SERVER_SHARE_HOST;
+  const upstreamUrl = new URL(
+    `${requestUrl.pathname}${requestUrl.search}`,
+    `http://${upstreamHost}:${WEB_SERVER_SHARE_PORT}/`,
+  );
+  const headers = new Headers(request.headers);
+  headers.delete("connection");
+  headers.delete("content-length");
+  headers.delete("host");
+  headers.delete("keep-alive");
+  headers.delete("proxy-authenticate");
+  headers.delete("proxy-authorization");
+  headers.delete("te");
+  headers.delete("trailer");
+  headers.delete("transfer-encoding");
+  headers.delete("upgrade");
+
+  const fetchOptions: RequestInit = {
+    headers,
+    method: request.method,
+    redirect: "manual",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    fetchOptions.body = request.body;
+  }
+
+  try {
+    return await fetch(upstreamUrl, fetchOptions);
+  } catch (error) {
+    webServerLogger.warning({
+      error: error instanceof Error ? error.message : String(error),
+      message: "Failed to proxy web-server share request",
+      pathname: requestUrl.pathname,
+    });
+    return stringResponse(
+      "Web-server share route is unavailable.",
+      "text/plain; charset=utf-8",
+      502,
+    );
+  }
+}
+
 function safeDecodeRouteComponent(value: string): string | null {
   try {
     return decodeURIComponent(value);
@@ -4394,6 +4449,10 @@ async function bootstrap(): Promise<void> {
 
         resetRuntimeStats();
         return jsonResponse(buildRuntimeDiagnosticsSnapshot());
+      }
+
+      if (isWebServerSharePath(pathname)) {
+        return proxyWebServerShareRequest(request);
       }
 
       webServerLogger.warning({

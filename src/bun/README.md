@@ -9,7 +9,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Parses runtime flags/env (`--port`, `--dev`, `--backend-only`, `--track-telemetry`) and builds the shared runtime configuration.
   - Also handles the `--wipe-user-data` maintenance flag, which confirms before deleting the local SQLite database files plus the optional telemetry sidecar database and exiting before server bootstrap.
   - Exposes loopback HTTP routes for mainview assets, serving versioned frontend assets under `/assets/mainview/<version>/...` with immutable cache headers while keeping HTML bootstrap responses `no-store`, plus compatibility root asset aliases and websocket RPC at `/rpc`.
-  - Also boots the dedicated fixed-port web-server share worker so stable `/share/open/<token>` and `/s/<thread>/<server>/...` URLs stay off the busy main HTTP request path.
+  - Also boots the dedicated fixed-port web-server share worker for stable `/share/open` and `/s/<thread>/<server>/...` URLs, with the main HTTP server forwarding those paths as a fallback when a reverse proxy only exposes the main origin.
   - Merges `METIDOS_ALLOWED_WS_ORIGINS` with `METIDOS_PUBLIC_ORIGIN` so reverse-proxy TLS deployments can keep one canonical browser-facing origin in `.env` while still satisfying websocket origin checks.
   - Registers all RPC handlers from `project-procedures.ts` and delegates Mainview RPC socket lifecycle, request execution, cancellation, push fanout, backpressure handling, and drain events to `rpc-transport.ts`.
   - Tracks overload telemetry and startup/shutdown behavior around those runtime services.
@@ -213,7 +213,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
   - Shared stable-share helpers for opaque token hashing, cookie serialization, fixed-port origin resolution, and clean-route URL construction.
 
 - `pi/web-server/share-thread.ts`
-  - Dedicated fixed-port share/proxy worker that validates opaque claim URLs, mints cookie-backed share sessions, and proxies `/s/<thread>/<server>/...` traffic to the current loopback dynamic port.
+  - Dedicated fixed-port share/proxy worker that validates opaque claim URLs, mints cookie-backed share sessions, and proxies `/s/<thread>/<server>/...` traffic to the current loopback dynamic port. Public deployments may route these paths directly to the share worker, or let the main HTTP server forward them.
 
 - `pi/web-server/share-worker.ts`
   - Main-process bootstrap wrapper for the dedicated share worker.
