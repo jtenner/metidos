@@ -213,7 +213,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Replace off-grid spacing in `src/mainview/controls/codex-model-selector.tsx` (`py-px`, `ml-[10px]`, `pl-[10px]`, `mt-[1px]`) with 4px-grid-compliant spacing.
 - [ ] Replace off-grid spacing/tracking in `src/mainview/controls/thread-access-control.tsx` (`space-y-1.5`, `tracking-[0.12em]`) with approved spacing and type tokens.
 - [ ] Replace off-grid spacing/tracking in `src/mainview/app/mainview-cron-workspace-controller.tsx` with approved spacing and type tokens.
-- [ ] Replace `mt-1.5` in `src/mainview/app/settings-panel.tsx` with 4px-grid-compliant spacing.
 - [ ] Bring mobile chat-bubble spacing in `src/mainview/app/chat-workspace.tsx` back onto the 4px grid instead of `px-[10px]`, `py-[10px]`, and `px-[2px]` recipes.
 - [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/controls/chat-composer-control.tsx`.
 - [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/app/calendar-workspace.tsx`.

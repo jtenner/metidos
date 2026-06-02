@@ -174,7 +174,7 @@ function TimezoneAutocompleteInput({
         autoCapitalize="none"
         autoComplete="off"
         autoCorrect="off"
-        className="mt-1.5 h-8 w-full border border-border-default bg-surface-1 px-2 font-mono text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+        className="mt-2 h-8 w-full border border-border-default bg-surface-1 px-2 font-mono text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
         name={name}
         onBlur={() => {
           window.setTimeout(commitValue, 0);
