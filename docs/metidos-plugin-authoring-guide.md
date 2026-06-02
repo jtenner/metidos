@@ -122,6 +122,8 @@ Top-level manifest fields:
 
 Permission list:
 
+See the [plugin permission reference](./plugin-permissions.md) for each exact permission name, capability granted, risk level, and user-facing explanation.
+
 - Storage and project files: `storage:read`, `storage:write`, `storage:delete`, `files:read`, `files:write`, `files:delete`
 - Network: `network:fetch`, `network:websocket`
 - Scheduling: `cron:create`

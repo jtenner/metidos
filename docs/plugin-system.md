@@ -86,7 +86,7 @@ Common capability areas include:
 - request ingress,
 - prompt injection.
 
-See the authoring guide and JSON schema for exact permission names and validation rules.
+See the [plugin permission reference](./plugin-permissions.md), authoring guide, and JSON schema for exact permission names, capabilities, risk levels, user-facing explanations, and validation rules.
 
 ## Settings and secrets
 

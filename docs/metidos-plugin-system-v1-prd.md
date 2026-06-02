@@ -63,15 +63,16 @@ Top-level manifest fields:
 - `access` declares thread-visible tool groups and their manifest-known tool names.
 - `files`, `network`, `env`, `settings`, `providers`, `notificationProviders`, `storage.defaults`, `gc`, and `limits` declare the capabilities that activation UI and runtime validation use.
 
-The exact v1 permission list is:
+The exact v1 permission list is documented in the [plugin permission reference](./plugin-permissions.md), including each permission's capability, risk level, and user-facing explanation. In summary:
 
 - `storage:read`, `storage:write`, `storage:delete`
 - `files:read`, `files:write`, `files:delete`
-- `network:fetch`
+- `network:fetch`, `network:websocket`
 - `cron:create`
+- `plugin:request-ingress`, `plugin:reply-to-source`
 - `notification:send`, `notification:provider`
-- `provider:register`
-- `metidos:provides_embeddings`, `metidos:can_embed`, `metidos:lancedb`
+- `provider:register`, `oauth:register`
+- `metidos:provides_embeddings`, `metidos:can_embed`, `metidos:lancedb`, `metidos:prompt_inject`
 - `calendar:list`, `calendar:create`, `calendar:modify`, `calendar:delete`
 - `events:list`, `events:get`, `events:create`, `events:modify`, `events:delete`
 - `terminal:create`, `terminal:read`, `terminal:grep`, `terminal:kill`
