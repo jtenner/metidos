@@ -318,7 +318,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] I1: Review shell executable realpath behavior in `src/bun/terminal-manager.ts`. Add tests/comments for symlinked shells and resolved paths.
 - [ ] I2: Review terminal environment allowlist in `src/bun/terminal-manager.ts`. Add comments/tests proving sensitive dynamic-linker/env variables are excluded.
 - [ ] I3: Review `METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST` in `src/bun/terminal-manager.ts`. If warning on sensitive-looking keys is insufficient, block by default; otherwise document operator opt-in threat model.
-- [ ] I4: Review env-var name validation in `src/bun/terminal-manager.ts`. Add tests for unsafe names and valid names.
 - [ ] I5: Review terminal Node binary ownership/permission checks in `src/bun/terminal-manager.ts`. Add tests/comments for world/group-writable binary denial.
 - [ ] I6: Review PTY bridge kill timing in `src/bun/terminal-manager.ts` (`TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS`). If 100ms is too aggressive, tune or document potential abrupt termination.
 - [ ] I7: Review terminal output trimming complexity in `src/bun/terminal-manager.ts`. If large output can cause CPU pressure, optimize; otherwise comment current bounded-buffer assumptions.

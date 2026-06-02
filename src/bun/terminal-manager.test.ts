@@ -365,6 +365,29 @@ describe("terminal environment", () => {
     expect(warnings.join("\n")).toContain("CUSTOM_PROVIDER_KEY");
     expect(warnings.join("\n")).toContain("OPENAI_API_KEY");
   });
+
+  it("only accepts portable environment variable names in extra terminal allowlist", () => {
+    const env = buildTerminalEnvironment({
+      _UNDERSCORE_OK: "underscore",
+      "1_LEADING_DIGIT": "digit",
+      CAMEL_CASE_OK: "camel",
+      METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST:
+        "_UNDERSCORE_OK, CAMEL_CASE_OK, 1_LEADING_DIGIT, has-hyphen, HAS.DOT, HAS SPACE, ÜNICODE, =EMPTY_NAME",
+      "HAS SPACE": "space",
+      "HAS.DOT": "dot",
+      "has-hyphen": "hyphen",
+      ÜNICODE: "unicode",
+    });
+
+    expect(env._UNDERSCORE_OK).toBe("underscore");
+    expect(env.CAMEL_CASE_OK).toBe("camel");
+    expect(env["1_LEADING_DIGIT"]).toBeUndefined();
+    expect(env["has-hyphen"]).toBeUndefined();
+    expect(env["HAS.DOT"]).toBeUndefined();
+    expect(env["HAS SPACE"]).toBeUndefined();
+    expect(env.ÜNICODE).toBeUndefined();
+    expect(env[""]).toBeUndefined();
+  });
 });
 
 describe("terminal shell resolution", () => {
