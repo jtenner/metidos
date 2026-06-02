@@ -4,7 +4,7 @@
  */
 
 import { lookup } from "node:dns/promises";
-import { request as requestHttp } from "node:http";
+import { request as requestHttp, type IncomingMessage } from "node:http";
 import { request as requestHttps } from "node:https";
 import { isIP } from "node:net";
 
@@ -471,6 +471,35 @@ export function pinResolvedOutboundLookupAddress(resolvedAddress: string) {
   };
 }
 
+function nodeResponseToWebStream(
+  nodeResponse: IncomingMessage,
+): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      const onData = (chunk: Buffer | string) => {
+        controller.enqueue(
+          typeof chunk === "string"
+            ? Buffer.from(chunk)
+            : new Uint8Array(chunk),
+        );
+      };
+      const onEnd = () => {
+        controller.close();
+      };
+      const onError = (error: Error) => {
+        controller.error(error);
+      };
+
+      nodeResponse.on("data", onData);
+      nodeResponse.once("end", onEnd);
+      nodeResponse.once("error", onError);
+    },
+    cancel() {
+      nodeResponse.destroy();
+    },
+  });
+}
+
 function createValidatedOutboundHttpFetch(
   validateUrl: (
     rawUrl: string,
@@ -510,7 +539,7 @@ function createValidatedOutboundHttpFetch(
             }
           }
           resolve(
-            new Response(nodeResponse as unknown as BodyInit, {
+            new Response(nodeResponseToWebStream(nodeResponse), {
               headers: responseHeaders,
               status: nodeResponse.statusCode ?? 0,
               statusText: nodeResponse.statusMessage ?? "",

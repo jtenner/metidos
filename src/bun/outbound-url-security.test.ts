@@ -1,8 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
+import { createServer, type Server } from "node:http";
 
 import {
   assertPrivateNetworkOutboundHttpUrl,
   assertSafeOutboundHttpUrl,
+  createPrivateNetworkOutboundHttpFetch,
   createSafeOutboundHttpFetch,
   isBlockedOutboundAddress,
   isBlockedPrivateNetworkMetadataAddress,
@@ -11,6 +13,19 @@ import {
 } from "./outbound-url-security";
 
 describe("outbound URL security", () => {
+  const servers: Server[] = [];
+
+  afterAll(async () => {
+    await Promise.all(
+      servers.map(
+        (server) =>
+          new Promise<void>((resolve, reject) => {
+            server.close((error) => (error ? reject(error) : resolve()));
+          }),
+      ),
+    );
+  });
+
   test("blocks loopback and private literal addresses", async () => {
     const blockedUrls = [
       "http://localhost/",
@@ -170,6 +185,33 @@ describe("outbound URL security", () => {
       }),
     ).rejects.toThrow();
     expect(calls).toBe(1);
+  });
+
+  test("materializes Node responses as Web streams", async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.write("streamed ");
+      response.end("body");
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Expected local HTTP server to listen on a TCP port.");
+    }
+
+    const guardedFetch = createPrivateNetworkOutboundHttpFetch({
+      label: "Plugin fetch URL",
+    });
+    const response = await guardedFetch(
+      new URL(`http://127.0.0.1:${address.port}/stream`),
+      { redirect: "manual" },
+    );
+
+    expect(response.body).toBeInstanceOf(ReadableStream);
+    await expect(response.text()).resolves.toBe("streamed body");
   });
 
   test("validates redirect targets", async () => {
