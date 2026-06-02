@@ -906,6 +906,7 @@ let mainviewRebuildQueued = false;
 
 let cachedMainviewHtml: string | null = null;
 let overloadMonitorTimer: ReturnType<typeof setInterval> | null = null;
+let procedureStartupWarmupTimer: ReturnType<typeof setTimeout> | null = null;
 let calendarSchedulerTimer: ReturnType<typeof setInterval> | null = null;
 let calendarCleanupTimer: ReturnType<typeof setInterval> | null = null;
 let externalIcsRefreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -4643,7 +4644,8 @@ async function bootstrap(): Promise<void> {
     url: `http://${SERVER_HOSTNAME === "0.0.0.0" ? "localhost" : SERVER_HOSTNAME}:${server.port}`,
   });
 
-  setTimeout(() => {
+  procedureStartupWarmupTimer = setTimeout(() => {
+    procedureStartupWarmupTimer = null;
     warmProcedureStartupCaches();
   }, 0);
 }
@@ -4670,6 +4672,13 @@ async function shutdownAndExit(exitCode: number): Promise<void> {
     watchdog.unref();
 
     shutdownDevWatchers();
+    if (procedureStartupWarmupTimer) {
+      // Startup cache warmup is intentionally best-effort. If shutdown begins
+      // before the one-shot timer fires, cancel it so shutdown does not start
+      // new cache reads after listeners, sidecars, and databases begin closing.
+      clearTimeout(procedureStartupWarmupTimer);
+      procedureStartupWarmupTimer = null;
+    }
     if (overloadMonitorTimer) {
       clearInterval(overloadMonitorTimer);
       overloadMonitorTimer = null;
