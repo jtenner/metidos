@@ -305,10 +305,10 @@ export function SettingsPanelFrame({
         Workspace, local app, and provider settings.
       </p>
       <div className="flex items-start justify-between gap-3 border-b border-border-subtle bg-surface-2 px-4 py-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border-default bg-accent-surface text-accent">
-            {materialSymbol("settings", "text-[20px]")}
-          </div>
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="mt-0.5 shrink-0 text-accent" aria-hidden="true">
+            {materialSymbol("settings", "text-[18px]")}
+          </span>
           <div className="min-w-0">
             <div
               className="text-base font-semibold leading-5 text-text-primary"
