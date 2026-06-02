@@ -362,6 +362,9 @@ function requireManageApp(context?: RpcRequestContext): void {
 }
 
 function requireRecentStepUp(context?: RpcRequestContext): void {
+  // Step-up proves only that the current local operator recently re-authenticated.
+  // Sensitive admin mutations must call requireManageApp before this helper so a
+  // future refactor cannot rely on recency as an authorization grant.
   requireLocalOperatorCapability(context, "recent_step_up");
 }
 
