@@ -1016,6 +1016,70 @@ describe("createPiMetidosTools", () => {
     );
   });
 
+  it("reports unavailable placeholder-only model providers with no startable models", async () => {
+    const host = createHost({
+      getModelCatalog: async () =>
+        makeModelCatalog({
+          models: [
+            {
+              contextWindowTokens: 0,
+              deprecated: false,
+              group: "Offline Provider",
+              id: "offline-provider:placeholder",
+              isPlaceholder: true,
+              label: "Offline Provider unavailable",
+              modelId: "placeholder",
+              providerAvailable: false,
+              providerAvailabilityNote:
+                "Set OFFLINE_PROVIDER_API_KEY to enable this provider.",
+              providerId: "offline-provider",
+              providerLabel: "Offline Provider",
+              summary: "Provider unavailable until settings are configured.",
+              supportsEmbeddings: false,
+              supportsImageInput: false,
+              supportsReasoningEffort: false,
+              supportedReasoningEfforts: [],
+            },
+          ],
+        }),
+    });
+
+    const providersResult = await executeTool(
+      makeScope({ metidosAccessEnabled: false, threadsAccessEnabled: true }),
+      host,
+      "model_providers",
+      {},
+    );
+    expect(resultText(providersResult)).toContain(
+      "| offline-provider | Offline Provider | 0 | no | Set OFFLINE_PROVIDER_API_KEY to enable this provider. |",
+    );
+
+    const queryResult = await executeTool(
+      makeScope({ metidosAccessEnabled: false, threadsAccessEnabled: true }),
+      host,
+      "models_query",
+      { provider: "offline-provider", query: "" },
+    );
+    expect(resultText(queryResult)).toContain(
+      "Models for provider offline-provider.\n\nNo matching models found.",
+    );
+  });
+
+  it("documents that reasoning effort is validated separately from model arguments", () => {
+    const tool = getTool(
+      makeScope({ metidosAccessEnabled: false, threadsAccessEnabled: true }),
+      createHost(),
+      "models_query",
+    );
+
+    expect(tool.promptGuidelines).toContain(
+      "Use the Model argument table column exactly as the model parameter for new_thread, new_cron, or update_cron.",
+    );
+    expect(tool.promptGuidelines).toContain(
+      "Pass reasoningEffort separately. Valid values shown in the Reasoning efforts column are minimal, low, medium, high, and xhigh.",
+    );
+  });
+
   it("keeps update_thread visible while hiding Metidos management tools for calendar-only access", () => {
     const scope = makeScope({
       calendarAccessEnabled: true,
