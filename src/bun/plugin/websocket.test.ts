@@ -36,6 +36,44 @@ function createEchoServer(): ReturnType<typeof Bun.serve> {
   return server;
 }
 
+function createHandshakeMetadataServer(): ReturnType<typeof Bun.serve> {
+  const server = Bun.serve({
+    fetch(request, bunServer) {
+      const sawHeader = request.headers.get("x-plugin-test") === "allowed";
+      const protocols =
+        request.headers
+          .get("sec-websocket-protocol")
+          ?.split(",")
+          .map((protocol) => protocol.trim()) ?? [];
+      const selectedProtocol = protocols.find(
+        (protocol) => protocol === "metidos-test",
+      );
+      if (!sawHeader || !selectedProtocol) {
+        return new Response("missing handshake metadata", { status: 400 });
+      }
+      if (
+        bunServer.upgrade(request, {
+          headers: { "Sec-WebSocket-Protocol": selectedProtocol },
+        })
+      ) {
+        return undefined;
+      }
+      return new Response("upgrade required", { status: 426 });
+    },
+    port: 0,
+    websocket: {
+      message() {
+        // The handshake metadata test only needs the server's open event.
+      },
+      open(socket) {
+        socket.send("handshake-ok");
+      },
+    },
+  });
+  testServers.push(server);
+  return server;
+}
+
 afterEach(() => {
   for (const server of testServers.splice(0)) {
     server.stop(true);
@@ -186,6 +224,33 @@ describe("PluginWebSocketRegistry", () => {
     });
     await expect(registry.close(connected.id)).resolves.toEqual({
       success: true,
+    });
+  });
+
+  it("passes plugin headers and subprotocols together via Bun constructor options", async () => {
+    const server = createHandshakeMetadataServer();
+    const origin = `ws://127.0.0.1:${server.port}`;
+    const registry = new PluginWebSocketRegistry({
+      network: {
+        allow: [],
+        enforceHttps: false,
+        webSocketAllow: [`${origin}/socket`],
+      },
+      permissions: ["network:websocket"],
+      unsafeAllowPrivateNetwork: true,
+    });
+
+    const connected = await registry.connect({
+      options: {
+        headers: { "x-plugin-test": "allowed" },
+        protocols: ["metidos-test"],
+      },
+      url: `${origin}/socket`,
+    });
+
+    await expect(registry.receive(connected.id)).resolves.toEqual({
+      text: "handshake-ok",
+      type: "message",
     });
   });
 

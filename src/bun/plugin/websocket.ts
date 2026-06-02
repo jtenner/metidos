@@ -344,9 +344,15 @@ function normalizeProtocols(input: unknown): string | string[] | undefined {
   });
 }
 
+type NormalizedPluginWebSocketConnectOptions = {
+  headers: Record<string, string>;
+  protocols: string | string[];
+  timeoutMs: number;
+};
+
 function normalizeConnectOptions(
   input: unknown,
-): Required<PluginWebSocketConnectOptions> {
+): NormalizedPluginWebSocketConnectOptions {
   if (input === undefined || input === null) {
     return {
       headers: {},
@@ -473,15 +479,21 @@ export class PluginWebSocketRegistry {
         try {
           const protocols = options.protocols;
           const headers = options.headers;
+          // Bun exposes both browser-style `(url, protocols)` and Bun-specific
+          // `(url, options)` WebSocket overloads. Always use the Bun options
+          // shape when plugin-supplied handshake metadata exists so custom
+          // headers and subprotocols are applied together instead of relying on
+          // runtime overload inference.
           const constructorOptions =
-            Object.keys(headers).length > 0
+            Object.keys(headers).length > 0 ||
+            (Array.isArray(protocols) && protocols.length > 0)
               ? { headers, protocols }
-              : Array.isArray(protocols) && protocols.length === 0
-                ? undefined
-                : protocols;
+              : undefined;
           socket = new WebSocket(
             requestUrl.toString(),
-            constructorOptions as ConstructorParameters<typeof WebSocket>[1],
+            constructorOptions as unknown as ConstructorParameters<
+              typeof WebSocket
+            >[1],
           );
         } catch (error) {
           clearTimeout(timer);
