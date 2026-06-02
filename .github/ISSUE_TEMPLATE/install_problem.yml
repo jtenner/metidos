@@ -77,3 +77,10 @@ body:
       label: Expected vs actual behavior
     validations:
       required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Redaction checklist
+      options:
+        - label: I removed secrets, provider keys, OAuth tokens, recovery codes, TOTP secrets, cookies, session ids, WebSocket tickets, full `.env` contents, private repository URLs, local databases, plugin runtime data, personal paths, hostnames, usernames, and unsafe screenshots.
+          required: true

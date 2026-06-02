@@ -64,9 +64,9 @@ The remaining gaps should be run in disposable checkouts, containers, VMs, or fr
    - Run the plan-first `.pi/skills/metidos-installation/SKILL.md` workflow in a dry-run or approved disposable scenario.
    - Verify it asks the expected questions, emits a secret-safe `metidos-config.md`, and does not apply host changes before approval.
 
-10. **Contributor-safe issue-reporting path**
-    - Verify install/setup failure reports can be produced without leaking `.env`, App Data, provider keys, cookies, recovery codes, personal paths, or private repository names.
-    - Cross-check `SECURITY.md`, `SUPPORT.md`, `docs/security-model.md`, and troubleshooting guidance.
+10. **Contributor-safe issue-reporting path** — verified in `docs/contributor-safe-issue-reporting-verification-2026-06-02.md`.
+    - `SECURITY.md`, `SUPPORT.md`, `docs/security-model.md`, and `docs/troubleshooting.md` provide a consistent safe-reporting path for install/setup failures.
+    - `.github/ISSUE_TEMPLATE/install_problem.yml` now requires an explicit redaction checklist, matching the existing bug report safety gate.
 
 ## Outcome
 
