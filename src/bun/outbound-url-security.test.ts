@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  assertPrivateNetworkOutboundHttpUrl,
   assertSafeOutboundHttpUrl,
   createSafeOutboundHttpFetch,
   isBlockedOutboundAddress,
@@ -183,17 +184,68 @@ describe("outbound URL security", () => {
   });
 
   test("blocks metadata addresses across IPv4 and IPv6 forms", () => {
-    expect(
-      isBlockedPrivateNetworkMetadataAddress("169.254.169.254"),
-    ).toBeTrue();
-    expect(
-      isBlockedPrivateNetworkMetadataAddress("::ffff:169.254.169.254"),
-    ).toBeTrue();
-    expect(
-      isBlockedPrivateNetworkMetadataAddress("::ffff:a9fe:a9fe"),
-    ).toBeTrue();
-    expect(isBlockedPrivateNetworkMetadataAddress("fd00:ec2::254")).toBeTrue();
+    const blockedMetadataAddresses = [
+      "100.100.100.200",
+      "169.254.169.254",
+      "169.254.170.2",
+      "::ffff:169.254.169.254",
+      "::ffff:169.254.170.2",
+      "::ffff:100.100.100.200",
+      "::ffff:a9fe:a9fe",
+      "::ffff:a9fe:aa02",
+      "::ffff:6464:64c8",
+      "fd00:ec2::254",
+    ];
+
+    for (const address of blockedMetadataAddresses) {
+      expect(
+        isBlockedPrivateNetworkMetadataAddress(address),
+        address,
+      ).toBeTrue();
+    }
+
     expect(isBlockedPrivateNetworkMetadataAddress("8.8.8.8")).toBeFalse();
+    expect(isBlockedPrivateNetworkMetadataAddress("10.0.0.1")).toBeFalse();
+    expect(isBlockedPrivateNetworkMetadataAddress("fd00::1")).toBeFalse();
+  });
+
+  test("blocks known metadata hosts and addresses in unsafe private-network mode", async () => {
+    for (const hostname of ["metadata", "metadata.google.internal"]) {
+      await expect(
+        assertPrivateNetworkOutboundHttpUrl(
+          `http://${hostname}/computeMetadata/v1/`,
+          {
+            label: "Plugin fetch URL",
+            resolveHostname: async () => ["8.8.8.8"],
+          },
+        ),
+      ).rejects.toThrow(/cloud metadata hosts/);
+    }
+
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl(
+        "http://169.254.169.254/latest/meta-data",
+        {
+          label: "Plugin fetch URL",
+        },
+      ),
+    ).rejects.toThrow(/cloud metadata hosts/);
+
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl(
+        "http://[fd00:ec2::254]/latest/meta-data",
+        {
+          label: "Plugin fetch URL",
+        },
+      ),
+    ).rejects.toThrow(/cloud metadata hosts/);
+
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl("https://internal.example.test/api", {
+        label: "Plugin fetch URL",
+        resolveHostname: async () => ["10.0.0.10", "fd00::10"],
+      }),
+    ).resolves.toMatchObject({ hostname: "internal.example.test" });
   });
 
   test("rejects IPv6 zone identifiers before outbound validation", async () => {
