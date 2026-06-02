@@ -1639,7 +1639,7 @@ function authErrorResponse(
  * @param request - Incoming request payload.
  */
 
-async function handleAuthRequest(
+export async function handleAuthRequestForTest(
   request: Request,
   serverInstance: AuthRequestServer,
   options?: {
@@ -4049,9 +4049,13 @@ async function bootstrap(): Promise<void> {
         requestId: requestId ?? null,
       }));
 
-      const authResponse = await handleAuthRequest(request, serverInstance, {
-        allowedOrigins: normalizedAllowedWsOrigins,
-      });
+      const authResponse = await handleAuthRequestForTest(
+        request,
+        serverInstance,
+        {
+          allowedOrigins: normalizedAllowedWsOrigins,
+        },
+      );
       if (authResponse) {
         traceWebServer(() => ({
           message: "HTTP request handled by auth route",
