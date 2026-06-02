@@ -36,6 +36,6 @@ Source images observed include `bird.png`, `docs/uploadthing-test.png`, `src/mai
 - Run a dedicated working-tree secret scanner and review all findings.
 - Run a Git-history secret scanner before publishing.
 - Complete the separate `.wiki/` audit before public launch.
-- Complete the separate `.pi/skills/` audit before public launch.
+- `.pi/skills/` audit completed in [`public-skills-audit-2026-06-02.md`](./public-skills-audit-2026-06-02.md); repeat only for newly added skill content before launch.
 - Confirm the public contact email is acceptable.
 - Review image assets for ownership, provenance, and screenshot safety.
