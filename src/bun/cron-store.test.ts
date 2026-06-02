@@ -51,6 +51,26 @@ function createCron(
   });
 }
 
+function startActiveCronThread(
+  database: Database,
+  cron: ReturnType<typeof createCron>,
+) {
+  const activeThread = createThread(database, {
+    agentsAccess: false,
+    cronJobId: cron.id,
+    githubAccess: false,
+    metidosAccess: true,
+    model: DEFAULT_THREAD_MODEL,
+    permissions: ["metidos:threads"],
+    projectId: cron.projectId,
+    reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
+    title: "Active cron thread",
+    unsafeMode: false,
+    worktreePath: cron.worktreePath,
+  });
+  markThreadRunStarted(database, activeThread.id, "2026-06-02T12:00:00.000Z");
+}
+
 describe("cron store", () => {
   it("uses the bound database for store methods", () => {
     const firstDatabase = createTestDatabase();
@@ -88,28 +108,135 @@ describe("cron store", () => {
       updateCronJobLastRun(database, inProgressCron.id, 1_000, "InProgress");
       updateCronJobLastRun(database, alreadyRunCron.id, 2_000, "Completed");
 
-      const activeThread = createThread(database, {
-        agentsAccess: false,
-        cronJobId: activeThreadCron.id,
-        githubAccess: false,
-        metidosAccess: true,
-        model: DEFAULT_THREAD_MODEL,
-        permissions: ["metidos:threads"],
-        projectId: activeThreadCron.projectId,
-        reasoningEffort: DEFAULT_THREAD_REASONING_EFFORT,
-        title: "Active cron thread",
-        unsafeMode: false,
-        worktreePath: activeThreadCron.worktreePath,
-      });
-      markThreadRunStarted(
-        database,
-        activeThread.id,
-        "2026-06-02T12:00:00.000Z",
-      );
+      startActiveCronThread(database, activeThreadCron);
 
       expect(store.listDueScheduledJobIds("0 0 * * *", 1_500)).toEqual([
         dueCron.id,
       ]);
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("claims scheduled runs only for eligible due jobs and returns job metadata", () => {
+    const database = createTestDatabase();
+    try {
+      const store = createBoundCronStore(database);
+      const dueCron = createCron(database, "claim-due", "15 8 * * *");
+      const disabledCron = createCron(database, "claim-disabled", "15 8 * * *");
+      const deletedCron = createCron(database, "claim-deleted", "15 8 * * *");
+      const activeThreadCron = createCron(
+        database,
+        "claim-active-thread",
+        "15 8 * * *",
+      );
+      const equalLastRunCron = createCron(
+        database,
+        "claim-equal-last-run",
+        "15 8 * * *",
+      );
+      const newerLastRunCron = createCron(
+        database,
+        "claim-newer-last-run",
+        "15 8 * * *",
+      );
+      createCron(database, "claim-other-schedule", "30 8 * * *");
+
+      setCronJobEnabled(database, disabledCron.id, false);
+      softDeleteCronJob(database, deletedCron.id);
+      startActiveCronThread(database, activeThreadCron);
+      updateCronJobLastRun(database, equalLastRunCron.id, 1_500, "Completed");
+      updateCronJobLastRun(database, newerLastRunCron.id, 2_000, "Errored");
+
+      const claimed = store.claimScheduledRuns("15 8 * * *", 1_500);
+
+      expect(claimed.map((cron) => cron.id)).toEqual([dueCron.id]);
+      expect(claimed[0]).toMatchObject({
+        id: dueCron.id,
+        description: "Cron store fixture claim-due",
+        enabled: 1,
+        lastRunDate: 1_500,
+        lastRunStatus: "InProgress",
+        permissions: ["metidos:threads"],
+        prompt: "Run cron store fixture claim-due.",
+        schedule: "15 8 * * *",
+        title: "Cron Store claim-due",
+        worktreePath: dueCron.worktreePath,
+      });
+      expect(store.getById(dueCron.id)?.lastRunStatus).toBe("InProgress");
+      expect(store.getById(disabledCron.id)?.lastRunDate).toBeNull();
+      expect(store.getById(deletedCron.id)?.lastRunDate).toBeNull();
+      expect(store.getById(activeThreadCron.id)?.lastRunDate).toBeNull();
+      expect(store.getById(equalLastRunCron.id)?.lastRunDate).toBe(1_500);
+      expect(store.getById(newerLastRunCron.id)?.lastRunDate).toBe(2_000);
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("claims a specific scheduled run only when manual and safety gates allow it", () => {
+    const database = createTestDatabase();
+    try {
+      const store = createBoundCronStore(database);
+      const disabledCron = createCron(database, "claim-by-id-disabled");
+      const deletedCron = createCron(database, "claim-by-id-deleted");
+      const activeThreadCron = createCron(
+        database,
+        "claim-by-id-active-thread",
+      );
+      const equalLastRunCron = createCron(
+        database,
+        "claim-by-id-equal-last-run",
+      );
+      const newerLastRunCron = createCron(
+        database,
+        "claim-by-id-newer-last-run",
+      );
+
+      setCronJobEnabled(database, disabledCron.id, false);
+      softDeleteCronJob(database, deletedCron.id);
+      startActiveCronThread(database, activeThreadCron);
+      updateCronJobLastRun(database, equalLastRunCron.id, 1_500, "Completed");
+      updateCronJobLastRun(database, newerLastRunCron.id, 2_000, "Completed");
+
+      expect(store.claimForScheduledRunById(disabledCron.id, 1_500)).toEqual(
+        [],
+      );
+
+      const disabledManualClaim = store.claimForScheduledRunById(
+        disabledCron.id,
+        1_500,
+        { includeDisabled: true },
+      );
+
+      expect(disabledManualClaim).toHaveLength(1);
+      expect(disabledManualClaim[0]).toMatchObject({
+        id: disabledCron.id,
+        enabled: 0,
+        lastRunDate: 1_500,
+        lastRunStatus: "InProgress",
+        title: "Cron Store claim-by-id-disabled",
+      });
+      expect(
+        store.claimForScheduledRunById(deletedCron.id, 1_500, {
+          includeDisabled: true,
+        }),
+      ).toEqual([]);
+      expect(
+        store.claimForScheduledRunById(activeThreadCron.id, 1_500, {
+          includeDisabled: true,
+        }),
+      ).toEqual([]);
+      expect(
+        store.claimForScheduledRunById(equalLastRunCron.id, 1_500, {
+          includeDisabled: true,
+        }),
+      ).toEqual([]);
+      expect(
+        store.claimForScheduledRunById(newerLastRunCron.id, 1_500, {
+          includeDisabled: true,
+        }),
+      ).toEqual([]);
     } finally {
       database.close(false);
     }
