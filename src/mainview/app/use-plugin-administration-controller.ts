@@ -287,6 +287,9 @@ export function usePluginAdministrationController({
   const [hoveredRouteDirectorySuggestion, setHoveredRouteDirectorySuggestion] =
     useState<string | null>(null);
   const pluginInventorySilentLoadInFlightRef = useRef(false);
+  const pluginSettingsLoadGenerationRef = useRef(0);
+  const pluginSettingsEditGenerationRef = useRef(0);
+  const pluginSettingsSaveInFlightCountRef = useRef(0);
 
   const loadPluginSidecarDiagnostics = useCallback(
     async (options?: { priority?: RpcRequestPriority }): Promise<void> => {
@@ -391,6 +394,8 @@ export function usePluginAdministrationController({
       inventory: RpcPluginInventory,
       options?: { priority?: RpcRequestPriority },
     ): Promise<void> => {
+      const loadGeneration = ++pluginSettingsLoadGenerationRef.current;
+      const editGeneration = pluginSettingsEditGenerationRef.current;
       const plugins = pluginsWithDeclaredSettings(inventory);
       if (plugins.length === 0) {
         setPluginSettingsSnapshots({});
@@ -406,6 +411,13 @@ export function usePluginAdministrationController({
         priority: options?.priority ?? "default",
         procedures,
       });
+      if (
+        loadGeneration !== pluginSettingsLoadGenerationRef.current ||
+        editGeneration !== pluginSettingsEditGenerationRef.current ||
+        pluginSettingsSaveInFlightCountRef.current > 0
+      ) {
+        return;
+      }
       setPluginSettingsSnapshots(settingsState.snapshots);
       setPluginSettingsValues(settingsState.values);
       setPluginSettingsErrors(settingsState.errors);
@@ -478,6 +490,7 @@ export function usePluginAdministrationController({
       key: string,
       value: PluginSettingFormValue,
     ): void => {
+      pluginSettingsEditGenerationRef.current += 1;
       setPluginSettingsValues((currentValues) => ({
         ...currentValues,
         [directoryName]: {
@@ -508,6 +521,8 @@ export function usePluginAdministrationController({
         return;
       }
       setPluginSettingsStatus("");
+      const editGeneration = pluginSettingsEditGenerationRef.current;
+      pluginSettingsSaveInFlightCountRef.current += 1;
       try {
         const updatedSnapshots: PluginSettingsSnapshots = {};
         for (const { patch, plugin } of pluginPatches) {
@@ -524,17 +539,19 @@ export function usePluginAdministrationController({
           ...currentSnapshots,
           ...updatedSnapshots,
         }));
-        setPluginSettingsValues((currentValues) => ({
-          ...currentValues,
-          ...Object.fromEntries(
-            Object.entries(updatedSnapshots).map(
-              ([directoryName, snapshot]) => [
-                directoryName,
-                pluginSettingsFormValuesFromSnapshot(snapshot),
-              ],
+        if (editGeneration === pluginSettingsEditGenerationRef.current) {
+          setPluginSettingsValues((currentValues) => ({
+            ...currentValues,
+            ...Object.fromEntries(
+              Object.entries(updatedSnapshots).map(
+                ([directoryName, snapshot]) => [
+                  directoryName,
+                  pluginSettingsFormValuesFromSnapshot(snapshot),
+                ],
+              ),
             ),
-          ),
-        }));
+          }));
+        }
         setPluginSettingsStatus("");
       } catch (error) {
         if (options?.promptForStepUp && isStepUpRequiredRpcError(error)) {
@@ -549,6 +566,11 @@ export function usePluginAdministrationController({
         }
         setPluginSettingsStatus(toDisplayError(error));
         throw error;
+      } finally {
+        pluginSettingsSaveInFlightCountRef.current = Math.max(
+          0,
+          pluginSettingsSaveInFlightCountRef.current - 1,
+        );
       }
     },
     [

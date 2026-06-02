@@ -151,7 +151,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Plugin administration UI races
 
-- [ ] Serialize or generation-guard plugin settings auto-save in `src/mainview/app/use-plugin-administration-controller.ts` so inventory/settings reload cannot race with `savePluginSettings` and PATCH stale form values.
 - [ ] Serialize ingress route draft access/model saves in `src/mainview/app/use-plugin-administration-controller.ts`; add in-flight guards and prevent stale state commits after navigation/close.
 - [ ] Scope plugin admin/lifecycle disabled states in `src/mainview/app/plugin-administration-panel.tsx` and `src/mainview/app/plugin-lifecycle-action-state.ts` to the matching action key instead of globally disabling unrelated buttons.
 
