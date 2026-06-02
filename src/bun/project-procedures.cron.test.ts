@@ -10,6 +10,7 @@ import {
   createThread,
   createUser,
   deleteProject,
+  ensureProjectWorktreeVisible,
   getCronJobById,
   initAppDatabase,
   markThreadRunStarted,
@@ -43,6 +44,29 @@ function createCronProcedureWorkspace(prefix: string): {
   const database = initAppDatabase();
   const project = upsertProject(database, {
     name: "Cron Procedure Repo",
+    projectPath: repoPath,
+  });
+  return { database, project, repoPath };
+}
+
+function createRegularVisibleCronProcedureWorkspace(prefix: string): {
+  database: ReturnType<typeof initAppDatabase>;
+  project: ReturnType<typeof upsertProject>;
+  repoPath: string;
+} {
+  process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
+  process.env.METIDOS_APP_DATA_DIR = createTempDirectory(`${prefix}app-data-`);
+  resetResolvedAppDataDirectory();
+  const repoPath = join(
+    process.env.METIDOS_APP_DATA_DIR,
+    "users",
+    "alice",
+    "repo",
+  );
+  mkdirSync(repoPath, { recursive: true });
+  const database = initAppDatabase();
+  const project = upsertProject(database, {
+    name: "Visible Cron Procedure Repo",
     projectPath: repoPath,
   });
   return { database, project, repoPath };
@@ -297,6 +321,117 @@ describe("cron procedure validation", () => {
     expect(getCronJobById(database, hiddenCronJob.id)).toMatchObject({
       deletedAt: null,
       title: "Hidden mutation scope cron",
+    });
+  });
+
+  it("hides cron jobs on untracked worktrees from regular callers", async () => {
+    const { database, project, repoPath } =
+      createRegularVisibleCronProcedureWorkspace(
+        "metidos-cron-untracked-worktree-repo-",
+      );
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = createRegularContext({
+      userId: alice.id,
+      username: "alice",
+    });
+    const { listCronsProcedure, runCronNowProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const rootCronJob = createCronJob(database, {
+      description: "Visible root cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo root",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Visible root cron",
+      worktreePath: repoPath,
+    });
+    const untrackedWorktreePath = join(repoPath, "untracked-worktree");
+    const untrackedCronJob = createCronJob(database, {
+      description: "Untracked worktree cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo untracked",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Untracked worktree cron",
+      worktreePath: untrackedWorktreePath,
+    });
+
+    const visibleCronIds = (await listCronsProcedure(undefined, context)).map(
+      (entry) => entry.id,
+    );
+    expect(visibleCronIds).toContain(rootCronJob.id);
+    expect(visibleCronIds).not.toContain(untrackedCronJob.id);
+    await expect(
+      runCronNowProcedure({ cronJobId: untrackedCronJob.id }, context),
+    ).rejects.toThrow(`Cron job not found: ${untrackedCronJob.id}`);
+    await expect(
+      updateCronProcedure(
+        { cronJobId: untrackedCronJob.id, title: "Unauthorized rename" },
+        context,
+      ),
+    ).rejects.toThrow(`Cron job not found: ${untrackedCronJob.id}`);
+    expect(getCronJobById(database, untrackedCronJob.id)).toMatchObject({
+      deletedAt: null,
+      title: "Untracked worktree cron",
+    });
+  });
+
+  it("hides cron jobs on inaccessible tracked worktrees from regular callers", async () => {
+    const { database, project } = createRegularVisibleCronProcedureWorkspace(
+      "metidos-cron-inaccessible-worktree-repo-",
+    );
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = createRegularContext({
+      userId: alice.id,
+      username: "alice",
+    });
+    const { listCronsProcedure, runCronNowProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const inaccessibleWorktreePath = createTempDirectory(
+      "metidos-cron-outside-worktree-",
+    );
+    ensureProjectWorktreeVisible(
+      database,
+      project.id,
+      inaccessibleWorktreePath,
+    );
+    const inaccessibleCronJob = createCronJob(database, {
+      description: "Inaccessible worktree cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo inaccessible",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Inaccessible worktree cron",
+      worktreePath: inaccessibleWorktreePath,
+    });
+
+    expect(
+      (await listCronsProcedure(undefined, context)).map((entry) => entry.id),
+    ).not.toContain(inaccessibleCronJob.id);
+    await expect(
+      runCronNowProcedure({ cronJobId: inaccessibleCronJob.id }, context),
+    ).rejects.toThrow(`Cron job not found: ${inaccessibleCronJob.id}`);
+    await expect(
+      updateCronProcedure(
+        { cronJobId: inaccessibleCronJob.id, deleted: true },
+        context,
+      ),
+    ).rejects.toThrow(`Cron job not found: ${inaccessibleCronJob.id}`);
+    expect(getCronJobById(database, inaccessibleCronJob.id)).toMatchObject({
+      deletedAt: null,
+      title: "Inaccessible worktree cron",
     });
   });
 

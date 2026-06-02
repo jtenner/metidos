@@ -523,6 +523,31 @@ function normalizeRequestedThreadStatusIds(
   return [...new Set(threadIds)];
 }
 
+function cronJobWorktreeIsVisible(
+  cronJob: CronJobRecord,
+  project: ProjectRecord,
+  context?: RpcRequestContext,
+): boolean {
+  if (
+    context &&
+    !localOperatorCanManageApp(context) &&
+    !isWorkspacePathAllowed(
+      cronJob.worktreePath,
+      workspacePathScopeForContext(context),
+    )
+  ) {
+    return false;
+  }
+
+  if (resolve(cronJob.worktreePath) === resolve(project.path)) {
+    return true;
+  }
+
+  return listProjectWorktreesMetadata(db, project.id).some(
+    (record) => resolve(record.worktreePath) === resolve(cronJob.worktreePath),
+  );
+}
+
 function visibleCronJobs(context?: RpcRequestContext): CronJobRecord[] {
   if (!context || localOperatorCanManageApp(context)) {
     return cronStore.list();
@@ -533,12 +558,15 @@ function visibleCronJobs(context?: RpcRequestContext): CronJobRecord[] {
     return [];
   }
 
-  const visibleProjectIds = new Set(
-    visibleProjects(context).map((project) => project.id),
+  const visibleProjectsById = new Map(
+    visibleProjects(context).map((project) => [project.id, project]),
   );
-  return cronStore
-    .list()
-    .filter((cronJob) => visibleProjectIds.has(cronJob.projectId));
+  return cronStore.list().filter((cronJob) => {
+    const project = visibleProjectsById.get(cronJob.projectId);
+    return project
+      ? cronJobWorktreeIsVisible(cronJob, project, context)
+      : false;
+  });
 }
 
 /**
@@ -3120,7 +3148,14 @@ function cronJobById(
 
   const cronJob = cronStore.getById(cronJobId, options);
   if (cronJob) {
-    projectByIdForPath(cronJob.projectId, context);
+    const project = projectByIdForPath(cronJob.projectId, context);
+    if (
+      context &&
+      !localOperatorCanManageApp(context) &&
+      !cronJobWorktreeIsVisible(cronJob, project, context)
+    ) {
+      return null;
+    }
   }
   return cronJob;
 }
