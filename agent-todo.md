@@ -41,7 +41,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 6. Plugin System Public Readiness
 
-- [ ] Document the plugin manifest format with required fields, optional fields, examples, validation rules, and common errors.
 - [ ] Document plugin permissions, including each permission name, capability granted, risk level, and user-facing explanation.
 - [ ] Document plugin settings and secret fields, including how secret values are stored, displayed, redacted, reset, and reported in diagnostics.
 - [ ] Document notification provider behavior for plugins, including registration, user configuration, permissions, and failure states.

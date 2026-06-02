@@ -672,6 +672,23 @@ Before sharing a plugin folder or asking the local operator to approve it:
 
 For repository-maintained examples, `bun test src/bun/plugin/examples.test.ts` validates manifests and startup registrations. For broader Metidos changes, run the repository validation flow required by `.pi/skills/commit/SKILL.md`.
 
+## Common manifest validation errors
+
+Use this section when Settings → Plugins reports a manifest problem or a copied example fails to activate:
+
+| Error pattern | Likely cause | Fix |
+| --- | --- | --- |
+| Schema rejects an unknown property | `metidos-plugin.json` includes a field that is not part of Plugin System v1, or a field is nested under the wrong object. | Remove the field or move it to the schema-defined location. The manifest schema has `additionalProperties: false` at each level. |
+| Folder identity mismatch | The install directory under `APP_DATA/plugins/` does not match the manifest `id`. | Rename the folder or the `id` so both use the same stable lowercase plugin id. |
+| Reserved or invalid identity | The manifest uses `metidos`, uppercase characters, hyphens, a leading digit, or an id outside the length/pattern limits. | Use a unique id matching `^[a-z][a-z0-9_]{1,63}$`, and keep the human-readable text in `name`. |
+| Missing or unsupported entry point | `main` is absent, does not start with `./`, escapes the plugin root, points into `.data`/`.logs`, or uses an unsupported runtime form. | Point `main` at a source file inside the plugin folder, typically `./index.ts` or `./main.py`. |
+| Permission dependency failure | A capability is declared without its paired permission, such as `sqlite` without `storage:write`, `terminal:create` without `unsafe`, or `network:fetch` without an allowlist. | Add the required paired permission or remove the capability. Prefer removing broad permissions until code actually needs them. |
+| Registration mismatch at startup | Code registers a tool, injection, provider, notification provider, cron, ingress source, or GC callback that the manifest does not declare, or vice versa. | Update the manifest and code together so every registered capability has one manifest declaration and required permission. |
+| Unsafe broad network access rejected | The manifest includes all-domain patterns such as `https://**/**` or `wss://**/**` without `unsafe`, or expects localhost/private-network access in safe mode. | Narrow the allowlist, or declare `unsafe` and require the operator-controlled private-network mode only when the plugin purpose requires it. |
+| Setting/env default rejected | A secret env var has a default, a URL/date/enum/list default does not match its declared kind, or code uses undeclared settings/env keys. | Remove secret defaults, correct typed defaults, and declare every key before reading it. |
+| Review hash changes after approval | Source, manifest, `AGENTS.md`, seed data, or support files changed after local-operator approval. | Use Review Plugin Changes, inspect the diff/hash, and re-approve. Runtime `.data`, `.data-bak-*`, and `.logs` do not affect the review hash. |
+| Root `node_modules/` blocks activation | A copied plugin includes package-manager output. | Remove root `node_modules/`; Plugin System v1 does not install or load runtime dependencies from plugin folders. |
+
 ## Non-goals to keep out of v1 plugins
 
 Plugin System v1 intentionally does not support:
