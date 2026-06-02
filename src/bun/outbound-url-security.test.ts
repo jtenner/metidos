@@ -144,6 +144,15 @@ describe("outbound URL security", () => {
     expect(isBlockedOutboundAddress("example.com")).toBeTrue();
   });
 
+  test("fails closed for malformed IPv4-mapped IPv6 forms", () => {
+    expect(isBlockedOutboundAddress("::ffff:127.0.0.1")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:127.0.0.999")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:127.0.0.1junk")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:127.0.0")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:127.0.0.-1")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:0127.0.0.1")).toBeTrue();
+  });
+
   test("blocks metadata addresses across IPv4 and IPv6 forms", () => {
     expect(
       isBlockedPrivateNetworkMetadataAddress("169.254.169.254"),
