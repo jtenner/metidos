@@ -149,7 +149,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Plugin administration UI races
 
-- [ ] Serialize ingress route draft access/model saves in `src/mainview/app/use-plugin-administration-controller.ts`; add in-flight guards and prevent stale state commits after navigation/close.
 - [ ] Scope plugin admin/lifecycle disabled states in `src/mainview/app/plugin-administration-panel.tsx` and `src/mainview/app/plugin-lifecycle-action-state.ts` to the matching action key instead of globally disabling unrelated buttons.
 
 ### Async lifecycle and stale-write races

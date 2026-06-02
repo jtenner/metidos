@@ -290,6 +290,21 @@ export function usePluginAdministrationController({
   const pluginSettingsLoadGenerationRef = useRef(0);
   const pluginSettingsEditGenerationRef = useRef(0);
   const pluginSettingsSaveInFlightCountRef = useRef(0);
+  const controllerGenerationRef = useRef(0);
+  const ingressRouteSaveSequencesRef = useRef<Record<string, number>>({});
+  const ingressRouteSaveQueuesRef = useRef<Record<string, Promise<void>>>({});
+
+  useEffect(() => {
+    return () => {
+      controllerGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    void active;
+    void open;
+    controllerGenerationRef.current += 1;
+  }, [active, open]);
 
   const loadPluginSidecarDiagnostics = useCallback(
     async (options?: { priority?: RpcRequestPriority }): Promise<void> => {
@@ -911,17 +926,28 @@ export function usePluginAdministrationController({
         return;
       }
       const actionKey = `ingress-route:${pluginId}:${sourceId}`;
+      const generation = controllerGenerationRef.current;
+      const sequence = (ingressRouteSaveSequencesRef.current[key] ?? 0) + 1;
+      ingressRouteSaveSequencesRef.current[key] = sequence;
+
+      const isCurrentSave = (): boolean =>
+        controllerGenerationRef.current === generation &&
+        ingressRouteSaveSequencesRef.current[key] === sequence;
+
       setPluginLifecycleActionKey(actionKey);
       setPluginLifecycleActionMessage("");
       setPluginLifecycleActionError("");
       setPendingIngressRouteFolderCreate(null);
-      void procedures
-        .openProject(
-          { createIfMissing, projectPath },
-          { priority: "foreground" },
-        )
-        .then((result) =>
-          procedures.upsertPluginIngressRouteConfig(
+
+      const previousSave = ingressRouteSaveQueuesRef.current[key];
+      const saveQueue = (previousSave ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(async () => {
+          const result = await procedures.openProject(
+            { createIfMissing, projectPath },
+            { priority: "foreground" },
+          );
+          const route = await procedures.upsertPluginIngressRouteConfig(
             {
               enabled: true,
               model: draft?.model ?? defaultCodexModel,
@@ -936,9 +962,10 @@ export function usePluginAdministrationController({
               worktreePath: result.project.path,
             },
             { priority: "foreground" },
-          ),
-        )
-        .then((route) => {
+          );
+          if (!isCurrentSave()) {
+            return;
+          }
           setPluginIngressRouteConfigs((currentRoutes) => [
             ...currentRoutes.filter(
               (currentRoute) =>
@@ -961,6 +988,9 @@ export function usePluginAdministrationController({
           );
         })
         .catch((error) => {
+          if (!isCurrentSave()) {
+            return;
+          }
           if (!createIfMissing && shouldPromptToCreateProjectFolder(error)) {
             setPendingIngressRouteFolderCreate({
               draft: {
@@ -977,10 +1007,17 @@ export function usePluginAdministrationController({
           setPluginLifecycleActionError(toDisplayError(error));
         })
         .finally(() => {
+          if (ingressRouteSaveQueuesRef.current[key] === saveQueue) {
+            delete ingressRouteSaveQueuesRef.current[key];
+          }
+          if (!isCurrentSave()) {
+            return;
+          }
           setPluginLifecycleActionKey((currentActionKey) =>
             clearPluginActionKey(currentActionKey, actionKey),
           );
         });
+      ingressRouteSaveQueuesRef.current[key] = saveQueue;
     },
     [
       availablePluginAccessGroups,
