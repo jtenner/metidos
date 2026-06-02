@@ -179,7 +179,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Remove card-like/decorative styling from the inline folder suggestion list in `src/mainview/app/projects-panel.tsx`, including sidebar `shadow-overlay`/`backdrop-blur-xl` drift.
 - [ ] Remove card-like bordered `bg-surface-1` treatment from the add-project form in `src/mainview/app/projects-panel.tsx` or align it with approved non-card primitives.
 - [ ] Replace decorative icon tiles in `src/mainview/app/settings-panel.tsx` with approved icon/section styling.
-- [ ] Replace decorative icon tiles in `src/mainview/app/cronjob-workspace.tsx` with approved icon/section styling.
 - [ ] Replace boxed loading/empty/error panels in `src/mainview/app/cronjob-workspace.tsx` with approved empty/error/loading primitives or inline treatments.
 - [ ] Replace off-grid spacing/tracking in `src/mainview/app/mainview-cron-workspace-controller.tsx` with approved spacing and type tokens.
 

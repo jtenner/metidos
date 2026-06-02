@@ -68,7 +68,7 @@ function CronjobListRow({
         className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2"
         onClick={onEdit}
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-surface-3 text-accent">
+        <span className="shrink-0 text-text-muted" aria-hidden="true">
           {materialSymbol("schedule", "text-[15px]")}
         </span>
         <span className="min-w-0 flex-1">
