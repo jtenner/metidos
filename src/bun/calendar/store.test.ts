@@ -24,6 +24,7 @@ import {
 import {
   listCurrentCalendarNotifications,
   scheduleDueCalendarReminders,
+  setCalendarNotificationListener,
 } from "./notifications";
 import {
   createCalendar,
@@ -52,6 +53,7 @@ function setupDb() {
 }
 
 afterEach(() => {
+  setCalendarNotificationListener(null);
   closeAppDatabase();
   resetResolvedAppDataDirectory();
   if (originalAppDataDir) process.env.METIDOS_APP_DATA_DIR = originalAppDataDir;
@@ -644,6 +646,55 @@ describe("calendar store", () => {
         )
         .get()?.count,
     ).toBe(0);
+  });
+
+  test("delivers due browser reminders through the notification listener", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    updateCalendarNotificationSettings(db, owner.id, {
+      inAppEnabled: false,
+      browserEnabled: true,
+    });
+    const calendar = createCalendar(db, owner.id, { title: "Browser alerts" });
+    updateCalendarPreference(db, owner.id, calendar.id, {
+      notificationChannels: ["browser"],
+      notificationsEnabled: true,
+    });
+    createCalendarEvent(db, owner.id, {
+      calendarId: calendar.id,
+      title: "Browser reminder",
+      startAt: "2026-06-01T10:10:00.000Z",
+      endAt: "2026-06-01T10:30:00.000Z",
+      timezone: "UTC",
+      reminders: [{ minutesBefore: 10 }],
+    });
+    const listenerCalls: Array<{
+      userId: number;
+      channels: string[];
+      statuses: string[];
+    }> = [];
+    setCalendarNotificationListener((userId, deliveries) => {
+      listenerCalls.push({
+        userId,
+        channels: deliveries.map((delivery) => delivery.channel),
+        statuses: deliveries.map((delivery) => delivery.status),
+      });
+    });
+
+    const delivered = scheduleDueCalendarReminders(
+      db,
+      new Date("2026-06-01T10:00:00.000Z"),
+    );
+
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toMatchObject({
+      channel: "browser",
+      status: "delivered",
+      title: "Browser reminder",
+    });
+    expect(listenerCalls).toEqual([
+      { userId: 1, channels: ["browser"], statuses: ["delivered"] },
+    ]);
   });
 
   test("listing current notifications does not schedule reminders", () => {
