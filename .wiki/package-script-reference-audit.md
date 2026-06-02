@@ -148,8 +148,8 @@ Follow-up work created from this smoke run:
 
 - Decide whether `a11y:check` should understand shared form-control primitives with prop-spread naming, or whether the primitives should enforce/require names at their API boundary.
 - Fix stale strict typings in the cron and terminal RPC test fixtures so a clean checkout passes `bun run typecheck`.
-- Make the clean-checkout `test` path build or otherwise provide the xmloxide WASM artifact before XML-dependent tests run.
-- Re-run the full test suite after the xmloxide prerequisite is satisfied and investigate the remaining sidecar crash-loop degraded-status failure.
+- The root `test` script now builds the xmloxide WASM prerequisite before running the suite, so clean checkouts no longer need a separate manual `bun run build:xmloxide-wasm` step for XML-dependent tests.
+- A current-checkout rerun of `bun run test` after that script change passed: 2475 tests across 293 files, 0 failures. This did not reproduce the earlier sidecar crash-loop degraded-status failure.
 
 ## Remaining follow-up
 
