@@ -36,10 +36,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify all README commands work from a clean clone.
 - [ ] Verify README terminology matches `UBIQUITOUS_LANGUAGE.md` after public terminology is finalized.
 
-## 6. Plugin System Public Readiness
-
-- [ ] Add a plugin tutorial that walks from empty folder to installed and approved plugin.
-
 ## 7. Install and First-Run Experience
 
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.

@@ -4,6 +4,7 @@ Plugin System v1 is Metidos' local, review-first extension system. It lets a Loc
 
 This page is the overview. Detailed authoring rules live in:
 
+- [Plugin tutorial](./plugin-tutorial.md) for building, installing, approving, and enabling a minimal local tool plugin.
 - [Plugin authoring guide](./metidos-plugin-authoring-guide.md)
 - [Plugin AGENTS.md guide](./metidos-plugin-agents-guide.md)
 - [Plugin decisions](./metidos-plugin-decisions.md)

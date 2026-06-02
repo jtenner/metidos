@@ -25,6 +25,7 @@ This directory contains the public operator and contributor documentation for Me
 - [Security model](./security-model.md) — auth, secrets, plugins, filesystem, network, reverse proxy, backups, and safe issue reporting.
 - [Security threat model](./security/threat-model.md) — assets, trust boundaries, abuse cases, and mitigations.
 - [Plugin system](./plugin-system.md) — Plugin System v1 overview and links to authoring details.
+- [Plugin tutorial](./plugin-tutorial.md) — build, install, approve, and enable a minimal local tool plugin.
 
 ## Contributors and release operators
 
@@ -45,6 +46,7 @@ This directory contains the public operator and contributor documentation for Me
 
 ## Existing specialist references
 
+- [Plugin tutorial](./plugin-tutorial.md)
 - [Plugin authoring guide](./metidos-plugin-authoring-guide.md)
 - [Plugin AGENTS.md guide](./metidos-plugin-agents-guide.md)
 - [Plugin decisions](./metidos-plugin-decisions.md)
