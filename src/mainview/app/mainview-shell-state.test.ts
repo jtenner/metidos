@@ -129,19 +129,17 @@ describe("mainview shell state", () => {
       selectedThreadIdRef: { current: 7 as number | null },
       selectedWorktreePathRef: { current: "/repo" as string | null },
     };
+    let currentPrimaryView: MainviewShellState["primaryView"] = "diff";
     const committed: string[] = [];
 
-    commitMainviewShellNavigationUpdate(
-      {
-        primaryView: "chat",
-        selectedProjectId: (current) => (current ?? 0) + 1,
-        selectedThreadId: null,
-        selectedWorktreePath: "/repo/feature",
-      },
-      {
+    const commitNavigationUpdate = (
+      update: Parameters<typeof commitMainviewShellNavigationUpdate>[0],
+    ): void => {
+      commitMainviewShellNavigationUpdate(update, {
         refs,
         setters: {
           setPrimaryView: (value) => {
+            currentPrimaryView = value;
             committed.push(`view:${String(value)}`);
           },
           setSelectedProjectId: (value) => {
@@ -154,8 +152,15 @@ describe("mainview shell state", () => {
             committed.push(`worktree:${String(value)}`);
           },
         },
-      },
-    );
+      });
+    };
+
+    commitNavigationUpdate({
+      primaryView: "chat",
+      selectedProjectId: (current) => (current ?? 0) + 1,
+      selectedThreadId: null,
+      selectedWorktreePath: "/repo/feature",
+    });
 
     expect(refs.selectedProjectIdRef.current).toBe(2);
     expect(refs.selectedThreadIdRef.current).toBeNull();
@@ -164,6 +169,28 @@ describe("mainview shell state", () => {
       "project:2",
       "worktree:/repo/feature",
       "thread:null",
+      "view:chat",
+    ]);
+
+    committed.length = 0;
+
+    for (const primaryView of [
+      "diff",
+      "cronjobs",
+      "calendar",
+      "chat",
+    ] satisfies MainviewShellState["primaryView"][]) {
+      commitNavigationUpdate({ primaryView });
+      expect(currentPrimaryView).toBe(primaryView);
+      expect(refs.selectedProjectIdRef.current).toBe(2);
+      expect(refs.selectedThreadIdRef.current).toBeNull();
+      expect(refs.selectedWorktreePathRef.current).toBe("/repo/feature");
+    }
+
+    expect(committed).toEqual([
+      "view:diff",
+      "view:cronjobs",
+      "view:calendar",
       "view:chat",
     ]);
   });
