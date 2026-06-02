@@ -823,6 +823,124 @@ describe("sidecar cron runner", () => {
     }
   });
 
+  it("suppresses manual overlap while a scheduled cron run is in progress and settles job status", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-scheduled-manual-repo-");
+    const project = upsertProject(database, {
+      name: "Cron Scheduled Manual Repo",
+      projectPath: repoPath,
+    });
+    const schedule = "17 * * * *";
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Suppress manual overlap during scheduled runs",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "scheduled/manual overlap",
+      reasoningEffort: "medium",
+      schedule,
+      title: "Scheduled Manual Overlap Guard",
+      worktreePath: repoPath,
+    });
+    const sendStarted = createDeferredPromise<void>();
+    const releaseSend = createDeferredPromise<void>();
+    const threadContext = new Map<
+      number,
+      {
+        projectId: number;
+        worktreePath: string;
+      }
+    >();
+
+    const host: CronThreadExecutionHost = {
+      async createThread(params) {
+        const thread = createThread(database, {
+          agentsAccess: params.permissions?.includes("metidos:agents") ?? false,
+          cronJobId: params.cronJobId,
+          githubAccess: params.permissions?.includes("metidos:github") ?? false,
+          metidosAccess:
+            params.permissions?.some((permission) =>
+              ["metidos:threads", "metidos:crons"].includes(permission),
+            ) ?? true,
+          model: params.model ?? "gpt-5.4",
+          piLeafEntryId: null,
+          piSessionFile: null,
+          piSessionId: null,
+          projectId: params.projectId,
+          reasoningEffort: params.reasoningEffort ?? "medium",
+          title: "Scheduled Manual Overlap Thread",
+          unsafeMode: params.permissions?.includes("metidos:unsafe") ?? false,
+          worktreePath: params.worktreePath,
+        });
+        threadContext.set(thread.id, {
+          projectId: params.projectId,
+          worktreePath: params.worktreePath,
+        });
+        return buildFakeThreadDetail({
+          projectId: params.projectId,
+          startedAt: null,
+          threadId: thread.id,
+          worktreePath: params.worktreePath,
+        });
+      },
+      async sendThreadMessage(params) {
+        const context = threadContext.get(params.threadId);
+        if (!context) {
+          throw new Error(
+            `Missing fake thread context for ${params.threadId}.`,
+          );
+        }
+        sendStarted.resolve(undefined);
+        await releaseSend.promise;
+        return buildFakeThreadDetail({
+          projectId: context.projectId,
+          startedAt: "2026-04-15T14:30:00.000Z",
+          threadId: params.threadId,
+          worktreePath: context.worktreePath,
+        });
+      },
+    };
+
+    const scheduledRunDate = Date.now();
+    const scheduledRunPromise = runner.runDueCronJobs(
+      schedule,
+      scheduledRunDate,
+      host,
+    );
+    await sendStarted.promise;
+
+    const manualThreadId = await runner.runCronJobById(
+      cronJob.id,
+      scheduledRunDate + 1,
+      host,
+    );
+
+    expect(manualThreadId).toBeNull();
+    expect(listCronJobRuns(database, cronJob.id)).toHaveLength(1);
+    expect(getCronJobById(database, cronJob.id)?.lastRunStatus).toBe(
+      "InProgress",
+    );
+
+    releaseSend.resolve(undefined);
+    await scheduledRunPromise;
+    await waitForCondition(
+      "scheduled cron monitor to settle after suppressed manual run",
+      () => getCronJobById(database, cronJob.id)?.lastRunStatus === "Completed",
+    );
+
+    const runs = listCronJobRuns(database, cronJob.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.runDate).toBe(scheduledRunDate);
+    expect(runs[0]?.runStatus).toBe("Completed");
+    expect(getCronJobById(database, cronJob.id)?.lastRunDate).toBe(
+      scheduledRunDate,
+    );
+  });
+
   it("runCronJobById lets a manual restart clear stale in-progress cron state", async () => {
     const { cronRunner: runner } = await loadCronModules();
     const database = initAppDatabase();
