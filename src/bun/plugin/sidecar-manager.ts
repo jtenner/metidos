@@ -736,6 +736,21 @@ function createDiagnosticsRecord(
   };
 }
 
+function redactSensitivePluginDiagnosticText(text: string): string {
+  return text
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\-/]+=*/gi, "$1 [redacted]")
+    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[redacted]@")
+    .replace(
+      /\b(callback(?:[_-]|\s+)?token|response[_-]?handle|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password)\b\s*[:=]\s*([^\s,;]+)/gi,
+      "$1=[redacted]",
+    )
+    .replace(/\b[A-Z]:\\[^\s<>'"]+/g, "[redacted host path]")
+    .replace(
+      /(^|\s)\/(?:Users|home|tmp|var|private|Volumes)\/[^\s<>'"]+/g,
+      "$1[redacted host path]",
+    );
+}
+
 export class PluginSidecarProcessManager {
   private readonly appDataOptions: AppDataPathOptions;
   private readonly buildInventory: (
@@ -2455,13 +2470,14 @@ export class PluginSidecarProcessManager {
     const observedAt = this.now().toISOString();
     const existing = this.diagnosticsByDirectoryName.get(plugin.directoryName);
     const record = existing ?? createDiagnosticsRecord(plugin);
+    const redactedLine = redactSensitivePluginDiagnosticText(line);
     record.pluginId = plugin.pluginId;
     record.pluginSnapshot = plugin;
     record.telemetryEnabled = plugin.manifest.telemetry;
-    if (record.lines.at(-1)?.line === line) {
+    if (record.lines.at(-1)?.line === redactedLine) {
       return;
     }
-    record.lines.push({ line, observedAt });
+    record.lines.push({ line: redactedLine, observedAt });
     retainNewestPluginSidecarDiagnostics(
       record.lines,
       this.diagnosticsRetentionLines,
@@ -2472,7 +2488,7 @@ export class PluginSidecarProcessManager {
       directoryName: plugin.directoryName,
       message: "Plugin sidecar startup diagnostic",
       pluginId: plugin.pluginId,
-      stderr: line,
+      stderr: redactedLine,
     });
   }
 
@@ -2512,10 +2528,11 @@ export class PluginSidecarProcessManager {
     const observedAt = this.now().toISOString();
     const existing = this.diagnosticsByDirectoryName.get(session.directoryName);
     const record = existing ?? createDiagnosticsRecord(session.plugin);
+    const redactedLine = redactSensitivePluginDiagnosticText(line);
     record.pluginId = session.plugin.pluginId;
     record.pluginSnapshot = session.plugin;
     record.telemetryEnabled = session.plugin.manifest.telemetry;
-    record.lines.push({ line, observedAt });
+    record.lines.push({ line: redactedLine, observedAt });
     retainNewestPluginSidecarDiagnostics(
       record.lines,
       this.diagnosticsRetentionLines,
@@ -2526,7 +2543,7 @@ export class PluginSidecarProcessManager {
       directoryName: session.directoryName,
       message: "Plugin sidecar stderr diagnostic",
       pluginId: session.plugin.pluginId,
-      stderr: line,
+      stderr: redactedLine,
     });
 
     if (
@@ -2535,7 +2552,7 @@ export class PluginSidecarProcessManager {
     ) {
       this.reportSidecarTelemetry({
         directoryName: session.directoryName,
-        lineLength: line.length,
+        lineLength: redactedLine.length,
         observedAt,
         pluginId: session.plugin.pluginId,
         retainedLineCount: record.lines.length,
@@ -2563,7 +2580,7 @@ export class PluginSidecarProcessManager {
     record.telemetryEnabled = session.plugin.manifest.telemetry;
     record.failures.push({
       code: input.code,
-      message: input.message,
+      message: redactSensitivePluginDiagnosticText(input.message),
       observedAt,
       operation: input.operation,
     });

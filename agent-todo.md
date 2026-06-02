@@ -12,11 +12,6 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Resolve `src/mainview/pixel-crown.png` provenance blocker. Context: audit inspection found no textual PNG metadata and Git history only traces to the 2026-05-27 initial open-source snapshot; ask the maintainer to confirm creator/source, creation date if known, and license/assignment/redistribution approval, or replace/remove the asset before publishing.
   - [ ] Re-run the tracked asset inventory after the remaining artwork decisions are documented.
 
-## 3. Security and Secret Handling
-
-- [ ] Verify security-sensitive error messages are actionable without leaking secrets or sensitive local paths. Context: `docs/security-sensitive-error-message-audit-2026-06-02.md` records a bounded 2026-06-02 high-risk grep review and fixed one raw Project path leak in `src/bun/project-store.ts`. Remaining 3-minute slices:
-  - [ ] Inspect plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.
-
 ## 4. CI, Validation, and Release Automation
 
 - [ ] Smoke-run documented package scripts from a clean setup and record exact outcomes. Context: `.wiki/package-script-reference-audit.md` verifies referenced script names exist as of 2026-06-01 and records a 2026-06-02 current-checkout preflight smoke run where `tailwind:build`, `website:build`, `sync:core-plugins`, `toml:check`, `style:check`, `a11y:check`, `typecheck`, and `test` pass after two strict test typing fixes. Remaining 3-minute slices:

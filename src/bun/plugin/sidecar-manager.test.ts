@@ -4997,6 +4997,101 @@ add_agent_tool({
     await manager.stopAll();
   });
 
+  it("redacts sensitive sidecar diagnostics before retaining them", async () => {
+    const appDataDir = createTempDirectory(
+      "metidos-plugin-sidecar-redacted-diagnostics-",
+    );
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
+    mkdirSync(pluginsDirectoryPath, { recursive: true });
+    writePlugin(pluginsDirectoryPath, "alpha_plugin");
+    await approvePlugin(appDataDir, "alpha_plugin");
+
+    let process: ControllableFakeSidecarProcess | null = null;
+    const warnings: unknown[] = [];
+    const manager = new PluginSidecarProcessManager({
+      appDataDir,
+      logger: {
+        error: () => {},
+        info: () => {},
+        warning: (entry) => warnings.push(entry),
+      },
+      now: () => new Date("2026-04-28T13:05:00.000Z"),
+      spawnSidecar({ plugin }) {
+        process = createControllableFakeProcess([
+          sidecarReadyFrame(plugin.pluginId ?? ""),
+        ]);
+        return process;
+      },
+      startupTimeoutMs: 250,
+    });
+
+    await manager.startApprovedPlugins();
+    const sidecarProcess = requireControllableProcess(process);
+    const request = manager.invokeSidecarRequest({
+      directoryName: "alpha_plugin",
+      operation: "tool.call",
+      params: { value: 42 },
+      timeoutMs: 1_000,
+    });
+    const requestFrame = await waitFor(() => {
+      const frame = sidecarProcess.writes.find((value) =>
+        value.includes('"type":"host.request"'),
+      );
+      return frame ?? null;
+    });
+    const requestEnvelope = JSON.parse(requestFrame.trim());
+    sidecarProcess.writeStderrLine(
+      "failed at /home/alice/private/repo with api_key=sk-live and Authorization: Bearer callback-secret",
+    );
+    const encoded = encodePluginSidecarRpcEnvelope({
+      id: "tool-error-1",
+      payload: {
+        code: "plugin_tool_failed",
+        message:
+          "Callback token=tok_live failed in C:\\Users\\Alice\\repo with password=hunter2",
+        requestId: requestEnvelope.id,
+      },
+      pluginId: "alpha_plugin",
+      type: "sidecar.error",
+    });
+    if (typeof encoded !== "string") {
+      throw new Error(encoded.error.message);
+    }
+    sidecarProcess.writeStdoutFrame(encoded);
+
+    await expect(request).rejects.toMatchObject({ code: "plugin_tool_failed" });
+    const diagnostics = await waitFor(() => {
+      const [record] = manager.getDiagnostics({
+        directoryName: "alpha_plugin",
+      });
+      return record?.stderr.lines.length && record.failures.items.length
+        ? record
+        : null;
+    });
+
+    const retainedStderr = diagnostics.stderr.lines.at(-1)?.line ?? "";
+    const retainedFailure = diagnostics.failures.items.at(-1)?.message ?? "";
+    expect(retainedStderr).toContain("[redacted host path]");
+    expect(retainedStderr).toContain("api_key=[redacted]");
+    expect(retainedStderr).toContain("Authorization=[redacted]");
+    expect(retainedStderr).not.toContain("/home/alice/private/repo");
+    expect(retainedStderr).not.toContain("sk-live");
+    expect(retainedStderr).not.toContain("callback-secret");
+    expect(retainedFailure).toContain("Callback token=[redacted]");
+    expect(retainedFailure).toContain("[redacted host path]");
+    expect(retainedFailure).toContain("password=[redacted]");
+    expect(retainedFailure).not.toContain("tok_live");
+    expect(retainedFailure).not.toContain("hunter2");
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ stderr: retainedStderr }),
+    );
+
+    await manager.stopAll();
+  });
+
   it("invokes the registered plugin GC callback with only the ~/ virtual root", async () => {
     const appDataDir = createTempDirectory("metidos-plugin-sidecar-gc-rpc-");
     const pluginsDirectoryPath = getPluginsDirectoryPath({
