@@ -148,6 +148,7 @@ import { readPluginSettingsForRuntime } from "./settings";
 import {
   createDefaultPluginSidecarProcess,
   createWorkerPluginSidecarProcess,
+  DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
   DEFAULT_PLUGIN_SIDECAR_MEMORY_LIMIT_BYTES,
   readTextLines,
   resolvePluginSidecarRuntimeKind,
@@ -366,8 +367,21 @@ export type PluginSidecarStderrTelemetryEvent = {
   type: "stderr_line";
 };
 
+export type PluginSidecarMemoryBudgetTelemetryEvent = {
+  activeSessionCount: number;
+  aggregateQuickJsMemoryLimitBytes: number;
+  aggregateSidecarMemoryLimitBytes: number;
+  directoryName: string;
+  observedAt: string;
+  pluginId: string;
+  quickJsMemoryLimitBytes: number;
+  sidecarMemoryLimitBytes: number;
+  type: "memory_budget";
+};
+
 export type PluginSidecarTelemetryEvent =
   | PluginSidecarStderrTelemetryEvent
+  | PluginSidecarMemoryBudgetTelemetryEvent
   | PluginIngressPollFailureTelemetryEvent;
 
 type PluginSidecarDiagnosticsRecord = {
@@ -2183,6 +2197,7 @@ export class PluginSidecarProcessManager {
       writeQueueDepth: 0,
     };
     this.sessions.set(plugin.directoryName, session);
+    this.reportSidecarMemoryBudget(session);
 
     const startupResult = new Promise<void>((resolve, reject) => {
       const resolveStartup = () => {
@@ -2458,6 +2473,35 @@ export class PluginSidecarProcessManager {
       message: "Plugin sidecar startup diagnostic",
       pluginId: plugin.pluginId,
       stderr: line,
+    });
+  }
+
+  private reportSidecarMemoryBudget(session: PluginSidecarSession) {
+    if (
+      session.plugin.manifest.telemetry === false ||
+      !session.plugin.pluginId
+    ) {
+      return;
+    }
+    const activeSessionCount = this.sessions.size;
+    // Plugin runtimes are intentionally isolated per sidecar. There is no
+    // shared heap, so the host records the aggregate configured ceilings at
+    // activation time rather than trying to infer RSS from the OS-specific
+    // process model. The per-plugin QuickJS limit remains the hard guest-JS
+    // heap guard; the sidecar limit is a virtual-memory ceiling for the Bun
+    // host process and can overstate committed memory.
+    this.reportSidecarTelemetry({
+      activeSessionCount,
+      aggregateQuickJsMemoryLimitBytes:
+        activeSessionCount * DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+      aggregateSidecarMemoryLimitBytes:
+        activeSessionCount * this.sidecarMemoryLimitBytes,
+      directoryName: session.directoryName,
+      observedAt: this.now().toISOString(),
+      pluginId: session.plugin.pluginId,
+      quickJsMemoryLimitBytes: DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+      sidecarMemoryLimitBytes: this.sidecarMemoryLimitBytes,
+      type: "memory_budget",
     });
   }
 

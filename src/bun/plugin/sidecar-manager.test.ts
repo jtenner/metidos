@@ -37,6 +37,7 @@ import {
 } from "./lifecycle";
 import { updatePluginSettings } from "./settings";
 import {
+  DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
   DEFAULT_PLUGIN_SIDECAR_STDERR_RETAINED_LINES,
   PLUGIN_SIDECAR_CRASH_LOOP_THRESHOLD,
   PLUGIN_SIDECAR_CRASH_LOOP_WINDOW_MS,
@@ -605,6 +606,68 @@ describe("plugin sidecar process manager", () => {
         }),
       }),
     ]);
+  });
+
+  it("reports aggregate sidecar memory budgets when plugins start", async () => {
+    const appDataDir = createTempDirectory(
+      "metidos-plugin-sidecar-memory-budget-",
+    );
+    const pluginsDirectoryPath = getPluginsDirectoryPath({
+      appDataDir,
+      stepUpVerified: true,
+    });
+    mkdirSync(pluginsDirectoryPath, { recursive: true });
+    writePlugin(pluginsDirectoryPath, "alpha_plugin");
+    writePlugin(pluginsDirectoryPath, "beta_plugin");
+    await approvePlugin(appDataDir, "alpha_plugin");
+    await approvePlugin(appDataDir, "beta_plugin");
+
+    const telemetryEvents: PluginSidecarTelemetryEvent[] = [];
+    const sidecarMemoryLimitBytes = 256 * 1024 * 1024;
+    const manager = new PluginSidecarProcessManager({
+      appDataDir,
+      logger: silentLogger(),
+      now: () => new Date("2026-04-28T12:30:00.000Z"),
+      reportSidecarTelemetry: (event) => telemetryEvents.push(event),
+      sidecarMemoryLimitBytes,
+      spawnSidecar({ plugin }) {
+        return createFakeProcess([sidecarReadyFrame(plugin.pluginId ?? "")]);
+      },
+      startupTimeoutMs: 250,
+    });
+
+    const start = await manager.startApprovedPlugins();
+    expect(start.failed).toEqual([]);
+    expect(
+      telemetryEvents.filter((event) => event.type === "memory_budget"),
+    ).toEqual([
+      {
+        activeSessionCount: 1,
+        aggregateQuickJsMemoryLimitBytes:
+          DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+        aggregateSidecarMemoryLimitBytes: sidecarMemoryLimitBytes,
+        directoryName: "alpha_plugin",
+        observedAt: "2026-04-28T12:30:00.000Z",
+        pluginId: "alpha_plugin",
+        quickJsMemoryLimitBytes: DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+        sidecarMemoryLimitBytes,
+        type: "memory_budget",
+      },
+      {
+        activeSessionCount: 2,
+        aggregateQuickJsMemoryLimitBytes:
+          2 * DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+        aggregateSidecarMemoryLimitBytes: 2 * sidecarMemoryLimitBytes,
+        directoryName: "beta_plugin",
+        observedAt: "2026-04-28T12:30:00.000Z",
+        pluginId: "beta_plugin",
+        quickJsMemoryLimitBytes: DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
+        sidecarMemoryLimitBytes,
+        type: "memory_budget",
+      },
+    ]);
+
+    await manager.stopAll();
   });
 
   it("starts approved plugins with the default worker-thread runtime", async () => {
@@ -4633,8 +4696,11 @@ add_agent_tool({
         stderr: "line-205",
       }),
     );
-    expect(telemetryEvents).toHaveLength(205);
-    expect(telemetryEvents.at(-1)).toEqual({
+    const stderrTelemetryEvents = telemetryEvents.filter(
+      (event) => event.type === "stderr_line",
+    );
+    expect(stderrTelemetryEvents).toHaveLength(205);
+    expect(stderrTelemetryEvents.at(-1)).toEqual({
       directoryName: "alpha_plugin",
       lineLength: "line-205".length,
       observedAt: "2026-04-28T12:30:00.000Z",

@@ -199,10 +199,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Authorization and capability follow-up
 
 
-### Plugin QuickJS sandbox follow-up
-
-- [ ] D10: Review per-plugin QuickJS memory limits in `src/bun/plugin/quickjs-runtime.ts` and sidecar manager. If multiple plugins can exhaust host memory, add a global cap/telemetry; otherwise document total-memory threat model.
-
 ### HTTP and RPC transport follow-up
 
 - [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.
