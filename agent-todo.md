@@ -6,7 +6,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 1. Repository Hygiene and Public Readiness
 
-- [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
+- [ ] Finish checked-in asset ownership review. Context: `docs/public-asset-provenance-audit-2026-06-02.md` inventories tracked PNG/font assets and confirms font license coverage; remaining work is to document/confirm provenance and redistribution approval for `bird.png`, `website/bird.png`, `docs/uploadthing-test.png`, `src/mainview/crown.png`, `src/mainview/logo.png`, and `src/mainview/pixel-crown.png`, then update `website/README.md` if the bird asset stays tracked.
 - [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
 
 ## 3. Security and Secret Handling
