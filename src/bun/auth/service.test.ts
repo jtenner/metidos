@@ -1240,6 +1240,40 @@ describe("auth service", () => {
     );
   });
 
+  it("keeps legacy auth cookie fallback from overriding host-prefixed cookies", () => {
+    expect(
+      readSessionCookie(
+        "metidos_session=legacy; __Host-metidos_session=secure-session",
+      ),
+    ).toBe("secure-session");
+    expect(
+      readWebSocketTicketCookie(
+        "metidos_ws_ticket=legacy; __Host-metidos_ws_ticket=secure-ticket",
+      ),
+    ).toBe("secure-ticket");
+    expect(
+      readAuthCsrfCookie(
+        "metidos_csrf=legacy; __Host-metidos_csrf=secure-csrf",
+      ),
+    ).toBe("secure-csrf");
+
+    expect(
+      readSessionCookie(
+        "metidos_session=legacy; __Host-metidos_session=one; __Host-metidos_session=two",
+      ),
+    ).toBeNull();
+    expect(
+      readWebSocketTicketCookie(
+        "metidos_ws_ticket=legacy; __Host-metidos_ws_ticket=one; __Host-metidos_ws_ticket=two",
+      ),
+    ).toBeNull();
+    expect(
+      readAuthCsrfCookie(
+        "metidos_csrf=legacy; __Host-metidos_csrf=one; __Host-metidos_csrf=two",
+      ),
+    ).toBeNull();
+  });
+
   it("serializes and clears session and websocket ticket cookies", () => {
     const sessionCookie = buildSessionCookieHeader("session-1", {
       maxAgeSeconds: 60,
