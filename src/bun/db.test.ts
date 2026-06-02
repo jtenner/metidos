@@ -2099,6 +2099,36 @@ describe("app database storage", () => {
     }
   });
 
+  it("documents singleton auth settings owner resolution", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      createLegacyUsersTable(database);
+      database.run(
+        "INSERT INTO users (id, username, is_admin) VALUES (2, 'first-local-operator', 1)",
+      );
+      database.run(
+        "INSERT INTO users (id, username, is_admin) VALUES (9, 'session-local-operator', 1)",
+      );
+
+      const settings = upsertAuthSettings(database, {
+        primaryFactorHash: "primary-factor-hash",
+        primaryFactorType: "pin",
+        sessionLifetimeDays: 7,
+        totpSecretCiphertext: "configured-totp-secret",
+        userId: 9,
+      });
+
+      expect(settings.userId).toBe(9);
+      expect(getAuthSettings(database, 9)?.userId).toBe(9);
+      expect(getAuthSettings(database, 2)?.userId).toBe(2);
+      expect(getAuthSettings(database)?.userId).toBe(2);
+    } finally {
+      database.close(false);
+    }
+  });
+
   it("treats users without a stored TOTP secret as pending setup", () => {
     const database = new Database(":memory:");
     migrateDatabase(database);

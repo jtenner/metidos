@@ -214,7 +214,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] A4: Review primary-factor-plus-TOTP lockout behavior in `src/bun/auth/service-session.ts` and `src/bun/auth/service-login.ts`. If a stolen primary factor enables too many TOTP guesses, tighten lockout/rate-limit policy; otherwise document the accepted risk and existing route-level throttles.
 - [ ] A7: Review synthetic local-operator handling in `src/bun/db.ts` (`LOCAL_SETTINGS_COMPAT_USER_ID`, `buildSyntheticLocalOperatorUser`, `readSyntheticLocalOperatorUser`). Fix any real possibility of shadowing a real user id or add comments/tests proving legacy-only scope.
-- [ ] A8: Review `src/bun/db.ts` (`getAuthSettings`) and `getFirstConfiguredAuthUserId` for accidental rebinding to the first user row. Fix if user identity can drift; otherwise comment the singleton auth invariant.
 - [ ] A9: Deduplicate or clarify `rethrowAuthSecretError` behavior across `src/bun/auth/service-login.ts`, `src/bun/auth/service-session.ts`, and `src/bun/auth/reset.ts`. If unknown auth-secret failures produce confusing 500s, map them to stable auth errors.
 - [ ] A13: Review lockout audit ordering in `src/bun/auth/service-core.ts` (`recordInvalidAuthAttempt` and `incrementFailedAttempts`). If the triggering failed attempt is mislabeled, fix audit events; otherwise add tests/comments explaining lockout event semantics.
 - [ ] A14: Review shared lockout counter for primary-factor, TOTP, and recovery-code failures in `src/bun/auth/service-core.ts` and `src/bun/auth/service-login.ts`. If it creates bad UX or security ambiguity, split counters; otherwise document that all auth proof failures intentionally share one lockout.
@@ -232,7 +231,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] C3: Review `rebuildProjectsTableForOwnerless` in `src/bun/app-schema-migration.ts`. If `GROUP BY path` can drop important legacy project rows, fix migration behavior; otherwise document expected data-consolidation semantics.
 - [ ] C4: Review `rebuildAppNotificationDeliveriesForLocalInbox` in `src/bun/app-schema-migration.ts`. If legacy multi-user notifications should not become local inbox entries, filter or migrate explicitly; otherwise comment the single-operator migration choice.
 - [ ] C6: Review dedicated auth rate-limit SQLite connection contention in `src/bun/auth/rate-limit.ts`. If it can starve login/setup flows, add backoff/telemetry; otherwise document the busy-timeout design.
-- [ ] C7: Review `getFirstConfiguredAuthUserId` and singleton auth ownership in `src/bun/db.ts`. Fix if first-user lookup can misattribute auth state; otherwise add invariants/tests.
 - [ ] C9: Review startup TOTP secret migration hook in `src/bun/index.ts` and `src/bun/auth/secret-migration.ts`. If missing coverage, add tests/comments around legacy v1-to-v2 ciphertext migration.
 - [ ] C11: Review plugin SQLite read guards in `src/bun/plugin/sqlite.ts` (`assertReadStatement`, `containsSqlIdentifierFromSet`). Fix false positives/false negatives if real; otherwise add tests/comments explaining why mutating CTEs and dangerous identifiers are blocked.
 

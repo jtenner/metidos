@@ -1516,6 +1516,13 @@ function normalizeOptionalProfileText(
 }
 
 function getFirstConfiguredAuthUserId(database: Database): number | null {
+  // Auth settings are a singleton local-operator credential row. The table does
+  // not persist per-user ownership, so this helper only answers whether setup is
+  // complete and chooses a legacy-compatible local-operator id for callers that
+  // omit an explicit authenticated user id. Request-path code must pass the
+  // current session user id to getAuthSettings/upsert helpers when that display
+  // owner matters; changing the first row in users must not be treated as a
+  // credential ownership migration.
   const row = database
     .query<{ configured: number }, []>(
       `
@@ -2156,7 +2163,9 @@ export function getAuthSettings(
 
   // Auth settings are singleton app credentials in the local-operator model;
   // resolvedUserId preserves the caller-facing owner shape while the table row
-  // remains id=1 for compatibility with legacy single-user stores.
+  // remains id=1 for compatibility with legacy single-user stores. When userId
+  // is omitted, the returned userId is only a legacy/default display owner, not a
+  // source of authorization truth.
   const settings = database
     .query<Omit<AuthSettingsRecord, "userId">, []>(
       `
