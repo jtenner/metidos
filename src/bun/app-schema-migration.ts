@@ -266,6 +266,7 @@ export const APP_SCHEMA_MIGRATION_REQUIRED_COLUMNS = {
     "created_at",
     "updated_at",
   ],
+  projects: ["favicon_data_url"],
   project_worktrees: ["pinned_at"],
   threads: ["permissions", "plugin_access_groups"],
   web_server_shares: [

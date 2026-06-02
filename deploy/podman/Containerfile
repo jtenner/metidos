@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.13-debian
+FROM docker.io/oven/bun:1.3.14-debian
 
 ARG INSTALL_CHROMIUM=false
 ARG INSTALL_GH=false
@@ -6,14 +6,18 @@ ARG INSTALL_LATEX=false
 ARG INSTALL_RUST=false
 ARG INSTALL_MOONBIT=false
 ARG INSTALL_WASM_TOOLS=false
-ARG WASM_TOOLS_VERSION=1.248.0
-ARG BINARYEN_VERSION=129
+ARG WASM_TOOLS_VERSION=1.251.0
+ARG BINARYEN_VERSION=130
+ARG MOONBIT_VERSION=0.9.3+b53c2807d
+ARG WHY3_VERSION=1.8.2
+ARG ALT_ERGO_VERSION=2.6.3
 
 ENV HOME=/home/metidos
 ENV OPAMROOT=/opt/opam
 ENV OPAMSWITCH=moonbit-proof
 ENV CARGO_HOME=/home/metidos/.cargo
 ENV RUSTUP_HOME=/home/metidos/.rustup
+ENV MOON_HOME=/opt/moonbit
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential ca-certificates git nodejs openssh-client python3 ripgrep tini wget \
@@ -42,10 +46,35 @@ RUN set -eux; \
   opam init --bare --disable-sandboxing --yes; \
   opam switch create "$OPAMSWITCH" ocaml-base-compiler.5.1.1 --yes; \
   eval "$(opam env --switch="$OPAMSWITCH" --set-switch)"; \
-  opam install --yes why3.1.7.2 alt-ergo.2.4.3; \
+  opam install --yes "why3.${WHY3_VERSION}" "alt-ergo.${ALT_ERGO_VERSION}"; \
   why3 config detect; \
   why3 --version; \
   alt-ergo --version
+
+RUN set -eux; \
+  if [ "$INSTALL_MOONBIT" != "true" ]; then echo "Skipping optional MoonBit toolchain"; exit 0; fi; \
+  arch="$(uname -m)"; \
+  case "$arch" in \
+    x86_64) target="linux-x86_64" ;; \
+    aarch64|arm64) target="linux-aarch64" ;; \
+    *) echo "unsupported arch: $arch" >&2; exit 1 ;; \
+  esac; \
+  encoded_version="$(printf '%s' "$MOONBIT_VERSION" | sed 's/+/%2B/g')"; \
+  tmp="$(mktemp -d)"; \
+  trap 'rm -rf "$tmp"' EXIT; \
+  mkdir -p "$MOON_HOME"; \
+  wget -q -O "$tmp/moonbit.tar.gz" "https://cli.moonbitlang.com/binaries/${encoded_version}/moonbit-${target}.tar.gz"; \
+  rm -rf "$MOON_HOME/bin" "$MOON_HOME/include" "$MOON_HOME/lib"; \
+  tar -xzf "$tmp/moonbit.tar.gz" -C "$MOON_HOME"; \
+  find "$MOON_HOME/bin" -maxdepth 1 -type f -exec chmod +x {} +; \
+  chmod +x "$MOON_HOME/bin/internal/tcc"; \
+  wget -q -O "$tmp/core.tar.gz" "https://cli.moonbitlang.com/cores/core-${encoded_version}.tar.gz"; \
+  mkdir -p "$MOON_HOME/lib"; \
+  rm -rf "$MOON_HOME/lib/core"; \
+  tar -xzf "$tmp/core.tar.gz" -C "$MOON_HOME/lib"; \
+  PATH="$MOON_HOME/bin:$PATH" moon -C "$MOON_HOME/lib/core" bundle --warn-list -a --all; \
+  PATH="$MOON_HOME/bin:$PATH" moon -C "$MOON_HOME/lib/core" bundle --warn-list -a --target wasm-gc --quiet; \
+  PATH="$MOON_HOME/bin:$PATH" moon version --all
 
 RUN set -eux; \
   if [ "$INSTALL_WASM_TOOLS" != "true" ]; then echo "Skipping optional wasm-tools"; exit 0; fi; \
@@ -101,8 +130,8 @@ ENV METIDOS_CHROME_DEBUG_PORT=9222
 ENV METIDOS_CHROME_DEBUG_BACKEND_PORT=19222
 ENV METIDOS_CHROME_DEBUG_USER_DATA_DIR=/data/chrome-debug
 ENV CODEX_AUTH_JSON_PATH=/data/plugins/codex/.data/auth.json
-ENV MOONBIT_BIN_DIR=
-ENV PATH=/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV MOONBIT_BIN_DIR=/opt/moonbit/bin
+ENV PATH=/opt/moonbit/bin:/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN printf '%s\n' \
   'export OPAMROOT="${OPAMROOT:-/opt/opam}"' \

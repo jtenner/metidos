@@ -121,6 +121,7 @@ import {
   PluginSqliteError,
   refreshPluginSqliteNativeSecurityDiagnostic,
 } from "./plugin/sqlite";
+import { WorkspacePathError } from "./project-procedures/workspace-path-policy";
 import {
   approveThreadStartRequestProcedure,
   closeProjectProcedure,
@@ -3529,6 +3530,13 @@ function buildRpcErrorPayload(error: unknown): RpcErrorPayload {
   const pluginErrorPayload = buildPluginRpcErrorPayload(error);
   if (pluginErrorPayload) {
     return pluginErrorPayload;
+  }
+
+  if (error instanceof WorkspacePathError) {
+    return {
+      error: error.message,
+      errorCode: error.code,
+    };
   }
 
   return {

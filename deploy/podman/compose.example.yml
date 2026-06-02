@@ -66,7 +66,7 @@ services:
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       MINIMAX_CN_API_KEY: ${MINIMAX_CN_API_KEY:-}
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      MOONBIT_BIN_DIR: ${MOONBIT_BIN_DIR:-}
+      MOONBIT_BIN_DIR: ${MOONBIT_BIN_DIR:-/opt/moonbit/bin}
       MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
       NOTION_API_KEY: ${NOTION_API_KEY:-}
       NTFY_TOKEN: ${NTFY_TOKEN:-}
@@ -77,7 +77,7 @@ services:
       OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      PATH: ${MOONBIT_BIN_DIR:-}:/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      PATH: ${MOONBIT_BIN_DIR:-/opt/moonbit/bin}:/home/metidos/.cargo/bin:/opt/opam/moonbit-proof/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       UPLOADTHING_API_KEY: ${UPLOADTHING_API_KEY:-}

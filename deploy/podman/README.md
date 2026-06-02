@@ -29,8 +29,8 @@ The base image always includes Bun, Git, Node.js, Python, basic build tools, and
 - **Browser automation** — Debian `chromium` and `chromium-sandbox`, with `BUN_CHROME_PATH=/usr/bin/chromium` and a headless Chrome DevTools Protocol listener on container loopback (`127.0.0.1:9222`).
 - **GitHub CLI** — `gh` from the Debian package repository.
 - **Document toolchain** — `latexmk`, TeX Live LaTeX packages, and `poppler-utils`.
-- **MoonBit proof dependencies** — an image-global `/opt/opam` root with the `moonbit-proof` switch active by default, containing Why3 1.7.2 and Alt-Ergo 2.4.3. Startup runs `why3 config detect` when `$HOME/.why3.conf` is missing.
-- **WebAssembly tooling** — `wasm-tools 1.248.0` and Binaryen `version_129` under `/opt/binaryen-version_129` with tools such as `wasm-opt` symlinked into `/usr/local/bin`.
+- **MoonBit toolchain and proof dependencies** — MoonBit `0.9.3+b53c2807d` under `/opt/moonbit`, plus an image-global `/opt/opam` root with the `moonbit-proof` switch active by default, containing Why3 1.8.2 and Alt-Ergo 2.6.3. Startup runs `why3 config detect` when `$HOME/.why3.conf` is missing.
+- **WebAssembly tooling** — `wasm-tools 1.251.0` and Binaryen `version_130` under `/opt/binaryen-version_130` with tools such as `wasm-opt` symlinked into `/usr/local/bin`.
 - **Interactive shell** — the entrypoint creates `$HOME/.bashrc` when missing and sets a prompt that includes the current working directory. If you use MoonBit, wire `MOONBIT_BIN_DIR` into the compose `PATH` so terminals and login shells can find the compiler.
 
 Choose which toolchains to include when running the installer or editing `deploy/podman/.env.podman`. The compose template passes these build args to the `Containerfile` and they all default to `false`:
@@ -74,7 +74,7 @@ shell exports for systemd-started containers. The example compose file keeps
 GitHub Copilot and SSH credential mounts commented out; enable only the mounts
 you need in your ignored local `compose.yml`.
 
-If you need MoonBit tooling, set `MOONBIT_BIN_DIR` in `deploy/podman/.env.podman` to the directory that contains `moon`, `moonc`, and `moonrun`, then prepend it to `PATH` in your ignored local compose file. Leave the value blank if your deployment does not use MoonBit.
+If you need MoonBit tooling, set `INSTALL_MOONBIT=true` and leave `MOONBIT_BIN_DIR=/opt/moonbit/bin` unless you intentionally mount an external MoonBit toolchain. To override it, set `MOONBIT_BIN_DIR` in `deploy/podman/.env.podman` to the directory that contains `moon`, `moonc`, and `moonrun`, then prepend it to `PATH` in your ignored local compose file.
 
 For host Ollama access, the compose template enables `slirp4netns:allow_host_loopback=true`, defaults `OLLAMA_BASE_URL` to `http://10.0.2.2:11434`, and defaults `METIDOS_PLUGIN_UNSAFE_PRIVATE_NETWORK_PLUGINS=ollama`. The Ollama core plugin must be approved with its `unsafe` permission before plugin-sidecar fetches can reach that private host-loopback address.
 

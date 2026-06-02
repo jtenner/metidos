@@ -263,6 +263,17 @@ describe("app schema migration", () => {
         },
       },
       {
+        name: "missing project favicon column",
+        mutate(database) {
+          database.run("ALTER TABLE projects DROP COLUMN favicon_data_url");
+        },
+        verify(database) {
+          expect(columnNames(database, "projects")).toContain(
+            "favicon_data_url",
+          );
+        },
+      },
+      {
         name: "missing thread and cron permission columns",
         mutate(database) {
           database.run("ALTER TABLE threads DROP COLUMN permissions");

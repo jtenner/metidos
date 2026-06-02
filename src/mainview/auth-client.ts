@@ -125,18 +125,20 @@ async function readJsonBody(
  */
 
 function toAuthApiError(response: Response, payload: unknown): AuthApiError {
-  const body = payload as AuthErrorResponse;
+  const body: AuthErrorResponse = isRecord(payload)
+    ? (payload as AuthErrorResponse)
+    : {};
+  const error = isRecord(body.error) ? body.error : {};
   const message =
-    typeof body.error?.message === "string"
-      ? body.error.message
+    typeof error.message === "string"
+      ? error.message
       : `Auth request failed with status ${response.status}.`;
-  const code =
-    typeof body.error?.code === "string" ? body.error.code : "auth_error";
+  const code = typeof error.code === "string" ? error.code : "auth_error";
   return new AuthApiError(
     code,
     message,
     response.status,
-    normalizeAuthErrorDetails(body.error?.details),
+    normalizeAuthErrorDetails(error.details),
   );
 }
 /**

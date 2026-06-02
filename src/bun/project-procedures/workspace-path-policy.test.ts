@@ -27,6 +27,7 @@ import {
   normalizeRequestedWorkspacePath,
   RESTRICTED_WORKSPACE_ERROR_MESSAGE,
   restrictedWorkspacePathScope,
+  WorkspacePathError,
   workspaceDirectorySuggestionOptions,
   workspacePathScopeForLocalOperator,
 } from "./workspace-path-policy";
@@ -163,6 +164,9 @@ describe("workspace path policy", () => {
     expect(() =>
       assertWorkspaceDirectory(missingPath, scope, { label: "Project path" }),
     ).toThrow("Project path does not exist: ~/missing-project");
+    expect(() =>
+      assertWorkspaceDirectory(missingPath, scope, { label: "Project path" }),
+    ).toThrow(WorkspacePathError);
     expect(() =>
       assertWorkspaceDirectory(filePath, scope, { label: "Project path" }),
     ).toThrow("Project path must be a directory: ~/not-a-directory");

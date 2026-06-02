@@ -32,6 +32,21 @@ export type WorkspaceDirectorySuggestionOptions = {
   supportsTildePath: boolean;
 };
 
+export type WorkspacePathErrorCode =
+  | "workspace_path_missing"
+  | "workspace_path_not_directory"
+  | "workspace_path_restricted";
+
+export class WorkspacePathError extends Error {
+  constructor(
+    message: string,
+    readonly code: WorkspacePathErrorCode,
+  ) {
+    super(message);
+    this.name = "WorkspacePathError";
+  }
+}
+
 export const RESTRICTED_WORKSPACE_ERROR_MESSAGE =
   "Workspace access is limited to the configured local workspace root.";
 
@@ -184,7 +199,10 @@ export function assertWorkspacePathAllowed(
   if (isWorkspacePathAllowed(path, scope)) {
     return;
   }
-  throw new Error(RESTRICTED_WORKSPACE_ERROR_MESSAGE);
+  throw new WorkspacePathError(
+    RESTRICTED_WORKSPACE_ERROR_MESSAGE,
+    "workspace_path_restricted",
+  );
 }
 
 export function buildMissingWorkspaceDirectoryMessage(
@@ -210,10 +228,16 @@ export function assertWorkspaceDirectory(
 ): void {
   const label = options.label ?? "Workspace path";
   if (!existsSync(path)) {
-    throw new Error(buildMissingWorkspaceDirectoryMessage(path, scope, label));
+    throw new WorkspacePathError(
+      buildMissingWorkspaceDirectoryMessage(path, scope, label),
+      "workspace_path_missing",
+    );
   }
   if (!safeIsDirectory(path)) {
-    throw new Error(buildNonDirectoryWorkspacePathMessage(path, scope, label));
+    throw new WorkspacePathError(
+      buildNonDirectoryWorkspacePathMessage(path, scope, label),
+      "workspace_path_not_directory",
+    );
   }
 }
 
