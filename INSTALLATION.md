@@ -6,6 +6,23 @@ For the interactive, plan-first installer workflow, use [`.pi/skills/metidos-ins
 
 ## Choose your path
 
+The first-run flow moves from a clean checkout to a local, authenticated workspace before any provider-backed agent work is expected:
+
+```mermaid
+flowchart TD
+    A[Clean clone] --> B[Install prerequisites<br/>Git, Bun, browser]
+    B --> C[Install dependencies<br/>bun install --frozen-lockfile]
+    C --> D[Create private configuration<br/>copy .env.example to .env]
+    D --> E[Start Metidos<br/>bun run dev or bun run start]
+    E --> F[Open local URL]
+    F --> G[Complete first-run Local Auth<br/>primary factor, optional TOTP, recovery codes]
+    G --> H[Configure provider or local model<br/>Settings, .env, or approved plugin]
+    H --> I[Add first Project]
+    I --> J[Select Worktree]
+    J --> K[Start a safe Thread]
+    K --> L[Review Diffs before keeping changes]
+```
+
 | Goal | Start here |
 | --- | --- |
 | Try Metidos from a clean checkout | [Quick start: clean clone to first Thread](#quick-start-clean-clone-to-first-thread) |
