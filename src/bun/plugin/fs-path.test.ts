@@ -187,6 +187,42 @@ describe("plugin fs virtual path resolver", () => {
     ).toBe("~/nested/note.txt");
   });
 
+  it("rejects absolute and NUL virtual paths before resolving host paths", async () => {
+    const { pluginPath } = createPluginFixture();
+    const absolutePluginDataPath = join(
+      pluginPath,
+      ".data",
+      "nested",
+      "note.txt",
+    );
+
+    const absolutePathError = await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        virtualPath: absolutePluginDataPath,
+      }),
+    );
+    expect(absolutePathError).toMatchObject({
+      code: "invalid_virtual_path",
+      message: "Plugin fs virtual paths must start with ~/ or ./.",
+      virtualPath: absolutePluginDataPath,
+    });
+    expect(absolutePathError.message).not.toContain(pluginPath);
+
+    const nulPathError = await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        virtualPath: "~/nested/evil\0.txt",
+      }),
+    );
+    expect(nulPathError).toMatchObject({
+      code: "invalid_virtual_path",
+      message: "Plugin fs virtual paths cannot contain NUL bytes.",
+      virtualPath: "~/nested/evil\0.txt",
+    });
+    expect(nulPathError.message).not.toContain(pluginPath);
+  });
+
   it("denies traversal and missing ./ context before returning host paths", async () => {
     const { pluginPath } = createPluginFixture();
 
