@@ -6,6 +6,7 @@ import {
 } from "../shared/rpc-binary-codec";
 import {
   createRpcTransport,
+  encodeRpcServerFrame,
   isSafeRpcRequestId,
   type ParsedRpcClientMessage,
   type RpcClientMessage,
@@ -473,6 +474,31 @@ describe("RPC transport", () => {
     });
     expect(transport.hasClients()).toBeFalse();
     expect(harness.failed).toHaveLength(1);
+  });
+
+  test("keeps large RPC responses on the JSON compatibility path unless callers opt out", async () => {
+    const response = {
+      id: 11,
+      ok: true,
+      result: { body: "x".repeat(64 * 1024) },
+      type: "response",
+    } as const;
+
+    const compatibilityFrame = await encodeRpcServerFrame(response, {
+      maxUncompressedServerBinaryFrameBytes: 32,
+    });
+    expect(typeof compatibilityFrame).toBe("string");
+    expect(JSON.parse(compatibilityFrame as string)).toEqual(response);
+
+    const compressedFrame = await encodeRpcServerFrame(response, {
+      avoidLargeJsonStringify: true,
+      maxUncompressedServerBinaryFrameBytes: 32,
+    });
+    expect(typeof compressedFrame).toBe("object");
+    expect(isRpcBinaryFrame(compressedFrame)).toBeTrue();
+    await expect(
+      decodeRpcBinaryFrame(compressedFrame as Uint8Array),
+    ).resolves.toEqual(response);
   });
 
   test("encodes large server pushes without JSON stringifying", async () => {
