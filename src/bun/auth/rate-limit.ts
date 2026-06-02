@@ -116,8 +116,11 @@ function authRouteRateLimitDb(): Database {
     // Use a dedicated connection so auth throttling can run before or alongside
     // higher-level auth service setup without sharing mutable transaction state
     // with login/setup flows. BEGIN IMMEDIATE plus busy_timeout serializes the
-    // small bucket updates with other SQLite writers; lock contention degrades
-    // availability rather than weakening brute-force protection.
+    // small bucket updates with other SQLite writers; if another writer holds
+    // the app database longer than SQL_BUSY_TIMEOUT_MS, SQLite fails the auth
+    // request instead of skipping the rate-limit write. That fail-closed path is
+    // intentional for local-operator auth: lock contention may briefly degrade
+    // login/setup availability, but it must not weaken brute-force protection.
     authRouteRateLimitDatabase = new Database(getAppDatabasePath(), {
       create: true,
       strict: true,
