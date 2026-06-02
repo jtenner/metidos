@@ -699,6 +699,12 @@ function revalidateAuthenticatedWebSocketSession<
     return true;
   }
 
+  // Message-time revalidation intentionally fails closed instead of trying to
+  // keep a degraded WebSocket alive. Session revocation, expiry, and admin-role
+  // loss all mean the already-upgraded channel can no longer be trusted for the
+  // next frame; closing with policy-violation status 1008 gives the UI a single
+  // reconnect/reauth path while the structured warning preserves the specific
+  // server-side reason for operators without exposing auth details to the wire.
   webServerLogger.warning({
     clearSessionCookie: result.failure.clearSessionCookie,
     error: normalizeErrorDescription(result.failure.error),
