@@ -58,12 +58,14 @@ function createOptions(pathname: string) {
 }
 
 describe("handleMainviewStaticAssetRequest", () => {
-  test("returns the HTML entrypoint for root routes", async () => {
-    const { options, traces } = createOptions("/");
+  test("returns the HTML entrypoint without using static asset caching", async () => {
+    const { options, traces, calls } = createOptions("/");
 
     const response = await handleMainviewStaticAssetRequest(options);
 
     expect(await response?.text()).toBe("html");
+    expect(calls).toEqual([]);
+    expect(response?.headers.get("Cache-Control")).toBeNull();
     expect(traces).toEqual(["Serving HTML entrypoint"]);
   });
 

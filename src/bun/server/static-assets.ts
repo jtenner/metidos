@@ -67,6 +67,9 @@ export async function handleMainviewStaticAssetRequest(
 
   if (pathname === "/" || pathname === "/index.html") {
     traceStaticAsset(options, "Serving HTML entrypoint");
+    // The HTML entrypoint carries request-specific bootstrap data, so it must
+    // stay on the caller-provided htmlResponse path rather than sharing the
+    // immutable static-asset cache policy below.
     return options.htmlResponse();
   }
 
@@ -83,6 +86,9 @@ export async function handleMainviewStaticAssetRequest(
     }
   }
 
+  // Compatibility routes are unversioned and intentionally avoid immutable
+  // caching. Only /assets/mainview/<version>/... routes receive the long-lived
+  // cache header because their version token changes with asset metadata.
   if (pathname === "/index.css") {
     traceStaticAsset(options, "Serving mainview css compatibility asset");
     return fileResponse(paths.cssPath, "text/css; charset=utf-8");
