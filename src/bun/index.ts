@@ -4652,6 +4652,10 @@ async function bootstrap(): Promise<void> {
     url: `http://${SERVER_HOSTNAME === "0.0.0.0" ? "localhost" : SERVER_HOSTNAME}:${server.port}`,
   });
 
+  // Defer non-essential cache warmup until the server is already listening.
+  // First requests may still compute their own cache entries; the warmup helpers
+  // share the same bounded, idempotent loaders and are an opportunistic latency
+  // optimization rather than a startup correctness requirement.
   procedureStartupWarmupTimer = setTimeout(() => {
     procedureStartupWarmupTimer = null;
     warmProcedureStartupCaches();
