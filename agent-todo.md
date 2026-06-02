@@ -39,8 +39,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
-  - [ ] Review the home-page copy against `README.md`, `INSTALLATION.md`, and `ROADMAP.md` so the public promise, status, and install path stay aligned.
-  - [ ] Run `bun run website:build` after home-page edits and inspect the static page for broken local assets or obvious layout regressions.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a docs landing page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a getting started page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a plugin page.
