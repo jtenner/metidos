@@ -549,6 +549,11 @@ function unwrapQuickJsResult(
   return result.value;
 }
 
+// The entrypoint bundler hands QuickJS a complete JavaScript string, and the
+// export rewrite below produces one transformed copy before evaluation. Keep the
+// cap well below plugin memory limits so worst-case startup holds only a small
+// bounded number of 5 MiB copies; larger plugins should be split or bundled
+// tighter instead of streamed through this non-module wrapper path.
 const MAX_ENTRYPOINT_EXPORT_REWRITE_SOURCE_BYTES = 5 * 1024 * 1024;
 
 const SUPPORTED_ENTRYPOINT_EXPORT_MESSAGE =
