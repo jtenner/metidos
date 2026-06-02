@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import {
   closeValidatedPluginFsFileDescriptor,
+  mkdirValidatedPluginFsPathSync,
   openValidatedPluginFsPathSync,
   PluginFsPathError,
   pluginFsReadOpenFlags,
@@ -386,6 +387,52 @@ describe("plugin fs virtual path resolver", () => {
     expect(deletedProjectRoot).toMatchObject({
       code: "root_unavailable",
       virtualPath: "./new.txt",
+    });
+  });
+
+  it("creates recursive directories without following a newly planted symlink parent", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    const { pluginPath } = createPluginFixture();
+    const outsidePath = createTempDirectory("metidos-plugin-fs-mkdir-outside-");
+    const resolved = await resolvePluginFsVirtualPath({
+      access: "write",
+      pluginPath,
+      virtualPath: "~/new-parent/nested",
+    });
+
+    symlinkSync(outsidePath, join(pluginPath, ".data", "new-parent"), "dir");
+
+    expect(() =>
+      mkdirValidatedPluginFsPathSync({
+        options: { recursive: true },
+        resolved,
+      }),
+    ).toThrow(PluginFsPathError);
+  });
+
+  it("creates recursive directories one segment at a time inside the validated root", async () => {
+    const { pluginPath } = createPluginFixture();
+    const resolved = await resolvePluginFsVirtualPath({
+      access: "write",
+      pluginPath,
+      virtualPath: "~/safe-parent/nested",
+    });
+
+    mkdirValidatedPluginFsPathSync({
+      options: { recursive: true },
+      resolved,
+    });
+
+    await expect(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        virtualPath: "~/safe-parent/nested",
+      }),
+    ).resolves.toMatchObject({
+      exists: true,
+      virtualPath: "~/safe-parent/nested",
     });
   });
 

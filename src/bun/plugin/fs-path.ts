@@ -591,6 +591,14 @@ export function mkdirValidatedPluginFsPathSync(input: {
   resolved: ResolvedPluginFsPath;
 }): void {
   const { realPath, virtualPath } = input.resolved;
+  if (input.options?.recursive) {
+    mkdirValidatedPluginFsPathRecursiveSync({
+      realPath,
+      virtualPath,
+    });
+    return;
+  }
+
   try {
     const stats = lstatSync(realPath);
     assertPluginFsLstatIsNotSymlink({ stats, virtualPath });
@@ -607,11 +615,70 @@ export function mkdirValidatedPluginFsPathSync(input: {
   }
 
   try {
-    mkdirSync(realPath, { recursive: input.options?.recursive ?? false });
+    mkdirSync(realPath, { recursive: false });
   } catch {
     throw pluginFsPathError({
       code: "path_unavailable",
       message: "Plugin fs directory could not be created safely.",
+      virtualPath,
+    });
+  }
+}
+
+function mkdirValidatedPluginFsPathRecursiveSync(input: {
+  realPath: string;
+  virtualPath: string;
+}): void {
+  const missingPaths: string[] = [];
+  let currentPath = resolve(input.realPath);
+  while (true) {
+    try {
+      assertValidatedPluginFsDirectory(currentPath, input.virtualPath);
+      break;
+    } catch (error) {
+      if (error instanceof PluginFsPathError) {
+        throw error;
+      }
+      if (!isMissingFileSystemError(error)) {
+        throw error;
+      }
+      missingPaths.unshift(currentPath);
+      const parentPath = dirname(currentPath);
+      if (parentPath === currentPath) {
+        throw pluginFsPathError({
+          code: "path_unavailable",
+          message: "Plugin fs directory could not be created safely.",
+          virtualPath: input.virtualPath,
+        });
+      }
+      currentPath = parentPath;
+    }
+  }
+
+  for (const path of missingPaths) {
+    try {
+      mkdirSync(path, { recursive: false });
+    } catch {
+      throw pluginFsPathError({
+        code: "path_unavailable",
+        message: "Plugin fs directory could not be created safely.",
+        virtualPath: input.virtualPath,
+      });
+    }
+    assertValidatedPluginFsDirectory(path, input.virtualPath);
+  }
+}
+
+function assertValidatedPluginFsDirectory(
+  path: string,
+  virtualPath: string,
+): void {
+  const stats = lstatSync(path);
+  assertPluginFsLstatIsNotSymlink({ stats, virtualPath });
+  if (!stats.isDirectory()) {
+    throw pluginFsPathError({
+      code: "path_unavailable",
+      message: "Plugin fs path is not a directory.",
       virtualPath,
     });
   }
