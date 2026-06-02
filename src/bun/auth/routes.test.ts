@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "../db";
+import { generateTotpCode } from "./";
 
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 let appDataDir: string | null = null;
@@ -29,6 +30,35 @@ function buildAuthServer(
 
 async function readJson(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
+}
+
+async function issueCsrfToken(): Promise<string> {
+  const response = await handleAuthRequestForTest(
+    new Request("http://127.0.0.1:7599/auth/csrf", {
+      headers: {
+        origin: "http://127.0.0.1:7599",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+      },
+    }),
+    buildAuthServer(),
+  );
+  expect(response).not.toBeNull();
+  expect(response?.status).toBe(200);
+  const body = await readJson(response!);
+  expect(typeof body.csrfToken).toBe("string");
+  return body.csrfToken as string;
+}
+
+function buildCsrfHeaders(csrfToken: string): HeadersInit {
+  return {
+    "content-type": "application/json",
+    cookie: `metidos_csrf=${csrfToken}`,
+    origin: "http://127.0.0.1:7599",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-metidos-csrf-token": csrfToken,
+  };
 }
 
 beforeAll(async () => {
@@ -212,5 +242,96 @@ describe("auth route HTTP security", () => {
       error: { code: "rate_limited" },
       ok: false,
     });
+  });
+
+  it("starts auth setup without issuing session cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/setup/start", {
+        body: JSON.stringify({ issuer: "Metidos Test", username: "operator" }),
+        headers: buildCsrfHeaders(csrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    const body = await readJson(response!);
+    expect(body.ok).toBe(true);
+    expect(body.enrollment).toMatchObject({
+      totpSecret: expect.any(String),
+      totpUri: expect.stringContaining("otpauth://totp/"),
+    });
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("metidos_session=");
+  });
+
+  it("returns deterministic setup validation errors without session cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/setup", {
+        body: JSON.stringify({ primaryFactorType: "pin" }),
+        headers: buildCsrfHeaders(csrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "invalid_request" },
+      ok: false,
+    });
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("metidos_session=");
+  });
+
+  it("completes auth setup and sets a safe session cookie", async () => {
+    const startCsrfToken = await issueCsrfToken();
+    const startResponse = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/setup/start", {
+        body: JSON.stringify({ username: "operator" }),
+        headers: buildCsrfHeaders(startCsrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+    expect(startResponse).not.toBeNull();
+    expect(startResponse?.status).toBe(200);
+    const startBody = await readJson(startResponse!);
+    const enrollment = startBody.enrollment as {
+      totpSecret: string;
+    };
+
+    const setupCsrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/setup", {
+        body: JSON.stringify({
+          primaryFactor: "482913",
+          primaryFactorType: "pin",
+          totpCode: await generateTotpCode(enrollment.totpSecret),
+          totpSecret: enrollment.totpSecret,
+          username: "operator",
+        }),
+        headers: buildCsrfHeaders(setupCsrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    const body = await readJson(response!);
+    expect(body.ok).toBe(true);
+    expect(body.recoveryCodes).toEqual(expect.any(Array));
+    expect(body.status).toMatchObject({ authenticated: true });
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("metidos_session=");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain("Secure");
   });
 });
