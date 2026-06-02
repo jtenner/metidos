@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { RpcPluginInventoryPlugin } from "../rpc-schema/plugin";
+import { evaluatePluginStaticCapability } from "./capability-gate";
 import type { PluginStartupRegistrations } from "./startup-registrations";
 import {
   buildPluginAgentToolSidecarRequest,
@@ -163,6 +164,110 @@ describe("Plugin execution capability", () => {
         registration: helloRegistration,
       },
     ]);
+  });
+
+  it("does not let enabled access groups grant undeclared host permissions", () => {
+    const basePlugin = plugin() as unknown as {
+      folderPath: string;
+      group: string;
+      lifecycle: { state: string };
+      manifest: {
+        access: Array<{
+          color: string | null;
+          description: string;
+          id: string;
+          name: string;
+          tools: Array<{ name: string }>;
+        }>;
+        files: {
+          allow: { read: string[] };
+          deny: { read: string[] };
+        };
+        permissions: string[];
+      };
+      pluginId: string;
+      structurallyValid: boolean;
+      validationErrors: string[];
+    };
+    basePlugin.group = "Active";
+    basePlugin.lifecycle = { state: "active" };
+    basePlugin.structurallyValid = true;
+    basePlugin.validationErrors = [];
+    basePlugin.manifest.access = [
+      {
+        color: null,
+        description: "Thread tools.",
+        id: "thread_tools",
+        name: "Thread tools",
+        tools: [{ name: "hello" }],
+      },
+    ];
+    basePlugin.manifest.files = {
+      allow: { read: [] },
+      deny: { read: [] },
+    };
+    basePlugin.manifest.permissions = [];
+    basePlugin.folderPath = "/plugins/alpha_plugin";
+
+    const registrations = emptyRegistrations();
+    registrations.tools = [
+      {
+        actionHandle: "tool:hello:action",
+        description: "Say hello.",
+        name: "hello",
+        runtimeId: "alpha_plugin_hello",
+        timeoutMs: 5_000,
+        tool: "hello",
+        validatePropsHandle: "tool:hello:validateProps",
+      },
+      {
+        actionHandle: "tool:terminal:action",
+        description: "Terminal helper.",
+        name: "terminal_helper",
+        runtimeId: "alpha_plugin_terminal_helper",
+        timeoutMs: 5_000,
+        tool: "terminal_helper",
+        validatePropsHandle: "tool:terminal:validateProps",
+      },
+    ];
+
+    const enabledAccessGroups = ["alpha_plugin/thread_tools"];
+    const visibleTools = listPluginAgentToolRegistrationsForThread({
+      enabledAccessGroups,
+      sessions: [
+        {
+          directoryName: "alpha_plugin",
+          plugin: basePlugin as unknown as RpcPluginInventoryPlugin,
+          ready: true,
+          registrations,
+          stopping: false,
+        },
+      ],
+    });
+
+    expect(visibleTools.map((tool) => tool.registration.runtimeId)).toEqual([
+      "alpha_plugin_hello",
+    ]);
+    expect(visibleTools[0]?.permissions).toEqual([]);
+
+    expect(
+      evaluatePluginStaticCapability({
+        context: {
+          enabledAccessGroups,
+          permissions: visibleTools[0]?.permissions ?? [],
+          pluginId: "alpha_plugin",
+        },
+        request: {
+          kind: "permission",
+          operation: "terminal.read",
+          permission: "terminal:read",
+        },
+      }),
+    ).toMatchObject({
+      allowed: false,
+      code: "plugin_permission_error",
+      permission: "terminal:read",
+    });
   });
 
   it("builds agent tool sidecar requests without changing callback payloads", async () => {
