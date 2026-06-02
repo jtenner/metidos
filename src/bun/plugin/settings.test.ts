@@ -209,6 +209,62 @@ describe("plugin settings persistence", () => {
     }
   });
 
+  it("redacts stored and default secret settings from operator snapshots", async () => {
+    const appDataDir = createTempDirectory("metidos-plugin-redacted-secret-");
+    const declarations = [
+      setting({
+        defaultValue: "default-secret",
+        hasDefault: true,
+        key: "api_token",
+        kind: "secret",
+      }),
+      setting({
+        defaultValue: "public-default",
+        hasDefault: true,
+        key: "label",
+        kind: "string",
+      }),
+    ];
+
+    await updatePluginSettings({
+      declarations,
+      directoryName: "redacted_plugin",
+      options: { appDataDir },
+      patch: { api_token: "stored-secret", label: "public-label" },
+      pluginId: "redacted_plugin",
+    });
+
+    const snapshot = await readPluginSettingsSnapshot({
+      declarations,
+      directoryName: "redacted_plugin",
+      options: { appDataDir },
+      pluginId: "redacted_plugin",
+    });
+
+    expect(snapshot.settings).toContainEqual(
+      expect.objectContaining({
+        defaultValue: null,
+        hasStoredValue: true,
+        key: "api_token",
+        readable: false,
+        secret: true,
+        value: null,
+      }),
+    );
+    expect(snapshot.settings).toContainEqual(
+      expect.objectContaining({
+        defaultValue: "public-default",
+        hasStoredValue: true,
+        key: "label",
+        readable: true,
+        secret: false,
+        value: "public-label",
+      }),
+    );
+    expect(JSON.stringify(snapshot)).not.toContain("stored-secret");
+    expect(JSON.stringify(snapshot)).not.toContain("default-secret");
+  });
+
   it("encrypts secret setting values at rest and warns for legacy plaintext", async () => {
     const appDataDir = createTempDirectory(
       "metidos-plugin-encrypted-settings-",
