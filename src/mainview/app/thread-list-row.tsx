@@ -15,6 +15,7 @@ import {
   useRef,
 } from "react";
 import type { RpcProject, RpcThread, RpcWorktree } from "../../bun/rpc-schema";
+import { AppBadge } from "../controls/badge";
 import { materialSymbol } from "../controls/icons";
 import { ListRowButton } from "../controls/list-row";
 import { PopoverSurface } from "../controls/popover";
@@ -718,11 +719,7 @@ const ThreadListRow = memo(function ThreadListRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 pl-2">
-          {hasUnreadError ? (
-            <span className="border border-danger-border bg-danger-surface px-2 py-1 font-label text-[10px] font-semibold uppercase tracking-[0.1em] text-danger-text">
-              Unread
-            </span>
-          ) : null}
+          {hasUnreadError ? <AppBadge tone="danger">Unread</AppBadge> : null}
         </div>
       </div>
     </ListRowButton>

@@ -29,6 +29,7 @@ import type {
   RpcPluginSidecarDiagnostics,
   RpcThreadPermissionDescriptor,
 } from "../../bun/rpc-schema";
+import { AppBadge } from "../controls/badge";
 import { AppButton } from "../controls/button";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { type AppIconName, materialSymbol } from "../controls/icons";
@@ -445,15 +446,15 @@ function PluginSettingControl({
           </span>
         ) : null}
         {secretBadgeLabel ? (
-          <span
-            className={`shrink-0 border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${
+          <AppBadge
+            tone={
               secretClearPending || secretReplacementPending
-                ? "border-warning-border bg-warning-surface text-warning-text"
-                : "border-success-border bg-success-surface text-success-text"
-            }`}
+                ? "warning"
+                : "success"
+            }
           >
             {secretBadgeLabel}
-          </span>
+          </AppBadge>
         ) : null}
       </label>
       {declaration.kind === "enum" && declaration.options.length > 0 ? (
