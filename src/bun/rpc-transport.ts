@@ -1048,6 +1048,11 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     };
 
     try {
+      // Revalidate every RPC frame so logout, admin revocation, and session
+      // expiry take effect on already-open sockets. The auth service keeps the
+      // hot path bounded with a short process-local resolve cache and throttled
+      // session-touch writes, avoiding a SQLite write per message while still
+      // checking persistent session state regularly.
       if (!options.revalidateSession(client)) {
         close(client, "RPC session is no longer authenticated.");
         return;
