@@ -211,6 +211,70 @@ describe("terminal websocket message validation", () => {
     expect(closeReasons).toEqual(["Terminal message rate limit exceeded."]);
   });
 
+  it("scopes terminal socket message rate limits by session and terminal", () => {
+    const manager = new TerminalManager(
+      {
+        exitedIdleTtlMs: 1_000,
+        maxGlobalTerminals: 10,
+        maxTerminalsPerOwner: 10,
+      },
+      {
+        socketMessageRateLimit: {
+          capacity: 1,
+          maxBuckets: 10,
+          refillIntervalMs: 60_000,
+          refillTokens: 1,
+        },
+      },
+    );
+    const closeReasons: string[] = [];
+    const firstSocket = {
+      close: (_code: number, reason: string) => {
+        closeReasons.push(`first:${reason}`);
+      },
+      data: {
+        isAdmin: true,
+        sessionId: "session-1",
+        terminalId: "terminal-1",
+        userId: 7,
+        username: "metidos",
+      },
+      send: () => {},
+    };
+    const secondSocket = {
+      close: (_code: number, reason: string) => {
+        closeReasons.push(`second:${reason}`);
+      },
+      data: {
+        isAdmin: true,
+        sessionId: "session-1",
+        terminalId: "terminal-2",
+        userId: 7,
+        username: "metidos",
+      },
+      send: () => {},
+    };
+    addMockTerminalSession(manager, "terminal-1", [firstSocket]);
+    addMockTerminalSession(manager, "terminal-2", [secondSocket]);
+
+    manager.handleSocketMessage(
+      firstSocket as never,
+      JSON.stringify({ type: "ping" }),
+    );
+    manager.handleSocketMessage(
+      secondSocket as never,
+      JSON.stringify({ type: "ping" }),
+    );
+    manager.handleSocketMessage(
+      firstSocket as never,
+      JSON.stringify({ type: "ping" }),
+    );
+
+    expect(closeReasons).toEqual([
+      "first:Terminal message rate limit exceeded.",
+    ]);
+  });
+
   it("can close terminal sockets without terminating the PTY", () => {
     const manager = new TerminalManager();
     const killedSignals: Array<NodeJS.Signals | undefined> = [];

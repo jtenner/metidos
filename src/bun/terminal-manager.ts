@@ -69,6 +69,12 @@ const TERMINAL_SOCKET_CLOSE_UNSUPPORTED_DATA = 1003;
 const DEFAULT_MAX_TERMINALS_PER_OWNER = 8;
 const DEFAULT_MAX_GLOBAL_TERMINALS = 32;
 const DEFAULT_EXITED_TERMINAL_IDLE_TTL_MS = 30 * 60 * 1000;
+// Terminal websocket messages are interactive control-plane events (input,
+// resize, ping) rather than bulk PTY output. The default allows short typing or
+// paste bursts while sustaining 60 messages/second per authenticated
+// session+terminal socket scope; larger transfer workloads should use normal
+// shell tools inside the PTY instead of websocket frame floods. The bounded
+// bucket count caps memory if many sockets repeatedly hit the limiter.
 const DEFAULT_TERMINAL_SOCKET_MESSAGE_RATE_LIMIT_CAPACITY = 120;
 const DEFAULT_TERMINAL_SOCKET_MESSAGE_RATE_LIMIT_REFILL_TOKENS = 60;
 const DEFAULT_TERMINAL_SOCKET_MESSAGE_RATE_LIMIT_REFILL_INTERVAL_MS = 1_000;
