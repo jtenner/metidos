@@ -222,10 +222,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] D7: Review `resolveQuickJsPromise` timeout behavior in `src/bun/plugin/quickjs-runtime.ts`. Add tests/comments for promise timeout, pending-job execution, and timer cleanup.
 - [ ] D10: Review per-plugin QuickJS memory limits in `src/bun/plugin/quickjs-runtime.ts` and sidecar manager. If multiple plugins can exhaust host memory, add a global cap/telemetry; otherwise document total-memory threat model.
 
-### Plugin filesystem sandbox follow-up
-
-- [ ] E7: Review RPC param bounds in `src/bun/index.ts` (`MAX_RPC_RECORD_KEYS`, `MAX_RPC_RECORD_DEPTH`). If nested payloads can still cause CPU/memory pressure, tighten limits; otherwise document per-request bounds.
-
 ### Outbound network and SSRF follow-up
 
 - [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.

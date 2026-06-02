@@ -2571,6 +2571,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 // request-scoped.
 const MAX_RPC_RECORD_DEPTH = 12;
 const MAX_RPC_RECORD_KEYS = 1000;
+const MAX_RPC_RECORD_ARRAY_ITEMS = 1000;
 const MAX_RPC_RECORD_STRING_BYTES = 64 * 1024;
 
 type RpcParamBoundsOptions = {
@@ -2595,6 +2596,7 @@ function assertRpcParamBounds(
   options: RpcParamBoundsOptions = {},
 ): void {
   let keyCount = 0;
+  let arrayItemCount = 0;
   const seen = new Set<object>();
   const stack: Array<{ path: string; value: unknown; depth: number }> = [
     { depth: 0, path: fieldPath, value },
@@ -2627,6 +2629,12 @@ function assertRpcParamBounds(
       );
     }
     if (Array.isArray(current.value)) {
+      arrayItemCount += current.value.length;
+      if (arrayItemCount > MAX_RPC_RECORD_ARRAY_ITEMS) {
+        throw new Error(
+          `Invalid RPC params: ${fieldPath} must contain at most ${MAX_RPC_RECORD_ARRAY_ITEMS} array items total; ${current.path} would raise the total to ${arrayItemCount}.`,
+        );
+      }
       current.value.forEach((item, index) => {
         stack.push({
           depth: current.depth + 1,
@@ -2659,6 +2667,7 @@ function assertRpcRecordBounds(
   fieldPath: string,
 ): void {
   let keyCount = 0;
+  let arrayItemCount = 0;
   const seen = new Set<object>();
   const stack: Array<{ path: string; value: unknown; depth: number }> = [
     { depth: 0, path: fieldPath, value },
@@ -2690,6 +2699,12 @@ function assertRpcRecordBounds(
       );
     }
     if (Array.isArray(current.value)) {
+      arrayItemCount += current.value.length;
+      if (arrayItemCount > MAX_RPC_RECORD_ARRAY_ITEMS) {
+        throw new Error(
+          `Invalid RPC params: ${fieldPath} must contain at most ${MAX_RPC_RECORD_ARRAY_ITEMS} array items total; ${current.path} would raise the total to ${arrayItemCount}.`,
+        );
+      }
       current.value.forEach((item, index) => {
         stack.push({
           depth: current.depth + 1,

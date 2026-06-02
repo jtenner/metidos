@@ -377,6 +377,12 @@ describe("RPC request validation", () => {
         projectPath: "/tmp/metidos-project",
       }),
     ).toThrow(/openProject must be at most 12 levels deep/);
+    expect(() =>
+      validateRpcRequestParams("openProject", {
+        extra: Array.from({ length: 1001 }, (_, index) => index),
+        projectPath: "/tmp/metidos-project",
+      }),
+    ).toThrow(/openProject must contain at most 1000 array items total/);
   });
 
   test("bounds generic RPC record params", async () => {
@@ -399,6 +405,14 @@ describe("RPC request validation", () => {
         values: { key: "x".repeat(64 * 1024 + 1) },
       }),
     ).toThrow(/string must be at most/);
+    expect(() =>
+      validateRpcRequestParams("updatePluginSettings", {
+        directoryName: "demo",
+        values: { key: Array.from({ length: 1001 }, (_, index) => index) },
+      }),
+    ).toThrow(
+      /updatePluginSettings must contain at most 1000 array items total/,
+    );
   });
 
   test("recognizes only JSON content types for sensitive mutation routes", async () => {
