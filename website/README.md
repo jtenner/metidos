@@ -5,9 +5,12 @@ setup and design tokens as the product UI.
 
 ## How it's wired
 
-- `index.html` — the page. Uses token-derived Tailwind utilities (`bg-bg-app`,
+- `index.html` — the home page. Uses token-derived Tailwind utilities (`bg-bg-app`,
   `text-text-primary`, `border-border-default`, `text-accent`, `rounded-md`,
   `font-mono`, …) so it matches `src/mainview/` without copying component code.
+- `docs.html` — the static docs landing page. The chosen URL shape is a root-level
+  `docs.html` file so the site stays no-framework and can be served from any
+  static host without directory-index routing assumptions.
 - `input.css` — the Tailwind entry: imports `tailwindcss`, imports `theme.css`,
   and scans `./**/*.html`.
 - `theme.css` — the `@theme { … }` token block copied verbatim from
@@ -44,8 +47,8 @@ python3 -m http.server -d website 8080
 
 ## Deploy
 
-It's plain static output (`index.html` + built `styles.css`), so it works on
-GitHub Pages or any static host. For GitHub Pages, either commit a built
+It's plain static output (`index.html`, `docs.html` + built `styles.css`), so it
+works on GitHub Pages or any static host. For GitHub Pages, either commit a built
 `styles.css` (remove the `.gitignore` entry) or run `bun run website:build` in CI
 before publishing the `website/` folder.
 

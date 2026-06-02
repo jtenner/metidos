@@ -75,6 +75,34 @@ body {
     image-rendering: pixelated;
   }
 
+  .doc-row {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    outline: none;
+  }
+
+  .doc-row:hover span:first-child {
+    color: var(--color-text-primary);
+  }
+
+  .doc-row:focus-visible {
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
+  }
+
+  .doc-row span:first-child {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .doc-row span:last-child {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
   .mock-icon-btn {
     display: grid;
     height: 2rem;
