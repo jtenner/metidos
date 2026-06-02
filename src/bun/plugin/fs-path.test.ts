@@ -328,6 +328,51 @@ describe("plugin fs virtual path resolver", () => {
     });
   });
 
+  it("fails closed for deleted roots and permits write paths through missing ancestors", async () => {
+    const { pluginPath, projectPath } = createPluginFixture();
+
+    const nestedWrite = await resolvePluginFsVirtualPath({
+      access: "write",
+      pluginPath,
+      virtualPath: "~/missing/parent/new.txt",
+    });
+    expect(nestedWrite).toMatchObject({
+      absolutePath: join(pluginPath, ".data", "missing", "parent", "new.txt"),
+      exists: false,
+      realPath: join(pluginPath, ".data", "missing", "parent", "new.txt"),
+      rootKind: "pluginData",
+      rootPath: join(pluginPath, ".data"),
+      virtualPath: "~/missing/parent/new.txt",
+    });
+
+    rmSync(join(pluginPath, ".data"), { force: true, recursive: true });
+    const deletedPluginData = await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        access: "write",
+        pluginPath,
+        virtualPath: "~/missing/parent/new.txt",
+      }),
+    );
+    expect(deletedPluginData).toMatchObject({
+      code: "root_unavailable",
+      virtualPath: "~/missing/parent/new.txt",
+    });
+
+    rmSync(projectPath, { force: true, recursive: true });
+    const deletedProjectRoot = await expectPluginFsPathError(
+      resolvePluginFsVirtualPath({
+        access: "write",
+        pluginPath,
+        projectRootPath: projectPath,
+        virtualPath: "./new.txt",
+      }),
+    );
+    expect(deletedProjectRoot).toMatchObject({
+      code: "root_unavailable",
+      virtualPath: "./new.txt",
+    });
+  });
+
   it("opens validated plugin paths with a synchronous lstat/open pair", async () => {
     const { pluginPath } = createPluginFixture();
     const resolved = await resolvePluginFsVirtualPath({
