@@ -572,6 +572,30 @@ function skipSqlQuotedToken(sql: string, startIndex: number): number {
   return index;
 }
 
+function readSqlQuotedIdentifier(
+  sql: string,
+  startIndex: number,
+): { nextIndex: number; value: string } | null {
+  const quote = sql[startIndex] ?? "";
+  if (quote !== '"' && quote !== "`" && quote !== "[") {
+    return null;
+  }
+
+  const closingQuote = quote === "[" ? "]" : quote;
+  const nextIndex = skipSqlQuotedToken(sql, startIndex);
+  if (nextIndex > sql.length || sql[nextIndex - 1] !== closingQuote) {
+    return null;
+  }
+
+  const quotedValue = sql.slice(startIndex + 1, nextIndex - 1);
+  const escapedClosingQuote = `${closingQuote}${closingQuote}`;
+  const value =
+    closingQuote === "]"
+      ? quotedValue
+      : quotedValue.replaceAll(escapedClosingQuote, closingQuote);
+  return { nextIndex, value };
+}
+
 function findSqlIdentifier(
   sql: string,
   startIndex: number,
@@ -583,13 +607,17 @@ function findSqlIdentifier(
     index = skipSqlWhitespaceAndComments(sql, index);
     const character = sql[index] ?? "";
 
-    if (
-      character === "'" ||
-      character === '"' ||
-      character === "`" ||
-      character === "["
-    ) {
+    if (character === "'") {
       index = skipSqlQuotedToken(sql, index);
+      continue;
+    }
+
+    const quotedIdentifier = readSqlQuotedIdentifier(sql, index);
+    if (quotedIdentifier) {
+      if (quotedIdentifier.value.toLowerCase() === expectedIdentifier) {
+        return { nextIndex: quotedIdentifier.nextIndex };
+      }
+      index = quotedIdentifier.nextIndex;
       continue;
     }
 

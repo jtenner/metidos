@@ -615,6 +615,29 @@ describe("executePluginSqliteOperation", () => {
     ).resolves.toEqual({ row: { count: 0 } });
   });
 
+  it("allows load_extension text and quoted aliases when they are not function calls", async () => {
+    const { pluginPath } = createPluginFixture();
+    const permissions = ["sqlite", "storage:write"];
+
+    for (const statement of [
+      "select 'load_extension(' as literal_text",
+      'select 1 as "load_extension"',
+      "select 1 as [load_extension]",
+      "select 1 as `load_extension`",
+      "select 1 -- load_extension('extension')",
+      "select 1 /* load_extension('extension') */",
+    ]) {
+      await expect(
+        executePluginSqliteOperation({
+          operation: "sqlite.get",
+          params: { path: "~/db/state.sqlite", statement },
+          permissions,
+          pluginPath,
+        }),
+      ).resolves.toMatchObject({ row: expect.any(Object) });
+    }
+  });
+
   it("blocks statements that can open or write other database files", async () => {
     const { pluginPath } = createPluginFixture();
     const permissions = ["sqlite", "storage:write"];
@@ -629,7 +652,13 @@ describe("executePluginSqliteOperation", () => {
       "-- comment\nattach database 'other.sqlite' as other",
       "-- comment\nvacuum into 'copy.sqlite'",
       "select load_extension('extension')",
+      "select load_extension\n\t('extension')",
       "select/**/load_extension('extension')",
+      "select load_extension/* comment */('extension')",
+      "select load_extension /* comment */ ('extension')",
+      "select \"load_extension\"('extension')",
+      "select [load_extension]('extension')",
+      "select `load_extension`('extension')",
       "pragma journal_mode = wal",
       "pragma table_info(notes)",
       "begin transaction",

@@ -259,7 +259,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] C9: Review startup TOTP secret migration hook in `src/bun/index.ts` and `src/bun/auth/secret-migration.ts`. If missing coverage, add tests/comments around legacy v1-to-v2 ciphertext migration.
 - [ ] C11: Review plugin SQLite read guards in `src/bun/plugin/sqlite.ts` (`assertReadStatement`, `containsSqlIdentifierFromSet`). Fix false positives/false negatives if real; otherwise add tests/comments explaining why mutating CTEs and dangerous identifiers are blocked.
 - [ ] C12: Review `sqlite.run` policy in `src/bun/plugin/sqlite.ts` for `CREATE TRIGGER`, `CREATE VIRTUAL TABLE`, `DROP`, and similar statements. If these should be disallowed, enforce it; otherwise document that plugins may fully control only their own `~/` SQLite DB.
-- [ ] C13: Review `load_extension()` detection in `src/bun/plugin/sqlite.ts`. Add tests for quoted identifiers, comments, and whitespace to prove the guard cannot be bypassed in executable function calls.
 
 ### Plugin QuickJS sandbox follow-up
 
