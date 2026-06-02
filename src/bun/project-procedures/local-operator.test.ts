@@ -71,6 +71,26 @@ describe("local operator seam", () => {
     ).toBeTrue();
   });
 
+  it("treats auth isAdmin as the sole local app-management gate", () => {
+    const steppedUpNonAdmin = context({
+      isAdmin: false,
+      stepUpValidUntil: "2026-05-12T00:05:00.000Z",
+    });
+
+    const state = getLocalOperatorState(steppedUpNonAdmin, nowMs);
+
+    expect(state.hasAuthenticatedSession).toBeTrue();
+    expect(state.hasRecentStepUp).toBeTrue();
+    expect(state.canManageApp).toBeFalse();
+    expect(state.canUseUnsafeMode).toBeFalse();
+    expect(
+      localOperatorHasCapability(steppedUpNonAdmin, "manage_app", nowMs),
+    ).toBeFalse();
+    expect(() =>
+      requireLocalOperatorCapability(steppedUpNonAdmin, "manage_app", nowMs),
+    ).toThrow(AuthServiceError);
+  });
+
   it("rejects unauthenticated calls for operator id lookups and capabilities", () => {
     const unauthenticated = context({
       isAdmin: false,

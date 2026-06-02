@@ -51,6 +51,10 @@ export function getLocalOperatorState(
   const validUntilMs = stepUpValidUntilMs(context);
   const hasRecentStepUp =
     typeof validUntilMs === "number" && validUntilMs > nowMs;
+  // Metidos currently uses a single local-operator authority model: the
+  // authenticated session is the actor identity, while `isAdmin` is the sole
+  // app-management gate assigned by the auth layer. Keep derived capabilities
+  // here so sensitive procedures do not grow divergent privilege checks.
   const canManageApp = context?.auth.isAdmin === true;
   return {
     profile,

@@ -250,7 +250,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Authorization and capability follow-up
 
 - [ ] B1: Review `src/bun/rpc-websocket-auth.ts` (`revalidateRpcWebSocketSession`) and `src/bun/index.ts` websocket close behavior. If admin revocation errors are too opaque for the UI, improve error surfacing; otherwise document why socket close is the intended response.
-- [ ] B2: Clarify the local-operator/admin threat model in `src/bun/project-procedures/local-operator.ts`: add comments or docs explaining why `isAdmin` is the sole app-management gate in the single-operator model.
 - [ ] B3: Review session-scoped step-up in `src/bun/auth/service-session.ts`. If stolen-session exposure is too broad, shorten lifetime or bind step-up to stronger context; otherwise document the 10-minute accepted risk.
 - [ ] B4: Review non-admin WebSocket connection behavior in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. If non-admin sockets can consume excessive resources, add tighter limits; otherwise comment that admin-only checks are per-procedure.
 - [ ] B5: Verify thread/project visibility checks in `src/bun/project-procedures.ts` for `getThreadProcedure` and related thread reads. Fix any IDOR; otherwise add tests/comments proving procedure-level authz covers raw RPC param validation.
