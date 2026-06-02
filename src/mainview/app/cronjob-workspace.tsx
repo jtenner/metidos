@@ -137,7 +137,7 @@ export function CronjobWorkspace({
 }: CronjobWorkspaceProps): JSX.Element {
   if (isLoadingCronJobs) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center border border-border-subtle bg-surface-1 px-4 py-8 text-sm text-text-muted">
+      <div className="min-h-0 px-3 py-2 text-xs text-text-muted" role="status">
         Loading cron jobs…
       </div>
     );
@@ -145,7 +145,7 @@ export function CronjobWorkspace({
 
   if (cronJobsError) {
     return (
-      <div className="min-h-0 border border-danger-border bg-danger-surface px-4 py-3 text-sm text-danger-text">
+      <div className="min-h-0 px-3 py-2 text-xs text-danger-text" role="alert">
         {cronJobsError}
       </div>
     );
@@ -153,7 +153,7 @@ export function CronjobWorkspace({
 
   if (cronJobs.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center border border-border-subtle bg-surface-1 px-4 py-8 text-sm text-text-muted">
+      <div className="min-h-0 px-3 py-2 text-xs text-text-muted">
         No cron jobs found.
       </div>
     );
