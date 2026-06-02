@@ -589,6 +589,7 @@ describe("executePluginSqliteOperation", () => {
       "with changed as (insert into notes (title) values ('side effect') returning title) select title from changed",
       "with changed as (update notes set title = 'side effect' returning title) select title from changed",
       "with changed as (delete from notes returning title) select title from changed",
+      "with ignored as (select 'insert into notes values (1)' as text) insert into notes (title) values ('side effect') returning title",
     ]) {
       await expect(
         executePluginSqliteOperation({
@@ -613,6 +614,51 @@ describe("executePluginSqliteOperation", () => {
         pluginPath,
       }),
     ).resolves.toEqual({ row: { count: 0 } });
+  });
+
+  it("allows read statements with disallowed words in inert SQL contexts", async () => {
+    const { pluginPath } = createPluginFixture();
+    const permissions = ["sqlite", "storage:write"];
+
+    await executePluginSqliteOperation({
+      operation: "sqlite.run",
+      params: {
+        path: "~/db/state.sqlite",
+        statement:
+          'create table "update" (id integer primary key, "drop" text not null)',
+      },
+      permissions,
+      pluginPath,
+    });
+    await executePluginSqliteOperation({
+      operation: "sqlite.run",
+      params: {
+        bindings: ["quoted schema"],
+        path: "~/db/state.sqlite",
+        statement: 'insert into "update" ("drop") values (?)',
+      },
+      permissions,
+      pluginPath,
+    });
+
+    for (const statement of [
+      "select 'insert update delete drop pragma' as literal_text",
+      "select 1 as updated_at, 2 as dropbox_count",
+      'select "drop" from "update"',
+      "select [drop] from [update]",
+      "select `drop` from `update`",
+      "-- insert into notes values (1)\nselect 1",
+      "select 1 /* update notes set title = 'side effect' */",
+    ]) {
+      await expect(
+        executePluginSqliteOperation({
+          operation: "sqlite.all",
+          params: { path: "~/db/state.sqlite", statement },
+          permissions,
+          pluginPath,
+        }),
+      ).resolves.toMatchObject({ rows: expect.any(Array) });
+    }
   });
 
   it("allows load_extension text and quoted aliases when they are not function calls", async () => {

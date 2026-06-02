@@ -216,7 +216,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### SQLite and persistence follow-up
 
 - [ ] C9: Review startup TOTP secret migration hook in `src/bun/index.ts` and `src/bun/auth/secret-migration.ts`. If missing coverage, add tests/comments around legacy v1-to-v2 ciphertext migration.
-- [ ] C11: Review plugin SQLite read guards in `src/bun/plugin/sqlite.ts` (`assertReadStatement`, `containsSqlIdentifierFromSet`). Fix false positives/false negatives if real; otherwise add tests/comments explaining why mutating CTEs and dangerous identifiers are blocked.
 
 ### Plugin QuickJS sandbox follow-up
 

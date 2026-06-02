@@ -965,7 +965,10 @@ function assertReadStatement(
   // The read guard intentionally keeps the first-keyword check and disallowed
   // identifier scan separate. This path only runs once per plugin SQLite call,
   // and separate helpers keep diagnostics focused; consolidate tokenization only
-  // if profiling shows SQL validation becoming hot.
+  // if profiling shows SQL validation becoming hot. The identifier scan skips
+  // strings, comments, and quoted identifiers so plugins may read their own
+  // quoted schema names, while unquoted mutating tokens in CTEs/subqueries are
+  // rejected before SQLite can execute a side effect.
   const firstKeyword =
     getFirstSqlIdentifier(statementText)?.value.toLowerCase() ?? "";
   if (firstKeyword !== "select" && firstKeyword !== "with") {
