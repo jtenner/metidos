@@ -14,9 +14,12 @@ setup and design tokens as the product UI.
   `src/mainview/input.css`. Keep it in sync when the product palette changes.
 - `styles.css` — **generated** by the Tailwind CLI (git-ignored).
 
-No JavaScript framework, no external images, and no committed binary/font assets.
-Inter / Fira Code degrade gracefully to the system font stacks declared in the
-tokens.
+No JavaScript framework and no external images. The website currently tracks
+`bird.png`, a byte-identical copy of the root mascot/favicon asset; its public
+redistribution provenance is still pending in
+`docs/public-asset-provenance-audit-2026-06-02.md`. No font assets are committed
+under `website/`; Inter / Fira Code degrade gracefully to the system font stacks
+declared in the tokens.
 
 ## Build
 
