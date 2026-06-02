@@ -17,7 +17,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Smoke-run documented package scripts from a clean setup and record exact outcomes. Context: `.wiki/package-script-reference-audit.md` verifies referenced script names exist as of 2026-06-01 and records a 2026-06-02 current-checkout preflight smoke run where `tailwind:build`, `website:build`, `sync:core-plugins`, `toml:check`, `style:check`, `a11y:check`, `typecheck`, and `test` pass after two strict test typing fixes. Remaining 3-minute slices:
   - [ ] In a clean clone or disposable checkout, run the representative root build/check/test scripts and record exact OS, Bun version, command list, pass/fail status, and any setup prerequisites.
   - [ ] In a clean clone or disposable checkout, run the documented `src/mainview/getdown` scripts (`test`, `typecheck`, and bounded performance baseline commands if practical) and record exact outcomes.
-  - [ ] Decide how to document intentionally long-running watch/start scripts (`dev`, `start`, TLS variants, `tailwind:watch`, `website:watch`): either bounded smoke checks with timeouts or an explicit rationale for excluding them from clean-clone execution validation.
 
 ## 5. README Improvements
 

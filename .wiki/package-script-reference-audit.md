@@ -83,6 +83,21 @@ On 2026-06-02, the following root package scripts were smoke-run from the existi
 
 This was not a clean-clone validation. It is a preflight smoke run from the active development checkout to identify immediate blockers before doing the clean setup pass.
 
+## Long-running script validation decision
+
+For clean-clone validation, the repository should not treat indefinitely running scripts as pass/fail commands that must terminate naturally. Instead, validate them with bounded smoke checks or explicitly exclude them when they require local state that is outside the clean-clone contract.
+
+Recommended clean-clone handling:
+
+- `bun run dev`: smoke-run with a short timeout and count it as passing only if the development supervisor reaches its normal startup/watch state without an immediate error. Capture the timeout used and the first readiness/error lines.
+- `bun run start`: smoke-run with a short timeout and count it as passing only if the production-style server reaches its normal listening state without an immediate error. Capture the timeout used, port/config prerequisites, and readiness/error lines.
+- `bun run start:telemetry`: exclude from routine clean-clone validation unless telemetry prerequisites and consent/configuration are intentionally part of the test environment; document it as covered by the same startup path as `start` plus telemetry configuration review.
+- `bun run start:tls` and `bun run start:tls:telemetry`: exclude from routine clean-clone validation unless disposable TLS credentials are generated during the test. If tested, record the certificate-generation command, environment variables, timeout, and readiness/error lines.
+- `bun run tailwind:watch` and `bun run website:watch`: smoke-run with a short timeout and count them as passing only if the watcher starts and performs the initial build without an immediate error. Capture the timeout and initial build output.
+- `bun run dev:watch`: do not validate separately because it aliases `bun run dev`; reference the `dev` smoke result.
+
+The clean-clone result log should state that watch/start scripts are long-running by design and that a timeout is expected after readiness is observed. A timeout before readiness, or any startup error, should be recorded as a failure with the observed logs.
+
 ## Remaining follow-up
 
-This audit verified that referenced package-script names exist and now includes a current-checkout smoke run for representative root scripts. It has not executed every referenced script from a clean clone, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should smoke-run representative documented commands in a clean setup and record exact outcomes.
+This audit verified that referenced package-script names exist and now includes a current-checkout smoke run for representative root scripts. It has not executed every referenced script from a clean clone, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should smoke-run representative documented commands in a clean setup and record exact outcomes, using the bounded handling above for long-running watch/start scripts.
