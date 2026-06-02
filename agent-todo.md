@@ -293,7 +293,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] K1: Review in-process auth immediate-transaction queue in `src/bun/auth/service-login.ts`. Add comments/tests for per-Database scope and multi-connection behavior.
 - [ ] K6: Review startup cache warmup deferral in `src/bun/index.ts`. If first request can race expensive warmup, fix scheduling; otherwise comment best-effort nature.
-- [ ] K7: Review overload monitoring in `src/bun/index.ts`. If lag should trigger backpressure instead of only logs, add behavior; otherwise document observability-only intent.
 - [ ] K9: Review runtime-stats pending RPC snapshots in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. Add comments/tests if getter semantics are unclear.
 - [ ] K10: Review per-request versus per-connection RPC param bounds in `src/bun/index.ts`. If repeated large bounded requests can DoS, add aggregate limits; otherwise document per-request threat model.
 - [ ] K12: Review `objectParams` validator casts in `src/bun/index.ts`. Add stricter typed validators for risky RPCs or comments/tests showing shape validation is sufficient.

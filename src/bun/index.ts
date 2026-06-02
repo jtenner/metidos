@@ -2309,6 +2309,11 @@ function startOverloadMonitoring(activeServerPort: () => number): void {
     peakEventLoopLagMs = Math.max(peakEventLoopLagMs, lastEventLoopLagMs);
     expectedAt = now + SERVER_MONITOR_INTERVAL_MS;
 
+    // This monitor is intentionally observability-only. Metidos is a local IDE
+    // backend where transient agent, Git, or provider stalls are expected; applying
+    // automatic backpressure here would risk breaking in-progress operator work.
+    // Individual transports/procedures own their request-size and rate-limit
+    // enforcement, while this loop surfaces aggregate pressure for diagnostics.
     // Keep the steady-state monitor cheap: only build the full health snapshot
     // (which clones runtime-stats maps) after inexpensive pressure checks pass.
     const git = getGitSchedulerStats();
