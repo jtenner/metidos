@@ -1070,7 +1070,7 @@ export function CalendarWorkspace({
                   aria-label={`Calendar actions for ${calendar.title}`}
                   aria-haspopup="dialog"
                   buttonStyle="muted"
-                  className="h-6 w-6 min-w-0"
+                  className="h-7 w-7 min-w-0"
                   iconOnly
                   onClick={(event) => {
                     openCalendarMenuAtElement(calendar.id, event.currentTarget);
@@ -1135,7 +1135,7 @@ export function CalendarWorkspace({
                       aria-label={`ICS subscription actions for ${calendar.title}`}
                       aria-haspopup="dialog"
                       buttonStyle="muted"
-                      className="h-6 w-6 min-w-0"
+                      className="h-7 w-7 min-w-0"
                       iconOnly
                       onClick={(event) => {
                         openExternalCalendarMenuAtElement(
