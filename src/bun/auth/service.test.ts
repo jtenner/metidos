@@ -906,6 +906,44 @@ describe("auth service", () => {
     ).toContain('"method":"recovery_code"');
   });
 
+  it("records invalid step-up primary-factor attempts distinctly from TOTP failures", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    const setupResult = await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+
+    await expect(
+      stepUpSession(database, {
+        appDataDir,
+        nowMs: nowMs + 35_000,
+        primaryFactor: "000000",
+        sessionId: setupResult.session.id,
+        totpCode: await generateTotpCode(enrollment.totpSecret, nowMs + 35_000),
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+
+    const invalidStepUpEvent = listSecurityAuditEvents(database).find(
+      (event) => event.eventType === "auth_invalid_credentials",
+    );
+    expect(invalidStepUpEvent?.payloadJson).toContain(
+      '"method":"primary_factor"',
+    );
+    expect(invalidStepUpEvent?.payloadJson).toContain(
+      '"primaryFactorType":"pin"',
+    );
+  });
+
   it("records setup, TOTP login, step-up, and logout audit events", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();

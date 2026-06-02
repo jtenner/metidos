@@ -367,7 +367,7 @@ export async function stepUpSession(
     const failure = incrementFailedAttempts(database, session.userId, now);
     recordInvalidAuthAttempt(database, {
       lockedUntil: failure.lockedUntil,
-      method: "totp",
+      method: "primary_factor",
       primaryFactorType: settings.primaryFactorType,
     });
 

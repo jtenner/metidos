@@ -527,7 +527,7 @@ export function recordInvalidAuthAttempt(
   database: Database,
   input: {
     lockedUntil: string | null;
-    method: "recovery_code" | "totp";
+    method: "primary_factor" | "recovery_code" | "totp";
     primaryFactorType: AuthPrimaryFactorType;
   },
 ): void {
