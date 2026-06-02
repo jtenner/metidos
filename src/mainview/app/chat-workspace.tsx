@@ -9,6 +9,7 @@ import {
   type CSSProperties,
   type FormEvent,
   type JSX,
+  type KeyboardEvent,
   lazy,
   memo,
   type PointerEvent,
@@ -1949,8 +1950,76 @@ export function DesktopChatView({
   }, [interactionPanelHeight]);
   const terminalCountLabel =
     terminals.length > 0 ? ` (${terminals.length})` : "";
+  const chatInteractionTabId = "desktop-interaction-tab-chat";
+  const terminalInteractionTabId = "desktop-interaction-tab-terminal";
+  const chatInteractionPanelId = "desktop-interaction-panel-chat";
+  const terminalInteractionPanelId = "desktop-interaction-panel-terminal";
+  const chatInteractionTabRef = useRef<HTMLButtonElement | null>(null);
+  const terminalInteractionTabRef = useRef<HTMLButtonElement | null>(null);
   const activeModelSupportsImageInput =
     findCodexModel(codexModels, activeCodexModel)?.supportsImageInput === true;
+
+  const selectInteractionMode = useCallback(
+    (mode: InteractionMode): void => {
+      if (mode === "terminal") {
+        if (!terminalAccessAllowed) {
+          return;
+        }
+        if (terminals.length === 0 && canCreateTerminal) {
+          onCreateTerminal();
+        }
+      }
+      onSetInteractionMode(mode);
+    },
+    [
+      canCreateTerminal,
+      onCreateTerminal,
+      onSetInteractionMode,
+      terminalAccessAllowed,
+      terminals.length,
+    ],
+  );
+
+  const handleInteractionTabKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>): void => {
+      const isTerminalAvailable = terminalAccessAllowed;
+      let nextMode: InteractionMode | null = null;
+
+      switch (event.key) {
+        case "ArrowLeft":
+        case "ArrowUp":
+          nextMode =
+            interactionMode === "terminal" || !isTerminalAvailable
+              ? "chat"
+              : "terminal";
+          break;
+        case "ArrowRight":
+        case "ArrowDown":
+          nextMode =
+            interactionMode === "chat" && isTerminalAvailable
+              ? "terminal"
+              : "chat";
+          break;
+        case "Home":
+          nextMode = "chat";
+          break;
+        case "End":
+          nextMode = isTerminalAvailable ? "terminal" : "chat";
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      selectInteractionMode(nextMode);
+      if (nextMode === "terminal") {
+        terminalInteractionTabRef.current?.focus();
+        return;
+      }
+      chatInteractionTabRef.current?.focus();
+    },
+    [interactionMode, selectInteractionMode, terminalAccessAllowed],
+  );
 
   const interactionPanelClassName = useDynamicCssVariablesClassName(
     {
@@ -2016,19 +2085,28 @@ export function DesktopChatView({
           onPointerUp={finishInteractionPanelResize}
         />
         <div className="flex h-9 items-center gap-4 border-b border-composer-border px-4">
-          <div className="flex items-center gap-4" role="tablist">
+          <div
+            aria-label="Interaction mode"
+            className="flex items-center gap-4"
+            role="tablist"
+          >
             <AppButton
               unstyled
+              aria-controls={chatInteractionPanelId}
               aria-selected={interactionMode === "chat"}
               className={`font-label pb-1 text-xs uppercase tracking-[0.1em] transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2 ${
                 interactionMode === "chat"
                   ? "border-b-2 border-accent text-accent-strong"
                   : "text-text-muted hover:text-text-primary"
               }`}
+              id={chatInteractionTabId}
               onClick={() => {
-                onSetInteractionMode("chat");
+                selectInteractionMode("chat");
               }}
+              onKeyDown={handleInteractionTabKeyDown}
+              ref={chatInteractionTabRef}
               role="tab"
+              tabIndex={interactionMode === "chat" ? 0 : -1}
               type="button"
             >
               Chat
@@ -2036,19 +2114,21 @@ export function DesktopChatView({
             {terminalAccessAllowed ? (
               <AppButton
                 unstyled
+                aria-controls={terminalInteractionPanelId}
                 aria-selected={interactionMode === "terminal"}
                 className={`font-label pb-1 text-xs uppercase tracking-[0.1em] transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2 ${
                   interactionMode === "terminal"
                     ? "border-b-2 border-accent text-accent-strong"
                     : "text-text-muted hover:text-text-primary"
                 }`}
+                id={terminalInteractionTabId}
                 onClick={() => {
-                  if (terminals.length === 0 && canCreateTerminal) {
-                    onCreateTerminal();
-                  }
-                  onSetInteractionMode("terminal");
+                  selectInteractionMode("terminal");
                 }}
+                onKeyDown={handleInteractionTabKeyDown}
+                ref={terminalInteractionTabRef}
                 role="tab"
+                tabIndex={interactionMode === "terminal" ? 0 : -1}
                 type="button"
               >
                 Terminal{terminalCountLabel}
@@ -2057,107 +2137,121 @@ export function DesktopChatView({
           </div>
         </div>
         {terminalAccessAllowed && interactionMode === "terminal" ? (
-          <Suspense
-            fallback={
-              <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-text-muted">
-                Loading terminal…
-              </div>
-            }
+          <div
+            aria-labelledby={terminalInteractionTabId}
+            className="flex min-h-0 flex-1 flex-col"
+            id={terminalInteractionPanelId}
+            role="tabpanel"
           >
-            <TerminalWorkspace
-              activeTerminalId={activeTerminalId}
-              canCreateTerminal={canCreateTerminal}
-              onCloseTerminal={onCloseTerminal}
-              onCreateTerminal={() => {
-                onCreateTerminal({ copyActive: true });
-              }}
-              onRenameTerminal={onRenameTerminal}
-              onSelectTerminal={onSelectTerminal}
-              terminals={terminals}
-            />
-          </Suspense>
+            <Suspense
+              fallback={
+                <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-text-muted">
+                  Loading terminal…
+                </div>
+              }
+            >
+              <TerminalWorkspace
+                activeTerminalId={activeTerminalId}
+                canCreateTerminal={canCreateTerminal}
+                onCloseTerminal={onCloseTerminal}
+                onCreateTerminal={() => {
+                  onCreateTerminal({ copyActive: true });
+                }}
+                onRenameTerminal={onRenameTerminal}
+                onSelectTerminal={onSelectTerminal}
+                terminals={terminals}
+              />
+            </Suspense>
+          </div>
         ) : (
-          <form
-            className="flex min-h-0 flex-1 flex-col p-4"
-            onSubmit={onSubmit}
+          <div
+            aria-labelledby={chatInteractionTabId}
+            className="flex min-h-0 flex-1 flex-col"
+            id={chatInteractionPanelId}
+            role="tabpanel"
           >
-            <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
-              {extensionWidgetsAbove.length > 0 ? (
-                <ExtensionWidgetStack widgets={extensionWidgetsAbove} />
-              ) : null}
-              <div className="flex items-center gap-2 border-b border-composer-border p-2">
-                <div className="min-w-[20rem] max-w-[28rem]">
-                  <CodexModelSelector
-                    models={codexModels}
-                    value={activeCodexModel}
-                    disabled={modelSelectorDisabled}
-                    onChange={onChangeModel}
-                    onChangeReasoningEffort={onChangeReasoningEffort}
-                    onRefresh={onRefreshModelCatalog}
-                    reasoningDisabled={reasoningEffortSelectorDisabled}
-                    reasoningOptions={reasoningEfforts}
-                    reasoningValue={activeReasoningEffort}
-                    refreshing={isRefreshingModelCatalog}
+            <form
+              className="flex min-h-0 flex-1 flex-col p-4"
+              onSubmit={onSubmit}
+            >
+              <div className="mx-auto flex h-full w-full max-w-4xl flex-col">
+                {extensionWidgetsAbove.length > 0 ? (
+                  <ExtensionWidgetStack widgets={extensionWidgetsAbove} />
+                ) : null}
+                <div className="flex items-center gap-2 border-b border-composer-border p-2">
+                  <div className="min-w-[20rem] max-w-[28rem]">
+                    <CodexModelSelector
+                      models={codexModels}
+                      value={activeCodexModel}
+                      disabled={modelSelectorDisabled}
+                      onChange={onChangeModel}
+                      onChangeReasoningEffort={onChangeReasoningEffort}
+                      onRefresh={onRefreshModelCatalog}
+                      reasoningDisabled={reasoningEffortSelectorDisabled}
+                      reasoningOptions={reasoningEfforts}
+                      reasoningValue={activeReasoningEffort}
+                      refreshing={isRefreshingModelCatalog}
+                      variant="desktop"
+                    />
+                  </div>
+                  <ThreadAccessControl
+                    availablePluginAccessGroups={availablePluginAccessGroups}
+                    availableThreadPermissionDescriptors={
+                      availableThreadPermissionDescriptors
+                    }
+                    disabled={threadAccessControlDisabled}
+                    onChange={onChangeThreadAccess}
+                    showUnsafeMode={showUnsafeModeControl}
+                    value={threadAccessValue}
+                    variant="desktop"
+                  />
+                  {extensionStatusEntries.length > 0 ? (
+                    <ExtensionStatusPills entries={extensionStatusEntries} />
+                  ) : null}
+                  <div className="flex-1" />
+                  <ContextUsageMeter
+                    inputTokens={activeContextInputTokens}
+                    contextWindowTokens={activeContextWindowTokens}
+                  />
+                </div>
+                {modelControlError ? (
+                  <div className="mt-2 text-xs text-danger-text">
+                    {modelControlError}
+                  </div>
+                ) : null}
+                {reasoningEffortControlError ? (
+                  <div className="mt-2 text-xs text-danger-text">
+                    {reasoningEffortControlError}
+                  </div>
+                ) : null}
+                {threadAccessControlError ? (
+                  <div className="mt-2 text-xs text-danger-text">
+                    {threadAccessControlError}
+                  </div>
+                ) : null}
+                <div className="min-h-0 flex-1">
+                  <ChatComposerControl
+                    actionDisabled={composerActionDisabled}
+                    actionLabel={composerActionLabel}
+                    availableSkills={availableSkills}
+                    disabled={composerDisabled}
+                    draftKey={composerDraftKey}
+                    fillHeight
+                    hasSelectedThread={hasSelectedThread}
+                    initialValue={initialChatInput}
+                    isWorking={selectedThreadIsWorking || isWorking}
+                    onDraftChange={onComposerDraftChange}
+                    onSubmitMessage={onSubmitMessage}
+                    supportsImageInput={activeModelSupportsImageInput}
                     variant="desktop"
                   />
                 </div>
-                <ThreadAccessControl
-                  availablePluginAccessGroups={availablePluginAccessGroups}
-                  availableThreadPermissionDescriptors={
-                    availableThreadPermissionDescriptors
-                  }
-                  disabled={threadAccessControlDisabled}
-                  onChange={onChangeThreadAccess}
-                  showUnsafeMode={showUnsafeModeControl}
-                  value={threadAccessValue}
-                  variant="desktop"
-                />
-                {extensionStatusEntries.length > 0 ? (
-                  <ExtensionStatusPills entries={extensionStatusEntries} />
+                {extensionWidgetsBelow.length > 0 ? (
+                  <ExtensionWidgetStack widgets={extensionWidgetsBelow} />
                 ) : null}
-                <div className="flex-1" />
-                <ContextUsageMeter
-                  inputTokens={activeContextInputTokens}
-                  contextWindowTokens={activeContextWindowTokens}
-                />
               </div>
-              {modelControlError ? (
-                <div className="mt-2 text-xs text-danger-text">
-                  {modelControlError}
-                </div>
-              ) : null}
-              {reasoningEffortControlError ? (
-                <div className="mt-2 text-xs text-danger-text">
-                  {reasoningEffortControlError}
-                </div>
-              ) : null}
-              {threadAccessControlError ? (
-                <div className="mt-2 text-xs text-danger-text">
-                  {threadAccessControlError}
-                </div>
-              ) : null}
-              <div className="min-h-0 flex-1">
-                <ChatComposerControl
-                  actionDisabled={composerActionDisabled}
-                  actionLabel={composerActionLabel}
-                  availableSkills={availableSkills}
-                  disabled={composerDisabled}
-                  draftKey={composerDraftKey}
-                  fillHeight
-                  hasSelectedThread={hasSelectedThread}
-                  initialValue={initialChatInput}
-                  isWorking={selectedThreadIsWorking || isWorking}
-                  onDraftChange={onComposerDraftChange}
-                  onSubmitMessage={onSubmitMessage}
-                  supportsImageInput={activeModelSupportsImageInput}
-                  variant="desktop"
-                />
-              </div>
-              {extensionWidgetsBelow.length > 0 ? (
-                <ExtensionWidgetStack widgets={extensionWidgetsBelow} />
-              ) : null}
-            </div>
-          </form>
+            </form>
+          </div>
         )}
       </section>
     </>

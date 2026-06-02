@@ -187,10 +187,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
 - [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
 
-### Style: type scale, focus, and tab semantics
-
-- [ ] Complete the ARIA tab pattern for interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`: roving `tabIndex`, arrow-key handling, and `aria-controls`.
-
 ### Style: shared primitives and one-off controls
 
 - [ ] Refactor cron mode tabs and “New Cron” in `src/mainview/app/mainview-cron-workspace-controller.tsx` to use approved shared primitives such as `AppButton`, `IconButton`, `ListOptionButton`, or `TabButton`.
