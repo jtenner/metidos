@@ -40,6 +40,7 @@ import {
   prepareTotpEnrollment,
   readAuthCsrfCookie,
   readSessionCookie,
+  readUniqueCookieValue,
   readWebSocketTicketCookie,
   resolveSession,
   setupAuth,
@@ -1166,6 +1167,30 @@ describe("auth service", () => {
         secure: false,
       }),
     ).toThrow("WebSocket ticket id contains characters");
+  });
+
+  it("parses duplicated, empty, and equals-containing cookie values intentionally", () => {
+    expect(
+      readUniqueCookieValue(
+        "metidos_session=session=with=equals",
+        "metidos_session",
+      ),
+    ).toBe("session=with=equals");
+    expect(
+      readUniqueCookieValue("metidos_session=", "metidos_session"),
+    ).toBeNull();
+    expect(
+      readUniqueCookieValue(
+        "metidos_session=session-1; metidos_session=session-2",
+        "metidos_session",
+      ),
+    ).toBeNull();
+    expect(
+      readSessionCookie("__Host-metidos_session=; metidos_session=fallback"),
+    ).toBeNull();
+    expect(readSessionCookie("metidos_session=session=with=equals")).toBe(
+      "session=with=equals",
+    );
   });
 
   it("serializes and clears session and websocket ticket cookies", () => {
