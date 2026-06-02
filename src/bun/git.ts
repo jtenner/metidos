@@ -411,9 +411,13 @@ export async function readGitTextStream(
 
 /**
  * Read-only snapshot for diagnostics and scheduling observability.
- * Counts active and queued jobs across all cwd-scoped queues.
+ * Counts active and queued jobs across all cwd-scoped queues. This intentionally
+ * stays cheap enough for the overload monitor: it iterates only the in-memory
+ * queue map, reads array lengths, and performs no Git, filesystem, or database
+ * work. The map is scoped to worktrees that have scheduled Git work in this
+ * process, so even many open projects add one small queue object each rather
+ * than an expensive repository scan.
  */
-
 export function getGitSchedulerStats(): {
   activeBackgroundCount: number;
   activeForegroundCount: number;
