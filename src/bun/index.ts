@@ -3048,7 +3048,11 @@ function boundedSendThreadMessageParams(): RpcParamValidator {
       );
     }
     if (value.images) {
-      assertRpcArrayLength(value.images, `${String(method)}.images`, 8);
+      assertRpcArrayLength(
+        value.images,
+        `${String(method)}.images`,
+        MAX_CHAT_IMAGE_ATTACHMENTS,
+      );
       value.images.forEach((image, index) => {
         const itemPath = `${String(method)}.images[${index}]`;
         if (!isPlainObject(image)) {

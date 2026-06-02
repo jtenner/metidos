@@ -156,7 +156,7 @@ describe("RPC request validation", () => {
 
     expect(() =>
       validateRpcRequestParams("sendThreadMessage", {
-        images: Array.from({ length: 9 }, () => ({
+        images: Array.from({ length: MAX_CHAT_IMAGE_ATTACHMENTS + 1 }, () => ({
           data: "abc",
           mimeType: "image/png",
           type: "image",
@@ -164,7 +164,7 @@ describe("RPC request validation", () => {
         input: "hello",
         threadId: 1,
       }),
-    ).toThrow(/at most 8 items/);
+    ).toThrow(new RegExp(`at most ${MAX_CHAT_IMAGE_ATTACHMENTS} items`));
     expect(() =>
       validateRpcRequestParams("sendThreadMessage", {
         input: "x".repeat(MAX_THREAD_MESSAGE_INPUT_BYTES + 1),
