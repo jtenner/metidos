@@ -113,7 +113,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Smoke Docker and/or Podman install guidance in a disposable container. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies container setup as a remaining gap; record host OS, engine/version, commands, pass/fail status, first-run auth outcome, provider expectations, backup/restore notes, and teardown.
 - [ ] Smoke or desk-check reverse-proxy/Tailscale/TLS setup guidance. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies remote-access setup as a remaining gap; record which checks were executed versus only reviewed.
 - [ ] Dry-run or execute the installer skill workflow in an approved disposable scenario. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies `.pi/skills/metidos-installation/SKILL.md` as a remaining gap; verify it asks expected questions, emits a secret-safe `metidos-config.md`, and does not apply host changes before approval.
-- [ ] Verify tests can run locally without private services or credentials.
 - [ ] Verify tests use fixtures and fake data instead of real repositories, secrets, or personal paths.
 - [ ] Verify failing tests produce enough context for outside contributors to debug.
 
