@@ -876,7 +876,7 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
     >
       {group.kind === "assistant" ? (
         <div className="flex w-full max-w-full flex-col items-start gap-2">
-          <div className="flex items-center gap-2 px-[2px] text-accent-strong">
+          <div className="flex items-center gap-2 px-1 text-accent-strong">
             {brandLogoIcon("h-4 w-4")}
             <h2
               className="text-[10px] font-label font-semibold uppercase tracking-[0.1em]"
@@ -909,7 +909,7 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
                 return (
                   <article
                     aria-labelledby={messageLabelId}
-                    className="w-full bg-user-bubble px-[10px] py-[10px]"
+                    className="w-full bg-user-bubble p-2"
                     key={message.key}
                   >
                     <span className="sr-only" id={messageLabelId}>
@@ -945,7 +945,7 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
       ) : (
         <div className="flex w-full justify-end">
           <div className="flex max-w-[92%] flex-col items-end gap-2">
-            <div className="flex items-center gap-2 px-[2px] text-text-secondary">
+            <div className="flex items-center gap-2 px-1 text-text-secondary">
               <h2
                 className="font-body text-[13px] font-semibold tracking-[0.01em]"
                 id={speakerId}
@@ -959,7 +959,7 @@ const MobileTranscriptGroupRow = memo(function MobileTranscriptGroupRow({
             </p>
             <article
               aria-labelledby={`${groupBaseId}-message-label`}
-              className="w-fit max-w-full bg-user-bubble px-[10px] py-[10px] text-sm leading-relaxed text-text-primary "
+              className="w-fit max-w-full bg-user-bubble p-2 text-sm leading-relaxed text-text-primary"
             >
               <span className="sr-only" id={`${groupBaseId}-message-label`}>
                 {describeUserGroupAccessibilityLabel(group, items)}
@@ -2467,7 +2467,7 @@ export function MobileChatView({
       />
       {/* Keep the composer mounted while file diffs expand so mobile users can keep chatting. */}
       <footer
-        className="fixed bottom-16 left-0 right-0 z-40 px-[10px] pb-[10px]"
+        className="fixed bottom-16 left-0 right-0 z-40 px-2 pb-2"
         ref={footerRef}
       >
         <form
