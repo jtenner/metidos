@@ -520,10 +520,7 @@ export const ProjectsPanel = memo(function ProjectsPanel({
           className="mt-3 space-y-3"
         >
           {addProjectOpen ? (
-            <form
-              className="space-y-2 border border-border-subtle bg-surface-1 px-3 py-2"
-              onSubmit={onSubmitAddProject}
-            >
+            <form className="space-y-2 px-3 py-2" onSubmit={onSubmitAddProject}>
               <label className="uppercase-label block text-accent-strong">
                 Project Folder
                 <div className="relative mt-2 space-y-2">
