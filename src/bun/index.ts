@@ -4606,6 +4606,10 @@ async function bootstrap(): Promise<void> {
       message(ws, rawMessage) {
         if ("terminalId" in ws.data && typeof ws.data.terminalId === "string") {
           const terminalSocket = ws as ServerWebSocket<TerminalWebSocketData>;
+          // Terminal PTY messages are not allowed to rely on upgrade-time
+          // authorization alone. Revalidate on every incoming terminal frame
+          // and require local-operator privileges so admin revocation closes the
+          // socket before terminalManager can process more input.
           if (
             !revalidateAuthenticatedWebSocketSession(terminalSocket, {
               requireAdmin: true,
