@@ -15,6 +15,7 @@ import {
 } from "../db";
 import { exportPublicCalendarIcs } from "./export";
 import {
+  externalIcsCalendarIsDueForRefresh,
   listDueExternalIcsCalendarRefreshes,
   parseIcsCalendar,
   refreshDueExternalIcsCalendars,
@@ -736,6 +737,57 @@ describe("calendar store", () => {
       refreshIntervalMinutes: 360,
     });
     expect(updated.refreshIntervalMinutes).toBe(360);
+  });
+
+  test("evaluates external ICS refresh due times with UTC elapsed-time semantics", () => {
+    const now = new Date("2026-06-01T12:00:00.000Z");
+    const baseCalendar = {
+      id: 1,
+      consecutiveFailures: 0,
+      lastErrorAt: null,
+      refreshIntervalMinutes: 60,
+    };
+
+    expect(
+      externalIcsCalendarIsDueForRefresh(
+        { ...baseCalendar, lastFetchedAt: "2026-06-01T11:00:00.000Z" },
+        now,
+      ),
+    ).toBeTrue();
+    expect(
+      externalIcsCalendarIsDueForRefresh(
+        { ...baseCalendar, lastFetchedAt: "2026-06-01T11:00:01.000Z" },
+        now,
+      ),
+    ).toBeFalse();
+    expect(
+      externalIcsCalendarIsDueForRefresh(
+        { ...baseCalendar, lastFetchedAt: "2026-06-01T13:00:00.000Z" },
+        now,
+      ),
+    ).toBeFalse();
+    expect(
+      externalIcsCalendarIsDueForRefresh(
+        {
+          ...baseCalendar,
+          consecutiveFailures: 2,
+          lastErrorAt: "2026-06-01T10:59:59.500Z",
+          lastFetchedAt: "2026-06-01T07:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBeTrue();
+    expect(
+      externalIcsCalendarIsDueForRefresh(
+        {
+          ...baseCalendar,
+          consecutiveFailures: 2,
+          lastErrorAt: "2026-06-01T11:00:00.500Z",
+          lastFetchedAt: "2026-06-01T07:00:00.000Z",
+        },
+        now,
+      ),
+    ).toBeFalse();
   });
 
   test("finds due external ICS calendars using the 4 hour default and failure backoff", () => {

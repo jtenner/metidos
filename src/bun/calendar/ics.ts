@@ -440,6 +440,9 @@ export function externalIcsCalendarIsDueForRefresh(
   >,
   now: Date = new Date(),
 ): boolean {
+  // Refresh timestamps are stored as UTC ISO-8601 strings. Date.parse handles
+  // the historic millisecond precision variants emitted by SQLite and JS, while
+  // the elapsed-time comparison below avoids local-timezone/DST interpretation.
   const lastFetchedMs = parseIsoTimeMs(calendar.lastFetchedAt);
   if (lastFetchedMs === null) {
     return true;
@@ -459,6 +462,9 @@ export function externalIcsCalendarIsDueForRefresh(
     calendar.consecutiveFailures > 0
       ? (parseIsoTimeMs(calendar.lastErrorAt) ?? lastFetchedMs)
       : lastFetchedMs;
+  // If the host clock moves backward, or persisted timestamps are somehow in
+  // the future, the negative elapsed time deliberately leaves the calendar not
+  // due until wall time catches up; this avoids a tight retry loop.
   return nowMs - baseMs >= delayMinutes * 60_000;
 }
 
