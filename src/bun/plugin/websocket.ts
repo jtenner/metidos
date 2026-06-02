@@ -28,6 +28,12 @@ export const DEFAULT_PLUGIN_WEBSOCKET_MAX_MESSAGE_BYTES = 64 * 1024;
 export const DEFAULT_PLUGIN_WEBSOCKET_MAX_QUEUED_MESSAGES = 32;
 export const DEFAULT_PLUGIN_WEBSOCKET_SEND_BURST = 32;
 export const DEFAULT_PLUGIN_WEBSOCKET_SEND_REFILL_PER_SECOND = 16;
+// Send throttling is intentionally scoped to each WebSocket connection record.
+// Plugins already need explicit network:websocket permission, an allowlisted URL,
+// and are capped at DEFAULT_PLUGIN_WEBSOCKET_MAX_CONNECTIONS concurrent sockets;
+// reconnecting may reset one connection's bucket, but it cannot exceed those
+// connection and destination-policy boundaries. This keeps the limit focused on
+// accidental interactive floods rather than acting as an aggregate egress quota.
 const MAX_PLUGIN_WEBSOCKET_TIMEOUT_MS = 600_000;
 
 const BLOCKED_PLUGIN_WEBSOCKET_REQUEST_HEADERS = new Set([
