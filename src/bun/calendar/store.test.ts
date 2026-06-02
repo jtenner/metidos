@@ -522,6 +522,73 @@ describe("calendar store", () => {
     expect(count).toBe(1);
   });
 
+  test("skips reminder deliveries when calendar notifications are disabled", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    const calendar = createCalendar(db, owner.id, { title: "Muted" });
+    updateCalendarPreference(db, owner.id, calendar.id, {
+      notificationsEnabled: false,
+    });
+    createCalendarEvent(db, owner.id, {
+      calendarId: calendar.id,
+      title: "Muted reminder",
+      startAt: "2026-06-01T10:10:00.000Z",
+      endAt: "2026-06-01T10:30:00.000Z",
+      timezone: "UTC",
+      reminders: [{ minutesBefore: 10 }],
+    });
+
+    const delivered = scheduleDueCalendarReminders(
+      db,
+      new Date("2026-06-01T10:00:00.000Z"),
+    );
+
+    expect(delivered).toEqual([]);
+    expect(
+      db
+        .query<{ count: number }, []>(
+          "SELECT COUNT(*) AS count FROM calendar_reminder_deliveries",
+        )
+        .get()?.count,
+    ).toBe(0);
+  });
+
+  test("honors globally disabled in-app and browser notification outlets", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    updateCalendarNotificationSettings(db, owner.id, {
+      inAppEnabled: false,
+      browserEnabled: false,
+    });
+    const calendar = createCalendar(db, owner.id, { title: "Muted outlets" });
+    updateCalendarPreference(db, owner.id, calendar.id, {
+      notificationChannels: ["in_app", "browser"],
+      notificationsEnabled: true,
+    });
+    createCalendarEvent(db, owner.id, {
+      calendarId: calendar.id,
+      title: "Outlet-muted reminder",
+      startAt: "2026-06-01T10:10:00.000Z",
+      endAt: "2026-06-01T10:30:00.000Z",
+      timezone: "UTC",
+      reminders: [{ minutesBefore: 10 }],
+    });
+
+    const delivered = scheduleDueCalendarReminders(
+      db,
+      new Date("2026-06-01T10:00:00.000Z"),
+    );
+
+    expect(delivered).toEqual([]);
+    expect(
+      db
+        .query<{ count: number }, []>(
+          "SELECT COUNT(*) AS count FROM calendar_reminder_deliveries",
+        )
+        .get()?.count,
+    ).toBe(0);
+  });
+
   test("listing current notifications does not schedule reminders", () => {
     const db = setupDb();
     const owner = createUser(db, { username: "owner", isAdmin: true });
