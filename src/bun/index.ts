@@ -2814,6 +2814,13 @@ function optionalObjectParams(shape: RpcParamShape = {}): RpcParamValidator {
     typeof params === "undefined" ? undefined : objectValidator(params, method);
 }
 
+// Top-level `objectParams` validators are intentionally shallow: procedure
+// handlers remain the source of truth for semantic authorization and domain
+// validation, while this dispatch gate rejects malformed wire types and bounds
+// every nested string/object/array before any handler can materialize attacker-
+// controlled payloads. RPCs that accept risky structured values add dedicated
+// validators below (for example file diffs, batch opens, records, and chat
+// images) so `as` casts only follow explicit shape checks.
 function objectParams(
   shape: RpcParamShape = {},
   options: RpcParamBoundsOptions = {},
