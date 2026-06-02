@@ -25,7 +25,7 @@ import type {
   RpcThreadDetail,
   RpcThreadPermissionDescriptor,
 } from "../../bun/rpc-schema";
-import { AppButton } from "../controls/button";
+import { AppButton, TabButton } from "../controls/button";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { ConfirmDialog } from "../controls/confirm-dialog";
 import { materialSymbol } from "../controls/icons";
@@ -804,9 +804,8 @@ export function MainviewCronWorkspaceController({
           Cron jobs
         </div>
         <AppButton
-          unstyled
+          buttonStyle="secondary"
           type="button"
-          className="border border-border-default bg-surface-2 px-3 py-2 text-[11px] font-label uppercase tracking-[0.12em] text-accent transition-colors hover:border-border-default hover:bg-surface-2 hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => openCronCreator("describe")}
         >
           New Cron
@@ -838,29 +837,37 @@ export function MainviewCronWorkspaceController({
             </AppButton>
           </div>
           <div className="max-h-[min(75vh,42rem)] space-y-4 overflow-y-auto p-4">
-            <div className="flex gap-2 border-b border-border-subtle pb-3">
-              <AppButton
-                unstyled
+            <div
+              className="flex h-8 border-b border-border-subtle"
+              role="tablist"
+              aria-label="Cron creation mode"
+            >
+              <TabButton
+                selected={cronCreatorMode === "describe"}
                 type="button"
-                className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.1em] transition-colors ${cronCreatorMode === "describe" ? "bg-surface-2 text-text-primary" : "text-accent hover:text-text-primary"}`}
+                role="tab"
+                aria-selected={cronCreatorMode === "describe"}
+                className="px-3 text-xs"
                 onClick={() => {
                   setCronCreatorError("");
                   setCronCreatorMode("describe");
                 }}
               >
                 Describe Cron
-              </AppButton>
-              <AppButton
-                unstyled
+              </TabButton>
+              <TabButton
+                selected={cronCreatorMode === "edit"}
                 type="button"
-                className={`px-3 py-1 text-[11px] font-label uppercase tracking-[0.1em] transition-colors ${cronCreatorMode === "edit" ? "bg-surface-2 text-text-primary" : "text-accent hover:text-text-primary"}`}
+                role="tab"
+                aria-selected={cronCreatorMode === "edit"}
+                className="px-3 text-xs"
                 onClick={() => {
                   setCronCreatorError("");
                   setCronCreatorMode("edit");
                 }}
               >
                 Edit Cron
-              </AppButton>
+              </TabButton>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">

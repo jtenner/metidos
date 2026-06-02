@@ -149,7 +149,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Style: shared primitives and one-off controls
 
-- [ ] Refactor cron mode tabs and “New Cron” in `src/mainview/app/mainview-cron-workspace-controller.tsx` to use approved shared primitives such as `AppButton`, `IconButton`, `ListOptionButton`, or `TabButton`.
 - [ ] Refactor calendar edit dialog controls in `src/mainview/app/calendar-edit-dialog.tsx` to avoid local one-off focus/input/button styling.
 - [ ] Refactor calendar ICS edit dialog controls in `src/mainview/app/calendar-ics-edit-dialog.tsx` to avoid local one-off focus/input/button styling.
 - [ ] Refactor extension dialog primary/cancel/select controls in `src/mainview/app/thread-extension-ui-dialog.tsx` to use shared primitives.
