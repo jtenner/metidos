@@ -3,7 +3,15 @@
  * @description Module for codex model selector.
  */
 
-import { type JSX, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  type FocusEvent,
+  type JSX,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   RpcModelOption,
   RpcReasoningEffort,
@@ -167,6 +175,7 @@ function ModelReasoningSubmenu({
 }: ModelReasoningSubmenuProps): JSX.Element {
   const [submenuOpen, setSubmenuOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
   const supportsReasoningSubmenu = selectionPath === "reasoning-submenu";
 
@@ -214,6 +223,25 @@ function ModelReasoningSubmenu({
     }, 80);
   }
 
+  function isSubmenuFocusTarget(target: EventTarget | null): boolean {
+    if (typeof Node === "undefined" || !(target instanceof Node)) {
+      return false;
+    }
+
+    return (
+      anchorRef.current?.contains(target) === true ||
+      submenuRef.current?.contains(target) === true
+    );
+  }
+
+  function scheduleCloseWhenFocusLeaves(event: FocusEvent<HTMLElement>): void {
+    if (isSubmenuFocusTarget(event.relatedTarget)) {
+      return;
+    }
+
+    scheduleClose();
+  }
+
   return (
     <>
       <AppButton
@@ -230,7 +258,7 @@ function ModelReasoningSubmenu({
         fullWidth
         role="option"
         aria-selected={selected}
-        onBlur={scheduleClose}
+        onBlur={scheduleCloseWhenFocusLeaves}
         onClick={() => {
           onModelSelect(model, close);
         }}
@@ -275,11 +303,14 @@ function ModelReasoningSubmenu({
         ) : null}
       </AppButton>
       <PopoverSurface
+        ref={submenuRef}
         className="z-[220] min-w-[12rem] border border-border-default bg-surface-1 shadow-overlay"
         data-dropdown-interactive-portal="true"
         hideWhenEscaped={false}
         hideWhenReferenceHidden={false}
         offsetPx={4}
+        onBlur={scheduleCloseWhenFocusLeaves}
+        onFocus={openSubmenu}
         onMouseEnter={openSubmenu}
         onMouseLeave={scheduleClose}
         open={submenuOpen && supportsReasoningSubmenu}

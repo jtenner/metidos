@@ -144,7 +144,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Focus, hover, and popover races
 
-- [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
 - [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
 
 ### Style: shared primitives and one-off controls
