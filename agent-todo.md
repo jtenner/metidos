@@ -204,7 +204,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Plugin QuickJS sandbox follow-up
 
 - [ ] D4: Review callback invocation token handling in `src/bun/plugin/quickjs-runtime.ts`. If plugin code can read or forge the token, fix isolation; otherwise add comments/tests proving token secrecy is within the QuickJS bootstrap boundary.
-- [ ] D6: Review QuickJS interrupt/timeout handling in `src/bun/plugin/quickjs-runtime.ts`. If guest code can catch/evade interrupts, add stronger cancellation or tests; otherwise document QuickJS deadline limitations.
 - [ ] D10: Review per-plugin QuickJS memory limits in `src/bun/plugin/quickjs-runtime.ts` and sidecar manager. If multiple plugins can exhaust host memory, add a global cap/telemetry; otherwise document total-memory threat model.
 
 ### HTTP and RPC transport follow-up

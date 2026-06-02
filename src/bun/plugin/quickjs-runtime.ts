@@ -778,6 +778,11 @@ export async function startPluginQuickJsRuntime(
       options.memoryLimitBytes ?? DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES,
     );
     runtime.setMaxStackSize(DEFAULT_PLUGIN_QUICKJS_STACK_SIZE_BYTES);
+    // The QuickJS interrupt handler is the only boundary for synchronous guest
+    // JavaScript. Host timers cannot fire while QuickJS is executing a tight
+    // loop, so install the deadline before evaluating bootstrap or plugin
+    // source. QuickJS reports the interrupt as an uncatchable runtime error;
+    // promise-based work is still guarded separately in resolveQuickJsPromise.
     runtime.setInterruptHandler(
       quickjsPackage.shouldInterruptAfterDeadline(startupDeadlineMs),
     );
@@ -891,6 +896,10 @@ export async function startPluginQuickJsRuntime(
             message: "Plugin QuickJS runtime is disposed.",
           });
         }
+        // Callback invocations get their own absolute deadline because a
+        // long-lived plugin runtime may serve multiple tools/crons/injections
+        // with different timeoutMs values. Replacing the interrupt handler here
+        // prevents a callback from inheriting the startup deadline.
         runtime.setInterruptHandler(
           quickjsPackage.shouldInterruptAfterDeadline(input.deadlineMs),
         );

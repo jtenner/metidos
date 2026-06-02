@@ -650,8 +650,12 @@ describe("executePluginQuickJsRuntime", () => {
       pluginRoot,
       "index.ts",
       `
-        while (true) {}
-        export default {};
+        try {
+          while (true) {}
+        } catch (_error) {
+          globalThis.__metidosInterruptedLoopWasCatchable = true;
+        }
+        export default { escaped: globalThis.__metidosInterruptedLoopWasCatchable ?? false };
       `,
     );
     const buildResult = await buildPluginEntrypoint({ pluginRoot });
@@ -783,6 +787,55 @@ describe("executePluginQuickJsRuntime", () => {
         context: { threadId: 7 },
         props: { name: "Ada", validated: true },
       });
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  it("interrupts synchronous callback loops after the callback deadline", async () => {
+    const pluginRoot = createTempDirectory(
+      "metidos-plugin-quickjs-callback-loop-",
+    );
+    writePluginFile(
+      pluginRoot,
+      "index.ts",
+      `
+        import { definePlugin } from "@metidos/plugin-api";
+        export default definePlugin((metidos) => {
+          metidos.addAgentTool({
+            tool: "loop",
+            name: "Loop",
+            description: "Loop forever.",
+            timeoutMs: 5000,
+            validateProps(props) { return props; },
+            action() {
+              try {
+                while (true) {}
+              } catch (_error) {
+                return { escaped: true };
+              }
+              return { escaped: false };
+            },
+          });
+        });
+      `,
+    );
+    const buildResult = await buildPluginEntrypoint({ pluginRoot });
+    const runtime = await startPluginQuickJsRuntime(buildResult, {
+      startupTimeoutMs: 1_000,
+    });
+    try {
+      const registrations = runtime.setupResult as {
+        tools: Array<{ actionHandle: string }>;
+      };
+      await expect(
+        runtime.invokeCallback({
+          args: [{ contextKind: "threadTool" }, {}],
+          deadlineMs: Date.now() + 25,
+          handle: registrations.tools[0]?.actionHandle ?? "missing",
+          label: "loop action",
+        }),
+      ).rejects.toThrow(PluginQuickJsRuntimeError);
     } finally {
       runtime.dispose();
     }
