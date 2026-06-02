@@ -131,22 +131,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Public repository settings have been reviewed.
 - [ ] No external social media, launch-posting, newsletter, Discord, Product Hunt, Hacker News, Reddit, LinkedIn, YouTube promotion, or other off-repo marketing tasks are included in this checklist.
 
-## 13. Frontend Review: Bugs, UI Races, and Style Violations
-
-### Plugin administration, access, and terminal bugs
-
-
-### Composer bugs
-
-
-### Async lifecycle and stale-write races
-
-### Focus, hover, and popover races
-
-### Style: semantic backdrops, cards, blur, badges, and spacing
-
-- [ ] Remove card-like/decorative styling from the inline folder suggestion list in `src/mainview/app/projects-panel.tsx`, including sidebar `shadow-overlay`/`backdrop-blur-xl` drift.
-
 ## 14. Backend Audit Follow-up: `src/bun` Bugs, Security Findings, and Threat-Model Clarifications
 
 For every item in this section: inspect the referenced code, decide whether the audit note is a real bug/security issue or an expected threat-model/design tradeoff, then either fix it with tests or add/adjust code comments and/or docs so future auditors understand why the behavior is safe. Mark an item complete only after the codebase itself contains the fix, regression test, or clarifying comment/docs.

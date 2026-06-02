@@ -553,8 +553,8 @@ export const ProjectsPanel = memo(function ProjectsPanel({
                     </AppButton>
                   </div>
                   {addProjectPath.trim() ? (
-                    <div className="overflow-hidden border border-border-default bg-surface-overlay shadow-overlay backdrop-blur-xl">
-                      <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
+                    <div className="overflow-hidden border border-border-default bg-surface-1">
+                      <div className="flex items-center justify-between border-b border-border-subtle bg-surface-1 px-3 py-2">
                         <span className="uppercase-label-sm text-accent">
                           Folders
                         </span>
