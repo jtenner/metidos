@@ -187,7 +187,11 @@ export function MainviewCronWorkspaceController({
     null,
   );
   const [cronEditWorktreePath, setCronEditWorktreePath] = useState("");
+  const isMountedRef = useRef(true);
   const cronJobsRequestIdRef = useRef(0);
+  const cronRunRequestIdsRef = useRef(new Map<number, number>());
+  const cronDeleteRequestIdsRef = useRef(new Map<number, number>());
+  const cronDescribeRequestIdRef = useRef(0);
   const runningCronJobIdsRef = useRef(new Set<number>());
   const loadCronJobsRef = useRef<
     ((options?: { background?: boolean }) => Promise<void>) | null
@@ -266,12 +270,17 @@ export function MainviewCronWorkspaceController({
           priority: loadBehavior.mode,
           signal: controller.signal,
         });
-        if (cronJobsRequestIdRef.current !== requestId) return;
+        if (!isMountedRef.current || cronJobsRequestIdRef.current !== requestId)
+          return;
         cronJobsInitializedRef.current = true;
         setCronJobs(result);
         setCronJobsError("");
       } catch (error) {
-        if (isAbortError(error) || cronJobsRequestIdRef.current !== requestId)
+        if (
+          isAbortError(error) ||
+          !isMountedRef.current ||
+          cronJobsRequestIdRef.current !== requestId
+        )
           return;
         cronJobsInitializedRef.current = true;
         setCronJobsError(
@@ -280,9 +289,10 @@ export function MainviewCronWorkspaceController({
       } finally {
         if (cronJobsAbortControllerRef.current === controller)
           cronJobsAbortControllerRef.current = null;
-        if (cronJobsRequestIdRef.current === requestId)
+        if (isMountedRef.current && cronJobsRequestIdRef.current === requestId)
           setIsLoadingCronJobs(false);
         if (
+          isMountedRef.current &&
           cronJobsAbortControllerRef.current === null &&
           cronJobsInvalidatedWhileLoadingRef.current
         ) {
@@ -295,10 +305,13 @@ export function MainviewCronWorkspaceController({
   );
   loadCronJobsRef.current = loadCronJobs;
 
-  useEffect(
-    () => () => abortCronJobsRequest("Cron job request was canceled."),
-    [abortCronJobsRequest],
-  );
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortCronJobsRequest("Cron job request was canceled.");
+    };
+  }, [abortCronJobsRequest]);
 
   useEffect(() => {
     if (!isDocumentVisible) return;
@@ -334,11 +347,13 @@ export function MainviewCronWorkspaceController({
         ),
         procedures.listThreads(),
       ]);
+      if (!isMountedRef.current) return;
       const detail = prepareOpenedThreadDetail(loadedDetail);
       replaceThreads(upsertThreadList(loadedThreads, detail.thread));
       await new Promise<void>((resolve) =>
         window.requestAnimationFrame(() => resolve()),
       );
+      if (!isMountedRef.current) return;
       setPrimaryViewForNavigation("chat");
       await openThread(threadId, { detailPromise: Promise.resolve(detail) });
     },
@@ -354,6 +369,8 @@ export function MainviewCronWorkspaceController({
   const handleRunCronNow = useCallback(
     (cronJobId: number) => {
       if (!claimCronJobRun(runningCronJobIdsRef.current, cronJobId)) return;
+      const requestId = (cronRunRequestIdsRef.current.get(cronJobId) ?? 0) + 1;
+      cronRunRequestIdsRef.current.set(cronJobId, requestId);
       void (async () => {
         setRunningCronJobs((current) => new Set(current).add(cronJobId));
         setCronJobsError("");
@@ -361,19 +378,38 @@ export function MainviewCronWorkspaceController({
           const result = await procedures.runCronNow({ cronJobId });
           if (!result.success)
             throw new Error(`Cron job ${cronJobId} did not start.`);
+          if (
+            !isMountedRef.current ||
+            cronRunRequestIdsRef.current.get(cronJobId) !== requestId
+          )
+            return;
           await openCronThreadInRecent(result.threadId);
+          if (
+            !isMountedRef.current ||
+            cronRunRequestIdsRef.current.get(cronJobId) !== requestId
+          )
+            return;
           await loadCronJobs();
         } catch (error) {
-          setCronJobsError(
-            error instanceof Error ? error.message : String(error),
-          );
+          if (
+            isMountedRef.current &&
+            cronRunRequestIdsRef.current.get(cronJobId) === requestId
+          ) {
+            setCronJobsError(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
         } finally {
           releaseCronJobRun(runningCronJobIdsRef.current, cronJobId);
-          setRunningCronJobs((current) => {
-            const next = new Set(current);
-            next.delete(cronJobId);
-            return next;
-          });
+          if (cronRunRequestIdsRef.current.get(cronJobId) === requestId)
+            cronRunRequestIdsRef.current.delete(cronJobId);
+          if (isMountedRef.current) {
+            setRunningCronJobs((current) => {
+              const next = new Set(current);
+              next.delete(cronJobId);
+              return next;
+            });
+          }
         }
       })();
     },
@@ -400,26 +436,43 @@ export function MainviewCronWorkspaceController({
     const cronJob = pendingCronDelete;
     if (!cronJob || deletingCronJobs.has(cronJob.id)) return;
     setPendingCronDelete(null);
+    const requestId =
+      (cronDeleteRequestIdsRef.current.get(cronJob.id) ?? 0) + 1;
+    cronDeleteRequestIdsRef.current.set(cronJob.id, requestId);
     void (async () => {
       setDeletingCronJobs((current) => new Set(current).add(cronJob.id));
       setCronJobsError("");
       try {
         await procedures.updateCron({ cronJobId: cronJob.id, deleted: true });
+        if (
+          !isMountedRef.current ||
+          cronDeleteRequestIdsRef.current.get(cronJob.id) !== requestId
+        )
+          return;
         setCronJobs((current) =>
           current.filter((entry) => entry.id !== cronJob.id),
         );
         if (cronEditingCronJobId === cronJob.id) closeCronCreator();
         void loadCronJobs();
       } catch (error) {
-        setCronJobsError(
-          error instanceof Error ? error.message : String(error),
-        );
+        if (
+          isMountedRef.current &&
+          cronDeleteRequestIdsRef.current.get(cronJob.id) === requestId
+        ) {
+          setCronJobsError(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       } finally {
-        setDeletingCronJobs((current) => {
-          const next = new Set(current);
-          next.delete(cronJob.id);
-          return next;
-        });
+        if (cronDeleteRequestIdsRef.current.get(cronJob.id) === requestId)
+          cronDeleteRequestIdsRef.current.delete(cronJob.id);
+        if (isMountedRef.current) {
+          setDeletingCronJobs((current) => {
+            const next = new Set(current);
+            next.delete(cronJob.id);
+            return next;
+          });
+        }
       }
     })();
   }, [
@@ -491,13 +544,21 @@ export function MainviewCronWorkspaceController({
     [closeCronFolderSelector, setCronEditorAccessValue],
   );
 
-  const refreshCronJobsForDescribeCron = useCallback(async () => {
-    await loadCronJobs();
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 1_200));
+  const refreshCronJobsForDescribeCron = useCallback(
+    async (requestId: number) => {
       await loadCronJobs();
-    }
-  }, [loadCronJobs]);
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1_200));
+        if (
+          !isMountedRef.current ||
+          cronDescribeRequestIdRef.current !== requestId
+        )
+          return;
+        await loadCronJobs();
+      }
+    },
+    [loadCronJobs],
+  );
 
   const handleDescribeCronSubmit = useCallback(() => {
     const describePrompt = cronDescribePrompt.trim();
@@ -516,6 +577,8 @@ export function MainviewCronWorkspaceController({
       cronCreatorReasoningEffort || defaultCodexReasoningEffort;
     const threadPermissions =
       permissionsForDescribeCronThread(cronEditPermissions);
+    const requestId = cronDescribeRequestIdRef.current + 1;
+    cronDescribeRequestIdRef.current = requestId;
     setIsCreatingCronJob(true);
     setCronCreatorError("");
     void (async () => {
@@ -535,7 +598,12 @@ export function MainviewCronWorkspaceController({
               permissions: threadPermissions,
             }),
         );
-        if (!createdDetail) return;
+        if (
+          !createdDetail ||
+          !isMountedRef.current ||
+          cronDescribeRequestIdRef.current !== requestId
+        )
+          return;
         const threadId = createdDetail.thread.id;
         const threadMessage = [
           "Use the new_cron tool to create this cron job for the current workspace.",
@@ -551,21 +619,46 @@ export function MainviewCronWorkspaceController({
               input: `${threadMessage}\n\nUse projectId ${cronEditProjectId} and worktree ${cronEditWorktreePath}.`,
             }),
         );
-        if (!sentDetail) return;
+        if (
+          !sentDetail ||
+          !isMountedRef.current ||
+          cronDescribeRequestIdRef.current !== requestId
+        )
+          return;
         upsertThread(sentDetail.thread);
         setPrimaryViewForNavigation("chat");
         await openThread(threadId, {
           detailPromise: Promise.resolve(sentDetail),
         });
-        await refreshCronJobsForDescribeCron();
+        if (
+          !isMountedRef.current ||
+          cronDescribeRequestIdRef.current !== requestId
+        )
+          return;
+        await refreshCronJobsForDescribeCron(requestId);
+        if (
+          !isMountedRef.current ||
+          cronDescribeRequestIdRef.current !== requestId
+        )
+          return;
         closeCronCreator();
       } catch (error) {
-        if (createdDetail) upsertThread(createdDetail.thread);
-        setCronCreatorError(
-          error instanceof Error ? error.message : String(error),
-        );
+        if (
+          isMountedRef.current &&
+          cronDescribeRequestIdRef.current === requestId
+        ) {
+          if (createdDetail) upsertThread(createdDetail.thread);
+          setCronCreatorError(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       } finally {
-        setIsCreatingCronJob(false);
+        if (
+          isMountedRef.current &&
+          cronDescribeRequestIdRef.current === requestId
+        ) {
+          setIsCreatingCronJob(false);
+        }
       }
     })();
   }, [
