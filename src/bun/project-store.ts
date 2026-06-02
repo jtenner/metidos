@@ -131,7 +131,7 @@ export function upsertProject(
   );
   const project = getProject(database, input.projectPath);
   if (!project) {
-    throw new Error(`Failed to upsert project at ${input.projectPath}`);
+    throw new Error("Failed to upsert project record.");
   }
 
   return project;
