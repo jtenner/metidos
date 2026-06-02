@@ -34,6 +34,11 @@ const DEFAULT_REPLAY_BUFFER_BYTES = 5 * 1024 * 1024;
 const MAX_REPLAY_BUFFER_BYTES = 16 * 1024 * 1024;
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
+// The bridge process only proxies a host-owned PTY. Shutdown first sends SIGTERM and
+// then uses this short fallback SIGKILL window so a broken bridge cannot keep the
+// terminal session alive after the manager has decided to close it. This may end
+// the proxy abruptly, but the force-kill path below still gives the child PTY its
+// longer normal shutdown window.
 const TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS = 100;
 const TERMINAL_FORCE_KILL_DELAY_MS = 2_000;
 const TERMINAL_SOCKET_FLUSH_INTERVAL_MS = 16;
@@ -159,6 +164,9 @@ class BridgeManagedPty implements ManagedPty {
     if (!this.child.killed) {
       this.child.kill(signal ?? "SIGTERM");
     }
+    // If the Node bridge stops reading or ignores SIGTERM, fail closed quickly.
+    // The visible terminal lifecycle is driven by TerminalSession cleanup, which
+    // separately gives the underlying PTY time to exit before force-killing it.
     safeSetTimeout(() => {
       if (!this.exited) {
         this.child.kill("SIGKILL");
