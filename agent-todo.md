@@ -336,7 +336,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Miscellaneous backend hardening follow-up
 
 - [ ] K1: Review in-process auth immediate-transaction queue in `src/bun/auth/service-login.ts`. Add comments/tests for per-Database scope and multi-connection behavior.
-- [ ] K5: Review dev-mode HTML reread/caching in `src/bun/index.ts`. Add comments/tests clarifying production cache versus dev template reload behavior.
 - [ ] K6: Review startup cache warmup deferral in `src/bun/index.ts`. If first request can race expensive warmup, fix scheduling; otherwise comment best-effort nature.
 - [ ] K7: Review overload monitoring in `src/bun/index.ts`. If lag should trigger backpressure instead of only logs, add behavior; otherwise document observability-only intent.
 - [ ] K8: Review `getGitSchedulerStats` use in the overload monitor. If many worktrees make the monitor expensive, add sampling/telemetry; otherwise comment expected cheapness.
