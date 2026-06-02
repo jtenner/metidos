@@ -155,10 +155,35 @@ function TimezoneAutocompleteInput({
       ? `${listboxId}-option-${clampedActiveOptionIndex}`
       : undefined;
 
+  const blurCommitTimeoutRef = useRef<number | null>(null);
   const commitValue = useCallback(() => {
     onCommit(value.trim());
     setOpen(false);
   }, [onCommit, value]);
+  const commitValueRef = useRef(commitValue);
+
+  useEffect(() => {
+    commitValueRef.current = commitValue;
+  }, [commitValue]);
+
+  useEffect(() => {
+    return () => {
+      if (blurCommitTimeoutRef.current !== null) {
+        window.clearTimeout(blurCommitTimeoutRef.current);
+        blurCommitTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const scheduleBlurCommit = useCallback(() => {
+    if (blurCommitTimeoutRef.current !== null) {
+      window.clearTimeout(blurCommitTimeoutRef.current);
+    }
+    blurCommitTimeoutRef.current = window.setTimeout(() => {
+      blurCommitTimeoutRef.current = null;
+      commitValueRef.current();
+    }, 0);
+  }, []);
 
   return (
     <label className="relative block">
@@ -176,9 +201,7 @@ function TimezoneAutocompleteInput({
         autoCorrect="off"
         className="mt-2 h-8 w-full border border-border-default bg-surface-1 px-2 font-mono text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
         name={name}
-        onBlur={() => {
-          window.setTimeout(commitValue, 0);
-        }}
+        onBlur={scheduleBlurCommit}
         onChange={(event) => {
           onDraftChange(event.currentTarget.value);
           setActiveOptionIndex(0);
@@ -452,6 +475,8 @@ export function SettingsPanel({
   const [selectedSettingsTab, setSelectedSettingsTab] =
     useState<SettingsPanelTabId>("general");
   const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const timezoneLoadRequestIdRef = useRef(0);
+  const runtimeLoadRequestIdRef = useRef(0);
   const pluginAdministration = usePluginAdministrationController({
     active,
     availablePluginAccessGroups,
@@ -482,13 +507,20 @@ export function SettingsPanel({
 
   const loadTimezoneSettings = useCallback(
     async (options?: { priority?: RpcRequestPriority }): Promise<void> => {
+      const requestId = ++timezoneLoadRequestIdRef.current;
       try {
         const result = await procedures.getTimezoneSettings(undefined, {
           priority: options?.priority ?? "default",
         });
+        if (requestId !== timezoneLoadRequestIdRef.current) {
+          return;
+        }
         applyTimezoneSettings(result);
         setTimezoneSaveStatus("");
       } catch (error) {
+        if (requestId !== timezoneLoadRequestIdRef.current) {
+          return;
+        }
         setTimezoneSaveStatus(toDisplayError(error));
       }
     },
@@ -497,13 +529,20 @@ export function SettingsPanel({
 
   const loadRuntimeSettings = useCallback(
     async (options?: { priority?: RpcRequestPriority }): Promise<void> => {
+      const requestId = ++runtimeLoadRequestIdRef.current;
       try {
         const result = await procedures.getUserRuntimeSettings(undefined, {
           priority: options?.priority ?? "default",
         });
+        if (requestId !== runtimeLoadRequestIdRef.current) {
+          return;
+        }
         applyRuntimeSettings(result);
         setRuntimeSaveStatus("");
       } catch (error) {
+        if (requestId !== runtimeLoadRequestIdRef.current) {
+          return;
+        }
         setRuntimeSaveStatus(toDisplayError(error));
       }
     },
@@ -664,6 +703,8 @@ export function SettingsPanel({
 
   useEffect(() => {
     if (!active || !open) {
+      timezoneLoadRequestIdRef.current += 1;
+      runtimeLoadRequestIdRef.current += 1;
       return;
     }
     void loadTimezoneSettings({
@@ -672,6 +713,10 @@ export function SettingsPanel({
     void loadRuntimeSettings({
       priority: "foreground",
     });
+    return () => {
+      timezoneLoadRequestIdRef.current += 1;
+      runtimeLoadRequestIdRef.current += 1;
+    };
   }, [active, loadRuntimeSettings, loadTimezoneSettings, open]);
 
   useEffect(() => {
