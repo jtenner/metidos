@@ -1,0 +1,52 @@
+# GitHub code ownership for the public Metidos repository.
+# Keep this file aligned with repository areas called out in agent-todo.md.
+
+# Default owner for all repository changes.
+* @jtenner
+
+# Backend runtime and shared backend-facing code.
+/src/bun/ @jtenner
+/src/shared/ @jtenner
+
+# Mainview UI.
+/src/mainview/ @jtenner
+/STYLE.md @jtenner
+
+# Documentation, project guidance, and launch/public-readiness docs.
+/docs/ @jtenner
+/.wiki/ @jtenner
+/README.md @jtenner
+/AGENTS.md @jtenner
+/UBIQUITOUS_LANGUAGE.md @jtenner
+/agent-todo.md @jtenner
+
+# Plugin system surface area: runtime, admin RPC, schemas, docs, manifests, and skills.
+/src/bun/plugin/ @jtenner
+/src/bun/project-procedures/plugin*.ts @jtenner
+/src/bun/rpc-handlers/plugin-admin*.ts @jtenner
+/src/bun/rpc-schema/plugin*.ts @jtenner
+/src/bun/sync-core-plugins.ts @jtenner
+/src/bun/legacy-plugin-settings-migration.ts @jtenner
+/docs/metidos-plugin-*.md @jtenner
+/.pi/skills/metidos-plugin-authoring/ @jtenner
+
+# Security-sensitive auth, transport, network, filesystem, terminal, and persistence code.
+/src/bun/auth/ @jtenner
+/src/bun/db.ts @jtenner
+/src/bun/index.ts @jtenner
+/src/bun/rpc-transport.ts @jtenner
+/src/bun/rpc-websocket-auth.ts @jtenner
+/src/bun/outbound-url-security.ts @jtenner
+/src/bun/safe-outbound-fetch.ts @jtenner
+/src/bun/terminal-manager.ts @jtenner
+/src/bun/terminal-pty-bridge.cjs @jtenner
+/src/bun/plugin/fs-path.ts @jtenner
+/src/bun/plugin/fetch.ts @jtenner
+/src/bun/plugin/sqlite.ts @jtenner
+/src/bun/plugin/websocket.ts @jtenner
+
+# CI, release automation, dependency metadata, and package manager files.
+/.github/ @jtenner
+/package.json @jtenner
+/bun.lock @jtenner
+/tsconfig*.json @jtenner

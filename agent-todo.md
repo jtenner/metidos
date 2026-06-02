@@ -12,10 +12,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
 - [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
 
-## 2. License, Governance, and Community Files
-
-- [ ] Add `.github/CODEOWNERS` covering backend, mainview, docs, plugin system, security-sensitive code, and release files.
-
 ## 3. Security and Secret Handling
 
 - [ ] Run a full working-tree secret scan using at least one dedicated tool and review every finding.
