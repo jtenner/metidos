@@ -223,6 +223,11 @@ async function assertSafePluginWebSocketUrl(
   const httpUrl = new URL(url.toString());
   httpUrl.protocol = url.protocol === "wss:" ? "https:" : "http:";
 
+  // Bun's WebSocket client accepts a hostname and owns the DNS lookup, unlike
+  // safe outbound HTTP where the host can resolve and validate every address
+  // before dialing. Until WebSocket dialing can pin a vetted resolved address,
+  // plugins may only connect to IP-literal WebSocket URLs; unsafe private-network
+  // access broadens which IP literals are allowed but does not re-enable DNS.
   if (context.unsafeAllowPrivateNetwork) {
     if (!isIpLiteralHostname(url.hostname)) {
       throw new PluginWebSocketError({
