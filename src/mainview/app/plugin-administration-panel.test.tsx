@@ -274,7 +274,7 @@ describe("plugin administration panel", () => {
     ]);
   });
 
-  it("renders pending feedback for secret replacement settings", () => {
+  it("renders pending feedback for secret replacement and clearing settings", () => {
     const plugin = buildPluginInventoryPlugin({
       manifest: {
         ...buildPluginInventoryPlugin().manifest,
@@ -310,7 +310,7 @@ describe("plugin administration panel", () => {
       ],
     };
 
-    const markup = renderToStaticMarkup(
+    const replacementMarkup = renderToStaticMarkup(
       <PluginSettingsGroup
         onValueChange={() => {}}
         plugin={plugin}
@@ -319,10 +319,23 @@ describe("plugin administration panel", () => {
       />,
     );
 
-    expect(markup).toContain("Replace pending");
-    expect(markup).toContain('autoComplete="new-password"');
-    expect(markup).toContain('data-lpignore="true"');
-    expect(markup).toContain('data-1p-ignore="true"');
+    expect(replacementMarkup).toContain("Replace pending");
+    expect(replacementMarkup).toContain('autoComplete="new-password"');
+    expect(replacementMarkup).toContain('data-lpignore="true"');
+    expect(replacementMarkup).toContain('data-1p-ignore="true"');
+
+    const clearMarkup = renderToStaticMarkup(
+      <PluginSettingsGroup
+        onValueChange={() => {}}
+        plugin={plugin}
+        snapshots={{ [plugin.directoryName]: snapshot }}
+        values={{ [plugin.directoryName]: { api_token: null } }}
+      />,
+    );
+
+    expect(clearMarkup).toContain("Clear pending");
+    expect(clearMarkup).toContain("Will clear on save");
+    expect(clearMarkup).toContain('aria-label="Clear stored API token"');
   });
 
   it("renders ingress link codes, binding actions, and route drafts through the section seam", () => {
