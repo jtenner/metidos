@@ -4,7 +4,7 @@
  */
 
 import { type JSX, useId, useRef } from "react";
-import { AppButton } from "./button";
+import { AppButton, ListOptionButton } from "./button";
 import { DropdownControl } from "./dropdown";
 import { type AppIconName, materialSymbol } from "./icons";
 
@@ -106,14 +106,9 @@ export function ChoiceDropdownControl<T extends string>({
             {options.map((option) => {
               const selected = option.value === value;
               return (
-                <AppButton
-                  unstyled
+                <ListOptionButton
                   aria-selected={selected}
-                  className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                    selected
-                      ? "bg-surface-3 text-text-primary"
-                      : "text-text-secondary hover:bg-surface-2"
-                  }`}
+                  className="flex items-center gap-3 px-3 font-label text-[11px] font-semibold uppercase tracking-[0.1em]"
                   data-chooser-option="true"
                   key={option.value}
                   role="option"
@@ -124,6 +119,7 @@ export function ChoiceDropdownControl<T extends string>({
                     }
                   }}
                   ref={selected ? selectedOptionRef : undefined}
+                  selected={selected}
                   type="button"
                 >
                   <span
@@ -137,10 +133,10 @@ export function ChoiceDropdownControl<T extends string>({
                       "text-[16px]",
                     )}
                   </span>
-                  <span className="min-w-0 flex-1 font-label text-[11px] font-semibold uppercase tracking-[0.1em] text-inherit">
+                  <span className="min-w-0 flex-1 text-inherit">
                     {option.label}
                   </span>
-                </AppButton>
+                </ListOptionButton>
               );
             })}
           </fieldset>
