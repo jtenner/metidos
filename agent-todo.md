@@ -271,7 +271,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Miscellaneous backend hardening follow-up
 
-- [ ] K9: Review runtime-stats pending RPC snapshots in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. Add comments/tests if getter semantics are unclear.
 - [ ] K12: Review `objectParams` validator casts in `src/bun/index.ts`. Add stricter typed validators for risky RPCs or comments/tests showing shape validation is sufficient.
 - [ ] K16: Audit `src/bun/message-activity-store.ts` separately for persistence, size limits, and authorization boundaries; add comments/fixes as appropriate.
 - [ ] K17: Review SQL `LIMIT` and pagination use in `src/bun/message-activity-store.ts` and adjacent stores. Add tests/comments for bind parameters and bounded reads.

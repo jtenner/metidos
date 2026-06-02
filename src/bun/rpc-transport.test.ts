@@ -337,6 +337,12 @@ describe("RPC transport", () => {
 
     transport.handleMessage(socket as never, request(5));
     await waitFor(() => expect(transport.getPendingRequestCount()).toBe(1));
+    const backlogSnapshot = transport.getHealthSnapshot();
+    expect(backlogSnapshot).toEqual({
+      clientCount: 1,
+      pendingRequests: { current: 1, peak: 1 },
+    });
+
     transport.handleMessage(socket as never, request(6));
     await waitFor(() => expect(socket.sent).toHaveLength(1));
     expect(decodeJsonSend(sentAt(socket, 0))).toMatchObject({
@@ -354,6 +360,11 @@ describe("RPC transport", () => {
     await waitFor(() => expect(socket.sent).toHaveLength(2));
     expect(transport.getPendingRequestCount()).toBe(0);
     expect(transport.getPeakPendingRequestCount()).toBe(1);
+    expect(transport.getHealthSnapshot()).toEqual({
+      clientCount: 1,
+      pendingRequests: { current: 0, peak: 1 },
+    });
+    expect(backlogSnapshot.pendingRequests.current).toBe(1);
   });
 
   test("cancels pending requests without sending stale responses", async () => {

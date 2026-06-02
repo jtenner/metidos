@@ -1189,6 +1189,10 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     getClientCount: () => clients.size,
     getHealthSnapshot: () => ({
       clientCount: clients.size,
+      // Return plain numeric values instead of exposing the per-client pending
+      // maps. Health consumers only need a point-in-time backlog gauge plus the
+      // process-lifetime peak, and keeping the maps private avoids retaining
+      // request ids or abort controllers in diagnostics snapshots.
       pendingRequests: {
         current: pendingRequestCount,
         peak: peakPendingRequestCount,

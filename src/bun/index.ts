@@ -2281,6 +2281,9 @@ function buildServerHealthSnapshot(activeServerPort: number): {
     },
     git: getGitSchedulerStats(),
     ok: true,
+    // Snapshot only aggregate transport counters for diagnostics. The transport
+    // owns request-id maps and abort controllers; the server health payload keeps
+    // those internals out of logs while still surfacing current and peak backlog.
     pendingRpcRequests: {
       current: rpcTransport.getPendingRequestCount(),
       peak: rpcTransport.getPeakPendingRequestCount(),
