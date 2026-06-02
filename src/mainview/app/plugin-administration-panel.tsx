@@ -53,6 +53,7 @@ import {
 } from "./plugin-inventory-state";
 import {
   pluginActionFeedbackState,
+  pluginAdminActionKey,
   pluginIssuesExceptReviewHashChanged,
   pluginLifecycleActionButtonState,
 } from "./plugin-lifecycle-action-state";
@@ -871,28 +872,29 @@ function PluginAdminActionsSection({
           {pluginDataUsageSummary(plugin)}
         </div>
         <div className="flex flex-wrap gap-2">
-          {footerActions.map((action) => (
-            <AppButton
-              buttonStyle={pluginAdminActionButtonStyle(action)}
-              disabled={!action.available || actionLoadingKey !== null}
-              key={action.action}
-              onClick={() => {
-                onAdminAction(action);
-              }}
-              title={action.reason ?? action.path ?? undefined}
-            >
-              {action.action === "reset_data"
-                ? materialSymbol("delete", "text-[15px]")
-                : null}
-              {action.action === "run_gc"
-                ? materialSymbol("history", "text-[15px]")
-                : null}
-              {actionLoadingKey ===
-              `${plugin.directoryName}:admin:${action.action}`
-                ? "Working..."
-                : action.label}
-            </AppButton>
-          ))}
+          {footerActions.map((action) => {
+            const actionKey = pluginAdminActionKey(plugin, action.action);
+            const busy = actionLoadingKey === actionKey;
+            return (
+              <AppButton
+                buttonStyle={pluginAdminActionButtonStyle(action)}
+                disabled={!action.available || busy}
+                key={action.action}
+                onClick={() => {
+                  onAdminAction(action);
+                }}
+                title={action.reason ?? action.path ?? undefined}
+              >
+                {action.action === "reset_data"
+                  ? materialSymbol("delete", "text-[15px]")
+                  : null}
+                {action.action === "run_gc"
+                  ? materialSymbol("history", "text-[15px]")
+                  : null}
+                {busy ? "Working..." : action.label}
+              </AppButton>
+            );
+          })}
         </div>
       </div>
     </PluginManagerSection>

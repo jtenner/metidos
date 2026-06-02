@@ -147,10 +147,6 @@ This checklist is for repository improvements only before making Metidos public/
 ### Composer bugs
 
 
-### Plugin administration UI races
-
-- [ ] Scope plugin admin/lifecycle disabled states in `src/mainview/app/plugin-administration-panel.tsx` and `src/mainview/app/plugin-lifecycle-action-state.ts` to the matching action key instead of globally disabling unrelated buttons.
-
 ### Async lifecycle and stale-write races
 
 - [ ] Add mount/abort/request-id guards around blur-commit timeouts and settings loads in `src/mainview/app/settings-panel.tsx`.

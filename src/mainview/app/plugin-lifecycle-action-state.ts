@@ -151,7 +151,7 @@ export function pluginLifecycleActionViewState({
   const busy = pluginActionIsBusy({ actionKey: key, actionLoadingKey });
   return {
     busy,
-    disabled: actionLoadingKey !== null || disabledReason !== null,
+    disabled: busy || disabledReason !== null,
     disabledReason,
     key,
     label: busy

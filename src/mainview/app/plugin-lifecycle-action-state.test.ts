@@ -233,6 +233,24 @@ describe("plugin-lifecycle-action-state", () => {
     ).toMatchObject({ disabled: false, label: "Approve" });
   });
 
+  it("keeps unrelated lifecycle actions enabled while another action is loading", () => {
+    const plugin = buildPluginInventoryPlugin({ status: "needs_review" });
+
+    expect(
+      pluginLifecycleActionButtonState({
+        action: "disable",
+        actionLoadingKey: "alpha_plugin:reapprove",
+        isAdmin: true,
+        plugin,
+      }),
+    ).toMatchObject({
+      busy: false,
+      disabled: false,
+      key: "alpha_plugin:disable",
+      label: "Disable",
+    });
+  });
+
   it("normalizes Plugin action feedback state", () => {
     expect(pluginActionFeedbackState({ error: "", message: "Saved" })).toEqual({
       error: "",
