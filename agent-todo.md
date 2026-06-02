@@ -213,7 +213,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Auth and session follow-up
 
 - [ ] A4: Review primary-factor-plus-TOTP lockout behavior in `src/bun/auth/service-session.ts` and `src/bun/auth/service-login.ts`. If a stolen primary factor enables too many TOTP guesses, tighten lockout/rate-limit policy; otherwise document the accepted risk and existing route-level throttles.
-- [ ] A7: Review synthetic local-operator handling in `src/bun/db.ts` (`LOCAL_SETTINGS_COMPAT_USER_ID`, `buildSyntheticLocalOperatorUser`, `readSyntheticLocalOperatorUser`). Fix any real possibility of shadowing a real user id or add comments/tests proving legacy-only scope.
 - [ ] A9: Deduplicate or clarify `rethrowAuthSecretError` behavior across `src/bun/auth/service-login.ts`, `src/bun/auth/service-session.ts`, and `src/bun/auth/reset.ts`. If unknown auth-secret failures produce confusing 500s, map them to stable auth errors.
 - [ ] A13: Review lockout audit ordering in `src/bun/auth/service-core.ts` (`recordInvalidAuthAttempt` and `incrementFailedAttempts`). If the triggering failed attempt is mislabeled, fix audit events; otherwise add tests/comments explaining lockout event semantics.
 - [ ] A14: Review shared lockout counter for primary-factor, TOTP, and recovery-code failures in `src/bun/auth/service-core.ts` and `src/bun/auth/service-login.ts`. If it creates bad UX or security ambiguity, split counters; otherwise document that all auth proof failures intentionally share one lockout.

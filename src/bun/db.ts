@@ -1570,6 +1570,11 @@ function resolveRequiredAuthUserId(
 
 const LOCAL_SETTINGS_COMPAT_USER_ID = 1;
 
+// This id is a legacy compatibility sentinel, not a reserved row in the modern
+// users table. Synthetic users are only returned when old single-operator data
+// has configured auth_settings but no users table yet; as soon as a users table
+// exists, all reads use real rows so id=1 cannot shadow or impersonate a real
+// local operator.
 function buildSyntheticLocalOperatorUser(): UserRecord {
   const now = new Date(0).toISOString();
   return {

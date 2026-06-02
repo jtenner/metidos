@@ -53,6 +53,7 @@ import {
   getAuthSettings,
   getThreadById,
   getTimezoneSettings,
+  getUserById,
   getUserRuntimeSettings,
   initAppDatabase,
   isAppDatabaseOpen,
@@ -62,6 +63,7 @@ import {
   listSecurityAuditEvents,
   listThreads,
   listThreadsByIds,
+  listUsers,
   listUsersWithSetupStatus,
   migrateDatabase,
   quoteSqliteIdentifier,
@@ -1318,6 +1320,64 @@ describe("app database storage", () => {
         .all();
       expect(users).toEqual([{ username: "metidos", isAdmin: 1 }]);
       expect(getAuthSettings(database)).toBeNull();
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("uses the synthetic local operator only for configured legacy databases without a users table", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      upsertAuthSettings(database, {
+        primaryFactorType: "password",
+        primaryFactorHash: "hash",
+        totpSecretCiphertext: "legacy-ciphertext",
+        sessionLifetimeDays: 14,
+      });
+
+      expect(tableExists(database, "users")).toBe(false);
+      expect(listUsers(database)).toEqual([
+        expect.objectContaining({
+          id: 1,
+          username: "metidos",
+          enabled: true,
+          isAdmin: true,
+        }),
+      ]);
+      expect(getUserById(database, 1)).toEqual(
+        expect.objectContaining({ username: "metidos" }),
+      );
+      expect(getUserById(database, 2)).toBeNull();
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("does not synthesize or shadow local operators when a real users table exists", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+    createLegacyUsersTable(database);
+
+    try {
+      database.run(
+        "INSERT INTO users (id, username, is_admin) VALUES (7, 'real-operator', 1)",
+      );
+      upsertAuthSettings(database, {
+        primaryFactorType: "password",
+        primaryFactorHash: "hash",
+        totpSecretCiphertext: "legacy-ciphertext",
+        sessionLifetimeDays: 14,
+      });
+
+      expect(listUsers(database).map((user) => user.username)).toEqual([
+        "real-operator",
+      ]);
+      expect(getUserById(database, 1)).toBeNull();
+      expect(getUserById(database, 7)).toEqual(
+        expect.objectContaining({ username: "real-operator" }),
+      );
     } finally {
       database.close(false);
     }
