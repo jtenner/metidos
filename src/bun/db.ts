@@ -4063,6 +4063,20 @@ export function listThreadMessages(
  * @param options - Configuration options used by this operation.
  */
 
+const THREAD_MESSAGES_PAGE_DEFAULT_LIMIT = 100;
+const THREAD_MESSAGES_PAGE_MIN_LIMIT = 1;
+const THREAD_MESSAGES_PAGE_MAX_LIMIT = 200;
+
+function normalizeThreadMessagesPageLimit(limit: number | undefined): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) {
+    return THREAD_MESSAGES_PAGE_DEFAULT_LIMIT;
+  }
+  return Math.min(
+    THREAD_MESSAGES_PAGE_MAX_LIMIT,
+    Math.max(THREAD_MESSAGES_PAGE_MIN_LIMIT, Math.floor(limit)),
+  );
+}
+
 export function listThreadMessagesPage(
   database: Database,
   threadId: number,
@@ -4074,7 +4088,11 @@ export function listThreadMessagesPage(
   messages: ThreadMessageRecord[];
   nextCursor: number | null;
 } {
-  const limit = Math.max(1, options?.limit ?? 100);
+  // Keep the store-level page size bounded even when called outside RPC
+  // procedures. The SQL uses bound LIMIT/cursor parameters after this integer
+  // clamp so user-supplied pagination values cannot create unbounded reads or
+  // alter the query shape.
+  const limit = normalizeThreadMessagesPageLimit(options?.limit);
   const pageSize = limit + 1;
   const cursor = typeof options?.cursor === "number" ? options.cursor : null;
   const rows =

@@ -106,6 +106,36 @@ describe("domain persistence stores", () => {
     ).toHaveLength(1);
   });
 
+  it("bounds message pagination at the store layer", () => {
+    const database = createDatabase();
+    const project = createProject(
+      database,
+      "/repo/messages",
+      "messages project",
+    );
+    const threadStore = createBoundThreadStore(database);
+    const messageActivityStore = createBoundMessageActivityStore(database);
+    const thread = threadStore.create(createThreadInput(project));
+
+    for (let index = 0; index < 205; index += 1) {
+      messageActivityStore.createMessage({
+        payloadJson: null,
+        role: "user",
+        text: `message ${index}`,
+        threadId: thread.id,
+      });
+    }
+
+    const page = messageActivityStore.listMessagesPage(thread.id, {
+      limit: 1_000,
+    });
+
+    expect(page.messages).toHaveLength(200);
+    expect(page.messages.at(0)?.text).toBe("message 5");
+    expect(page.messages.at(-1)?.text).toBe("message 204");
+    expect(page.nextCursor).toBe(page.messages[0]?.id);
+  });
+
   it("hydrates cron jobs and due scheduled job ids through ownerless reads", () => {
     const database = createDatabase();
     const project = createProject(database, "/repo/project", "project");
