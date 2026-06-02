@@ -145,7 +145,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Style: shared primitives and one-off controls
 
-- [ ] Refactor extension dialog primary/cancel/select controls in `src/mainview/app/thread-extension-ui-dialog.tsx` to use shared primitives.
 - [ ] Refactor skills menu controls in `src/mainview/controls/chat-composer-control.tsx` to use shared primitives or approved shared recipes.
 
 ### Style: semantic backdrops, cards, blur, badges, and spacing

@@ -4,7 +4,7 @@
  */
 
 import { useId, useRef, type FormEvent, type JSX } from "react";
-import { AppButton } from "../controls/button";
+import { AppButton, ListOptionButton } from "../controls/button";
 import { ModalDialogSurface } from "../controls/popover";
 import type { ThreadExtensionUiDialog as ThreadExtensionUiDialogState } from "../thread-extension-ui";
 
@@ -139,10 +139,9 @@ export function ThreadExtensionUiDialog({
         {dialog.method === "select" ? (
           <div className="grid gap-2">
             {dialog.options.map((option) => (
-              <AppButton
-                unstyled
+              <ListOptionButton
                 key={option}
-                className="w-full rounded-sm border border-border-default bg-surface-2 px-4 py-2 text-left text-sm text-text-primary transition hover:border-accent hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-60"
+                className="text-sm"
                 disabled={busy}
                 onClick={() => {
                   onConfirm(option);
@@ -150,7 +149,7 @@ export function ThreadExtensionUiDialog({
                 type="button"
               >
                 {option}
-              </AppButton>
+              </ListOptionButton>
             ))}
           </div>
         ) : null}
@@ -167,8 +166,7 @@ export function ThreadExtensionUiDialog({
           </div>
           <div className="flex items-center gap-3">
             <AppButton
-              unstyled
-              className="rounded-sm border border-border-default px-4 py-2 text-sm text-text-secondary transition hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+              buttonStyle="muted"
               disabled={busy}
               onClick={onCancel}
               type="button"
@@ -176,21 +174,11 @@ export function ThreadExtensionUiDialog({
               Cancel
             </AppButton>
             {dialog.method === "select" ? null : dialog.method === "confirm" ? (
-              <AppButton
-                unstyled
-                className="rounded-sm bg-accent-strong px-4 py-2 text-sm font-semibold text-bg-app transition hover:bg-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={busy}
-                type="submit"
-              >
+              <AppButton buttonStyle="primary" disabled={busy} type="submit">
                 {busy ? "Working..." : "Confirm"}
               </AppButton>
             ) : (
-              <AppButton
-                unstyled
-                className="rounded-sm bg-accent-strong px-4 py-2 text-sm font-semibold text-bg-app transition hover:bg-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={busy}
-                type="submit"
-              >
+              <AppButton buttonStyle="primary" disabled={busy} type="submit">
                 {busy ? "Working..." : "Continue"}
               </AppButton>
             )}
