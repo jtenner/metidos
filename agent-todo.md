@@ -352,7 +352,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Miscellaneous backend hardening follow-up
 
 - [ ] K1: Review in-process auth immediate-transaction queue in `src/bun/auth/service-login.ts`. Add comments/tests for per-Database scope and multi-connection behavior.
-- [ ] K2: Review `releaseQueue` promise choreography in `src/bun/auth/service-login.ts`. Add a short comment/test proving depth accounting and queue release cannot deadlock.
 - [ ] K4: Review TTY-only destructive CLI checks in `src/bun/index.ts` and `src/bun/auth/reset.ts`. Add tests/comments for non-TTY refusal.
 - [ ] K5: Review dev-mode HTML reread/caching in `src/bun/index.ts`. Add comments/tests clarifying production cache versus dev template reload behavior.
 - [ ] K6: Review startup cache warmup deferral in `src/bun/index.ts`. If first request can race expensive warmup, fix scheduling; otherwise comment best-effort nature.
