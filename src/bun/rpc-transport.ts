@@ -637,6 +637,11 @@ export function createRpcTransport(options: RpcTransportOptions): RpcTransport {
     }
     sessionClients.delete(client);
     if (sessionClients.size === 0) {
+      // The session index is intentionally a plain Map rather than a WeakMap
+      // because session-scoped broadcasts need to enumerate currently attached
+      // sockets. Every socket close path calls removeClientIndexes, and empty
+      // buckets are deleted here so closed sessions cannot accumulate stale
+      // Set instances.
       clientsBySessionId.delete(sessionId);
     }
   }
