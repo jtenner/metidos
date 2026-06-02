@@ -346,6 +346,7 @@ This directory hosts the Bun-side runtime for Metidos: process entrypoints, RPC 
 
 - `terminal-manager.ts`
   - Owns managed terminal session lifecycle, PTY bridge startup, output buffering, and kill/view/grep operations used by unsafe Metidos terminal tools.
+  - Builds terminal process environments from a small explicit allowlist so app/provider secrets, dynamic linker controls, and runtime hooks are not inherited by default. `METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST` is an intentional local-operator escape hatch for interactive shells: sensitive-looking names produce a warning but are still passed through because setting this variable is treated as explicit operator opt-in on the local host, not an untrusted plugin/user input path.
 
 - `terminal-pty-bridge.cjs`
   - CommonJS node-pty bridge process used to keep terminal IO integration isolated from the main Bun runtime boundary.
