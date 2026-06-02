@@ -468,6 +468,69 @@ describe("RPC transport", () => {
     expect(transport.getClientCount()).toBe(1);
   });
 
+  test("refreshes session indexes when socket session ids change", async () => {
+    const harness = createHarness();
+    const transport = createRpcTransport(harness.options);
+    const socket = createFakeSocket({ sessionId: "session-a" });
+    transport.open(socket as never);
+
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: "session-a" }),
+    ).toBeTrue();
+
+    socket.data.sessionId = "session-b";
+    transport.drain(socket as never);
+
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: "session-a" }),
+    ).toBeFalse();
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: "session-b" }),
+    ).toBeTrue();
+
+    await expect(
+      transport.publish(
+        { reason: "test", type: "reload" },
+        { kind: "session", sessionId: "session-a" },
+      ),
+    ).resolves.toBe(0);
+    expect(socket.sent).toHaveLength(0);
+
+    await expect(
+      transport.publish(
+        { reason: "test", type: "reload" },
+        { kind: "session", sessionId: "session-b" },
+      ),
+    ).resolves.toBe(1);
+    expect(socket.sent).toHaveLength(1);
+  });
+
+  test("removes null session ids from the session index and closeSession ignores stale buckets", async () => {
+    const harness = createHarness();
+    const transport = createRpcTransport(harness.options);
+    const socket = createFakeSocket({ sessionId: "session-a" });
+    transport.open(socket as never);
+
+    socket.data.sessionId = null;
+    transport.drain(socket as never);
+
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: "session-a" }),
+    ).toBeFalse();
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: null }),
+    ).toBeFalse();
+    expect(transport.closeSession("session-a", "signed out")).toBe(0);
+    expect(socket.closed).toHaveLength(0);
+    expect(transport.getClientCount()).toBe(1);
+
+    transport.close(socket as never, "client disconnected");
+    expect(transport.getClientCount()).toBe(0);
+    expect(
+      transport.hasPublishTargets({ kind: "session", sessionId: "session-a" }),
+    ).toBeFalse();
+  });
+
   test("cleans up session state and pending requests before closing sockets", async () => {
     const harness = createHarness({
       listProjects: async (_params: unknown, context: RpcRequestContext) => {

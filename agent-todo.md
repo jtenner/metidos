@@ -223,7 +223,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### HTTP and RPC transport follow-up
 
 - [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.
-- [ ] G10: Review session index refresh in `src/bun/rpc-transport.ts`. Add tests for session id changes, null session ids, and stale socket cleanup.
 - [ ] G13: Review decoded binary RPC payload limits in `src/bun/rpc-transport.ts`. Add tests for compressed/oversize rejection if missing.
 - [ ] G15: Review large RPC response JSON fallback in `src/bun/rpc-transport.ts`. If it blocks the event loop, prefer compressed binary for responses too; otherwise document compatibility tradeoff.
 - [ ] G18: Review dev-port fallback and allowed-origin rebuilding in `src/bun/index.ts`. Add tests/comments for fallback port and WebSocket origin allowlist consistency.
