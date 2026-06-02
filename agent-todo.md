@@ -230,7 +230,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Auth and session follow-up
 
-- [ ] A2: Review recovery-code matching/mark-used timing in `src/bun/auth/service-login.ts` (`findMatchingUnusedRecoveryCodeHash` and `markAuthRecoveryCodeUsed`). If there is a practical race or timing leak, fix it; otherwise add a threat-model comment/test explaining why fixed-size Argon2 fan-out plus conditional SQL consumption is acceptable.
 - [ ] A4: Review primary-factor-plus-TOTP lockout behavior in `src/bun/auth/service-session.ts` and `src/bun/auth/service-login.ts`. If a stolen primary factor enables too many TOTP guesses, tighten lockout/rate-limit policy; otherwise document the accepted risk and existing route-level throttles.
 - [ ] A6: Review `src/bun/db.ts` (`setAuthFailureState`) for implicit bootstrap-user creation through `resolveRequiredAuthUserId`. If unexpected writes are possible, fix; otherwise add a comment explaining the singleton-local-operator compatibility shim.
 - [ ] A7: Review synthetic local-operator handling in `src/bun/db.ts` (`LOCAL_SETTINGS_COMPAT_USER_ID`, `buildSyntheticLocalOperatorUser`, `readSyntheticLocalOperatorUser`). Fix any real possibility of shadowing a real user id or add comments/tests proving legacy-only scope.
