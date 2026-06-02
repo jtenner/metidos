@@ -57,6 +57,30 @@ function insertTimedUtcEvent(
     );
 }
 
+function insertAllDayEvent(
+  database: Database,
+  calendarId: number,
+  values: {
+    title: string;
+    startDate?: string;
+    endDate?: string;
+  },
+): void {
+  database
+    .query(
+      `INSERT INTO calendar_events (
+        calendar_id, title, start_date, end_date, all_day, timezone,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 1, 'UTC', '2025-12-31T20:00:00.000Z', '2025-12-31T20:30:00.000Z')`,
+    )
+    .run(
+      calendarId,
+      values.title,
+      values.startDate ?? "2026-01-01",
+      values.endDate ?? "2026-01-02",
+    );
+}
+
 describe("public calendar ICS export", () => {
   it("exports strict UTC ISO timestamps", () => {
     const { database, calendarId } = createCalendarDatabase();
@@ -95,6 +119,42 @@ describe("public calendar ICS export", () => {
       );
       expect(warnSpy.mock.calls[1]?.[0]).toContain(
         "invalid event 2 createdAt; expected real UTC calendar date/time",
+      );
+    } finally {
+      database.close();
+    }
+  });
+
+  it("rejects invalid all-day dates instead of normalizing impossible calendar days", () => {
+    const { database, calendarId } = createCalendarDatabase();
+    try {
+      insertAllDayEvent(database, calendarId, { title: "Valid All Day" });
+      insertAllDayEvent(database, calendarId, {
+        title: "Datetime Start Date",
+        startDate: "2026-01-01T00:00:00Z",
+      });
+      insertAllDayEvent(database, calendarId, {
+        title: "Impossible End Date",
+        endDate: "2026-02-30",
+      });
+
+      const ics = exportPublicCalendarIcs(database, "public-test");
+
+      expect(ics).toContain("SUMMARY:Valid All Day");
+      expect(ics).toContain("DTSTART;VALUE=DATE:20260101");
+      expect(ics).not.toContain("Datetime Start Date");
+      expect(ics).not.toContain("Impossible End Date");
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      const warnings = warnSpy.mock.calls.map((call) => String(call[0]));
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          "invalid event 2 startDate; expected YYYY-MM-DD",
+        ),
+      );
+      expect(warnings).toContainEqual(
+        expect.stringContaining(
+          "invalid event 3 endDate; expected real calendar date",
+        ),
       );
     } finally {
       database.close();
