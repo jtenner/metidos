@@ -50,6 +50,22 @@ describe("outbound URL security", () => {
     ).rejects.toThrow(/resolved to a blocked address/);
   });
 
+  test("blocks hostnames when any mixed A or AAAA answer is blocked", async () => {
+    await expect(
+      assertSafeOutboundHttpUrl("https://mixed-address.example.test/feed.ics", {
+        label: "External ICS URL",
+        resolveHostname: async () => ["8.8.8.8", "fd00::10"],
+      }),
+    ).rejects.toThrow(/resolved to a blocked address/);
+
+    await expect(
+      assertSafeOutboundHttpUrl("https://mixed-address.example.test/feed.ics", {
+        label: "External ICS URL",
+        resolveHostname: async () => ["2001:4860:4860::8888", "10.0.0.10"],
+      }),
+    ).rejects.toThrow(/resolved to a blocked address/);
+  });
+
   test("collapses resolver failures into a generic policy error", async () => {
     await expect(
       assertSafeOutboundHttpUrl("https://calendar.example.test/feed.ics", {

@@ -320,6 +320,11 @@ async function validateOutboundHttpUrl(
   if (addresses.some((address) => !isOutboundIpAddress(address))) {
     throw new Error(`${prefix} host resolved to a non-IP address.`);
   }
+  // Treat every DNS answer as authoritative for the hostname's safety. A
+  // hostname with mixed public and blocked A/AAAA records is rejected outright
+  // instead of selecting a public-looking address, because a later resolver or
+  // address-family choice could otherwise steer the request to the blocked
+  // network target.
   if (addresses.some((address) => options.isBlockedAddress(address))) {
     throw new Error(
       `${prefix} host resolved to ${options.blockedResolvedAddressError}`,
