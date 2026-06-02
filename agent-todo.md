@@ -406,5 +406,4 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Audit coverage notes from the previous pass
 
-- [ ] L1: Inspect `src/bun/auth/json-body.ts` directly. Add comments/tests for JSON body size, object-only parsing, and error mapping, or fix any discovered parser issue.
 - [ ] L2: Inspect `src/bun/auth/secret-migration.ts` directly. Add comments/tests for legacy ciphertext migration threat model and failure behavior, or fix any discovered migration issue.
