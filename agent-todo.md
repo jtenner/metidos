@@ -144,8 +144,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Focus, hover, and popover races
 
-- [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
-
 ### Style: shared primitives and one-off controls
 
 - [ ] Refactor extension dialog primary/cancel/select controls in `src/mainview/app/thread-extension-ui-dialog.tsx` to use shared primitives.

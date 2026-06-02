@@ -106,6 +106,25 @@ export function deriveCodexModelClickOutcome(
 }
 
 /**
+ * The shared dropdown surface owns initial focus when the panel opens. The
+ * selector only needs to move focus when an already-open chooser advances to a
+ * different step, avoiding duplicate initial focus requests on open.
+ */
+export function shouldFocusCodexSelectorStepChange({
+  currentOpen,
+  currentStep,
+  previousOpen,
+  previousStep,
+}: {
+  currentOpen: boolean;
+  currentStep: SelectorStep;
+  previousOpen: boolean;
+  previousStep: SelectorStep;
+}): boolean {
+  return currentOpen && previousOpen && currentStep !== previousStep;
+}
+
+/**
  * Apply a reasoning-capable model selection in sequence so the model update
  * settles before the optional reasoning-effort update runs.
  */
@@ -444,6 +463,10 @@ export function CodexModelSelector({
   const reasoningListboxId = `${panelId}-reasoning`;
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const selectedReasoningOptionRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusStateRef = useRef({
+    dropdownOpen: false,
+    selectorStep: "provider" as SelectorStep,
+  });
 
   useEffect(() => {
     if (dropdownOpen) {
@@ -459,7 +482,17 @@ export function CodexModelSelector({
   }, [activeProvider?.providerId, dropdownOpen, providerGroups]);
 
   useEffect(() => {
-    if (!dropdownOpen) {
+    const previousFocusState = previousFocusStateRef.current;
+    previousFocusStateRef.current = { dropdownOpen, selectorStep };
+
+    if (
+      !shouldFocusCodexSelectorStepChange({
+        currentOpen: dropdownOpen,
+        currentStep: selectorStep,
+        previousOpen: previousFocusState.dropdownOpen,
+        previousStep: previousFocusState.selectorStep,
+      })
+    ) {
       return;
     }
 

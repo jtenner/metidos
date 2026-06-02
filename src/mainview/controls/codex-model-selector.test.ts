@@ -15,6 +15,7 @@ import {
   defaultReasoningEffortForModelClick,
   deriveCodexModelClickOutcome,
   deriveCodexModelSelectionPath,
+  shouldFocusCodexSelectorStepChange,
 } from "./codex-model-selector";
 import {
   codexReasoningPresentation,
@@ -102,6 +103,41 @@ describe("deriveCodexModelClickOutcome", () => {
     expect(deriveCodexModelClickOutcome("reasoning-step")).toBe(
       "reasoning-step",
     );
+  });
+});
+
+describe("shouldFocusCodexSelectorStepChange", () => {
+  it("leaves initial chooser focus to the dropdown surface", () => {
+    expect(
+      shouldFocusCodexSelectorStepChange({
+        currentOpen: true,
+        currentStep: "provider",
+        previousOpen: false,
+        previousStep: "provider",
+      }),
+    ).toBe(false);
+  });
+
+  it("moves focus only when an open chooser changes step", () => {
+    expect(
+      shouldFocusCodexSelectorStepChange({
+        currentOpen: true,
+        currentStep: "reasoning",
+        previousOpen: true,
+        previousStep: "model",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not focus when the open chooser stays on the same step", () => {
+    expect(
+      shouldFocusCodexSelectorStepChange({
+        currentOpen: true,
+        currentStep: "model",
+        previousOpen: true,
+        previousStep: "model",
+      }),
+    ).toBe(false);
   });
 });
 
