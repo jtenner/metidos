@@ -12,9 +12,11 @@ import {
   decodePluginSettingListValue,
   encodePluginSettingListValue,
   parsePluginManifest,
+  PLUGIN_MANIFEST_PERMISSIONS,
 } from "./manifest";
 
 const SCHEMA_PATH = join("docs", "metidos-plugin.schema.json");
+const PERMISSION_REFERENCE_PATH = join("docs", "plugin-permissions.md");
 const EXAMPLE_MANIFESTS = [
   "metidos-plugin-minimal-tool.json",
   "metidos-plugin-provider.json",
@@ -34,6 +36,39 @@ type SchemaBackedInvalidCase = {
 
 function readJsonFile(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
+}
+
+function permissionReferenceEntries(): string[] {
+  const markdown = readFileSync(PERMISSION_REFERENCE_PATH, "utf8");
+  const matrixStart = markdown.indexOf("## Permission matrix");
+  const reviewStart = markdown.indexOf("## Review checklist");
+  if (matrixStart === -1 || reviewStart === -1 || reviewStart <= matrixStart) {
+    throw new Error(
+      `Expected ${PERMISSION_REFERENCE_PATH} to contain a permission matrix before the review checklist.`,
+    );
+  }
+
+  return Array.from(
+    markdown.slice(matrixStart, reviewStart).matchAll(/^\|\s*`([^`]+)`\s*\|/gm),
+  ).flatMap((match) => (match[1] ? [match[1]] : []));
+}
+
+function schemaPermissionEnumEntries(): string[] {
+  const schema = readJsonFile(SCHEMA_PATH) as {
+    $defs?: { permission?: { enum?: unknown } };
+    definitions?: { permission?: { enum?: unknown } };
+  };
+  const permissionEnum =
+    schema.$defs?.permission?.enum ?? schema.definitions?.permission?.enum;
+  if (
+    !Array.isArray(permissionEnum) ||
+    !permissionEnum.every((permission) => typeof permission === "string")
+  ) {
+    throw new Error(
+      `Expected ${SCHEMA_PATH} to define a string permission enum.`,
+    );
+  }
+  return permissionEnum;
 }
 
 function readExampleManifest(fileName: string): JsonObject {
@@ -86,6 +121,13 @@ function issueCodesFor(manifest: JsonObject): string[] {
 }
 
 describe("plugin manifest schema alignment", () => {
+  it("keeps the public permission reference aligned with manifest permission enums", () => {
+    const manifestPermissions = [...PLUGIN_MANIFEST_PERMISSIONS];
+
+    expect(permissionReferenceEntries()).toEqual(manifestPermissions);
+    expect(schemaPermissionEnumEntries()).toEqual(manifestPermissions);
+  });
+
   it("accepts documented examples with the JSON Schema and typed validator", () => {
     const validateManifest = buildSchemaValidator();
 

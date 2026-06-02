@@ -42,7 +42,7 @@ const LIST_SETTING_ITEM_KINDS = ["string", "number", "url", "email"] as const;
 const LIST_SETTING_ITEM_KIND_SET = new Set<string>(LIST_SETTING_ITEM_KINDS);
 const EMAIL_SETTING_ITEM_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const PLUGIN_MANIFEST_PERMISSIONS = [
+export const PLUGIN_MANIFEST_PERMISSIONS = [
   "storage:read",
   "storage:write",
   "storage:delete",
