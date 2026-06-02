@@ -85,7 +85,11 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 10. Testing
 
-- [ ] Identify critical backend tests missing before public release and file or add TODOs for each gap.
+- [ ] Add backend bootstrap and maintenance flag tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/index.ts`, `src/bun/start.ts`, `src/bun/tls-config.ts`, and `src/bun/dev-flows.ts`; cover TLS/origin env normalization, non-destructive `--wipe-user-data` confirmation/cancellation, and display env clearing/preservation.
+- [ ] Add terminal and local-operator RPC seam tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/rpc-handlers/terminal.ts` and `src/bun/pi/metidos/terminal.ts`; cover unauthorized/non-local-operator/deleted worktree contexts, workspace path rejection, and safe error text.
+- [ ] Add calendar notification and permission seam tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/calendar/notifications.ts`, `src/bun/calendar/permissions.ts`, `src/bun/project-procedures/calendar-procedures.ts`, `src/bun/rpc-handlers/calendar.ts`, and `src/bun/pi/metidos/calendar.ts`; cover owned/userless events, due windows, duplicate suppression, disabled outlets, and missing user/project handling.
+- [ ] Add Pi-native Metidos tool wrapper tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/pi/metidos/thread.ts`, `cron.ts`, `notifications.ts`, `model-discovery.ts`, `permission-normalization.ts`, and `targeting.ts`; cover target resolution, permission normalization, safe-context unsafe escalation denial, local-operator-only mutations, provider selection, and secret redaction.
+- [ ] Add persistence adapter boundary tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/thread-store.ts`, `src/bun/message-activity-store.ts`, `src/bun/cron-store.ts`, `src/bun/thread-status-coalescer.ts`, and `src/bun/user-notifications.ts`; cover bound singleton database use, cron due filtering, active cron threads, disabled/deleted jobs, stale last-run values, and status transitions.
 - [ ] Identify critical mainview tests missing before public release and file or add TODOs for each gap.
 - [ ] Identify plugin permission tests missing before public release and file or add TODOs for each gap.
 - [ ] Identify auth/session tests missing before public release and file or add TODOs for each gap.
