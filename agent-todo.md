@@ -24,7 +24,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 4. CI, Validation, and Release Automation
 
-- [ ] Add CodeQL or an equivalent code scanning workflow if appropriate for the stack.
 - [ ] Smoke-run documented package scripts from a clean setup and record exact outcomes. Context: `.wiki/package-script-reference-audit.md` verifies referenced script names exist as of 2026-06-01; remaining work is execution validation for documented root scripts and `src/mainview/getdown` scripts, excluding intentional long-running watch modes unless they are checked with a bounded timeout.
 - [ ] Verify CI does not require private secrets for normal pull request validation.
 - [ ] Verify CI artifacts, logs, and test outputs do not expose secrets or machine-specific paths.
