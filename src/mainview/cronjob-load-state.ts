@@ -9,6 +9,11 @@ export type CronJobsLoadBehavior = {
   showLoadingState: boolean;
 };
 
+export type CronJobsInvalidationBehavior =
+  | { mode: "ignore" }
+  | { mode: "queue-background-refresh" }
+  | { isBackgroundRefresh: boolean; mode: "load" };
+
 export function resolveCronJobsLoadBehavior(options: {
   hasInitializedCronJobs: boolean;
   isBackgroundRefresh: boolean;
@@ -29,5 +34,20 @@ export function resolveCronJobsLoadBehavior(options: {
     clearError: mode === "foreground",
     mode,
     showLoadingState: mode === "foreground" && !hasInitializedCronJobs,
+  };
+}
+
+export function resolveCronJobsInvalidationBehavior(options: {
+  hasInitializedCronJobs: boolean;
+  isDocumentVisible: boolean;
+  requestInFlight: boolean;
+}): CronJobsInvalidationBehavior {
+  const { hasInitializedCronJobs, isDocumentVisible, requestInFlight } =
+    options;
+  if (!hasInitializedCronJobs && !isDocumentVisible) return { mode: "ignore" };
+  if (requestInFlight) return { mode: "queue-background-refresh" };
+  return {
+    isBackgroundRefresh: hasInitializedCronJobs,
+    mode: "load",
   };
 }

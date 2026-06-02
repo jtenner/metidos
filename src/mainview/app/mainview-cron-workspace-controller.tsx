@@ -34,7 +34,10 @@ import {
   ThreadAccessControl,
   type ThreadAccessValue,
 } from "../controls/thread-access-control";
-import { resolveCronJobsLoadBehavior } from "../cronjob-load-state";
+import {
+  resolveCronJobsInvalidationBehavior,
+  resolveCronJobsLoadBehavior,
+} from "../cronjob-load-state";
 import { claimCronJobRun, releaseCronJobRun } from "../cronjob-run-state";
 import { createAbortError, isAbortError } from "./async-request-state";
 import { permissionsForDescribeCronThread } from "./cron-describe-thread-access";
@@ -326,12 +329,19 @@ export function MainviewCronWorkspaceController({
   useEffect(
     () =>
       subscribeToCronJobsChanged(() => {
-        if (!cronJobsInitializedRef.current && !isDocumentVisible) return;
-        if (cronJobsAbortControllerRef.current !== null) {
+        const invalidationBehavior = resolveCronJobsInvalidationBehavior({
+          hasInitializedCronJobs: cronJobsInitializedRef.current,
+          isDocumentVisible,
+          requestInFlight: cronJobsAbortControllerRef.current !== null,
+        });
+        if (invalidationBehavior.mode === "ignore") return;
+        if (invalidationBehavior.mode === "queue-background-refresh") {
           cronJobsInvalidatedWhileLoadingRef.current = true;
           return;
         }
-        void loadCronJobs({ background: cronJobsInitializedRef.current });
+        void loadCronJobs({
+          background: invalidationBehavior.isBackgroundRefresh,
+        });
       }),
     [isDocumentVisible, loadCronJobs],
   );
