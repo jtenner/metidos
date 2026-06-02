@@ -35,7 +35,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add feature screenshots for plugin administration using fake/demo data only.
 - [ ] Add feature screenshots for settings/provider setup using fake/demo data only.
 - [ ] Ensure all screenshots hide usernames, hostnames, tokens, internal repositories, local paths, private branches, and real customer/user data.
-- [ ] Add a small brand asset folder if appropriate, with source files, exported images, and licensing/provenance notes.
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
