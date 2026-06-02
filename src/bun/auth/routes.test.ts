@@ -432,6 +432,85 @@ describe("auth route HTTP security", () => {
     );
   });
 
+  it("returns only current-session identity metadata on authenticated status reads", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error(
+        "Expected setup test to provide an authenticated session cookie",
+      );
+    }
+
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          cookie: sessionCookie,
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected auth status route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: {
+        authenticated: true,
+        configured: true,
+        isAdmin: true,
+        knownUsernames: ["metidos"],
+        lockedUntil: null,
+        primaryFactorType: "pin",
+        sessionExpiresAt: expect.any(String),
+        username: "metidos",
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("recovery");
+    expect(JSON.stringify(body)).not.toContain("totp");
+  });
+
+  it("returns deterministic unauthenticated status for stale session cookies", async () => {
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          cookie: "metidos_session=stale-session",
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected auth status route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: {
+        authenticated: false,
+        configured: true,
+        isAdmin: false,
+        knownUsernames: [],
+        lockedUntil: null,
+        primaryFactorType: null,
+        sessionExpiresAt: null,
+        username: null,
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("metidos");
+  });
+
   it("rejects invalid login credentials without issuing session cookies", async () => {
     const csrfToken = await issueCsrfToken();
     const response = await handleAuthRequestForTest(
