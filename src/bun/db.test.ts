@@ -465,6 +465,54 @@ describe("ownerless notifications and web shares", () => {
     }
   });
 
+  it("consolidates duplicate legacy project paths deterministically", () => {
+    const database = new Database(":memory:");
+    database.exec(`
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE
+      );
+      INSERT INTO users (id, username) VALUES (1, 'local'), (2, 'legacy');
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        path TEXT NOT NULL,
+        name TEXT NOT NULL,
+        git_remote TEXT,
+        is_open INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        last_opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        deleted_at INTEGER,
+        owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+      );
+      INSERT INTO projects (id, path, name, owner_user_id)
+      VALUES
+        (1, '/tmp/shared', 'First shared project', 1),
+        (2, '/tmp/shared', 'Second shared project', 2),
+        (3, '/tmp/other', 'Other project', 2);
+    `);
+    try {
+      migrateDatabase(database);
+      const migratedProjects = database
+        .query<{ id: number; path: string; name: string }, []>(
+          "SELECT id, path, name FROM projects ORDER BY id ASC",
+        )
+        .all();
+      expect(migratedProjects).toEqual([
+        { id: 1, path: "/tmp/shared", name: "First shared project" },
+        { id: 3, path: "/tmp/other", name: "Other project" },
+      ]);
+      expect(
+        database
+          .query<{ name: string }, []>("PRAGMA table_info(projects)")
+          .all()
+          .map((column) => column.name),
+      ).not.toContain("owner_user_id");
+    } finally {
+      database.close(false);
+    }
+  });
+
   it("migrates legacy app notifications and web shares away from user foreign keys", () => {
     const database = new Database(":memory:");
     database.exec(`

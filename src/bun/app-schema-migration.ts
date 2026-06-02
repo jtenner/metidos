@@ -813,6 +813,11 @@ function rebuildProjectsTableForOwnerless(db: Database): void {
 				last_opened_at,
 				deleted_at
 			)
+			-- Legacy project rows were keyed by path and scoped to users. The
+			-- ownerless schema intentionally keeps one local project per path; if a
+			-- manually-edited or partially-migrated database contains duplicate paths,
+			-- preserve the oldest row deterministically instead of relying on SQLite's
+			-- non-aggregate GROUP BY row selection.
 			SELECT
 				id,
 				path,
@@ -824,7 +829,7 @@ function rebuildProjectsTableForOwnerless(db: Database): void {
 				last_opened_at,
 				deleted_at
 			FROM projects
-			GROUP BY path
+			WHERE id IN (SELECT MIN(id) FROM projects GROUP BY path)
 			ORDER BY id ASC
 		`,
     );

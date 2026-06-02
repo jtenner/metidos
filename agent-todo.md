@@ -219,7 +219,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### SQLite and persistence follow-up
 
-- [ ] C3: Review `rebuildProjectsTableForOwnerless` in `src/bun/app-schema-migration.ts`. If `GROUP BY path` can drop important legacy project rows, fix migration behavior; otherwise document expected data-consolidation semantics.
 - [ ] C4: Review `rebuildAppNotificationDeliveriesForLocalInbox` in `src/bun/app-schema-migration.ts`. If legacy multi-user notifications should not become local inbox entries, filter or migrate explicitly; otherwise comment the single-operator migration choice.
 - [ ] C9: Review startup TOTP secret migration hook in `src/bun/index.ts` and `src/bun/auth/secret-migration.ts`. If missing coverage, add tests/comments around legacy v1-to-v2 ciphertext migration.
 - [ ] C11: Review plugin SQLite read guards in `src/bun/plugin/sqlite.ts` (`assertReadStatement`, `containsSqlIdentifierFromSet`). Fix false positives/false negatives if real; otherwise add tests/comments explaining why mutating CTEs and dangerous identifiers are blocked.
