@@ -88,6 +88,30 @@ afterEach(() => {
 });
 
 describe("createPiPluginTools", () => {
+  it("requests no plugin registrations without matching plugin permissions", () => {
+    const manager = {
+      invokeAgentTool: async () => ({ ok: true }),
+      listAgentToolRegistrationsForThread: (groups: readonly string[]) => {
+        expect(groups).toEqual([]);
+        return [];
+      },
+    } as unknown as PluginSidecarProcessManager;
+
+    const tools = createPiPluginTools({
+      context: {
+        contextKind: "threadTool",
+        ownerUserId: 9,
+        projectId: 3,
+        threadId: 7,
+        worktreePath: "/repo",
+      },
+      enabledPermissions: ["metidos:git", "metidos:unsafe"],
+      manager,
+    });
+
+    expect(tools).toEqual([]);
+  });
+
   it("passes only well-formed plugin permission ids to the sidecar manager", () => {
     const manager = {
       invokeAgentTool: async () => ({ ok: true }),
