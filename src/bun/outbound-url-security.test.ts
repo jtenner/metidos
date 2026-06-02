@@ -144,6 +144,35 @@ describe("outbound URL security", () => {
     expect(isBlockedOutboundAddress("example.com")).toBeTrue();
   });
 
+  test("blocks wildcard and reserved IPv4 ranges", () => {
+    const blockedAddresses = [
+      ["0.0.0.0", "wildcard this host"],
+      ["0.1.2.3", "this network"],
+      ["10.20.30.40", "private-use network"],
+      ["100.64.0.1", "carrier-grade NAT range start"],
+      ["100.127.255.254", "carrier-grade NAT range end"],
+      ["127.255.255.255", "loopback range"],
+      ["169.254.10.20", "link-local range"],
+      ["172.16.0.1", "private 172.16/12 range start"],
+      ["172.31.255.254", "private 172.16/12 range end"],
+      ["192.168.255.254", "private 192.168/16 range"],
+      ["198.18.0.1", "benchmark range start"],
+      ["198.19.255.254", "benchmark range end"],
+      ["224.0.0.1", "multicast and higher reserved space"],
+      ["240.0.0.1", "reserved future-use space"],
+      ["255.255.255.255", "limited broadcast address"],
+    ] as const;
+
+    for (const [address, label] of blockedAddresses) {
+      expect(isBlockedOutboundAddress(address), label).toBeTrue();
+    }
+
+    expect(isBlockedOutboundAddress("100.128.0.1")).toBeFalse();
+    expect(isBlockedOutboundAddress("172.32.0.1")).toBeFalse();
+    expect(isBlockedOutboundAddress("198.20.0.1")).toBeFalse();
+    expect(isBlockedOutboundAddress("223.255.255.254")).toBeFalse();
+  });
+
   test("fails closed for malformed IPv4-mapped IPv6 forms", () => {
     expect(isBlockedOutboundAddress("::ffff:127.0.0.1")).toBeTrue();
     expect(isBlockedOutboundAddress("::ffff:127.0.0.999")).toBeTrue();
