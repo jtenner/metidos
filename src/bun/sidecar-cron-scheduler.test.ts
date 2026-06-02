@@ -180,6 +180,69 @@ describe("sidecar cron scheduler", () => {
     expect(registeredSchedules).toEqual(["*/15 * * * *"]);
   });
 
+  it("removes stale handles when an updated cron job has an invalid schedule", () => {
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
+    const repoPath = createTempDirectory(
+      "metidos-cron-scheduler-invalid-sync-repo-",
+    );
+    mkdirSync(repoPath, {
+      recursive: true,
+    });
+
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Cron Scheduler Invalid Sync Repo",
+      projectPath: repoPath,
+    });
+
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Invalid sync cron",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "run invalid sync cron",
+      reasoningEffort: "medium",
+      schedule: "*/5 * * * *",
+      title: "Invalid Sync Cron",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+
+    const registeredSchedules: string[] = [];
+    const stoppedSchedules: string[] = [];
+    (Bun as { cron: typeof Bun.cron }).cron = ((
+      schedule: string,
+      _handler: () => unknown,
+    ) => {
+      registeredSchedules.push(schedule);
+      return {
+        stop() {
+          stoppedSchedules.push(schedule);
+          return this;
+        },
+      };
+    }) as unknown as typeof Bun.cron;
+
+    startCronScheduler();
+    expect(registeredSchedules).toEqual(["*/5 * * * *"]);
+
+    updateCronJob(database, cronJob.id, {
+      schedule: "not a cron schedule",
+    });
+    expect(() => syncCronSchedulerCron(cronJob.id)).not.toThrow();
+
+    expect(stoppedSchedules).toEqual(["*/5 * * * *"]);
+    expect(registeredSchedules).toEqual(["*/5 * * * *"]);
+
+    syncCronSchedulerCron(cronJob.id);
+
+    expect(stoppedSchedules).toEqual(["*/5 * * * *"]);
+    expect(registeredSchedules).toEqual(["*/5 * * * *"]);
+  });
+
   it("re-registers updated cron jobs and removes disabled ones on sync", () => {
     process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-scheduler-sync-repo-");
