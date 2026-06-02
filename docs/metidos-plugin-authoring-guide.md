@@ -153,7 +153,62 @@ Important manifest constraints:
 - `access[].injects` requires the plugin manifest permission `metidos:prompt_inject`. Registered injections run before each thread prompt when the containing plugin access group is enabled for the thread.
 - Secret env declarations cannot include defaults.
 - Settings must match their declared kind: `string`, `number`, `boolean`, `enum`, `secret`, `url`, `date`, or `list`.
-- `url` defaults must be valid URLs, `date` defaults use `YYYY-MM-DD`, enum defaults must match an option, and list defaults are arrays of strings or numbers according to the list item kind.
+- `url` defaults must be valid HTTP(S) URLs, `date` defaults use `YYYY-MM-DD`, enum defaults must match an option, and list defaults are arrays of strings or numbers according to the list item kind.
+
+## Declare settings and secrets
+
+Use manifest `settings[]` for local-operator-editable values. Each declaration needs a stable `key`, human-readable `label`, `kind`, and optional `description`, `required`, `default`, `options`, or `items` depending on the kind.
+
+```json
+{
+  "settings": [
+    {
+      "key": "endpoint_url",
+      "label": "Endpoint URL",
+      "kind": "url",
+      "required": true,
+      "default": "https://api.example.test/v1"
+    },
+    {
+      "key": "api_key",
+      "label": "API key",
+      "kind": "secret",
+      "required": true,
+      "description": "Stored locally and used only by this plugin."
+    },
+    {
+      "key": "enabled_labels",
+      "label": "Enabled labels",
+      "kind": "list",
+      "items": { "kind": "string" },
+      "default": ["triage"]
+    }
+  ]
+}
+```
+
+Authoring rules:
+
+- Prefer Plugin Settings for values the Local Operator edits in Settings → Plugins. Prefer `env[]` for process-level deployment values that should be captured at sidecar startup.
+- Use `kind: "secret"` for API keys, bearer tokens, passwords, webhook topics that act as capabilities, and similar credentials.
+- Secret settings are scalar-only in practice: save strings, numbers, booleans, or `null`; use `null` to clear/reset the stored secret. Do not model secret lists.
+- Avoid secret defaults. The schema permits scalar defaults for secret settings, but public examples and real plugins should not embed live credentials or reusable private values. Secret `env` declarations cannot define defaults.
+- Keep labels and descriptions specific enough that operators know where the value goes and what happens if it is missing.
+
+Storage and runtime behavior:
+
+- Plugin Settings are persisted under App Data in `plugin-settings-v1.json`, keyed by plugin install directory.
+- Non-secret settings are stored as JSON values. Secret setting values are encrypted when saved with the local auth secret key and plugin/key-specific authenticated data.
+- If an old plaintext or legacy-scoped encrypted secret is found, Metidos attempts to migrate it to current encrypted storage on read. If a secret cannot be decrypted, it is treated as unset and the operator should save the setting again.
+- Plugin sidecar startup receives a `metidos.settings` snapshot with materialized values and `missingRequiredKeys`. Secret values are available to that plugin runtime, so do not log them or return them from tools.
+
+Display, redaction, diagnostics, and reset behavior:
+
+- Settings UI snapshots mark secret settings as `secret` and `readable: false`; their `value` and `defaultValue` are `null`, while `hasStoredValue` tells the UI whether a saved secret exists.
+- Host diagnostics and warnings may name the plugin directory and setting key and give repair steps, but must not include decrypted values.
+- v1 does not automatically redact plugin-authored logs, thrown errors, tool results, provider responses, or notification payloads. Treat every plugin output path as author-controlled and avoid echoing settings.
+- Reset Plugin Data affects `.data` and seed/reset behavior only; it does not clear Plugin Settings. To reset a setting, save a new value or save `null` for secrets.
+- Do not ask operators to paste `plugin-settings-v1.json`, plugin `.data`, `.logs`, or unredacted diagnostics into public issues.
 
 ## Implement the manifest `main` entry point
 

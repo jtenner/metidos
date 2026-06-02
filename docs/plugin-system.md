@@ -90,13 +90,23 @@ See the [plugin permission reference](./plugin-permissions.md), authoring guide,
 
 ## Settings and secrets
 
-Plugin Settings are one per-plugin map stored in App Data. Secret fields should be redacted when displayed, omitted from diagnostics, and reset deliberately.
+Plugin Settings are one per-plugin map stored in App Data in `plugin-settings-v1.json`. The manifest declares each setting key, label, description, kind, required state, optional default, and any enum/list constraints. Supported setting kinds are `string`, `number`, `boolean`, `enum`, `secret`, `url`, `date`, and `list`.
+
+Secret settings are for local-operator-provided credentials such as API tokens, passwords, or sensitive provider topics. On save, scalar secret values are encrypted with the local auth secret key and plugin/key-specific authenticated data. Saving a secret as `null` clears the stored secret. Legacy plaintext or legacy-scoped encrypted plugin secrets are re-encrypted the next time they are read when possible; unreadable encrypted values are treated as unset and should be repaired by saving the setting again.
+
+Display, diagnostics, and reset behavior:
+
+- Settings UI and ordinary RPC snapshots request unreadable secrets, so secret `value` and `defaultValue` are returned as `null`; the UI can still show whether a stored value exists.
+- Runtime startup receives materialized setting values, including secrets, only for the plugin whose sidecar is starting.
+- Host diagnostics should identify setting keys and repair guidance without including secret values. Plugin-authored logs, thrown errors, tool results, provider output, or notification messages are not automatically redacted in v1.
+- Reset Plugin Data affects plugin-owned `.data`; it does not clear Plugin Settings. Clear a secret by saving `null` or by removing/resetting the plugin settings state under App Data using operator-approved repair steps.
 
 Rules:
 
 - Use fake values in docs and examples.
 - Do not paste real Plugin Settings into issues.
 - Prefer settings/env declarations over hard-coded secrets.
+- Do not put defaults on `env` declarations marked `secret`; secret settings may have scalar defaults only when the value is not a real credential.
 - Remember plugin-authored logs and tool results may include whatever the plugin writes; review plugins accordingly.
 
 ## Filesystem behavior
