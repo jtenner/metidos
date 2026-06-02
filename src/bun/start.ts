@@ -3,12 +3,9 @@
  * @description Package-script bootstrap for the long-running Metidos backend.
  */
 
-const ENABLE_NATIVE_CLIPBOARD_ENV = "METIDOS_BACKEND_NATIVE_CLIPBOARD";
+import { sanitizeBackendDisplayEnvironment } from "./start-env";
 
-if (process.env[ENABLE_NATIVE_CLIPBOARD_ENV]?.trim() !== "1") {
-  delete process.env.DISPLAY;
-  delete process.env.WAYLAND_DISPLAY;
-}
+sanitizeBackendDisplayEnvironment(process.env);
 
 const { runBackendCli } = await import("./index");
 
