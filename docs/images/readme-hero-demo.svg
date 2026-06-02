@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Metidos demo workspace screenshot</title>
+  <desc id="desc">A fake Metidos workspace showing demo projects, agent threads, diffs, plugins, and cron jobs without private data.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101828"/>
+      <stop offset="1" stop-color="#1d2939"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef2f6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <circle cx="1100" cy="90" r="180" fill="#7c3aed" opacity="0.18"/>
+  <circle cx="120" cy="650" r="220" fill="#0ea5e9" opacity="0.16"/>
+
+  <rect x="72" y="60" width="1136" height="600" rx="28" fill="url(#panel)" filter="url(#shadow)"/>
+  <rect x="72" y="60" width="1136" height="54" rx="28" fill="#111827"/>
+  <circle cx="108" cy="87" r="8" fill="#f87171"/>
+  <circle cx="132" cy="87" r="8" fill="#fbbf24"/>
+  <circle cx="156" cy="87" r="8" fill="#34d399"/>
+  <text x="192" y="93" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" fill="#e5e7eb">Metidos · Demo workspace</text>
+
+  <rect x="96" y="136" width="226" height="500" rx="18" fill="#111827"/>
+  <text x="122" y="174" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="20" font-weight="700" fill="#fff">Projects</text>
+  <rect x="116" y="200" width="186" height="58" rx="12" fill="#2563eb"/>
+  <text x="134" y="224" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#fff">demo-web-app</text>
+  <text x="134" y="244" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#bfdbfe">main · 3 threads</text>
+  <rect x="116" y="274" width="186" height="58" rx="12" fill="#1f2937"/>
+  <text x="134" y="298" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#f9fafb">sample-plugin</text>
+  <text x="134" y="318" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#9ca3af">feature/demo</text>
+  <rect x="116" y="348" width="186" height="58" rx="12" fill="#1f2937"/>
+  <text x="134" y="372" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#f9fafb">tutorial-repo</text>
+  <text x="134" y="392" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#9ca3af">clean demo data</text>
+  <text x="122" y="562" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#9ca3af">Safe Mode enabled</text>
+  <rect x="122" y="580" width="146" height="24" rx="12" fill="#064e3b"/>
+  <text x="138" y="597" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#a7f3d0">No secrets loaded</text>
+
+  <rect x="346" y="136" width="508" height="500" rx="18" fill="#ffffff" stroke="#d0d5dd"/>
+  <text x="374" y="176" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="24" font-weight="800" fill="#111827">Agent threads</text>
+  <text x="374" y="202" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#667085">Coordinate work, review diffs, and keep context in one place.</text>
+
+  <rect x="374" y="230" width="454" height="96" rx="16" fill="#f9fafb" stroke="#e5e7eb"/>
+  <rect x="398" y="254" width="10" height="10" rx="5" fill="#22c55e"/>
+  <text x="424" y="263" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" fill="#111827">Write README quickstart copy</text>
+  <text x="424" y="286" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#667085">Running · Safe tools · Demo provider</text>
+  <rect x="424" y="302" width="226" height="8" rx="4" fill="#dbeafe"/>
+  <rect x="424" y="302" width="146" height="8" rx="4" fill="#2563eb"/>
+
+  <rect x="374" y="344" width="454" height="96" rx="16" fill="#f9fafb" stroke="#e5e7eb"/>
+  <rect x="398" y="368" width="10" height="10" rx="5" fill="#f59e0b"/>
+  <text x="424" y="377" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" fill="#111827">Review plugin permissions</text>
+  <text x="424" y="400" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#667085">Waiting for operator approval</text>
+  <rect x="424" y="416" width="126" height="24" rx="12" fill="#fef3c7"/>
+  <text x="440" y="433" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#92400e">2 permissions</text>
+
+  <rect x="374" y="458" width="454" height="96" rx="16" fill="#f9fafb" stroke="#e5e7eb"/>
+  <rect x="398" y="482" width="10" height="10" rx="5" fill="#38bdf8"/>
+  <text x="424" y="491" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" fill="#111827">Prepare tutorial diff</text>
+  <text x="424" y="514" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#667085">3 files changed · ready to inspect</text>
+  <rect x="424" y="530" width="86" height="24" rx="12" fill="#ecfeff"/>
+  <text x="442" y="547" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#155e75">Open diff</text>
+
+  <rect x="878" y="136" width="306" height="236" rx="18" fill="#ffffff" stroke="#d0d5dd"/>
+  <text x="906" y="176" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="20" font-weight="800" fill="#111827">Diff review</text>
+  <rect x="906" y="202" width="246" height="44" rx="10" fill="#f0fdf4"/>
+  <text x="924" y="229" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#166534">+ docs/getting-started.md</text>
+  <rect x="906" y="258" width="246" height="44" rx="10" fill="#eff6ff"/>
+  <text x="924" y="285" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#1d4ed8">~ src/demo/example.ts</text>
+  <rect x="906" y="314" width="246" height="44" rx="10" fill="#fef2f2"/>
+  <text x="924" y="341" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#991b1b">- old-placeholder.txt</text>
+
+  <rect x="878" y="396" width="306" height="240" rx="18" fill="#ffffff" stroke="#d0d5dd"/>
+  <text x="906" y="436" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="20" font-weight="800" fill="#111827">Cron jobs</text>
+  <rect x="906" y="462" width="246" height="46" rx="12" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="924" y="490" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#111827">Daily TODO runner</text>
+  <rect x="906" y="522" width="246" height="46" rx="12" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="924" y="550" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#111827">Weekly docs check</text>
+  <rect x="906" y="582" width="148" height="26" rx="13" fill="#e0e7ff"/>
+  <text x="924" y="600" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#3730a3">Fake schedule data</text>
+</svg>

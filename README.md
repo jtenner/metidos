@@ -15,6 +15,10 @@ Metidos is a local workspace for developers who use AI coding agents. It brings 
 
 The name comes from *mētis*: practical wisdom, good judgment, and knowing the right move at the right time.
 
+![Metidos demo workspace showing fake projects, agent threads, diffs, plugins, and cron jobs](docs/images/readme-hero-demo.svg)
+
+*Demo screenshot with fake project names and generated data only.*
+
 ## Status
 
 Metidos is pre-1.0 local developer tooling. Expect rough edges, changing APIs, and incomplete public-release polish. Keep backups of important local data, review Plugin and Provider access carefully, and do not treat Unsafe Mode or unreviewed Plugins as safe defaults.

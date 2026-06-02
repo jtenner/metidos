@@ -13,8 +13,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 5. README Improvements
 
-- [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
-- [ ] Add a screenshot gallery or visual feature section with safe demo data.
+- [ ] Add a screenshot gallery or visual feature section with safe demo data. Future 3-minute slices can reuse the fake-data visual language from `docs/images/readme-hero-demo.svg` and should not include private paths, usernames, hostnames, tokens, real repositories, or customer/user data.
 
 ## 7. Install and First-Run Experience
 
