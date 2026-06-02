@@ -51,7 +51,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add feature screenshots for plugin administration using fake/demo data only.
 - [ ] Add feature screenshots for settings/provider setup using fake/demo data only.
 - [ ] Ensure all screenshots hide usernames, hostnames, tokens, internal repositories, local paths, private branches, and real customer/user data.
-- [ ] Add an architecture diagram showing backend, mainview, agent runtime, persistence, plugins, providers, and external boundaries.
 - [ ] Add a plugin lifecycle diagram showing discovery, review, approval, enabled use, disabled state, reset, and removal.
 - [ ] Add an install flow diagram showing clean clone, dependencies, configuration, first auth, provider setup, and first project.
 - [ ] Add a small brand asset folder if appropriate, with source files, exported images, and licensing/provenance notes.

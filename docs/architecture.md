@@ -18,6 +18,89 @@ Bun Backend
   |-- Static share worker for thread-hosted web servers
 ```
 
+## Architecture diagram
+
+This diagram shows the primary runtime components, persistence surfaces, plugin/provider integrations, and external trust boundaries. The Bun Backend is the security authority between the browser Mainview, local Worktrees, App Data, Plugins, the Pi runtime, and outbound Provider calls.
+
+```mermaid
+flowchart LR
+  operator[Local Operator]
+
+  subgraph browser[Browser boundary]
+    mainview[React/Tailwind Mainview]
+  end
+
+  subgraph backendBoundary[Bun Backend boundary]
+    backend[Bun Backend\nHTTP, auth, RPC, procedures]
+    rpc[Typed WebSocket RPC\n/rpc requests, cancels, pushes]
+    auth[Local Auth\nsessions, WebSocket tickets, step-up]
+    git[Git and Worktree services\nWorkspace Path Scope]
+    piAdapter[Pi Runtime adapter\nThread session mapping]
+    cron[Cron scheduler and runner\nrecurring child Threads]
+    pluginHost[Plugin System v1 host\ndiscovery, review, approval]
+    share[Static share worker\nthread-hosted web servers]
+  end
+
+  subgraph appDataBoundary[Private App Data boundary]
+    sqlite[(SQLite databases)]
+    runtimeState[(Pi runtime state)]
+    pluginData[(Plugin data, settings, logs)]
+    secrets[(Auth and Provider secrets)]
+    telemetry[(Optional telemetry sidecar output)]
+  end
+
+  subgraph workspaceBoundary[Project Worktree boundary]
+    worktrees[(Tracked project Worktrees)]
+  end
+
+  subgraph runtimeBoundary[Agent runtime boundary]
+    piRuntime[Pi runtime]
+    tools[Installed native and plugin tools\nscoped by Access Control]
+  end
+
+  subgraph pluginBoundary[Approved Plugin boundary]
+    pluginSidecars[Per-plugin sidecars]
+    pluginCaps[Declared tools, providers, crons,\nnotifications, ingress, settings]
+  end
+
+  subgraph externalBoundary[External service boundary]
+    providers[Model Providers\nOpenAI, Anthropic, Ollama, plugins, etc.]
+    network[Allowed network endpoints\nper provider/plugin policy]
+  end
+
+  operator --> mainview
+  mainview -->|HTTP assets and authenticated RPC| rpc
+  rpc --> backend
+  backend --> auth
+  backend --> git
+  backend --> piAdapter
+  backend --> cron
+  backend --> pluginHost
+  backend --> share
+
+  auth --> sqlite
+  auth --> secrets
+  backend --> sqlite
+  backend --> telemetry
+  piAdapter --> runtimeState
+  pluginHost --> pluginData
+  git -->|scoped filesystem operations| worktrees
+
+  piAdapter --> piRuntime
+  piRuntime --> tools
+  tools -->|file/search/edit/write in scope| worktrees
+  tools -->|thread-visible approved groups| pluginSidecars
+
+  cron -->|scheduled due fire| piAdapter
+  pluginHost -->|approved review hash only| pluginSidecars
+  pluginSidecars --> pluginCaps
+  pluginCaps -->|registered provider/tool surfaces| backend
+  pluginSidecars -->|declared allowlists only| network
+
+  piRuntime -->|Provider Auth mediated by Backend/Pi| providers
+  providers --> network
+```
+
 ## Backend
 
 The Backend lives under `src/bun/` and is the authority for:
