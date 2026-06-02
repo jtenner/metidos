@@ -19,6 +19,7 @@ import {
   normalizeTerminalResizeDimensions,
   resolveShellSpawn,
   resolveTerminalNodeBinary,
+  terminalOwnerSessionKeyForThread,
   TerminalManager,
   TerminalOutputBuffer,
 } from "./terminal-manager";
@@ -61,6 +62,10 @@ function addMockTerminalSession(
   terminalId: string,
   sockets: unknown[],
   onKill: (signal?: NodeJS.Signals) => void = () => {},
+  scope: {
+    createdFromThreadId?: number | null;
+    ownerSessionId?: string | null;
+  } = {},
 ): void {
   (
     manager as unknown as {
@@ -72,13 +77,13 @@ function addMockTerminalSession(
     cols: 80,
     command: null,
     createdAt: "2026-01-01T00:00:00.000Z",
-    createdFromThreadId: null,
+    createdFromThreadId: scope.createdFromThreadId ?? null,
     cwd: "/tmp",
     exitCode: null,
     exitSignal: null,
     exitedCleanupTimer: null,
     outputBuffer: new TerminalOutputBuffer(1024),
-    ownerSessionId: "session-1",
+    ownerSessionId: scope.ownerSessionId ?? "session-1",
     pendingSocketOutput: "pending",
     projectId: 1,
     projectName: "Project",
@@ -773,6 +778,37 @@ describe("terminal session limits", () => {
 });
 
 describe("terminal access scoping", () => {
+  it("allows the owning thread to read, grep, and kill a resumable thread-owned terminal", () => {
+    const manager = new TerminalManager({
+      exitedIdleTtlMs: 60_000,
+      maxGlobalTerminals: 10,
+      maxTerminalsPerOwner: 10,
+    });
+    let killed = false;
+    addMockTerminalSession(
+      manager,
+      "terminal-1",
+      [],
+      () => {
+        killed = true;
+      },
+      {
+        createdFromThreadId: 10,
+        ownerSessionId: terminalOwnerSessionKeyForThread(10),
+      },
+    );
+    const access = { createdFromThreadId: 10 };
+
+    expect(manager.viewTerminal(0, 0, 10, access)).toContain("Terminal 0");
+    expect(manager.grepTerminal(0, "hi", false, 5, access)).toContain(
+      "No matches",
+    );
+
+    manager.killTerminalByIndex(0, access);
+
+    expect(killed).toBe(true);
+  });
+
   it("denies read, grep, and kill when the caller thread does not own the terminal", () => {
     const manager = new TerminalManager({
       exitedIdleTtlMs: 60_000,

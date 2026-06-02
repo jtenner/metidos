@@ -527,6 +527,11 @@ export function terminalOwnerSessionKeyForThread(threadId: number): string {
   return `thread:${threadId}`;
 }
 
+// Plugin-created terminals are scoped to the agent thread, not to a browser
+// session. That keeps terminals resumable by the same thread after UI/session
+// churn while still denying access from unrelated threads. The canonical owner
+// key is deterministic and non-secret; authorization depends on matching the
+// server-stored thread identity, not on callers presenting an unguessable token.
 function assertTerminalAccess(
   session: TerminalSession,
   access?: TerminalAccessScope,

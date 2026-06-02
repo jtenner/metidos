@@ -213,10 +213,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] H4: Review public ICS unauthenticated rate limits in `src/bun/index.ts`. If scraping risk is too high, reduce limits or add optional auth; otherwise document public-calendar information disclosure expectations.
 
-### Terminal and PTY follow-up
-
-- [ ] I11: Review `terminalOwnerSessionKeyForThread` ownership model in `src/bun/terminal-manager.ts`. Fix orphan/cross-session behavior if real; otherwise document thread-owned terminal semantics.
-
 ### Web-server share follow-up
 
 - [ ] J2: Review public share route Origin/auth expectations in `src/bun/pi/web-server/share-thread.ts` and `src/bun/index.ts`. If cross-site access can expose private hosted content, tighten cookies/tokens; otherwise document public-share threat model.
