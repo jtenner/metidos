@@ -15,6 +15,8 @@ const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 let appDataDir: string | null = null;
 let peerIndex = 0;
 let authenticatedSessionCookie: string | null = null;
+let configuredTotpSecret: string | null = null;
+let initialRecoveryCode: string | null = null;
 let handleAuthRequestForTest: typeof import("../index").handleAuthRequestForTest;
 
 function buildAuthServer(
@@ -351,6 +353,10 @@ describe("auth route HTTP security", () => {
     const body = await readJson(response!);
     expect(body.ok).toBe(true);
     expect(body.recoveryCodes).toEqual(expect.any(Array));
+    const recoveryCodes = body.recoveryCodes as string[];
+    expect(recoveryCodes.length).toBeGreaterThan(0);
+    configuredTotpSecret = enrollment.totpSecret;
+    initialRecoveryCode = recoveryCodes[0] ?? null;
     expect(body.status).toMatchObject({ authenticated: true });
     const setCookie = response?.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("metidos_session=");
@@ -362,6 +368,132 @@ describe("auth route HTTP security", () => {
       setCookie,
       "metidos_session",
     );
+  });
+
+  it("rejects invalid login credentials without issuing session cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/login", {
+        body: JSON.stringify({
+          primaryFactor: "000000",
+          totpCode: "000000",
+        }),
+        headers: buildCsrfHeaders(csrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "invalid_credentials" },
+      ok: false,
+    });
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("metidos_session=");
+  });
+
+  it("logs in with TOTP and replaces a stale browser session cookie", async () => {
+    const totpSecret = configuredTotpSecret;
+    expect(totpSecret).toBeTruthy();
+    if (!totpSecret) {
+      throw new Error("Expected setup test to provide a TOTP secret");
+    }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/login", {
+        body: JSON.stringify({
+          primaryFactor: "482913",
+          totpCode: await generateTotpCode(totpSecret),
+        }),
+        headers: buildCsrfHeaders(csrfToken, ["metidos_session=stale-session"]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected login route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: { authenticated: true },
+    });
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("metidos_session=");
+    expect(setCookie).not.toContain("metidos_session=stale-session");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
+  });
+
+  it("rejects invalid recovery login codes without issuing session cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/recovery-login", {
+        body: JSON.stringify({
+          primaryFactor: "482913",
+          recoveryCode: "NOT-A-VALID-RECOVERY-CODE",
+        }),
+        headers: buildCsrfHeaders(csrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "invalid_credentials" },
+      ok: false,
+    });
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).not.toContain("metidos_session=");
+  });
+
+  it("logs in with a recovery code and replaces a stale browser session cookie", async () => {
+    const recoveryCode = initialRecoveryCode;
+    expect(recoveryCode).toBeTruthy();
+    if (!recoveryCode) {
+      throw new Error("Expected setup test to provide a recovery code");
+    }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/recovery-login", {
+        body: JSON.stringify({
+          primaryFactor: "482913",
+          recoveryCode,
+        }),
+        headers: buildCsrfHeaders(csrfToken, [
+          "metidos_session=expired-session",
+        ]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected recovery login route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: { authenticated: true },
+    });
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("metidos_session=");
+    expect(setCookie).not.toContain("metidos_session=expired-session");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
   });
 
   it("issues websocket tickets only for the current authenticated session", async () => {
