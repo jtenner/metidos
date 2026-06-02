@@ -4255,6 +4255,15 @@ async function bootstrap(): Promise<void> {
         // Bun accepts the socket. If the later upgrade fails, the client must
         // request a fresh ticket; that is preferable to allowing replay of a
         // bearer cookie after a partially processed handshake.
+        //
+        // RPC websocket upgrades intentionally require an authenticated session,
+        // not local-operator/admin privileges. Non-admin sessions may connect so
+        // the Mainview can route them to ordinary procedure-level auth failures
+        // while the transport still enforces same-origin, one-time-ticket,
+        // message-size, pre-parse abuse, rate-limit, timeout, and in-flight caps
+        // before dispatch. Admin-only privileges are revalidated for each frame
+        // by the procedure layer instead of turning the socket itself into an
+        // admin-only resource.
         const websocketAuth = authorizeRpcWebSocketUpgrade({
           cookieHeader: request.headers.get("cookie"),
           nowMs: Date.now(),

@@ -202,7 +202,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Authorization and capability follow-up
 
-- [ ] B4: Review non-admin WebSocket connection behavior in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. If non-admin sockets can consume excessive resources, add tighter limits; otherwise comment that admin-only checks are per-procedure.
 
 ### Plugin QuickJS sandbox follow-up
 
