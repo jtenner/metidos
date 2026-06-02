@@ -35,6 +35,8 @@ function insertTimedUtcEvent(
   calendarId: number,
   values: {
     title: string;
+    description?: string;
+    location?: string;
     startAt?: string;
     endAt?: string;
     createdAt?: string;
@@ -44,12 +46,15 @@ function insertTimedUtcEvent(
   database
     .query(
       `INSERT INTO calendar_events (
-        calendar_id, title, start_at, end_at, all_day, timezone, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 0, 'UTC', ?, ?)`,
+        calendar_id, title, description, location, start_at, end_at, all_day,
+        timezone, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'UTC', ?, ?)`,
     )
     .run(
       calendarId,
       values.title,
+      values.description ?? "",
+      values.location ?? "",
       values.startAt ?? "2026-01-01T10:00:00.000Z",
       values.endAt ?? "2026-01-01T11:00:00.000Z",
       values.createdAt ?? "2025-12-31T20:00:00.000Z",
@@ -91,6 +96,34 @@ describe("public calendar ICS export", () => {
 
       expect(ics).toContain("SUMMARY:Strict UTC Event");
       expect(ics).toContain("DTSTART:20260101T100000Z");
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      database.close();
+    }
+  });
+
+  it("escapes text properties so stored text cannot inject extra ICS fields", () => {
+    const { database, calendarId } = createCalendarDatabase();
+    try {
+      insertTimedUtcEvent(database, calendarId, {
+        title: "Planning\\Meeting\nLOCATION:Injected room",
+        description: "Agenda, notes; and slash \\ plus\nSTATUS:CANCELLED",
+        location: "Room, 1; east wing\\north\nATTENDEE:mailto:bad@example.test",
+      });
+
+      const ics = exportPublicCalendarIcs(database, "public-test");
+
+      expect(ics).toContain(
+        "SUMMARY:Planning\\\\Meeting\\nLOCATION:Injected room",
+      );
+      expect(ics).toContain(
+        "DESCRIPTION:Agenda\\, notes\\; and slash \\\\ plus\\nSTATUS:CANCELLED",
+      );
+      expect(ics).toContain(
+        "LOCATION:Room\\, 1\\; east wing\\\\north\\nATTENDEE:mailto:bad@example.test",
+      );
+      expect(ics).not.toContain("\nSTATUS:CANCELLED");
+      expect(ics).not.toContain("\nATTENDEE:mailto:bad@example.test");
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       database.close();
