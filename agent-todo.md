@@ -254,7 +254,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G18: Review dev-port fallback and allowed-origin rebuilding in `src/bun/index.ts`. Add tests/comments for fallback port and WebSocket origin allowlist consistency.
 - [ ] G19: Review main/share port collision checks in `src/bun/index.ts`. Add comments/tests for dev fallback behavior and fixed share-worker port assumptions.
 - [ ] G21: Review aggregate chat image payload limits in `src/bun/index.ts`. If 8 large images per message can pressure memory, lower limits or stream; otherwise document accepted desktop-app cap.
-- [ ] G22: Review `safeOutboundFetchWithTimeout` watchdog behavior in `src/bun/safe-outbound-fetch.ts`. Add tests/comments for `unref`, abort reason propagation, and timeout mapping.
 
 ### Calendar and notification follow-up
 

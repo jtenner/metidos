@@ -22,19 +22,32 @@ describe("safeOutboundFetchWithTimeout", () => {
     expect(await response.text()).toBe("ok");
   });
 
-  it("rejects with a typed timeout error", async () => {
+  it("rejects with a typed timeout error and exposes the timeout reason to fetch", async () => {
+    let abortReason: unknown = null;
+
     await expect(
       safeOutboundFetchWithTimeout({
         fetch: (_url, init) =>
           new Promise<Response>((_resolve, reject) => {
             init?.signal?.addEventListener("abort", () => {
-              reject(init.signal?.reason);
+              abortReason = init.signal?.reason;
+              reject(new Error("runtime-specific abort rejection"));
             });
           }),
-        timeoutMs: 1,
+        timeoutMessage: "custom timeout",
+        timeoutMs: 1.9,
         url: "http://example.test/hung",
       }),
-    ).rejects.toBeInstanceOf(SafeOutboundFetchTimeoutError);
+    ).rejects.toMatchObject({
+      message: "custom timeout",
+      timeoutMs: 1,
+    });
+
+    expect(abortReason).toBeInstanceOf(SafeOutboundFetchTimeoutError);
+    expect(abortReason).toMatchObject({
+      message: "custom timeout",
+      timeoutMs: 1,
+    });
   });
 
   it("preserves caller aborts instead of converting them to timeouts", async () => {

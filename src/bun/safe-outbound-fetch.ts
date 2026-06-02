@@ -49,14 +49,15 @@ export async function safeOutboundFetchWithTimeout(
   let timedOut = false;
   const timeout = setTimeout(() => {
     timedOut = true;
-    timeoutController.abort(
-      new SafeOutboundFetchTimeoutError(
-        input.timeoutMessage ??
-          `Outbound fetch timed out after ${timeoutMs} ms.`,
-        timeoutMs,
-      ),
+    const timeoutReason = new SafeOutboundFetchTimeoutError(
+      input.timeoutMessage ?? `Outbound fetch timed out after ${timeoutMs} ms.`,
+      timeoutMs,
     );
+    timeoutController.abort(timeoutReason);
   }, timeoutMs);
+  // This helper is used by background share/proxy paths; the watchdog must not
+  // keep the Bun process alive after all foreground work has finished. Browser
+  // timers do not expose unref(), so keep this optional for test/runtime parity.
   timeout.unref?.();
 
   try {
@@ -66,6 +67,9 @@ export async function safeOutboundFetchWithTimeout(
     });
   } catch (error) {
     if (timedOut) {
+      // Fetch implementations do not consistently reject with signal.reason, so
+      // map watchdog-triggered failures back to the helper's public typed error
+      // while preserving caller-driven abort reasons via the non-timeout branch.
       throw new SafeOutboundFetchTimeoutError(
         input.timeoutMessage ??
           `Outbound fetch timed out after ${timeoutMs} ms.`,
