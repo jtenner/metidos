@@ -1644,6 +1644,18 @@ describe("createPiMetidosTools", () => {
                     },
                   ],
                 },
+                {
+                  description: "Malformed descriptor that must be ignored",
+                  id: "Bad:Scope",
+                  name: "Bad scope",
+                  tools: [
+                    {
+                      description: "Should not grant a permission",
+                      name: "notes_bad_scope",
+                      timeoutMs: null,
+                    },
+                  ],
+                },
               ],
             },
             pluginId: "notes",
@@ -1664,16 +1676,16 @@ describe("createPiMetidosTools", () => {
 
     await executeTool(scope, host, "new_thread", {
       input: "Do permissioned work",
-      permissions: ["notes:read", "metidos:git", "metidos:git"],
+      permissions: [" notes:read ", "metidos:git", "metidos:git", " "],
     });
     await executeTool(scope, host, "new_cron", {
-      permissions: ["metidos:threads", "notes:read", "notes:read"],
+      permissions: ["metidos:threads", " notes:read ", "notes:read", ""],
       prompt: "Run note sync",
       schedule: "0 0 * * *",
     });
     await executeTool(scope, host, "update_cron", {
       cronJobId: "10",
-      permissions: [],
+      permissions: [" metidos:threads ", "metidos:threads"],
     });
 
     expect(threadParams).toMatchObject({
@@ -1682,7 +1694,9 @@ describe("createPiMetidosTools", () => {
     expect(cronCreateParams).toMatchObject({
       permissions: ["metidos:threads", "notes:read"],
     });
-    expect(cronUpdateParams).toMatchObject({ permissions: [] });
+    expect(cronUpdateParams).toMatchObject({
+      permissions: ["metidos:threads"],
+    });
 
     await expect(
       executeTool(scope, host, "new_thread", {
@@ -1690,6 +1704,23 @@ describe("createPiMetidosTools", () => {
         permissions: ["notes:write"],
       }),
     ).rejects.toThrow("Call metidos_list_permissions");
+    await expect(
+      executeTool(scope, host, "new_cron", {
+        permissions: ["notes:Bad:Scope"],
+        prompt: "Bad cron permission",
+        schedule: "0 0 * * *",
+      }),
+    ).rejects.toThrow(
+      "Unknown thread permission notes:Bad:Scope. Call metidos_list_permissions",
+    );
+    await expect(
+      executeTool(scope, host, "update_cron", {
+        cronJobId: "10",
+        permissions: ["notes:Bad:Scope"],
+      }),
+    ).rejects.toThrow(
+      "Unknown thread permission notes:Bad:Scope. Call metidos_list_permissions",
+    );
   });
 
   it("creates and updates cron jobs through the direct host callbacks", async () => {

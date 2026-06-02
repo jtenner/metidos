@@ -74,7 +74,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 10. Testing
 
 - [ ] Add Pi-native Metidos tool wrapper tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/pi/metidos/thread.ts`, `cron.ts`, `notifications.ts`, `model-discovery.ts`, `permission-normalization.ts`, and `targeting.ts`. Current coverage now includes bound target resolution denial for explicit child thread/cron targets and authenticated-operator error propagation for thread/cron mutations in `src/bun/pi/metidos/tools.test.ts`. Remaining 3-minute slices:
-  - [ ] Add focused permission-normalization tests for malformed plugin permission descriptors, duplicate/whitespace trimming, and contributor-facing invalid-permission guidance across thread and cron inputs.
   - [ ] Add model-discovery wrapper tests for provider selection, placeholder/unavailable provider messaging, and reasoning-effort validation guidance.
   - [ ] Add notifications wrapper tests for permission gating, authenticated-operator failures, and secret-safe/redacted host error messages.
 - [ ] Add persistence adapter boundary tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/thread-store.ts`, `src/bun/message-activity-store.ts`, `src/bun/cron-store.ts`, `src/bun/thread-status-coalescer.ts`, and `src/bun/user-notifications.ts`; cover bound singleton database use, cron due filtering, active cron threads, disabled/deleted jobs, stale last-run values, and status transitions.
