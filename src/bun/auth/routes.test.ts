@@ -356,6 +356,40 @@ describe("auth route HTTP security", () => {
     expect(setCookie).not.toContain("metidos_session=");
   });
 
+  it("keeps setup-start usernames out of unauthenticated status reads", async () => {
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected auth status route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: {
+        authenticated: false,
+        configured: false,
+        isAdmin: false,
+        knownUsernames: [],
+        lockedUntil: null,
+        primaryFactorType: null,
+        sessionExpiresAt: null,
+        username: null,
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("operator");
+  });
+
   it("returns deterministic setup validation errors without session cookies", async () => {
     const csrfToken = await issueCsrfToken();
     const response = await handleAuthRequestForTest(
