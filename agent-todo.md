@@ -356,7 +356,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] K8: Review `getGitSchedulerStats` use in the overload monitor. If many worktrees make the monitor expensive, add sampling/telemetry; otherwise comment expected cheapness.
 - [ ] K9: Review runtime-stats pending RPC snapshots in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. Add comments/tests if getter semantics are unclear.
 - [ ] K10: Review per-request versus per-connection RPC param bounds in `src/bun/index.ts`. If repeated large bounded requests can DoS, add aggregate limits; otherwise document per-request threat model.
-- [ ] K11: Review `Buffer.byteLength`-based string limits in `src/bun/index.ts`. Add tests/comments for multibyte UTF-8 rejection.
 - [ ] K12: Review `objectParams` validator casts in `src/bun/index.ts`. Add stricter typed validators for risky RPCs or comments/tests showing shape validation is sufficient.
 - [ ] K13: Review chat-image path-specific string cap in `src/bun/index.ts` (`rpcStringLimitForChatImagePath`). Add tests/comments to prevent accidental cap bypass.
 - [ ] K14: Review one-shot warmup timer cleanup in `src/bun/index.ts`. Add comments/tests if shutdown during warmup can leave work running.

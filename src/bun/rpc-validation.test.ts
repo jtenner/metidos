@@ -204,6 +204,17 @@ describe("RPC request validation", () => {
       }),
     ).toThrow(/extra string must be at most/);
 
+    const fourByteCharacters = "😀".repeat(
+      Math.floor(MAX_RPC_PARAM_STRING_BYTES / 4) + 1,
+    );
+    expect(fourByteCharacters.length).toBeLessThan(MAX_RPC_PARAM_STRING_BYTES);
+    expect(() =>
+      validateRpcRequestParams("openProject", {
+        extra: fourByteCharacters,
+        projectPath: "/tmp/metidos-project",
+      }),
+    ).toThrow(/extra string must be at most/);
+
     expect(() =>
       validateRpcRequestParams("updateThreadExtensionEditor", {
         text: "x".repeat(MAX_THREAD_EXTENSION_EDITOR_TEXT_BYTES + 1),
