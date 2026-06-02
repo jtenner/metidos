@@ -168,7 +168,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Focus, hover, and popover races
 
-- [ ] Add a hover bridge or equivalent stable open behavior for the help tooltip in `src/mainview/controls/thread-access-control.tsx` so users can move from the “?” trigger to the tooltip without it closing.
 - [ ] Fix blur-close versus keyboard navigation in `src/mainview/controls/codex-model-selector.tsx`, especially when moving into the reasoning submenu.
 - [ ] Remove or coordinate double initial-focus behavior in `src/mainview/controls/codex-model-selector.tsx`.
 

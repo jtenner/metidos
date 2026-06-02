@@ -3,7 +3,15 @@
  * @description Module for thread access control.
  */
 
-import { Fragment, type JSX, useId, useRef, useState } from "react";
+import {
+  Fragment,
+  type JSX,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { AppButton } from "./button";
 
 import type {
@@ -284,8 +292,36 @@ function AccessDescriptionPopover({
 }): JSX.Element {
   const tooltipId = useId();
   const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
   const placement = accessDescriptionPopoverPlacement(variant);
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
+  const openTooltip = useCallback(() => {
+    clearCloseTimer();
+    setOpen(true);
+  }, [clearCloseTimer]);
+
+  const closeTooltip = useCallback(() => {
+    clearCloseTimer();
+    setOpen(false);
+  }, [clearCloseTimer]);
+
+  const scheduleCloseTooltip = useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setOpen(false);
+    }, 120);
+  }, [clearCloseTimer]);
+
+  useEffect(() => clearCloseTimer, [clearCloseTimer]);
 
   return (
     <span className="shrink-0 self-center">
@@ -294,18 +330,10 @@ function AccessDescriptionPopover({
         aria-describedby={open ? tooltipId : undefined}
         aria-label={`About ${label} access`}
         className="inline-flex h-7 w-7 items-center justify-center border border-transparent text-[11px] font-semibold leading-none text-text-muted transition-colors hover:border-border-default hover:text-text-primary focus-visible:border-accent focus-visible:text-text-primary focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent focus-visible:outline-offset-1"
-        onBlur={() => {
-          setOpen(false);
-        }}
-        onFocus={() => {
-          setOpen(true);
-        }}
-        onMouseEnter={() => {
-          setOpen(true);
-        }}
-        onMouseLeave={() => {
-          setOpen(false);
-        }}
+        onBlur={closeTooltip}
+        onFocus={openTooltip}
+        onMouseEnter={openTooltip}
+        onMouseLeave={scheduleCloseTooltip}
         ref={anchorRef}
         type="button"
       >
@@ -319,6 +347,8 @@ function AccessDescriptionPopover({
         placement={placement}
         reference={anchorRef.current}
         role="tooltip"
+        onMouseEnter={openTooltip}
+        onMouseLeave={scheduleCloseTooltip}
       >
         {description}
       </PopoverSurface>
