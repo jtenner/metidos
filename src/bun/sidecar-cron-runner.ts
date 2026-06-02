@@ -35,7 +35,15 @@ import { createBoundThreadStore } from "./thread-store";
 
 /** Poll interval used only by custom test hosts that cannot publish thread-settled events. */
 const THREAD_FALLBACK_POLL_INTERVAL_MS = 500;
-/** Maximum elapsed time allowed for one cron invocation before marking it errored. */
+/**
+ * Maximum elapsed time allowed for cron completion tracking before marking the
+ * run errored. This is a monitor deadline, not a hard kill switch for the
+ * underlying Pi thread: a timed-out child thread may keep running until the Pi
+ * runtime settles or the local operator stops it. Cron overlap guards still
+ * consult active thread state before launching another run for the same job,
+ * and runtime telemetry records the timeout so operators can spot leaked or
+ * long-running cron work.
+ */
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
 /** Conservative launch cap for scheduler-fired cron work so bursts do not spawn unlimited threads at once. */
 const SCHEDULED_CRON_EXECUTION_CONCURRENCY = 2;
@@ -229,6 +237,10 @@ function waitForThreadRunSettled(
           timedOut,
         });
       };
+      // Do not attempt to stop the child thread here. The cron runner cannot
+      // safely infer whether the provider/runtime supports cooperative abort;
+      // it records the run as timed out and leaves thread ownership with the
+      // Pi runtime/local operator while active-thread checks prevent overlap.
       timeout = setTimeout(() => settle("Errored", true), RUN_TIMEOUT_MS);
       unsubscribe = subscribeToThreadStatusChanged((thread) => {
         if (thread.id !== threadId) {
@@ -267,6 +279,10 @@ function waitForThreadRunSettled(
           timedOut,
         });
       };
+      // Do not attempt to stop the child thread here. The cron runner cannot
+      // safely infer whether the provider/runtime supports cooperative abort;
+      // it records the run as timed out and leaves thread ownership with the
+      // Pi runtime/local operator while active-thread checks prevent overlap.
       timeout = setTimeout(() => settle("Errored", true), RUN_TIMEOUT_MS);
       unsubscribe = subscribeToThreadRunSettled((event) => {
         if (event.threadId !== threadId) {
