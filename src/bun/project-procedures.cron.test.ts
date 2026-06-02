@@ -10,6 +10,7 @@ import {
   initAppDatabase,
   resetResolvedAppDataDirectory,
   runInTransaction,
+  updateTimezoneSettings,
   upsertProject,
 } from "./db";
 
@@ -278,6 +279,52 @@ describe("cron procedure validation", () => {
       }),
     ).rejects.toThrow(/Cron jobs are limited to 512/);
     await expect(listCronsProcedure(undefined)).resolves.toHaveLength(512);
+  });
+
+  it("rejects schedules that expand beyond the per-job handle limit", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-expanded-handle-repo-",
+    );
+    updateTimezoneSettings(database, project.id, {
+      timezone: "Pacific/Chatham",
+    });
+    const { newCronProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const tooManyHandlesSchedule =
+      "16,19,24,25,26,30,31,51 5,6,11,13,22,23 8,10,13,18,19,20,21,22,25,31 1,2,6,8,9 *";
+
+    await expect(
+      newCronProcedure({
+        enabled: true,
+        permissions: ["metidos:threads"],
+        projectId: project.id,
+        prompt: "echo too many handles",
+        schedule: tooManyHandlesSchedule,
+        title: "Expanded handle overflow",
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(
+      /Invalid cron schedule: Cron schedule expands to 9 handles; limit is 8/,
+    );
+
+    const cronJob = await newCronProcedure({
+      enabled: true,
+      permissions: ["metidos:threads"],
+      projectId: project.id,
+      prompt: "echo ok",
+      schedule: "0 * * * *",
+      title: "Valid cron",
+      worktreePath: repoPath,
+    });
+    await expect(
+      updateCronProcedure({
+        cronJobId: cronJob.id,
+        schedule: tooManyHandlesSchedule,
+      }),
+    ).rejects.toThrow(
+      /Invalid cron schedule: Cron schedule expands to 9 handles; limit is 8/,
+    );
+    expect(getCronJobById(database, cronJob.id)?.schedule).toBe("0 * * * *");
   });
 
   it("rejects enabling cron jobs once the active job limit is reached", async () => {
