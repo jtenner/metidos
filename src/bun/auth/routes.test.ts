@@ -3,7 +3,14 @@
  * @description Route-level regression tests for auth HTTP security handling.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  setSystemTime,
+} from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +25,7 @@ let authenticatedSessionCookie: string | null = null;
 let configuredTotpSecret: string | null = null;
 let initialRecoveryCode: string | null = null;
 let handleAuthRequestForTest: typeof import("../index").handleAuthRequestForTest;
+let totpClockMs = Date.parse("2026-06-02T20:30:00.000Z");
 
 function buildAuthServer(
   peer = `127.0.0.${++peerIndex}`,
@@ -88,6 +96,59 @@ function extractCookiePair(setCookie: string | string[], name: string): string {
   throw new Error(`Missing ${name} cookie`);
 }
 
+function expectClearedAuthCookies(response: Response | null | undefined): void {
+  const setCookies = readSetCookieHeaders(response);
+  expect(
+    setCookies.some((cookie) => cookie.startsWith("metidos_session=")),
+  ).toBe(true);
+  expect(
+    setCookies.some((cookie) => cookie.startsWith("__Host-metidos_session=")),
+  ).toBe(true);
+  expect(
+    setCookies.some((cookie) => cookie.startsWith("metidos_ws_ticket=")),
+  ).toBe(true);
+  expect(
+    setCookies.some((cookie) => cookie.startsWith("__Host-metidos_ws_ticket=")),
+  ).toBe(true);
+  expect(
+    setCookies.filter((cookie) => cookie.includes("Max-Age=0")),
+  ).toHaveLength(4);
+}
+
+async function generateFreshTotpCode(secret: string): Promise<string> {
+  totpClockMs += 35_000;
+  setSystemTime(totpClockMs);
+  return generateTotpCode(secret, totpClockMs);
+}
+
+async function loginWithTotp(primaryFactor: string): Promise<string> {
+  const totpSecret = configuredTotpSecret;
+  expect(totpSecret).toBeTruthy();
+  if (!totpSecret) {
+    throw new Error("Expected setup test to provide a TOTP secret");
+  }
+
+  const csrfToken = await issueCsrfToken();
+  const response = await handleAuthRequestForTest(
+    new Request("http://127.0.0.1:7599/auth/login", {
+      body: JSON.stringify({
+        primaryFactor,
+        totpCode: await generateFreshTotpCode(totpSecret),
+      }),
+      headers: buildCsrfHeaders(csrfToken),
+      method: "POST",
+    }),
+    buildAuthServer(),
+  );
+
+  expect(response).not.toBeNull();
+  expect(response?.status).toBe(200);
+  return extractCookiePair(
+    response?.headers.get("set-cookie") ?? "",
+    "metidos_session",
+  );
+}
+
 beforeAll(async () => {
   closeAppDatabase();
   resetResolvedAppDataDirectory();
@@ -97,6 +158,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+  setSystemTime();
   closeAppDatabase();
   resetResolvedAppDataDirectory();
   if (typeof originalAppDataDir === "string") {
@@ -338,7 +400,7 @@ describe("auth route HTTP security", () => {
         body: JSON.stringify({
           primaryFactor: "482913",
           primaryFactorType: "pin",
-          totpCode: await generateTotpCode(enrollment.totpSecret),
+          totpCode: await generateFreshTotpCode(enrollment.totpSecret),
           totpSecret: enrollment.totpSecret,
           username: "operator",
         }),
@@ -406,7 +468,7 @@ describe("auth route HTTP security", () => {
       new Request("http://127.0.0.1:7599/auth/login", {
         body: JSON.stringify({
           primaryFactor: "482913",
-          totpCode: await generateTotpCode(totpSecret),
+          totpCode: await generateFreshTotpCode(totpSecret),
         }),
         headers: buildCsrfHeaders(csrfToken, ["metidos_session=stale-session"]),
         method: "POST",
@@ -494,6 +556,149 @@ describe("auth route HTTP security", () => {
     expect(setCookie).toContain("Path=/");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Strict");
+  });
+
+  it("rejects unauthenticated step-up requests with deterministic JSON", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/step-up", {
+        body: JSON.stringify({ primaryFactor: "482913", totpCode: "000000" }),
+        headers: buildCsrfHeaders(csrfToken),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "session_required" },
+      ok: false,
+    });
+  });
+
+  it("rejects malformed step-up requests on an authenticated session", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error(
+        "Expected setup test to provide an authenticated session cookie",
+      );
+    }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/step-up", {
+        body: JSON.stringify({ primaryFactor: "482913" }),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "invalid_request" },
+      ok: false,
+    });
+  });
+
+  it("accepts valid step-up credentials and returns the step-up expiry", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    const totpSecret = configuredTotpSecret;
+    expect(sessionCookie).toBeTruthy();
+    expect(totpSecret).toBeTruthy();
+    if (!sessionCookie || !totpSecret) {
+      throw new Error("Expected setup test to provide auth session state");
+    }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/step-up", {
+        body: JSON.stringify({
+          primaryFactor: "482913",
+          totpCode: await generateFreshTotpCode(totpSecret),
+        }),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected step-up route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: { authenticated: true },
+      stepUpValidUntil: expect.any(String),
+    });
+  });
+
+  it("rejects unauthenticated browser reset requests with deterministic JSON", async () => {
+    for (const [path, body] of [
+      ["/auth/reset-pin", { newPin: "719204", totpCode: "000000" }],
+      [
+        "/auth/reset-password",
+        { newPassword: "correct horse battery staple", totpCode: "000000" },
+      ],
+    ] as const) {
+      const csrfToken = await issueCsrfToken();
+      const response = await handleAuthRequestForTest(
+        new Request(`http://127.0.0.1:7599${path}`, {
+          body: JSON.stringify(body),
+          headers: buildCsrfHeaders(csrfToken),
+          method: "POST",
+        }),
+        buildAuthServer(),
+      );
+
+      expect(response).not.toBeNull();
+      expect(response?.status).toBe(401);
+      await expect(response?.json()).resolves.toMatchObject({
+        error: { code: "session_required" },
+        ok: false,
+      });
+    }
+  });
+
+  it("rejects malformed browser reset requests without clearing the active session", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error(
+        "Expected setup test to provide an authenticated session cookie",
+      );
+    }
+
+    for (const [path, body] of [
+      ["/auth/reset-pin", { totpCode: "000000" }],
+      ["/auth/reset-password", { totpCode: "000000" }],
+    ] as const) {
+      const csrfToken = await issueCsrfToken();
+      const response = await handleAuthRequestForTest(
+        new Request(`http://127.0.0.1:7599${path}`, {
+          body: JSON.stringify(body),
+          headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+          method: "POST",
+        }),
+        buildAuthServer(),
+      );
+
+      expect(response).not.toBeNull();
+      expect(response?.status).toBe(400);
+      await expect(response?.json()).resolves.toMatchObject({
+        error: { code: "invalid_request" },
+        ok: false,
+      });
+      const setCookie = response?.headers.get("set-cookie") ?? "";
+      expect(setCookie).not.toContain("metidos_session=;");
+      expect(setCookie).not.toContain("metidos_ws_ticket=;");
+    }
   });
 
   it("issues websocket tickets only for the current authenticated session", async () => {
@@ -592,14 +797,68 @@ describe("auth route HTTP security", () => {
     ).toHaveLength(4);
   });
 
-  it("logs out by clearing session, websocket-ticket cookies, and browser storage", async () => {
-    const sessionCookie = authenticatedSessionCookie;
-    expect(sessionCookie).toBeTruthy();
-    if (!sessionCookie) {
-      throw new Error(
-        "Expected setup test to provide an authenticated session cookie",
-      );
+  it("resets PIN from an authenticated browser session and clears auth cookies", async () => {
+    const sessionCookie = await loginWithTotp("482913");
+    const totpSecret = configuredTotpSecret;
+    expect(totpSecret).toBeTruthy();
+    if (!totpSecret) {
+      throw new Error("Expected setup test to provide a TOTP secret");
     }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/reset-pin", {
+        body: JSON.stringify({
+          newPin: "719204",
+          totpCode: await generateFreshTotpCode(totpSecret),
+        }),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      ok: true,
+      status: { authenticated: false },
+    });
+    expectClearedAuthCookies(response);
+  });
+
+  it("resets password from an authenticated browser session and clears auth cookies", async () => {
+    const sessionCookie = await loginWithTotp("719204");
+    const totpSecret = configuredTotpSecret;
+    expect(totpSecret).toBeTruthy();
+    if (!totpSecret) {
+      throw new Error("Expected setup test to provide a TOTP secret");
+    }
+
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/reset-password", {
+        body: JSON.stringify({
+          newPassword: "correct horse battery staple",
+          totpCode: await generateFreshTotpCode(totpSecret),
+        }),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    await expect(response?.json()).resolves.toMatchObject({
+      ok: true,
+      status: { authenticated: false },
+    });
+    expectClearedAuthCookies(response);
+  });
+
+  it("logs out by clearing session, websocket-ticket cookies, and browser storage", async () => {
+    const sessionCookie = await loginWithTotp("correct horse battery staple");
 
     const ticketCsrfToken = await issueCsrfToken();
     const ticketResponse = await handleAuthRequestForTest(
