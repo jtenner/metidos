@@ -257,6 +257,48 @@ describe("cron procedure validation", () => {
     ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
   });
 
+  it("rejects updates and deletion outside a regular caller's visible project scope", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-hidden-mutation-scope-repo-",
+    );
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = createRegularContext({
+      userId: alice.id,
+      username: alice.username,
+    });
+    const { updateCronProcedure } = await loadProjectProcedures();
+    const hiddenCronJob = createCronJob(database, {
+      description: "Hidden mutation scope cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo hidden mutation",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Hidden mutation scope cron",
+      worktreePath: repoPath,
+    });
+
+    await expect(
+      updateCronProcedure(
+        { cronJobId: hiddenCronJob.id, title: "Unauthorized rename" },
+        context,
+      ),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
+    await expect(
+      updateCronProcedure(
+        { cronJobId: hiddenCronJob.id, deleted: true },
+        context,
+      ),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
+    expect(getCronJobById(database, hiddenCronJob.id)).toMatchObject({
+      deletedAt: null,
+      title: "Hidden mutation scope cron",
+    });
+  });
+
   it("rejects invalid cron schedules before persisting them", async () => {
     const { project, repoPath } = createCronProcedureWorkspace(
       "metidos-cron-procedure-repo-",
