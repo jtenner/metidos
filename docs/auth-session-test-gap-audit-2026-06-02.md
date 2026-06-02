@@ -41,8 +41,8 @@ Current tests already cover the core auth service helpers well: primary-factor p
    - Current route tests cover unauthenticated status reads, authenticated status reads exposing only the current singleton local-operator identity, pending setup-start usernames staying private, stale session cookies, and explicitly revoked session cookies.
    - True wrong-session `/auth/status` coverage is blocked until the auth persistence model has per-session user ownership or a test helper that can represent a session bound to a non-current user. Today `src/bun/db.ts` stores `auth_sessions` without a user id and resolves every session through the first configured auth user, so fabricating a second user would not produce a meaningful wrong-session case.
    - When multi-user session ownership exists, add route-level tests proving wrong-session `/auth/status` responses do not leak a global user list while authenticated responses expose only that session's username and intended known-usernames metadata.
-   - Add route/integration tests for pending user setup/login states if the HTTP layer exposes or depends on pending-user service behavior.
-   - Assert deterministic, contributor-friendly error text and codes for missing users, pending users, and deleted/revoked sessions.
+   - Pending-user setup/login route tests are not currently actionable: `createPendingUser` is a disabled legacy provisioning entrypoint for the single-local-operator model, and the HTTP auth routes do not expose pending-user provisioning. Revisit this only if pending users become HTTP-visible again.
+   - If pending or multi-user HTTP endpoints return, assert deterministic, contributor-friendly error text and codes for missing users, pending users, and deleted/revoked sessions.
 
 ## Validation notes
 
