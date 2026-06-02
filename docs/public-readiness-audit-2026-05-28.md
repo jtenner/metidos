@@ -29,7 +29,7 @@ Ignored local artifacts observed on disk include `.tmp/`, `reports/`, `.metidos/
 
 ### Image/provenance follow-up remains required
 
-Source images observed include `bird.png`, `docs/uploadthing-test.png`, `src/mainview/crown.png`, `src/mainview/logo.png`, and `src/mainview/pixel-crown.png`. They need the separate asset ownership/provenance review already listed in `agent-todo.md`.
+Source images observed include `bird.png`, `docs/uploadthing-test.png`, `src/mainview/logo.png`, and `src/mainview/pixel-crown.png`; `src/mainview/crown.png` was removed on 2026-06-02 because it was unused and lacked public-redistribution provenance. The remaining assets need the separate asset ownership/provenance review already listed in `agent-todo.md`.
 
 ## Required follow-ups
 
