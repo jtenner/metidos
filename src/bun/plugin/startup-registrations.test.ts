@@ -43,6 +43,35 @@ function pluginWithTools(...tools: string[]): RpcPluginInventoryPlugin {
   ]);
 }
 
+function pluginWithInjections(
+  permissions = ["metidos:prompt_inject"],
+  ...injections: string[]
+): RpcPluginInventoryPlugin {
+  return {
+    pluginId: "alpha_plugin",
+    manifest: {
+      access: [
+        {
+          id: "thread_context",
+          name: "Thread context",
+          description: null,
+          injects: injections.map((inject) => ({
+            description: "Adds plugin context to thread prompts.",
+            name: inject,
+            timeoutMs: 5_000,
+          })),
+          tools: [],
+        },
+      ],
+      crons: [],
+      gc: null,
+      notificationProviders: [],
+      permissions,
+      providers: [],
+    },
+  } as unknown as RpcPluginInventoryPlugin;
+}
+
 function pluginWithCronPermission(
   permissions = ["cron:create"],
 ): RpcPluginInventoryPlugin {
@@ -161,6 +190,15 @@ function toolRegistration(tool: string) {
     timeoutMs: 5_000,
     tool,
     validatePropsHandle: "tool:validateProps:1",
+  };
+}
+
+function injectionRegistration(inject: string) {
+  return {
+    inject,
+    name: "Thread context",
+    promptHandle: `injection:prompt:${inject}`,
+    timeoutMs: 5_000,
   };
 }
 
@@ -334,6 +372,61 @@ describe("validatePluginStartupRegistrations", () => {
       ),
     ).toThrow(
       "tools[1].tool undeclared_tool is not declared by the plugin manifest",
+    );
+  });
+
+  it("accepts permissioned prompt injection startup registrations", () => {
+    const registrations = validatePluginStartupRegistrations(
+      {
+        injections: [injectionRegistration("thread_context")],
+      },
+      pluginWithInjections(["metidos:prompt_inject"], "thread_context"),
+    );
+
+    expect(registrations.injections).toEqual([
+      injectionRegistration("thread_context"),
+    ]);
+  });
+
+  it("rejects prompt injection startup registrations without prompt injection permission", () => {
+    expect(() =>
+      validatePluginStartupRegistrations(
+        {
+          injections: [injectionRegistration("thread_context")],
+        },
+        pluginWithInjections([], "thread_context"),
+      ),
+    ).toThrow("injections requires metidos:prompt_inject");
+  });
+
+  it("requires registered prompt injections to exactly match manifest declarations", () => {
+    expect(() =>
+      validatePluginStartupRegistrations(
+        {
+          injections: [injectionRegistration("thread_context")],
+        },
+        pluginWithInjections(
+          ["metidos:prompt_inject"],
+          "thread_context",
+          "project_context",
+        ),
+      ),
+    ).toThrow(
+      "injections is missing manifest-declared injection project_context",
+    );
+
+    expect(() =>
+      validatePluginStartupRegistrations(
+        {
+          injections: [
+            injectionRegistration("thread_context"),
+            injectionRegistration("undeclared"),
+          ],
+        },
+        pluginWithInjections(["metidos:prompt_inject"], "thread_context"),
+      ),
+    ).toThrow(
+      "injections[1].inject undeclared is not declared by the plugin manifest",
     );
   });
 

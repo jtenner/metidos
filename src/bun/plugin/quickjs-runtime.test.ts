@@ -729,6 +729,24 @@ describe("executePluginQuickJsRuntime", () => {
     });
   });
 
+  it("rejects prompt injection registration without prompt injection permission at runtime", async () => {
+    await expect(
+      buildAndRunPlugin(`
+        import { definePlugin } from "@metidos/plugin-api";
+        export default definePlugin((metidos) => {
+          metidos.addInjection({
+            inject: "thread_context",
+            name: "Thread context",
+            timeoutMs: 5000,
+            prompt() {
+              return "context";
+            },
+          });
+        });
+      `),
+    ).rejects.toThrow("metidos.addInjection requires metidos:prompt_inject");
+  });
+
   it("rejects OAuth provider registration without oauth:register at runtime", async () => {
     await expect(
       buildAndRunPlugin(`

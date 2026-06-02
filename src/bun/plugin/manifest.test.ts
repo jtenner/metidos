@@ -287,6 +287,40 @@ describe("plugin manifest schema alignment", () => {
     ).toContain("missing_required_permission");
   });
 
+  it("requires prompt injection permission for manifest injection declarations", () => {
+    const parsed = parsePluginManifest(
+      JSON.stringify(
+        baseManifest({
+          access: [
+            {
+              id: "thread_context",
+              name: "Thread context",
+              injects: [
+                {
+                  description: "Adds plugin context to thread prompts.",
+                  name: "thread_context",
+                  timeoutMs: 5_000,
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+      "schema-case.json",
+    );
+
+    expect(parsed.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing_required_permission",
+          path: "schema-case.json#/permissions",
+          message:
+            "permissions: `access[].injects` requires `metidos:prompt_inject`.",
+        }),
+      ]),
+    );
+  });
+
   it("accepts network allowlist patterns with omitted HTTPS protocol", () => {
     expect(
       issueCodesFor(
