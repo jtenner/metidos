@@ -38,11 +38,24 @@ export function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatDateOnlyUtc(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function parseDateOnlyLocal(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return null;
+  }
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 }
 
 export function monthGridDays(anchor: Date): Date[] {
@@ -88,6 +101,10 @@ export function viewWindow(
 
 export function occurrenceDayKey(occurrence: RpcCalendarOccurrence): string {
   if (occurrence.allDay && occurrence.startDate) {
+    const date = parseDateOnlyLocal(occurrence.startDate);
+    if (date) {
+      return toDateInputValue(date);
+    }
     return occurrence.startDate;
   }
   const date = new Date(occurrence.startAt ?? occurrence.originalStart);
@@ -110,20 +127,18 @@ export function groupOccurrencesByDay(
   const grouped = new Map<string, RpcCalendarOccurrence[]>();
   for (const occurrence of occurrences) {
     if (occurrence.allDay && occurrence.startDate) {
-      const start = new Date(`${occurrence.startDate}T00:00:00.000Z`);
-      const end = new Date(
-        `${occurrence.endDate ?? occurrence.startDate}T00:00:00.000Z`,
+      const start = parseDateOnlyLocal(occurrence.startDate);
+      const end = parseDateOnlyLocal(
+        occurrence.endDate ?? occurrence.startDate,
       );
-      if (Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
-        const finalDay = new Date(
-          Math.max(start.getTime(), end.getTime() - DAY_MS),
-        );
+      if (start && end) {
+        const finalDay = addDays(end, -1);
         for (
           let day = start;
           day.getTime() <= finalDay.getTime();
-          day = new Date(day.getTime() + DAY_MS)
+          day = addDays(day, 1)
         ) {
-          pushGroupedOccurrence(grouped, formatDateOnlyUtc(day), occurrence);
+          pushGroupedOccurrence(grouped, toDateInputValue(day), occurrence);
         }
         continue;
       }

@@ -144,10 +144,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 13. Frontend Review: Bugs, UI Races, and Style Violations
 
-### Calendar bugs
-
-- [ ] Fix day-grouping timezone inconsistency in `src/mainview/app/calendar-layout.ts`: choose one date-key strategy for all-day and timed events so same-date events do not land in different visible day columns for non-UTC viewers.
-
 ### Plugin administration, access, and terminal bugs
 
 
