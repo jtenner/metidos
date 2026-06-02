@@ -24,7 +24,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify `bun run validate` passes from a clean clone.
 - [ ] Verify local auth setup and reset flow are documented and work as described.
 - [ ] Verify missing dependencies produce readable errors with next-step guidance.
-- [ ] Verify setup docs do not require private knowledge, private package access, personal paths, or internal services.
 - [ ] Verify backup and restore paths are documented and tested.
 - [ ] Verify installation failure paths do not leave behind confusing or unsafe partial state.
 
