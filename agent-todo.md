@@ -207,7 +207,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Remove `backdrop-blur-sm` from the tooltip in `src/mainview/controls/codex-model-selector.tsx` unless it is converted to an approved overlay recipe.
 - [ ] Introduce or use a shared badge primitive for the “Unread” badge in `src/mainview/app/thread-list-row.tsx`.
 - [ ] Introduce or use a shared badge primitive for the secret badge in `src/mainview/app/plugin-administration-panel.tsx`.
-- [ ] Replace off-grid spacing in `src/mainview/controls/codex-model-selector.tsx` (`py-px`, `ml-[10px]`, `pl-[10px]`, `mt-[1px]`) with 4px-grid-compliant spacing.
 - [ ] Replace off-grid spacing/tracking in `src/mainview/controls/thread-access-control.tsx` (`space-y-1.5`, `tracking-[0.12em]`) with approved spacing and type tokens.
 - [ ] Replace off-grid spacing/tracking in `src/mainview/app/mainview-cron-workspace-controller.tsx` with approved spacing and type tokens.
 - [ ] Bring mobile chat-bubble spacing in `src/mainview/app/chat-workspace.tsx` back onto the 4px grid instead of `px-[10px]`, `py-[10px]`, and `px-[2px]` recipes.

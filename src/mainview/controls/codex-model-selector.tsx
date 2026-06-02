@@ -221,7 +221,7 @@ function ModelReasoningSubmenu({
         aria-expanded={supportsReasoningSubmenu ? submenuOpen : undefined}
         aria-haspopup={supportsReasoningSubmenu ? "dialog" : undefined}
         buttonStyle="muted"
-        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-px text-left font-normal ${
+        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-1 text-left font-normal ${
           selected
             ? "bg-surface-3 text-text-primary"
             : "text-text-secondary hover:bg-surface-2"
@@ -735,7 +735,7 @@ export function CodexModelSelector({
                 </span>
               )}
             </span>
-            <span className="ml-[10px] flex shrink-0 items-center gap-2">
+            <span className="ml-3 flex shrink-0 items-center gap-2">
               {buttonThinkingLabel ? (
                 <span className="inline-flex shrink-0 border border-border-default bg-accent-surface px-2 py-1 uppercase-label text-accent-strong">
                   {buttonThinkingLabel}
@@ -827,7 +827,7 @@ export function CodexModelSelector({
                         aria-disabled={!providerAvailable}
                         aria-selected={selected}
                         buttonStyle="muted"
-                        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-px text-left font-normal ${
+                        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-1 text-left font-normal ${
                           providerAvailable
                             ? selected
                               ? "bg-surface-3 text-text-primary"
@@ -898,7 +898,7 @@ export function CodexModelSelector({
                           </span>
                           <span className="ml-auto flex shrink-0 items-center gap-2">
                             {variant === "desktop" && scopeInfo ? (
-                              <span className="inline-flex shrink-0 border border-border-strong bg-accent-surface pl-[10px] pr-2 py-1 uppercase-label text-accent-strong">
+                              <span className="inline-flex shrink-0 border border-border-strong bg-accent-surface px-2 py-1 uppercase-label text-accent-strong">
                                 {scopeInfo.badge}
                               </span>
                             ) : null}
@@ -1023,7 +1023,7 @@ export function CodexModelSelector({
         role="tooltip"
       >
         <div className="flex items-start gap-2">
-          <span className="mt-[1px] shrink-0 text-warning-text">
+          <span className="shrink-0 text-warning-text">
             {materialSymbol("warning", "text-[15px]")}
           </span>
           <span className="break-words">{providerWarningPopover?.note}</span>
