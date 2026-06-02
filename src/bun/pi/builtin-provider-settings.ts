@@ -147,6 +147,9 @@ async function readCodexAuthJsonFile(input: {
     ) {
       return null;
     }
+    // This importer can run before plugin/provider logging is wired. Use stderr
+    // for operator repair guidance and log only the plugin setting identity plus
+    // parse/read failure, never imported auth contents.
     console.warn(
       `Plugin Pi auth file for ${input.directoryName}/${input.settingKey} could not be imported: ${error instanceof Error ? error.message : String(error)}`,
     );

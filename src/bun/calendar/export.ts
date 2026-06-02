@@ -278,6 +278,9 @@ export function exportPublicCalendarIcs(
     try {
       addEvent(component, event, exdates);
     } catch (error) {
+      // Public ICS export is available without a request-scoped subsystem logger.
+      // Stderr diagnostics include only the local event id and validation error,
+      // not event title, description, location, or attendee data.
       console.warn(
         `Skipping invalid calendar event ${event.id} during public ICS export: ${
           error instanceof Error ? error.message : String(error)

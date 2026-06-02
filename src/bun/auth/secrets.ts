@@ -28,10 +28,10 @@ const GROUP_OR_OTHER_ACCESS_MASK = 0o077;
 const STICKY_DIRECTORY_MODE = 0o1000;
 const warnedLooseAuthSecretParentDirectories = new Set<string>();
 
-function warnWindowsAclManualCheck(message: string): void {
+function warnAuthSecretManualCheck(message: string): void {
   // This low-level auth-secret helper can run before the backend logger is
-  // initialized, including CLI reset/setup flows. Keep Windows ACL warnings on
-  // stderr so operators still see hardening guidance during early startup.
+  // initialized, including CLI reset/setup flows. Keep filesystem-permission
+  // hardening guidance on stderr so operators see it during early startup.
   console.warn(message);
 }
 
@@ -120,7 +120,7 @@ function applyOwnerOnlyDirectoryPermissions(path: string): void {
     chmodSync(path, OWNER_ACCESS_ONLY_MODE);
   } catch (error) {
     if (process.platform === "win32") {
-      warnWindowsAclManualCheck(
+      warnAuthSecretManualCheck(
         `Unable to enforce owner-only permissions on auth secret directory ${path}; verify Windows ACLs manually. See ${WINDOWS_ACL_GUIDANCE}.`,
       );
       return;
@@ -161,7 +161,7 @@ function warnLooseExistingAuthSecretParentDirectories(path: string): void {
       !warnedLooseAuthSecretParentDirectories.has(current)
     ) {
       warnedLooseAuthSecretParentDirectories.add(current);
-      console.warn(
+      warnAuthSecretManualCheck(
         `Auth secret parent directory ${current} is accessible by group or other users; consider tightening it to owner-only permissions because it contains or leads to auth-secret.key.`,
       );
     }
@@ -225,7 +225,7 @@ function applyOwnerOnlyFilePermissions(path: string): void {
     chmodSync(path, 0o600);
   } catch (error) {
     if (process.platform === "win32") {
-      warnWindowsAclManualCheck(
+      warnAuthSecretManualCheck(
         `Unable to enforce owner-only permissions on auth secret key ${path}; verify Windows ACLs manually. See ${WINDOWS_ACL_GUIDANCE}.`,
       );
       return;

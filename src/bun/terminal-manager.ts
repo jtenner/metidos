@@ -792,6 +792,9 @@ function assertTerminalNodeBinarySecurity(
 }
 
 function resolveConfiguredTerminalNodeBinary(configured: string): string {
+  // Terminal binary resolution runs during PTY startup and in tests without a
+  // request/runtime logger. Stderr warnings are limited to executable paths the
+  // local operator configured or that PATH already exposes.
   if (!isAbsolute(configured)) {
     throw new Error("METIDOS_NODE_BINARY must be an absolute path.");
   }
@@ -858,6 +861,8 @@ function resolveDefaultTerminalNodeBinary(): string {
   assertTerminalNodeBinarySecurity(resolved, "Resolved terminal node binary");
   assertDefaultNodeDirectorySecurity(resolved);
   if (loggedDefaultNodeBinary !== resolved) {
+    // Same stderr-only rationale as configured terminal binaries: this path is
+    // already executable via PATH and helps diagnose PTY startup failures.
     console.warn(`Using resolved Node.js binary for terminals: ${resolved}`);
     loggedDefaultNodeBinary = resolved;
   }
@@ -917,6 +922,9 @@ const TERMINAL_SENSITIVE_ENV_KEY_PATTERN =
   /(?:API|AUTH|CREDENTIAL|KEY|PASSWORD|SECRET|TOKEN)/iu;
 
 function warnIfTerminalExtraEnvLooksSensitive(key: string): void {
+  // This operator-facing warning deliberately uses stderr because environment
+  // construction is a low-level terminal helper. It logs only the variable name,
+  // not the value that may contain a credential.
   if (!TERMINAL_SENSITIVE_ENV_KEY_PATTERN.test(key)) {
     return;
   }
@@ -1017,6 +1025,8 @@ function coercePositiveInteger(value: unknown, fallback: number): number {
 }
 
 function readNonNegativeIntegerEnv(name: string, fallback: number): number {
+  // Terminal limit configuration is parsed before TerminalManager has a
+  // subsystem logger, so malformed local env overrides are reported on stderr.
   const raw = process.env[name]?.trim();
   if (!raw) {
     return fallback;
@@ -1268,6 +1278,9 @@ export class TerminalManager {
   }
 
   private auditTerminalRefusal(reason: "global" | "app"): void {
+    // Refusals are useful during overload/debugging even when no request logger
+    // is available. The payload contains bounded counters and configured limits,
+    // not terminal input/output or environment values.
     console.warn("Terminal creation refused by configured session cap.", {
       limitConfig: this.limitConfig,
       metrics: this.getProcessMetrics(),

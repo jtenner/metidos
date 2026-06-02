@@ -555,6 +555,9 @@ function pluginSecretReadWarning(input: {
   error: unknown;
   key: string;
 }): void {
+  // Plugin setting storage is used by runtime setup paths where the subsystem
+  // logger is not always available. Keep repair guidance on stderr and avoid
+  // printing decrypted secret values.
   console.warn(
     `Plugin secret setting ${input.directoryName}/${input.key} could not be read and will be treated as unset. Save the setting again to repair it. ${pluginSecretReadFailureReason(input.error)}`,
   );
@@ -564,6 +567,9 @@ function plaintextSecretWarning(input: {
   directoryName: string;
   key: string;
 }): void {
+  // This migration warning intentionally goes to stderr because plugin settings
+  // may be loaded before a request-scoped logger exists; only plugin/key names
+  // are logged, never secret values.
   console.warn(
     `Plugin secret setting ${input.directoryName}/${input.key} is stored as plaintext. Save the setting again to encrypt it at rest.`,
   );
