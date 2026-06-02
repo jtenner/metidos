@@ -28,7 +28,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add or polish mascot/icon files if they are part of the project identity.
 - [ ] Add a GitHub social preview image using safe, repo-owned assets.
 - [ ] Add an Open Graph image for the website if the website lives in the repository.
-- [ ] Add favicon and app icon files if the app or website uses them.
 - [ ] Add README screenshots with fake/demo data only.
 - [ ] Add feature screenshots for project/worktree view using fake/demo data only.
 - [ ] Add feature screenshots for agent threads using fake/demo data only.

@@ -1,0 +1,17 @@
+{
+	"name": "Metidos",
+	"short_name": "Metidos",
+	"description": "The local command center for AI coding agents.",
+	"start_url": "./",
+	"display": "standalone",
+	"background_color": "#0a0b0c",
+	"theme_color": "#0a0b0c",
+	"icons": [
+		{
+			"src": "./app-icon.svg",
+			"sizes": "512x512",
+			"type": "image/svg+xml",
+			"purpose": "any maskable"
+		}
+	]
+}
