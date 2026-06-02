@@ -117,6 +117,69 @@ describe("sidecar cron scheduler", () => {
     expect(stoppedCount).toBe(1);
   });
 
+  it("skips invalid stored schedules without blocking valid scheduler registrations", () => {
+    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
+    const repoPath = createTempDirectory(
+      "metidos-cron-scheduler-invalid-schedule-repo-",
+    );
+    mkdirSync(repoPath, {
+      recursive: true,
+    });
+
+    const database = initAppDatabase();
+    const project = upsertProject(database, {
+      name: "Cron Scheduler Invalid Schedule Repo",
+      projectPath: repoPath,
+    });
+
+    createCronJob(database, {
+      agentsAccess: false,
+      description: "Invalid cron",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "run invalid cron",
+      reasoningEffort: "medium",
+      schedule: "not a cron schedule",
+      title: "Invalid Cron",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+    createCronJob(database, {
+      agentsAccess: false,
+      description: "Valid cron",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "run valid cron",
+      reasoningEffort: "medium",
+      schedule: "*/15 * * * *",
+      title: "Valid Cron",
+      unsafeMode: false,
+      worktreePath: repoPath,
+    });
+
+    const registeredSchedules: string[] = [];
+    (Bun as { cron: typeof Bun.cron }).cron = ((
+      schedule: string,
+      _handler: () => unknown,
+    ) => {
+      registeredSchedules.push(schedule);
+      return {
+        stop() {
+          return this;
+        },
+      };
+    }) as unknown as typeof Bun.cron;
+
+    expect(() => startCronScheduler()).not.toThrow();
+    expect(registeredSchedules).toEqual(["*/15 * * * *"]);
+  });
+
   it("re-registers updated cron jobs and removes disabled ones on sync", () => {
     process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
     const repoPath = createTempDirectory("metidos-cron-scheduler-sync-repo-");
