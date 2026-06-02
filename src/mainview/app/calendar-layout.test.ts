@@ -167,14 +167,27 @@ describe("calendar event form helpers", () => {
     expect(datetimeLocalInputToIso(localValue)).toBe(iso);
   });
 
-  test("maps and preserves recurrence rules unless repeat is changed", () => {
+  test("maps basic recurrence rules exactly", () => {
     expect(repeatOptionFromRRule("RRULE:FREQ=WEEKLY")).toBe("weekly");
-    expect(repeatOptionFromRRule("RRULE:FREQ=MONTHLY;COUNT=4")).toBe("monthly");
+    expect(repeatOptionFromRRule("rrule:freq=monthly")).toBe("monthly");
+    expect(repeatOptionFromRRule("RRULE:FREQ=WEEKLY;COUNT=4")).toBe("custom");
+    expect(repeatOptionFromRRule("RRULE:FREQ=DAILY;BYDAY=MO")).toBe("custom");
+    expect(repeatOptionFromRRule("EXDATE:20260601T100000Z")).toBe("custom");
+  });
+
+  test("preserves custom or untouched recurrence rules unless a preset is selected", () => {
     expect(
       recurrenceRuleForEventForm({
         occurrence: { recurrenceRule: "RRULE:FREQ=WEEKLY;COUNT=4" },
-        repeat: "weekly",
+        repeat: "custom",
         repeatTouched: false,
+      }),
+    ).toBe("RRULE:FREQ=WEEKLY;COUNT=4");
+    expect(
+      recurrenceRuleForEventForm({
+        occurrence: { recurrenceRule: "RRULE:FREQ=WEEKLY;COUNT=4" },
+        repeat: "custom",
+        repeatTouched: true,
       }),
     ).toBe("RRULE:FREQ=WEEKLY;COUNT=4");
     expect(

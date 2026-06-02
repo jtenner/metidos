@@ -3,7 +3,13 @@
  * @description Pure calendar event form serialization helpers.
  */
 
-export type RepeatOption = "none" | "daily" | "weekly" | "monthly" | "yearly";
+export type RepeatOption =
+  | "none"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "yearly"
+  | "custom";
 
 export function toDatetimeLocalInputValue(
   iso: string | null | undefined,
@@ -32,17 +38,20 @@ export function datetimeLocalInputToIso(value: string): string {
 export function repeatOptionFromRRule(
   rule: string | null | undefined,
 ): RepeatOption {
-  const upper = rule?.toUpperCase() ?? "";
-  if (!upper.trim()) return "none";
-  if (upper.includes("FREQ=DAILY")) return "daily";
-  if (upper.includes("FREQ=WEEKLY")) return "weekly";
-  if (upper.includes("FREQ=MONTHLY")) return "monthly";
-  if (upper.includes("FREQ=YEARLY")) return "yearly";
-  return "none";
+  const trimmed = rule?.trim() ?? "";
+  if (!trimmed) return "none";
+
+  const match = /^RRULE:FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)$/i.exec(trimmed);
+  if (!match) return "custom";
+
+  const frequency = match[1];
+  if (!frequency) return "custom";
+
+  return frequency.toLowerCase() as RepeatOption;
 }
 
 export function basicRRuleForRepeatOption(option: RepeatOption): string | null {
-  if (option === "none") return null;
+  if (option === "none" || option === "custom") return null;
   return `RRULE:FREQ=${option.toUpperCase()}`;
 }
 
@@ -51,7 +60,8 @@ export function recurrenceRuleForEventForm(input: {
   repeat: RepeatOption;
   repeatTouched: boolean;
 }): string | null {
-  return input.occurrence && !input.repeatTouched
-    ? (input.occurrence.recurrenceRule ?? null)
-    : basicRRuleForRepeatOption(input.repeat);
+  if (input.occurrence && (!input.repeatTouched || input.repeat === "custom")) {
+    return input.occurrence.recurrenceRule ?? null;
+  }
+  return basicRRuleForRepeatOption(input.repeat);
 }

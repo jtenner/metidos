@@ -322,6 +322,9 @@ export function CalendarEventDialog({
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
+              {repeat === "custom" ? (
+                <option value="custom">Custom repeat (preserved)</option>
+              ) : null}
             </select>
           </label>
           <label className="block space-y-1" htmlFor={locationId}>
