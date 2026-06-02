@@ -202,7 +202,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Authorization and capability follow-up
 
-- [ ] B3: Review session-scoped step-up in `src/bun/auth/service-session.ts`. If stolen-session exposure is too broad, shorten lifetime or bind step-up to stronger context; otherwise document the 10-minute accepted risk.
 - [ ] B4: Review non-admin WebSocket connection behavior in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. If non-admin sockets can consume excessive resources, add tighter limits; otherwise comment that admin-only checks are per-procedure.
 
 ### Plugin QuickJS sandbox follow-up

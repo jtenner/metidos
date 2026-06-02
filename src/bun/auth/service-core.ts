@@ -33,6 +33,12 @@ export const DEFAULT_TOTP_ISSUER = "Metidos";
 const LOGIN_LOCKOUT_AFTER_FAILURES = 3;
 const LOGIN_LOCKOUT_WINDOW_MS = 10 * 60 * 1000;
 export const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+// Step-up is deliberately session-scoped and short-lived. Sensitive procedure
+// gates compare this timestamp against the current request time; there is no
+// per-action binding or refresh-on-use. The accepted local-desktop threat model
+// is that a stolen authenticated session can reuse a completed step-up only for
+// the remaining part of this 10-minute window before primary factor plus TOTP
+// must be presented again.
 export const DEFAULT_STEP_UP_LIFETIME_MS = 10 * 60 * 1000;
 export const WEBSOCKET_TICKET_LIFETIME_MS = 60 * 1000;
 
