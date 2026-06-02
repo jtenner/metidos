@@ -12,7 +12,10 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Document/confirm provenance and redistribution approval for `src/mainview/logo.png`.
   - [ ] Document/confirm provenance and redistribution approval for `src/mainview/pixel-crown.png`.
   - [ ] Re-run the tracked asset inventory after the remaining artwork decisions are documented.
-- [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
+- [ ] Fix clean-clone validation so it does not rely on ignored local native artifacts. Context: `docs/clean-clone-verification-2026-06-02.md` records a 2026-06-02 clean local clone into `.tmp/agent-clean-clone`; `bun install --frozen-lockfile` succeeded, but `bun run validate` failed because XML structured-data tests could not load ignored `native/xmloxide-wasm/dist/metidos_xmloxide_wasm.{wasm,cjs}` outputs.
+  - [ ] Decide whether `bun run validate` should build xmloxide automatically, the setup docs should require `bun run build:xmloxide-wasm` before validation, or approved xmloxide artifacts should be tracked for public clones.
+  - [ ] Implement the chosen fix and update the relevant setup/validation docs.
+  - [ ] Re-run the clean-clone check from `docs/clean-clone-verification-2026-06-02.md` and record the exact outcome.
 
 ## 3. Security and Secret Handling
 
