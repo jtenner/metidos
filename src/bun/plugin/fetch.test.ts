@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import {
   executePluginFetch,
+  MAX_PLUGIN_FETCH_RESPONSE_BODY_BYTES,
   MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES,
   PluginFetchError,
   PluginPermissionError,
@@ -545,5 +546,37 @@ describe("executePluginFetch", () => {
         url,
       }),
     ).rejects.toMatchObject({ code: "response_body_too_large" });
+  });
+
+  it("rejects declared oversize bodies before materializing response bytes", async () => {
+    let bodyRead = false;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          bodyRead = true;
+          controller.enqueue(new Uint8Array([1]));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+
+    await expect(
+      executePluginFetch({
+        context: {
+          network: { allow: ["http://93.184.216.34/**"], enforceHttps: false },
+          permissions: ["network:fetch"],
+        },
+        fetch: async () =>
+          new Response(body, {
+            headers: {
+              "content-length": String(
+                MAX_PLUGIN_FETCH_RESPONSE_BODY_BYTES + 1,
+              ),
+            },
+          }),
+        url: "http://93.184.216.34/oversize.bin",
+      }),
+    ).rejects.toMatchObject({ code: "response_body_too_large" });
+    expect(bodyRead).toBe(false);
   });
 });

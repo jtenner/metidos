@@ -208,10 +208,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] D6: Review QuickJS interrupt/timeout handling in `src/bun/plugin/quickjs-runtime.ts`. If guest code can catch/evade interrupts, add stronger cancellation or tests; otherwise document QuickJS deadline limitations.
 - [ ] D10: Review per-plugin QuickJS memory limits in `src/bun/plugin/quickjs-runtime.ts` and sidecar manager. If multiple plugins can exhaust host memory, add a global cap/telemetry; otherwise document total-memory threat model.
 
-### Outbound network and SSRF follow-up
-
-- [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.
-
 ### HTTP and RPC transport follow-up
 
 - [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.

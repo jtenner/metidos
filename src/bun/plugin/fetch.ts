@@ -24,6 +24,11 @@ import { PluginPermissionError } from "./context";
 export { PluginPermissionError };
 
 export const DEFAULT_PLUGIN_FETCH_TIMEOUT_MS = 30_000;
+// The plugin bridge returns one JSON-serializable response object, so binary
+// bodies are base64-encoded and can expand to roughly 34 MiB at this 25 MiB raw
+// cap before JSON/string overhead. This is an accepted desktop-app ceiling for a
+// single plugin fetch response; larger transfers should use a future streaming
+// or temp-file API instead of raising this materialized payload limit.
 export const MAX_PLUGIN_FETCH_RESPONSE_BODY_BYTES = 25 * 1024 * 1024;
 export const MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES = 1024 * 1024;
 const BASE64_BYTES_PAYLOAD_PATTERN =
