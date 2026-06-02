@@ -522,6 +522,63 @@ describe("calendar store", () => {
     expect(count).toBe(1);
   });
 
+  test("schedules reminders at inclusive catch-up and look-ahead boundaries", () => {
+    const db = setupDb();
+    const owner = createUser(db, { username: "owner", isAdmin: true });
+    const calendar = createCalendar(db, owner.id, { title: "Boundaries" });
+    for (const [title, startAt, endAt] of [
+      [
+        "Before catch-up lower bound",
+        "2026-06-01T09:29:59.999Z",
+        "2026-06-01T09:35:00.000Z",
+      ],
+      [
+        "At catch-up lower bound",
+        "2026-06-01T09:30:00.000Z",
+        "2026-06-01T09:35:00.000Z",
+      ],
+      [
+        "At look-ahead upper bound",
+        "2026-06-01T10:02:00.000Z",
+        "2026-06-01T10:07:00.000Z",
+      ],
+      [
+        "After look-ahead upper bound",
+        "2026-06-01T10:02:00.001Z",
+        "2026-06-01T10:07:00.001Z",
+      ],
+    ] as const) {
+      createCalendarEvent(db, owner.id, {
+        calendarId: calendar.id,
+        title,
+        startAt,
+        endAt,
+        timezone: "UTC",
+        reminders: [{ minutesBefore: 0 }],
+      });
+    }
+
+    scheduleDueCalendarReminders(db, new Date("2026-06-01T10:00:00.000Z"));
+
+    const rows = db
+      .query<{ title: string; status: string; scheduledAt: string }, []>(
+        `SELECT title, status, scheduled_at AS scheduledAt FROM calendar_reminder_deliveries ORDER BY scheduled_at ASC`,
+      )
+      .all();
+    expect(rows).toEqual([
+      {
+        title: "At catch-up lower bound",
+        status: "delivered",
+        scheduledAt: "2026-06-01T09:30:00.000Z",
+      },
+      {
+        title: "At look-ahead upper bound",
+        status: "scheduled",
+        scheduledAt: "2026-06-01T10:02:00.000Z",
+      },
+    ]);
+  });
+
   test("skips reminder deliveries when calendar notifications are disabled", () => {
     const db = setupDb();
     const owner = createUser(db, { username: "owner", isAdmin: true });

@@ -74,7 +74,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 10. Testing
 
 - [ ] Add calendar notification and permission seam tests. Context: `docs/backend-test-gap-audit-2026-06-02.md` identified gaps around `src/bun/calendar/notifications.ts`, `src/bun/calendar/permissions.ts`, `src/bun/project-procedures/calendar-procedures.ts`, `src/bun/rpc-handlers/calendar.ts`, and `src/bun/pi/metidos/calendar.ts`. `src/bun/calendar/store.test.ts` now covers duplicate reminder suppression plus disabled calendar/global in-app/browser notification outlets. Remaining 3-minute slices:
-  - [ ] Add due-window boundary tests for calendar reminders, including catch-up lower bound and look-ahead upper bound.
   - [ ] Add owned/userless event tests for local calendar notification scheduling and listing.
   - [ ] Add missing user/project handling tests around calendar project procedures, RPC handlers, and Pi Metidos calendar wrappers.
   - [ ] Add calendar permission seam tests for read/write/owner access across store, project procedures, RPC, and Pi tool entry points.
