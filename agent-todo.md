@@ -147,7 +147,6 @@ This checklist is for repository improvements only before making Metidos public/
 ### Async lifecycle and stale-write races
 
 - [ ] Add mount/abort/request-id guards around run/delete/describe flows and delayed `loadCronJobs` calls in `src/mainview/app/mainview-cron-workspace-controller.tsx`.
-- [ ] Add mount/abort/request-id guards around terminal refresh and rename flows in `src/mainview/app/use-terminals-controller.ts`.
 
 ### Focus, hover, and popover races
 

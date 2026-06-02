@@ -3,7 +3,7 @@
  * @description Client-side terminal list/selection controller.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectProcedures, RpcTerminal } from "../../bun/rpc-schema";
 
 export type InteractionMode = "chat" | "terminal";
@@ -88,31 +88,55 @@ export function useTerminalsController({
     () => readInteractionMode(),
   );
   const [error, setError] = useState("");
+  const mountedRef = useRef(false);
+  const refreshRequestIdRef = useRef(0);
+  const renameRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshRequestIdRef.current += 1;
+      renameRequestIdRef.current += 1;
+    };
+  }, []);
 
   const refreshTerminals = useCallback(async (): Promise<RpcTerminal[]> => {
+    refreshRequestIdRef.current += 1;
+    const requestId = refreshRequestIdRef.current;
     if (!isAdmin) {
-      setTerminals([]);
+      if (mountedRef.current && requestId === refreshRequestIdRef.current) {
+        setTerminals([]);
+      }
       return [];
     }
     try {
       const result = await procedures.listTerminals(undefined, {
         priority: "background",
       });
-      setTerminals(result);
+      if (mountedRef.current && requestId === refreshRequestIdRef.current) {
+        setTerminals(result);
+      }
       return result;
     } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : String(refreshError),
-      );
+      if (mountedRef.current && requestId === refreshRequestIdRef.current) {
+        setError(
+          refreshError instanceof Error
+            ? refreshError.message
+            : String(refreshError),
+        );
+      }
       return [];
     }
   }, [isAdmin, procedures]);
 
   useEffect(() => {
     void refreshTerminals().then((result) => {
-      if (result.length === 0 && readInteractionMode() === "terminal") {
+      if (
+        mountedRef.current &&
+        result.length === 0 &&
+        readInteractionMode() === "terminal"
+      ) {
         setInteractionModeState("chat");
         writeInteractionMode("chat");
       }
@@ -233,23 +257,31 @@ export function useTerminalsController({
 
   const renameTerminal = useCallback(
     async (terminalId: string, title: string): Promise<void> => {
-      setTerminals((current) =>
-        current.map((terminal) =>
-          terminal.terminalId === terminalId
-            ? { ...terminal, title }
-            : terminal,
-        ),
-      );
+      renameRequestIdRef.current += 1;
+      const requestId = renameRequestIdRef.current;
+      if (mountedRef.current) {
+        setTerminals((current) =>
+          current.map((terminal) =>
+            terminal.terminalId === terminalId
+              ? { ...terminal, title }
+              : terminal,
+          ),
+        );
+      }
       try {
         await procedures.renameTerminal({ terminalId, title });
       } catch (renameError) {
-        setError(
-          renameError instanceof Error
-            ? renameError.message
-            : String(renameError),
-        );
+        if (mountedRef.current && requestId === renameRequestIdRef.current) {
+          setError(
+            renameError instanceof Error
+              ? renameError.message
+              : String(renameError),
+          );
+        }
       } finally {
-        await refreshTerminals();
+        if (mountedRef.current && requestId === renameRequestIdRef.current) {
+          await refreshTerminals();
+        }
       }
     },
     [procedures, refreshTerminals],
