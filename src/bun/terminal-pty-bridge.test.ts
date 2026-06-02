@@ -117,4 +117,51 @@ describe("terminal PTY bridge", () => {
         "Terminal bridge spawn configuration field file must be a non-empty string without null bytes.",
     });
   });
+
+  it("rejects unsafe spawn arguments before spawning a PTY", async () => {
+    const result = await runBridgeWithConfig({
+      args: ["safe", "bad\0arg"],
+      cols: 80,
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH ?? "" },
+      file: "/bin/echo",
+      name: "xterm-256color",
+      rows: 24,
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toEqual({
+      type: "error",
+      message:
+        "Terminal bridge spawn configuration field args must be an array of strings without null bytes.",
+    });
+  });
+
+  it("reports invalid executables as PTY child startup failures", async () => {
+    const result = await runBridgeWithConfig({
+      args: [],
+      cols: 80,
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH ?? "" },
+      file: "/tmp/metidos-terminal-pty-bridge-missing-executable",
+      name: "xterm-256color",
+      rows: 24,
+    });
+
+    const messages = result.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+
+    // node-pty reports execvp startup failures through the PTY stream and then
+    // exits the child process; the bridge itself exits successfully because it
+    // delivered the child failure to the terminal manager.
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({ type: "data" });
+    expect(messages[0].data).toContain("No such file or directory");
+    expect(messages[1]).toEqual({ type: "exit", exitCode: 1, signal: 0 });
+  });
 });
