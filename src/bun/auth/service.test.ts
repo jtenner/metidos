@@ -557,6 +557,70 @@ describe("auth service", () => {
     } satisfies Partial<AuthServiceError>);
   });
 
+  it("shares one lockout counter across primary-factor, TOTP, and recovery-code failures", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const setupTimeMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+    const setupCode = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs,
+    );
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs: setupTimeMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: setupCode,
+      totpSecret: enrollment.totpSecret,
+    });
+
+    const validTotp = await generateTotpCode(
+      enrollment.totpSecret,
+      setupTimeMs + 1_000,
+    );
+    const invalidTotp =
+      validTotp === "000000" || validTotp === "111111" ? "222222" : "111111";
+
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 1_000,
+        primaryFactor: "000000",
+        totpCode: validTotp,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(1);
+
+    await expect(
+      login(database, {
+        appDataDir,
+        nowMs: setupTimeMs + 2_000,
+        primaryFactor: TEST_ADMIN_PIN,
+        totpCode: invalidTotp,
+      }),
+    ).rejects.toThrow("The provided credentials are invalid.");
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(2);
+
+    await expect(
+      loginWithRecoveryCode(database, {
+        nowMs: setupTimeMs + 3_000,
+        primaryFactor: TEST_ADMIN_PIN,
+        recoveryCode: "INVALID-CODE-3",
+      }),
+    ).rejects.toMatchObject({
+      code: "auth_locked",
+    } satisfies Partial<AuthServiceError>);
+
+    expect(getAuthSettings(database)?.failedPrimaryFactorAttempts).toBe(0);
+    expect(getAuthSettings(database)?.lockedUntil).toBe(
+      new Date(setupTimeMs + 3_000 + 10 * 60 * 1000).toISOString(),
+    );
+  });
+
   it("locks out after repeated invalid recovery codes when the primary factor is correct", async () => {
     const database = createTestDatabase();
     const appDataDir = createTempDirectory();

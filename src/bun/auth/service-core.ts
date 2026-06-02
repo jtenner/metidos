@@ -307,8 +307,15 @@ export function buildSession(
 
 /**
  * Increment failed login attempts and update lockout state.
+ *
+ * Primary-factor, TOTP, recovery-code, and step-up proof failures intentionally
+ * share this per-user counter. Metidos has one local-operator account, so a
+ * mixed credential guessing sequence should consume the same small attempt
+ * budget instead of giving each proof type its own fresh lockout window.
+ * Route-level rate limits still partition traffic by path/peer/subject before
+ * calls reach this durable per-user guard.
+ *
  * @param database - Database handle.
- * @param failedAttempts - Prior failed attempt count.
  * @param now - Current timestamp.
  */
 export function incrementFailedAttempts(

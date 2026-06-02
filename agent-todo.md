@@ -201,7 +201,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Auth and session follow-up
 
 - [ ] A4: Review primary-factor-plus-TOTP lockout behavior in `src/bun/auth/service-session.ts` and `src/bun/auth/service-login.ts`. If a stolen primary factor enables too many TOTP guesses, tighten lockout/rate-limit policy; otherwise document the accepted risk and existing route-level throttles.
-- [ ] A14: Review shared lockout counter for primary-factor, TOTP, and recovery-code failures in `src/bun/auth/service-core.ts` and `src/bun/auth/service-login.ts`. If it creates bad UX or security ambiguity, split counters; otherwise document that all auth proof failures intentionally share one lockout.
 
 ### Authorization and capability follow-up
 
