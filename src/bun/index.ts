@@ -1314,6 +1314,12 @@ const MAX_AUTH_JSON_BODY_BYTES = 16 * 1024;
 const AUTH_CSRF_RATE_LIMIT_REFILL_INTERVAL_MS = 1_000;
 const AUTH_CSRF_RATE_LIMIT_CAPACITY = 60;
 const AUTH_CSRF_RATE_LIMIT_MAX_BUCKETS = 2_048;
+// Public calendar ICS endpoints are intentionally unauthenticated share links.
+// Calendar contents become visible to anyone who knows the slug, so this bucket
+// is an abuse/resource guard rather than an authorization boundary: each peer
+// may burst 30 calendar fetches, then refills at one fetch every 20 seconds.
+// Export itself also caps event count, EXDATE count, and serialized bytes in
+// src/bun/calendar/export.ts so scraping cannot demand unbounded server work.
 const PUBLIC_CALENDAR_ICS_RATE_LIMIT_REFILL_INTERVAL_MS = 20 * 1000;
 const PUBLIC_CALENDAR_ICS_RATE_LIMIT_CAPACITY = 30;
 const PUBLIC_CALENDAR_ICS_RATE_LIMIT_MAX_BUCKETS = 2_048;

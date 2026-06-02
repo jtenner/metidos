@@ -126,6 +126,12 @@ Network access depends on the capability:
 
 Prefer HTTPS/WSS. Treat localhost/private-network endpoints as sensitive because they may expose internal services. Allow broad or private network access only for plugins and providers you trust.
 
+## Public calendar links
+
+Public calendar ICS URLs under `/calendar/public/<slug>.ics` are unauthenticated share links by design. Anyone who knows the slug can fetch that calendar's exported event data until the Local Operator disables public sharing or changes the slug.
+
+This is an intentional sharing boundary, not a private-calendar access control. The Backend applies per-peer token-bucket rate limiting before export, and the exporter caps event count, EXDATE count, and serialized ICS size so repeated public fetches cannot require unbounded server work. These limits reduce scraping and resource-exhaustion risk, but they do not make a public calendar secret. Use private calendars for events that should not be shared.
+
 ## Remote access, reverse proxy, and TLS
 
 Remote access is advanced. For reverse-proxy deployments:
