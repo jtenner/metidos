@@ -23,6 +23,22 @@ function createTempDirectory(prefix: string): string {
   return path;
 }
 
+function createCronProcedureWorkspace(prefix: string): {
+  database: ReturnType<typeof initAppDatabase>;
+  project: ReturnType<typeof upsertProject>;
+  repoPath: string;
+} {
+  process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
+  const repoPath = createTempDirectory(prefix);
+  mkdirSync(repoPath, { recursive: true });
+  const database = initAppDatabase();
+  const project = upsertProject(database, {
+    name: "Cron Procedure Repo",
+    projectPath: repoPath,
+  });
+  return { database, project, repoPath };
+}
+
 async function loadProjectProcedures(): Promise<ProjectProceduresModule> {
   return (await import(
     `./project-procedures?cron-validation=${Date.now()}`
@@ -50,14 +66,9 @@ afterEach(() => {
 
 describe("cron procedure validation", () => {
   it("rejects invalid cron schedules before persisting them", async () => {
-    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
-    const repoPath = createTempDirectory("metidos-cron-procedure-repo-");
-    mkdirSync(repoPath, { recursive: true });
-    const database = initAppDatabase();
-    const project = upsertProject(database, {
-      name: "Cron Procedure Repo",
-      projectPath: repoPath,
-    });
+    const { project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-procedure-repo-",
+    );
     const { listCronsProcedure, newCronProcedure } =
       await loadProjectProcedures();
 
@@ -76,14 +87,9 @@ describe("cron procedure validation", () => {
   });
 
   it("rejects invalid cron schedule updates without changing the job", async () => {
-    process.env.METIDOS_APP_DATABASE_PATH = ":memory:";
-    const repoPath = createTempDirectory("metidos-cron-update-repo-");
-    mkdirSync(repoPath, { recursive: true });
-    const database = initAppDatabase();
-    const project = upsertProject(database, {
-      name: "Cron Update Repo",
-      projectPath: repoPath,
-    });
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-update-repo-",
+    );
     const { newCronProcedure, updateCronProcedure } =
       await loadProjectProcedures();
     const cronJob = await newCronProcedure({
@@ -103,5 +109,77 @@ describe("cron procedure validation", () => {
       }),
     ).rejects.toThrow(/Invalid cron schedule/);
     expect(getCronJobById(database, cronJob.id)?.schedule).toBe("0 * * * *");
+  });
+
+  it("rejects blank create inputs before persisting cron jobs", async () => {
+    const { project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-blank-create-repo-",
+    );
+    const { listCronsProcedure, newCronProcedure } =
+      await loadProjectProcedures();
+    const validParams = {
+      enabled: true,
+      permissions: ["metidos:threads"],
+      projectId: project.id,
+      prompt: "echo ok",
+      schedule: "0 * * * *",
+      title: "Valid cron",
+      worktreePath: repoPath,
+    };
+
+    await expect(
+      newCronProcedure({ ...validParams, schedule: "   " }),
+    ).rejects.toThrow(/Cron schedule is required/);
+    await expect(
+      newCronProcedure({ ...validParams, prompt: "   " }),
+    ).rejects.toThrow(/Cron prompt is required/);
+    await expect(
+      newCronProcedure({ ...validParams, title: "   " }),
+    ).rejects.toThrow(/Cron title is required/);
+    await expect(
+      newCronProcedure({ ...validParams, description: "   " }),
+    ).rejects.toThrow(/Cron description is required/);
+    await expect(listCronsProcedure(undefined)).resolves.toEqual([]);
+  });
+
+  it("rejects blank and oversized updates without changing the job", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-update-validation-repo-",
+    );
+    const { newCronProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const cronJob = await newCronProcedure({
+      enabled: true,
+      permissions: ["metidos:threads"],
+      projectId: project.id,
+      prompt: "echo ok",
+      schedule: "0 * * * *",
+      title: "Valid cron",
+      worktreePath: repoPath,
+    });
+
+    await expect(
+      updateCronProcedure({ cronJobId: cronJob.id, prompt: "   " }),
+    ).rejects.toThrow(/Cron prompt is required/);
+    await expect(
+      updateCronProcedure({ cronJobId: cronJob.id, title: "x".repeat(73) }),
+    ).rejects.toThrow(/Cron title is limited to 72 characters/);
+    await expect(
+      updateCronProcedure({
+        cronJobId: cronJob.id,
+        description: "x".repeat(241),
+      }),
+    ).rejects.toThrow(/Cron description is limited to 240 characters/);
+    await expect(
+      updateCronProcedure({
+        cronJobId: cronJob.id,
+        prompt: "x".repeat(64 * 1024 + 1),
+      }),
+    ).rejects.toThrow(/Cron prompt is limited to 65536 characters/);
+    expect(getCronJobById(database, cronJob.id)).toMatchObject({
+      description: expect.stringMatching(/^Schedule 0 \* \* \* \*/u),
+      prompt: "echo ok",
+      title: "Valid cron",
+    });
   });
 });
