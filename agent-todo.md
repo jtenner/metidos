@@ -106,7 +106,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Identify auth/session tests missing before public release and file or add TODOs for each gap.
 - [ ] Identify cron tests missing before public release and file or add TODOs for each gap.
 - [ ] Identify install/setup smoke tests missing before public release and file or add TODOs for each gap.
-- [ ] Add a documented release validation checklist with commands, manual checks, docs checks, security checks, and artifact checks.
 - [ ] Verify tests can run locally without private services or credentials.
 - [ ] Verify tests use fixtures and fake data instead of real repositories, secrets, or personal paths.
 - [ ] Verify failing tests produce enough context for outside contributors to debug.

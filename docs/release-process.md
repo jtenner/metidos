@@ -29,6 +29,8 @@ A release should include:
 
 ## Pre-release checklist
 
+Use `docs/release-validation-checklist.md` as the detailed validation record for release candidates. The summary below captures the minimum expected release gate.
+
 From a clean checkout:
 
 ```bash
