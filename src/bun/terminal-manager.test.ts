@@ -588,6 +588,28 @@ describe("terminal node binary resolution", () => {
       );
     });
   }
+
+  for (const [name, directoryMode] of [
+    ["group-writable", 0o770],
+    ["world-writable", 0o707],
+  ] as const) {
+    it(`rejects default node binaries resolved from ${name} PATH directories`, () => {
+      if (process.platform === "win32") {
+        return;
+      }
+      const root = createTempDirectory();
+      const binaryPath = join(root, `node`);
+      writeFileSync(binaryPath, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+      chmodSync(binaryPath, 0o700);
+      chmodSync(root, directoryMode);
+      delete process.env.METIDOS_NODE_BINARY;
+      process.env.PATH = root;
+
+      expect(() => resolveTerminalNodeBinary()).toThrow(
+        "Resolved terminal node binary directory must not be writable by group or other users.",
+      );
+    });
+  }
 });
 
 describe("terminal index resolution", () => {
