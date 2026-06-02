@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Metidos visual feature tour with fake data</title>
+  <desc id="desc">Four illustrated feature panels showing fake projects, agent threads, diff review, and plugin plus cron controls with generated demo data only.</desc>
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e0f2fe"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" fill="url(#page)"/>
+  <text x="80" y="82" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="38" font-weight="800" fill="#0f172a">Metidos feature tour</text>
+  <text x="80" y="120" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" fill="#475569">Generated demo UI with fake repositories, paths, providers, schedules, and thread names.</text>
+
+  <g filter="url(#softShadow)">
+    <rect x="80" y="168" width="540" height="176" rx="24" fill="#ffffff"/>
+    <rect x="104" y="192" width="120" height="128" rx="18" fill="#111827"/>
+    <text x="128" y="224" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" fill="#ffffff">Projects</text>
+    <rect x="124" y="244" width="80" height="20" rx="10" fill="#2563eb"/>
+    <rect x="124" y="276" width="64" height="12" rx="6" fill="#475569"/>
+    <rect x="124" y="300" width="72" height="12" rx="6" fill="#475569"/>
+    <text x="252" y="220" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Projects and Worktrees</text>
+    <text x="252" y="252" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#475569">Open a demo project, switch fake branches, and keep agent work scoped to the selected Worktree.</text>
+    <rect x="252" y="282" width="210" height="30" rx="15" fill="#dbeafe"/>
+    <text x="276" y="302" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#1d4ed8">demo-web-app · main</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="660" y="168" width="540" height="176" rx="24" fill="#ffffff"/>
+    <text x="692" y="220" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Agent Threads</text>
+    <text x="692" y="252" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#475569">Track running, waiting, and completed Threads without exposing real prompts or private repositories.</text>
+    <rect x="692" y="282" width="160" height="30" rx="15" fill="#dcfce7"/>
+    <text x="716" y="302" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#166534">Safe Mode thread</text>
+    <circle cx="1112" cy="220" r="38" fill="#22c55e" opacity="0.2"/>
+    <path d="M1096 220l11 11 24-28" fill="none" stroke="#16a34a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="80" y="384" width="540" height="176" rx="24" fill="#ffffff"/>
+    <text x="112" y="436" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Diff Review</text>
+    <text x="112" y="468" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#475569">Review generated small, large, renamed, deleted, and binary-like demo changes before keeping work.</text>
+    <rect x="112" y="498" width="150" height="30" rx="15" fill="#f0fdf4"/>
+    <text x="136" y="518" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#166534">+ tutorial.md</text>
+    <rect x="282" y="498" width="150" height="30" rx="15" fill="#eff6ff"/>
+    <text x="306" y="518" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#1d4ed8">~ demo.ts</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="660" y="384" width="540" height="176" rx="24" fill="#ffffff"/>
+    <text x="692" y="436" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Plugins and Cron Jobs</text>
+    <text x="692" y="468" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#475569">Review local Plugin permissions and schedule recurring agent work with visible fake-data examples.</text>
+    <rect x="692" y="498" width="142" height="30" rx="15" fill="#fef3c7"/>
+    <text x="716" y="518" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#92400e">2 permissions</text>
+    <rect x="854" y="498" width="180" height="30" rx="15" fill="#e0e7ff"/>
+    <text x="878" y="518" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700" fill="#3730a3">Weekly docs check</text>
+  </g>
+</svg>

@@ -11,10 +11,6 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Send or answer the drafted maintainer request in `docs/artwork-provenance-maintainer-request-2026-06-02.md` for `src/mainview/pixel-crown.png`, then update `docs/public-asset-provenance-audit-2026-06-02.md` with creator/source, creation date if known, and license/assignment/redistribution approval, or replace/remove the asset before publishing.
   - [ ] Re-run the tracked asset inventory after the remaining artwork decisions are documented.
 
-## 5. README Improvements
-
-- [ ] Add a screenshot gallery or visual feature section with safe demo data. Future 3-minute slices can reuse the fake-data visual language from `docs/images/readme-hero-demo.svg` and should not include private paths, usernames, hostnames, tokens, real repositories, or customer/user data.
-
 ## 7. Install and First-Run Experience
 
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.

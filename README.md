@@ -41,6 +41,12 @@ It is designed for one Local Operator running a local installation, not for host
 - Review file changes before they land.
 - Preserve useful context across sessions while keeping local data under operator control.
 
+## Visual feature tour
+
+![Metidos feature tour showing fake project, thread, diff, plugin, and cron examples](docs/images/readme-feature-tour.svg)
+
+The generated tour image uses fake project names, fake provider state, fake schedules, and generated interface examples only. It highlights the everyday public-demo flow: choose a Project and Worktree, run or resume Agent Threads, inspect Diffs, review Plugin permissions, and schedule Cron Jobs without exposing private paths, usernames, hostnames, tokens, real repositories, branches, or customer/user data.
+
 ## Core concepts
 
 - **Projects** are high-level entries for one or more Worktrees.
