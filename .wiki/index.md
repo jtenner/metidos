@@ -9,6 +9,7 @@ This is the content index for the repository research wiki.
 - [performance-validation-workflow](./performance-validation-workflow.md) — Durable operator workflow for validating Metidos performance with the starvation harness, telemetry sidecar, and bounded Metidos-tool benchmark.
 - [package-script-reference-audit](./package-script-reference-audit.md) — 2026-06-01 public-readiness audit of documented package-script references across repo docs, workflows, templates, and checked-in package manifests.
 - [dependency-declaration-audit](./dependency-declaration-audit.md) — 2026-06-02 public-readiness audit of checked-in package manifests and Bun lockfiles for private dependency sources, local path references, and machine-specific registry/path drift.
+- [ci-private-secret-audit](./ci-private-secret-audit.md) — 2026-06-02 public-readiness audit confirming normal pull request CI does not depend on private secrets.
 - [karpathy-llm-wiki-pattern](./karpathy-llm-wiki-pattern.md) — Notes on the Karpathy LLM Wiki pattern and how this repository adapts it.
 
 ## Runtime, security, and provider design

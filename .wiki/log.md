@@ -1,5 +1,10 @@
 # Wiki Log
 
+## [2026-06-02] audit | CI private secret independence
+- Reviewed checked-in GitHub workflows and automation configuration for private secret requirements during normal pull request validation.
+- Confirmed CI, CodeQL, and dependency review workflows do not reference `secrets.*` or private credentials; only standard repository/GitHub action permissions are used.
+- Added `.wiki/ci-private-secret-audit.md` and closed the corresponding open-source readiness TODO.
+
 ## [2026-06-02] audit | Dependency declaration public-readiness
 - Audited checked-in package manifests and Bun lockfiles for private packages, unpublished/local dependency specs, private registry URLs, and machine-specific references.
 - Confirmed no blocking dependency declaration or lockfile references were found; the only manifest `private` matches are package metadata fields.
