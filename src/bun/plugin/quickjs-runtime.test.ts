@@ -1405,7 +1405,7 @@ describe("executePluginQuickJsRuntime", () => {
     const runtime = await startPluginQuickJsRuntime(buildResult, {
       pluginApi: {
         fs: async (_operation, request) => {
-          const path = (request.params as { path?: string }).path;
+          const path = (request as { params: { path?: string } }).params.path;
           if (path === "typed") {
             return hostTypedBytes.subarray(1, 3);
           }
