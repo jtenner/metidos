@@ -7,6 +7,7 @@ This is the content index for the repository research wiki.
 - [mainview-accessibility-standards](./mainview-accessibility-standards.md) — Maintained implementation and QA standards for accessible mainview interactions, including controls, dialogs, choosers, transcript semantics, and release checks.
 - [mainview-accessibility-status](./mainview-accessibility-status.md) — Current accessibility documentation status, source-of-truth links, review posture, and the remaining audit-mapping gap.
 - [performance-validation-workflow](./performance-validation-workflow.md) — Durable operator workflow for validating Metidos performance with the starvation harness, telemetry sidecar, and bounded Metidos-tool benchmark.
+- [package-script-reference-audit](./package-script-reference-audit.md) — 2026-06-01 public-readiness audit of documented package-script references across repo docs, workflows, templates, and checked-in package manifests.
 - [karpathy-llm-wiki-pattern](./karpathy-llm-wiki-pattern.md) — Notes on the Karpathy LLM Wiki pattern and how this repository adapts it.
 
 ## Runtime, security, and provider design

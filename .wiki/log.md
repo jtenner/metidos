@@ -1,5 +1,10 @@
 # Wiki Log
 
+## [2026-06-01] audit | Package script reference existence
+- Scanned repository docs, workflows, templates, and package manifests for package-manager `run` references.
+- Recorded that current package-script references resolve to root or Getdown package scripts, with direct Bun file executions classified separately from scripts.
+- Added `.wiki/package-script-reference-audit.md` and left clean-setup smoke-running as the remaining open-source readiness work.
+
 ## [2026-05-30] maintenance | Documentation accuracy pass
 - Corrected `.wiki/mainview-accessibility-standards.md` so it no longer claims a non-existent `bun run test:a11y` script.
 - Reframed accessibility automation around the current root `bun run test`, focused Mainview test files, manual keyboard/screen-reader checks, and `bun run validate`.
