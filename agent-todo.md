@@ -67,8 +67,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 10. Testing
 
-- [ ] Add mainview shell navigation and workspace composition tests. Context: `docs/mainview-test-gap-audit-2026-06-02.md` identified gaps around `src/mainview/App.tsx`, `workspace-panel.tsx`, sidebar/thread panels, and desktop/mobile navigation; `src/mainview/app/workspace-panel.test.tsx` now covers the no-thread empty state plus create-thread busy state alongside a backend thread-list error. Remaining 3-minute slices:
-  - [ ] Add fake pinned/recent thread workspace panel coverage for readable labels, selected state, and busy/error indicators.
+- [ ] Add mainview shell navigation and workspace composition tests. Context: `docs/mainview-test-gap-audit-2026-06-02.md` identified gaps around `src/mainview/App.tsx`, `workspace-panel.tsx`, sidebar/thread panels, and desktop/mobile navigation; `src/mainview/app/workspace-panel.test.tsx` now covers the no-thread empty state, create-thread busy state alongside a backend thread-list error, and fake pinned/recent thread labels with selected, busy, and error indicators. Remaining 3-minute slices:
   - [ ] Add shell navigation coverage for switching between project, worktree, thread, diff, cron, calendar, and preserving selected context.
   - [ ] Add desktop/mobile sidebar coverage proving the critical navigation affordances and labels are available in both variants.
 - [ ] Add terminal workspace safety and local-operator affordance tests. Context: `docs/mainview-test-gap-audit-2026-06-02.md` identified gaps around `src/mainview/app/terminal-workspace.tsx` and `use-terminals-controller.ts`; cover loading/connected/disconnected/failed states, unsafe warnings, session refresh/selection, and safe output summaries with fake terminal payloads.
