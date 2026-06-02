@@ -30,11 +30,11 @@ import {
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
-  AuthSecretAccessError,
   type AuthSecretOptions as AuthSecretCryptoOptions,
   buildLocalOperatorAuthSecretAdditionalData,
   decryptAuthSecret,
 } from "./secrets";
+import { rethrowAuthSecretError } from "./secret-errors";
 import { AuthServiceError, verifyPrimaryFactorAndTotp } from "./service";
 import {
   buildAuthSecretOptions,
@@ -264,13 +264,6 @@ function buildCliAuthProofInput(input: CliAuthProofInput): CliAuthProofInput {
         }
       : {}),
   };
-}
-
-function rethrowAuthSecretError(error: unknown): never {
-  if (error instanceof AuthSecretAccessError) {
-    throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
-  }
-  throw error;
 }
 
 async function finalizePrimaryFactorReset(

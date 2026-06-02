@@ -33,12 +33,12 @@ import {
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
-  AuthSecretAccessError,
   type AuthSecretOptions,
   buildLocalOperatorAuthSecretAdditionalData,
   decryptAuthSecret,
   encryptAuthSecret,
 } from "./secrets";
+import { rethrowAuthSecretError } from "./secret-errors";
 import {
   AuthServiceError,
   type AuthStatus,
@@ -68,13 +68,6 @@ import { normalizeUsername, normalizeWorkspaceHomeUsername } from "./usernames";
 
 const DEFAULT_LOCAL_OPERATOR_USERNAME = "metidos";
 const DEFAULT_TOTP_ACCOUNT_NAME = "Metidos";
-
-function rethrowAuthSecretError(error: unknown): never {
-  if (error instanceof AuthSecretAccessError) {
-    throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
-  }
-  throw error;
-}
 
 function buildTotpAuthSecretOptions(
   _userId: number,

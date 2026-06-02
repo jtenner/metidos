@@ -31,11 +31,11 @@ import {
 } from "./";
 import {
   AUTH_TOTP_SECRET_PURPOSE,
-  AuthSecretAccessError,
   type AuthSecretOptions,
   buildLocalOperatorAuthSecretAdditionalData,
   decryptAuthSecret,
 } from "./secrets";
+import { rethrowAuthSecretError } from "./secret-errors";
 import {
   AuthServiceError,
   addMilliseconds,
@@ -56,13 +56,6 @@ import {
   type StepUpResult,
   WEBSOCKET_TICKET_LIFETIME_MS,
 } from "./service-core";
-
-function rethrowAuthSecretError(error: unknown): never {
-  if (error instanceof AuthSecretAccessError) {
-    throw new AuthServiceError("auth_secret_unavailable", error.message, 503);
-  }
-  throw error;
-}
 
 function buildTotpAuthSecretOptions(
   _userId: number,
