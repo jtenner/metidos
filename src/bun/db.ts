@@ -2296,6 +2296,9 @@ export function tryAdvanceTotpLastUsedCounter(
   if (!Number.isInteger(counter) || counter < 0) {
     throw new Error("TOTP last-used counter must be a non-negative integer.");
   }
+  // Keep TOTP replay rejection atomic: concurrent verifications race on this
+  // single conditional UPDATE, so equal or older counters cannot advance the
+  // stored value even if the same code matched in the allowed verification window.
   const result = runStatement(
     database,
     `

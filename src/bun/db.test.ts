@@ -73,6 +73,7 @@ import {
   setThreadAccess,
   setThreadUnsafeMode,
   SQL_BUSY_TIMEOUT_MS,
+  tryAdvanceTotpLastUsedCounter,
   updateCronJob,
   updateTerminalSettings,
   updateThreadPiSessionState,
@@ -1754,6 +1755,33 @@ describe("app database storage", () => {
       expect(cronColumns).toContain("permissions");
       expect(threadColumns).not.toContain("calendar_access");
       expect(cronColumns).not.toContain("calendar_access");
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("atomically rejects equal or older TOTP replay counters", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      upsertAuthSettings(database, {
+        primaryFactorHash: "hash",
+        primaryFactorType: "password",
+        sessionLifetimeDays: 14,
+        totpSecretCiphertext: "totp-secret",
+        userId: null,
+      });
+
+      expect(tryAdvanceTotpLastUsedCounter(database, 42)).toBe(true);
+      expect(getAuthSettings(database)?.totpLastUsedCounter).toBe(42);
+
+      expect(tryAdvanceTotpLastUsedCounter(database, 42)).toBe(false);
+      expect(tryAdvanceTotpLastUsedCounter(database, 41)).toBe(false);
+      expect(getAuthSettings(database)?.totpLastUsedCounter).toBe(42);
+
+      expect(tryAdvanceTotpLastUsedCounter(database, 43)).toBe(true);
+      expect(getAuthSettings(database)?.totpLastUsedCounter).toBe(43);
     } finally {
       database.close(false);
     }
