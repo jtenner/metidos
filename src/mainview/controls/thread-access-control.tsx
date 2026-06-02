@@ -510,7 +510,7 @@ export function ThreadAccessControl({
             {materialSymbol("shield", "text-[16px] leading-none")}
             <span>Access</span>
           </span>
-          <span className="ml-1 flex min-w-0 items-center gap-1 text-[10px] font-medium tracking-[0.12em] text-text-muted">
+          <span className="ml-1 flex min-w-0 items-center gap-1 text-[10px] font-medium tracking-[0.1em] text-text-muted">
             <span aria-hidden="true" className="text-text-muted">
               {materialSymbol(
                 open ? "expand_less" : "expand_more",
@@ -543,7 +543,7 @@ export function ThreadAccessControl({
               {materialSymbol("close", "text-[15px]")}
             </AppButton>
           </div>
-          <div className="max-h-[50vw] space-y-1.5 overflow-y-auto p-3">
+          <div className="max-h-[50vw] space-y-2 overflow-y-auto p-3">
             {descriptorGroups.map(([groupKey, groupDescriptors]) => (
               <Fragment key={groupKey}>
                 {groupDescriptors.map((descriptor) => {
