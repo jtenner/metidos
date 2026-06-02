@@ -190,8 +190,17 @@ describe("cron procedure validation", () => {
     });
 
     await expect(
+      updateCronProcedure({ cronJobId: cronJob.id, schedule: "   " }),
+    ).rejects.toThrow(/Cron schedule is required/);
+    await expect(
       updateCronProcedure({ cronJobId: cronJob.id, prompt: "   " }),
     ).rejects.toThrow(/Cron prompt is required/);
+    await expect(
+      updateCronProcedure({ cronJobId: cronJob.id, title: "   " }),
+    ).rejects.toThrow(/Cron title is required/);
+    await expect(
+      updateCronProcedure({ cronJobId: cronJob.id, description: "   " }),
+    ).rejects.toThrow(/Cron description is required/);
     await expect(
       updateCronProcedure({ cronJobId: cronJob.id, title: "x".repeat(73) }),
     ).rejects.toThrow(/Cron title is limited to 72 characters/);
@@ -207,9 +216,16 @@ describe("cron procedure validation", () => {
         prompt: "x".repeat(64 * 1024 + 1),
       }),
     ).rejects.toThrow(/Cron prompt is limited to 65536 characters/);
+    await expect(
+      updateCronProcedure({
+        cronJobId: cronJob.id,
+        schedule: "* ".repeat(129).trim(),
+      }),
+    ).rejects.toThrow(/Cron schedule is limited to 256 characters/);
     expect(getCronJobById(database, cronJob.id)).toMatchObject({
       description: expect.stringMatching(/^Schedule 0 \* \* \* \*/u),
       prompt: "echo ok",
+      schedule: "0 * * * *",
       title: "Valid cron",
     });
   });
