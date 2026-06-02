@@ -278,6 +278,13 @@ async function realpathExistingPath(path: string): Promise<string> {
   try {
     return await realpath(path);
   } catch (error) {
+    // Fail closed for ordinary POSIX paths. The only fallback intentionally
+    // supports Windows-style paths that may contain backslash separators when
+    // Metidos is running on a non-Windows host; in that compatibility case,
+    // lstat() must still prove the current leaf is not a symlink before we
+    // resolve its parent. Broken symlinks, unreadable ancestors, and other
+    // realpath/lstat failures keep the original denial path so plugins never
+    // receive access based on a partially trusted filesystem view.
     if (process.platform === "win32" || !path.includes("\\")) {
       throw error;
     }

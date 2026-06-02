@@ -254,7 +254,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Plugin filesystem sandbox follow-up
 
-- [ ] E2: Review `realpathExistingPath` fallback behavior in `src/bun/plugin/fs-path.ts`. If non-Windows broken symlink/unreadable ancestor handling is too strict or confusing, improve diagnostics; otherwise comment fail-closed behavior.
 - [ ] E3: Review `assertOutsidePluginSource` in `src/bun/plugin/fs-path.ts`. Add a comment/test proving plugin-data paths are intentionally exempt while `./` project roots cannot read plugin source.
 - [ ] E4: Review `pluginFsPathOpenUnavailableError` in `src/bun/plugin/fs-path.ts`. If diagnostics need causes, preserve `cause`; otherwise comment why host paths/errors are intentionally hidden from plugins.
 - [ ] E5: Review recursive directory creation in `src/bun/plugin/fs-path.ts` (`mkdirValidatedPluginFsPathSync`). Add tests/comments proving recursive mkdir cannot escape the validated root.
