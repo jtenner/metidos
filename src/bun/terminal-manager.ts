@@ -877,6 +877,10 @@ export function resolveTerminalNodeBinary(): string {
   return resolveDefaultTerminalNodeBinary();
 }
 
+// Terminal sessions inherit only shell usability variables by default. Do not
+// broaden this to prefix-based copying: dynamic linker controls (LD_*, DYLD_*),
+// runtime hooks (NODE_OPTIONS), and provider/app secrets must stay out unless a
+// local operator explicitly opts in through METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST.
 const TERMINAL_ENV_ALLOWLIST = new Set([
   "COLORTERM",
   "HOME",
@@ -900,6 +904,9 @@ const WINDOWS_TERMINAL_ENV_ALLOWLIST = new Set([
   "USERPROFILE",
   "WINDIR",
 ]);
+// The PTY bridge gets an even smaller environment because it only needs enough
+// context to locate Node and create the child process. The user-facing terminal
+// environment is passed separately in the bounded bridge config.
 const TERMINAL_BRIDGE_ENV_ALLOWLIST = new Set([
   "HOME",
   "LANG",

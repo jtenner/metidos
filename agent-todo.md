@@ -286,7 +286,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Terminal and PTY follow-up
 
-- [ ] I2: Review terminal environment allowlist in `src/bun/terminal-manager.ts`. Add comments/tests proving sensitive dynamic-linker/env variables are excluded.
 - [ ] I3: Review `METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST` in `src/bun/terminal-manager.ts`. If warning on sensitive-looking keys is insufficient, block by default; otherwise document operator opt-in threat model.
 - [ ] I5: Review terminal Node binary ownership/permission checks in `src/bun/terminal-manager.ts`. Add tests/comments for world/group-writable binary denial.
 - [ ] I6: Review PTY bridge kill timing in `src/bun/terminal-manager.ts` (`TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS`). If 100ms is too aggressive, tune or document potential abrupt termination.

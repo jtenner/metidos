@@ -335,6 +335,34 @@ describe("terminal environment", () => {
     });
   });
 
+  it("excludes dynamic linker and runtime hook variables by default", () => {
+    const terminalEnv = buildTerminalEnvironment({
+      DYLD_INSERT_LIBRARIES: "/tmp/macos-hook.dylib",
+      LD_LIBRARY_PATH: "/tmp/lib",
+      LD_PRELOAD: "/tmp/hook.so",
+      NODE_OPTIONS: "--require /tmp/hook.js",
+      PATH: "/usr/bin",
+    });
+    const bridgeEnv = buildTerminalBridgeEnvironment({
+      DYLD_INSERT_LIBRARIES: "/tmp/macos-hook.dylib",
+      LD_LIBRARY_PATH: "/tmp/lib",
+      LD_PRELOAD: "/tmp/hook.so",
+      NODE_OPTIONS: "--require /tmp/hook.js",
+      PATH: "/usr/bin",
+    });
+
+    expect(terminalEnv.LD_PRELOAD).toBeUndefined();
+    expect(terminalEnv.LD_LIBRARY_PATH).toBeUndefined();
+    expect(terminalEnv.DYLD_INSERT_LIBRARIES).toBeUndefined();
+    expect(terminalEnv.NODE_OPTIONS).toBeUndefined();
+    expect(terminalEnv.PATH).toBe("/usr/bin");
+    expect(bridgeEnv.LD_PRELOAD).toBeUndefined();
+    expect(bridgeEnv.LD_LIBRARY_PATH).toBeUndefined();
+    expect(bridgeEnv.DYLD_INSERT_LIBRARIES).toBeUndefined();
+    expect(bridgeEnv.NODE_OPTIONS).toBeUndefined();
+    expect(bridgeEnv.PATH).toBe("/usr/bin");
+  });
+
   it("fills terminal defaults and allows explicit opt-in for extra variables", () => {
     const warnings: string[] = [];
     const originalWarn = console.warn;
