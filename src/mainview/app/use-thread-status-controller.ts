@@ -146,6 +146,32 @@ export function shouldCommitThreadDiscoveryPoll({
   return !cancelled;
 }
 
+export function buildThreadDiscoverySeedKey(
+  threads: readonly RpcThread[],
+): string {
+  const seedStore = createThreadStore([...threads]);
+  return JSON.stringify(
+    seedStore.orderedIds.map((threadId) => {
+      const thread = seedStore.byId[threadId];
+      const queue = thread?.runStatus.queue;
+      return [
+        threadId,
+        thread?.updatedAt ?? "",
+        thread?.pinnedAt ?? "",
+        thread?.runStatus.state ?? "missing",
+        thread?.runStatus.startedAt ?? "",
+        thread?.runStatus.updatedAt ?? "",
+        thread?.runStatus.error ?? "",
+        thread?.runStatus.hasUnreadError ?? false,
+        thread?.runStatus.phase ?? "",
+        queue?.pendingMessageCount ?? null,
+        queue?.steeringMessageCount ?? null,
+        queue?.followUpMessageCount ?? null,
+      ];
+    }),
+  );
+}
+
 export function shouldRequestEmptyThreadDiscard({
   isProtected,
   previousThreadId,
@@ -185,6 +211,8 @@ export function useThreadStatusController(
     options.selectedThreadId,
   );
   const previousDocumentVisibilityRef = useRef(options.isDocumentVisible);
+  const latestThreadsRef = useRef(options.threads);
+  latestThreadsRef.current = options.threads;
   const activeThreadStatusRefreshKeyRef = useRef<string | null>(null);
   const queuedThreadStatusRefreshIdsRef = useRef<number[] | null>(null);
   const threadStatusRefreshPromiseRef = useRef<Promise<void> | null>(null);
@@ -200,6 +228,10 @@ export function useThreadStatusController(
 
   const polledThreadIdsKey = useMemo(
     () => buildThreadStatusRequestKey(listWorkingThreadIds(options.threads)),
+    [options.threads],
+  );
+  const threadDiscoverySeedKey = useMemo(
+    () => buildThreadDiscoverySeedKey(options.threads),
     [options.threads],
   );
 
@@ -563,6 +595,9 @@ export function useThreadStatusController(
   ]);
 
   useEffect(() => {
+    // Restart discovery only when the semantic thread seed changes, not when
+    // parent renders allocate an equivalent `options.threads` array.
+    void threadDiscoverySeedKey;
     if (!options.isDocumentVisible) {
       return;
     }
@@ -593,7 +628,7 @@ export function useThreadStatusController(
           }
           const nextDiscoveredThreadStore = loadedThreads.reduce(
             (store, thread) => upsertThreadStore(store, thread),
-            createThreadStore(options.threads),
+            createThreadStore(latestThreadsRef.current),
           );
           const discoveredThreads = threadStoreItems(nextDiscoveredThreadStore);
           const selectedSummary =
@@ -761,7 +796,7 @@ export function useThreadStatusController(
     options.selectedThreadIdRef,
     options.selectedThreadRunStateRef,
     options.setThreadStore,
-    options.threads,
+    threadDiscoverySeedKey,
   ]);
 }
 

@@ -7,6 +7,7 @@ import { describe, expect, it } from "bun:test";
 import type { RpcThread } from "../../bun/rpc-schema";
 
 import {
+  buildThreadDiscoverySeedKey,
   SELECTED_THREAD_DETAIL_UNCHANGED_WORKING_MIN_INTERVAL_MS,
   shouldCommitThreadDiscoveryPoll,
   shouldRequestEmptyThreadDiscard,
@@ -34,6 +35,20 @@ function workingThread(updatedAt: string): RpcThread {
 }
 
 describe("thread status controller polling RPC options", () => {
+  it("keeps the thread discovery seed key stable for equivalent thread arrays", () => {
+    const first = workingThread("2026-05-06T16:59:30.000Z");
+    const second = { ...first, runStatus: { ...first.runStatus } };
+
+    expect(buildThreadDiscoverySeedKey([first])).toBe(
+      buildThreadDiscoverySeedKey([second]),
+    );
+    expect(
+      buildThreadDiscoverySeedKey([
+        { ...second, runStatus: { ...second.runStatus, state: "idle" } },
+      ]),
+    ).not.toBe(buildThreadDiscoverySeedKey([first]));
+  });
+
   it("does not commit cancelled thread discovery poll results", () => {
     expect(shouldCommitThreadDiscoveryPoll({ cancelled: true })).toBe(false);
     expect(shouldCommitThreadDiscoveryPoll({ cancelled: false })).toBe(true);
