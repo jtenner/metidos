@@ -369,7 +369,3 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] K14: Review one-shot warmup timer cleanup in `src/bun/index.ts`. Add comments/tests if shutdown during warmup can leave work running.
 - [ ] K16: Audit `src/bun/message-activity-store.ts` separately for persistence, size limits, and authorization boundaries; add comments/fixes as appropriate.
 - [ ] K17: Review SQL `LIMIT` and pagination use in `src/bun/message-activity-store.ts` and adjacent stores. Add tests/comments for bind parameters and bounded reads.
-
-### Audit coverage notes from the previous pass
-
-- [ ] L2: Inspect `src/bun/auth/secret-migration.ts` directly. Add comments/tests for legacy ciphertext migration threat model and failure behavior, or fix any discovered migration issue.
