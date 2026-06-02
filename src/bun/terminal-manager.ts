@@ -796,6 +796,9 @@ function assertTerminalNodeBinarySecurity(
     throw new Error(`${label} must not be writable by group or other users.`);
   }
   if (process.platform !== "win32") {
+    // PTY bridge startup only trusts operator-controlled Node binaries: the
+    // current user may replace their own binary, while root-owned package
+    // manager installs are accepted when they are not group/world writable.
     const effectiveUserId = process.geteuid?.();
     if (
       typeof effectiveUserId === "number" &&

@@ -568,6 +568,26 @@ describe("terminal node binary resolution", () => {
       console.warn = originalWarn;
     }
   });
+
+  for (const [name, mode] of [
+    ["group-writable", 0o720],
+    ["world-writable", 0o702],
+  ] as const) {
+    it(`rejects ${name} configured node binaries`, () => {
+      if (process.platform === "win32") {
+        return;
+      }
+      const root = createTempDirectory();
+      const binaryPath = join(root, `node-${name}`);
+      writeFileSync(binaryPath, "#!/bin/sh\nexit 0\n", { mode });
+      chmodSync(binaryPath, mode);
+      process.env.METIDOS_NODE_BINARY = binaryPath;
+
+      expect(() => resolveTerminalNodeBinary()).toThrow(
+        "METIDOS_NODE_BINARY must not be writable by group or other users.",
+      );
+    });
+  }
 });
 
 describe("terminal index resolution", () => {
