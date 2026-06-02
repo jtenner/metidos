@@ -60,10 +60,12 @@ function awaitWorkerMessage(
       cleanup();
       resolve(message);
     };
-    const handleError = () => {
+    const handleError = (error: Error) => {
       cleanup();
       reject(
-        new Error("Web server share worker failed before startup completed."),
+        new Error(
+          `Web server share worker failed before startup completed: ${error.message}`,
+        ),
       );
     };
     const cleanup = () => {
@@ -129,8 +131,9 @@ export async function startPiWebServerShareWorker(options?: {
         timeoutMs: WEB_SERVER_SHARE_THREAD_START_TIMEOUT_MS,
       });
       if (message.type === "error") {
+        const detail = message.error.trim() || "Unknown worker startup error.";
         throw new Error(
-          "Web server share worker failed before startup completed. Check share host, port, and database availability.",
+          `Web server share worker failed before startup completed. host=${host} port=${port} db=${options?.dbPath ?? getAppDatabasePath()}. ${detail}`,
         );
       }
       if (message.type !== "ready") {

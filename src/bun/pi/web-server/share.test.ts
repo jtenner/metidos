@@ -319,6 +319,47 @@ describe("stable web-server share URL cookies", () => {
 });
 
 describe("stable web-server share URLs", () => {
+  it("reports concrete startup diagnostics when the share worker cannot listen", async () => {
+    const appDataDir = createTempDirectory(
+      "metidos-pi-web-server-share-startup-diagnostics-",
+    );
+    process.env.METIDOS_APP_DATA_DIR = appDataDir;
+    initAppDatabase();
+    const occupiedServer = createServer();
+    await new Promise<void>((resolve, reject) => {
+      occupiedServer.once("error", reject);
+      occupiedServer.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = occupiedServer.address();
+    if (!address || typeof address === "string") {
+      occupiedServer.close();
+      throw new Error("Occupied startup diagnostics port was unavailable.");
+    }
+
+    try {
+      await expect(
+        startPiWebServerShareWorker({
+          dbPath: getAppDatabasePath({ appDataDir }),
+          host: "127.0.0.1",
+          port: address.port,
+          secureCookies: false,
+        }),
+      ).rejects.toThrow(
+        `host=127.0.0.1 port=${address.port} db=${getAppDatabasePath({ appDataDir })}`,
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        occupiedServer.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+  });
+
   it("prefers the configured public origin without rewriting it to the share worker port", () => {
     expect(
       resolveWebServerShareOrigin({

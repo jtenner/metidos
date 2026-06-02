@@ -55,4 +55,4 @@ However, the observed web-server share-worker failure is not enough for a first-
 
 ## Follow-up
 
-Add a bounded follow-up to investigate the web-server share-worker startup failure in a disposable no-`.env` checkout and either fix the startup path or improve diagnostics/docs with specific next steps.
+Resolved in a follow-up slice: share-worker startup failures now include the resolved share host, share port, database path, and underlying worker startup error in the top-level startup exception. A contributor who hits this no-`.env` path should be able to identify whether the recovery action is changing `METIDOS_WEB_SERVER_SHARE_PORT`, changing `METIDOS_WEB_SERVER_SHARE_HOST`, or fixing App Data/database access.
