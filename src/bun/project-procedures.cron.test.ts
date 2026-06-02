@@ -8,6 +8,7 @@ import {
   closeAppDatabase,
   createCronJob,
   createThread,
+  createUser,
   getCronJobById,
   initAppDatabase,
   markThreadRunStarted,
@@ -60,6 +61,21 @@ function createAdminContextWithoutStepUp(): RpcRequestContext {
       stepUpValidUntil: null,
       userId: 1,
       username: "admin",
+    },
+    signal: new AbortController().signal,
+  };
+}
+
+function createRegularContext(
+  auth: Partial<RpcRequestContext["auth"]>,
+): RpcRequestContext {
+  return {
+    auth: {
+      isAdmin: false,
+      sessionId: "cron-user-session",
+      userId: 1,
+      username: "alice",
+      ...auth,
     },
     signal: new AbortController().signal,
   };
@@ -202,6 +218,39 @@ describe("cron procedure validation", () => {
         createAdminContextWithoutStepUp(),
       ),
     ).rejects.toThrow("Cannot run a deleted cron job.");
+  });
+
+  it("rejects manual runs outside a regular caller's visible project scope", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-hidden-scope-repo-",
+    );
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = createRegularContext({
+      userId: alice.id,
+      username: alice.username,
+    });
+    const { listCronsProcedure, runCronNowProcedure } =
+      await loadProjectProcedures();
+    const hiddenCronJob = createCronJob(database, {
+      description: "Hidden manual-run scope cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo hidden",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Hidden scope cron",
+      worktreePath: repoPath,
+    });
+
+    expect(
+      (await listCronsProcedure(undefined, context)).map((entry) => entry.id),
+    ).not.toContain(hiddenCronJob.id);
+    await expect(
+      runCronNowProcedure({ cronJobId: hiddenCronJob.id }, context),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
   });
 
   it("rejects invalid cron schedules before persisting them", async () => {
