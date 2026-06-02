@@ -208,10 +208,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] B4: Review non-admin WebSocket connection behavior in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. If non-admin sockets can consume excessive resources, add tighter limits; otherwise comment that admin-only checks are per-procedure.
 - [ ] B7: Review all uses of `requireLocalOperatorCapability(context, "recent_step_up")`. Ensure sensitive procedures also require `manage_app` when intended; add comments/tests to prevent future refactors from relying on step-up alone.
 
-### SQLite and persistence follow-up
-
-- [ ] C9: Review startup TOTP secret migration hook in `src/bun/index.ts` and `src/bun/auth/secret-migration.ts`. If missing coverage, add tests/comments around legacy v1-to-v2 ciphertext migration.
-
 ### Plugin QuickJS sandbox follow-up
 
 - [ ] D4: Review callback invocation token handling in `src/bun/plugin/quickjs-runtime.ts`. If plugin code can read or forge the token, fix isolation; otherwise add comments/tests proving token secrecy is within the QuickJS bootstrap boundary.
