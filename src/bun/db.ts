@@ -4033,6 +4033,9 @@ export function listThreadMessages(
   database: Database,
   threadId: number,
 ): ThreadMessageRecord[] {
+  // Intentionally unpaged for trusted internal checks that need complete thread
+  // state (for example, empty-thread discard). External/RPC detail reads should
+  // use `listThreadMessagesPage`, which clamps the caller-supplied limit.
   /** Return all messages in canonical order for a thread. */
 
   return database

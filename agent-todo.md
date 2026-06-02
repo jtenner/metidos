@@ -244,4 +244,3 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Miscellaneous backend hardening follow-up
 
-- [ ] K16: Audit `src/bun/message-activity-store.ts` separately for persistence, size limits, and authorization boundaries; add comments/fixes as appropriate.

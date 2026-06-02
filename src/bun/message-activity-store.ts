@@ -28,6 +28,15 @@ export type MessageActivityStore = {
 export function createMessageActivityStore(
   _database: Database,
 ): MessageActivityStore {
+  // Security/audit boundary: this store is a persistence adapter only. It does
+  // not authenticate callers or scope reads by project/session because some
+  // background flows (runtime resume, activity persistence, cleanup) are
+  // intentionally ownerless. RPC procedures must authorize the thread/project
+  // before calling into this store; see `threadById(..., context)` gates in
+  // `project-procedures.ts`. Message payload size limits are enforced before
+  // persistence by the agent/RPC input paths, while paginated reads are clamped
+  // in `listThreadMessagesPage` so externally driven detail reads remain
+  // bounded even if this adapter is reused directly.
   return {
     createMessage: (db, input) => createThreadMessage(db, input),
     listMessages: (db, threadId) => listThreadMessages(db, threadId),
