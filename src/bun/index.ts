@@ -1003,7 +1003,13 @@ function buildResponseHeaders(
     // injection. This loop only lets internal callers add non-reserved headers
     // so security policy headers stay controlled in one place.
     for (const [name, value] of new Headers(headers)) {
-      if (!RESERVED_RESPONSE_HEADER_NAMES.has(name.toLowerCase())) {
+      const normalizedName = name.toLowerCase();
+      if (RESERVED_RESPONSE_HEADER_NAMES.has(normalizedName)) {
+        continue;
+      }
+      if (normalizedName === "set-cookie") {
+        responseHeaders.append(name, value);
+      } else {
         responseHeaders.set(name, value);
       }
     }

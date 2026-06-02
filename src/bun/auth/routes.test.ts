@@ -14,6 +14,7 @@ import { generateTotpCode } from "./";
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 let appDataDir: string | null = null;
 let peerIndex = 0;
+let authenticatedSessionCookie: string | null = null;
 let handleAuthRequestForTest: typeof import("../index").handleAuthRequestForTest;
 
 function buildAuthServer(
@@ -50,15 +51,39 @@ async function issueCsrfToken(): Promise<string> {
   return body.csrfToken as string;
 }
 
-function buildCsrfHeaders(csrfToken: string): HeadersInit {
+function buildCsrfHeaders(
+  csrfToken: string,
+  extraCookies: string[] = [],
+): HeadersInit {
   return {
     "content-type": "application/json",
-    cookie: `metidos_csrf=${csrfToken}`,
+    cookie: [`metidos_csrf=${csrfToken}`, ...extraCookies].join("; "),
     origin: "http://127.0.0.1:7599",
     "sec-fetch-mode": "cors",
     "sec-fetch-site": "same-origin",
     "x-metidos-csrf-token": csrfToken,
   };
+}
+
+function readSetCookieHeaders(response: Response | null | undefined): string[] {
+  const headers = response?.headers as
+    | (Headers & { getSetCookie?: () => string[] })
+    | undefined;
+  return (
+    headers?.getSetCookie?.() ?? [response?.headers.get("set-cookie") ?? ""]
+  );
+}
+
+function extractCookiePair(setCookie: string | string[], name: string): string {
+  const values = Array.isArray(setCookie) ? setCookie : [setCookie];
+  for (const value of values) {
+    const match = value.match(new RegExp(`(?:^|,\\s*)(${name}=[^;,]*)`));
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+  expect(values.join(", ")).toContain(`${name}=`);
+  throw new Error(`Missing ${name} cookie`);
 }
 
 beforeAll(async () => {
@@ -333,5 +358,82 @@ describe("auth route HTTP security", () => {
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Strict");
     expect(setCookie).not.toContain("Secure");
+    authenticatedSessionCookie = extractCookiePair(
+      setCookie,
+      "metidos_session",
+    );
+  });
+
+  it("logs out by clearing session, websocket-ticket cookies, and browser storage", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error(
+        "Expected setup test to provide an authenticated session cookie",
+      );
+    }
+
+    const ticketCsrfToken = await issueCsrfToken();
+    const ticketResponse = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/ws-ticket", {
+        body: JSON.stringify({}),
+        headers: buildCsrfHeaders(ticketCsrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+    expect(ticketResponse).not.toBeNull();
+    expect(ticketResponse?.status).toBe(200);
+    const ticketSetCookie = ticketResponse?.headers.get("set-cookie") ?? "";
+    expect(ticketSetCookie).toContain("metidos_ws_ticket=");
+    const webSocketTicketCookie = extractCookiePair(
+      ticketSetCookie,
+      "metidos_ws_ticket",
+    );
+
+    const logoutCsrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/logout", {
+        body: JSON.stringify({}),
+        headers: buildCsrfHeaders(logoutCsrfToken, [
+          sessionCookie,
+          webSocketTicketCookie,
+        ]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected logout route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: { authenticated: false },
+    });
+    const setCookies = readSetCookieHeaders(response);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_session=")),
+    ).toBe(true);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("__Host-metidos_session=")),
+    ).toBe(true);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_ws_ticket=")),
+    ).toBe(true);
+    expect(
+      setCookies.some((cookie) =>
+        cookie.startsWith("__Host-metidos_ws_ticket="),
+      ),
+    ).toBe(true);
+    expect(
+      setCookies.filter((cookie) => cookie.includes("Max-Age=0")),
+    ).toHaveLength(4);
+    expect(response?.headers.get("clear-site-data")).toBe(
+      '"cache", "cookies", "storage"',
+    );
   });
 });
