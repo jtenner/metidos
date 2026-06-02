@@ -426,6 +426,32 @@ describe("terminal shell resolution", () => {
     expect(spawnConfig.file).toBe(realpathSync(shellPath));
   });
 
+  it("canonicalizes symlinked configured shells before spawning", () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    const root = createTempDirectory();
+    const realShellPath = join(root, "realsh");
+    const symlinkShellPath = join(root, "linksh");
+    writeFileSync(realShellPath, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    chmodSync(realShellPath, 0o700);
+    symlinkSync(realShellPath, symlinkShellPath);
+
+    const absoluteSpawnConfig = resolveShellSpawn(null, {
+      defaultShell: symlinkShellPath,
+      replayBufferBytes: 1024,
+    });
+
+    process.env.PATH = [root, process.env.PATH || ""].join(delimiter);
+    const pathSpawnConfig = resolveShellSpawn(null, {
+      defaultShell: "linksh",
+      replayBufferBytes: 1024,
+    });
+
+    expect(absoluteSpawnConfig.file).toBe(realpathSync(realShellPath));
+    expect(pathSpawnConfig.file).toBe(realpathSync(realShellPath));
+  });
+
   it("reports unavailable configured shells before node-pty sees them", () => {
     const root = createTempDirectory();
     const missingShell = join(root, "missing-shell");
