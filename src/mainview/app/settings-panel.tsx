@@ -26,7 +26,7 @@ import type {
   RpcUserRuntimeSettings,
 } from "../../bun/rpc-schema";
 import { dispatchAuthRequired, resetPinAuth } from "../auth-client";
-import { AppButton } from "../controls/button";
+import { AppButton, IconButton } from "../controls/button";
 import { CodexModelSelector } from "../controls/codex-model-selector";
 import { ConfirmDialog } from "../controls/confirm-dialog";
 import { type AppIconName, materialSymbol } from "../controls/icons";
@@ -298,16 +298,15 @@ export function SettingsPanelFrame({
             </div>
           </div>
         </div>
-        <AppButton
-          unstyled
+        <IconButton
           aria-label="Close settings"
-          className="flex h-8 w-8 shrink-0 items-center justify-center border border-border-default bg-surface-1 text-text-muted transition-colors hover:border-border-strong hover:bg-surface-3 hover:text-text-primary"
+          buttonStyle="muted"
           onClick={onClose}
           ref={closeButtonRef}
           type="button"
         >
           {materialSymbol("close", "text-[15px]")}
-        </AppButton>
+        </IconButton>
       </div>
       {children}
     </>
@@ -315,7 +314,6 @@ export function SettingsPanelFrame({
 }
 
 function ResetPinSection(props: {
-  actionButtonClassName: string;
   className: string;
   error: string;
   loading: boolean;
@@ -394,8 +392,7 @@ function ResetPinSection(props: {
       </div>
       <div className="flex justify-end">
         <AppButton
-          unstyled
-          className={`${props.actionButtonClassName} border-border-default bg-surface-1 text-text-secondary hover:border-accent hover:text-text-primary`}
+          buttonStyle="muted"
           disabled={props.loading}
           onClick={props.onReset}
           type="button"
@@ -455,8 +452,6 @@ export function SettingsPanel({
   const [selectedSettingsTab, setSelectedSettingsTab] =
     useState<SettingsPanelTabId>("general");
   const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
-  const actionButtonClassName =
-    "inline-flex h-8 items-center justify-center border px-3 text-xs font-label uppercase tracking-[0.1em] transition disabled:cursor-not-allowed disabled:opacity-50";
   const pluginAdministration = usePluginAdministrationController({
     active,
     availablePluginAccessGroups,
@@ -693,7 +688,6 @@ export function SettingsPanel({
 
   const resetPinSection = (
     <ResetPinSection
-      actionButtonClassName={actionButtonClassName}
       className="space-y-2"
       error={resetPinError}
       loading={resetPinLoading}

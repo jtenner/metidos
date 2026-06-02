@@ -187,7 +187,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Refactor skills menu controls in `src/mainview/controls/chat-composer-control.tsx` to use shared primitives or approved shared recipes.
 - [ ] Refactor choice dropdown options in `src/mainview/controls/choice-dropdown-control.tsx` to use shared primitives or approved shared recipes.
 - [ ] Refactor Codex model selector controls in `src/mainview/controls/codex-model-selector.tsx` to use shared primitives or approved shared recipes.
-- [ ] Refactor settings close/reset controls in `src/mainview/app/settings-panel.tsx` to use shared button primitives.
 
 ### Style: semantic backdrops, cards, blur, badges, and spacing
 
