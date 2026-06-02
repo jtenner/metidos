@@ -93,7 +93,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 12. Final Pre-Public Checklist
 
-- [ ] All required community files exist.
 - [ ] License exists and GitHub detects it correctly.
 - [ ] CI passes on the default branch.
 - [ ] `bun run validate` passes from a clean clone.
