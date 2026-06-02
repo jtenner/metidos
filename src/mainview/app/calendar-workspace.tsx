@@ -240,6 +240,7 @@ export function CalendarWorkspace({
   );
   const calendarDayButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const calendarLoadRequestIdRef = useRef(0);
+  const eventSaveInFlightRef = useRef(false);
   const pendingCalendarGridFocusRef = useRef<string | null>(null);
   const deleteScopeCancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const deleteScopeTitleId = useId();
@@ -489,6 +490,10 @@ export function CalendarWorkspace({
         expectedVersion?: number | null;
       },
     ) => {
+      if (eventSaveInFlightRef.current) {
+        return;
+      }
+      eventSaveInFlightRef.current = true;
       try {
         if (typeof input.eventId === "number") {
           await procedures.updateCalendarEvent(
@@ -503,6 +508,8 @@ export function CalendarWorkspace({
         setError(
           saveError instanceof Error ? saveError.message : String(saveError),
         );
+      } finally {
+        eventSaveInFlightRef.current = false;
       }
     },
     [load, procedures],
