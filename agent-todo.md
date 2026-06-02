@@ -24,10 +24,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 4. CI, Validation, and Release Automation
 
-- [ ] Add `.github/workflows/ci.yml` for pull requests and pushes to the default branch.
-- [ ] Ensure CI runs `bun install --frozen-lockfile` from a clean checkout.
-- [ ] Ensure CI runs `bun run validate`.
-- [ ] Ensure CI runs backend tests, mainview tests, typecheck, style checks, TOML validation, and formatting checks.
 - [ ] Add a dependency review workflow if appropriate for the repository and license/security posture.
 - [ ] Add CodeQL or an equivalent code scanning workflow if appropriate for the stack.
 - [ ] Add Dependabot configuration for npm/Bun dependencies and GitHub Actions.
