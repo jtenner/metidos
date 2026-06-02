@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { AuthServiceError } from "../auth/service";
 import { closeAppDatabase, resetResolvedAppDataDirectory } from "../db";
+import type { RpcRequestContext } from "../rpc-schema";
 
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 let appDataDir: string;
@@ -26,6 +27,27 @@ afterAll(() => {
   resetResolvedAppDataDirectory();
   rmSync(appDataDir, { recursive: true, force: true });
 });
+
+function authenticatedContext(userId = 1): RpcRequestContext {
+  return {
+    auth: {
+      isAdmin: true,
+      sessionId: `calendar-procedures-test-${userId}`,
+      userId,
+      username: `operator-${userId}`,
+    },
+    signal: new AbortController().signal,
+    priority: "default",
+    timeoutMs: null,
+  };
+}
+
+async function expectProcedureError(
+  call: () => Promise<unknown>,
+  expectedMessage: string,
+): Promise<void> {
+  await expect(call()).rejects.toThrow(expectedMessage);
+}
 
 describe("calendar project procedures auth seam", () => {
   it("rejects representative calendar procedures without an authenticated local operator", async () => {
@@ -170,5 +192,75 @@ describe("calendar project procedures auth seam", () => {
         );
       }
     }
+  });
+
+  it("keeps authenticated procedure access bounded to non-deleted calendars and events", async () => {
+    const {
+      createCalendarEventProcedure,
+      createCalendarProcedure,
+      deleteCalendarEventProcedure,
+      deleteCalendarProcedure,
+      updateCalendarEventProcedure,
+      updateCalendarPreferenceProcedure,
+    } = await import("./calendar-procedures");
+    const context = authenticatedContext(42);
+
+    const deletedCalendar = await createCalendarProcedure(
+      { title: "Deleted boundary calendar" },
+      context,
+    );
+    await deleteCalendarProcedure({ calendarId: deletedCalendar.id }, context);
+
+    await expectProcedureError(
+      () =>
+        updateCalendarPreferenceProcedure(
+          { calendarId: deletedCalendar.id, visible: true },
+          context,
+        ),
+      "Calendar not found or not visible.",
+    );
+    await expectProcedureError(
+      () =>
+        createCalendarEventProcedure(
+          {
+            calendarId: deletedCalendar.id,
+            title: "Blocked deleted-calendar event",
+            startAt: "2026-06-02T15:00:00.000Z",
+            endAt: "2026-06-02T15:30:00.000Z",
+            timezone: "UTC",
+          },
+          context,
+        ),
+      "Calendar not found or not visible.",
+    );
+
+    const liveCalendar = await createCalendarProcedure(
+      { title: "Event boundary calendar" },
+      context,
+    );
+    const deletedEvent = await createCalendarEventProcedure(
+      {
+        calendarId: liveCalendar.id,
+        title: "Deleted boundary event",
+        startAt: "2026-06-02T16:00:00.000Z",
+        endAt: "2026-06-02T16:30:00.000Z",
+        timezone: "UTC",
+      },
+      context,
+    );
+    await deleteCalendarEventProcedure({ eventId: deletedEvent.id }, context);
+
+    await expectProcedureError(
+      () =>
+        updateCalendarEventProcedure(
+          { eventId: deletedEvent.id, title: "Blocked update" },
+          context,
+        ),
+      "Event not found.",
+    );
+    await expectProcedureError(
+      () => deleteCalendarEventProcedure({ eventId: deletedEvent.id }, context),
+      "Event not found.",
+    );
   });
 });
