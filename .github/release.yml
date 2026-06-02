@@ -1,0 +1,35 @@
+# GitHub generated release notes configuration.
+# Keep labels in sync with .github/labels.md so public release drafts group
+# pull requests into maintainer-friendly sections.
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+  categories:
+    - title: Security hardening
+      labels:
+        - security-hardening
+    - title: Plugin system
+      labels:
+        - plugin-system
+    - title: Backend and runtime
+      labels:
+        - backend
+        - cron
+    - title: Mainview UI
+      labels:
+        - mainview
+    - title: Install and setup
+      labels:
+        - install
+    - title: Documentation
+      labels:
+        - docs
+    - title: Bug fixes
+      labels:
+        - bug
+    - title: Other changes
+      labels:
+        - "*"
