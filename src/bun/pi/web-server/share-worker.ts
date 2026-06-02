@@ -60,9 +60,11 @@ function awaitWorkerMessage(
       cleanup();
       resolve(message);
     };
-    const handleError = (error: Error) => {
+    const handleError = () => {
       cleanup();
-      reject(new Error(error.message || "Web server share worker failed."));
+      reject(
+        new Error("Web server share worker failed before startup completed."),
+      );
     };
     const cleanup = () => {
       clearTimeout(timeout);
@@ -127,17 +129,19 @@ export async function startPiWebServerShareWorker(options?: {
         timeoutMs: WEB_SERVER_SHARE_THREAD_START_TIMEOUT_MS,
       });
       if (message.type === "error") {
-        throw new Error(message.error);
+        throw new Error(
+          "Web server share worker failed before startup completed. Check share host, port, and database availability.",
+        );
       }
       if (message.type !== "ready") {
         throw new Error("Web server share worker did not report readiness.");
       }
       const readyMessage = message;
       shareWorker = worker;
-      worker.on("error", (error) => {
+      worker.on("error", () => {
         logger.error({
-          error: error instanceof Error ? error.message : String(error),
-          message: "Web server share worker failed.",
+          error: "redacted",
+          message: "Web server share worker failed after startup.",
         });
         shareWorker = null;
         shareWorkerStartPromise = null;

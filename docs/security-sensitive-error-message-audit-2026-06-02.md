@@ -32,10 +32,11 @@ grep -R "message:.*(path|Path|token|secret|key|password|Authorization)|errorMess
 - `src/bun/auth/secret-errors.ts` now maps low-level `AuthSecretAccessError` values to a stable browser-facing `auth_secret_unavailable` message instead of forwarding the raw local `auth-secret.key` path through `AuthServiceError.message`.
 - Pi web-server tool path errors now avoid echoing outside-project absolute paths; in-project missing/type errors report only the project-relative display path.
 - Pi Git/file path containment errors now use a stable `current worktree` message instead of interpolating the raw worktree path or rejected path. Normal successful Git tool output still returns repository-relative paths and Git stderr where useful, which is acceptable inside the project-bound agent runtime because commands are scoped to the active worktree and do not include provider secrets or callback tokens.
+- Terminal startup now avoids displaying raw configured shell paths, PTY bridge paths, or unexpected child-process error messages in terminal output. Expected operator remediation messages still name configuration knobs such as `METIDOS_NODE_BINARY`, but generic startup failures now point users to terminal settings, selected worktree, and Node.js/shell availability instead of echoing host paths.
+- Web-server share worker startup and post-startup error propagation now uses stable public messages instead of forwarding worker `error.message` strings that may include module URLs, database paths, or hosted local paths.
 
 ## Remaining review slices
 
 The broad release-readiness task is not fully complete. Future slices should inspect and, where needed, fix or explicitly document:
 
-1. Terminal and worker startup errors that include configured executable or hosted paths.
-2. Plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.
+1. Plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.

@@ -14,6 +14,7 @@ import {
   buildCleanTerminalBuffer,
   buildTerminalBridgeEnvironment,
   buildTerminalEnvironment,
+  formatTerminalStartupError,
   createSafeTerminalGrepRegex,
   normalizeTerminalInputData,
   normalizeTerminalResizeDimensions,
@@ -602,7 +603,7 @@ describe("terminal shell resolution", () => {
     expect(pathSpawnConfig.file).toBe(realpathSync(realShellPath));
   });
 
-  it("reports unavailable configured shells before node-pty sees them", () => {
+  it("reports unavailable configured shells without exposing the configured path", () => {
     const root = createTempDirectory();
     const missingShell = join(root, "missing-shell");
 
@@ -612,6 +613,30 @@ describe("terminal shell resolution", () => {
         replayBufferBytes: 1024,
       }),
     ).toThrow("Configured terminal default shell");
+
+    try {
+      resolveShellSpawn(null, {
+        defaultShell: missingShell,
+        replayBufferBytes: 1024,
+      });
+      throw new Error("expected missing shell to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toContain(missingShell);
+    }
+  });
+
+  it("redacts unexpected terminal startup error details before display", () => {
+    const root = createTempDirectory();
+    const privateBridgePath = join(root, "terminal-pty-bridge.cjs");
+    const message = formatTerminalStartupError(
+      new Error(`spawn ${privateBridgePath} ENOENT`),
+    );
+
+    expect(message).toBe(
+      "Terminal startup failed before the shell was ready. Check terminal settings, the selected worktree, and configured Node.js/shell availability.",
+    );
+    expect(message).not.toContain(privateBridgePath);
   });
 });
 

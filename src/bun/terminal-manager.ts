@@ -144,8 +144,10 @@ class BridgeManagedPty implements ManagedPty {
         signal: signal ?? null,
       });
     });
-    child.on("error", (error) => {
-      this.emitData(`\r\nTerminal bridge failed: ${error.message}\r\n`);
+    child.on("error", () => {
+      this.emitData(
+        "\r\nTerminal bridge failed before the shell was ready. Check terminal settings and Node.js availability.\r\n",
+      );
       this.emitExit({ exitCode: 1, signal: null });
     });
   }
@@ -215,7 +217,7 @@ class BridgeManagedPty implements ManagedPty {
     }
     if (message.type === "error") {
       this.emitData(
-        `\r\nTerminal bridge: ${typeof message.message === "string" ? message.message : "Unknown error"}\r\n`,
+        "\r\nTerminal bridge reported an internal error. Check terminal settings, selected worktree, and shell availability.\r\n",
       );
       return;
     }
@@ -742,7 +744,7 @@ function resolveShell(settings: RpcTerminalSettings): string {
       return resolved;
     }
     throw new Error(
-      `Configured terminal default shell ${JSON.stringify(configured)} is not available in this runtime.`,
+      "Configured terminal default shell is not available in this runtime. Check the terminal settings shell path or leave it blank to auto-detect a shell.",
     );
   }
   return resolveAutomaticShell();
@@ -1031,6 +1033,20 @@ export function buildTerminalBridgeEnvironment(
     }
   }
   return pickEnvironment(base, allowlist);
+}
+
+export function formatTerminalStartupError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.startsWith("Configured terminal default shell") ||
+    message.startsWith("No available terminal shell") ||
+    message.startsWith("METIDOS_NODE_BINARY") ||
+    message.startsWith("Unable to resolve a terminal Node.js binary") ||
+    message.startsWith("Resolved terminal node binary")
+  ) {
+    return message;
+  }
+  return "Terminal startup failed before the shell was ready. Check terminal settings, the selected worktree, and configured Node.js/shell availability.";
 }
 
 function spawnManagedPty(options: {
@@ -1415,7 +1431,7 @@ export class TerminalManager {
       session.updatedAt = nowIso();
       this.appendOutput(
         session,
-        `\r\nFailed to start terminal: ${error instanceof Error ? error.message : String(error)}\r\n`,
+        `\r\nFailed to start terminal: ${formatTerminalStartupError(error)}\r\n`,
       );
       this.scheduleExitedCleanup(session);
     }
