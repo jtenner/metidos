@@ -76,6 +76,59 @@ export function settingsTabsForRole(isAdmin: boolean): SettingsPanelTabItem[] {
     : SINGLE_OPERATOR_SETTINGS_TABS;
 }
 
+export function SettingsPanelSectionNavigation({
+  activeSettingsTab,
+  panelId,
+  selectedSettingsTabPanelId,
+  settingsTabs,
+  onSelectTab,
+}: {
+  activeSettingsTab: SettingsPanelTabId;
+  panelId: string;
+  selectedSettingsTabPanelId: string;
+  settingsTabs: SettingsPanelTabItem[];
+  onSelectTab: (tabId: SettingsPanelTabId) => void;
+}): JSX.Element {
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="w-1/5 min-w-[112px] shrink-0 overflow-y-auto border-r border-border-subtle bg-surface-2 px-2 py-3"
+    >
+      <div
+        aria-orientation="vertical"
+        className="flex flex-col gap-1"
+        role="tablist"
+      >
+        {settingsTabs.map((tab) => {
+          const selected = tab.id === activeSettingsTab;
+          return (
+            <AppButton
+              unstyled
+              aria-controls={selected ? selectedSettingsTabPanelId : undefined}
+              aria-selected={selected}
+              className={`flex h-9 w-full min-w-0 items-center gap-2 border-l-2 px-2 text-left text-sm transition-colors ${
+                selected
+                  ? "border-accent bg-accent-surface text-accent-strong"
+                  : "border-transparent text-text-muted hover:bg-surface-3 hover:text-text-primary"
+              }`}
+              id={`${panelId}-${tab.id}-tab`}
+              key={tab.id}
+              onClick={() => {
+                onSelectTab(tab.id);
+              }}
+              role="tab"
+              type="button"
+            >
+              {materialSymbol(tab.iconName, "text-[16px]")}
+              <span className="min-w-0 truncate">{tab.label}</span>
+            </AppButton>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 const TIMEZONE_OPTIONS = (() => {
   const intlWithSupportedValues = Intl as typeof Intl & {
     supportedValuesOf?: (key: "timeZone") => string[];
@@ -913,44 +966,13 @@ export function SettingsPanel({
           titleId={panelTitleId}
         >
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            <nav
-              aria-label="Settings sections"
-              className="w-1/5 min-w-[112px] shrink-0 overflow-y-auto border-r border-border-subtle bg-surface-2 px-2 py-3"
-            >
-              <div
-                aria-orientation="vertical"
-                className="flex flex-col gap-1"
-                role="tablist"
-              >
-                {settingsTabs.map((tab) => {
-                  const selected = tab.id === activeSettingsTab;
-                  return (
-                    <AppButton
-                      unstyled
-                      aria-controls={
-                        selected ? selectedSettingsTabPanelId : undefined
-                      }
-                      aria-selected={selected}
-                      className={`flex h-9 w-full min-w-0 items-center gap-2 border-l-2 px-2 text-left text-sm transition-colors ${
-                        selected
-                          ? "border-accent bg-accent-surface text-accent-strong"
-                          : "border-transparent text-text-muted hover:bg-surface-3 hover:text-text-primary"
-                      }`}
-                      id={`${panelId}-${tab.id}-tab`}
-                      key={tab.id}
-                      onClick={() => {
-                        setSelectedSettingsTab(tab.id);
-                      }}
-                      role="tab"
-                      type="button"
-                    >
-                      {materialSymbol(tab.iconName, "text-[16px]")}
-                      <span className="min-w-0 truncate">{tab.label}</span>
-                    </AppButton>
-                  );
-                })}
-              </div>
-            </nav>
+            <SettingsPanelSectionNavigation
+              activeSettingsTab={activeSettingsTab}
+              panelId={panelId}
+              selectedSettingsTabPanelId={selectedSettingsTabPanelId}
+              settingsTabs={settingsTabs}
+              onSelectTab={setSelectedSettingsTab}
+            />
             <div
               className="min-w-0 flex-1 overflow-y-auto px-4 py-3"
               aria-labelledby={selectedSettingsTabButtonId}
