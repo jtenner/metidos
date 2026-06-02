@@ -39,7 +39,10 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
-- [ ] If a repo-hosted website exists or will be added, create TODOs for a security page.
+- [ ] Add a repo-hosted website security page. Context: a repo-hosted website exists in `website/`, and `website/docs.html` already links to repository security docs. Remaining 3-minute slices:
+  - [ ] Create `website/security.html` with public-safe security posture, local-first assumptions, secret-handling expectations, supported reporting channels, and links to `docs/security-model.md`, `docs/security/threat-model.md`, and `SECURITY.md`.
+  - [ ] Link the security page from the website navigation and/or docs page without introducing placeholder external URLs.
+  - [ ] Verify the new page renders with the existing static website styles and all links point to tracked public files or intentional public URLs.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a roadmap page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a changelog page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for screenshot/demo sections that use safe data only.
