@@ -30,7 +30,7 @@ Current Local Auth hardening expectations:
 - new or rotated PINs must be at least 8 digits and not obvious repeated or ascending/descending patterns,
 - new or rotated passwords/passphrases must be at least 12 characters,
 - repeated setup/login/recovery/step-up failures are rate-limited and may return `429` with `Retry-After`,
-- failed primary-factor attempts count toward lockout transactionally,
+- failed primary-factor, TOTP, recovery-code, and step-up proof attempts share one per-user lockout counter that is updated transactionally,
 - successful browser PIN/password resets revoke sessions, close authenticated WebSockets, terminate affected terminal PTYs, and abort active thread turns on a best-effort basis,
 - TOTP currently uses 6 digits, 30-second periods, and a +/-1 period verification window.
 
