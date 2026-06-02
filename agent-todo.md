@@ -143,10 +143,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Focus, hover, and popover races
 
-### Style: shared primitives and one-off controls
-
-- [ ] Refactor skills menu controls in `src/mainview/controls/chat-composer-control.tsx` to use shared primitives or approved shared recipes.
-
 ### Style: semantic backdrops, cards, blur, badges, and spacing
 
 - [ ] Remove card-like/decorative styling from the inline folder suggestion list in `src/mainview/app/projects-panel.tsx`, including sidebar `shadow-overlay`/`backdrop-blur-xl` drift.

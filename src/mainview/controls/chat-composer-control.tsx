@@ -32,6 +32,7 @@ import {
 import { devLog } from "../dev-log";
 import { mergeClassNames } from "../dynamic-styles";
 import { AppButton } from "./button";
+import { ListRowButton } from "./list-row";
 import {
   getTextareaCaretViewportPosition,
   resizeComposerTextarea,
@@ -763,27 +764,28 @@ export function ChatComposerControl({
       surfaceMode="plain"
     >
       <div className="flex max-h-48 flex-col overflow-y-auto">
-        {filteredSkills.map((skill, index) => (
-          <AppButton
-            unstyled
-            key={skill}
-            className={`flex items-center px-3 py-2 text-left text-sm transition-colors ${
-              index === activeSkillIndex
-                ? "bg-accent-strong/10 text-accent-strong"
-                : "text-text-primary hover:bg-surface-1"
-            }`}
-            onClick={() => {
-              applySkill(skill);
-            }}
-            onMouseEnter={() => {
-              setActiveSkillIndex(index);
-            }}
-            type="button"
-          >
-            {materialSymbol("auto_fix_high", "mr-2 text-xs text-text-muted")}
-            <span className="font-medium">{skill}</span>
-          </AppButton>
-        ))}
+        {filteredSkills.map((skill, index) => {
+          const active = index === activeSkillIndex;
+          return (
+            <ListRowButton
+              active={active}
+              key={skill}
+              className="flex items-center text-sm"
+              onClick={() => {
+                applySkill(skill);
+              }}
+              onMouseEnter={() => {
+                setActiveSkillIndex(index);
+              }}
+            >
+              {materialSymbol(
+                "auto_fix_high",
+                `mr-2 text-xs ${active ? "text-accent-strong" : "text-text-muted"}`,
+              )}
+              <span className="font-medium">{skill}</span>
+            </ListRowButton>
+          );
+        })}
       </div>
     </PopoverSurface>
   );
