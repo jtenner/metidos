@@ -184,8 +184,37 @@ describe("RPC request validation", () => {
         threadId: 1,
       }),
     ).not.toThrow();
+
+    const maxBase64ChatImageBytes = Math.ceil((MAX_CHAT_IMAGE_BYTES * 4) / 3);
+    expect(() =>
+      validateRpcRequestParams("sendThreadMessage", {
+        images: [
+          {
+            data: "x".repeat(maxBase64ChatImageBytes + 1),
+            mimeType: "image/png",
+            type: "image",
+          },
+        ],
+        input: "hello",
+        threadId: 1,
+      }),
+    ).toThrow(/sendThreadMessage\.images\[0\]\.data string must be at most/);
+    expect(() =>
+      validateRpcRequestParams("sendThreadMessage", {
+        images: [
+          {
+            data: "abc",
+            extra: "x".repeat(MAX_RPC_PARAM_STRING_BYTES + 1),
+            mimeType: "image/png",
+            type: "image",
+          },
+        ],
+        input: "hello",
+        threadId: 1,
+      }),
+    ).toThrow(/sendThreadMessage\.images\[0\]\.extra string must be at most/);
     expect(MAX_RPC_WEBSOCKET_MESSAGE_BYTES).toBeGreaterThan(
-      Math.ceil((MAX_CHAT_IMAGE_BYTES * 4) / 3) * MAX_CHAT_IMAGE_ATTACHMENTS,
+      maxBase64ChatImageBytes * MAX_CHAT_IMAGE_ATTACHMENTS,
     );
   });
 

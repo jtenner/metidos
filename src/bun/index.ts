@@ -2963,6 +2963,10 @@ function worktreeFileDiffParams(): RpcParamValidator {
 function rpcStringLimitForChatImagePath(
   fieldPath: string,
 ): number | null | undefined {
+  // Only the canonical chat-image payload slot gets the larger base64 cap.
+  // Other strings under sendThreadMessage, including unexpected fields, retain
+  // the generic 1 MiB RPC string cap so callers cannot smuggle arbitrary large
+  // strings beside image attachments.
   return /\.images\[\d+\]\.data$/u.test(fieldPath)
     ? MAX_BASE64_CHAT_IMAGE_BYTES
     : undefined;

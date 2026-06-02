@@ -343,7 +343,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] K9: Review runtime-stats pending RPC snapshots in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. Add comments/tests if getter semantics are unclear.
 - [ ] K10: Review per-request versus per-connection RPC param bounds in `src/bun/index.ts`. If repeated large bounded requests can DoS, add aggregate limits; otherwise document per-request threat model.
 - [ ] K12: Review `objectParams` validator casts in `src/bun/index.ts`. Add stricter typed validators for risky RPCs or comments/tests showing shape validation is sufficient.
-- [ ] K13: Review chat-image path-specific string cap in `src/bun/index.ts` (`rpcStringLimitForChatImagePath`). Add tests/comments to prevent accidental cap bypass.
 - [ ] K14: Review one-shot warmup timer cleanup in `src/bun/index.ts`. Add comments/tests if shutdown during warmup can leave work running.
 - [ ] K16: Audit `src/bun/message-activity-store.ts` separately for persistence, size limits, and authorization boundaries; add comments/fixes as appropriate.
 - [ ] K17: Review SQL `LIMIT` and pagination use in `src/bun/message-activity-store.ts` and adjacent stores. Add tests/comments for bind parameters and bounded reads.
