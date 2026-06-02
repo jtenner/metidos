@@ -38,7 +38,10 @@ import type {
   PluginRuntimeTerminalCaller,
   PluginRuntimeWebSocketCaller,
 } from "./plugin-runtime-contract";
+import { createSubsystemLogger } from "../logging";
 import { executePluginStructuredDataOperation } from "./host-structured-data";
+
+const logger = createSubsystemLogger("Plugin QuickJS Runtime");
 
 const require = createRequire(import.meta.url);
 const quickjsPackage = require("@tootallnate/quickjs-emscripten") as {
@@ -711,6 +714,7 @@ export async function startPluginQuickJsRuntime(
       return;
     }
     disposed = true;
+    const cleanupErrors: unknown[] = [];
     try {
       const cleanupResult = context.evalCode(
         "globalThis.__metidosDefaultExport = undefined; globalThis.__metidosDefinedPlugin = undefined;",
@@ -721,11 +725,29 @@ export async function startPluginQuickJsRuntime(
       } else {
         cleanupResult.error.dispose();
       }
-    } catch {
-      // Best-effort guest cleanup; the original setup error should remain visible.
+    } catch (error) {
+      // Best-effort guest cleanup; log diagnostics without masking the original
+      // setup/callback error that triggered disposal.
+      cleanupErrors.push(error);
     }
-    context.dispose();
-    runtime.dispose();
+    try {
+      context.dispose();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    try {
+      runtime.dispose();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (cleanupErrors.length > 0) {
+      logger.warning({
+        errors: cleanupErrors.map((error) =>
+          error instanceof Error ? error.message : String(error),
+        ),
+        message: "Plugin QuickJS runtime cleanup completed with errors.",
+      });
+    }
   };
 
   try {
