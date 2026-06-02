@@ -274,7 +274,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G13: Review decoded binary RPC payload limits in `src/bun/rpc-transport.ts`. Add tests for compressed/oversize rejection if missing.
 - [ ] G15: Review large RPC response JSON fallback in `src/bun/rpc-transport.ts`. If it blocks the event loop, prefer compressed binary for responses too; otherwise document compatibility tradeoff.
 - [ ] G16: Review cron timeout behavior in `src/bun/sidecar-cron-runner.ts`. If timed-out cron threads keep running, abort/stop the Pi session; otherwise comment known resource behavior and add telemetry.
-- [ ] G17: Review scheduled cron pending-count bookkeeping in `src/bun/sidecar-cron-runner.ts`. Add tests/comments to prevent mismatch with the actual concurrency limiter.
 - [ ] G18: Review dev-port fallback and allowed-origin rebuilding in `src/bun/index.ts`. Add tests/comments for fallback port and WebSocket origin allowlist consistency.
 - [ ] G19: Review main/share port collision checks in `src/bun/index.ts`. Add comments/tests for dev fallback behavior and fixed share-worker port assumptions.
 - [ ] G21: Review aggregate chat image payload limits in `src/bun/index.ts`. If 8 large images per message can pressure memory, lower limits or stream; otherwise document accepted desktop-app cap.
