@@ -7,7 +7,11 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { RpcCronJob } from "../../bun/rpc-schema";
-import { CronjobWorkspace } from "./cronjob-workspace";
+import {
+  CronjobWorkspace,
+  describeCronPermissions,
+  describeCronWorkspace,
+} from "./cronjob-workspace";
 
 function makeCronJob(overrides?: Partial<RpcCronJob>): RpcCronJob {
   return {
@@ -68,15 +72,42 @@ describe("CronjobWorkspace presentation states", () => {
     expect(renderCronWorkspace()).toContain("No cron jobs found.");
   });
 
-  it("renders enabled cron rows with schedule and next-run summaries", () => {
-    const markup = renderCronWorkspace({ cronJobs: [makeCronJob()] });
+  it("renders enabled cron rows with schedule, next-run, workspace, and permission summaries", () => {
+    const markup = renderCronWorkspace({
+      cronJobs: [
+        makeCronJob({
+          cronsAccess: true,
+          gitAccess: true,
+          pluginAccessGroups: ["demo:workspace"],
+          title: "Daily fixture cron",
+        }),
+      ],
+    });
 
     expect(markup).toContain("Daily fixture cron");
     expect(markup).toContain("0 14 * * *");
     expect(markup).toContain("Enabled");
     expect(markup).toContain("At 02:00 PM");
+    expect(markup).toContain("Project #7");
+    expect(markup).toContain("/tmp/metidos-demo");
+    expect(markup).toContain("Git, Crons, 1 plugin group");
     expect(markup).toContain("Run cron job Daily fixture cron");
     expect(markup).toContain("Delete cron job Daily fixture cron");
+  });
+
+  it("summarizes explicit cron permissions without exposing raw permission ids in rows", () => {
+    const cronJob = makeCronJob({
+      permissions: ["metidos:threads", "metidos:crons"],
+      pluginAccessGroups: ["plugin:read", "plugin:write"],
+      worktreePath: "",
+    });
+
+    expect(describeCronWorkspace(cronJob)).toBe(
+      "Project #7 · No worktree path",
+    );
+    expect(describeCronPermissions(cronJob)).toBe(
+      "2 permissions, 2 plugin groups",
+    );
   });
 
   it("renders busy run/delete labels and disabled affordances per cron row", () => {

@@ -39,6 +39,66 @@ function describeCronSchedule(schedule: string): string {
   }
 }
 
+const CRON_PERMISSION_LABELS: Array<[keyof RpcCronJob, string]> = [
+  ["webSearchAccess", "Web search"],
+  ["githubAccess", "GitHub"],
+  ["gitAccess", "Git"],
+  ["sqliteAccess", "SQLite"],
+  ["webServerAccess", "Web server"],
+  ["agentsAccess", "Agents"],
+  ["calendarAccess", "Calendar"],
+  ["notificationsAccess", "Notifications"],
+  ["weatherAccess", "Weather"],
+  ["threadsAccess", "Threads"],
+  ["cronsAccess", "Crons"],
+  ["metidosAccess", "Metidos"],
+];
+
+export function describeCronWorkspace(cronJob: RpcCronJob): string {
+  const worktreePath = cronJob.worktreePath.trim();
+  const workspace = worktreePath ? worktreePath : "No worktree path";
+  return `Project #${cronJob.projectId} · ${workspace}`;
+}
+
+export function describeCronPermissions(cronJob: RpcCronJob): string {
+  const explicitPermissions = cronJob.permissions?.filter(
+    (permission) => permission.trim() !== "",
+  );
+  const pluginAccessGroups = cronJob.pluginAccessGroups?.filter(
+    (group) => group.trim() !== "",
+  );
+
+  if (explicitPermissions && explicitPermissions.length > 0) {
+    const permissionSummary = `${explicitPermissions.length} permission${
+      explicitPermissions.length === 1 ? "" : "s"
+    }`;
+    if (pluginAccessGroups && pluginAccessGroups.length > 0) {
+      return `${permissionSummary}, ${pluginAccessGroups.length} plugin group${
+        pluginAccessGroups.length === 1 ? "" : "s"
+      }`;
+    }
+    return permissionSummary;
+  }
+
+  const enabledPermissionLabels = CRON_PERMISSION_LABELS.flatMap(
+    ([field, label]) => (cronJob[field] === true ? [label] : []),
+  );
+  if (cronJob.unsafeMode) {
+    enabledPermissionLabels.push("Unsafe mode");
+  }
+  if (pluginAccessGroups && pluginAccessGroups.length > 0) {
+    enabledPermissionLabels.push(
+      `${pluginAccessGroups.length} plugin group${
+        pluginAccessGroups.length === 1 ? "" : "s"
+      }`,
+    );
+  }
+
+  return enabledPermissionLabels.length > 0
+    ? enabledPermissionLabels.join(", ")
+    : "No extra permissions";
+}
+
 function CronjobListRow({
   cronJob,
   deleting,
@@ -90,6 +150,11 @@ function CronjobListRow({
             <span className="text-text-muted">
               Next {formatNextRunDate(cronJob.nextRunDate)}
             </span>
+          </span>
+          <span className="mt-0.5 block truncate text-[11px] leading-4 text-text-muted">
+            <span>{describeCronWorkspace(cronJob)}</span>
+            <span className="mx-1.5 text-text-faint">·</span>
+            <span>{describeCronPermissions(cronJob)}</span>
           </span>
         </span>
       </AppButton>
