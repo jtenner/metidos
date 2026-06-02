@@ -84,6 +84,9 @@ function buildTotpAuthSecretOptions(
 // This is a last-resort per-Database backpressure guard for serialized setup
 // transactions. Public auth routes hit peer/subject rate limits before this
 // queue, so a 503 here means the local SQLite writer is already saturated.
+// The WeakMap key is the concrete SQLite connection, not a database path: calls
+// sharing one connection are serialized in-process before BEGIN IMMEDIATE, while
+// independent connections still rely on SQLite's file lock and busy_timeout.
 const MAX_IMMEDIATE_TRANSACTION_QUEUE_DEPTH = 100;
 const immediateTransactionQueues = new WeakMap<Database, Promise<void>>();
 const immediateTransactionQueueDepths = new WeakMap<Database, number>();
