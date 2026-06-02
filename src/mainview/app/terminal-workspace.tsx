@@ -334,21 +334,14 @@ function TerminalRow({
         </label>
         <div className="mt-3 flex justify-end gap-2">
           <AppButton
-            unstyled
-            className="h-7 border border-border-default bg-surface-2 px-2 text-[11px] text-text-secondary hover:bg-surface-3 hover:text-text-primary"
+            buttonStyle="muted"
             onClick={() => {
               setEditing(false);
             }}
-            type="button"
           >
             Cancel
           </AppButton>
-          <AppButton
-            unstyled
-            className="h-7 border border-border-default bg-surface-2 px-2 text-[11px] text-accent-strong hover:bg-surface-3"
-            onClick={submitRename}
-            type="button"
-          >
+          <AppButton buttonStyle="secondary" onClick={submitRename}>
             Ok
           </AppButton>
         </div>
@@ -398,12 +391,7 @@ export function TerminalWorkspace({
         {terminals.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-text-muted">
             {canCreateTerminal ? (
-              <AppButton
-                unstyled
-                className="border border-border-default bg-surface-2 px-3 py-2 text-xs text-text-secondary hover:bg-surface-3 hover:text-text-primary"
-                onClick={onCreateTerminal}
-                type="button"
-              >
+              <AppButton buttonStyle="secondary" onClick={onCreateTerminal}>
                 New Terminal
               </AppButton>
             ) : (
@@ -418,11 +406,9 @@ export function TerminalWorkspace({
             Open terminals
           </div>
           <AppButton
-            unstyled
-            className="h-6 border border-border-default bg-surface-2 px-2 text-[11px] text-text-secondary hover:bg-surface-3 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            buttonStyle="muted"
             disabled={!canCreateTerminal}
             onClick={onCreateTerminal}
-            type="button"
           >
             New Terminal
           </AppButton>
