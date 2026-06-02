@@ -185,6 +185,9 @@ describe("outbound URL security", () => {
     expect(isBlockedOutboundAddress("::ffff:127.0.0.1")).toBeTrue();
     expect(isBlockedOutboundAddress("::ffff:7f00:1")).toBeTrue();
     expect(isBlockedOutboundAddress("0:0:0:0:0:ffff:a9fe:a9fe")).toBeTrue();
+    expect(isBlockedOutboundAddress("::ffff:8.8.8.8")).toBeFalse();
+    expect(isBlockedOutboundAddress("::8.8.8.8")).toBeFalse();
+    expect(isBlockedOutboundAddress("0:0:0:0:0:0:0808:0808")).toBeFalse();
     expect(isBlockedOutboundAddress("fe8a::1")).toBeTrue();
     expect(isBlockedOutboundAddress("64:ff9b::a9fe:a9fe")).toBeTrue();
     expect(isBlockedOutboundAddress("64:ff9b::c000:201")).toBeTrue();

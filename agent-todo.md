@@ -255,7 +255,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] F1: Review `src/bun/outbound-url-security.ts` `new Response(nodeResponse as unknown as BodyInit)`. If Bun/Node stream coercion is brittle or leaks sockets, wrap with a proper Web `ReadableStream`; otherwise comment runtime assumption and add a test.
 - [ ] F2: Review custom DNS `lookup` callback shape in `src/bun/outbound-url-security.ts`. Add tests/comments for `lookupOptions.all` and single-address callbacks.
-- [ ] F5: Review `isIP` behavior for IPv4-in-IPv6 forms in `src/bun/outbound-url-security.ts`. Add tests/comments if not already covered.
 - [ ] F7: Review mixed A/AAAA DNS result rejection in `src/bun/outbound-url-security.ts`. Add comments/tests clarifying that any blocked resolved address rejects the hostname.
 - [ ] F8: Review DNS error handling in `src/bun/outbound-url-security.ts`. If transient DNS errors should be distinguishable from policy denials, improve error codes; otherwise comment current generic behavior.
 - [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.
