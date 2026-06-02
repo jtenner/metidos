@@ -20,6 +20,8 @@ The clone target is under ignored `.tmp/` so no generated dependency or build ar
 
 ## Outcome
 
+Initial check before the validation fix:
+
 - `git status --short` in the clean clone printed no changes.
 - `bun install --frozen-lockfile` completed successfully.
 - `bun run validate` failed during `bun run test` because XML structured-data tests could not load the generated xmloxide WASM bundle from `native/xmloxide-wasm/dist/`.
@@ -39,6 +41,21 @@ Final test summary from the failed run:
 Ran 2377 tests across 286 files.
 ```
 
-## Decision / follow-up
+Follow-up check with the validation fix applied to the clean clone:
 
-The repository does **not** yet satisfy the clean-clone readiness check for the documented `bun run validate` workflow. A future slice should make validation self-contained from tracked files plus documented setup steps, either by building the xmloxide artifact as part of setup/validation, documenting it as a required pre-validation step, or committing an approved redistributable generated artifact if that is the intended release model.
+- `bun install --frozen-lockfile` completed successfully.
+- `bun run validate` now runs `bun run build:xmloxide-wasm` before repository checks and tests.
+- `bun run validate` completed successfully.
+
+Final test summary from the passing run:
+
+```text
+2380 pass
+0 fail
+45665 expect() calls
+Ran 2380 tests across 286 files.
+```
+
+## Decision
+
+`bun run validate` now builds the ignored xmloxide WASM outputs before running tests. This keeps clean-clone validation self-contained from tracked files plus the documented native build toolchain, without committing generated `native/xmloxide-wasm/dist/` artifacts.

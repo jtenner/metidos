@@ -10,7 +10,7 @@ The wrapper exposes only an in-memory parse API. It does not expose filesystem, 
 bun run native/xmloxide-wasm/build.ts
 ```
 
-The build requires Rust with the `wasm32-unknown-unknown` target installed. The generated runtime artifacts are committed so normal installs can use loose XML parsing without a Rust toolchain:
+The build requires Rust with the `wasm32-unknown-unknown` target installed. The generated runtime artifacts are ignored build outputs, and `bun run validate` builds them before running tests:
 
 ```text
 native/xmloxide-wasm/dist/metidos_xmloxide_wasm.wasm
