@@ -294,12 +294,11 @@ import {
   applySecurityHeaders,
   buildConfiguredBrowserOrigins,
   buildLivenessPayload,
-  buildLoopbackBrowserOrigins,
+  buildMainServerBrowserOrigins,
   buildRuntimeConfigElement,
   isRuntimeStatsSecretMatch,
   isWebSocketOriginAllowed,
   LOOPBACK_HOSTNAME,
-  normalizeBrowserOriginSet,
 } from "./server-security";
 import {
   startCronScheduler,
@@ -590,22 +589,12 @@ const MAINVIEW_DYNAMIC_STYLE_NONCE = randomBytes(16).toString("base64");
 function buildNormalizedAllowedWsOrigins(
   activeServerPort: number,
 ): Set<string> {
-  // Metidos is a local-operator app, so default browser origins include the
-  // active loopback port plus conventional localhost reverse-proxy ports. Public
-  // TLS deployments must still set METIDOS_PUBLIC_ORIGIN (or
-  // METIDOS_ALLOWED_WS_ORIGINS for additional hosts) to the real browser-facing
-  // origin; the implicit localhost:80/443 entries are only for same-host
-  // development or trusted local reverse-proxy assumptions.
-  return normalizeBrowserOriginSet([
-    ...buildLoopbackBrowserOrigins(activeServerPort),
-    ...buildLoopbackBrowserOrigins(DEFAULT_HTTP_PROXY_PORT, {
-      protocols: ["http:"],
-    }),
-    ...buildLoopbackBrowserOrigins(DEFAULT_HTTPS_PROXY_PORT, {
-      protocols: ["https:"],
-    }),
-    ...CONFIGURED_ALLOWED_WS_ORIGINS,
-  ]);
+  return buildMainServerBrowserOrigins({
+    activeServerPort,
+    configuredOrigins: CONFIGURED_ALLOWED_WS_ORIGINS,
+    httpProxyPort: DEFAULT_HTTP_PROXY_PORT,
+    httpsProxyPort: DEFAULT_HTTPS_PROXY_PORT,
+  });
 }
 
 /**

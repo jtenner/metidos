@@ -216,7 +216,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### HTTP and RPC transport follow-up
 
 - [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.
-- [ ] G18: Review dev-port fallback and allowed-origin rebuilding in `src/bun/index.ts`. Add tests/comments for fallback port and WebSocket origin allowlist consistency.
 - [ ] G21: Review aggregate chat image payload limits in `src/bun/index.ts`. If 8 large images per message can pressure memory, lower limits or stream; otherwise document accepted desktop-app cap.
 
 ### Calendar and notification follow-up

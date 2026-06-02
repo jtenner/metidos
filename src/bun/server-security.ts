@@ -168,6 +168,33 @@ export function buildConfiguredBrowserOrigins(options: {
   return [...normalized];
 }
 
+/**
+ * Build the normalized browser-origin allowlist for the main HTTP/WebSocket server.
+ *
+ * The allowlist is rebuilt after Bun chooses the final listen port so dev-mode
+ * port fallback stays same-origin with the actual Mainview URL. Conventional
+ * localhost reverse-proxy ports remain explicitly local-only convenience entries;
+ * public TLS deployments must still pass their browser-facing origin through
+ * METIDOS_PUBLIC_ORIGIN or METIDOS_ALLOWED_WS_ORIGINS.
+ */
+export function buildMainServerBrowserOrigins(options: {
+  activeServerPort: number;
+  configuredOrigins: Iterable<string>;
+  httpProxyPort: number;
+  httpsProxyPort: number;
+}): Set<string> {
+  return normalizeBrowserOriginSet([
+    ...buildLoopbackBrowserOrigins(options.activeServerPort),
+    ...buildLoopbackBrowserOrigins(options.httpProxyPort, {
+      protocols: ["http:"],
+    }),
+    ...buildLoopbackBrowserOrigins(options.httpsProxyPort, {
+      protocols: ["https:"],
+    }),
+    ...options.configuredOrigins,
+  ]);
+}
+
 export function normalizeBrowserOriginSet(
   origins: Iterable<string>,
 ): Set<string> {

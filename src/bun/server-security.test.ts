@@ -10,6 +10,7 @@ import {
   buildConfiguredBrowserOrigins,
   buildContentSecurityPolicy,
   buildLoopbackBrowserOrigins,
+  buildMainServerBrowserOrigins,
   buildRuntimeConfigElement,
   isRuntimeStatsSecretMatch,
   isWebSocketOriginAllowed,
@@ -53,6 +54,50 @@ describe("server security helpers", () => {
         protocols: ["http:"],
       }),
     ).toEqual(["http://127.0.0.1", "http://localhost"]);
+  });
+
+  it("builds main-server browser origins around the active fallback port", () => {
+    const origins = buildMainServerBrowserOrigins({
+      activeServerPort: 49152,
+      configuredOrigins: ["https://public.example", "http://localhost:49152"],
+      httpProxyPort: 80,
+      httpsProxyPort: 443,
+    });
+
+    expect(origins).toContain("http://127.0.0.1:49152");
+    expect(origins).toContain("https://localhost:49152");
+    expect(origins).toContain("http://localhost");
+    expect(origins).toContain("https://localhost");
+    expect(origins).toContain("https://public.example");
+    expect(origins).not.toContain("http://127.0.0.1:7599");
+  });
+
+  it("uses the same main-server origin allowlist for required browser websocket checks", () => {
+    const origins = buildMainServerBrowserOrigins({
+      activeServerPort: 49152,
+      configuredOrigins: ["https://public.example"],
+      httpProxyPort: 80,
+      httpsProxyPort: 443,
+    });
+
+    expect(
+      isWebSocketOriginAllowed("http://localhost:49152", origins, {
+        preNormalizedAllowedOrigins: true,
+        requireOrigin: true,
+      }),
+    ).toBeTrue();
+    expect(
+      isWebSocketOriginAllowed("http://localhost:7599", origins, {
+        preNormalizedAllowedOrigins: true,
+        requireOrigin: true,
+      }),
+    ).toBeFalse();
+    expect(
+      isWebSocketOriginAllowed(null, origins, {
+        preNormalizedAllowedOrigins: true,
+        requireOrigin: true,
+      }),
+    ).toBeFalse();
   });
 
   it("parses and normalizes configured origins", () => {
