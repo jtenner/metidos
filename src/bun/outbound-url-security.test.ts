@@ -6,6 +6,7 @@ import {
   createSafeOutboundHttpFetch,
   isBlockedOutboundAddress,
   isBlockedPrivateNetworkMetadataAddress,
+  pinResolvedOutboundLookupAddress,
   resolveSafeRedirectUrl,
 } from "./outbound-url-security";
 
@@ -91,6 +92,36 @@ describe("outbound URL security", () => {
     );
 
     expect(url.hostname).toBe("api.telegram.org");
+  });
+
+  test("returns pinned DNS answers using Node lookup callback shapes", () => {
+    const lookup = pinResolvedOutboundLookupAddress("2001:4860:4860::8888");
+    let singleAddress: string | undefined;
+    let singleFamily: number | undefined;
+    let allAddresses: Array<{ address: string; family: number }> | undefined;
+
+    lookup("ignored.example.test", {}, (error, address, family) => {
+      expect(error).toBeNull();
+      singleAddress = address;
+      singleFamily = family;
+    });
+    lookup(
+      "ignored.example.test",
+      { all: true },
+      (
+        error: Error | null,
+        addresses: Array<{ address: string; family: number }>,
+      ) => {
+        expect(error).toBeNull();
+        allAddresses = addresses;
+      },
+    );
+
+    expect(singleAddress).toBe("2001:4860:4860::8888");
+    expect(singleFamily).toBe(6);
+    expect(allAddresses).toEqual([
+      { address: "2001:4860:4860::8888", family: 6 },
+    ]);
   });
 
   test("pins the validated DNS answer for the outbound connection", async () => {

@@ -27,6 +27,17 @@ type SafeOutboundHttpUrlValidation = {
   url: URL;
 };
 
+type NodeLookupOptions = {
+  all?: boolean | undefined;
+};
+
+type NodeLookupCallback =
+  | ((error: Error | null, address: string, family: number) => void)
+  | ((
+      error: Error | null,
+      addresses: Array<{ address: string; family: number }>,
+    ) => void);
+
 type OutboundHttpUrlValidationOptions = SafeOutboundHttpUrlOptions & {
   blockedAddressError: string;
   blockedHostnameError: string;
@@ -424,6 +435,32 @@ export function isHttpRedirectStatus(status: number): boolean {
   );
 }
 
+export function pinResolvedOutboundLookupAddress(resolvedAddress: string) {
+  return (
+    _hostname: string,
+    lookupOptions: NodeLookupOptions,
+    callback: NodeLookupCallback,
+  ): void => {
+    const family = isIP(resolvedAddress) || 4;
+    if (lookupOptions?.all) {
+      // node:http/node:https can request either the single-address callback
+      // shape or the all-addresses array shape. Always return the already
+      // validated address in the requested shape so the outbound request stays
+      // pinned to the SSRF-checked DNS result.
+      (
+        callback as (
+          error: Error | null,
+          addresses: Array<{ address: string; family: number }>,
+        ) => void
+      )(null, [{ address: resolvedAddress, family }]);
+      return;
+    }
+    (
+      callback as (error: Error | null, address: string, family: number) => void
+    )(null, resolvedAddress, family);
+  };
+}
+
 function createValidatedOutboundHttpFetch(
   validateUrl: (
     rawUrl: string,
@@ -448,26 +485,7 @@ function createValidatedOutboundHttpFetch(
         {
           headers: Object.fromEntries(headers.entries()),
           method: init.method,
-          lookup: (_hostname, lookupOptions, callback) => {
-            const address = validation.resolvedAddress;
-            const family = isIP(address) || 4;
-            if (lookupOptions?.all) {
-              (
-                callback as unknown as (
-                  error: Error | null,
-                  addresses: Array<{ address: string; family: number }>,
-                ) => void
-              )(null, [{ address, family }]);
-              return;
-            }
-            (
-              callback as unknown as (
-                error: Error | null,
-                address: string,
-                family: number,
-              ) => void
-            )(null, address, family);
-          },
+          lookup: pinResolvedOutboundLookupAddress(validation.resolvedAddress),
           signal: init.signal ?? undefined,
         },
         (nodeResponse) => {
