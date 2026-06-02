@@ -78,7 +78,7 @@ export const ListRowIconButton = forwardRef<
   return (
     <button
       {...props}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center text-text-faint transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-1 ${toneClass} ${className}`.trim()}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center text-text-faint transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-1 ${toneClass} ${className}`.trim()}
       ref={ref}
       type={type}
     />
