@@ -486,9 +486,46 @@ try {
 
 ### Registering notification providers
 
-`metidos.notifications.addProvider({ id, timeoutMs, send })` and `metidos.notifications.registerProvider(...)` require `notification:provider`, must run during initialization, and are limited to 10 providers per plugin.
+A notification provider plugin adds a delivery outlet that Metidos can use for later notification sends. It does not automatically send notifications by itself; the Local Operator must approve the plugin and configure/enable the outlet in plugin settings and notification controls.
 
-The `send` callback returns `{ receipts }`. Each receipt should be either delivered or failed with a stable provider-specific code/message. Provider callback failures are converted into failed receipts rather than crashing Metidos.
+Declare the outlet family in the manifest and request only the capabilities the provider needs:
+
+```json
+{
+  "permissions": ["notification:provider", "network:fetch"],
+  "notificationProviders": [
+    {
+      "id": "ntfy",
+      "name": "ntfy",
+      "description": "Forward Metidos notifications to an ntfy topic.",
+      "timeoutMs": 10000
+    }
+  ],
+  "settings": [
+    { "key": "server_url", "label": "Server URL", "kind": "url", "required": true },
+    { "key": "default_topic", "label": "Default topic", "kind": "secret" }
+  ],
+  "network": { "allow": ["https://ntfy.sh/**"] }
+}
+```
+
+`metidos.notifications.addProvider({ id, timeoutMs, send })` and `metidos.notifications.registerProvider(...)` require `notification:provider`, must run during initialization, and are limited to 10 providers per plugin. The `id` and `timeoutMs` must match one manifest `notificationProviders[]` entry. Provider registration is unavailable from tool, cron, GC, provider execution, notification provider, and other non-startup callbacks so the activation review remains stable.
+
+The `send(request)` callback receives a normalized notification request with `title`, `message`/`body`, optional `priority`, `tags`, `clickUrl`, and any extra host metadata supported by the runtime. Return `{ receipts }`; each receipt should include `status: "delivered"` or `status: "failed"`, a user-readable `message`, and stable provider-specific `code`, `externalId`, `externalUrl`, `retryAfter`, or other metadata when helpful.
+
+User configuration rules:
+
+- Use manifest `settings[]` or `env[]` for server URLs, topics, routing names, API tokens, and bearer credentials; mark secrets as `kind: "secret"` or secret env declarations.
+- Use narrow `network.allow` entries for provider HTTP calls. Self-hosted or private-network targets require an explicit manifest/network update, re-review, and any unsafe private-network runtime opt-in documented for the plugin.
+- Keep topics, tokens, URLs with credentials, and receipt payloads out of logs and public support files. V1 does not automatically redact plugin-authored notification payloads or provider output.
+- Document whether missing settings disable the outlet, use a safe default, or return a failed receipt.
+
+Failure-state rules:
+
+- Delivery failures, disabled/missing configuration, rate-limit or policy denials, remote server errors, and callback timeouts should return failed receipts instead of throwing whenever the provider can classify the problem.
+- Permission errors, malformed registrations, undeclared providers, registration after startup, and callback results that are not `{ receipts }` are contract failures and may block activation or be converted by the host into failed receipts.
+- Use stable failure `code` values such as `MISSING_TOPIC`, `NETWORK_POLICY_DENIED`, `REMOTE_ERROR`, or `TIMEOUT` so Settings, diagnostics, and future tests can recognize the failure without parsing prose.
+- Prefer retry hints (`retryAfter`, `retryable`, provider status fields) when the remote provider exposes them, but do not include secrets or sensitive local paths.
 
 Use [`ntfy_notification_provider`](./examples/plugins/ntfy_notification_provider/) as the copyable example.
 

@@ -37,7 +37,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 6. Plugin System Public Readiness
 
-- [ ] Document notification provider behavior for plugins, including registration, user configuration, permissions, and failure states.
 - [ ] Document model provider registration behavior for plugins, including provider metadata, credentials, request flow, and user approval expectations.
 - [ ] Add a plugin tutorial that walks from empty folder to installed and approved plugin.
 

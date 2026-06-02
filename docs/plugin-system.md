@@ -124,6 +124,16 @@ Network fetch/websocket APIs require explicit permissions and manifest allowlist
 
 Network policy failures should surface as plugin-visible errors without exposing unrelated host details.
 
+## Notification providers
+
+A plugin can register notification provider families such as an ntfy, webhook, or email outlet. The manifest must declare each family in `notificationProviders[]` and include `notification:provider`; provider code must register matching families during plugin startup with `metidos.notifications.addProvider(...)` or `registerProvider(...)`.
+
+Provider plugins usually also declare settings or env vars for server URLs, topics, routing names, and API tokens, plus narrow network allowlists for outbound delivery. The Local Operator approves the provider capability, fills in any required settings, and enables the outlet through notification controls before Metidos sends through it.
+
+Notification provider callbacks return receipts. Delivery problems should surface as failed receipts with stable codes and redacted messages instead of crashing Metidos; startup-time contract problems such as undeclared providers, missing permissions, invalid timeouts, or late registration block activation or produce host diagnostics.
+
+See the [authoring guide notification section](./metidos-plugin-authoring-guide.md#notifications) and the [`ntfy_notification_provider` example](./examples/plugins/ntfy_notification_provider/) for the full registration, configuration, permission, and failure-state contract.
+
 ## Plugin crons
 
 A plugin can declare global scheduled callbacks. Plugin crons run under plugin lifecycle control and do not automatically receive a selected Project or Worktree. They should be bounded, idempotent, and safe to retry.
