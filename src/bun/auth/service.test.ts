@@ -16,6 +16,7 @@ import {
   listAuthRecoveryCodes,
   listSecurityAuditEvents,
   listUsers,
+  markAuthRecoveryCodeUsed,
   migrateDatabase,
 } from "../db";
 import { generateTotpCode } from "./";
@@ -905,6 +906,48 @@ describe("auth service", () => {
         (event) => event.eventType === "auth_invalid_credentials",
       )?.payloadJson,
     ).toContain('"method":"recovery_code"');
+  });
+
+  it("rejects a second recovery-code consume attempt after a stale unused snapshot", async () => {
+    const database = createTestDatabase();
+    const appDataDir = createTempDirectory();
+    const nowMs = Date.parse("2026-04-03T00:00:00.000Z");
+    const enrollment = prepareTotpEnrollment({
+      accountName: TEST_USERNAME,
+    });
+
+    await setupAuth(database, {
+      appDataDir,
+      nowMs,
+      primaryFactor: TEST_ADMIN_PIN,
+      primaryFactorType: "pin",
+      totpCode: await generateTotpCode(enrollment.totpSecret, nowMs),
+      totpSecret: enrollment.totpSecret,
+    });
+    const [staleUnusedRecord] = listAuthRecoveryCodes(database);
+    if (!staleUnusedRecord) {
+      throw new Error("Expected an initial recovery-code record.");
+    }
+
+    expect(
+      markAuthRecoveryCodeUsed(
+        database,
+        staleUnusedRecord.codeHash,
+        "2026-04-03T00:00:01.000Z",
+      ),
+    ).toBeTrue();
+    expect(
+      markAuthRecoveryCodeUsed(
+        database,
+        staleUnusedRecord.codeHash,
+        "2026-04-03T00:00:02.000Z",
+      ),
+    ).toBeFalse();
+    expect(
+      listAuthRecoveryCodes(database).find(
+        (record) => record.codeHash === staleUnusedRecord.codeHash,
+      )?.usedAt,
+    ).toBe("2026-04-03T00:00:01.000Z");
   });
 
   it("records invalid step-up primary-factor attempts distinctly from TOTP failures", async () => {
