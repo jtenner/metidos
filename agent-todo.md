@@ -26,7 +26,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Add a dependency review workflow if appropriate for the repository and license/security posture.
 - [ ] Add CodeQL or an equivalent code scanning workflow if appropriate for the stack.
-- [ ] Add Dependabot configuration for npm/Bun dependencies and GitHub Actions.
 - [ ] Verify every package script referenced in README, docs, workflows, and templates still exists and works.
 - [ ] Verify CI does not require private secrets for normal pull request validation.
 - [ ] Verify CI artifacts, logs, and test outputs do not expose secrets or machine-specific paths.
