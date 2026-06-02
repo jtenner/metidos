@@ -32,7 +32,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
 - [ ] Add a screenshot gallery or visual feature section with safe demo data.
-- [ ] Add a concise security model summary covering local auth, plugins, filesystem/network boundaries, and unsafe mode.
 - [ ] Add badges only after the underlying CI, license, release, and status items are real.
 - [ ] Verify all README commands work from a clean clone.
 - [ ] Verify README terminology matches `UBIQUITOUS_LANGUAGE.md` after public terminology is finalized.

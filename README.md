@@ -44,6 +44,16 @@ It is designed for one Local Operator running a local installation, not for host
 
 Metidos is not a sandbox for arbitrary untrusted code, a replacement for code review and tests, or a stable plugin marketplace yet. Treat App Data, diagnostics, plugin-authored logs, provider credentials, and project paths as private local information.
 
+## Security model summary
+
+Metidos assumes a single **Local Operator** controls one local installation. Local Auth protects browser access with first-run setup, sessions, WebSocket tickets, optional TOTP, recovery codes, and step-up authentication for sensitive plugin actions.
+
+The Bun Backend is the security authority. It validates sessions, owns provider credentials and Plugin Settings, enforces Project and Worktree path scope, applies filesystem containment checks, mediates network-capable features, and decides when Safe Mode or Unsafe Mode capabilities are available. The Mainview presents choices but does not grant security-sensitive access by itself.
+
+Plugins are local, review-first extensions. They require manifests, `AGENTS.md` guidance, operator approval, declared permissions, access groups for Thread-visible tools, settings validation, and secret redaction. Review file and network allowlists before enabling a plugin, and re-review after source changes.
+
+Safe Mode is the default for Threads and Cron Jobs. Unsafe Mode can broaden runtime capabilities, including shell or other risky local operations, and should only be enabled for narrow, trusted work. See [`docs/security-model.md`](docs/security-model.md) for the full model, including filesystem boundaries, network policy, remote access, backups, and safe issue reporting.
+
 ## Documentation
 
 The README is intentionally an overview. Setup, tutorial, and installer details live in the dedicated install guide and installer skill:
