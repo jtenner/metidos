@@ -6,10 +6,13 @@ import { join } from "node:path";
 import {
   closeAppDatabase,
   createCronJob,
+  createThread,
   getCronJobById,
   initAppDatabase,
+  markThreadRunStarted,
   resetResolvedAppDataDirectory,
   runInTransaction,
+  softDeleteCronJob,
   updateTimezoneSettings,
   upsertProject,
 } from "./db";
@@ -94,6 +97,71 @@ afterEach(() => {
 });
 
 describe("cron procedure validation", () => {
+  it("returns deterministic manual-run errors for missing, deleted, and already-active jobs", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-manual-edge-repo-",
+    );
+    const { runCronNowProcedure } = await loadProjectProcedures();
+
+    await expect(runCronNowProcedure({ cronJobId: 404 })).rejects.toThrow(
+      "Cron job not found: 404",
+    );
+
+    const deletedCronJob = createCronJob(database, {
+      description: "Deleted manual-run edge cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo deleted",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Deleted edge cron",
+      worktreePath: repoPath,
+    });
+    softDeleteCronJob(database, deletedCronJob.id);
+    await expect(
+      runCronNowProcedure({ cronJobId: deletedCronJob.id }),
+    ).rejects.toThrow("Cannot run a deleted cron job.");
+
+    const activeCronJob = createCronJob(database, {
+      description: "Active manual-run edge cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo active",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Active edge cron",
+      worktreePath: repoPath,
+    });
+    const activeThread = createThread(database, {
+      agentsAccess: false,
+      cronJobId: activeCronJob.id,
+      githubAccess: false,
+      gitAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      reasoningEffort: "medium",
+      threadsAccess: true,
+      title: "Active cron child",
+      unsafeMode: false,
+      webSearchAccess: false,
+      worktreePath: repoPath,
+    });
+    markThreadRunStarted(database, activeThread.id, "2026-06-02T15:00:00.000Z");
+
+    await expect(
+      runCronNowProcedure({ cronJobId: activeCronJob.id }),
+    ).rejects.toThrow("Cron job is already running.");
+  });
+
   it("rejects invalid cron schedules before persisting them", async () => {
     const { project, repoPath } = createCronProcedureWorkspace(
       "metidos-cron-procedure-repo-",
