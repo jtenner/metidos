@@ -666,12 +666,12 @@ export class PluginWebSocketRegistry {
   }
 
   closeAll(): void {
+    // Plugin shutdown is a teardown boundary, not a graceful WebSocket close
+    // handshake. The sidecar may be stopping or restarting, so close every
+    // socket best-effort, reject any pending receive immediately, and drop
+    // queued events instead of awaiting remote close/error delivery that could
+    // prolong shutdown.
     for (const record of this.connections.values()) {
-      try {
-        record.socket.close(1000, "plugin shutdown");
-      } catch {
-        // Best-effort shutdown cleanup.
-      }
       if (record.receive) {
         clearTimeout(record.receive.timer);
         record.receive.reject(
@@ -681,6 +681,11 @@ export class PluginWebSocketRegistry {
           }),
         );
         record.receive = null;
+      }
+      try {
+        record.socket.close(1000, "plugin shutdown");
+      } catch {
+        // Best-effort shutdown cleanup.
       }
     }
     this.connections.clear();

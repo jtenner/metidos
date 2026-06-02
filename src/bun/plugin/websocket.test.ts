@@ -245,6 +245,39 @@ describe("PluginWebSocketRegistry", () => {
     }
   });
 
+  it("rejects pending receives and drops connections during shutdown", async () => {
+    const server = createEchoServer();
+    const origin = `ws://127.0.0.1:${server.port}`;
+    const registry = new PluginWebSocketRegistry({
+      network: {
+        allow: [],
+        enforceHttps: false,
+        webSocketAllow: [`${origin}/socket`],
+      },
+      permissions: ["network:websocket"],
+      unsafeAllowPrivateNetwork: true,
+    });
+
+    const connected = await registry.connect({ url: `${origin}/socket` });
+    await expect(registry.receive(connected.id)).resolves.toEqual({
+      text: "ready",
+      type: "message",
+    });
+
+    const pendingReceive = registry.receive(connected.id, {
+      timeoutMs: 60_000,
+    });
+    registry.closeAll();
+
+    await expect(pendingReceive).rejects.toMatchObject({
+      code: "network_websocket_failed",
+      message: "Plugin WebSocket closed during plugin shutdown.",
+    });
+    await expect(registry.state(connected.id)).rejects.toMatchObject({
+      code: "invalid_connection_id",
+    });
+  });
+
   it("bounds message size and connection count", async () => {
     const server = createEchoServer();
     const origin = `ws://127.0.0.1:${server.port}`;

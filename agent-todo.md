@@ -218,7 +218,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.
 - [ ] F17: Review Bun WebSocket constructor options in `src/bun/plugin/websocket.ts`. If header/protocol behavior is runtime-dependent, add compatibility tests or normalize options.
-- [ ] F19: Review `closeAll` in `src/bun/plugin/websocket.ts`. If pending receives need reliable delivery of close/error events, await or drain; otherwise comment best-effort shutdown semantics.
 
 ### HTTP and RPC transport follow-up
 
