@@ -355,7 +355,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Web-server share follow-up
 
-- [ ] J1: Review unauthenticated main-server forwarding of `/share/open` and `/s/` in `src/bun/index.ts`. If the share worker does not fully enforce claim/session policy, fix; otherwise add a comment at the proxy boundary naming the share worker as the auth authority.
 - [ ] J2: Review public share route Origin/auth expectations in `src/bun/pi/web-server/share-thread.ts` and `src/bun/index.ts`. If cross-site access can expose private hosted content, tighten cookies/tokens; otherwise document public-share threat model.
 
 ### Miscellaneous backend hardening follow-up
