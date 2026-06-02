@@ -653,6 +653,10 @@ function containsSqlFunctionCall(sql: string, functionName: string): boolean {
 }
 
 function assertSqliteStatementAllowed(statementText: string): void {
+  // sqlite.run intentionally lets plugins own the schema and contents of their
+  // own ~/ SQLite database, including CREATE TRIGGER, CREATE VIRTUAL TABLE, and
+  // DROP. The guard below blocks statements that can escape that database,
+  // affect host-controlled transaction/quota boundaries, or load native code.
   const firstIdentifier = getFirstSqlIdentifier(statementText);
   const firstKeyword = firstIdentifier?.value.toLowerCase() ?? "";
 

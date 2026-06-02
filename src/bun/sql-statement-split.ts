@@ -129,6 +129,20 @@ export function splitTopLevelSqlStatements(query: string): string[] {
     }
 
     if (character === ";") {
+      const currentStatement = currentParts.join("");
+      const lowerCurrentStatement = currentStatement.toLowerCase();
+      if (
+        /\bcreate\s+(?:temp(?:orary)?\s+)?trigger\b/.test(
+          lowerCurrentStatement,
+        ) &&
+        !/\bend\s*$/.test(lowerCurrentStatement)
+      ) {
+        // SQLite trigger bodies contain semicolon-separated inner statements,
+        // but the whole CREATE TRIGGER ... BEGIN ... END block is still one
+        // top-level statement for plugin single-statement enforcement.
+        append(character);
+        continue;
+      }
       flushCurrentStatement();
       continue;
     }

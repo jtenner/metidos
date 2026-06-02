@@ -638,6 +638,83 @@ describe("executePluginSqliteOperation", () => {
     }
   });
 
+  it("allows plugins to fully control their own SQLite schema", async () => {
+    const { pluginPath } = createPluginFixture();
+    const permissions = ["sqlite", "storage:write"];
+
+    await expect(
+      executePluginSqliteOperation({
+        operation: "sqlite.run",
+        params: {
+          path: "~/db/state.sqlite",
+          statement:
+            "create table notes (id integer primary key, title text not null)",
+        },
+        permissions,
+        pluginPath,
+      }),
+    ).resolves.toMatchObject({ changes: 0 });
+
+    await expect(
+      executePluginSqliteOperation({
+        operation: "sqlite.run",
+        params: {
+          path: "~/db/state.sqlite",
+          statement:
+            "create trigger notes_title_trim after insert on notes begin update notes set title = trim(new.title) where id = new.id; end",
+        },
+        permissions,
+        pluginPath,
+      }),
+    ).resolves.toMatchObject({ changes: 0 });
+
+    await expect(
+      executePluginSqliteOperation({
+        operation: "sqlite.run",
+        params: {
+          path: "~/db/state.sqlite",
+          statement: "create virtual table notes_search using fts5(title)",
+        },
+        permissions,
+        pluginPath,
+      }),
+    ).resolves.toMatchObject({ changes: expect.any(Number) });
+
+    await executePluginSqliteOperation({
+      operation: "sqlite.run",
+      params: {
+        path: "~/db/state.sqlite",
+        statement: "insert into notes (title) values ('  owned schema  ')",
+      },
+      permissions,
+      pluginPath,
+    });
+
+    await expect(
+      executePluginSqliteOperation({
+        operation: "sqlite.get",
+        params: {
+          path: "~/db/state.sqlite",
+          statement: "select title from notes where id = 1",
+        },
+        permissions,
+        pluginPath,
+      }),
+    ).resolves.toEqual({ row: { title: "owned schema" } });
+
+    await expect(
+      executePluginSqliteOperation({
+        operation: "sqlite.run",
+        params: {
+          path: "~/db/state.sqlite",
+          statement: "drop table notes_search",
+        },
+        permissions,
+        pluginPath,
+      }),
+    ).resolves.toMatchObject({ changes: 0 });
+  });
+
   it("blocks statements that can open or write other database files", async () => {
     const { pluginPath } = createPluginFixture();
     const permissions = ["sqlite", "storage:write"];
