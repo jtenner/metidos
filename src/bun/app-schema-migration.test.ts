@@ -354,6 +354,32 @@ describe("app schema migration", () => {
         project_id,
         worktree_path
       ) VALUES ('claim', 1, 7, 'instance-1', 4321, 1, 1, '/tmp/legacy-app-schema');
+      CREATE TABLE app_notification_deliveries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plugin_id TEXT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        click_url TEXT,
+        priority TEXT,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'sent',
+        sent_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        dismissed_at TEXT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      );
+      INSERT INTO app_notification_deliveries (
+        id,
+        plugin_id,
+        title,
+        body,
+        click_url,
+        priority,
+        tags_json,
+        status,
+        user_id
+      ) VALUES (1, 'weather', 'Legacy Notice', 'Rain soon', 'metidos://notice', 'high', '["forecast"]', 'sent', 1);
       CREATE TABLE user_auth_settings (
         user_id INTEGER PRIMARY KEY,
         primary_factor_type TEXT NOT NULL,
@@ -395,6 +421,33 @@ describe("app schema migration", () => {
       expect(columnNames(database, "web_server_shares")).not.toContain(
         "owner_user_id",
       );
+      expect(
+        columnNames(database, "app_notification_deliveries"),
+      ).not.toContain("user_id");
+      expect(
+        database
+          .query<
+            {
+              body: string;
+              plugin_id: string;
+              priority: string;
+              tags_json: string;
+              title: string;
+            },
+            []
+          >(
+            `SELECT plugin_id, title, body, priority, tags_json
+             FROM app_notification_deliveries
+             WHERE id = 1`,
+          )
+          .get(),
+      ).toEqual({
+        body: "Rain soon",
+        plugin_id: "weather",
+        priority: "high",
+        tags_json: '["forecast"]',
+        title: "Legacy Notice",
+      });
       expect(
         database
           .query<

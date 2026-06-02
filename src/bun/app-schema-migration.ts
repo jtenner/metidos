@@ -899,6 +899,9 @@ function rebuildAppNotificationDeliveriesForLocalInbox(db: Database): void {
 				dismissed_at,
 				created_at,
 				updated_at
+			-- The ownerless app has one local operator inbox. Legacy notification
+			-- deliveries were already local-app records scoped by user_id, so preserve
+			-- every legacy delivery and intentionally drop only the obsolete user scope.
 			FROM app_notification_deliveries
 		`,
     );
