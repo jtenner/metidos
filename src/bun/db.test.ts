@@ -577,6 +577,13 @@ describe("app database storage", () => {
     expect(quoteSqliteIdentifier("runtime_stats_snapshots")).toBe(
       '"runtime_stats_snapshots"',
     );
+    expect(quoteSqliteIdentifier(" _internal2 ")).toBe('"_internal2"');
+    expect(() => quoteSqliteIdentifier("")).toThrow(
+      "SQLite identifier contains unsupported characters.",
+    );
+    expect(() => quoteSqliteIdentifier("   ")).toThrow(
+      "SQLite identifier contains unsupported characters.",
+    );
     expect(() => quoteSqliteIdentifier('column"name')).toThrow(
       "SQLite identifier contains unsupported characters.",
     );
