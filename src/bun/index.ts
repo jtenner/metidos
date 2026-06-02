@@ -4076,6 +4076,10 @@ async function bootstrap(): Promise<void> {
             403,
           );
         }
+        // Decoding only normalizes the route component for downstream lookup.
+        // It is not a path-safety decision: terminal access is checked by
+        // authorizeTerminalWebSocketUpgrade against the authenticated session
+        // and terminal manager instead of trusting the decoded route text.
         const terminalId = safeDecodeRouteComponent(
           pathname.slice("/terminal/".length),
         );
@@ -4336,6 +4340,9 @@ async function bootstrap(): Promise<void> {
         if (calendarRateLimitResponse) {
           return calendarRateLimitResponse;
         }
+        // Decoding only accepts valid percent-encoding for the public slug.
+        // The slug is passed to exportPublicCalendarIcs as an opaque database
+        // key; no filesystem path is derived from this decoded value.
         const slug = safeDecodeRouteComponent(
           pathname.slice("/calendar/public/".length, -".ics".length),
         );

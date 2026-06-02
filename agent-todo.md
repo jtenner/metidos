@@ -308,7 +308,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### HTTP and RPC transport follow-up
 
 - [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.
-- [ ] G2: Review `safeDecodeRouteComponent` use in `src/bun/index.ts`. Add comments/tests confirming downstream path policies, not decoding, perform traversal checks.
 - [ ] G3: Review terminal WebSocket admin revalidation in `src/bun/index.ts`. Add comments/tests proving terminal sockets require admin on every message.
 - [ ] G4: Review mainview static asset cache/security headers in `src/bun/server/static-assets.ts` and `src/bun/index.ts`. Add comments/tests if auditors may confuse immutable asset caching with HTML/bootstrap caching.
 - [ ] G5: Review `MAX_RPC_WEBSOCKET_MESSAGE_BYTES` in `src/bun/index.ts`. If chat image payloads allow too much memory pressure, lower limits or stream images; otherwise document why current cap is acceptable.
