@@ -6,6 +6,7 @@
 import { defineTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { RpcTerminal } from "../../rpc-schema";
+import { pathIsWithinRoot } from "../../project-procedures/shared";
 import {
   canonicalPath,
   type PiMetidosToolHost,
@@ -141,6 +142,16 @@ function terminalAccess(scope: PiMetidosToolScope) {
   return { createdFromThreadId: scope.threadIdContext };
 }
 
+function terminalDirectory(scope: PiMetidosToolScope, dir: string): string {
+  const resolved = canonicalPath(dir, scope);
+  if (!pathIsWithinRoot(scope.worktreePathContext, resolved)) {
+    throw new Error(
+      "Terminal directory must stay inside the selected worktree.",
+    );
+  }
+  return resolved;
+}
+
 export function createPiMetidosTerminalTools(
   scope: PiMetidosToolScope,
   host: PiMetidosToolHost,
@@ -153,7 +164,7 @@ export function createPiMetidosTerminalTools(
           "Create an interactive terminal for the user. Use this instead of a background bash command for long-lived processes, watch tasks, dev servers, REPLs, TUIs, or anything the user may want to inspect or control manually.",
         execute: async (_toolCallId, params) => {
           const dir = params.dir?.trim()
-            ? canonicalPath(params.dir, scope)
+            ? terminalDirectory(scope, params.dir)
             : scope.worktreePathContext;
           if (!host.createTerminal) {
             throw new Error("Terminal host is unavailable.");

@@ -7,6 +7,7 @@ import type {
   RpcPluginInventory,
   RpcPluginInventoryPlugin,
   RpcProject,
+  RpcTerminal,
   RpcThread,
   RpcThreadDetail,
   RpcThreadStartRequest,
@@ -72,6 +73,29 @@ function makeWorktree(input?: Partial<RpcWorktree>): RpcWorktree {
     head: "abc123",
     path: "/repo/alpha/feature-a",
     pinnedAt: null,
+    ...input,
+  };
+}
+
+function makeTerminal(input?: Partial<RpcTerminal>): RpcTerminal {
+  return {
+    cols: 80,
+    command: null,
+    createdAt: NOW,
+    createdFromThreadId: 11,
+    cwd: "/repo/alpha/feature-a",
+    exitCode: null,
+    exitSignal: null,
+    projectId: 7,
+    projectName: "Alpha",
+    rows: 24,
+    status: "running",
+    terminalId: "terminal-1",
+    terminalIndex: 0,
+    title: "Shell",
+    updatedAt: NOW,
+    worktreeFolder: "feature-a",
+    worktreePath: "/repo/alpha/feature-a",
     ...input,
   };
 }
@@ -586,6 +610,61 @@ describe("createPiMetidosTools", () => {
     expect(resultText(result)).not.toContain("## Broken tools: broken");
     expect(Array.isArray(details.diagnostics)).toBe(true);
     expect(details.diagnostics.length).toBe(1);
+  });
+
+  it("creates terminals only after resolving the directory inside the selected worktree", async () => {
+    const scope = makeScope({ unsafeModeEnabled: true });
+    let receivedParams: Record<string, unknown> | null = null;
+    const host = createHost({
+      createTerminal: async (params) => {
+        receivedParams = params;
+        return makeTerminal({
+          cwd: params.dir ?? scope.worktreePathContext,
+          title: params.title ?? "Shell",
+        });
+      },
+    });
+
+    const result = await executeTool(scope, host, "new_terminal", {
+      command: " bun test ",
+      dir: "packages/app",
+      title: " Tests ",
+    });
+
+    expect(resultText(result)).toBe(
+      'Created terminal "Tests" in Alpha · feature-a.',
+    );
+    expectDeepEqual(requireValue(receivedParams), {
+      command: "bun test",
+      createdFromThreadId: 11,
+      dir: "/repo/alpha/feature-a/packages/app",
+      projectId: 7,
+      title: "Tests",
+      worktreePath: "/repo/alpha/feature-a",
+    });
+  });
+
+  it("rejects Pi-native terminal directories outside the selected worktree", async () => {
+    const scope = makeScope({ unsafeModeEnabled: true });
+    let createTerminalCalled = false;
+    const host = createHost({
+      createTerminal: async () => {
+        createTerminalCalled = true;
+        return makeTerminal();
+      },
+    });
+
+    await expect(
+      executeTool(scope, host, "new_terminal", { dir: "../other-worktree" }),
+    ).rejects.toThrow(
+      "Terminal directory must stay inside the selected worktree.",
+    );
+    await expect(
+      executeTool(scope, host, "new_terminal", { dir: "/repo/alpha/other" }),
+    ).rejects.toThrow(
+      "Terminal directory must stay inside the selected worktree.",
+    );
+    expect(createTerminalCalled).toBe(false);
   });
 
   it("updates thread metadata while ignoring in-thread access toggles", async () => {
