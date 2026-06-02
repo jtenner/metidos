@@ -25,7 +25,12 @@ describe("auth secret service error mapping", () => {
         "auth_secret_unavailable",
       );
       expect((mappedError as AuthServiceError).status).toBe(503);
-      expect((mappedError as AuthServiceError).message).toBe(error.message);
+      expect((mappedError as AuthServiceError).message).not.toContain(
+        "/safe/test/auth-secret.key",
+      );
+      expect((mappedError as AuthServiceError).message).toBe(
+        "Auth secret key material is unavailable. Restore the original key file or complete a full auth reset before continuing.",
+      );
     }
   });
 
