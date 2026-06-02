@@ -199,4 +199,66 @@ describe("createCalendarRpcHandlers", () => {
       ),
     ).rejects.toBe(authError);
   });
+
+  it("does not rewrite calendar permission failures from procedure seams", async () => {
+    const context = createRegularUserContext();
+    const permissionError = new Error("Calendar not found or not visible.");
+    const permissionCases: Array<{
+      method: keyof CalendarRpcHandlerMap;
+      procedure: keyof CalendarRpcHandlerDependencies;
+      params: unknown;
+    }> = [
+      {
+        method: "updateCalendarPreference",
+        procedure: "updateCalendarPreferenceProcedure",
+        params: { calendarId: 9, visible: true },
+      },
+      {
+        method: "createCalendarEvent",
+        procedure: "createCalendarEventProcedure",
+        params: {
+          calendarId: 9,
+          title: "Blocked write",
+          startAt: "2026-06-02T14:00:00.000Z",
+          endAt: "2026-06-02T14:30:00.000Z",
+          timezone: "UTC",
+        },
+      },
+      {
+        method: "updateCalendarEvent",
+        procedure: "updateCalendarEventProcedure",
+        params: { eventId: 30, title: "Blocked update" },
+      },
+      {
+        method: "deleteCalendarEvent",
+        procedure: "deleteCalendarEventProcedure",
+        params: { eventId: 30 },
+      },
+      {
+        method: "deleteCalendar",
+        procedure: "deleteCalendarProcedure",
+        params: { calendarId: 9 },
+      },
+    ];
+
+    expect.assertions(permissionCases.length);
+    for (const { method, procedure, params } of permissionCases) {
+      const handlers = createCalendarRpcHandlers(
+        createDefaultDependencies({
+          [procedure]: async () => {
+            throw permissionError;
+          },
+        }),
+      );
+
+      await expect(
+        (
+          handlers[method] as (
+            params: unknown,
+            context: RpcRequestContext,
+          ) => Promise<unknown>
+        )(params, context),
+      ).rejects.toBe(permissionError);
+    }
+  });
 });
