@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { RpcRequestContext } from "./rpc-schema";
 import {
   closeAppDatabase,
   createCronJob,
@@ -49,6 +50,19 @@ async function loadProjectProcedures(): Promise<ProjectProceduresModule> {
   return (await import(
     `./project-procedures?cron-validation=${Date.now()}`
   )) as ProjectProceduresModule;
+}
+
+function createAdminContextWithoutStepUp(): RpcRequestContext {
+  return {
+    auth: {
+      isAdmin: true,
+      sessionId: "cron-admin-session",
+      stepUpValidUntil: null,
+      userId: 1,
+      username: "admin",
+    },
+    signal: new AbortController().signal,
+  };
 }
 
 function seedCronJobs(
@@ -160,6 +174,34 @@ describe("cron procedure validation", () => {
     await expect(
       runCronNowProcedure({ cronJobId: activeCronJob.id }),
     ).rejects.toThrow("Cron job is already running.");
+  });
+
+  it("does not require recent step-up before enforcing manual-run job guards", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-no-step-up-repo-",
+    );
+    const { runCronNowProcedure } = await loadProjectProcedures();
+    const deletedCronJob = createCronJob(database, {
+      description: "Deleted no-step-up cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo no-step-up",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Deleted no-step-up cron",
+      worktreePath: repoPath,
+    });
+    softDeleteCronJob(database, deletedCronJob.id);
+
+    await expect(
+      runCronNowProcedure(
+        { cronJobId: deletedCronJob.id },
+        createAdminContextWithoutStepUp(),
+      ),
+    ).rejects.toThrow("Cannot run a deleted cron job.");
   });
 
   it("rejects invalid cron schedules before persisting them", async () => {
