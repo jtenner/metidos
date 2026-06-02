@@ -1642,6 +1642,10 @@ export class TerminalManager {
     session: TerminalSession | undefined,
     socket: TerminalSocket,
   ): session is TerminalSession {
+    // Terminal WebSockets are scoped to the authenticated session id captured
+    // during the upgrade. A socket may only attach to PTYs owned by that exact
+    // session, so an operator cannot reuse a valid WebSocket ticket/session to
+    // connect to another browser session's terminal by guessing its terminalId.
     return (
       !!session &&
       typeof socket.data.sessionId === "string" &&

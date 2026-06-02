@@ -217,7 +217,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### Terminal and PTY follow-up
 
-- [ ] I8: Review terminal socket ownership checks in `src/bun/terminal-manager.ts` (`socketCanAccessSession`). Add tests/comments proving terminal WebSockets cannot attach across sessions.
 - [ ] I11: Review `terminalOwnerSessionKeyForThread` ownership model in `src/bun/terminal-manager.ts`. Fix orphan/cross-session behavior if real; otherwise document thread-owned terminal semantics.
 
 ### Web-server share follow-up

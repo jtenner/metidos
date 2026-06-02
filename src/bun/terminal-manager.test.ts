@@ -275,6 +275,37 @@ describe("terminal websocket message validation", () => {
     ]);
   });
 
+  it("rejects terminal socket connections from a different owner session", () => {
+    const manager = new TerminalManager();
+    const closeReasons: string[] = [];
+    const sentMessages: string[] = [];
+    const socket = {
+      close: (_code: number, reason: string) => {
+        closeReasons.push(reason);
+      },
+      data: {
+        isAdmin: true,
+        sessionId: "session-2",
+        terminalId: "terminal-1",
+        userId: 7,
+        username: "metidos",
+      },
+      send: (message: string) => {
+        sentMessages.push(message);
+      },
+    };
+    addMockTerminalSession(manager, "terminal-1", []);
+
+    manager.connectSocket(socket as never);
+
+    expect(closeReasons).toEqual(["Terminal not authorized."]);
+    expect(sentMessages).toEqual([]);
+    const session = (
+      manager as unknown as { sessions: Map<string, { sockets: Set<unknown> }> }
+    ).sessions.get("terminal-1");
+    expect(session?.sockets.size).toBe(0);
+  });
+
   it("can close terminal sockets without terminating the PTY", () => {
     const manager = new TerminalManager();
     const killedSignals: Array<NodeJS.Signals | undefined> = [];
