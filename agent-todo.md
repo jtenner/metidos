@@ -341,7 +341,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Calendar and notification follow-up
 
 - [ ] H1: Review ICS text escaping in `src/bun/calendar/export.ts` with `ICAL.Component.addPropertyWithValue`. If newlines/control text can inject ICS properties, sanitize; otherwise add tests/comments proving `ical.js` escapes values safely.
-- [ ] H2: Review date parsing strictness in `src/bun/calendar/export.ts` (`parseUtcIso`). Add comments/tests for invalid and lenient date inputs.
 - [ ] H3: Review all-day date validation in `src/bun/calendar/export.ts`. Add tests/comments for invalid calendar dates and strict `YYYY-MM-DD` input.
 - [ ] H4: Review public ICS unauthenticated rate limits in `src/bun/index.ts`. If scraping risk is too high, reduce limits or add optional auth; otherwise document public-calendar information disclosure expectations.
 - [ ] H5: Review external ICS due-refresh time handling in `src/bun/calendar/ics.ts`. Add comments/tests if clock skew or timezone semantics are unclear.

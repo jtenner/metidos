@@ -13,15 +13,57 @@ import {
 import type { RpcCalendarEvent } from "./types";
 
 const STRICT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const STRICT_UTC_ISO_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/;
 const MAX_PUBLIC_CALENDAR_EXPORT_EVENTS = 5_000;
 const MAX_PUBLIC_CALENDAR_EXPORT_EXDATES_PER_EVENT = 5_000;
 const MAX_PUBLIC_CALENDAR_ICS_BYTES = 5 * 1024 * 1024;
 const TEXT_ENCODER = new TextEncoder();
 
 function parseUtcIso(value: string, context: string): ICAL.Time {
+  const match = STRICT_UTC_ISO_RE.exec(value);
+  if (!match) {
+    throw new Error(
+      `Calendar export has invalid ${context}; expected strict UTC ISO timestamp, got ${value}`,
+    );
+  }
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) {
     throw new Error(`Calendar export has invalid ${context}: ${value}`);
+  }
+  const [
+    ,
+    yearValue,
+    monthValue,
+    dayValue,
+    hourValue,
+    minuteValue,
+    secondValue,
+  ] = match;
+  const millisecondValue = match[7] ?? "0";
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const second = Number(secondValue);
+  const millisecond = Number(millisecondValue.padEnd(3, "0"));
+  // JavaScript Date parsing accepts lenient inputs and can normalize impossible
+  // dates (for example 2026-02-30). Public ICS export treats stored UTC
+  // timestamps as canonical data, so require every parsed UTC component to
+  // round-trip exactly before handing it to ical.js.
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute ||
+    date.getUTCSeconds() !== second ||
+    date.getUTCMilliseconds() !== millisecond
+  ) {
+    throw new Error(
+      `Calendar export has invalid ${context}; expected real UTC calendar date/time, got ${value}`,
+    );
   }
   return ICAL.Time.fromJSDate(date, true);
 }
