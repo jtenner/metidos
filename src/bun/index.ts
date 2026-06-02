@@ -4777,6 +4777,22 @@ process.on("unhandledRejection", (reason) => {
   void shutdownAndExit(1);
 });
 
+function formatBackendStartupFailure(error: unknown): string {
+  const errorMessage =
+    error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : String(error);
+
+  if (isAddressInUseError(error)) {
+    return [
+      `Metidos failed to start because ${SERVER_HOSTNAME}:${SERVER_PORT} is already in use.`,
+      `Stop the process using that port, choose another port with --port <port> or METIDOS_PORT=<port>, or unset METIDOS_PORT during bun run dev to allow the development fallback port.`,
+    ].join("\n");
+  }
+
+  return `Metidos failed to start: ${errorMessage}`;
+}
+
 export async function runBackendCli(): Promise<void> {
   if (SERVER_ARGS.includes(WIPE_USER_DATA_FLAG)) {
     try {
@@ -4791,7 +4807,12 @@ export async function runBackendCli(): Promise<void> {
       process.exitCode = 1;
     }
   } else {
-    await bootstrap();
+    try {
+      await bootstrap();
+    } catch (error) {
+      console.error(formatBackendStartupFailure(error));
+      await shutdownAndExit(1);
+    }
   }
 }
 
