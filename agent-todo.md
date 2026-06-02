@@ -201,9 +201,5 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### HTTP and RPC transport follow-up
 
-### Web-server share follow-up
-
-- [ ] J2: Review public share route Origin/auth expectations in `src/bun/pi/web-server/share-thread.ts` and `src/bun/index.ts`. If cross-site access can expose private hosted content, tighten cookies/tokens; otherwise document public-share threat model.
-
 ### Miscellaneous backend hardening follow-up
 

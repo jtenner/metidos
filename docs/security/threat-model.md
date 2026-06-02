@@ -198,6 +198,26 @@ Mitigations:
 - WebSocket upgrade guidance,
 - Tailscale/private-network preference for early deployments.
 
+### Public web-server share routes
+
+Risk: a shared web-server route exposes hosted Thread content to anyone who receives or steals the share URL/session, or a cross-site page attempts to claim a share token or forward browser credentials through the share proxy.
+
+Threat-model decision: `/share/open` and `/s/<thread>/<server>/...` are intentionally public share routes, not normal Local Auth routes. A claim token from the Metidos UI is exchanged once for a scoped share-session cookie; after that, route access is authorized by the share-session cookie matching the Thread and server IDs. This makes shared content available to token holders without requiring a Metidos account, so operators must treat share links as bearer-style access to the hosted content.
+
+Mitigations:
+
+- share routes bind to loopback by default and require explicit opt-in for non-loopback hosts,
+- non-loopback share hosts require public TLS mode,
+- `/share/open` accepts claim-token POSTs only from the same Origin or Referer as the share origin,
+- claim tokens are hashed in App Data and consumed into scoped, expiring share-session cookies,
+- `/s/*` routes require a valid share session whose Thread/server IDs match the route,
+- the share proxy strips Metidos share cookies, `Authorization`, API-key, proxy, hop-by-hop, and disallowed upstream response headers,
+- upstream redirects are rewritten back through the share route when they target the hosted loopback origin,
+- request bodies, response bodies, open-route attempts, upstream timeouts, and per-share concurrent proxy fetches are bounded,
+- the upstream server must prove ownership with the expected server-instance header before content is proxied.
+
+Residual risk: anyone with a valid share session can view and interact with the hosted content until the share/session expires or the operator stops the shared server. Do not use web-server shares for private content unless the share URL is distributed only to intended recipients over trusted channels.
+
 ## Residual risks
 
 - Approved plugins are still local code and may be malicious or vulnerable.
