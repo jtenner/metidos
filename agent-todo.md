@@ -212,7 +212,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Calendar and notification follow-up
 
 - [ ] H4: Review public ICS unauthenticated rate limits in `src/bun/index.ts`. If scraping risk is too high, reduce limits or add optional auth; otherwise document public-calendar information disclosure expectations.
-- [ ] H6: Review external ICS background error logging in `src/bun/index.ts` and `src/bun/calendar/ics.ts`. If persistent failures cause log spam, add backoff; otherwise document polling/logging behavior.
 
 ### Terminal and PTY follow-up
 

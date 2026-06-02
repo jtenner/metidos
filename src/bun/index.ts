@@ -3893,6 +3893,12 @@ async function runExternalIcsRefreshCycle(): Promise<void> {
   }
   externalIcsRefreshInFlight = true;
   try {
+    // refreshDueExternalIcsCalendars only returns calendars whose persisted
+    // refresh state is due. Calendar-level failures are recorded with
+    // consecutive failure counts in src/bun/calendar/ics.ts, where both the SQL
+    // due query and externalIcsCalendarIsDueForRefresh apply exponential-ish
+    // backoff. This loop can therefore log each failed due attempt for operator
+    // diagnostics without retrying/logging the same broken feed every minute.
     const results = await refreshDueExternalIcsCalendars(initAppDatabase());
     if (results.length === 0) {
       return;
