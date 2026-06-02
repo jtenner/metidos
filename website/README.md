@@ -14,6 +14,10 @@ setup and design tokens as the product UI.
 - `getting-started.html` — the static Getting Started page. It intentionally
   summarizes the canonical `INSTALLATION.md` clean-clone flow instead of
   duplicating backup, restore, troubleshooting, or remote-access details.
+- `plugins.html` — the static Plugin System v1 overview page. It explains the
+  local review-first safety model, approval flow, permissions versus Access
+  Groups, local data boundaries, and authoring entry points without adding
+  undecided hosted URLs.
 - `input.css` — the Tailwind entry: imports `tailwindcss`, imports `theme.css`,
   and scans `./**/*.html`.
 - `theme.css` — the `@theme { … }` token block copied verbatim from
@@ -50,10 +54,11 @@ python3 -m http.server -d website 8080
 
 ## Deploy
 
-It's plain static output (`index.html`, `docs.html`, `getting-started.html` + built `styles.css`), so it
-works on GitHub Pages or any static host. For GitHub Pages, either commit a built
-`styles.css` (remove the `.gitignore` entry) or run `bun run website:build` in CI
-before publishing the `website/` folder.
+It's plain static output (`index.html`, `docs.html`, `getting-started.html`,
+`plugins.html` + built `styles.css`), so it works on GitHub Pages or any static
+host. For GitHub Pages, either commit a built `styles.css` (remove the
+`.gitignore` entry) or run `bun run website:build` in CI before publishing the
+`website/` folder.
 
 ## TODO before going live
 
