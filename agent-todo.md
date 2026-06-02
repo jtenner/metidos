@@ -301,7 +301,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G17: Review scheduled cron pending-count bookkeeping in `src/bun/sidecar-cron-runner.ts`. Add tests/comments to prevent mismatch with the actual concurrency limiter.
 - [ ] G18: Review dev-port fallback and allowed-origin rebuilding in `src/bun/index.ts`. Add tests/comments for fallback port and WebSocket origin allowlist consistency.
 - [ ] G19: Review main/share port collision checks in `src/bun/index.ts`. Add comments/tests for dev fallback behavior and fixed share-worker port assumptions.
-- [ ] G20: Review base64 chat-image byte math in `src/bun/index.ts`. Add comments/tests to avoid future off-by-one cap changes.
 - [ ] G21: Review aggregate chat image payload limits in `src/bun/index.ts`. If 8 large images per message can pressure memory, lower limits or stream; otherwise document accepted desktop-app cap.
 - [ ] G22: Review `safeOutboundFetchWithTimeout` watchdog behavior in `src/bun/safe-outbound-fetch.ts`. Add tests/comments for `unref`, abort reason propagation, and timeout mapping.
 

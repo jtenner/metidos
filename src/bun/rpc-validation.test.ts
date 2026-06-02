@@ -185,12 +185,29 @@ describe("RPC request validation", () => {
       }),
     ).not.toThrow();
 
-    const maxBase64ChatImageBytes = Math.ceil((MAX_CHAT_IMAGE_BYTES * 4) / 3);
+    const maxBase64ChatImageBytes = Math.ceil(MAX_CHAT_IMAGE_BYTES / 3) * 4;
+    const exactLimitImagePayload = Buffer.from(
+      new Uint8Array(MAX_CHAT_IMAGE_BYTES),
+    ).toString("base64");
+    expect(exactLimitImagePayload).toHaveLength(maxBase64ChatImageBytes);
     expect(() =>
       validateRpcRequestParams("sendThreadMessage", {
         images: [
           {
-            data: "x".repeat(maxBase64ChatImageBytes + 1),
+            data: exactLimitImagePayload,
+            mimeType: "image/png",
+            type: "image",
+          },
+        ],
+        input: "hello",
+        threadId: 1,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateRpcRequestParams("sendThreadMessage", {
+        images: [
+          {
+            data: `${exactLimitImagePayload}A`,
             mimeType: "image/png",
             type: "image",
           },

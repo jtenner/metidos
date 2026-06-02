@@ -356,7 +356,11 @@ const EXTERNAL_ICS_REFRESH_WORKER_INTERVAL_MS = 60_000;
 export const MAX_PENDING_RPC_REQUESTS_PER_CLIENT = 64;
 export const MAX_PENDING_RPC_REQUESTS = MAX_PENDING_RPC_REQUESTS_PER_CLIENT * 6;
 export const PENDING_RPC_WARN_COUNT = MAX_PENDING_RPC_REQUESTS_PER_CLIENT / 2;
-const MAX_BASE64_CHAT_IMAGE_BYTES = Math.ceil((MAX_CHAT_IMAGE_BYTES * 4) / 3);
+// Base64 encodes each complete or partial 3-byte group as 4 characters. Use
+// ceil(bytes / 3) * 4 instead of ceil(bytes * 4 / 3) so exact-limit image
+// payloads whose byte count is not divisible by 3 still fit through RPC
+// string validation before the decoded byte-size check runs.
+const MAX_BASE64_CHAT_IMAGE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES / 3) * 4;
 export const MAX_RPC_WEBSOCKET_MESSAGE_BYTES =
   MAX_BASE64_CHAT_IMAGE_BYTES * MAX_CHAT_IMAGE_ATTACHMENTS + 1024 * 1024;
 export const MAX_THREAD_MESSAGE_INPUT_BYTES = 1024 * 1024;
