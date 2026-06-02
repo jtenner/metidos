@@ -155,7 +155,10 @@ describe("normalizeGitPath", () => {
   test("rejects lexical traversal outside the worktree", () => {
     const worktreePath = makeTempDir();
     expect(() => normalizeGitPath(worktreePath, "../secret.txt")).toThrow(
-      /Path must stay within worktree/,
+      /Path must stay within current worktree/,
+    );
+    expect(() => normalizeGitPath(worktreePath, "../secret.txt")).not.toThrow(
+      worktreePath,
     );
   });
 
@@ -174,11 +177,11 @@ describe("normalizeGitPath", () => {
 
     expect(() =>
       normalizeGitPath(worktreePath, "linked-outside/secret.txt"),
-    ).toThrow(/Path must stay within worktree/);
+    ).toThrow(/Path must stay within current worktree/);
 
     await expect(
       readWorktreeFileContentPage(worktreePath, "linked-outside/secret.txt"),
-    ).rejects.toThrow(/Path must stay within worktree/);
+    ).rejects.toThrow(/Path must stay within current worktree/);
   });
 
   test("preserves valid in-worktree paths", () => {

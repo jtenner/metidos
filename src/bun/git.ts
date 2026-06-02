@@ -868,12 +868,10 @@ function nearestExistingPath(path: string): string | null {
 function assertPathInsideWorktree(
   worktreePath: string,
   candidatePath: string,
-  originalValue: string,
+  _originalValue: string,
 ): void {
   if (pathEscapesRoot(worktreePath, candidatePath)) {
-    throw new Error(
-      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
-    );
+    throw new Error("Path must stay within current worktree.");
   }
 
   const existingPath = nearestExistingPath(candidatePath);
@@ -892,15 +890,11 @@ function assertPathInsideWorktree(
   try {
     realCandidatePath = realpathSync(existingPath);
   } catch {
-    throw new Error(
-      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
-    );
+    throw new Error("Path must stay within current worktree.");
   }
 
   if (pathEscapesRoot(realWorktreePath, realCandidatePath)) {
-    throw new Error(
-      `Path must stay within worktree ${worktreePath}: ${originalValue}`,
-    );
+    throw new Error("Path must stay within current worktree.");
   }
 }
 

@@ -15,7 +15,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 3. Security and Secret Handling
 
 - [ ] Verify security-sensitive error messages are actionable without leaking secrets or sensitive local paths. Context: `docs/security-sensitive-error-message-audit-2026-06-02.md` records a bounded 2026-06-02 high-risk grep review and fixed one raw Project path leak in `src/bun/project-store.ts`. Remaining 3-minute slices:
-  - [ ] Inspect Pi tool surfaces that intentionally echo user-supplied paths, especially web-server and git/file tools; redact or document why each is safe for the agent runtime.
   - [ ] Inspect terminal and worker startup errors that include configured executable or hosted paths; redact or document user-facing safety boundaries.
   - [ ] Inspect plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.
 

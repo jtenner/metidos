@@ -323,36 +323,30 @@ export function createPiWebServerManager(
     const workspacePath = resolve(scope.worktreePathContext);
     const absolutePath = resolve(workspacePath, trimmedPath);
     if (!pathIsWithinRoot(workspacePath, absolutePath)) {
-      throw new Error(
-        `Path is outside the current project root: ${candidatePath.trim()}`,
-      );
+      throw new Error("Path is outside the current project root.");
     }
+    const relativePath = relative(workspacePath, absolutePath).replaceAll(
+      "\\",
+      "/",
+    );
+    const displayPath = relativePath || ".";
     if (!existsSync(absolutePath)) {
-      throw new Error(`Path does not exist: ${candidatePath.trim()}`);
+      throw new Error(`Path does not exist: ${displayPath}`);
     }
 
     const realWorkspacePath = realpathSync(workspacePath);
     const realAbsolutePath = realpathSync(absolutePath);
     if (!pathIsWithinRoot(realWorkspacePath, realAbsolutePath)) {
-      throw new Error(
-        `Path is outside the current project root: ${candidatePath.trim()}`,
-      );
+      throw new Error("Path is outside the current project root.");
     }
 
     const stats = statSync(realAbsolutePath);
     if (!stats.isDirectory() && !stats.isFile()) {
-      throw new Error(
-        `Path must be a file or directory: ${candidatePath.trim()}`,
-      );
+      throw new Error(`Path must be a file or directory: ${displayPath}`);
     }
-
-    const relativePath = relative(workspacePath, absolutePath).replaceAll(
-      "\\",
-      "/",
-    );
     return {
       absolutePath,
-      displayPath: relativePath || ".",
+      displayPath,
       realWorkspacePath,
     };
   }

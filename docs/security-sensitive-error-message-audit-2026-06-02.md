@@ -30,11 +30,12 @@ grep -R "message:.*(path|Path|token|secret|key|password|Authorization)|errorMess
 
 - `src/bun/project-store.ts` now reports `Failed to upsert project record.` instead of interpolating the raw Project path in the upsert/readback failure.
 - `src/bun/auth/secret-errors.ts` now maps low-level `AuthSecretAccessError` values to a stable browser-facing `auth_secret_unavailable` message instead of forwarding the raw local `auth-secret.key` path through `AuthServiceError.message`.
+- Pi web-server tool path errors now avoid echoing outside-project absolute paths; in-project missing/type errors report only the project-relative display path.
+- Pi Git/file path containment errors now use a stable `current worktree` message instead of interpolating the raw worktree path or rejected path. Normal successful Git tool output still returns repository-relative paths and Git stderr where useful, which is acceptable inside the project-bound agent runtime because commands are scoped to the active worktree and do not include provider secrets or callback tokens.
 
 ## Remaining review slices
 
 The broad release-readiness task is not fully complete. Future slices should inspect and, where needed, fix or explicitly document:
 
-1. Pi tool surfaces that intentionally return user-supplied paths to the agent runtime, especially web-server and git/file tools.
-2. Terminal and worker startup errors that include configured executable or hosted paths.
-3. Plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.
+1. Terminal and worker startup errors that include configured executable or hosted paths.
+2. Plugin sidecar/runtime error propagation to ensure host paths, callback tokens, and provider secrets are redacted before display.

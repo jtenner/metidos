@@ -402,6 +402,15 @@ describe("createPiWebServerTools", () => {
         { cwd: worktreePath } as never,
       ),
     ).rejects.toThrow("Path is outside the current project root");
+    await expect(
+      tool.execute(
+        "call-2",
+        { path: "outside-link" } as never,
+        undefined,
+        async () => {},
+        { cwd: worktreePath } as never,
+      ),
+    ).rejects.not.toThrow(outsidePath);
   });
 
   it("rejects paths outside the current project root", async () => {
@@ -435,5 +444,14 @@ describe("createPiWebServerTools", () => {
         { cwd: worktreePath } as never,
       ),
     ).rejects.toThrow("Path is outside the current project root");
+    await expect(
+      tool.execute(
+        "call-2",
+        { path: outsidePath } as never,
+        undefined,
+        async () => {},
+        { cwd: worktreePath } as never,
+      ),
+    ).rejects.not.toThrow(outsidePath);
   });
 });
