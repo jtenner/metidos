@@ -251,6 +251,19 @@ describe("auth HTTP security helpers", () => {
     ).not.toThrow();
   });
 
+  it("rejects unequal-length CSRF tokens without throwing from comparison", () => {
+    expect(() =>
+      enforceAuthCsrfToken(
+        buildRequest("http://127.0.0.1:7599/auth/login", {
+          headers: {
+            cookie: `${AUTH_CSRF_COOKIE_NAME}=csrf-token`,
+            [AUTH_CSRF_HEADER_NAME]: "csrf-token-with-extra-bytes",
+          },
+        }),
+      ),
+    ).toThrow(RequestValidationError);
+  });
+
   it("prefers host-prefixed CSRF cookies when both names are present", () => {
     expect(() =>
       enforceAuthCsrfToken(

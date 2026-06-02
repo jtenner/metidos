@@ -18,6 +18,8 @@ export const AUTH_CSRF_HOST_COOKIE_PATH = "/";
 // origin checks plus a matching custom header, and this cookie is HttpOnly so
 // browser JavaScript cannot read it for exfiltration.
 export const AUTH_CSRF_TOKEN_MAX_AGE_SECONDS = 24 * 60 * 60;
+// Bound parsed CSRF token bytes before the digest comparison so malformed or
+// hostile Cookie headers cannot force unbounded hashing work on auth routes.
 const AUTH_CSRF_TOKEN_MAX_BYTES = 256;
 const COOKIE_VALUE_PATTERN = /^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$/u;
 

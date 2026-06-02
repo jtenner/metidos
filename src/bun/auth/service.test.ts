@@ -1145,11 +1145,15 @@ describe("auth service", () => {
     expect(secureCookie).toContain("Secure");
   });
 
-  it("rejects oversized auth CSRF cookie tokens", () => {
+  it("rejects auth CSRF cookie tokens above the byte cap", () => {
     expect(readAuthCsrfCookie(`metidos_csrf=${"x".repeat(256)}`)).toBe(
       "x".repeat(256),
     );
     expect(readAuthCsrfCookie(`metidos_csrf=${"x".repeat(257)}`)).toBeNull();
+    expect(readAuthCsrfCookie(`metidos_csrf=${"é".repeat(128)}`)).toBe(
+      "é".repeat(128),
+    );
+    expect(readAuthCsrfCookie(`metidos_csrf=${"é".repeat(129)}`)).toBeNull();
   });
 
   it("rejects cookie values that would inject additional attributes", () => {
