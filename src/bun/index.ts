@@ -373,9 +373,12 @@ export const MAX_RPC_PARAM_STRING_BYTES = 1024 * 1024;
 export const MAX_THREAD_EXTENSION_EDITOR_TEXT_BYTES = 256 * 1024;
 export const MAX_RPC_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_UNCOMPRESSED_SERVER_BINARY_FRAME_BYTES = 256 * 1024;
-// The mainview multiplexes active polling, user actions, and cancellation churn
-// through one websocket. Keep the limiter high enough for normal desktop usage
-// while pending-request capacity still bounds real server work.
+// The mainview multiplexes active polling, user actions, cancellation churn,
+// streaming thread updates, terminal coordination, and cron/worktree refreshes
+// through one authenticated local-operator websocket. The 180/s refill with a
+// two-second 360-message burst is intentionally a desktop-IDE backpressure
+// threshold, not an internet-facing abuse limit: procedure auth, payload caps,
+// pending-request capacity, and backpressure closes still bound real server work.
 const RPC_RATE_LIMIT_REFILL_PER_SECOND = 180;
 const RPC_RATE_LIMIT_BURST = 360;
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
