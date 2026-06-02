@@ -101,6 +101,33 @@ describe("auth route HTTP security", () => {
     });
   });
 
+  it("issues unauthenticated CSRF tokens with a matching cookie", async () => {
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/csrf", {
+        headers: {
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    const body = await readJson(response!);
+    expect(body.ok).toBe(true);
+    expect(typeof body.csrfToken).toBe("string");
+    expect((body.csrfToken as string).length).toBeGreaterThan(20);
+
+    const csrfCookie = response?.headers.get("set-cookie") ?? "";
+    expect(csrfCookie).toContain(`metidos_csrf=${body.csrfToken}`);
+    expect(csrfCookie).toContain("Path=/auth");
+    expect(csrfCookie).toContain("HttpOnly");
+    expect(csrfCookie).toContain("SameSite=Strict");
+    expect(csrfCookie).not.toContain("Secure");
+  });
+
   it("allows CSRF-free status reads without leaking global users", async () => {
     const response = await handleAuthRequestForTest(
       new Request("http://127.0.0.1:7599/auth/status", {
