@@ -9,6 +9,7 @@ import {
   createCronJob,
   createThread,
   createUser,
+  deleteProject,
   getCronJobById,
   initAppDatabase,
   markThreadRunStarted,
@@ -296,6 +297,98 @@ describe("cron procedure validation", () => {
     expect(getCronJobById(database, hiddenCronJob.id)).toMatchObject({
       deletedAt: null,
       title: "Hidden mutation scope cron",
+    });
+  });
+
+  it("allows a local operator to manage cron jobs outside a regular user's workspace", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-admin-hidden-scope-repo-",
+    );
+    const { listCronsProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const hiddenCronJob = createCronJob(database, {
+      description: "Admin-visible hidden scope cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo admin visible",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Admin-visible scope cron",
+      worktreePath: repoPath,
+    });
+    const adminContext = createAdminContextWithoutStepUp();
+
+    expect(
+      (await listCronsProcedure(undefined, adminContext)).map(
+        (entry) => entry.id,
+      ),
+    ).toContain(hiddenCronJob.id);
+    await expect(
+      updateCronProcedure(
+        { cronJobId: hiddenCronJob.id, title: "Admin renamed scope cron" },
+        adminContext,
+      ),
+    ).resolves.toMatchObject({
+      id: hiddenCronJob.id,
+      title: "Admin renamed scope cron",
+    });
+    await expect(
+      updateCronProcedure(
+        { cronJobId: hiddenCronJob.id, deleted: true },
+        adminContext,
+      ),
+    ).resolves.toMatchObject({
+      deletedAt: expect.any(Number),
+      id: hiddenCronJob.id,
+    });
+  });
+
+  it("hides cron jobs after their owning project is deleted", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-deleted-project-repo-",
+    );
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = createRegularContext({
+      userId: alice.id,
+      username: alice.username,
+    });
+    const { listCronsProcedure, runCronNowProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+    const deletedProjectCronJob = createCronJob(database, {
+      description: "Deleted project scope cron",
+      enabled: true,
+      model: "gpt-5.4",
+      permissions: ["metidos:threads"],
+      pluginAccessGroups: [],
+      projectId: project.id,
+      prompt: "echo deleted project",
+      reasoningEffort: "medium",
+      schedule: "0 * * * *",
+      title: "Deleted project cron",
+      worktreePath: repoPath,
+    });
+
+    deleteProject(database, project.id);
+
+    expect(
+      (await listCronsProcedure(undefined, context)).map((entry) => entry.id),
+    ).not.toContain(deletedProjectCronJob.id);
+    await expect(
+      runCronNowProcedure({ cronJobId: deletedProjectCronJob.id }, context),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
+    await expect(
+      updateCronProcedure(
+        { cronJobId: deletedProjectCronJob.id, title: "Unauthorized rename" },
+        context,
+      ),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
+    expect(getCronJobById(database, deletedProjectCronJob.id)).toMatchObject({
+      deletedAt: expect.any(Number),
+      enabled: 0,
+      title: "Deleted project cron",
     });
   });
 
