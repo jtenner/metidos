@@ -197,6 +197,37 @@ describe("project procedure workspace scoping", () => {
     expect(getThreadById(database, thread.id)).not.toBeNull();
   });
 
+  it("rejects raw thread-id reads outside the caller workspace", async () => {
+    const database = initAppDatabase();
+    const alice = createUser(database, { isAdmin: false, username: "alice" });
+    const context = regularContext({ userId: alice.id, username: "alice" });
+    const outsideDirectory = createTempDirectory();
+    const project = upsertProject(database, {
+      projectPath: outsideDirectory,
+      name: "Outside Workspace",
+    });
+    const thread = createThread(database, {
+      agentsAccess: false,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      reasoningEffort: "medium",
+      title: "Outside thread",
+      unsafeMode: false,
+      worktreePath: outsideDirectory,
+    });
+    const { getThreadProcedure, listThreadsProcedure } =
+      await loadProjectProcedures();
+
+    expect(
+      (await listThreadsProcedure(undefined, context)).map((entry) => entry.id),
+    ).not.toContain(thread.id);
+    await expect(
+      getThreadProcedure({ threadId: thread.id }, context),
+    ).rejects.toThrow(`Project not currently tracked: ${project.id}`);
+  });
+
   it("exposes app-owned projects, threads, and crons when the workspace path is visible", async () => {
     const database = initAppDatabase();
     const alice = createUser(database, { isAdmin: false, username: "alice" });

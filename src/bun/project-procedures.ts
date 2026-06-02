@@ -1933,6 +1933,9 @@ function threadById(
   if (!thread) {
     throw new Error(`Thread not found: ${threadId}`);
   }
+  // Raw thread ids are never authoritative for non-admin RPC callers. Reuse the
+  // project visibility gate so direct getThread-style reads match listThreads
+  // workspace scoping and fail closed for hidden project paths.
   projectByIdForPath(thread.projectId, context);
   return thread;
 }
