@@ -364,6 +364,102 @@ describe("auth route HTTP security", () => {
     );
   });
 
+  it("issues websocket tickets only for the current authenticated session", async () => {
+    const sessionCookie = authenticatedSessionCookie;
+    expect(sessionCookie).toBeTruthy();
+    if (!sessionCookie) {
+      throw new Error(
+        "Expected setup test to provide an authenticated session cookie",
+      );
+    }
+
+    const ticketCsrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/ws-ticket", {
+        body: JSON.stringify({}),
+        headers: buildCsrfHeaders(ticketCsrfToken, [sessionCookie]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(200);
+    const body = await readJson(response!);
+    expect(body).toMatchObject({
+      ok: true,
+      ticket: { expiresAt: expect.any(String) },
+    });
+    expect(JSON.stringify(body)).not.toContain("ticket-1");
+    const setCookie = response?.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("metidos_ws_ticket=");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain("Secure");
+  });
+
+  it("rejects unauthenticated websocket ticket requests with deterministic JSON and cleared cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/ws-ticket", {
+        body: JSON.stringify({}),
+        headers: buildCsrfHeaders(csrfToken, ["metidos_ws_ticket=stale"]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "session_required" },
+      ok: false,
+    });
+    const setCookies = readSetCookieHeaders(response);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_session=")),
+    ).toBe(true);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_ws_ticket=")),
+    ).toBe(true);
+    expect(
+      setCookies.filter((cookie) => cookie.includes("Max-Age=0")),
+    ).toHaveLength(4);
+  });
+
+  it("rejects stale websocket ticket sessions with deterministic JSON and cleared cookies", async () => {
+    const csrfToken = await issueCsrfToken();
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/ws-ticket", {
+        body: JSON.stringify({}),
+        headers: buildCsrfHeaders(csrfToken, [
+          "metidos_session=stale-session",
+          "metidos_ws_ticket=stale-ticket",
+        ]),
+        method: "POST",
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: { code: "session_required" },
+      ok: false,
+    });
+    const setCookies = readSetCookieHeaders(response);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_session=")),
+    ).toBe(true);
+    expect(
+      setCookies.some((cookie) => cookie.startsWith("metidos_ws_ticket=")),
+    ).toBe(true);
+    expect(
+      setCookies.filter((cookie) => cookie.includes("Max-Age=0")),
+    ).toHaveLength(4);
+  });
+
   it("logs out by clearing session, websocket-ticket cookies, and browser storage", async () => {
     const sessionCookie = authenticatedSessionCookie;
     expect(sessionCookie).toBeTruthy();
