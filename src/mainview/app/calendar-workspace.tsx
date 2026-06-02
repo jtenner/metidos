@@ -98,6 +98,27 @@ export function shouldCommitCalendarLoad({
   return currentRequestId === requestId;
 }
 
+export function getCalendarRangeNavigationDate({
+  anchorDate,
+  direction,
+  now = new Date(),
+  view,
+}: {
+  anchorDate: Date;
+  direction: "previous" | "today" | "next";
+  now?: Date;
+  view: CalendarViewMode;
+}): Date {
+  if (direction === "today") {
+    return now;
+  }
+  if (view === "month") {
+    return addMonthsClamped(anchorDate, direction === "previous" ? -1 : 1);
+  }
+  const dayStep = view === "week" || view === "agenda" ? 7 : 1;
+  return addDays(anchorDate, direction === "previous" ? -dayStep : dayStep);
+}
+
 export function getCalendarActionAvailability(
   permission: RpcCalendar["permission"],
 ): {
@@ -391,12 +412,33 @@ export function CalendarWorkspace({
     });
   }, []);
 
-  const focusCalendarDate = useCallback((day: Date): void => {
-    const key = toDateInputValue(day);
-    setFocusedCalendarDateValue(key);
-    pendingCalendarGridFocusRef.current = key;
-    dispatch({ type: "jump", date: startOfLocalDay(day) });
+  const jumpToCalendarDate = useCallback((day: Date): void => {
+    const localDay = startOfLocalDay(day);
+    setFocusedCalendarDateValue(toDateInputValue(localDay));
+    dispatch({ type: "jump", date: localDay });
   }, []);
+
+  const focusCalendarDate = useCallback(
+    (day: Date): void => {
+      const key = toDateInputValue(day);
+      pendingCalendarGridFocusRef.current = key;
+      jumpToCalendarDate(day);
+    },
+    [jumpToCalendarDate],
+  );
+
+  const moveCalendarRange = useCallback(
+    (direction: "previous" | "today" | "next"): void => {
+      jumpToCalendarDate(
+        getCalendarRangeNavigationDate({
+          anchorDate: state.anchorDate,
+          direction,
+          view: state.view,
+        }),
+      );
+    },
+    [jumpToCalendarDate, state.anchorDate, state.view],
+  );
 
   const handleCalendarGridKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>, day: Date): void => {
@@ -1151,13 +1193,13 @@ export function CalendarWorkspace({
             aria-label="Previous calendar range"
             buttonStyle="muted"
             iconOnly
-            onClick={() => dispatch({ type: "previous" })}
+            onClick={() => moveCalendarRange("previous")}
           >
             {materialSymbol("chevron_right", "rotate-180 text-[15px]")}
           </AppButton>
           <AppButton
             buttonStyle="secondary"
-            onClick={() => dispatch({ type: "today" })}
+            onClick={() => moveCalendarRange("today")}
           >
             <span className="font-label text-[11px] uppercase tracking-[0.1em]">
               Today
@@ -1167,7 +1209,7 @@ export function CalendarWorkspace({
             aria-label="Next calendar range"
             buttonStyle="muted"
             iconOnly
-            onClick={() => dispatch({ type: "next" })}
+            onClick={() => moveCalendarRange("next")}
           >
             {materialSymbol("chevron_right", "text-[15px]")}
           </AppButton>
@@ -1180,10 +1222,7 @@ export function CalendarWorkspace({
             name="calendar-anchor-date"
             value={toDateInputValue(state.anchorDate)}
             onChange={(event) =>
-              dispatch({
-                type: "jump",
-                date: new Date(`${event.target.value}T00:00:00`),
-              })
+              jumpToCalendarDate(new Date(`${event.target.value}T00:00:00`))
             }
           />
           <AppButton
