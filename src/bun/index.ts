@@ -5,7 +5,6 @@
 
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import type { ServerWebSocket } from "bun";
 import {
   MAX_CHAT_IMAGE_ATTACHMENTS,
@@ -69,10 +68,7 @@ import type { RpcCalendarReminderDelivery } from "./calendar/types";
 import {
   type AuthSessionRecord,
   closeAppDatabase,
-  deleteAppDatabaseFiles,
-  getAppDatabasePath,
   initAppDatabase,
-  isAppDatabaseOpen,
   stopAllActiveWebServerShares,
 } from "./db";
 import { resetLocalAppState, resolveDevFlowMode } from "./dev-flows";
@@ -284,12 +280,12 @@ import {
   resetRuntimeStats,
 } from "./runtime-stats";
 import {
-  deleteRuntimeStatsSidecarDatabaseFiles,
   type RuntimeStatsSidecar,
   startRuntimeStatsSidecar,
   TRACK_TELEMETRY_FLAG,
 } from "./runtime-stats-sidecar";
 import { handleMainviewStaticAssetRequest } from "./server/static-assets";
+import { runUserDataWipeCli } from "./user-data-wipe-cli";
 import {
   applySecurityHeaders,
   buildConfiguredBrowserOrigins,
@@ -528,7 +524,6 @@ export function normalizeRequestIdHeader(value: string | null): string | null {
 }
 
 const WIPE_USER_DATA_FLAG = "--wipe-user-data";
-const WIPE_USER_DATA_CONFIRMATION = "DELETE";
 
 const SERVER_ARGS = Bun.argv.slice(2);
 const CONFIGURED_SERVER_PORT =
@@ -595,64 +590,6 @@ function buildNormalizedAllowedWsOrigins(
     httpProxyPort: DEFAULT_HTTP_PROXY_PORT,
     httpsProxyPort: DEFAULT_HTTPS_PROXY_PORT,
   });
-}
-
-/**
- * Runs the destructive local database wipe confirmation flow.
- */
-async function runUserDataWipeCli(): Promise<boolean> {
-  // This destructive maintenance command must only run from a real terminal:
-  // stdin receives the typed confirmation and stdout shows the exact database
-  // path being wiped. Refuse piped/non-interactive execution so automation,
-  // redirected logs, or background jobs cannot accidentally confirm the wipe.
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error("The --wipe-user-data flag requires an interactive TTY.");
-  }
-
-  const databasePath = getAppDatabasePath();
-  const hadOpenAppDatabase = isAppDatabaseOpen();
-  const readlineInterface = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
-
-  try {
-    const confirmation = (
-      await readlineInterface.question(
-        [
-          `This will permanently delete all local user data stored in ${databasePath} and the optional runtime telemetry sidecar database in the same app-data directory.`,
-          `Type "${WIPE_USER_DATA_CONFIRMATION}" to continue: `,
-        ].join("\n"),
-      )
-    )
-      .trim()
-      .toUpperCase();
-
-    if (confirmation !== WIPE_USER_DATA_CONFIRMATION) {
-      console.error("User data wipe cancelled.");
-      return false;
-    }
-
-    const deletedPaths = [
-      ...deleteAppDatabaseFiles(),
-      ...deleteRuntimeStatsSidecarDatabaseFiles(),
-    ];
-    if (deletedPaths.length === 0) {
-      console.log(
-        `No local data files were present at ${databasePath} or its telemetry sidecar location.`,
-      );
-    } else {
-      console.log(`Deleted local data files: ${deletedPaths.join(", ")}`);
-    }
-
-    return true;
-  } finally {
-    readlineInterface.close();
-    if (hadOpenAppDatabase && isAppDatabaseOpen()) {
-      closeAppDatabase();
-    }
-  }
 }
 
 function buildRpcSocketDataFromSession(
