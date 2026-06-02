@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Getting started with Metidos</title>
+		<meta
+			name="description"
+			content="Install Metidos from a clean clone, complete first-run Local Auth, understand provider-free expectations, and start with the canonical repository docs."
+		/>
+		<meta name="theme-color" content="#0a0b0c" />
+		<meta name="color-scheme" content="dark" />
+
+		<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+		<link rel="manifest" href="./site.webmanifest" />
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body class="min-h-screen bg-bg-app text-text-primary font-sans antialiased">
+		<a
+			href="#main"
+			class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-border-strong focus:bg-surface-2 focus:px-3 focus:py-2 focus:text-sm focus:text-text-primary focus:outline-none focus:ring-2 focus:ring-focus-ring"
+		>
+			Skip to content
+		</a>
+
+		<header class="sticky top-0 z-40 border-b border-border-subtle bg-bg-app/90 backdrop-blur">
+			<div class="mx-auto flex h-14 max-w-[1180px] items-center gap-4 px-4 sm:px-6">
+				<a href="./index.html" class="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
+					<img src="./bird.png" alt="" width="28" height="28" class="site-logo shrink-0" aria-hidden="true" />
+					<span class="text-[15px] font-bold tracking-tight">Metidos</span>
+				</a>
+				<nav class="ml-auto flex items-center gap-2" aria-label="Primary">
+					<a href="./index.html" class="inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium text-text-muted outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring">Home</a>
+					<a href="./getting-started.html" aria-current="page" class="inline-flex h-8 items-center rounded-md border border-border-strong bg-surface-2 px-3 text-[13px] font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">Getting started</a>
+					<a href="./docs.html" class="inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium text-text-muted outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring">Docs</a>
+					<a href="https://github.com/jtenner/metidos" class="inline-flex h-8 items-center rounded-md border border-border-strong bg-surface-2 px-3 text-[13px] font-medium text-text-secondary outline-none hover:bg-hover-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring">GitHub</a>
+				</nav>
+			</div>
+		</header>
+
+		<main id="main">
+			<section class="border-b border-border-subtle">
+				<div class="site-band mx-auto max-w-[1180px] px-4 sm:px-6">
+					<p class="eyebrow">Getting started</p>
+					<h1 class="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">
+						Run Metidos locally from a clean clone.
+					</h1>
+					<p class="mt-4 max-w-2xl text-[15px] leading-relaxed text-text-muted">
+						This page summarizes the documented setup path only. Use it to orient yourself, then follow the canonical installation guide for exact commands, troubleshooting, backup, restore, and remote-access details.
+					</p>
+					<div class="mt-7 flex flex-wrap items-center gap-3">
+						<a href="https://github.com/jtenner/metidos/blob/main/INSTALLATION.md" class="inline-flex h-9 items-center rounded-md bg-text-primary px-4 text-[14px] font-semibold text-bg-app outline-none hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-focus-ring">Open full install guide</a>
+						<a href="./docs.html" class="inline-flex h-9 items-center rounded-md border border-border-strong bg-surface-2 px-4 text-[14px] font-medium text-text-secondary outline-none hover:bg-hover-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus-ring">Browse docs</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="border-b border-border-subtle">
+				<div class="mx-auto grid max-w-[1180px] gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+					<div>
+						<p class="eyebrow">Prerequisites</p>
+						<h2 class="mt-3 text-2xl font-extrabold tracking-tight">Install the basics first.</h2>
+						<p class="mt-3 text-[14px] leading-relaxed text-text-muted">
+							Metidos is an operator-owned local app. Start with a clean checkout and do not copy private runtime state from another machine.
+						</p>
+					</div>
+					<ul class="space-y-3 text-[15px] leading-relaxed text-text-muted">
+						<li class="flex gap-3"><span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-accent" aria-hidden="true"></span><span>Git, a modern browser, and the Bun version declared in <code class="font-mono text-text-secondary">package.json</code>.</span></li>
+						<li class="flex gap-3"><span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-accent" aria-hidden="true"></span><span>A private <code class="font-mono text-text-secondary">.env</code> copied from <code class="font-mono text-text-secondary">.env.example</code>; keep secrets out of commits, screenshots, logs, and issues.</span></li>
+						<li class="flex gap-3"><span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-accent" aria-hidden="true"></span><span>A model provider credential or approved local/private provider is required for real agent turns. The UI can open before a provider is configured.</span></li>
+					</ul>
+				</div>
+			</section>
+
+			<section class="border-b border-border-subtle bg-bg-app-elevated">
+				<div class="mx-auto grid max-w-[1180px] gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+					<div>
+						<p class="eyebrow">Clean clone path</p>
+						<h2 class="mt-3 text-2xl font-extrabold tracking-tight">Install, start, authenticate.</h2>
+						<p class="mt-3 text-[14px] leading-relaxed text-text-muted">
+							Use the full install guide when running these commands so you can check the current Bun requirement, app-data guidance, and troubleshooting notes.
+						</p>
+					</div>
+					<ol class="space-y-4 text-[15px] leading-relaxed text-text-muted">
+						<li><span class="font-semibold text-text-secondary">1. Clone and install:</span> clone the repository, enter it, then run <code class="font-mono text-text-secondary">bun install --frozen-lockfile</code>.</li>
+						<li><span class="font-semibold text-text-secondary">2. Configure locally:</span> copy <code class="font-mono text-text-secondary">.env.example</code> to <code class="font-mono text-text-secondary">.env</code> and keep provider keys or app-data paths private.</li>
+						<li><span class="font-semibold text-text-secondary">3. Start Metidos:</span> run <code class="font-mono text-text-secondary">bun run start</code> for a production-style local checkout, or <code class="font-mono text-text-secondary">bun run dev</code> while developing the app.</li>
+						<li><span class="font-semibold text-text-secondary">4. Complete Local Auth:</span> open the printed localhost URL, configure the first local operator login, and save recovery codes privately.</li>
+					</ol>
+				</div>
+			</section>
+
+			<section class="border-b border-border-subtle">
+				<div class="mx-auto grid max-w-[1180px] gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+					<div>
+						<p class="eyebrow">First safe workspace</p>
+						<h2 class="mt-3 text-2xl font-extrabold tracking-tight">Add a project before scheduling agents.</h2>
+						<p class="mt-3 text-[14px] leading-relaxed text-text-muted">
+							Keep the first run conservative: no private screenshots, no broad permissions, and no cron job until an interactive thread works.
+						</p>
+					</div>
+					<ul class="divide-y divide-border-subtle border-y border-border-subtle">
+						<li class="py-4"><span class="block text-[15px] font-semibold text-text-secondary">Configure a provider</span><span class="mt-1 block text-[13px] leading-relaxed text-text-muted">Use Settings, environment variables, or an approved plugin-backed provider. Provider-free sessions should show setup guidance but cannot run model-backed turns.</span></li>
+						<li class="py-4"><span class="block text-[15px] font-semibold text-text-secondary">Open a Project and Worktree</span><span class="mt-1 block text-[13px] leading-relaxed text-text-muted">Confirm the displayed path is the disposable or intended checkout before starting agent work.</span></li>
+						<li class="py-4"><span class="block text-[15px] font-semibold text-text-secondary">Start a safe Thread</span><span class="mt-1 block text-[13px] leading-relaxed text-text-muted">Leave Unsafe Mode off and begin with a read-only request, such as asking Metidos to summarize test commands without editing files.</span></li>
+						<li class="py-4"><span class="block text-[15px] font-semibold text-text-secondary">Review Diffs</span><span class="mt-1 block text-[13px] leading-relaxed text-text-muted">If files change, review added, modified, deleted, renamed, and binary entries before keeping or committing anything.</span></li>
+					</ul>
+				</div>
+			</section>
+		</main>
+
+		<footer>
+			<div class="mx-auto flex max-w-[1180px] flex-col items-start justify-between gap-3 px-4 py-8 text-[12px] text-text-faint sm:flex-row sm:items-center sm:px-6">
+				<p><span class="font-semibold text-text-muted">Metidos</span> — getting started from documented, public-safe setup only.</p>
+				<nav class="flex flex-wrap items-center gap-x-5 gap-y-2" aria-label="Footer">
+					<a class="hover:text-text-muted" href="./index.html">Home</a>
+					<a class="hover:text-text-muted" href="./docs.html">Docs</a>
+					<a class="hover:text-text-muted" href="https://github.com/jtenner/metidos">GitHub</a>
+					<a class="hover:text-text-muted" href="https://github.com/jtenner/metidos/blob/main/INSTALLATION.md">Install guide</a>
+					<span>Apache-2.0</span>
+				</nav>
+			</div>
+		</footer>
+	</body>
+</html>
