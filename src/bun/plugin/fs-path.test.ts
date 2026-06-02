@@ -281,8 +281,24 @@ describe("plugin fs virtual path resolver", () => {
     });
   });
 
-  it("denies plugin source and manifest access through ./ roots", async () => {
+  it("denies plugin source through ./ roots but permits plugin data with source-like filenames", async () => {
     const { pluginPath } = createPluginFixture();
+    writeFileSync(
+      join(pluginPath, ".data", "metidos-plugin.json"),
+      '{"data":true}\n',
+    );
+
+    await expect(
+      resolvePluginFsVirtualPath({
+        pluginPath,
+        projectRootPath: pluginPath,
+        virtualPath: "~/metidos-plugin.json",
+      }),
+    ).resolves.toMatchObject({
+      absolutePath: join(pluginPath, ".data", "metidos-plugin.json"),
+      rootKind: "pluginData",
+      virtualPath: "~/metidos-plugin.json",
+    });
 
     const manifestAccess = await expectPluginFsPathError(
       resolvePluginFsVirtualPath({

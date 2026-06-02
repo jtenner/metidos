@@ -326,6 +326,10 @@ async function assertOutsidePluginSource(input: {
   virtualPath: string;
 }): Promise<void> {
   if (input.rootKind === "pluginData") {
+    // Plugin data lives under the plugin installation directory but is the
+    // plugin's private mutable storage, not shipped source. Source denial is
+    // intentionally scoped to ./ project/thread roots so a project root cannot
+    // point at the plugin folder and read manifests or entrypoints.
     return;
   }
 
