@@ -228,7 +228,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] A9: Deduplicate or clarify `rethrowAuthSecretError` behavior across `src/bun/auth/service-login.ts`, `src/bun/auth/service-session.ts`, and `src/bun/auth/reset.ts`. If unknown auth-secret failures produce confusing 500s, map them to stable auth errors.
 - [ ] A13: Review lockout audit ordering in `src/bun/auth/service-core.ts` (`recordInvalidAuthAttempt` and `incrementFailedAttempts`). If the triggering failed attempt is mislabeled, fix audit events; otherwise add tests/comments explaining lockout event semantics.
 - [ ] A14: Review shared lockout counter for primary-factor, TOTP, and recovery-code failures in `src/bun/auth/service-core.ts` and `src/bun/auth/service-login.ts`. If it creates bad UX or security ambiguity, split counters; otherwise document that all auth proof failures intentionally share one lockout.
-- [ ] A15: Review TOTP replay-window and last-used-counter comments in `src/bun/auth/index.ts` and `src/bun/db.ts`. Add or update comments/tests proving replay rejection is compare-and-swap safe.
 
 ### Authorization and capability follow-up
 
