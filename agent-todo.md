@@ -19,9 +19,8 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 3. Security and Secret Handling
 
-- [ ] Run a full working-tree secret scan using at least one dedicated tool and review every finding.
 - [ ] Run a full Git-history secret scan before publishing the repository and decide whether history rewrite is required.
-- [ ] Rotate any exposed, suspicious, stale, or unverifiable credentials found during the audit, even if they appear unused.
+- [ ] Rotate any exposed, suspicious, stale, or unverifiable credentials found during the audit, even if they appear unused. Context: the 2026-06-02 working-tree Secretlint scan in `docs/working-tree-secret-scan-2026-06-02.md` found only intentional fake test credentials and did not require rotation; revisit this after Git-history and any additional secret audits.
 - [ ] Add or improve tests around sensitive settings redaction.
 - [ ] Add or improve tests around plugin permission enforcement.
 - [ ] Add or improve tests around filesystem path validation, denied paths, symlink handling, and traversal attempts.
