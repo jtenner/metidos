@@ -318,7 +318,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] F11: Review handling for `0.0.0.0` and reserved IPv4 ranges in `src/bun/outbound-url-security.ts`. Add tests/comments as needed.
 - [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.
 - [ ] F13: Review textual response detection in `src/bun/plugin/fetch.ts`. Add tests/comments for UTF-8 fatal decode and binary fallback.
-- [ ] F14: Review blocked fetch request headers in `src/bun/plugin/fetch.ts`. Add a test/comment proving ambient auth headers including `Cookie2` and proxy auth are blocked.
 - [ ] F15: Review blocked WebSocket request headers in `src/bun/plugin/websocket.ts`. Add tests/comments for Origin and Sec-WebSocket header denial.
 - [ ] F16: Review plugin WebSocket DNS-hostname denial in `src/bun/plugin/websocket.ts`. If this is intentional until DNS-pinned dialing exists, add docs/comment; otherwise implement safe DNS pinning.
 - [ ] F17: Review Bun WebSocket constructor options in `src/bun/plugin/websocket.ts`. If header/protocol behavior is runtime-dependent, add compatibility tests or normalize options.

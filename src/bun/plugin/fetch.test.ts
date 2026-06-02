@@ -228,7 +228,12 @@ describe("executePluginFetch", () => {
     expect(seenHeaders).toEqual([""]);
   });
 
-  it("blocks dangerous request headers before sending the request", async () => {
+  it.each([
+    "Cookie",
+    "Cookie2",
+    "Proxy-Authenticate",
+    "Proxy-Authorization",
+  ])("blocks dangerous request header %s before sending the request", async (headerName) => {
     let requestReachedServer = false;
     const server = startServer(() => {
       requestReachedServer = true;
@@ -242,7 +247,9 @@ describe("executePluginFetch", () => {
           network: { allow: [url], enforceHttps: false },
           permissions: ["network:fetch"],
         },
-        options: { headers: { Cookie: "secret", "x-plugin-test": "yes" } },
+        options: {
+          headers: { [headerName]: "secret", "x-plugin-test": "yes" },
+        },
         url,
       }),
     ).rejects.toMatchObject({ code: "blocked_request_header" });
