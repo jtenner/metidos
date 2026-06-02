@@ -98,6 +98,27 @@ Recommended clean-clone handling:
 
 The clean-clone result log should state that watch/start scripts are long-running by design and that a timeout is expected after readiness is observed. A timeout before readiness, or any startup error, should be recorded as a failure with the observed logs.
 
+## Clean checkout Getdown script smoke run
+
+On 2026-06-02, the documented nested Getdown package scripts were smoke-run from a disposable detached Git worktree at `.tmp/getdown-smoke`, with dependencies installed only inside `src/mainview/getdown/` from its checked-in `bun.lock`.
+
+Environment:
+
+- OS: Debian GNU/Linux 13 (trixie)
+- Kernel: Linux 6.12.90+deb13.1-amd64 x86_64 GNU/Linux
+- Bun: 1.3.13
+- Checkout: detached `HEAD` at `c013a07`
+- Working directory for commands: `src/mainview/getdown/`
+
+Commands and outcomes:
+
+- `bun install --frozen-lockfile` passed and installed 11 package dependencies from the nested lockfile.
+- `bun test` passed: 341 tests across 2 files, 0 failures, 427 assertions.
+- `bun run typecheck` passed: `tsc --noEmit` completed without diagnostics.
+- `bun run perf:baseline` passed and printed the bounded Getdown internal performance baseline table. No baseline artifact was saved.
+
+This covered the documented `bun test`, `bun run typecheck`, and bounded performance baseline path for the nested package from a disposable checkout. It did not run `bun run perf:baseline:save`, because that command intentionally creates a timestamped JSON snapshot under `perf/baselines/` and is only needed when updating stored performance data.
+
 ## Remaining follow-up
 
-This audit verified that referenced package-script names exist and now includes a current-checkout smoke run for representative root scripts. It has not executed every referenced script from a clean clone, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should smoke-run representative documented commands in a clean setup and record exact outcomes, using the bounded handling above for long-running watch/start scripts.
+This audit verified that referenced package-script names exist, includes a current-checkout smoke run for representative root scripts, and includes a clean-checkout smoke run for the nested Getdown scripts. It has not executed every referenced root script from a clean clone, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should smoke-run representative documented root commands in a clean setup and record exact outcomes, using the bounded handling above for long-running watch/start scripts.
