@@ -17,6 +17,7 @@ This directory contains the public operator and contributor documentation for Me
 - [RPC](./rpc.md) — typed WebSocket contract, auth/session behavior, request expectations, and errors.
 - [Cron jobs](./cron.md) — scheduled agent jobs, run-now, disabling, deletion, failures, and plugin interactions.
 - [Performance validation](./performance-validation.md) — repeatable local runtime and bounded-tool checks for performance-sensitive changes.
+- [Manual QA checklist](./manual-qa-checklist.md) — end-to-end install, auth, provider, project, thread, diff, cron, plugin, settings, and diagnostics checks.
 
 ## Configuration and safety
 
