@@ -36,6 +36,7 @@ The inventory below covers only assets tracked by Git. Dependency assets under i
 
 ## Recommended follow-up
 
-1. Ask the maintainer to confirm whether the shared bird mascot at `bird.png` and `website/bird.png` is repo-owned or otherwise redistributable. Record the creator/source, creation date if known, license or assignment status, redistribution approval, and whether the website still needs a self-contained duplicate.
-2. Add a durable provenance note for repo-owned artwork (`bird.png`, `website/bird.png`, `src/mainview/pixel-crown.png`) that names the creator/source, creation date if known, license or assignment status, redistribution approval, and why both bird copies are needed if both remain tracked.
-3. Re-run the `git ls-files` inventory after any asset additions or removals.
+1. Send or answer the maintainer confirmation questions drafted in `docs/artwork-provenance-maintainer-request-2026-06-02.md` for the shared bird mascot at `bird.png` / `website/bird.png` and the app artwork at `src/mainview/pixel-crown.png`.
+2. Record the creator/source, creation date if known, license or assignment status, redistribution approval, and whether the website still needs a self-contained bird duplicate.
+3. Add a durable provenance note for repo-owned artwork (`bird.png`, `website/bird.png`, `src/mainview/pixel-crown.png`) that names the creator/source, creation date if known, license or assignment status, redistribution approval, and why both bird copies are needed if both remain tracked.
+4. Re-run the `git ls-files` inventory after any asset additions or removals.
