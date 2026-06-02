@@ -77,11 +77,12 @@ afterEach(() => {
 });
 
 describe("terminal project procedures", () => {
-  it("rejects unauthenticated list, create, and close calls before reading app data", async () => {
+  it("rejects unauthenticated list, create, rename, and close calls before reading app data", async () => {
     const {
       closeTerminalProcedure,
       createTerminalProcedure,
       listTerminalsProcedure,
+      renameTerminalProcedure,
     } = await loadProjectProcedures();
     const unauthenticated = context({
       isAdmin: false,
@@ -100,15 +101,22 @@ describe("terminal project procedures", () => {
       ),
     ).rejects.toMatchObject({ code: "admin_required" });
     await expect(
+      renameTerminalProcedure(
+        { terminalId: "terminal-1", title: "Renamed" },
+        unauthenticated,
+      ),
+    ).rejects.toMatchObject({ code: "admin_required" });
+    await expect(
       closeTerminalProcedure({ terminalId: "terminal-1" }, unauthenticated),
     ).rejects.toMatchObject({ code: "admin_required" });
   });
 
-  it("rejects non-admin local operators for list, create, and close terminal flows", async () => {
+  it("rejects non-admin local operators for list, create, rename, and close terminal flows", async () => {
     const {
       closeTerminalProcedure,
       createTerminalProcedure,
       listTerminalsProcedure,
+      renameTerminalProcedure,
     } = await loadProjectProcedures();
     const nonAdmin = context({ isAdmin: false });
 
@@ -118,6 +126,12 @@ describe("terminal project procedures", () => {
     await expect(
       createTerminalProcedure(
         { projectId: 1, worktreePath: createTempDirectory() },
+        nonAdmin,
+      ),
+    ).rejects.toMatchObject({ code: "admin_required" });
+    await expect(
+      renameTerminalProcedure(
+        { terminalId: "terminal-1", title: "Renamed" },
         nonAdmin,
       ),
     ).rejects.toMatchObject({ code: "admin_required" });
