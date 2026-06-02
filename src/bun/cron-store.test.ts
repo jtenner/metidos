@@ -150,6 +150,34 @@ describe("cron store", () => {
     }
   });
 
+  it("treats stale completed or errored last-run metadata as due while blocking stale in-progress metadata", () => {
+    const database = createTestDatabase();
+    try {
+      const store = createBoundCronStore(database);
+      const staleCompletedCron = createCron(database, "stale-completed");
+      const staleErroredCron = createCron(database, "stale-errored");
+      const staleInProgressCron = createCron(database, "stale-in-progress");
+      const freshCompletedCron = createCron(database, "fresh-completed");
+
+      updateCronJobLastRun(database, staleCompletedCron.id, 1_000, "Completed");
+      updateCronJobLastRun(database, staleErroredCron.id, 1_000, "Errored");
+      updateCronJobLastRun(
+        database,
+        staleInProgressCron.id,
+        1_000,
+        "InProgress",
+      );
+      updateCronJobLastRun(database, freshCompletedCron.id, 2_000, "Completed");
+
+      expect(store.listDueScheduledJobIds("0 0 * * *", 1_500)).toEqual([
+        staleCompletedCron.id,
+        staleErroredCron.id,
+      ]);
+    } finally {
+      database.close(false);
+    }
+  });
+
   it("claims scheduled runs only for eligible due jobs and returns job metadata", () => {
     const database = createTestDatabase();
     try {
