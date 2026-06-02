@@ -15,6 +15,12 @@ import type { RpcExternalIcsCalendar } from "../../bun/calendar/types";
 import { AppButton } from "../controls/button";
 import { ConfirmDialog } from "../controls/confirm-dialog";
 import { materialSymbol } from "../controls/icons";
+import {
+  AppCheckboxInput,
+  AppColorInput,
+  AppSelectInput,
+  AppTextInput,
+} from "../controls/input";
 import { ModalDialogSurface } from "../controls/popover";
 
 const REFRESH_INTERVAL_OPTIONS = [
@@ -195,9 +201,8 @@ export function CalendarIcsEditDialog({
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 Title
               </span>
-              <input
+              <AppTextInput
                 aria-label="Calendar title"
-                className="h-8 w-full border border-border-default bg-surface-2 px-2 text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                 disabled={busy}
                 name="calendar-ics-title"
                 onChange={(event) => setTitle(event.currentTarget.value)}
@@ -209,12 +214,12 @@ export function CalendarIcsEditDialog({
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 URL
               </span>
-              <input
+              <AppTextInput
                 aria-label="Calendar URL"
                 autoCapitalize="none"
                 autoCorrect="off"
-                className="h-8 w-full border border-border-default bg-surface-2 px-2 font-mono text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                 disabled={busy}
+                monospace
                 name="calendar-ics-url"
                 onChange={(event) => setUrl(event.currentTarget.value)}
                 spellCheck={false}
@@ -226,8 +231,7 @@ export function CalendarIcsEditDialog({
                 <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                   Refresh
                 </span>
-                <select
-                  className="h-8 w-full border border-border-default bg-surface-2 px-2 text-xs text-text-secondary outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+                <AppSelectInput
                   disabled={busy}
                   name="calendar-ics-refresh-interval"
                   onChange={(event) =>
@@ -240,26 +244,24 @@ export function CalendarIcsEditDialog({
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </AppSelectInput>
               </label>
               <label className="flex items-center gap-2">
                 <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                   Color
                 </span>
-                <input
+                <AppColorInput
                   aria-label="Calendar color"
-                  className="h-8 w-14 border border-border-default bg-surface-2 p-1 outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
                   disabled={busy}
                   name="calendar-ics-color"
                   onChange={(event) => setColor(event.currentTarget.value)}
-                  type="color"
                   value={color}
                 />
               </label>
             </div>
             <div className="space-y-2 border-t border-border-subtle pt-3 text-xs text-text-secondary">
               <label className="flex items-center gap-2">
-                <input
+                <AppCheckboxInput
                   aria-label="Enable notifications"
                   checked={notificationsEnabled}
                   disabled={busy}
@@ -271,12 +273,11 @@ export function CalendarIcsEditDialog({
                       setSourceNotificationsEnabled(false);
                     }
                   }}
-                  type="checkbox"
                 />
                 Enable Notifications
               </label>
               <label className="flex items-center gap-2">
-                <input
+                <AppCheckboxInput
                   aria-label="Notify source attendees"
                   checked={sourceNotificationsEnabled}
                   disabled={busy || !notificationsEnabled}
@@ -284,7 +285,6 @@ export function CalendarIcsEditDialog({
                   onChange={(event) =>
                     setSourceNotificationsEnabled(event.currentTarget.checked)
                   }
-                  type="checkbox"
                 />
                 <span
                   className={
