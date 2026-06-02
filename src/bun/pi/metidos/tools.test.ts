@@ -1047,6 +1047,7 @@ describe("createPiMetidosTools", () => {
     const authError = new AuthServiceError(
       "session_required",
       "A valid authenticated session is required for calendar access.",
+      401,
     );
     const host = createHost({
       createCalendarEvent: async () => {
@@ -1106,6 +1107,56 @@ describe("createPiMetidosTools", () => {
         );
       }
     }
+  });
+
+  it("surfaces calendar permission failures from Pi-native calendar host callbacks", async () => {
+    const scope = makeScope({ calendarAccessEnabled: true });
+    const readPermissionError = new Error("Calendar not found or not visible.");
+    const writePermissionError = new Error(
+      "Calendar event not found or not writable.",
+    );
+    const host = createHost({
+      createCalendarEvent: async () => {
+        throw writePermissionError;
+      },
+      getCalendarBootstrap: async () => ({
+        calendars: [],
+        externalCalendars: [],
+      }),
+      listCalendarOccurrences: async () => {
+        throw readPermissionError;
+      },
+      updateCalendarEvent: async () => {
+        throw writePermissionError;
+      },
+    });
+
+    await expect(
+      executeTool(scope, host, "list_calendar_events", {
+        end: "2026-04-30T23:59:59.000Z",
+        start: "2026-04-30T00:00:00.000Z",
+      }),
+    ).rejects.toBe(readPermissionError);
+    await expect(
+      executeTool(scope, host, "show_calendar_event", {
+        occurrenceId: "local:22:2026-04-30T14:00:00.000Z",
+      }),
+    ).rejects.toBe(readPermissionError);
+    await expect(
+      executeTool(scope, host, "new_calendar_event", {
+        calendarId: 1,
+        endAt: "2026-04-30T14:30:00.000Z",
+        startAt: "2026-04-30T14:00:00.000Z",
+        timezone: "America/New_York",
+        title: "Planning",
+      }),
+    ).rejects.toBe(writePermissionError);
+    await expect(
+      executeTool(scope, host, "modify_calendar_event", {
+        eventId: 22,
+        title: "Planning updated",
+      }),
+    ).rejects.toBe(writePermissionError);
   });
 
   it("creates and starts a new safe child thread immediately from a safe thread", async () => {
