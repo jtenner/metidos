@@ -729,6 +729,24 @@ describe("executePluginQuickJsRuntime", () => {
     });
   });
 
+  it("rejects OAuth provider registration without oauth:register at runtime", async () => {
+    await expect(
+      buildAndRunPlugin(`
+        import { definePlugin } from "@metidos/plugin-api";
+        export default definePlugin((metidos) => {
+          metidos.oauth.registerProvider({
+            id: "github",
+            provider: "github-copilot",
+            timeoutMs: 5000,
+            refresh(credentials) {
+              return credentials;
+            },
+          });
+        });
+      `),
+    ).rejects.toThrow("metidos.oauth.registerProvider requires oauth:register");
+  });
+
   it("invokes registered agent tool callbacks while the runtime remains active", async () => {
     const pluginRoot = createTempDirectory("metidos-plugin-quickjs-callback-");
     writePluginFile(

@@ -130,6 +130,29 @@ function pluginWithModelProviders(
   } as unknown as RpcPluginInventoryPlugin;
 }
 
+function pluginWithOAuthProviders(
+  permissions = ["oauth:register"],
+  ...providers: string[]
+): RpcPluginInventoryPlugin {
+  return {
+    pluginId: "alpha_plugin",
+    manifest: {
+      access: [],
+      crons: [],
+      gc: null,
+      notificationProviders: [],
+      oauthProviders: providers.map((id) => ({
+        description: "Import OAuth credentials from test endpoints.",
+        id,
+        name: id,
+        timeoutMs: 5_000,
+      })),
+      permissions,
+      providers: [],
+    },
+  } as unknown as RpcPluginInventoryPlugin;
+}
+
 function toolRegistration(tool: string) {
   return {
     actionHandle: "tool:action:2",
@@ -178,6 +201,16 @@ function modelProviderRegistration(
   return {
     configurations,
     id,
+    timeoutMs: 5_000,
+  };
+}
+
+function oauthProviderRegistration(id: string) {
+  return {
+    id,
+    importCredentialsHandle: `oauth:import:${id}`,
+    provider: id,
+    refreshHandle: `oauth:refresh:${id}`,
     timeoutMs: 5_000,
   };
 }
@@ -620,6 +653,30 @@ describe("validatePluginStartupRegistrations", () => {
     expect(registrations.notificationProviders).toEqual([
       notificationProviderRegistration("ntfy"),
     ]);
+  });
+
+  it("accepts manifest-declared OAuth provider registrations", () => {
+    const registrations = validatePluginStartupRegistrations(
+      {
+        oauthProviders: [oauthProviderRegistration("github")],
+      },
+      pluginWithOAuthProviders(["oauth:register"], "github"),
+    );
+
+    expect(registrations.oauthProviders).toEqual([
+      oauthProviderRegistration("github"),
+    ]);
+  });
+
+  it("rejects OAuth provider registrations without permission", () => {
+    expect(() =>
+      validatePluginStartupRegistrations(
+        {
+          oauthProviders: [oauthProviderRegistration("github")],
+        },
+        pluginWithOAuthProviders([], "github"),
+      ),
+    ).toThrow("oauthProviders requires oauth:register");
   });
 
   it("rejects notification provider registrations without permission", () => {

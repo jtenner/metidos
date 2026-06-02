@@ -680,6 +680,20 @@ describe("plugin manifest schema alignment", () => {
         typedIssueCodes: ["missing_required_permission"],
       },
       {
+        name: "OAuth provider without permission",
+        manifest: baseManifest({
+          oauthProviders: [
+            {
+              id: "oauth",
+              name: "OAuth",
+              description: "Registers OAuth credentials.",
+              timeoutMs: 30000,
+            },
+          ],
+        }),
+        typedIssueCodes: ["missing_required_permission"],
+      },
+      {
         name: "codex auth file without storage read",
         manifest: baseManifest({
           env: [{ key: "CODEX_AUTH_JSON_PATH" }],
