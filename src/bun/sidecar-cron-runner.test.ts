@@ -547,6 +547,174 @@ describe("sidecar cron runner", () => {
     }
   });
 
+  it("marks cron runs errored before thread creation when prompt validation fails", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    resetRuntimeStats();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-empty-prompt-repo-");
+    const project = upsertProject(database, {
+      name: "Cron Empty Prompt Repo",
+      projectPath: repoPath,
+    });
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Empty prompt failure",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "   ",
+      reasoningEffort: "medium",
+      schedule: "*/19 * * * *",
+      title: "Empty Prompt Cron",
+      worktreePath: repoPath,
+    });
+    let createThreadCalls = 0;
+    const host: CronThreadExecutionHost = {
+      async createThread() {
+        createThreadCalls += 1;
+        throw new Error("createThread should not run for an empty prompt.");
+      },
+      async sendThreadMessage() {
+        throw new Error(
+          "sendThreadMessage should not run for an empty prompt.",
+        );
+      },
+    };
+
+    const threadId = await runner.runCronJobById(cronJob.id, Date.now(), host);
+
+    expect(threadId).toBeNull();
+    expect(createThreadCalls).toBe(0);
+    expect(listCronJobRuns(database, cronJob.id)).toHaveLength(0);
+    expect(getCronJobById(database, cronJob.id)?.lastRunStatus).toBe("Errored");
+    expect(getRuntimeStatsSummary().cron).toMatchObject({
+      activeRuns: 0,
+      erroredRuns: 1,
+      startedRuns: 1,
+    });
+  });
+
+  it("marks cron runs errored when thread creation fails", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    resetRuntimeStats();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-create-failure-repo-");
+    const project = upsertProject(database, {
+      name: "Cron Create Failure Repo",
+      projectPath: repoPath,
+    });
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Thread creation failure",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "fail while creating the child thread",
+      reasoningEffort: "medium",
+      schedule: "*/23 * * * *",
+      title: "Thread Create Failure Cron",
+      worktreePath: repoPath,
+    });
+    let sendCalls = 0;
+    const host: CronThreadExecutionHost = {
+      async createThread() {
+        throw new Error("forced child thread creation failure");
+      },
+      async sendThreadMessage() {
+        sendCalls += 1;
+        throw new Error("sendThreadMessage should not run without a thread.");
+      },
+    };
+
+    const threadId = await runner.runCronJobById(cronJob.id, Date.now(), host);
+
+    expect(threadId).toBeNull();
+    expect(sendCalls).toBe(0);
+    expect(listCronJobRuns(database, cronJob.id)).toHaveLength(0);
+    expect(getCronJobById(database, cronJob.id)?.lastRunStatus).toBe("Errored");
+    expect(getRuntimeStatsSummary().cron).toMatchObject({
+      activeRuns: 0,
+      erroredRuns: 1,
+      startedRuns: 1,
+    });
+  });
+
+  it("marks cron runs errored when queuing runtime execution fails", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    resetRuntimeStats();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-send-failure-repo-");
+    const project = upsertProject(database, {
+      name: "Cron Send Failure Repo",
+      projectPath: repoPath,
+    });
+    const cronJob = createCronJob(database, {
+      agentsAccess: false,
+      description: "Runtime queue failure",
+      enabled: true,
+      githubAccess: false,
+      metidosAccess: true,
+      model: "gpt-5.4",
+      projectId: project.id,
+      prompt: "fail while queuing cron prompt",
+      reasoningEffort: "medium",
+      schedule: "*/29 * * * *",
+      title: "Runtime Queue Failure Cron",
+      worktreePath: repoPath,
+    });
+    let createdThreadId: number | null = null;
+    const host: CronThreadExecutionHost = {
+      async createThread(params) {
+        const thread = createThread(database, {
+          agentsAccess: false,
+          cronJobId: params.cronJobId,
+          githubAccess: false,
+          metidosAccess: true,
+          model: params.model ?? "gpt-5.4",
+          piLeafEntryId: null,
+          piSessionFile: null,
+          piSessionId: null,
+          projectId: params.projectId,
+          reasoningEffort: params.reasoningEffort ?? "medium",
+          title: "Runtime Queue Failure Thread",
+          unsafeMode: false,
+          worktreePath: params.worktreePath,
+        });
+        createdThreadId = thread.id;
+        return buildFakeThreadDetail({
+          projectId: params.projectId,
+          startedAt: null,
+          threadId: thread.id,
+          worktreePath: params.worktreePath,
+        });
+      },
+      async sendThreadMessage() {
+        throw new Error("forced runtime queue failure");
+      },
+    };
+
+    const threadId = await runner.runCronJobById(cronJob.id, Date.now(), host);
+
+    expect(threadId).toBeNull();
+    expect(createdThreadId).not.toBeNull();
+    const runs = listCronJobRuns(database, cronJob.id);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.runStatus).toBe("Errored");
+    expect(getCronJobById(database, cronJob.id)?.lastRunStatus).toBe("Errored");
+    if (createdThreadId !== null) {
+      expect(getThreadById(database, createdThreadId)).not.toBeNull();
+    }
+    expect(getRuntimeStatsSummary().cron).toMatchObject({
+      activeRuns: 0,
+      erroredRuns: 1,
+      startedRuns: 1,
+    });
+  });
+
   it("runCronJobById blocks a second launch while the same cron is still in progress", async () => {
     const { cronRunner: runner } = await loadCronModules();
     const database = initAppDatabase();
