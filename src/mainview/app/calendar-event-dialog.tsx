@@ -17,6 +17,10 @@ import type {
   RpcCalendarOccurrence,
 } from "../../bun/calendar/types";
 import { AppButton } from "../controls/button";
+import {
+  APP_FORM_CONTROL_CLASS_NAME,
+  APP_FORM_TEXTAREA_CLASS_NAME,
+} from "../controls/form-control";
 import { materialSymbol } from "../controls/icons";
 import { ModalDialogSurface } from "../controls/popover";
 import {
@@ -211,7 +215,7 @@ export function CalendarEventDialog({
               Calendar
             </span>
             <select
-              className="w-full border border-border-default bg-surface-2 px-3 py-2"
+              className={APP_FORM_CONTROL_CLASS_NAME}
               name="calendar-id"
               value={calendarId}
               onChange={(event) => setCalendarId(Number(event.target.value))}
@@ -229,7 +233,7 @@ export function CalendarEventDialog({
             </span>
             <input
               aria-label="Event title"
-              className="w-full border border-border-default bg-surface-2 px-3 py-2"
+              className={APP_FORM_CONTROL_CLASS_NAME}
               name="calendar-event-title"
               ref={titleInputRef}
               value={title}
@@ -254,7 +258,7 @@ export function CalendarEventDialog({
                 <input
                   id={startDateId}
                   type="date"
-                  className="w-full border border-border-default bg-surface-2 px-3 py-2"
+                  className={APP_FORM_CONTROL_CLASS_NAME}
                   name="calendar-event-start-date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
@@ -267,7 +271,7 @@ export function CalendarEventDialog({
                 <input
                   id={endDateId}
                   type="date"
-                  className="w-full border border-border-default bg-surface-2 px-3 py-2"
+                  className={APP_FORM_CONTROL_CLASS_NAME}
                   name="calendar-event-end-date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
@@ -283,7 +287,7 @@ export function CalendarEventDialog({
                 <input
                   id={startDateTimeId}
                   type="datetime-local"
-                  className="w-full border border-border-default bg-surface-2 px-3 py-2"
+                  className={APP_FORM_CONTROL_CLASS_NAME}
                   name="calendar-event-start"
                   value={start}
                   onChange={(event) => setStart(event.target.value)}
@@ -296,7 +300,7 @@ export function CalendarEventDialog({
                 <input
                   id={endDateTimeId}
                   type="datetime-local"
-                  className="w-full border border-border-default bg-surface-2 px-3 py-2"
+                  className={APP_FORM_CONTROL_CLASS_NAME}
                   name="calendar-event-end"
                   value={end}
                   onChange={(event) => setEnd(event.target.value)}
@@ -309,7 +313,7 @@ export function CalendarEventDialog({
               Repeat
             </span>
             <select
-              className="w-full border border-border-default bg-surface-2 px-3 py-2"
+              className={APP_FORM_CONTROL_CLASS_NAME}
               name="calendar-event-repeat"
               value={repeat}
               onChange={(event) => {
@@ -334,7 +338,7 @@ export function CalendarEventDialog({
             <input
               id={locationId}
               placeholder="Location"
-              className="w-full border border-border-default bg-surface-2 px-3 py-2"
+              className={APP_FORM_CONTROL_CLASS_NAME}
               name="calendar-event-location"
               value={location}
               onChange={(event) => setLocation(event.target.value)}
@@ -347,7 +351,7 @@ export function CalendarEventDialog({
             <textarea
               id={notesId}
               placeholder="Notes"
-              className="min-h-20 w-full resize-y border border-border-default bg-surface-2 px-3 py-2"
+              className={`min-h-20 ${APP_FORM_TEXTAREA_CLASS_NAME}`}
               name="calendar-event-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
