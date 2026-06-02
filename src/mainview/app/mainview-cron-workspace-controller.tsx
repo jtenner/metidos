@@ -800,7 +800,7 @@ export function MainviewCronWorkspaceController({
   return (
     <div className={containerClassName}>
       <div className="flex items-center justify-between">
-        <div className="font-label text-xs uppercase tracking-[0.1em] text-accent">
+        <div className="font-label text-xs uppercase tracking-widest text-accent">
           Cron jobs
         </div>
         <AppButton
@@ -872,7 +872,7 @@ export function MainviewCronWorkspaceController({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-1">
-                  <div className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
+                  <div className="font-label text-[10px] uppercase tracking-widest text-text-faint">
                     Folder
                   </div>
                   <div className="break-all font-mono text-sm text-text-muted">
@@ -923,7 +923,7 @@ export function MainviewCronWorkspaceController({
               <div className="space-y-3">
                 <label
                   htmlFor={`cron-describe-input${inputIdSuffix}`}
-                  className="font-label text-[11px] uppercase tracking-[0.1em] text-text-faint"
+                  className="font-label text-[11px] uppercase tracking-widest text-text-faint"
                 >
                   Cron description
                 </label>
@@ -985,7 +985,7 @@ export function MainviewCronWorkspaceController({
               </div>
             )}
             <div className="space-y-1">
-              <div className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
+              <div className="font-label text-[10px] uppercase tracking-widest text-text-faint">
                 Model
               </div>
               <CodexModelSelector
@@ -1009,7 +1009,7 @@ export function MainviewCronWorkspaceController({
               />
             </div>
             <div className="space-y-1">
-              <div className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
+              <div className="font-label text-[10px] uppercase tracking-widest text-text-faint">
                 Access controls
               </div>
               <ThreadAccessControl
