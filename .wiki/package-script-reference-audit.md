@@ -119,6 +119,38 @@ Commands and outcomes:
 
 This covered the documented `bun test`, `bun run typecheck`, and bounded performance baseline path for the nested package from a disposable checkout. It did not run `bun run perf:baseline:save`, because that command intentionally creates a timestamped JSON snapshot under `perf/baselines/` and is only needed when updating stored performance data.
 
+## Clean disposable checkout root script smoke run
+
+On 2026-06-02, representative documented root package scripts were smoke-run from a disposable detached Git worktree at `.tmp/root-script-smoke`, with root dependencies installed from the checked-in `bun.lock`. `METIDOS_APP_DATA_DIR` was set to `.tmp/app-data` inside the disposable worktree before running scripts that write app data.
+
+Environment:
+
+- OS: Debian GNU/Linux 13 (trixie)
+- Kernel: Linux 6.12.90+deb13.1-amd64 x86_64 GNU/Linux
+- Bun: 1.3.13
+- Checkout: detached `HEAD` at `4f144c1`
+- Working directory for commands: repository root
+
+Commands and outcomes:
+
+- `bun install --frozen-lockfile` passed and installed 473 packages.
+- `bun run tailwind:build` passed; Tailwind CSS v4.3.0 reported completion in 192ms.
+- `bun run website:build` passed; Tailwind CSS v4.3.0 reported completion in 186ms.
+- `bun run sync:core-plugins` passed and synced core plugins to the disposable `.tmp/app-data/plugins` directory.
+- `bun run toml:check` passed; Taplo found 11 TOML files and 2 excluded files for both format-check and lint phases.
+- `bun run style:check` passed with `STYLE.md enforcement: no violations found.`
+- `bun run a11y:check` failed with 5 `input-name` errors in `src/mainview/controls/input.tsx`; the checker flagged shared `<input {...props}>` primitive definitions that do not declare a static `id`, `title`, `aria-label`, or `aria-labelledby` at the primitive site.
+- `bun run typecheck` failed with strict test typing errors in `src/bun/project-procedures.cron.test.ts` where two `RpcRequestContext` fixtures were missing `priority` and `timeoutMs`, and in `src/bun/rpc-handlers/terminal.test.ts` where the `AuthServiceError` test fixture call omitted the required HTTP status argument.
+- `bun run test` failed with 5 failures across 2471 tests. Four failures were caused by the missing generated xmloxide WASM bundle/artifact in a clean checkout; `bun run build:xmloxide-wasm` subsequently passed and a targeted rerun of the XML-dependent plugin runtime tests passed. One full-suite failure remained in `src/bun/plugin/sidecar-manager.test.ts` for the crash-loop degraded-status retry scenario.
+- `bun run build:xmloxide-wasm` passed after the initial `test` failure and wrote `native/xmloxide-wasm/dist/metidos_xmloxide_wasm.wasm` and `.cjs` in the disposable checkout.
+
+Follow-up work created from this smoke run:
+
+- Decide whether `a11y:check` should understand shared form-control primitives with prop-spread naming, or whether the primitives should enforce/require names at their API boundary.
+- Fix stale strict typings in the cron and terminal RPC test fixtures so a clean checkout passes `bun run typecheck`.
+- Make the clean-checkout `test` path build or otherwise provide the xmloxide WASM artifact before XML-dependent tests run.
+- Re-run the full test suite after the xmloxide prerequisite is satisfied and investigate the remaining sidecar crash-loop degraded-status failure.
+
 ## Remaining follow-up
 
-This audit verified that referenced package-script names exist, includes a current-checkout smoke run for representative root scripts, and includes a clean-checkout smoke run for the nested Getdown scripts. It has not executed every referenced root script from a clean clone, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should smoke-run representative documented root commands in a clean setup and record exact outcomes, using the bounded handling above for long-running watch/start scripts.
+This audit verified that referenced package-script names exist, includes a current-checkout smoke run for representative root scripts, includes a clean-checkout smoke run for the nested Getdown scripts, and now records a clean disposable checkout smoke run for representative root build/check/test scripts. It has not executed every referenced root script, because scripts such as `dev`, `start`, watch modes, TLS startup, native builds beyond `build:xmloxide-wasm`, and migration commands are environment-dependent or long-running. The remaining open-source readiness work should use the bounded handling above for long-running watch/start scripts.

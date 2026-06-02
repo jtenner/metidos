@@ -11,11 +11,6 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Send or answer the drafted maintainer request in `docs/artwork-provenance-maintainer-request-2026-06-02.md` for `src/mainview/pixel-crown.png`, then update `docs/public-asset-provenance-audit-2026-06-02.md` with creator/source, creation date if known, and license/assignment/redistribution approval, or replace/remove the asset before publishing.
   - [ ] Re-run the tracked asset inventory after the remaining artwork decisions are documented.
 
-## 4. CI, Validation, and Release Automation
-
-- [ ] Smoke-run documented package scripts from a clean setup and record exact outcomes. Context: `.wiki/package-script-reference-audit.md` verifies referenced script names exist as of 2026-06-01, records a 2026-06-02 current-checkout preflight smoke run where `tailwind:build`, `website:build`, `sync:core-plugins`, `toml:check`, `style:check`, `a11y:check`, `typecheck`, and `test` pass after two strict test typing fixes, and records a clean disposable checkout smoke run where the nested `src/mainview/getdown` documented `test`, `typecheck`, and bounded `perf:baseline` scripts pass. Remaining 3-minute slice:
-  - [ ] In a clean clone or disposable checkout, run the representative root build/check/test scripts and record exact OS, Bun version, command list, pass/fail status, and any setup prerequisites.
-
 ## 5. README Improvements
 
 - [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
@@ -111,6 +106,9 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Smoke Docker and/or Podman install guidance in a disposable container. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies container setup as a remaining gap; record host OS, engine/version, commands, pass/fail status, first-run auth outcome, provider expectations, backup/restore notes, and teardown.
 - [ ] Smoke or desk-check reverse-proxy/Tailscale/TLS setup guidance. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies remote-access setup as a remaining gap; record which checks were executed versus only reviewed.
 - [ ] Dry-run or execute the installer skill workflow in an approved disposable scenario. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies `.pi/skills/metidos-installation/SKILL.md` as a remaining gap; verify it asks expected questions, emits a secret-safe `metidos-config.md`, and does not apply host changes before approval.
+- [ ] Fix clean disposable root `a11y:check` failure. Context: `.wiki/package-script-reference-audit.md` records a 2026-06-02 root script smoke run where `bun run a11y:check` failed on 5 `input-name` findings in `src/mainview/controls/input.tsx`; decide whether the checker should understand shared form-control primitives with prop-spread naming or whether the primitives should enforce/require names at their API boundary.
+- [ ] Fix clean disposable root `typecheck` failures. Context: `.wiki/package-script-reference-audit.md` records `bun run typecheck` failures in `src/bun/project-procedures.cron.test.ts` for `RpcRequestContext` fixtures missing `priority` and `timeoutMs`, and in `src/bun/rpc-handlers/terminal.test.ts` for an `AuthServiceError` fixture call missing its required HTTP status argument.
+- [ ] Fix clean disposable root `test` prerequisite/failures. Context: `.wiki/package-script-reference-audit.md` records `bun run test` failed because the clean checkout lacked the generated xmloxide WASM artifact; after `bun run build:xmloxide-wasm`, targeted XML-dependent plugin runtime tests passed. Make the clean-checkout test path build/provide this artifact, then rerun the full suite and investigate the remaining `src/bun/plugin/sidecar-manager.test.ts` crash-loop degraded-status failure.
 - [ ] Verify failing tests produce enough context for outside contributors to debug.
 
 ## 11. GitHub Public Repository Setup Notes
