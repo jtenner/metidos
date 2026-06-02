@@ -197,7 +197,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ### Style: type scale, focus, and tab semantics
 
-- [ ] Add consistent `focus-visible` styling to the interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`.
 - [ ] Complete the ARIA tab pattern for interaction-mode tabs in `src/mainview/app/chat-workspace.tsx`: roving `tabIndex`, arrow-key handling, and `aria-controls`.
 
 ### Style: shared primitives and one-off controls

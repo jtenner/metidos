@@ -2020,7 +2020,7 @@ export function DesktopChatView({
             <AppButton
               unstyled
               aria-selected={interactionMode === "chat"}
-              className={`font-label text-xs uppercase tracking-[0.1em] ${
+              className={`font-label pb-1 text-xs uppercase tracking-[0.1em] transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2 ${
                 interactionMode === "chat"
                   ? "border-b-2 border-accent text-accent-strong"
                   : "text-text-muted hover:text-text-primary"
@@ -2037,7 +2037,7 @@ export function DesktopChatView({
               <AppButton
                 unstyled
                 aria-selected={interactionMode === "terminal"}
-                className={`font-label text-xs uppercase tracking-[0.1em] ${
+                className={`font-label pb-1 text-xs uppercase tracking-[0.1em] transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2 ${
                   interactionMode === "terminal"
                     ? "border-b-2 border-accent text-accent-strong"
                     : "text-text-muted hover:text-text-primary"
