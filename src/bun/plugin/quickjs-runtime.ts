@@ -548,6 +548,34 @@ function unwrapQuickJsResult(
 
 const MAX_ENTRYPOINT_EXPORT_REWRITE_SOURCE_BYTES = 5 * 1024 * 1024;
 
+const SUPPORTED_ENTRYPOINT_EXPORT_MESSAGE =
+  "Supported plugin QuickJS entrypoint exports are `export default ...` and `export { value as default }` after bundling to plain JavaScript.";
+
+function assertSupportedEntrypointExportSyntax(source: string): void {
+  // QuickJS starts plugin entrypoints from a script wrapper, not as native ES modules.
+  // Keep the rewrite surface intentionally small so unsupported module styles fail with
+  // an author-facing diagnostic instead of a generic QuickJS syntax/reference error.
+  if (
+    /(?:^|[;\r\n])\s*export\s+(?:async\s+)?(?:const|let|var|function|class|type|interface|enum|namespace|\*)\b/.test(
+      source,
+    )
+  ) {
+    throw runtimeFailure({
+      message: `Unsupported plugin QuickJS entrypoint export syntax. ${SUPPORTED_ENTRYPOINT_EXPORT_MESSAGE}`,
+    });
+  }
+
+  if (
+    /(?:^|[;\r\n])\s*(?:module\.exports|exports\.[A-Za-z_$][\w$]*)\s*=/.test(
+      source,
+    )
+  ) {
+    throw runtimeFailure({
+      message: `Unsupported CommonJS plugin QuickJS entrypoint export syntax. ${SUPPORTED_ENTRYPOINT_EXPORT_MESSAGE}`,
+    });
+  }
+}
+
 export function rewriteEntrypointExports(source: string): string {
   if (
     Buffer.byteLength(source, "utf8") >
@@ -558,6 +586,8 @@ export function rewriteEntrypointExports(source: string): string {
         "Plugin QuickJS entrypoint source is too large to rewrite exports safely.",
     });
   }
+
+  assertSupportedEntrypointExportSyntax(source);
 
   let transformed = source.replace(
     /export\s*\{([\s\S]*?)\};?/g,

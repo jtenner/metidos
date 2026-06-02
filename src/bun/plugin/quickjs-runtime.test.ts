@@ -102,6 +102,18 @@ describe("rewriteEntrypointExports", () => {
       "Plugin QuickJS entrypoint source is too large to rewrite exports safely.",
     );
   });
+
+  it("rejects unsupported ESM, TypeScript, and CommonJS export styles with author-facing errors", () => {
+    expect(() => rewriteEntrypointExports("export const plugin = {};")).toThrow(
+      "Unsupported plugin QuickJS entrypoint export syntax.",
+    );
+    expect(() => rewriteEntrypointExports("export type Plugin = {};")).toThrow(
+      "Unsupported plugin QuickJS entrypoint export syntax.",
+    );
+    expect(() => rewriteEntrypointExports("module.exports = {};")).toThrow(
+      "Unsupported CommonJS plugin QuickJS entrypoint export syntax.",
+    );
+  });
 });
 
 describe("executePluginQuickJsRuntime", () => {

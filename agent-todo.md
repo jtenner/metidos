@@ -251,7 +251,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] D1: Review `MAX_ENTRYPOINT_EXPORT_REWRITE_SOURCE_BYTES` and source rewriting memory use in `src/bun/plugin/quickjs-runtime.ts`. If large plugin entrypoints can cause pressure, reduce the cap or stream/avoid duplicate copies; otherwise document accepted startup memory cost.
 - [ ] D2: Review `rewriteEntrypointExports` regexes in `src/bun/plugin/quickjs-runtime.ts`. Fix if valid plugin export syntax is mishandled; otherwise add tests/comments stating supported export syntax.
-- [ ] D3: Review unsupported export styles in `src/bun/plugin/quickjs-runtime.ts`. Add a clearer plugin startup error or docs for unsupported CommonJS/TypeScript export forms.
 - [ ] D4: Review callback invocation token handling in `src/bun/plugin/quickjs-runtime.ts`. If plugin code can read or forge the token, fix isolation; otherwise add comments/tests proving token secrecy is within the QuickJS bootstrap boundary.
 - [ ] D5: Review host global override risk in `src/bun/plugin/quickjs-runtime.ts` (`__metidosHostStructuredDataOperation` and related globals). If plugin self-shadowing breaks host API invariants, freeze or hide host bindings; otherwise document that a plugin can only sabotage itself.
 - [ ] D6: Review QuickJS interrupt/timeout handling in `src/bun/plugin/quickjs-runtime.ts`. If guest code can catch/evade interrupts, add stronger cancellation or tests; otherwise document QuickJS deadline limitations.
