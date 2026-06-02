@@ -1277,6 +1277,88 @@ describe("createPiMetidosTools", () => {
     });
   });
 
+  it("rejects cross-boundary explicit thread and cron targets before host mutation", async () => {
+    const scope = makeScope();
+    let createThreadCalled = false;
+    let newCronCalled = false;
+    const host = createHost({
+      createThread: async () => {
+        createThreadCalled = true;
+        return makeThreadDetail();
+      },
+      listProjectWorktrees: async (params) => {
+        if (params.projectId === 8) {
+          return [makeWorktree({ path: "/repo/beta/main" })];
+        }
+        return [
+          makeWorktree({ path: scope.worktreePathContext }),
+          makeWorktree({ branch: "other", path: "/repo/alpha/other-worktree" }),
+        ];
+      },
+      listProjects: async () => [
+        makeProject({ id: 7, name: "Alpha", path: "/repo/alpha" }),
+        makeProject({ id: 8, name: "Beta", path: "/repo/beta" }),
+      ],
+      newCron: async () => {
+        newCronCalled = true;
+        return makeCron();
+      },
+    });
+
+    await expect(
+      executeTool(scope, host, "new_thread", {
+        input: "Escape project",
+        projectId: "8",
+        worktreePath: "/repo/beta/main",
+      }),
+    ).rejects.toThrow("Cross-project access is not allowed");
+    await expect(
+      executeTool(scope, host, "new_cron", {
+        prompt: "Escape worktree",
+        schedule: "0 0 * * *",
+        worktreePath: "/repo/alpha/other-worktree",
+      }),
+    ).rejects.toThrow("Cross-worktree access is not allowed");
+    expect(createThreadCalled).toBe(false);
+    expect(newCronCalled).toBe(false);
+  });
+
+  it("surfaces authenticated-operator failures from Pi-native thread and cron mutations", async () => {
+    const scope = makeScope();
+    const authError = new AuthServiceError(
+      "session_required",
+      "A valid authenticated session is required for Metidos mutations.",
+      401,
+    );
+    const host = createHost({
+      createThread: async () => {
+        throw authError;
+      },
+      newCron: async () => {
+        throw authError;
+      },
+      updateCron: async () => {
+        throw authError;
+      },
+    });
+
+    await expect(
+      executeTool(scope, host, "new_thread", { input: "Start child" }),
+    ).rejects.toBe(authError);
+    await expect(
+      executeTool(scope, host, "new_cron", {
+        prompt: "Nightly",
+        schedule: "0 0 * * *",
+      }),
+    ).rejects.toBe(authError);
+    await expect(
+      executeTool(scope, host, "update_cron", {
+        cronJobId: "9",
+        title: "Retitled",
+      }),
+    ).rejects.toBe(authError);
+  });
+
   it("inherits the current thread model and reasoning when new_thread omits them", async () => {
     const scope = makeScope({
       modelContext: "openai:gpt-5.5",
