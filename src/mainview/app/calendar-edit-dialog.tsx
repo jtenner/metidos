@@ -37,6 +37,8 @@ export function CalendarEditDialog({
 }): JSX.Element {
   const dialogId = useId();
   const titleId = `${dialogId}-title`;
+  const titleFieldId = `${dialogId}-calendar-title`;
+  const colorFieldId = `${dialogId}-calendar-color`;
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [title, setTitle] = useState(calendar.title);
   const [color, setColor] = useState(calendar.color);
@@ -141,26 +143,26 @@ export function CalendarEditDialog({
                 {formError}
               </div>
             ) : null}
-            <label className="block space-y-1">
+            <label className="block space-y-1" htmlFor={titleFieldId}>
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 Title
               </span>
               <AppTextInput
-                aria-label="Calendar title"
                 disabled={busy}
+                id={titleFieldId}
                 name="calendar-title"
                 onChange={(event) => setTitle(event.currentTarget.value)}
                 ref={titleInputRef}
                 value={title}
               />
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2" htmlFor={colorFieldId}>
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 Color
               </span>
               <AppColorInput
-                aria-label="Calendar color"
                 disabled={busy}
+                id={colorFieldId}
                 name="calendar-color"
                 onChange={(event) => setColor(event.currentTarget.value)}
                 value={color}

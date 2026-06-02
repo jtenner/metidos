@@ -9,7 +9,39 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 
-type AppInputProps = InputHTMLAttributes<HTMLInputElement> & {
+type AccessibleInputName =
+  | {
+      id: string;
+      "aria-label"?: string;
+      "aria-labelledby"?: string;
+      title?: string;
+    }
+  | {
+      id?: string;
+      "aria-label": string;
+      "aria-labelledby"?: string;
+      title?: string;
+    }
+  | {
+      id?: string;
+      "aria-label"?: string;
+      "aria-labelledby": string;
+      title?: string;
+    }
+  | {
+      id?: string;
+      "aria-label"?: string;
+      "aria-labelledby"?: string;
+      title: string;
+    };
+
+type NamedInputAttributes = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "aria-label" | "aria-labelledby" | "id" | "title"
+> &
+  AccessibleInputName;
+
+type AppInputProps = NamedInputAttributes & {
   /** Shared escape hatch for controls that own a specialized class recipe. */
   unstyled?: boolean;
 };
@@ -27,16 +59,37 @@ const inputBaseClassName =
 
 export const AppTextInput = forwardRef<HTMLInputElement, AppTextInputProps>(
   function AppTextInput(
-    { className = "", monospace = false, unstyled = false, ...props },
+    {
+      className = "",
+      monospace = false,
+      unstyled = false,
+      id,
+      "aria-label": ariaLabel,
+      "aria-labelledby": ariaLabelledBy,
+      title,
+      ...props
+    },
     ref,
   ) {
     if (unstyled) {
-      return <input {...props} className={className} ref={ref} />;
+      return (
+        <input
+          {...props}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          className={className}
+          id={id}
+          ref={ref}
+          title={title}
+        />
+      );
     }
 
     return (
       <input
         {...props}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         className={[
           "h-8 w-full px-2 text-xs",
           inputBaseClassName,
@@ -45,25 +98,53 @@ export const AppTextInput = forwardRef<HTMLInputElement, AppTextInputProps>(
         ]
           .filter(Boolean)
           .join(" ")}
+        id={id}
         ref={ref}
+        title={title}
       />
     );
   },
 );
 
 export const AppColorInput = forwardRef<HTMLInputElement, AppColorInputProps>(
-  function AppColorInput({ className = "", unstyled = false, ...props }, ref) {
+  function AppColorInput(
+    {
+      className = "",
+      unstyled = false,
+      id,
+      "aria-label": ariaLabel,
+      "aria-labelledby": ariaLabelledBy,
+      title,
+      ...props
+    },
+    ref,
+  ) {
     if (unstyled) {
-      return <input {...props} className={className} ref={ref} />;
+      return (
+        <input
+          {...props}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          className={className}
+          id={id}
+          ref={ref}
+          title={title}
+          type="color"
+        />
+      );
     }
 
     return (
       <input
         {...props}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         className={["h-8 w-14 p-1", inputBaseClassName, className]
           .filter(Boolean)
           .join(" ")}
+        id={id}
         ref={ref}
+        title={title}
         type="color"
       />
     );
@@ -74,23 +155,46 @@ export const AppCheckboxInput = forwardRef<
   HTMLInputElement,
   AppCheckboxInputProps
 >(function AppCheckboxInput(
-  { className = "", unstyled = false, ...props },
+  {
+    className = "",
+    unstyled = false,
+    id,
+    "aria-label": ariaLabel,
+    "aria-labelledby": ariaLabelledBy,
+    title,
+    ...props
+  },
   ref,
 ) {
   if (unstyled) {
-    return <input {...props} className={className} ref={ref} />;
+    return (
+      <input
+        {...props}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        className={className}
+        id={id}
+        ref={ref}
+        title={title}
+        type="checkbox"
+      />
+    );
   }
 
   return (
     <input
       {...props}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       className={[
         "h-4 w-4 shrink-0 accent-accent-strong focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-60",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
+      id={id}
       ref={ref}
+      title={title}
       type="checkbox"
     />
   );

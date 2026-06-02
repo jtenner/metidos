@@ -59,6 +59,12 @@ export function CalendarIcsEditDialog({
 }): JSX.Element {
   const dialogId = useId();
   const titleId = `${dialogId}-title`;
+  const titleFieldId = `${dialogId}-calendar-ics-title`;
+  const urlFieldId = `${dialogId}-calendar-ics-url`;
+  const refreshIntervalFieldId = `${dialogId}-calendar-ics-refresh-interval`;
+  const colorFieldId = `${dialogId}-calendar-ics-color`;
+  const notificationsEnabledFieldId = `${dialogId}-calendar-ics-notifications-enabled`;
+  const sourceNotificationsEnabledFieldId = `${dialogId}-calendar-ics-source-notifications-enabled`;
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [title, setTitle] = useState(calendar.title);
   const [url, setUrl] = useState(calendar.url);
@@ -197,28 +203,28 @@ export function CalendarIcsEditDialog({
                 {formError}
               </div>
             ) : null}
-            <label className="block space-y-1">
+            <label className="block space-y-1" htmlFor={titleFieldId}>
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 Title
               </span>
               <AppTextInput
-                aria-label="Calendar title"
                 disabled={busy}
+                id={titleFieldId}
                 name="calendar-ics-title"
                 onChange={(event) => setTitle(event.currentTarget.value)}
                 ref={titleInputRef}
                 value={title}
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block space-y-1" htmlFor={urlFieldId}>
               <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                 URL
               </span>
               <AppTextInput
-                aria-label="Calendar URL"
                 autoCapitalize="none"
                 autoCorrect="off"
                 disabled={busy}
+                id={urlFieldId}
                 monospace
                 name="calendar-ics-url"
                 onChange={(event) => setUrl(event.currentTarget.value)}
@@ -227,12 +233,16 @@ export function CalendarIcsEditDialog({
               />
             </label>
             <div className="space-y-3">
-              <label className="block space-y-1">
+              <label
+                className="block space-y-1"
+                htmlFor={refreshIntervalFieldId}
+              >
                 <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                   Refresh
                 </span>
                 <AppSelectInput
                   disabled={busy}
+                  id={refreshIntervalFieldId}
                   name="calendar-ics-refresh-interval"
                   onChange={(event) =>
                     setRefreshIntervalMinutes(Number(event.currentTarget.value))
@@ -246,13 +256,13 @@ export function CalendarIcsEditDialog({
                   ))}
                 </AppSelectInput>
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-2" htmlFor={colorFieldId}>
                 <span className="font-label text-[10px] uppercase tracking-[0.1em] text-text-faint">
                   Color
                 </span>
                 <AppColorInput
-                  aria-label="Calendar color"
                   disabled={busy}
+                  id={colorFieldId}
                   name="calendar-ics-color"
                   onChange={(event) => setColor(event.currentTarget.value)}
                   value={color}
@@ -260,11 +270,14 @@ export function CalendarIcsEditDialog({
               </label>
             </div>
             <div className="space-y-2 border-t border-border-subtle pt-3 text-xs text-text-secondary">
-              <label className="flex items-center gap-2">
+              <label
+                className="flex items-center gap-2"
+                htmlFor={notificationsEnabledFieldId}
+              >
                 <AppCheckboxInput
-                  aria-label="Enable notifications"
                   checked={notificationsEnabled}
                   disabled={busy}
+                  id={notificationsEnabledFieldId}
                   name="calendar-ics-notifications-enabled"
                   onChange={(event) => {
                     const checked = event.currentTarget.checked;
@@ -276,11 +289,14 @@ export function CalendarIcsEditDialog({
                 />
                 Enable Notifications
               </label>
-              <label className="flex items-center gap-2">
+              <label
+                className="flex items-center gap-2"
+                htmlFor={sourceNotificationsEnabledFieldId}
+              >
                 <AppCheckboxInput
-                  aria-label="Notify source attendees"
                   checked={sourceNotificationsEnabled}
                   disabled={busy || !notificationsEnabled}
+                  id={sourceNotificationsEnabledFieldId}
                   name="calendar-ics-source-notifications-enabled"
                   onChange={(event) =>
                     setSourceNotificationsEnabled(event.currentTarget.checked)
