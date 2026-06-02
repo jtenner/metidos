@@ -9,6 +9,7 @@ import type {
   ProjectProcedures,
   RpcProject,
   RpcWorktreeChange,
+  RpcWorktreeFileDiff,
 } from "../../bun/rpc-schema";
 import { createAbortError, isAbortError } from "./async-request-state";
 import {
@@ -40,6 +41,57 @@ function worktreeChangeMetadataMatches(
     left.stagedStatus === right.stagedStatus &&
     left.unstagedStatus === right.unstagedStatus
   );
+}
+
+/**
+ * Computes the visible state for a newly requested file patch.
+ * Background refreshes keep an already-rendered patch visible while the replacement loads.
+ */
+export function nextDiffFilePatchRequestState(
+  currentState: DiffFilePatchState,
+  path: string,
+  options?: { background?: boolean },
+): DiffFilePatchState {
+  const preserveVisiblePatch =
+    options?.background &&
+    currentState.path === path &&
+    currentState.diffText.trim().length > 0 &&
+    !currentState.error;
+
+  return preserveVisiblePatch
+    ? currentState
+    : {
+        ...emptyDiffFilePatchState(path),
+        isLoading: true,
+      };
+}
+
+/** Computes the visible state after a file patch loads successfully. */
+export function nextDiffFilePatchSuccessState(
+  result: RpcWorktreeFileDiff,
+): DiffFilePatchState {
+  return {
+    diffText: result.diffText,
+    error: "",
+    isLoading: false,
+    path: result.path,
+  };
+}
+
+/** Computes the visible state after a file patch request fails. */
+export function nextDiffFilePatchErrorState(
+  currentState: DiffFilePatchState,
+  path: string,
+  error: unknown,
+): DiffFilePatchState {
+  return {
+    ...(currentState.path === path
+      ? currentState
+      : emptyDiffFilePatchState(path)),
+    error: error instanceof Error ? error.message : String(error),
+    isLoading: false,
+    path,
+  };
 }
 
 /** Parameters controlling worktree snapshot and diff polling behavior. */
@@ -159,33 +211,26 @@ export function useWorktreeDiff({
       abortDiffFilePatchRequest("Worktree file diff request was superseded.");
       const controller = new AbortController();
       diffFilePatchAbortControllerRef.current = controller;
-      const currentState = diffFilePatchStateRef.current;
       const selectedChange: RpcWorktreeChange = {
         path: selectedDiffFileChangePath,
         previousPath: selectedDiffFilePreviousPath,
         stagedStatus: selectedDiffFileStagedStatus,
         unstagedStatus: selectedDiffFileUnstagedStatus,
       };
-      const preserveVisiblePatch =
-        options?.background &&
-        currentState.path === selectedDiffFileChangePath &&
-        currentState.diffText.trim().length > 0 &&
-        !currentState.error;
-      if (!preserveVisiblePatch) {
-        // Replace displayed patch with loading state unless background reuse is safe.
-        setDiffFilePatchState((current) => {
-          const next = {
-            ...emptyDiffFilePatchState(selectedDiffFileChangePath),
-            isLoading: true,
-          };
-          return current.path === next.path &&
-            current.diffText === next.diffText &&
-            current.error === next.error &&
-            current.isLoading === next.isLoading
-            ? current
-            : next;
-        });
-      }
+      // Replace displayed patch with loading state unless background reuse is safe.
+      setDiffFilePatchState((current) => {
+        const next = nextDiffFilePatchRequestState(
+          current,
+          selectedDiffFileChangePath,
+          options,
+        );
+        return current.path === next.path &&
+          current.diffText === next.diffText &&
+          current.error === next.error &&
+          current.isLoading === next.isLoading
+          ? current
+          : next;
+      });
 
       try {
         const result = await procedures.readWorktreeFileDiff(
@@ -205,12 +250,7 @@ export function useWorktreeDiff({
 
         setDiffFilePatchState((current) => {
           // Success path: stash loaded patch and clear any previous error.
-          const next = {
-            diffText: result.diffText,
-            error: "",
-            isLoading: false,
-            path: result.path,
-          };
+          const next = nextDiffFilePatchSuccessState(result);
           return current.path === next.path &&
             current.diffText === next.diffText &&
             current.error === next.error &&
@@ -226,14 +266,13 @@ export function useWorktreeDiff({
         if (diffFilePatchRequestIdRef.current !== requestId) {
           return;
         }
-        setDiffFilePatchState((current) => ({
-          ...(current.path === selectedDiffFileChangePath
-            ? current
-            : emptyDiffFilePatchState(selectedDiffFileChangePath)),
-          error: error instanceof Error ? error.message : String(error),
-          isLoading: false,
-          path: selectedDiffFileChangePath,
-        }));
+        setDiffFilePatchState((current) =>
+          nextDiffFilePatchErrorState(
+            current,
+            selectedDiffFileChangePath,
+            error,
+          ),
+        );
       } finally {
         if (diffFilePatchAbortControllerRef.current === controller) {
           diffFilePatchAbortControllerRef.current = null;
