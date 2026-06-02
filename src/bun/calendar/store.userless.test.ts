@@ -15,6 +15,10 @@ import {
 } from "../db";
 import { listDueExternalIcsCalendarRefreshes } from "./ics";
 import {
+  listCurrentCalendarNotifications,
+  scheduleDueCalendarReminders,
+} from "./notifications";
+import {
   createCalendar,
   createCalendarEvent,
   createExternalCalendar,
@@ -22,6 +26,7 @@ import {
   initCalendarSchema,
   listCalendarOccurrences,
   replaceExternalCalendarCache,
+  updateCalendarNotificationSettings,
   updateCalendarPreference,
 } from "./store";
 
@@ -231,6 +236,53 @@ describe("userless calendar store", () => {
     ]);
     expect(occurrences[0]?.createdByUserId).toBe(LOCAL_USER_ID);
     expect(occurrences[0]?.createdByUsername).toBe("Local Operator");
+  });
+
+  test("local event reminders schedule and list without user rows", () => {
+    const db = setupDb();
+    expect(
+      db
+        .query<{ name: string }, []>(
+          `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'`,
+        )
+        .get(),
+    ).toBeNull();
+    updateCalendarNotificationSettings(db, LOCAL_USER_ID, {
+      defaultReminders: [{ minutesBefore: 10 }],
+      inAppEnabled: true,
+    });
+    const calendar = createCalendar(db, LOCAL_USER_ID, { title: "Ops" });
+    updateCalendarPreference(db, LOCAL_USER_ID, calendar.id, {
+      notificationChannels: ["in_app"],
+      notificationsEnabled: true,
+    });
+    const event = createCalendarEvent(db, LOCAL_USER_ID, {
+      calendarId: calendar.id,
+      title: "Userless reminder",
+      startAt: "2026-06-01T10:10:00.000Z",
+      endAt: "2026-06-01T10:30:00.000Z",
+      timezone: "UTC",
+    });
+
+    const delivered = scheduleDueCalendarReminders(
+      db,
+      new Date("2026-06-01T10:00:00.000Z"),
+    );
+    const listed = listCurrentCalendarNotifications(db, LOCAL_USER_ID);
+
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toMatchObject({
+      calendarId: calendar.id,
+      channel: "in_app",
+      eventId: String(event.id),
+      sourceType: "local",
+      status: "delivered",
+      title: "Userless reminder",
+      userId: LOCAL_USER_ID,
+    });
+    expect(listed.map((item) => item.id)).toEqual(
+      delivered.map((item) => item.id),
+    );
   });
 
   test("external ICS calendars stay ownerless but remain refreshable", () => {
