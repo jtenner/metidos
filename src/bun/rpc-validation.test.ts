@@ -230,8 +230,9 @@ describe("RPC request validation", () => {
         threadId: 1,
       }),
     ).toThrow(/sendThreadMessage\.images\[0\]\.extra string must be at most/);
-    expect(MAX_RPC_WEBSOCKET_MESSAGE_BYTES).toBeGreaterThan(
-      maxBase64ChatImageBytes * MAX_CHAT_IMAGE_ATTACHMENTS,
+    expect(MAX_RPC_WEBSOCKET_MESSAGE_BYTES).toBe(
+      maxBase64ChatImageBytes * MAX_CHAT_IMAGE_ATTACHMENTS +
+        MAX_THREAD_MESSAGE_INPUT_BYTES,
     );
   });
 

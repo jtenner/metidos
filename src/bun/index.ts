@@ -361,6 +361,11 @@ export const PENDING_RPC_WARN_COUNT = MAX_PENDING_RPC_REQUESTS_PER_CLIENT / 2;
 // payloads whose byte count is not divisible by 3 still fit through RPC
 // string validation before the decoded byte-size check runs.
 const MAX_BASE64_CHAT_IMAGE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES / 3) * 4;
+// Chat image RPC frames are intentionally allowed to carry the largest valid
+// desktop IDE message: every accepted image attachment at the per-image binary
+// cap, expanded to base64, plus 1 MiB for prompt text and JSON metadata. Image
+// count and decoded byte validation still run in procedure validation, so this
+// websocket cap is an aggregate transport allowance rather than the only guard.
 export const MAX_RPC_WEBSOCKET_MESSAGE_BYTES =
   MAX_BASE64_CHAT_IMAGE_BYTES * MAX_CHAT_IMAGE_ATTACHMENTS + 1024 * 1024;
 export const MAX_THREAD_MESSAGE_INPUT_BYTES = 1024 * 1024;
