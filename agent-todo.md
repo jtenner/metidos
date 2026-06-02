@@ -7,7 +7,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 1. Repository Hygiene and Public Readiness
 
 - [ ] Audit `.pi/skills/` and decide which skills are appropriate to ship publicly, which need redaction, and which should be excluded.
-- [ ] Review dependency declarations and lockfiles for private packages, unpublished packages, local path dependencies, private registry URLs, or non-public references.
 - [ ] Review checked-in assets for ownership, provenance, license compatibility, and permission to redistribute publicly.
 - [ ] Verify the repository can be cloned into a clean directory without relying on ignored local state from the current developer machine.
 

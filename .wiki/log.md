@@ -1,5 +1,10 @@
 # Wiki Log
 
+## [2026-06-02] audit | Dependency declaration public-readiness
+- Audited checked-in package manifests and Bun lockfiles for private packages, unpublished/local dependency specs, private registry URLs, and machine-specific references.
+- Confirmed no blocking dependency declaration or lockfile references were found; the only manifest `private` matches are package metadata fields.
+- Added `.wiki/dependency-declaration-audit.md` and closed the corresponding open-source readiness TODO.
+
 ## [2026-06-01] audit | Package script reference existence
 - Scanned repository docs, workflows, templates, and package manifests for package-manager `run` references.
 - Recorded that current package-script references resolve to root or Getdown package scripts, with direct Bun file executions classified separately from scripts.
