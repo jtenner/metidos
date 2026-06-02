@@ -274,7 +274,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] F2: Review custom DNS `lookup` callback shape in `src/bun/outbound-url-security.ts`. Add tests/comments for `lookupOptions.all` and single-address callbacks.
 - [ ] F3: Review IPv4/IPv6 blocklists in `src/bun/outbound-url-security.ts`. If missing ranges matter, update; otherwise comment the intentionally blocked private/reserved ranges.
 - [ ] F5: Review `isIP` behavior for IPv4-in-IPv6 forms in `src/bun/outbound-url-security.ts`. Add tests/comments if not already covered.
-- [ ] F6: Review redirect URL handling in `src/bun/outbound-url-security.ts` (`resolveSafeRedirectUrl`). Add tests/comments for scheme-relative redirects and per-hop revalidation.
 - [ ] F7: Review mixed A/AAAA DNS result rejection in `src/bun/outbound-url-security.ts`. Add comments/tests clarifying that any blocked resolved address rejects the hostname.
 - [ ] F8: Review DNS error handling in `src/bun/outbound-url-security.ts`. If transient DNS errors should be distinguishable from policy denials, improve error codes; otherwise comment current generic behavior.
 - [ ] F9: Review unsafe private-network mode in `src/bun/outbound-url-security.ts`. Add comments/docs explaining that localhost/RFC1918 are allowed only with unsafe private-network permission while metadata hosts remain blocked.

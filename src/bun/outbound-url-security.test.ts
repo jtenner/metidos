@@ -124,6 +124,60 @@ describe("outbound URL security", () => {
     ).rejects.toThrow(/Web fetch URL/);
   });
 
+  test("validates scheme-relative redirect targets", async () => {
+    await expect(
+      resolveSafeRedirectUrl(
+        new URL("https://origin.example.test/start"),
+        "//127.0.0.1/private",
+        { label: "Web fetch URL" },
+      ),
+    ).rejects.toThrow(/Web fetch URL/);
+
+    await expect(
+      resolveSafeRedirectUrl(
+        new URL("https://origin.example.test/start"),
+        "//public.example.test/final",
+        {
+          label: "Web fetch URL",
+          resolveHostname: async (hostname) => {
+            expect(hostname).toBe("public.example.test");
+            return ["8.8.8.8"];
+          },
+        },
+      ),
+    ).resolves.toMatchObject({
+      hostname: "public.example.test",
+      pathname: "/final",
+      protocol: "https:",
+    });
+  });
+
+  test("revalidates each redirect hop", async () => {
+    const resolvedHostnames: string[] = [];
+    const resolveHostname = async (hostname: string) => {
+      resolvedHostnames.push(hostname);
+      return hostname === "second.example.test" ? ["127.0.0.1"] : ["8.8.8.8"];
+    };
+
+    const firstHop = await resolveSafeRedirectUrl(
+      new URL("https://origin.example.test/start"),
+      "https://first.example.test/next",
+      { label: "Web fetch URL", resolveHostname },
+    );
+
+    await expect(
+      resolveSafeRedirectUrl(firstHop, "//second.example.test/final", {
+        label: "Web fetch URL",
+        resolveHostname,
+      }),
+    ).rejects.toThrow(/resolved to a blocked address/);
+
+    expect(resolvedHostnames).toEqual([
+      "first.example.test",
+      "second.example.test",
+    ]);
+  });
+
   test("classifies blocked resolved addresses", () => {
     expect(isBlockedOutboundAddress("127.0.0.1")).toBeTrue();
     expect(isBlockedOutboundAddress("192.168.0.1")).toBeTrue();
