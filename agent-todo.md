@@ -201,8 +201,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### HTTP and RPC transport follow-up
 
-- [ ] G1: Review `proxyWebServerShareRequest` in `src/bun/index.ts`. If main-server proxying can stream unbounded responses or leak resources, add response limits/backpressure; otherwise document that the share worker owns body limits and auth.
-
 ### Web-server share follow-up
 
 - [ ] J2: Review public share route Origin/auth expectations in `src/bun/pi/web-server/share-thread.ts` and `src/bun/index.ts`. If cross-site access can expose private hosted content, tighten cookies/tokens; otherwise document public-share threat model.

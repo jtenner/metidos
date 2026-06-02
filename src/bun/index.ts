@@ -1106,11 +1106,14 @@ function isWebServerSharePath(pathname: string): boolean {
 
 async function proxyWebServerShareRequest(request: Request): Promise<Response> {
   // The main server is only a transport boundary for public share routes.
-  // Claim-token validation, share-session cookies, route/session matching, and
-  // hosted-content authorization live in the dedicated share worker
-  // (`src/bun/pi/web-server/share-thread.ts`) so `/share/open` and `/s/*`
-  // requests are governed by one share-specific authority whether they arrive
-  // through this proxy or directly at the worker in tests.
+  // Claim-token validation, share-session cookies, route/session matching,
+  // hosted-content authorization, request/response body limits, outbound-fetch
+  // timeout, per-share concurrency limits, and upstream header allowlisting live
+  // in the dedicated share worker (`src/bun/pi/web-server/share-thread.ts`) so
+  // `/share/open` and `/s/*` requests are governed by one share-specific
+  // authority whether they arrive through this proxy or directly at the worker
+  // in tests. This proxy forwards the worker's bounded streaming response
+  // without buffering it into the main server.
   const requestUrl = new URL(request.url);
   const upstreamHost = WEB_SERVER_SHARE_HOST.includes(":")
     ? `[${WEB_SERVER_SHARE_HOST}]`
