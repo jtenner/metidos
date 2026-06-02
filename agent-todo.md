@@ -39,10 +39,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
-- [ ] Add a repo-hosted changelog page. Context: the website exists in `website/`, and `docs/release-process.md` currently says changelog entries live in release notes or a future `CHANGELOG.md`. Remaining 3-minute slices:
-  - [ ] Decide whether the website changelog should be generated from a root `CHANGELOG.md`, GitHub releases, or a hand-maintained `website/changelog.html`, and document the source of truth in `docs/release-process.md`.
-  - [ ] Add the first website changelog page or placeholder that points to the chosen source of truth and uses safe, public release/demo content only.
-  - [ ] Link the changelog from the website navigation or docs page after the page/source exists.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for screenshot/demo sections that use safe data only.
 
 ## 9. Product Hardening

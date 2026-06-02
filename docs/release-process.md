@@ -64,7 +64,9 @@ Security checks:
 
 ## Changelog workflow
 
-Until automated changelog generation exists, maintain a human-readable changelog section in the release notes or a future `CHANGELOG.md`.
+Until automated changelog generation exists, maintain the root `CHANGELOG.md` as the human-readable source of truth for public changelog entries. The repo-hosted website changelog page at `website/changelog.html` points visitors back to that file instead of duplicating release history.
+
+During release preparation, move relevant `Unreleased` entries in `CHANGELOG.md` into a versioned section and summarize the same changes in GitHub release notes.
 
 Group changes by:
 
