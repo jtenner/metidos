@@ -10,6 +10,7 @@ import type {
   RpcWorktreeGitHistoryResult,
 } from "../../bun/rpc-schema";
 import {
+  createGitHistoryDiffModalOpenState,
   estimateGitHistoryDiffCacheEntryBytes,
   estimateGitHistoryResultBytes,
   GIT_HISTORY_LOAD_MORE_THRESHOLD_PX,
@@ -21,6 +22,55 @@ import {
 } from "./git-history-state";
 
 describe("git history state helpers", () => {
+  it("builds modal state for uncached loads and cached diff reopens", () => {
+    const entry: RpcGitHistoryEntry = {
+      authorName: "Alice",
+      committedAt: "2026-05-05T00:00:00Z",
+      hash: "abc123",
+      shortHash: "abc123",
+      subject: "Initial commit",
+    };
+    const cachedCommit: RpcGitHistoryEntry = {
+      ...entry,
+      authorName: "Cached Author",
+      subject: "Cached commit metadata",
+    };
+
+    expect(
+      createGitHistoryDiffModalOpenState({
+        projectId: 7,
+        worktreePath: "/repo/main",
+        entry,
+      }),
+    ).toEqual({
+      projectId: 7,
+      worktreePath: "/repo/main",
+      entry,
+      diffText: "",
+      loading: true,
+      error: "",
+    });
+
+    expect(
+      createGitHistoryDiffModalOpenState({
+        projectId: 7,
+        worktreePath: "/repo/main",
+        entry,
+        cached: {
+          commit: cachedCommit,
+          diffText: "+cached diff",
+        },
+      }),
+    ).toEqual({
+      projectId: 7,
+      worktreePath: "/repo/main",
+      entry: cachedCommit,
+      diffText: "+cached diff",
+      loading: false,
+      error: "",
+    });
+  });
+
   it("builds stable commit-diff cache keys", () => {
     expect(gitHistoryDiffCacheKey(7, "/repo/main", "abc123")).toBe(
       "7::/repo/main::abc123",

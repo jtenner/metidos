@@ -62,6 +62,27 @@ export function gitHistoryDiffCacheKey(
 }
 
 /**
+ * Builds the modal state used when opening or reopening a commit diff.
+ * Cached diffs reopen immediately while uncached diffs enter the loading state.
+ * @param params - Commit, worktree, and optional cached diff payload.
+ */
+export function createGitHistoryDiffModalOpenState(params: {
+  projectId: number;
+  worktreePath: string;
+  entry: RpcGitHistoryEntry;
+  cached?: GitHistoryDiffCacheEntry | null;
+}): GitHistoryModalState {
+  return {
+    projectId: params.projectId,
+    worktreePath: params.worktreePath,
+    entry: params.cached?.commit ?? params.entry,
+    diffText: params.cached?.diffText ?? "",
+    loading: !params.cached,
+    error: "",
+  };
+}
+
+/**
  * Replace current page while preserving pre-existing entries that are not duplicated by
  * the server page.
  */

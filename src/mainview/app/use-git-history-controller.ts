@@ -28,6 +28,7 @@ import {
 } from "./async-request-state";
 import {
   appendGitHistoryPage,
+  createGitHistoryDiffModalOpenState,
   estimateGitHistoryDiffCacheEntryBytes,
   estimateGitHistoryResultBytes,
   GIT_HISTORY_CACHE_PRUNE_INTERVAL_MS,
@@ -503,14 +504,14 @@ export function useGitHistoryController({
       gitHistoryDiffRequestIdRef.current = requestId;
       abortGitHistoryDiffRequest("Commit diff request was superseded.");
 
-      setGitHistoryModal({
-        projectId,
-        worktreePath,
-        entry: cached?.commit ?? entry,
-        diffText: cached?.diffText ?? "",
-        loading: !cached,
-        error: "",
-      });
+      setGitHistoryModal(
+        createGitHistoryDiffModalOpenState({
+          projectId,
+          worktreePath,
+          entry,
+          cached,
+        }),
+      );
 
       if (cached) {
         return;
