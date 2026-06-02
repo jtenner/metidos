@@ -1015,7 +1015,7 @@ export function CodexModelSelector({
         )}
       />
       <PopoverSurface
-        className="z-[110] max-w-[20rem] rounded-sm border border-warning-border bg-warning-surface px-3 py-2 text-xs leading-5 text-warning-text shadow-overlay backdrop-blur-sm"
+        className="z-[110] max-w-[20rem] rounded-sm border border-warning-border bg-warning-surface px-3 py-2 text-xs leading-5 text-warning-text shadow-overlay"
         offsetPx={12}
         open={providerWarningPopover !== null}
         placement="right"
