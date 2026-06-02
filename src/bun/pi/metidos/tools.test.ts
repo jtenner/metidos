@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import type { RpcCalendarEvent } from "../../calendar/types";
+import { AuthServiceError } from "../../auth/service";
 import type {
   AppRPCSchema,
   RpcCronJob,
@@ -1039,6 +1040,72 @@ describe("createPiMetidosTools", () => {
     expect(() => getTool(scope, host, "model_providers")).toThrow(
       "Tool not found: model_providers",
     );
+  });
+
+  it("surfaces authenticated-operator failures from Pi-native calendar host callbacks", async () => {
+    const scope = makeScope({ calendarAccessEnabled: true });
+    const authError = new AuthServiceError(
+      "session_required",
+      "A valid authenticated session is required for calendar access.",
+    );
+    const host = createHost({
+      createCalendarEvent: async () => {
+        throw authError;
+      },
+      getCalendarBootstrap: async () => {
+        throw authError;
+      },
+      listCalendarOccurrences: async () => {
+        throw authError;
+      },
+      updateCalendarEvent: async () => {
+        throw authError;
+      },
+    });
+    const cases: Array<{
+      args: unknown;
+      name: string;
+    }> = [
+      { args: {}, name: "list_calendars" },
+      {
+        args: {
+          end: "2026-04-30T23:59:59.000Z",
+          start: "2026-04-30T00:00:00.000Z",
+        },
+        name: "list_calendar_events",
+      },
+      {
+        args: { occurrenceId: "local:22:2026-04-30T14:00:00.000Z" },
+        name: "show_calendar_event",
+      },
+      {
+        args: {
+          calendarId: 1,
+          endAt: "2026-04-30T14:30:00.000Z",
+          startAt: "2026-04-30T14:00:00.000Z",
+          timezone: "America/New_York",
+          title: "Planning",
+        },
+        name: "new_calendar_event",
+      },
+      {
+        args: { eventId: 22, title: "Planning updated" },
+        name: "modify_calendar_event",
+      },
+    ];
+
+    expect.assertions(cases.length * 3);
+    for (const { args, name } of cases) {
+      try {
+        await executeTool(scope, host, name, args);
+      } catch (error) {
+        expect(error, name).toBeInstanceOf(AuthServiceError);
+        expect((error as AuthServiceError).code, name).toBe("session_required");
+        expect((error as AuthServiceError).message, name).toBe(
+          "A valid authenticated session is required for calendar access.",
+        );
+      }
+    }
   });
 
   it("creates and starts a new safe child thread immediately from a safe thread", async () => {
