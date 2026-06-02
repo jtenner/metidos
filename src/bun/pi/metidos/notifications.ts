@@ -6,6 +6,7 @@
 import { defineTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
+import { AuthServiceError } from "../../auth/service";
 import {
   type PiMetidosToolHost,
   type PiMetidosToolScope,
@@ -68,6 +69,19 @@ function assertNotificationToolsAllowed(
   }
 }
 
+async function invokeNotificationHost<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    if (error instanceof AuthServiceError) {
+      throw error;
+    }
+    throw new Error(
+      "Notification delivery failed. Check notification settings for details.",
+    );
+  }
+}
+
 export function createPiMetidosNotificationTools(
   scope: PiMetidosToolScope,
   host: PiMetidosToolHost,
@@ -80,18 +94,23 @@ export function createPiMetidosNotificationTools(
         description:
           "Send a notification to the owning user of this thread or cron. Requires Notifications access.",
         execute: async (_toolCallId, params) => {
-          const result = await host.notifyUser?.({
-            body: params.message,
-            clickUrl: params.clickUrl ?? null,
-            priority: params.priority ?? "low",
-            sourceThreadId: scope.threadIdContext,
-            sourceType: "ai_tool",
-            tags: params.tags ?? [],
-            title: params.title,
-          });
-          if (!result) {
-            throw new Error("Notification host did not return a result.");
+          const notifyUser = host.notifyUser;
+          if (!notifyUser) {
+            throw new Error(
+              "Notification tools require a Metidos notification host.",
+            );
           }
+          const result = await invokeNotificationHost(() =>
+            notifyUser({
+              body: params.message,
+              clickUrl: params.clickUrl ?? null,
+              priority: params.priority ?? "low",
+              sourceThreadId: scope.threadIdContext,
+              sourceType: "ai_tool",
+              tags: params.tags ?? [],
+              title: params.title,
+            }),
+          );
           return textToolResult(result.message, result);
         },
         label: "Notify User",

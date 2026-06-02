@@ -1106,6 +1106,113 @@ describe("createPiMetidosTools", () => {
     );
   });
 
+  it("hides notification tools unless Notifications access is enabled", () => {
+    const host = createHost({
+      notifyUser: async () => ({
+        deliveryId: 12,
+        message: "Delivered notification.",
+        status: "delivered",
+      }),
+    });
+
+    expect(() => getTool(makeScope(), host, "notify_user")).toThrow(
+      "Tool not found: notify_user",
+    );
+    expect(
+      getTool(
+        makeScope({ notificationsAccessEnabled: true }),
+        host,
+        "notify_user",
+      ).name,
+    ).toBe("notify_user");
+  });
+
+  it("sends Pi-native notifications with safe defaults", async () => {
+    const scope = makeScope({ notificationsAccessEnabled: true });
+    let receivedParams: Record<string, unknown> | null = null;
+    const host = createHost({
+      notifyUser: async (params) => {
+        receivedParams = params;
+        return {
+          deliveryId: 12,
+          message: "Delivered notification.",
+          status: "delivered",
+        };
+      },
+    });
+
+    const result = await executeTool(scope, host, "notify_user", {
+      message: "Background task finished.",
+      title: "Task complete",
+    });
+
+    expectDeepEqual(requireValue(receivedParams), {
+      body: "Background task finished.",
+      clickUrl: null,
+      priority: "low",
+      sourceThreadId: 11,
+      sourceType: "ai_tool",
+      tags: [],
+      title: "Task complete",
+    });
+    expect(resultText(result)).toBe("Delivered notification.");
+    expect(result.details).toMatchObject({
+      deliveryId: 12,
+      status: "delivered",
+    });
+  });
+
+  it("surfaces authenticated-operator failures from Pi-native notification delivery", async () => {
+    const scope = makeScope({ notificationsAccessEnabled: true });
+    const authError = new AuthServiceError(
+      "session_required",
+      "A valid authenticated session is required for notification delivery.",
+      401,
+    );
+    const host = createHost({
+      notifyUser: async () => {
+        throw authError;
+      },
+    });
+
+    await expect(
+      executeTool(scope, host, "notify_user", {
+        message: "Background task finished.",
+        title: "Task complete",
+      }),
+    ).rejects.toBe(authError);
+  });
+
+  it("sanitizes host failure messages from Pi-native notification delivery", async () => {
+    const scope = makeScope({ notificationsAccessEnabled: true });
+    const leakedHostError =
+      "ntfy delivery failed for https://ntfy.local/u/jtenner?token=sk-test-secret from /home/jtenner/private";
+    const host = createHost({
+      notifyUser: async () => {
+        throw new Error(leakedHostError);
+      },
+    });
+
+    try {
+      await executeTool(scope, host, "notify_user", {
+        clickUrl: "https://metidos.local/thread/11",
+        message: "Background task failed.",
+        priority: "urgent",
+        tags: ["agent", "todo"],
+        title: "Task failed",
+      });
+      throw new Error("Expected notify_user to fail.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toBe(
+        "Notification delivery failed. Check notification settings for details.",
+      );
+      expect(message).not.toContain("ntfy.local");
+      expect(message).not.toContain("sk-test-secret");
+      expect(message).not.toContain("/home/jtenner/private");
+    }
+  });
+
   it("surfaces authenticated-operator failures from Pi-native calendar host callbacks", async () => {
     const scope = makeScope({ calendarAccessEnabled: true });
     const authError = new AuthServiceError(
