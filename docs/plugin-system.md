@@ -124,6 +124,16 @@ Network fetch/websocket APIs require explicit permissions and manifest allowlist
 
 Network policy failures should surface as plugin-visible errors without exposing unrelated host details.
 
+## Model providers
+
+A plugin can register model provider families when it owns the provider transport, model discovery, or request execution. The manifest must declare each provider family in `providers[]` with stable operator-facing metadata such as `id`, `name`, `description`, and `timeoutMs`, and it must include `provider:register`. Provider code must register matching families during plugin startup with `metidos.providers.addProvider(...)` or `registerProvider(...)`; late or undeclared registration is a contract failure.
+
+Credentials should come from declared Plugin Settings or `env` entries, not source code. If Pi already owns the provider transport and catalog, use manifest-level `piAuth` to hand credentials to that existing Pi provider instead of registering a new provider family. If the plugin owns dynamic configurations, each returned configuration can include ordered `piAuth` fallbacks so the host can resolve the correct credential for that configuration. Secret values are stored by Metidos, materialized only for the plugin runtime or Pi auth handoff, and must not be logged or exposed in diagnostics.
+
+The request flow is: the Local Operator installs and reviews the plugin folder, approves the current review hash, fills any required settings, and activates the plugin; during startup the plugin registers provider families and returns provider configurations/models; Metidos publishes stable Pi model ids derived from the plugin/provider/configuration/model identity; when a Thread or Cron selects one of those models, Pi sends execution or embedding requests through the registered plugin callback under host-enforced timeouts, settings, network policy, and permissions. Refresh failures should leave diagnostics or empty/placeholder model lists rather than inventing unsafe fallback models.
+
+User approval is part of the provider contract. Review `providers[]`, requested permissions, settings/env secrets, network allowlists, embedding capability, and whether raw prompts or embedding input can leave the local machine before enabling the plugin. Source changes outside excluded runtime paths require re-review before the changed provider code can run.
+
 ## Notification providers
 
 A plugin can register notification provider families such as an ntfy, webhook, or email outlet. The manifest must declare each family in `notificationProviders[]` and include `notification:provider`; provider code must register matching families during plugin startup with `metidos.notifications.addProvider(...)` or `registerProvider(...)`.

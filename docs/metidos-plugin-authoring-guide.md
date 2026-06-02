@@ -578,6 +578,10 @@ OAuth adapters return normalized credentials with `access`, `refresh`, and `expi
 
 For plugin-owned model providers, Metidos normally creates the Pi registry id `plugin_id/provider_id/configuration_id`, such as `ollama/ollama/default`. The `provider` value is passed to Pi as written. An intentional exception is a plugin that refreshes a Pi built-in provider in place by reusing that built-in provider id; in that case Metidos preserves the built-in provider id instead of namespacing it.
 
+Treat provider metadata as part of the operator review contract. `providers[]` should name each provider family clearly enough for Settings -> Plugins review, including stable `id`, human `name`, useful `description`, and bounded `timeoutMs`. Each runtime provider configuration should also expose stable `id`, display label/name, model list, capability flags, base URL or API hint when helpful, and any pricing or compatibility metadata the operator needs to distinguish safe local providers from remote paid providers.
+
+Provider credentials must come from declared Plugin Settings, declared `env` entries, or explicit per-configuration `piAuth` records. Do not hard-code credentials in plugin source, examples, seeds, model metadata, or AGENTS guidance. Secret values are materialized for the plugin runtime or Pi auth handoff only after the local operator approves the plugin and saves settings; provider callbacks, model lists, thrown errors, logs, and diagnostics must avoid echoing them.
+
 When a plugin owns dynamic provider configurations, put the ordered auth records on each returned configuration instead of the manifest. The host derives the target Pi provider id from that configuration:
 
 ```ts
@@ -592,6 +596,15 @@ return [{
 ```
 
 `metidos.providers.addProvider({ id, timeoutMs, refreshIntervalMs?, getProviderConfigurations, execute?, embed? })` and `metidos.providers.registerProvider(...)` require `provider:register`, must run during initialization, and are limited to 10 provider families per plugin. Providers that can return embeddings should declare `metidos:provides_embeddings` and implement `embed(context, request)`; callers use `metidos.embeddings.embed(input, payload?)` and require `metidos:can_embed`.
+
+Request flow for plugin-owned providers:
+
+1. The Local Operator installs the plugin folder, reviews `providers[]`, permissions, settings/env declarations, network allowlists, and review hash, then approves and activates it.
+2. At startup the plugin registers provider families and `getProviderConfigurations()` returns configurations and model metadata. Metidos builds stable Pi model identities from plugin id, provider id, configuration id, and model id.
+3. When a Thread, Cron Job, or embedding call selects one of those models, Pi routes the request to the plugin `execute(context, request)` or `embed(context, request)` callback with callback context, selected configuration, selected model, options, and prompt/input payload.
+4. The callback may use only declared host APIs such as `metidos.fetch`, Plugin Settings, storage, or logging. Host policy still enforces permissions, network allowlists, timeouts, and sidecar limits.
+5. The callback returns a Pi-compatible response or embedding vector. Errors should be classified and redacted; never include API keys, bearer tokens, raw auth files, sensitive local paths, or private prompt/input text in user-facing diagnostics unless the operator explicitly requested that content.
+
 
 Embedding provider callback details:
 
