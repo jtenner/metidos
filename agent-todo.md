@@ -7,7 +7,7 @@ This checklist is for repository improvements only before making Metidos public/
 ## 1. Repository Hygiene and Public Readiness
 
 - [ ] Finish checked-in artwork ownership review. Context: `docs/public-asset-provenance-audit-2026-06-02.md` inventories tracked PNG/font assets, confirms font license coverage, and documents `docs/uploadthing-test.png` as a repo-owned generated fixture; `website/README.md` now acknowledges the tracked `website/bird.png` asset. Remaining 3-minute slices:
-  - [ ] Document/confirm provenance and redistribution approval for the shared bird mascot/favicon asset at `bird.png` and `website/bird.png`, including why both copies should remain tracked if both stay.
+  - [ ] Ask the maintainer to confirm creator/source, creation date if known, license/assignment/redistribution approval for the shared bird mascot/favicon asset at `bird.png` and `website/bird.png`, or replace/remove both before publishing. Context: `docs/public-asset-provenance-audit-2026-06-02.md` now documents byte identity, lack of PNG text metadata, Git history only tracing to the initial snapshot, current root/website usage, and why both copies may remain tracked if approved.
   - [ ] Resolve `src/mainview/crown.png` provenance blocker. Context: audit inspection found no textual PNG metadata and Git history only traces to the 2026-05-27 initial open-source snapshot; ask the maintainer to confirm creator/source, creation date if known, and license/assignment/redistribution approval, or replace/remove the asset before publishing.
   - [ ] Document/confirm provenance and redistribution approval for `src/mainview/logo.png`.
   - [ ] Document/confirm provenance and redistribution approval for `src/mainview/pixel-crown.png`.
