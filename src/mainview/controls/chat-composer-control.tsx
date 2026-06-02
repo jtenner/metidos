@@ -114,7 +114,7 @@ function ChatComposerImageAttachmentPreview({
       <AppButton
         aria-label={`Remove image ${index + 1}`}
         buttonStyle="muted"
-        className="h-6 w-6 min-w-0 border-transparent bg-transparent"
+        className="h-7 w-7 min-w-0 border-transparent bg-transparent"
         iconOnly
         onClick={onRemove}
       >
