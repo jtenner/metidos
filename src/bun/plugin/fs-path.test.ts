@@ -5,6 +5,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 import {
+  constants as fsConstants,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -20,6 +21,7 @@ import {
   openValidatedPluginFsPathSync,
   PluginFsPathError,
   pluginFsReadOpenFlags,
+  pluginFsWriteOpenFlags,
   readValidatedPluginFsFileDescriptor,
   resolvePluginFsVirtualPath,
   splitRelativePathSegments,
@@ -434,6 +436,21 @@ describe("plugin fs virtual path resolver", () => {
       exists: true,
       virtualPath: "~/safe-parent/nested",
     });
+  });
+
+  it("uses O_NOFOLLOW for plugin fs open flags on supported platforms", () => {
+    if (process.platform === "win32") {
+      expect(pluginFsReadOpenFlags() & fsConstants.O_NOFOLLOW).toBe(0);
+      expect(pluginFsWriteOpenFlags() & fsConstants.O_NOFOLLOW).toBe(0);
+      return;
+    }
+
+    expect(pluginFsReadOpenFlags() & fsConstants.O_NOFOLLOW).toBe(
+      fsConstants.O_NOFOLLOW,
+    );
+    expect(pluginFsWriteOpenFlags() & fsConstants.O_NOFOLLOW).toBe(
+      fsConstants.O_NOFOLLOW,
+    );
   });
 
   it("opens validated plugin paths with a synchronous lstat/open pair", async () => {

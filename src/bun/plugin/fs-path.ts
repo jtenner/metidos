@@ -494,6 +494,11 @@ export function pluginFsVirtualRootForPath(
 }
 
 export function pluginFsReadOpenFlags(): number {
+  // POSIX hosts ask the kernel to reject symlink leaves at open time. Bun/Node
+  // exposes O_NOFOLLOW on Windows but Windows open() does not provide the same
+  // leaf-symlink contract, so openValidatedPluginFsPathSync() fails closed with
+  // a synchronous lstat rejection before open instead of passing a misleading
+  // flag.
   return process.platform === "win32"
     ? fsConstants.O_RDONLY
     : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
@@ -502,6 +507,9 @@ export function pluginFsReadOpenFlags(): number {
 export function pluginFsWriteOpenFlags(): number {
   const flags =
     fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC;
+  // Keep read/write behavior aligned: supported platforms use O_NOFOLLOW, while
+  // Windows relies on the same lstat-before-open fail-closed guard documented
+  // above.
   return process.platform === "win32" ? flags : flags | fsConstants.O_NOFOLLOW;
 }
 
