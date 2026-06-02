@@ -560,6 +560,11 @@ const DEV_FLOW_MODE = resolveDevFlowMode({
   isDevServer: IS_DEV_SERVER,
 });
 
+// The share worker intentionally uses a fixed, separately configured port so
+// externally distributed `/share/open` and `/s/*` URLs remain stable while the
+// main app server may move. Reject an initial same-port configuration early;
+// the dev-only main-server fallback below only runs when the preferred app port
+// is already occupied, and it does not rewrite the share-worker port.
 if (WEB_SERVER_SHARE_PORT === SERVER_PORT) {
   throw new Error(
     `METIDOS web-server share port ${WEB_SERVER_SHARE_PORT} conflicts with the main HTTP port ${SERVER_PORT}. Configure ${"METIDOS_WEB_SERVER_SHARE_PORT"} to a different fixed port.`,
@@ -4653,6 +4658,10 @@ async function bootstrap(): Promise<void> {
       throw error;
     }
 
+    // Development fallback affects only the main HTTP/WebSocket server. The
+    // share worker keeps METIDOS_WEB_SERVER_SHARE_PORT fixed so existing stable
+    // share URLs and upstream proxy assumptions do not change when the app dev
+    // port falls back to an ephemeral port.
     server = Bun.serve({
       ...serverOptions,
       port: 0,
