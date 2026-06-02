@@ -39,8 +39,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
-- [ ] Add a repo-hosted website plugin page. Context: `website/` already contains a static no-framework home page, docs landing page, and getting-started page. Keep the page self-contained, token-aligned, and free of private data or placeholder public URLs unless explicitly tracked. Remaining 3-minute slices:
-  - [ ] Draft the plugin page information architecture: plugin safety model, approval/review flow, capabilities/permissions, local data boundaries, and authoring entry points.
+- [ ] Add a repo-hosted website plugin page. Context: `website/` already contains a static no-framework home page, docs landing page, and getting-started page. Keep the page self-contained, token-aligned, and free of private data or placeholder public URLs unless explicitly tracked. The page information architecture is drafted in `docs/website-plugin-page-information-architecture-2026-06-02.md`; use it for the plugin safety model, approval/review flow, capabilities/permissions, local data boundaries, and authoring entry points. Remaining 3-minute slices:
   - [ ] Add `website/plugins.html` using existing website tokens/components and only links that already exist in the public repo/docs.
   - [ ] Link the plugin page from `website/index.html`, `website/docs.html`, and `website/README.md` after the page exists.
   - [ ] Build or otherwise validate the static website page and note any unresolved placeholder URL decisions.
