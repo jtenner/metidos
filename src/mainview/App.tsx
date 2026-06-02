@@ -3244,12 +3244,12 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                 dismissUserNotification(item.notification.id);
               }}
             >
-              <div className="font-medium text-text-secondary">
+              <span className="block font-medium text-text-secondary">
                 {item.notification.title}
-              </div>
-              <div className="text-[11px] text-text-faint">
+              </span>
+              <span className="block text-[11px] text-text-faint">
                 {item.notification.body}
-              </div>
+              </span>
             </AppButton>
             <AppButton
               unstyled

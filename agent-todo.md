@@ -216,7 +216,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/controls/chat-composer-control.tsx`.
 - [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/app/calendar-workspace.tsx`.
 - [ ] Standardize small icon buttons to the 28px standard instead of 24px in `src/mainview/controls/list-row.tsx`.
-- [ ] Fix invalid notification tray markup in `src/mainview/App.tsx` by avoiding block-level `<div>` nesting inside an unstyled `AppButton`/`<button>`.
 
 ## 14. Backend Audit Follow-up: `src/bun` Bugs, Security Findings, and Threat-Model Clarifications
 
