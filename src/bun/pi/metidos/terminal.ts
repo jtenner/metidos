@@ -152,6 +152,19 @@ function terminalDirectory(scope: PiMetidosToolScope, dir: string): string {
   return resolved;
 }
 
+async function invokeTerminalHost<T>(
+  operation: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await action();
+  } catch {
+    throw new Error(
+      `Terminal ${operation} failed. Check the terminal workspace for details.`,
+    );
+  }
+}
+
 export function createPiMetidosTerminalTools(
   scope: PiMetidosToolScope,
   host: PiMetidosToolHost,
@@ -166,17 +179,20 @@ export function createPiMetidosTerminalTools(
           const dir = params.dir?.trim()
             ? terminalDirectory(scope, params.dir)
             : scope.worktreePathContext;
-          if (!host.createTerminal) {
+          const createTerminal = host.createTerminal;
+          if (!createTerminal) {
             throw new Error("Terminal host is unavailable.");
           }
-          const terminal = await host.createTerminal({
-            command: params.command?.trim() || null,
-            createdFromThreadId: scope.threadIdContext,
-            dir,
-            projectId: scope.projectIdContext,
-            title: params.title?.trim() || null,
-            worktreePath: scope.worktreePathContext,
-          });
+          const terminal = await invokeTerminalHost("creation", () =>
+            createTerminal({
+              command: params.command?.trim() || null,
+              createdFromThreadId: scope.threadIdContext,
+              dir,
+              projectId: scope.projectIdContext,
+              title: params.title?.trim() || null,
+              worktreePath: scope.worktreePathContext,
+            }),
+          );
           return textToolResult(
             `Created terminal "${terminal.title}" in ${terminal.projectName} · ${terminal.worktreeFolder}.`,
             terminalPayload(terminal),
@@ -192,10 +208,13 @@ export function createPiMetidosTerminalTools(
       defineTool({
         description: "List current terminals for the local operator.",
         execute: async () => {
-          if (!host.listTerminals) {
+          const listTerminals = host.listTerminals;
+          if (!listTerminals) {
             throw new Error("Terminal host is unavailable.");
           }
-          const terminals = await host.listTerminals(terminalAccess(scope));
+          const terminals = await invokeTerminalHost("list", () =>
+            listTerminals(terminalAccess(scope)),
+          );
           return textToolResult(terminalTable(terminals), {
             terminals: terminals.map(terminalPayload),
           });
@@ -210,10 +229,13 @@ export function createPiMetidosTerminalTools(
       defineTool({
         description: "Close one terminal by terminalIndex.",
         execute: async (_toolCallId, params) => {
-          if (!host.killTerminal) {
+          const killTerminal = host.killTerminal;
+          if (!killTerminal) {
             throw new Error("Terminal host is unavailable.");
           }
-          await host.killTerminal(params.terminalIndex, terminalAccess(scope));
+          await invokeTerminalHost("close", () =>
+            killTerminal(params.terminalIndex, terminalAccess(scope)),
+          );
           return textToolResult(`Closed terminal ${params.terminalIndex}.`, {
             terminalIndex: params.terminalIndex,
           });
@@ -229,14 +251,17 @@ export function createPiMetidosTerminalTools(
         description:
           "View retained cleaned output from one terminal by terminalIndex.",
         execute: async (_toolCallId, params) => {
-          if (!host.viewTerminal) {
+          const viewTerminal = host.viewTerminal;
+          if (!viewTerminal) {
             throw new Error("Terminal host is unavailable.");
           }
-          const text = await host.viewTerminal(
-            params.terminalIndex,
-            params.lineOffset,
-            params.lineCount,
-            terminalAccess(scope),
+          const text = await invokeTerminalHost("view", () =>
+            viewTerminal(
+              params.terminalIndex,
+              params.lineOffset,
+              params.lineCount,
+              terminalAccess(scope),
+            ),
           );
           return textToolResult(text, {
             lineCount: params.lineCount ?? 200,
@@ -255,9 +280,6 @@ export function createPiMetidosTerminalTools(
         description:
           "Search retained cleaned output from one terminal by terminalIndex.",
         execute: async (_toolCallId, params) => {
-          if (!host.grepTerminal) {
-            throw new Error("Terminal host is unavailable.");
-          }
           const grepOptions: { ignoreCase?: boolean; maxMatches?: number } = {};
           if (typeof params.ignoreCase === "boolean") {
             grepOptions.ignoreCase = params.ignoreCase;
@@ -265,11 +287,17 @@ export function createPiMetidosTerminalTools(
           if (typeof params.maxMatches === "number") {
             grepOptions.maxMatches = params.maxMatches;
           }
-          const text = await host.grepTerminal(
-            params.terminalIndex,
-            params.pattern,
-            grepOptions,
-            terminalAccess(scope),
+          const grepTerminal = host.grepTerminal;
+          if (!grepTerminal) {
+            throw new Error("Terminal host is unavailable.");
+          }
+          const text = await invokeTerminalHost("search", () =>
+            grepTerminal(
+              params.terminalIndex,
+              params.pattern,
+              grepOptions,
+              terminalAccess(scope),
+            ),
           );
           return textToolResult(text, {
             ignoreCase: params.ignoreCase ?? false,

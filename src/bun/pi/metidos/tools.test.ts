@@ -667,6 +667,81 @@ describe("createPiMetidosTools", () => {
     expect(createTerminalCalled).toBe(false);
   });
 
+  it("sanitizes host failure messages from Pi-native terminal tools", async () => {
+    const scope = makeScope({ unsafeModeEnabled: true });
+    const leakedHostError =
+      "node-pty spawn failed in /home/jtenner/private with OPENAI_API_KEY=sk-test-secret and impl terminal-99";
+    const host = createHost({
+      createTerminal: async () => {
+        throw new Error(leakedHostError);
+      },
+      grepTerminal: async () => {
+        throw new Error(leakedHostError);
+      },
+      killTerminal: async () => {
+        throw new Error(leakedHostError);
+      },
+      listTerminals: async () => {
+        throw new Error(leakedHostError);
+      },
+      viewTerminal: async () => {
+        throw new Error(leakedHostError);
+      },
+    });
+
+    const cases: Array<{
+      args: unknown;
+      expectedMessage: string;
+      name: string;
+    }> = [
+      {
+        args: { command: "bun test" },
+        expectedMessage:
+          "Terminal creation failed. Check the terminal workspace for details.",
+        name: "new_terminal",
+      },
+      {
+        args: {},
+        expectedMessage:
+          "Terminal list failed. Check the terminal workspace for details.",
+        name: "list_terminals",
+      },
+      {
+        args: { terminalIndex: 0 },
+        expectedMessage:
+          "Terminal close failed. Check the terminal workspace for details.",
+        name: "kill_terminal",
+      },
+      {
+        args: { terminalIndex: 0 },
+        expectedMessage:
+          "Terminal view failed. Check the terminal workspace for details.",
+        name: "view_terminal",
+      },
+      {
+        args: { pattern: "secret", terminalIndex: 0 },
+        expectedMessage:
+          "Terminal search failed. Check the terminal workspace for details.",
+        name: "grep_terminal",
+      },
+    ];
+
+    for (const testCase of cases) {
+      try {
+        await executeTool(scope, host, testCase.name, testCase.args);
+        throw new Error(`Expected ${testCase.name} to fail.`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        expect(message).toBe(testCase.expectedMessage);
+        expect(message).not.toContain("/home/jtenner/private");
+        expect(message).not.toContain("OPENAI_API_KEY");
+        expect(message).not.toContain("sk-test-secret");
+        expect(message).not.toContain("node-pty");
+        expect(message).not.toContain("terminal-99");
+      }
+    }
+  });
+
   it("updates thread metadata while ignoring in-thread access toggles", async () => {
     const scope = makeScope();
     let receivedParams: Record<string, unknown> | null = null;
