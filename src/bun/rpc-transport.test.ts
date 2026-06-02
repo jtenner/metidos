@@ -4,6 +4,7 @@ import {
   encodeRpcBinaryFrame,
   isRpcBinaryFrame,
 } from "../shared/rpc-binary-codec";
+import { createCronRpcHandlers } from "./rpc-handlers/cron";
 import {
   createRpcTransport,
   encodeRpcServerFrame,
@@ -267,6 +268,102 @@ describe("RPC transport", () => {
       type: "response",
     });
     expect(harness.failed).toHaveLength(1);
+  });
+
+  test("preserves regular-user context for cron authorization routes", async () => {
+    const calls: Array<{
+      auth: RpcRequestContext["auth"];
+      method: string;
+      params: unknown;
+    }> = [];
+    const cronHandlers = createCronRpcHandlers({
+      listCronsProcedure: async (params, context) => {
+        calls.push({ auth: context.auth, method: "listCrons", params });
+        return [] as never;
+      },
+      newCronProcedure: async () => ({ id: 0 }) as never,
+      runCronNowProcedure: async (params, context) => {
+        calls.push({ auth: context.auth, method: "runCronNow", params });
+        return { success: true } as never;
+      },
+      syncCronSchedulerCron: () => {},
+      updateCronProcedure: async (params, context) => {
+        calls.push({ auth: context.auth, method: "updateCron", params });
+        return { id: 61 } as never;
+      },
+    });
+    const harness = createHarness(cronHandlers as never);
+    const transport = createRpcTransport(harness.options);
+    const socket = createFakeSocket({
+      isAdmin: false,
+      sessionId: "cron-route-regular-session",
+      stepUpValidUntil: "2026-09-08T00:00:00.000Z",
+      userId: 61,
+      username: "cron-route-regular-user",
+    });
+    transport.open(socket as never);
+
+    transport.handleMessage(socket as never, request(61, "listCrons"));
+    transport.handleMessage(
+      socket as never,
+      request(62, "updateCron", { cronJobId: 61, title: "User rename" }),
+    );
+    transport.handleMessage(
+      socket as never,
+      request(63, "updateCron", { cronJobId: 61, deleted: true }),
+    );
+    transport.handleMessage(
+      socket as never,
+      request(64, "runCronNow", { cronJobId: 61 }),
+    );
+
+    await waitFor(() => expect(socket.sent).toHaveLength(4));
+    expect(calls).toEqual([
+      {
+        auth: {
+          isAdmin: false,
+          sessionId: "cron-route-regular-session",
+          stepUpValidUntil: "2026-09-08T00:00:00.000Z",
+          userId: 61,
+          username: "cron-route-regular-user",
+        },
+        method: "listCrons",
+        params: {},
+      },
+      {
+        auth: {
+          isAdmin: false,
+          sessionId: "cron-route-regular-session",
+          stepUpValidUntil: "2026-09-08T00:00:00.000Z",
+          userId: 61,
+          username: "cron-route-regular-user",
+        },
+        method: "updateCron",
+        params: { cronJobId: 61, title: "User rename" },
+      },
+      {
+        auth: {
+          isAdmin: false,
+          sessionId: "cron-route-regular-session",
+          stepUpValidUntil: "2026-09-08T00:00:00.000Z",
+          userId: 61,
+          username: "cron-route-regular-user",
+        },
+        method: "updateCron",
+        params: { cronJobId: 61, deleted: true },
+      },
+      {
+        auth: {
+          isAdmin: false,
+          sessionId: "cron-route-regular-session",
+          stepUpValidUntil: "2026-09-08T00:00:00.000Z",
+          userId: 61,
+          username: "cron-route-regular-user",
+        },
+        method: "runCronNow",
+        params: { cronJobId: 61 },
+      },
+    ]);
   });
 
   test("responds to unknown methods and drops invalid frames before dispatch", async () => {
