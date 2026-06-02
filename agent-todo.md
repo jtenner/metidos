@@ -301,7 +301,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G11: Review `clientsBySessionId` cleanup in `src/bun/rpc-transport.ts`. Add leak tests or comments explaining regular Map cleanup on `close`.
 - [ ] G12: Review RPC measurement start/failure paths in `src/bun/rpc-transport.ts`. Add tests/comments ensuring malformed frames do not leave open telemetry tokens.
 - [ ] G13: Review decoded binary RPC payload limits in `src/bun/rpc-transport.ts`. Add tests for compressed/oversize rejection if missing.
-- [ ] G14: Review client compressed binary frame rejection in `src/bun/rpc-transport.ts`. Add a comment/test explaining why clients cannot send compressed frames.
 - [ ] G15: Review large RPC response JSON fallback in `src/bun/rpc-transport.ts`. If it blocks the event loop, prefer compressed binary for responses too; otherwise document compatibility tradeoff.
 - [ ] G16: Review cron timeout behavior in `src/bun/sidecar-cron-runner.ts`. If timed-out cron threads keep running, abort/stop the Pi session; otherwise comment known resource behavior and add telemetry.
 - [ ] G17: Review scheduled cron pending-count bookkeeping in `src/bun/sidecar-cron-runner.ts`. Add tests/comments to prevent mismatch with the actual concurrency limiter.

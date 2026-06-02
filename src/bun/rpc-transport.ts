@@ -454,6 +454,11 @@ async function parseRpcClientPayload(
   if (isRpcBinaryFrame(raw)) {
     try {
       return (await decodeRpcBinaryFrame(raw, {
+        // Clients may send JSON text or uncompressed RPC binary frames only. The
+        // server rejects compressed client frames because Bun already enforces
+        // maxPayloadLength on the wire bytes; accepting compressed input would
+        // make resource accounting depend on decompression ratio instead of the
+        // existing per-message payload cap.
         allowCompressed: false,
         maxDecodedBodyBytes: options.maxPayloadBytes,
       })) as ParsedRpcClientMessage;
