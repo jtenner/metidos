@@ -281,13 +281,16 @@ Remote access is advanced. Prefer localhost until local auth, providers, and pro
 When exposing through a reverse proxy:
 
 - terminate TLS at the proxy,
+- start Metidos with `bun run start:tls` so it treats the browser transport as HTTPS/wss,
 - set `METIDOS_PUBLIC_ORIGIN` to the exact browser origin,
-- set `METIDOS_ALLOWED_WS_ORIGINS` when additional origins are required,
+- set `METIDOS_ALLOWED_WS_ORIGINS` when additional legitimate browser origins are required,
 - set `METIDOS_TRUST_PROXY=true` only if the proxy is the only public path to Bun and overwrites forwarded headers,
+- set `METIDOS_ALLOWED_FORWARDED_ORIGINS` only when trust-proxy mode needs forwarded origins beyond `METIDOS_PUBLIC_ORIGIN`,
+- set `METIDOS_TRUSTED_PROXY_PEERS` when the trusted proxy peer is not loopback,
 - forward WebSocket upgrades for `/rpc`,
 - keep the backend bound to loopback where possible.
 
-For Tailscale-style access, use the DNS name that matches `METIDOS_PUBLIC_ORIGIN`, not the raw private-network IP.
+For Tailscale-style access, use the DNS name that matches `METIDOS_PUBLIC_ORIGIN`, not the raw private-network IP. If `/rpc` fails after sign-in, use the reverse-proxy checklist in [Troubleshooting](docs/troubleshooting.md#rpc-fails-behind-a-proxy).
 
 ### Backup, restore, and reset
 

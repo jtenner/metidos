@@ -56,9 +56,9 @@ The remaining gaps should be run in disposable checkouts, containers, VMs, or fr
    - Smoke Docker and/or Podman guidance, including required mounts/env, first-run auth, provider configuration expectations, backup/restore notes, and teardown.
    - Record host OS, container engine/version, commands, pass/fail status, and any prerequisites.
 
-8. **Reverse-proxy/Tailscale/TLS path**
-   - Smoke or explicitly desk-check the remote-access path, including `METIDOS_PUBLIC_ORIGIN`, WebSocket origin settings, trusted proxy settings, `start:tls`, and troubleshooting guidance.
-   - Record which checks were executed versus only reviewed.
+8. **Reverse-proxy/Tailscale/TLS path** — desk-checked in `docs/remote-access-setup-desk-check-2026-06-02.md`.
+   - `INSTALLATION.md`, `docs/troubleshooting.md`, `docs/security-model.md`, `docs/operator-runbook.md`, and `docs/security/threat-model.md` were reviewed for `METIDOS_PUBLIC_ORIGIN`, WebSocket origin settings, trusted proxy settings, `start:tls`, Tailscale DNS guidance, and troubleshooting coverage.
+   - No live reverse proxy, Tailscale device, TLS certificate, or browser session was exercised in that slice; a future live smoke can still verify the path end to end.
 
 9. **Installer skill path**
    - Run the plan-first `.pi/skills/metidos-installation/SKILL.md` workflow in a dry-run or approved disposable scenario.
