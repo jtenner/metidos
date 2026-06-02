@@ -62,7 +62,7 @@ export function createPiSqliteTools(
   return [
     defineTool<typeof SqliteToolParameters, SqliteQueryResultDetails>({
       description:
-        "Execute one read-only SQLite statement against a database file inside the current project. The database path must be relative to the project root. Query results are returned as markdown tables.",
+        "Execute one SQLite statement against a database file inside the current project. The database path must be relative to the project root. Query results are returned as markdown tables; writes return affected row counts.",
       execute: async (_toolCallId, params) => {
         let resolvedPath = resolveRelativeSqliteToolPath(
           scope.worktreePathContext,
@@ -70,7 +70,6 @@ export function createPiSqliteTools(
         );
         const statementText = requireSingleSqlStatement(params.query);
         assertSqliteStatementAllowed(statementText);
-        assertSqliteReadStatementAllowed(statementText);
         if (!existsSync(resolvedPath)) {
           throw new Error(
             "SQLite database file must already exist for this tool.",
@@ -105,8 +104,18 @@ export function createPiSqliteTools(
             });
           }
 
-          throw new Error(
-            "Only read-only SQLite statements are allowed by the sqlite tool.",
+          const changes = statement.run().changes;
+          return textToolResult(
+            `SQLite statement executed. Rows affected: ${changes}.`,
+            {
+              columns,
+              path: resolvedPath,
+              relativePath: params.path.trim(),
+              rowCount: 0,
+              rowsAffected: changes,
+              statementKind: "write",
+              truncated: false,
+            },
           );
         } finally {
           database.close(false);
@@ -116,12 +125,13 @@ export function createPiSqliteTools(
       name: "sqlite",
       parameters: SqliteToolParameters,
       promptGuidelines: [
-        "Use this when you need to inspect a project-local SQLite database without using bash.",
+        "Use this when you need to inspect or modify a project-local SQLite database without using bash.",
         "The database path must stay relative to the current project root.",
-        "Execute exactly one read-only SQLite statement per tool call.",
+        "Execute exactly one SQLite statement per tool call.",
+        "Be careful with writes: prefer a SELECT first when changing user data, and explain destructive statements before running them.",
       ],
       promptSnippet:
-        "Run one read-only SQLite statement against a project-local database file",
+        "Run one SQLite statement against a project-local database file",
     }),
   ];
 }
@@ -198,8 +208,8 @@ function resolveRelativeSqliteToolPath(
 
 function sqliteDatabaseOpenFlags(): number {
   return process.platform === "win32"
-    ? fsConstants.O_RDONLY
-    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+    ? fsConstants.O_RDWR
+    : fsConstants.O_RDWR | fsConstants.O_NOFOLLOW;
 }
 
 function requireSingleSqlStatement(query: string): string {
@@ -238,19 +248,6 @@ function assertSqliteStatementAllowed(statementText: string): void {
   }
 
   assertSqlitePragmaAllowed(statementText);
-}
-
-function assertSqliteReadStatementAllowed(statementText: string): void {
-  const firstKeyword =
-    getFirstSqlIdentifier(statementText)?.value.toLowerCase() ?? "";
-  if (firstKeyword === "pragma") {
-    return;
-  }
-  if (firstKeyword !== "select" && firstKeyword !== "with") {
-    throw new Error(
-      "Only read-only SELECT statements are allowed by the sqlite tool.",
-    );
-  }
 }
 
 function assertSqlitePragmaAllowed(statementText: string): void {

@@ -132,7 +132,7 @@ describe("createPiSqliteTools", () => {
     });
   });
 
-  it("rejects write statements", async () => {
+  it("executes write statements and reports affected rows", async () => {
     const worktreePath = makeWorktree();
     const databasePath = join(worktreePath, "state.sqlite");
     const database = new Database(databasePath, { create: true });
@@ -145,14 +145,31 @@ describe("createPiSqliteTools", () => {
       database.close(false);
     }
 
-    await expect(
-      executeSqliteTool(worktreePath, {
-        path: "state.sqlite",
-        query: "UPDATE flags SET enabled = 1 WHERE enabled = 0",
-      }),
-    ).rejects.toThrow(
-      "Only read-only SELECT statements are allowed by the sqlite tool.",
-    );
+    const result = await executeSqliteTool(worktreePath, {
+      path: "state.sqlite",
+      query: "UPDATE flags SET enabled = 1 WHERE enabled = 0",
+    });
+
+    expect(resultText(result)).toContain("Rows affected: 2");
+    expect(result.details).toMatchObject({
+      columns: [],
+      relativePath: "state.sqlite",
+      rowCount: 0,
+      rowsAffected: 2,
+      statementKind: "write",
+      truncated: false,
+    });
+
+    const checkDatabase = new Database(databasePath, { create: true });
+    try {
+      expect(
+        checkDatabase
+          .query("SELECT count(*) AS count FROM flags WHERE enabled = 1")
+          .get(),
+      ).toMatchObject({ count: 3 });
+    } finally {
+      checkDatabase.close(false);
+    }
   });
 
   it("rejects missing database files instead of creating them", async () => {
