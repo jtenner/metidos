@@ -568,6 +568,10 @@ export async function runCronJobById(
   let runThreadId: number | null = null;
 
   for (const job of jobs) {
+    // Manual runs are an explicit local-operator action, so they bypass the
+    // scheduler-fired launch limiter. Overlap protection above still prevents
+    // duplicate launches for the same cron job, while separate on-demand jobs
+    // can start immediately instead of being queued behind scheduled work.
     const execution = await executeCronJob(job, scheduledTime, host);
     if (runThreadId === null && execution !== null) {
       runThreadId = execution.threadId;

@@ -958,6 +958,132 @@ describe("sidecar cron runner", () => {
     }
   });
 
+  it("lets separate manual cron runs bypass the scheduled launch limiter", async () => {
+    const { cronRunner: runner } = await loadCronModules();
+    resetRuntimeStats();
+    const database = initAppDatabase();
+    const repoPath = createTempDirectory("metidos-cron-manual-bypass-repo-");
+    const project = upsertProject(database, {
+      name: "Manual Cron Bypass Repo",
+      projectPath: repoPath,
+    });
+    const cronJobs = [0, 1, 2].map((index) =>
+      createCronJob(database, {
+        agentsAccess: false,
+        description: `manual bypass test ${index}`,
+        enabled: true,
+        githubAccess: false,
+        metidosAccess: true,
+        model: "gpt-5.4",
+        projectId: project.id,
+        prompt: `manual cron ${index}`,
+        reasoningEffort: "medium",
+        schedule: `manual-bypass-${Date.now()}-${index}`,
+        title: `Manual Bypass Cron ${Date.now()}-${index}`,
+        worktreePath: repoPath,
+      }),
+    );
+
+    const limiterStats = runner.getScheduledCronExecutionLimitStats();
+    const inFlightSends: Array<ReturnType<typeof createDeferredPromise<void>>> =
+      [];
+    const threadContext = new Map<
+      number,
+      {
+        projectId: number;
+        worktreePath: string;
+      }
+    >();
+    let activeSendCount = 0;
+    let peakSendCount = 0;
+    let sendCallCount = 0;
+
+    const host: CronThreadExecutionHost = {
+      async createThread(params) {
+        const thread = createThread(database, {
+          agentsAccess: params.permissions?.includes("metidos:agents") ?? false,
+          githubAccess: params.permissions?.includes("metidos:github") ?? false,
+          metidosAccess: true,
+          model: params.model ?? "gpt-5.4",
+          piLeafEntryId: null,
+          piSessionFile: null,
+          piSessionId: null,
+          projectId: params.projectId,
+          reasoningEffort: params.reasoningEffort ?? "medium",
+          title: `Manual Bypass Cron Thread ${Date.now()}`,
+          unsafeMode: params.permissions?.includes("metidos:unsafe") ?? false,
+          worktreePath: params.worktreePath,
+        });
+        threadContext.set(thread.id, {
+          projectId: params.projectId,
+          worktreePath: params.worktreePath,
+        });
+        return buildFakeThreadDetail({
+          projectId: params.projectId,
+          startedAt: null,
+          threadId: thread.id,
+          worktreePath: params.worktreePath,
+        });
+      },
+      async sendThreadMessage(params) {
+        const context = threadContext.get(params.threadId);
+        if (!context) {
+          throw new Error(
+            `Missing fake thread context for ${params.threadId}.`,
+          );
+        }
+        sendCallCount += 1;
+        activeSendCount += 1;
+        peakSendCount = Math.max(peakSendCount, activeSendCount);
+        const deferred = createDeferredPromise<void>();
+        inFlightSends.push(deferred);
+        await deferred.promise;
+        activeSendCount = Math.max(0, activeSendCount - 1);
+        return buildFakeThreadDetail({
+          projectId: context.projectId,
+          startedAt: `2026-04-11T12:00:0${sendCallCount}.000Z`,
+          threadId: params.threadId,
+          worktreePath: context.worktreePath,
+        });
+      },
+    };
+
+    const runPromises = cronJobs.map((cronJob, index) =>
+      runner.runCronJobById(cronJob.id, Date.now() + index, host),
+    );
+
+    await waitForCondition(
+      "all manual cron launches to begin without scheduler queueing",
+      () => sendCallCount === cronJobs.length,
+    );
+
+    expect(peakSendCount).toBe(cronJobs.length);
+    expect(runner.getScheduledCronExecutionLimitStats()).toEqual({
+      activeCount: 0,
+      maxConcurrent: limiterStats.maxConcurrent,
+      pendingCount: 0,
+    });
+
+    for (const pending of inFlightSends) {
+      pending.resolve(undefined);
+    }
+    await Promise.all(runPromises);
+
+    for (const cronJob of cronJobs) {
+      expect(listCronJobRuns(database, cronJob.id)).toHaveLength(1);
+    }
+
+    expect(getRuntimeStatsSummary().cron).toMatchObject({
+      activeRuns: 0,
+      completedRuns: 3,
+      peakActiveRuns: 3,
+      peakPendingRuns: 0,
+      pendingRuns: 0,
+      saturationEvents: 0,
+      startedRuns: 3,
+    });
+  });
+
   it("caps scheduled cron launches and exposes pending queue stats", async () => {
     const { cronRunner: runner } = await loadCronModules();
     resetRuntimeStats();
