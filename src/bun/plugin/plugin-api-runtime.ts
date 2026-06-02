@@ -834,6 +834,23 @@ const __metidosSnapshotRegistrations = async () => {
   }
   return Object.freeze(snapshot);
 };
+// Callback invocation tokens are host capabilities embedded in bootstrap
+// closures. Hide protected bootstrap function bodies from plugin code so
+// Function.prototype.toString cannot reveal a token that would allow a plugin
+// callback to forge nested invocations of other registered callbacks.
+const __metidosHiddenFunctionSources = new WeakSet();
+const __metidosNativeFunctionSource = Function.prototype.toString;
+Object.defineProperty(Function.prototype, "toString", {
+  configurable: false,
+  enumerable: false,
+  value: function __metidosFunctionToString() {
+    if (__metidosHiddenFunctionSources.has(this)) {
+      return "function () { [native code] }";
+    }
+    return __metidosNativeFunctionSource.call(this);
+  },
+  writable: false,
+});
 Object.defineProperty(globalThis, "__metidosPluginStartupRegistrations", {
   configurable: false,
   enumerable: false,
@@ -846,29 +863,31 @@ Object.defineProperty(globalThis, "__metidosPluginCallbackHandles", {
   value: __metidosCallbackHandles,
   writable: false,
 });
+const __metidosInvokePluginCallback = async (token, handle, args, deadlineMs) => {
+  if (token !== ${jsonForPluginBootstrap(input.callbackInvocationToken)}) {
+    throw new Error("Plugin callback invocation token is invalid.");
+  }
+  const callback = __metidosCallbackHandles[handle];
+  if (typeof callback !== "function") {
+    throw new Error("Plugin callback handle " + String(handle) + " is not registered.");
+  }
+  const previousContext = __metidosActiveCallbackContextValue;
+  const previousDeadlineMs = __metidosActiveCallbackDeadlineMsValue;
+  const callbackContext = args[0] ?? null;
+  __metidosActiveCallbackContextValue = callbackContext;
+  __metidosActiveCallbackDeadlineMsValue = deadlineMs;
+  try {
+    return await callback(...args);
+  } finally {
+    __metidosActiveCallbackContextValue = previousContext;
+    __metidosActiveCallbackDeadlineMsValue = previousDeadlineMs;
+  }
+};
+__metidosHiddenFunctionSources.add(__metidosInvokePluginCallback);
 Object.defineProperty(globalThis, "__metidosInvokePluginCallback", {
   configurable: false,
   enumerable: false,
-  value: async (token, handle, args, deadlineMs) => {
-    if (token !== ${jsonForPluginBootstrap(input.callbackInvocationToken)}) {
-      throw new Error("Plugin callback invocation token is invalid.");
-    }
-    const callback = __metidosCallbackHandles[handle];
-    if (typeof callback !== "function") {
-      throw new Error("Plugin callback handle " + String(handle) + " is not registered.");
-    }
-    const previousContext = __metidosActiveCallbackContextValue;
-    const previousDeadlineMs = __metidosActiveCallbackDeadlineMsValue;
-    const callbackContext = args[0] ?? null;
-    __metidosActiveCallbackContextValue = callbackContext;
-    __metidosActiveCallbackDeadlineMsValue = deadlineMs;
-    try {
-      return await callback(...args);
-    } finally {
-      __metidosActiveCallbackContextValue = previousContext;
-      __metidosActiveCallbackDeadlineMsValue = previousDeadlineMs;
-    }
-  },
+  value: __metidosInvokePluginCallback,
   writable: false,
 });
 const __metidosApi = {

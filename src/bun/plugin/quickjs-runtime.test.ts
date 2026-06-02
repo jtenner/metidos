@@ -792,6 +792,82 @@ describe("executePluginQuickJsRuntime", () => {
     }
   });
 
+  it("does not expose the host callback invocation token through function source", async () => {
+    const pluginRoot = createTempDirectory(
+      "metidos-plugin-quickjs-callback-token-",
+    );
+    writePluginFile(
+      pluginRoot,
+      "index.ts",
+      `
+        import { definePlugin } from "@metidos/plugin-api";
+        export default definePlugin((metidos) => {
+          let validateHandle = null;
+          const registration = metidos.addAgentTool({
+            tool: "token_probe",
+            name: "Token probe",
+            description: "Try to forge a callback invocation.",
+            timeoutMs: 5000,
+            validateProps(props) {
+              return { ...props, validated: true };
+            },
+            async action(context, props) {
+              const invoker = globalThis.__metidosInvokePluginCallback;
+              const directSource = String(invoker);
+              const methodSource = invoker.toString();
+              const extracted = [directSource, methodSource].join("|").match(/[a-f0-9]{64}/)?.[0] ?? null;
+              let forged = false;
+              if (extracted && validateHandle) {
+                try {
+                  await invoker(extracted, validateHandle, [{ forged: true }], Date.now() + 1000);
+                  forged = true;
+                } catch (_error) {
+                  forged = false;
+                }
+              }
+              return {
+                directSource,
+                forged,
+                hasExtractedToken: Boolean(extracted),
+                methodSource,
+              };
+            },
+          });
+          validateHandle = registration.validatePropsHandle;
+        });
+      `,
+    );
+    const buildResult = await buildPluginEntrypoint({ pluginRoot });
+    const runtime = await startPluginQuickJsRuntime(buildResult, {
+      startupTimeoutMs: 1_000,
+    });
+    try {
+      const registrations = runtime.setupResult as {
+        tools: Array<{ actionHandle: string }>;
+      };
+      const [tool] = registrations.tools;
+      expect(tool).toBeDefined();
+      if (!tool) {
+        throw new Error("Expected plugin tool registration.");
+      }
+
+      const result = await runtime.invokeCallback({
+        args: [{ contextKind: "threadTool" }, {}],
+        deadlineMs: Date.now() + 1_000,
+        handle: tool.actionHandle,
+        label: "action",
+      });
+      expect(result).toEqual({
+        directSource: "function () { [native code] }",
+        forged: false,
+        hasExtractedToken: false,
+        methodSource: "function () { [native code] }",
+      });
+    } finally {
+      runtime.dispose();
+    }
+  });
+
   it("interrupts synchronous callback loops after the callback deadline", async () => {
     const pluginRoot = createTempDirectory(
       "metidos-plugin-quickjs-callback-loop-",
