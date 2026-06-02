@@ -280,7 +280,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] F9: Review unsafe private-network mode in `src/bun/outbound-url-security.ts`. Add comments/docs explaining that localhost/RFC1918 are allowed only with unsafe private-network permission while metadata hosts remain blocked.
 - [ ] F12: Review plugin fetch response materialization in `src/bun/plugin/fetch.ts`. If 25MB binary responses plus base64 JSON can cause memory pressure, lower limits or introduce streaming/temp-file delivery; otherwise document accepted cap.
 - [ ] F13: Review textual response detection in `src/bun/plugin/fetch.ts`. Add tests/comments for UTF-8 fatal decode and binary fallback.
-- [ ] F15: Review blocked WebSocket request headers in `src/bun/plugin/websocket.ts`. Add tests/comments for Origin and Sec-WebSocket header denial.
 - [ ] F16: Review plugin WebSocket DNS-hostname denial in `src/bun/plugin/websocket.ts`. If this is intentional until DNS-pinned dialing exists, add docs/comment; otherwise implement safe DNS pinning.
 - [ ] F17: Review Bun WebSocket constructor options in `src/bun/plugin/websocket.ts`. If header/protocol behavior is runtime-dependent, add compatibility tests or normalize options.
 - [ ] F18: Review WebSocket send-rate bucket reset on reconnect in `src/bun/plugin/websocket.ts`. If reconnect can bypass intended aggregate limits, add plugin-level rate limiting; otherwise document per-connection scope.

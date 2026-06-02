@@ -217,6 +217,34 @@ describe("PluginWebSocketRegistry", () => {
     ).resolves.toEqual({ text: "ready", type: "message" });
   });
 
+  it("blocks plugin-controlled WebSocket handshake headers", async () => {
+    const registry = new PluginWebSocketRegistry({
+      network: {
+        allow: [],
+        enforceHttps: false,
+        webSocketAllow: ["ws://127.0.0.1/**"],
+      },
+      permissions: ["network:websocket"],
+      unsafeAllowPrivateNetwork: true,
+    });
+
+    for (const headerName of [
+      "Origin",
+      "Sec-WebSocket-Key",
+      "sec-websocket-protocol",
+    ]) {
+      await expect(
+        registry.connect({
+          options: { headers: { [headerName]: "plugin-controlled" } },
+          url: "ws://127.0.0.1/socket",
+        }),
+      ).rejects.toMatchObject({
+        code: "blocked_request_header",
+        message: `Plugin WebSocket cannot set blocked request header "${headerName}".`,
+      });
+    }
+  });
+
   it("bounds message size and connection count", async () => {
     const server = createEchoServer();
     const origin = `ws://127.0.0.1:${server.port}`;
