@@ -263,6 +263,35 @@ describe("outbound URL security", () => {
     expect(isBlockedPrivateNetworkMetadataAddress("fd00::1")).toBeFalse();
   });
 
+  test("unsafe private-network mode is required for localhost and RFC1918 addresses", async () => {
+    await expect(
+      assertSafeOutboundHttpUrl("http://localhost:3000/status", {
+        label: "Plugin fetch URL",
+      }),
+    ).rejects.toThrow(/host is not allowed/);
+    await expect(
+      assertSafeOutboundHttpUrl("http://10.0.0.10/status", {
+        label: "Plugin fetch URL",
+      }),
+    ).rejects.toThrow(/host is not allowed/);
+
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl("http://localhost:3000/status", {
+        label: "Plugin fetch URL",
+      }),
+    ).resolves.toMatchObject({ hostname: "localhost" });
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl("http://10.0.0.10/status", {
+        label: "Plugin fetch URL",
+      }),
+    ).resolves.toMatchObject({ hostname: "10.0.0.10" });
+    await expect(
+      assertPrivateNetworkOutboundHttpUrl("http://[fd00::10]/status", {
+        label: "Plugin fetch URL",
+      }),
+    ).resolves.toMatchObject({ hostname: "[fd00::10]" });
+  });
+
   test("blocks known metadata hosts and addresses in unsafe private-network mode", async () => {
     for (const hostname of ["metadata", "metadata.google.internal"]) {
       await expect(

@@ -339,6 +339,11 @@ async function validatePrivateNetworkOutboundHttpUrl(
   rawUrl: string,
   options: SafeOutboundHttpUrlOptions = {},
 ): Promise<SafeOutboundHttpUrlValidation> {
+  // This validator is only selected by plugin fetch/WebSocket callers after
+  // the plugin has the explicit unsafe private-network grant. That grant allows
+  // operator-intended localhost, RFC1918, and unique-local/internal addresses,
+  // but still blocks cloud metadata hostnames and addresses because metadata
+  // services expose host credentials rather than ordinary LAN resources.
   return validateOutboundHttpUrl(rawUrl, {
     ...options,
     blockedAddressError:
