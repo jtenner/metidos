@@ -18,6 +18,7 @@ import type { RpcMeasurementToken } from "./runtime-stats";
 type FakeSocket = {
   closed: Array<{ code: number | undefined; reason: string | undefined }>;
   data: RpcWebSocketSocketData;
+  onClose?: (code: number | undefined, reason: string | undefined) => void;
   sendResults: number[];
   sent: Array<string | Uint8Array>;
   close(code?: number, reason?: string): void;
@@ -62,6 +63,7 @@ function createFakeSocket(
     sendResults: [],
     sent: [],
     close(code?: number, reason?: string) {
+      this.onClose?.(code, reason);
       this.closed.push({ code, reason });
     },
     send(raw: string | Uint8Array) {
@@ -447,5 +449,54 @@ describe("RPC transport", () => {
       transport.hasPublishTargets({ kind: "session", sessionId: "session-a" }),
     ).toBeFalse();
     expect(transport.getClientCount()).toBe(1);
+  });
+
+  test("cleans up session state and pending requests before closing sockets", async () => {
+    const harness = createHarness({
+      listProjects: async (_params: unknown, context: RpcRequestContext) => {
+        await new Promise((_resolve, reject) => {
+          context.signal.addEventListener(
+            "abort",
+            () => reject(context.signal.reason),
+            { once: true },
+          );
+        });
+        return [];
+      },
+    });
+    const transport = createRpcTransport(harness.options);
+    const sessionSocket = createFakeSocket({ sessionId: "session-close" });
+    const closeSnapshots: Array<{
+      clientCount: number;
+      hasSessionTargets: boolean;
+      pendingRequestCount: number;
+    }> = [];
+    sessionSocket.onClose = () => {
+      closeSnapshots.push({
+        clientCount: transport.getClientCount(),
+        hasSessionTargets: transport.hasPublishTargets({
+          kind: "session",
+          sessionId: "session-close",
+        }),
+        pendingRequestCount: transport.getPendingRequestCount(),
+      });
+    };
+    transport.open(sessionSocket as never);
+    transport.handleMessage(sessionSocket as never, request(9));
+    await waitFor(() => expect(transport.getPendingRequestCount()).toBe(1));
+
+    expect(transport.closeSession("session-close", "session revoked")).toBe(1);
+
+    expect(closeSnapshots).toEqual([
+      {
+        clientCount: 0,
+        hasSessionTargets: false,
+        pendingRequestCount: 0,
+      },
+    ]);
+    expect(sessionSocket.closed).toEqual([
+      { code: 1008, reason: "session revoked" },
+    ]);
+    await waitFor(() => expect(harness.canceled).toHaveLength(1));
   });
 });
