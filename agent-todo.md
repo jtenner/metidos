@@ -272,7 +272,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G6: Review RPC rate-limit constants in `src/bun/index.ts` and `src/bun/rpc-transport.ts`. If 360 burst/180 per second is excessive, tune; otherwise document desktop-IDE traffic expectations.
 - [ ] G7: Review per-message session revalidation DB reads in `src/bun/rpc-transport.ts` and `src/bun/auth/service-session.ts`. If expensive, add cache/telemetry; otherwise comment why row reads are acceptable and touches are throttled.
 - [ ] G8: Review RPC `closeSession` order in `src/bun/rpc-transport.ts`. Add a regression test/comment proving state is cleaned up before socket close without leaks.
-- [ ] G9: Review `publishLazy` snapshot/send behavior in `src/bun/rpc-transport.ts`. Add comments/tests for mutation-safe client iteration.
 - [ ] G10: Review session index refresh in `src/bun/rpc-transport.ts`. Add tests for session id changes, null session ids, and stale socket cleanup.
 - [ ] G11: Review `clientsBySessionId` cleanup in `src/bun/rpc-transport.ts`. Add leak tests or comments explaining regular Map cleanup on `close`.
 - [ ] G12: Review RPC measurement start/failure paths in `src/bun/rpc-transport.ts`. Add tests/comments ensuring malformed frames do not leave open telemetry tokens.
