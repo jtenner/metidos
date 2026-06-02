@@ -45,6 +45,28 @@ APP_DATA/plugins/{plugin_id}/
 
 Changes outside excluded runtime paths invalidate the previous approval hash and require review again.
 
+```mermaid
+flowchart TD
+  discovered[Discovery\nPlugin folder found]
+  inventory[Inventory\nManifest and runtime summaries read]
+  needsReview[Needs Review\nNew or changed source]
+  approved[Approved\nReview hash accepted]
+  active[Active\nSidecar running and capabilities registered]
+  enabledUse[Enabled use\nThread selects plugin Access Group]
+  disabled[Disabled\nFuture use blocked; restart may clear v1 registrations]
+  reset[Reset Plugin Data\n.data moved or replaced from seed files]
+  removed[Removal\nStop Metidos and remove or archive folder]
+
+  discovered --> inventory --> needsReview --> approved --> active --> enabledUse
+  enabledUse --> disabled
+  active --> disabled
+  disabled --> active
+  disabled --> reset --> needsReview
+  disabled --> removed
+  active -. Source changes outside excluded runtime paths .-> needsReview
+  approved -. Source changes outside excluded runtime paths .-> needsReview
+```
+
 ## Review and approval
 
 Before approval, inspect:
