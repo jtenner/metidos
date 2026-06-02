@@ -124,4 +124,20 @@ describe("CronjobWorkspace presentation states", () => {
     expect(markup).toContain("Running…");
     expect(markup).toContain("Deleting…");
   });
+
+  it("keeps unrelated cron row actions available while another row is busy", () => {
+    const markup = renderCronWorkspace({
+      cronJobs: [
+        makeCronJob({ id: 99, title: "Paused cleanup" }),
+        makeCronJob({ id: 100, title: "Independent backup" }),
+      ],
+      runningCronJobs: new Set([99]),
+    });
+
+    expect(markup).toContain("Cron job Paused cleanup is running");
+    expect(markup).toContain("Delete cron job Paused cleanup");
+    expect(markup).toContain("Run cron job Independent backup");
+    expect(markup).toContain("Delete cron job Independent backup");
+    expect(markup.match(/disabled=""/g) ?? []).toHaveLength(2);
+  });
 });
