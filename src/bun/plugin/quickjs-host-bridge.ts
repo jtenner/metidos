@@ -139,6 +139,13 @@ function resolveQuickJsHostPromise(input: {
 export function installQuickJsHostOperation<TRequest, TResult>(
   input: QuickJSHostOperationInput<TRequest, TResult>,
 ): void {
+  // Host capability bindings are intentionally plain global functions because
+  // the generated plugin bootstrap calls them by name from the guest realm.
+  // Guest code may shadow or replace these properties later, but that only
+  // sabotages that plugin's own `metidos` API calls: authorization, parameter
+  // validation, path/network policy, and resource limits are enforced again by
+  // the host-side `execute` implementation below. Do not treat the presence or
+  // identity of a guest-visible global as an authorization boundary.
   const hostFunction = input.context.newFunction(
     input.globalName,
     (...args) => {
