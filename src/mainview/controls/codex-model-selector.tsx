@@ -17,7 +17,7 @@ import type {
   RpcReasoningEffort,
   RpcReasoningEffortOption,
 } from "../../bun/rpc-schema";
-import { AppButton } from "./button";
+import { AppButton, IconButton, ListOptionButton } from "./button";
 import {
   codexModelLabel,
   codexModelSelectionOutcome,
@@ -263,20 +263,15 @@ function ModelReasoningSubmenu({
 
   return (
     <>
-      <AppButton
+      <ListOptionButton
         ref={anchorRef}
         aria-expanded={supportsReasoningSubmenu ? submenuOpen : undefined}
         aria-haspopup={supportsReasoningSubmenu ? "dialog" : undefined}
-        buttonStyle="muted"
-        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-1 text-left font-normal ${
-          selected
-            ? "bg-surface-3 text-text-primary"
-            : "text-text-secondary hover:bg-surface-2"
-        } touch-pan-y`}
+        className="flex min-w-0 items-center justify-start gap-3 px-3 py-1 font-normal touch-pan-y"
         data-chooser-option="true"
-        fullWidth
         role="option"
         aria-selected={selected}
+        selected={selected}
         onBlur={scheduleCloseWhenFocusLeaves}
         onClick={() => {
           onModelSelect(model, close);
@@ -320,7 +315,7 @@ function ModelReasoningSubmenu({
             {materialSymbol("chevron_right", "text-[17px]")}
           </span>
         ) : null}
-      </AppButton>
+      </ListOptionButton>
       <PopoverSurface
         ref={submenuRef}
         className="z-[220] min-w-[12rem] border border-border-default bg-surface-1 shadow-overlay"
@@ -345,16 +340,11 @@ function ModelReasoningSubmenu({
             const selectedOption =
               option.id === reasoningPresentation.activeValue;
             return (
-              <AppButton
+              <ListOptionButton
                 key={option.id}
                 aria-pressed={selectedOption}
-                buttonStyle="muted"
-                className={`h-auto min-w-0 justify-start border-0 px-3 py-2 text-left font-normal ${
-                  selectedOption
-                    ? "bg-surface-3 text-text-primary"
-                    : "text-text-secondary hover:bg-surface-2"
-                } touch-pan-y`}
-                fullWidth
+                className="min-w-0 px-3 py-2 font-normal touch-pan-y"
+                selected={selectedOption}
                 onClick={() => {
                   onReasoningSelect(option.id, model, close);
                 }}
@@ -369,7 +359,7 @@ function ModelReasoningSubmenu({
                 <span className="mt-1 block text-[11px] leading-4 text-text-muted">
                   {option.description}
                 </span>
-              </AppButton>
+              </ListOptionButton>
             );
           })}
         </fieldset>
@@ -710,7 +700,7 @@ export function CodexModelSelector({
           spellCheck={false}
         />
         {onRefresh ? (
-          <AppButton
+          <IconButton
             aria-label="Refresh model list"
             buttonStyle="muted"
             className={
@@ -719,7 +709,6 @@ export function CodexModelSelector({
                 : "border-transparent text-text-muted"
             }
             disabled={refreshing}
-            iconOnly
             onClick={() => {
               void onRefresh();
               searchInputRef.current?.focus();
@@ -731,14 +720,13 @@ export function CodexModelSelector({
               "refresh",
               refreshing ? "animate-spin text-[16px]" : "text-[16px]",
             )}
-          </AppButton>
+          </IconButton>
         ) : null}
         {searchQuery ? (
-          <AppButton
+          <IconButton
             aria-label="Clear selector search"
             buttonStyle="muted"
             className="border-transparent text-text-muted"
-            iconOnly
             onClick={() => {
               setSearchQuery("");
               searchInputRef.current?.focus();
@@ -746,7 +734,7 @@ export function CodexModelSelector({
             type="button"
           >
             {materialSymbol("close", "text-[15px]")}
-          </AppButton>
+          </IconButton>
         ) : null}
       </div>
     );
@@ -831,11 +819,10 @@ export function CodexModelSelector({
               ) : selectedProvider ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <AppButton
+                    <IconButton
                       aria-label="Back to previous selector step"
                       buttonStyle="muted"
                       className="shrink-0 border-transparent text-accent"
-                      iconOnly
                       onClick={handleStepBack}
                       type="button"
                     >
@@ -843,7 +830,7 @@ export function CodexModelSelector({
                         "arrow_forward",
                         "text-[16px] rotate-180",
                       )}
-                    </AppButton>
+                    </IconButton>
                     <div className="text-[12px] font-semibold text-text-primary">
                       {selectedProvider.providerLabel}
                     </div>
@@ -886,23 +873,18 @@ export function CodexModelSelector({
                       provider.providerAvailabilityNote ?? null;
                     const providerModelCount = provider.modelCount;
                     return (
-                      <AppButton
+                      <ListOptionButton
                         key={provider.providerId}
                         aria-disabled={!providerAvailable}
                         aria-selected={selected}
-                        buttonStyle="muted"
-                        className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-1 text-left font-normal ${
+                        className={`flex min-w-0 items-center justify-start gap-3 px-3 py-1 font-normal touch-pan-y ${
                           providerAvailable
-                            ? selected
-                              ? "bg-surface-3 text-text-primary"
-                              : "text-text-secondary hover:bg-surface-2"
-                            : selected
-                              ? "bg-surface-3 text-text-primary"
-                              : "cursor-not-allowed text-text-muted opacity-75"
-                        } touch-pan-y`}
+                            ? ""
+                            : "cursor-not-allowed text-text-muted opacity-75"
+                        }`}
                         data-chooser-option="true"
-                        fullWidth
                         role="option"
+                        selected={selected}
                         onClick={() => {
                           if (!providerAvailable) {
                             return;
@@ -971,7 +953,7 @@ export function CodexModelSelector({
                         <span className="flex shrink-0 items-center pl-1 text-text-faint">
                           {materialSymbol("chevron_right", "text-[17px]")}
                         </span>
-                      </AppButton>
+                      </ListOptionButton>
                     );
                   })
                 )
@@ -1026,18 +1008,13 @@ export function CodexModelSelector({
                   const selected =
                     option.id === pendingReasoningPresentation.activeValue;
                   return (
-                    <AppButton
+                    <ListOptionButton
                       key={option.id}
-                      buttonStyle="muted"
-                      className={`h-auto min-w-0 justify-start gap-3 border-0 px-3 py-3 text-left font-normal ${
-                        selected
-                          ? "bg-surface-3 text-text-primary"
-                          : "text-text-secondary hover:bg-surface-2"
-                      } touch-pan-y`}
+                      className="flex min-w-0 items-start justify-start gap-3 px-3 py-3 font-normal touch-pan-y"
                       data-chooser-option="true"
-                      fullWidth
                       role="option"
                       aria-selected={selected}
+                      selected={selected}
                       ref={selected ? selectedReasoningOptionRef : undefined}
                       onClick={() => {
                         handleReasoningSelect(option.id, close);
@@ -1066,7 +1043,7 @@ export function CodexModelSelector({
                           {option.description}
                         </span>
                       </span>
-                    </AppButton>
+                    </ListOptionButton>
                   );
                 })
               ) : (
