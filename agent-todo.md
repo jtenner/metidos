@@ -248,7 +248,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] G3: Review terminal WebSocket admin revalidation in `src/bun/index.ts`. Add comments/tests proving terminal sockets require admin on every message.
 - [ ] G7: Review per-message session revalidation DB reads in `src/bun/rpc-transport.ts` and `src/bun/auth/service-session.ts`. If expensive, add cache/telemetry; otherwise comment why row reads are acceptable and touches are throttled.
 - [ ] G10: Review session index refresh in `src/bun/rpc-transport.ts`. Add tests for session id changes, null session ids, and stale socket cleanup.
-- [ ] G12: Review RPC measurement start/failure paths in `src/bun/rpc-transport.ts`. Add tests/comments ensuring malformed frames do not leave open telemetry tokens.
 - [ ] G13: Review decoded binary RPC payload limits in `src/bun/rpc-transport.ts`. Add tests for compressed/oversize rejection if missing.
 - [ ] G15: Review large RPC response JSON fallback in `src/bun/rpc-transport.ts`. If it blocks the event loop, prefer compressed binary for responses too; otherwise document compatibility tradeoff.
 - [ ] G16: Review cron timeout behavior in `src/bun/sidecar-cron-runner.ts`. If timed-out cron threads keep running, abort/stop the Pi session; otherwise comment known resource behavior and add telemetry.

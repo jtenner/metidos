@@ -282,6 +282,7 @@ describe("RPC transport", () => {
       type: "response",
     });
     expect(harness.started).toHaveLength(0);
+    expect(harness.failed).toHaveLength(0);
 
     transport.handleMessage(
       socket as never,
@@ -294,6 +295,11 @@ describe("RPC transport", () => {
         expect.objectContaining({ message: "Invalid RPC client message JSON" }),
       ]),
     );
+    expect(harness.started).toHaveLength(0);
+    expect(harness.failed).toHaveLength(0);
+    expect(harness.canceled).toHaveLength(0);
+    expect(harness.succeeded).toHaveLength(0);
+    expect(harness.timedOut).toHaveLength(0);
   });
 
   test("closes clients on pre-parse budget failure", async () => {
