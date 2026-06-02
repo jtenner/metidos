@@ -139,8 +139,9 @@ describe("mainview shell state", () => {
         refs,
         setters: {
           setPrimaryView: (value) => {
-            currentPrimaryView = value;
-            committed.push(`view:${String(value)}`);
+            currentPrimaryView =
+              typeof value === "function" ? value(currentPrimaryView) : value;
+            committed.push(`view:${currentPrimaryView}`);
           },
           setSelectedProjectId: (value) => {
             committed.push(`project:${String(value)}`);
@@ -181,7 +182,9 @@ describe("mainview shell state", () => {
       "chat",
     ] satisfies MainviewShellState["primaryView"][]) {
       commitNavigationUpdate({ primaryView });
-      expect(currentPrimaryView).toBe(primaryView);
+      expect(currentPrimaryView as MainviewShellState["primaryView"]).toBe(
+        primaryView,
+      );
       expect(refs.selectedProjectIdRef.current).toBe(2);
       expect(refs.selectedThreadIdRef.current).toBeNull();
       expect(refs.selectedWorktreePathRef.current).toBe("/repo/feature");
@@ -193,6 +196,61 @@ describe("mainview shell state", () => {
       "view:calendar",
       "view:chat",
     ]);
+  });
+
+  it("preserves selected context while switching shell surfaces", () => {
+    const refs = {
+      selectedProjectIdRef: { current: 1 as number | null },
+      selectedThreadIdRef: { current: 7 as number | null },
+      selectedWorktreePathRef: { current: "/repo/feature" as string | null },
+    };
+    let currentPrimaryView: MainviewShellState["primaryView"] = "chat";
+
+    const commitNavigationUpdate = (
+      update: Parameters<typeof commitMainviewShellNavigationUpdate>[0],
+    ): void => {
+      commitMainviewShellNavigationUpdate(update, {
+        refs,
+        setters: {
+          setPrimaryView: (value) => {
+            currentPrimaryView =
+              typeof value === "function" ? value(currentPrimaryView) : value;
+          },
+          setSelectedProjectId: () => undefined,
+          setSelectedThreadId: () => undefined,
+          setSelectedWorktreePath: () => undefined,
+        },
+      });
+    };
+
+    const expectContext = (surface: string): void => {
+      expect(refs.selectedProjectIdRef.current, surface).toBe(1);
+      expect(refs.selectedWorktreePathRef.current, surface).toBe(
+        "/repo/feature",
+      );
+      expect(refs.selectedThreadIdRef.current, surface).toBe(7);
+    };
+
+    for (const surface of [
+      { name: "project panel", update: {} },
+      { name: "worktree panel", update: {} },
+      { name: "thread panel", update: {} },
+      { name: "diff workspace", update: { primaryView: "diff" } },
+      { name: "git history panel", update: {} },
+      { name: "cron workspace", update: { primaryView: "cronjobs" } },
+      { name: "calendar workspace", update: { primaryView: "calendar" } },
+      { name: "plugin administration", update: {} },
+      { name: "terminal workspace", update: { primaryView: "chat" } },
+      { name: "settings panel", update: {} },
+    ] satisfies Array<{
+      name: string;
+      update: Parameters<typeof commitMainviewShellNavigationUpdate>[0];
+    }>) {
+      commitNavigationUpdate(surface.update);
+      expectContext(surface.name);
+    }
+
+    expect(currentPrimaryView).toBe("chat");
   });
 
   it("debounces persisted shell state writes and flushes the latest state", () => {
