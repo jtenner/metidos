@@ -68,6 +68,7 @@ import {
   resetResolvedAppDataDirectory,
   resolveEnabledPluginExternalIdentityBinding,
   selectWritableAppDataDirectory,
+  setAuthFailureState,
   setPluginExternalIdentityBindingEnabled,
   setProjectWorktreePinned,
   setThreadAccess,
@@ -1276,6 +1277,47 @@ describe("app database storage", () => {
           )
           .get(thread.id)?.deletedAt,
       ).toEqual(expect.any(Number));
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("keeps auth failure state updates ownerless until auth is configured", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+
+    try {
+      setAuthFailureState(database, 3, "2026-01-01T00:00:00.000Z");
+
+      expect(tableExists(database, "users")).toBe(false);
+      expect(getAuthSettings(database)).toBeNull();
+      expect(
+        database
+          .query<{ count: number }, []>(
+            "SELECT COUNT(*) AS count FROM auth_settings",
+          )
+          .get()?.count,
+      ).toBe(0);
+    } finally {
+      database.close(false);
+    }
+  });
+
+  it("creates the legacy bootstrap user only when an empty users table already exists", () => {
+    const database = new Database(":memory:");
+    migrateDatabase(database);
+    createLegacyUsersTable(database);
+
+    try {
+      setAuthFailureState(database, 3, "2026-01-01T00:00:00.000Z");
+
+      const users = database
+        .query<{ username: string; isAdmin: number }, []>(
+          "SELECT username, is_admin AS isAdmin FROM users ORDER BY id ASC",
+        )
+        .all();
+      expect(users).toEqual([{ username: "metidos", isAdmin: 1 }]);
+      expect(getAuthSettings(database)).toBeNull();
     } finally {
       database.close(false);
     }
