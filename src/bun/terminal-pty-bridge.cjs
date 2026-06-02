@@ -57,6 +57,10 @@ function requireSafeInteger(value, fieldName, min, max) {
 }
 
 function validateSpawnConfig(config) {
+  // The bridge accepts spawn configuration only from its owning Bun terminal
+  // manager over stdin. Even so, validate every field before node-pty spawn so
+  // malformed host state cannot smuggle null bytes, unbounded dimensions, or
+  // non-string environment values across the Node bridge boundary.
   if (!isPlainRecord(config)) {
     throw new Error("Terminal bridge spawn configuration must be an object.");
   }

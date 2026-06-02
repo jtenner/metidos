@@ -138,6 +138,26 @@ describe("terminal PTY bridge", () => {
     });
   });
 
+  it("rejects unsafe spawn environment variables before spawning a PTY", async () => {
+    const result = await runBridgeWithConfig({
+      args: [],
+      cols: 80,
+      cwd: process.cwd(),
+      env: { "BAD-NAME": "value", PATH: `safe\0${process.env.PATH ?? ""}` },
+      file: "/bin/echo",
+      name: "xterm-256color",
+      rows: 24,
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toEqual({
+      type: "error",
+      message:
+        "Terminal bridge spawn configuration field env must contain safe string variables.",
+    });
+  });
+
   it("reports invalid executables as PTY child startup failures", async () => {
     const result = await runBridgeWithConfig({
       args: [],
