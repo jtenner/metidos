@@ -50,6 +50,17 @@ describe("outbound URL security", () => {
     ).rejects.toThrow(/resolved to a blocked address/);
   });
 
+  test("collapses resolver failures into a generic policy error", async () => {
+    await expect(
+      assertSafeOutboundHttpUrl("https://calendar.example.test/feed.ics", {
+        label: "External ICS URL",
+        resolveHostname: async () => {
+          throw new Error("SERVFAIL from internal resolver 10.0.0.53");
+        },
+      }),
+    ).rejects.toThrow(/^External ICS URL host could not be resolved\.$/);
+  });
+
   test("blocks resolver results that are not concrete IP addresses", async () => {
     await expect(
       assertSafeOutboundHttpUrl("https://calendar.example.test/feed.ics", {

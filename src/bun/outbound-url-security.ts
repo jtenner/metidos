@@ -307,6 +307,11 @@ async function validateOutboundHttpUrl(
   try {
     addresses = await resolveHostname(hostname);
   } catch {
+    // DNS failures are intentionally collapsed into the same caller-facing
+    // resolution error. The outbound fetch guard is a policy boundary, not a
+    // resolver diagnostic API: exposing NXDOMAIN/SERVFAIL/timeout details would
+    // invite plugins or remote inputs to fingerprint internal resolver behavior
+    // without changing the safe next step, which is to reject the request.
     throw new Error(`${prefix} host could not be resolved.`);
   }
   if (addresses.length === 0) {
