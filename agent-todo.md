@@ -250,7 +250,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 ### Plugin filesystem sandbox follow-up
 
 - [ ] E3: Review `assertOutsidePluginSource` in `src/bun/plugin/fs-path.ts`. Add a comment/test proving plugin-data paths are intentionally exempt while `./` project roots cannot read plugin source.
-- [ ] E4: Review `pluginFsPathOpenUnavailableError` in `src/bun/plugin/fs-path.ts`. If diagnostics need causes, preserve `cause`; otherwise comment why host paths/errors are intentionally hidden from plugins.
 - [ ] E5: Review recursive directory creation in `src/bun/plugin/fs-path.ts` (`mkdirValidatedPluginFsPathSync`). Add tests/comments proving recursive mkdir cannot escape the validated root.
 - [ ] E6: Review `O_NOFOLLOW` and `lstat` behavior in `src/bun/plugin/fs-path.ts`. Add tests/comments for symlink leaf rejection on supported platforms and fail-closed behavior on Windows.
 - [ ] E7: Review RPC param bounds in `src/bun/index.ts` (`MAX_RPC_RECORD_KEYS`, `MAX_RPC_RECORD_DEPTH`). If nested payloads can still cause CPU/memory pressure, tighten limits; otherwise document per-request bounds.

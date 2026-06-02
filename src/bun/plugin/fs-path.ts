@@ -517,6 +517,11 @@ function assertPluginFsLstatIsNotSymlink(input: {
 function pluginFsPathOpenUnavailableError(
   virtualPath: string,
 ): PluginFsPathError {
+  // Intentionally omit the host open() cause from plugin-visible diagnostics.
+  // Native filesystem errors can include absolute paths, permission details, or
+  // symlink/race information from outside the plugin's virtual fs boundary. The
+  // stable virtual path and generic code give plugin authors an actionable
+  // failure without leaking host-local state.
   return pluginFsPathError({
     code: "path_unavailable",
     message: "Plugin fs path could not be opened safely.",
