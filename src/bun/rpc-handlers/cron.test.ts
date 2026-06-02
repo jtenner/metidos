@@ -5,6 +5,20 @@ import { createCronRpcHandlers, type CronRpcHandlerDependencies } from "./cron";
 
 const requestContext = {} as RpcRequestContext;
 
+function createRegularUserContext(): RpcRequestContext {
+  return {
+    auth: {
+      isAdmin: false,
+      sessionId: "cron-rpc-regular-session",
+      userId: 11,
+      username: "cron-rpc-regular-user",
+    },
+    priority: "default",
+    signal: new AbortController().signal,
+    timeoutMs: null,
+  };
+}
+
 function createDefaultDependencies(
   overrides: Partial<CronRpcHandlerDependencies> = {},
 ): CronRpcHandlerDependencies {
@@ -84,5 +98,55 @@ describe("createCronRpcHandlers", () => {
       handlers.runCronNow({} as never, requestContext),
     ).resolves.toBe(runResult);
     expect(syncedCronIds).toEqual([]);
+  });
+
+  it("passes regular-user RPC context into cron authorization procedures", async () => {
+    const context = createRegularUserContext();
+    const calls: { name: string; context: RpcRequestContext }[] = [];
+    const handlers = createCronRpcHandlers(
+      createDefaultDependencies({
+        listCronsProcedure: async (_params, procedureContext) => {
+          calls.push({ name: "list", context: procedureContext });
+          return [] as never;
+        },
+        runCronNowProcedure: async (_params, procedureContext) => {
+          calls.push({ name: "run-now", context: procedureContext });
+          return { success: true } as never;
+        },
+        updateCronProcedure: async (_params, procedureContext) => {
+          calls.push({ name: "update", context: procedureContext });
+          return { id: 51 } as never;
+        },
+      }),
+    );
+
+    await handlers.listCrons(undefined, context);
+    await handlers.updateCron({ cronJobId: 51, title: "User rename" }, context);
+    await handlers.runCronNow({ cronJobId: 51 }, context);
+
+    expect(calls).toEqual([
+      { name: "list", context },
+      { name: "update", context },
+      { name: "run-now", context },
+    ]);
+  });
+
+  it("passes delete requests through updateCron with caller context", async () => {
+    const context = createRegularUserContext();
+    const updateCalls: { params: unknown; context: RpcRequestContext }[] = [];
+    const handlers = createCronRpcHandlers(
+      createDefaultDependencies({
+        updateCronProcedure: async (params, procedureContext) => {
+          updateCalls.push({ params, context: procedureContext });
+          return { id: 52 } as never;
+        },
+      }),
+    );
+
+    await handlers.updateCron({ cronJobId: 52, deleted: true }, context);
+
+    expect(updateCalls).toEqual([
+      { params: { cronJobId: 52, deleted: true }, context },
+    ]);
   });
 });
