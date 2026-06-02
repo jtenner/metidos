@@ -136,9 +136,10 @@ function authRouteRateLimitDb(): Database {
         `PRAGMA journal_mode = ${pragmas.journalMode.toUpperCase()}`,
       );
     } catch {
-      // Keep brute-force protection available; busy_timeout still serializes
-      // the small rate-limit writes even when an existing connection owns the
-      // journal-mode decision for this database file.
+      // Do not fail startup or disable auth throttling when a concurrent
+      // connection has already fixed the SQLite journal mode. The degraded
+      // state is an availability concern, not a bypass: busy_timeout plus
+      // BEGIN IMMEDIATE still serializes the tiny rate-limit writes.
     }
     authRouteRateLimitDatabase.exec(
       `PRAGMA synchronous = ${pragmas.synchronous}`,
