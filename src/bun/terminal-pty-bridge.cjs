@@ -104,6 +104,9 @@ function attachPtyEventHandlers(processHandle) {
   });
 
   processHandle.onExit((event) => {
+    // The bridge exits successfully after faithfully reporting the PTY child's
+    // exit status. The terminal manager treats the JSON event as the child
+    // result and reserves the bridge process exit code for bridge failures.
     send(
       {
         type: "exit",
@@ -148,6 +151,8 @@ function exitWhenParentGone() {
   } catch {
     // The PTY may already be gone.
   }
+  // EOF from the Bun host means the owning terminal session is gone. Treat it
+  // as an orderly bridge shutdown even if no spawn configuration was received.
   setTimeout(() => {
     process.exit(0);
   }, 100).unref?.();

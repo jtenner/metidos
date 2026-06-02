@@ -6,11 +6,15 @@ const TERMINAL_PTY_BRIDGE_PATH = fileURLToPath(
   new URL("./terminal-pty-bridge.cjs", import.meta.url),
 );
 
-function runBridgeWithRawInput(input: string): Promise<{
+function runBridgeWithRawInput(
+  input: string,
+  options: { endStdin?: boolean } = {},
+): Promise<{
   code: number | null;
   stderr: string;
   stdout: string;
 }> {
+  const { endStdin = true } = options;
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [TERMINAL_PTY_BRIDGE_PATH], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -29,11 +33,18 @@ function runBridgeWithRawInput(input: string): Promise<{
     child.on("exit", (code) => {
       resolve({ code, stderr, stdout });
     });
-    child.stdin.end(input);
+    if (endStdin) {
+      child.stdin.end(input);
+    } else {
+      child.stdin.write(input);
+    }
   });
 }
 
-function runBridgeWithConfig(config: unknown): Promise<{
+function runBridgeWithConfig(
+  config: unknown,
+  options?: { endStdin?: boolean },
+): Promise<{
   code: number | null;
   stderr: string;
   stdout: string;
@@ -41,10 +52,41 @@ function runBridgeWithConfig(config: unknown): Promise<{
   const encodedConfig = Buffer.from(JSON.stringify(config), "utf8").toString(
     "base64",
   );
-  return runBridgeWithRawInput(`${encodedConfig}\n`);
+  return runBridgeWithRawInput(`${encodedConfig}\n`, options);
 }
 
 describe("terminal PTY bridge", () => {
+  it("exits successfully when the host closes stdin before configuration", async () => {
+    const result = await runBridgeWithRawInput("");
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("");
+  });
+
+  it("reports PTY child exit status separately from bridge success", async () => {
+    const result = await runBridgeWithConfig(
+      {
+        args: [],
+        cols: 80,
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" },
+        file: "/bin/false",
+        name: "xterm-256color",
+        rows: 24,
+      },
+      { endStdin: false },
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout)).toEqual({
+      type: "exit",
+      exitCode: 1,
+      signal: 0,
+    });
+  });
+
   it("exits after an oversized partial input buffer", async () => {
     const result = await runBridgeWithRawInput("x".repeat(1024 * 1024 + 1));
 

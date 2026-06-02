@@ -264,7 +264,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 - [ ] I10: Review `assertTerminalNodeBinarySecurity` in `src/bun/terminal-manager.ts`. Add tests/comments for owner/root checks and group/world writable rejection.
 - [ ] I11: Review `terminalOwnerSessionKeyForThread` ownership model in `src/bun/terminal-manager.ts`. Fix orphan/cross-session behavior if real; otherwise document thread-owned terminal semantics.
 - [ ] I12: Review `src/bun/terminal-pty-bridge.cjs` spawn-config and env validation. Add tests/comments proving host-supplied config is bounded and trusted.
-- [ ] I14: Review PTY bridge exit behavior in `src/bun/terminal-pty-bridge.cjs`. Add comments/tests for bridge exit code and host EOF handling.
 - [ ] I15: Review `pty.spawn` error handling in `src/bun/terminal-pty-bridge.cjs`. Add tests/comments for invalid file/args and fatal startup failure.
 
 ### Web-server share follow-up
