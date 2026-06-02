@@ -39,11 +39,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
   - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
   - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
-- [ ] Add a repo-hosted website roadmap page. Context: `website/` already contains a static home page and public docs pages, but no roadmap page yet. Keep roadmap content limited to repo/product status, not external launch promotion. Remaining 3-minute slices:
-  - [ ] Decide the roadmap page path and navigation placement, likely `website/roadmap.html` linked from existing website navigation.
-  - [ ] Draft roadmap sections using public-safe content only: current status, near-term hardening, plugin ecosystem, install/first-run work, and known limitations.
-  - [ ] Add the static roadmap page and link it from appropriate website pages without introducing placeholder public URLs.
-  - [ ] Verify the roadmap page renders with existing website styles and contains no private repositories, usernames, hostnames, local paths, tokens, or customer/user data.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for a changelog page.
 - [ ] If a repo-hosted website exists or will be added, create TODOs for screenshot/demo sections that use safe data only.
 
