@@ -284,4 +284,62 @@ describe("plugin network allowlist", () => {
       ).allowed,
     ).toBe(true);
   });
+
+  it("denies requests when the allowlist is empty or the host is not exact", () => {
+    expect(
+      matchPluginNetworkAllowlist([], "https://api.example.test/v1/items"),
+    ).toMatchObject({
+      allowed: false,
+      code: "network_url_not_allowed",
+      message: "Plugin fetch URL is not covered by network.allow.",
+    });
+
+    const compiled = compilePluginNetworkAllowlist({
+      patterns: ["https://api.example.test/v1/**"],
+    });
+    expect(compiled.issues).toEqual([]);
+    expect(
+      matchPluginNetworkAllowlist(
+        compiled.patterns,
+        "https://evil-api.example.test/v1/items",
+      ),
+    ).toMatchObject({
+      allowed: false,
+      code: "network_url_not_allowed",
+    });
+    expect(
+      matchPluginNetworkAllowlist(
+        compiled.patterns,
+        "https://api.example.test.evil.test/v1/items",
+      ),
+    ).toMatchObject({
+      allowed: false,
+      code: "network_url_not_allowed",
+    });
+  });
+
+  it("rejects wildcard hosts and unsupported request protocols", () => {
+    const compiled = compilePluginNetworkAllowlist({
+      patterns: ["https://*.example.test/**", "ftp://api.example.test/**"],
+    });
+
+    expect(compiled.patterns).toEqual([]);
+    expect(compiled.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "invalid_network_allow_pattern" }),
+      ]),
+    );
+    expect(
+      matchPluginNetworkAllowlist([], "ftp://api.example.test/v1/items"),
+    ).toMatchObject({
+      allowed: false,
+      code: "invalid_network_url",
+    });
+    expect(
+      matchPluginNetworkAllowlist([], "data:text/plain,hello"),
+    ).toMatchObject({
+      allowed: false,
+      code: "invalid_network_url",
+    });
+  });
 });

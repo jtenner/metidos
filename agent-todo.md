@@ -14,7 +14,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 3. Security and Secret Handling
 
-- [ ] Add or improve tests around network policy enforcement and allowlist/denylist behavior.
 - [ ] Verify security-sensitive error messages are actionable without leaking secrets or sensitive local paths.
 
 ## 4. CI, Validation, and Release Automation
