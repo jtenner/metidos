@@ -142,6 +142,37 @@ describe("cron procedure validation", () => {
     await expect(listCronsProcedure(undefined)).resolves.toEqual([]);
   });
 
+  it("rejects oversized create inputs before persisting cron jobs", async () => {
+    const { project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-oversized-create-repo-",
+    );
+    const { listCronsProcedure, newCronProcedure } =
+      await loadProjectProcedures();
+    const validParams = {
+      enabled: true,
+      permissions: ["metidos:threads"],
+      projectId: project.id,
+      prompt: "echo ok",
+      schedule: "0 * * * *",
+      title: "Valid cron",
+      worktreePath: repoPath,
+    };
+
+    await expect(
+      newCronProcedure({ ...validParams, prompt: "x".repeat(64 * 1024 + 1) }),
+    ).rejects.toThrow(/Cron prompt is limited to 65536 characters/);
+    await expect(
+      newCronProcedure({ ...validParams, title: "x".repeat(73) }),
+    ).rejects.toThrow(/Cron title is limited to 72 characters/);
+    await expect(
+      newCronProcedure({ ...validParams, description: "x".repeat(241) }),
+    ).rejects.toThrow(/Cron description is limited to 240 characters/);
+    await expect(
+      newCronProcedure({ ...validParams, schedule: "* ".repeat(129).trim() }),
+    ).rejects.toThrow(/Cron schedule is limited to 256 characters/);
+    await expect(listCronsProcedure(undefined)).resolves.toEqual([]);
+  });
+
   it("rejects blank and oversized updates without changing the job", async () => {
     const { database, project, repoPath } = createCronProcedureWorkspace(
       "metidos-cron-update-validation-repo-",
