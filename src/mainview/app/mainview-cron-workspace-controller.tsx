@@ -110,6 +110,140 @@ type MainviewCronWorkspaceControllerProps = {
   variant: CronControllerVariant;
 };
 
+type CronEditorMutationState = {
+  currentEditingCronJobId: number | null;
+  isCreatingCronJob: boolean;
+  isEditingCronDeleting: boolean;
+  isEditingCronRunning: boolean;
+};
+
+export function describeCronEditorMutationState({
+  currentEditingCronJobId,
+  isCreatingCronJob,
+  isEditingCronDeleting,
+  isEditingCronRunning,
+}: CronEditorMutationState): {
+  deleteDisabled: boolean;
+  deleteLabel: string;
+  runNowDisabled: boolean;
+  runNowLabel: string;
+  submitLabel: string;
+} {
+  return {
+    deleteDisabled:
+      isCreatingCronJob || isEditingCronRunning || isEditingCronDeleting,
+    deleteLabel: isEditingCronDeleting ? "Deleting…" : "Delete",
+    runNowDisabled: isCreatingCronJob || isEditingCronRunning,
+    runNowLabel: isEditingCronRunning ? "Running…" : "Run Now",
+    submitLabel: isCreatingCronJob
+      ? "Saving…"
+      : currentEditingCronJobId === null
+        ? "Create Cron"
+        : "Save",
+  };
+}
+
+type CronEditMutationDraft = {
+  activeCodexModel: string;
+  cronCreatorModel: string;
+  cronCreatorReasoningEffort: RpcReasoningEffort;
+  cronEditDescription: string;
+  cronEditEnabled: boolean;
+  cronEditPermissions: ThreadAccessValue["permissions"];
+  cronEditProjectId: number | null;
+  cronEditPrompt: string;
+  cronEditSchedule: string;
+  cronEditTitle: string;
+  cronEditWorktreePath: string;
+  defaultCodexModel: string;
+  defaultCodexReasoningEffort: RpcReasoningEffort;
+};
+
+type CronEditMutationPayload = {
+  description?: string;
+  enabled: boolean;
+  model?: string;
+  permissions?: string[];
+  projectId: number;
+  prompt: string;
+  reasoningEffort: RpcReasoningEffort;
+  schedule: string;
+  title?: string;
+  worktreePath: string;
+};
+
+export function buildCronEditMutationPayload({
+  activeCodexModel,
+  cronCreatorModel,
+  cronCreatorReasoningEffort,
+  cronEditDescription,
+  cronEditEnabled,
+  cronEditPermissions,
+  cronEditProjectId,
+  cronEditPrompt,
+  cronEditSchedule,
+  cronEditTitle,
+  cronEditWorktreePath,
+  defaultCodexModel,
+  defaultCodexReasoningEffort,
+}: CronEditMutationDraft): CronEditMutationPayload {
+  const schedule = cronEditSchedule.trim();
+  const prompt = cronEditPrompt.trim();
+  if (cronEditProjectId === null || !cronEditWorktreePath) {
+    throw new Error("Select a folder for this cron job.");
+  }
+  if (!schedule || !prompt) {
+    throw new Error(
+      !schedule ? "Cron schedule is required." : "Cron prompt is required.",
+    );
+  }
+  const model = cronCreatorModel.trim()
+    ? cronCreatorModel.trim()
+    : activeCodexModel || defaultCodexModel;
+  const reasoningEffort =
+    cronCreatorReasoningEffort || defaultCodexReasoningEffort;
+  return {
+    projectId: cronEditProjectId,
+    worktreePath: cronEditWorktreePath,
+    schedule,
+    prompt,
+    ...(model ? { model } : {}),
+    reasoningEffort,
+    ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
+    ...(cronEditDescription.trim()
+      ? { description: cronEditDescription.trim() }
+      : {}),
+    ...(cronEditPermissions ? { permissions: cronEditPermissions } : {}),
+    enabled: cronEditEnabled,
+  };
+}
+
+export async function executeCronEditMutation({
+  cronEditingCronJobId,
+  draft,
+  loadCronJobs,
+  newCron,
+  updateCron,
+}: {
+  cronEditingCronJobId: number | null;
+  draft: CronEditMutationDraft;
+  loadCronJobs: () => Promise<void>;
+  newCron: (payload: CronEditMutationPayload) => Promise<unknown>;
+  updateCron: (
+    payload: CronEditMutationPayload & { cronJobId: number },
+  ) => Promise<unknown>;
+}): Promise<"created" | "updated"> {
+  const payload = buildCronEditMutationPayload(draft);
+  if (cronEditingCronJobId === null) {
+    await newCron(payload);
+    await loadCronJobs();
+    return "created";
+  }
+  await updateCron({ cronJobId: cronEditingCronJobId, ...payload });
+  await loadCronJobs();
+  return "updated";
+}
+
 function CronWorkspaceLoadingFallback({
   label,
   variant,
@@ -695,50 +829,42 @@ export function MainviewCronWorkspaceController({
   const handleEditCronSubmit = useCallback(() => {
     const updatingExistingCron =
       cronCreatorMode === "edit" && cronEditingCronJobId !== null;
-    const schedule = cronEditSchedule.trim();
-    const prompt = cronEditPrompt.trim();
-    if (cronEditProjectId === null || !cronEditWorktreePath) {
-      setCronCreatorError("Select a folder for this cron job.");
-      return;
-    }
-    if (!schedule || !prompt) {
+    const draft = {
+      activeCodexModel,
+      cronCreatorModel,
+      cronCreatorReasoningEffort,
+      cronEditDescription,
+      cronEditEnabled,
+      cronEditPermissions,
+      cronEditProjectId,
+      cronEditPrompt,
+      cronEditSchedule,
+      cronEditTitle,
+      cronEditWorktreePath,
+      defaultCodexModel,
+      defaultCodexReasoningEffort,
+    };
+    try {
+      buildCronEditMutationPayload(draft);
+    } catch (error) {
       setCronCreatorError(
-        !schedule ? "Cron schedule is required." : "Cron prompt is required.",
+        error instanceof Error ? error.message : String(error),
       );
       return;
     }
-    const model = cronCreatorModel.trim()
-      ? cronCreatorModel.trim()
-      : activeCodexModel || defaultCodexModel;
-    const reasoningEffort =
-      cronCreatorReasoningEffort || defaultCodexReasoningEffort;
-    const payload = {
-      projectId: cronEditProjectId,
-      worktreePath: cronEditWorktreePath,
-      schedule,
-      prompt,
-      ...(model ? { model } : {}),
-      reasoningEffort,
-      ...(cronEditTitle.trim() ? { title: cronEditTitle.trim() } : {}),
-      ...(cronEditDescription.trim()
-        ? { description: cronEditDescription.trim() }
-        : {}),
-      permissions: cronEditPermissions,
-      enabled: cronEditEnabled,
-    };
     setIsCreatingCronJob(true);
     setCronCreatorError("");
     void (async () => {
       try {
-        if (updatingExistingCron) {
-          await procedures.updateCron({
-            cronJobId: cronEditingCronJobId,
-            ...payload,
-          });
-        } else {
-          await procedures.newCron(payload);
-        }
-        await loadCronJobs();
+        await executeCronEditMutation({
+          cronEditingCronJobId: updatingExistingCron
+            ? cronEditingCronJobId
+            : null,
+          draft,
+          loadCronJobs,
+          newCron: (payload) => procedures.newCron(payload),
+          updateCron: (payload) => procedures.updateCron(payload),
+        });
         if (!updatingExistingCron) closeCronCreator();
       } catch (error) {
         setCronCreatorError(
@@ -784,11 +910,12 @@ export function MainviewCronWorkspaceController({
   const isEditingCronDeleting =
     currentEditingCronJobId !== null &&
     deletingCronJobs.has(currentEditingCronJobId);
-  const submitLabel = isCreatingCronJob
-    ? "Saving…"
-    : currentEditingCronJobId === null
-      ? "Create Cron"
-      : "Save";
+  const cronEditorMutationState = describeCronEditorMutationState({
+    currentEditingCronJobId,
+    isCreatingCronJob,
+    isEditingCronDeleting,
+    isEditingCronRunning,
+  });
   const inputIdSuffix = variant === "mobile" ? "-mobile" : "";
 
   const openCronFolderSelector = useCallback(() => {
@@ -1044,25 +1171,21 @@ export function MainviewCronWorkspaceController({
               {currentEditingCronJobId !== null ? (
                 <AppButton
                   buttonStyle="secondary"
-                  disabled={isCreatingCronJob || isEditingCronRunning}
+                  disabled={cronEditorMutationState.runNowDisabled}
                   onClick={() => handleRunCronNow(currentEditingCronJobId)}
                 >
                   {materialSymbol("arrow_forward", "text-[15px]")}
-                  <span>{isEditingCronRunning ? "Running…" : "Run Now"}</span>
+                  <span>{cronEditorMutationState.runNowLabel}</span>
                 </AppButton>
               ) : null}
               {currentEditingCronJob ? (
                 <AppButton
                   buttonStyle="error"
-                  disabled={
-                    isCreatingCronJob ||
-                    isEditingCronRunning ||
-                    isEditingCronDeleting
-                  }
+                  disabled={cronEditorMutationState.deleteDisabled}
                   onClick={() => handleDeleteCron(currentEditingCronJob)}
                 >
                   {materialSymbol("delete", "text-[15px]")}
-                  <span>{isEditingCronDeleting ? "Deleting…" : "Delete"}</span>
+                  <span>{cronEditorMutationState.deleteLabel}</span>
                 </AppButton>
               ) : null}
               <AppButton buttonStyle="muted" onClick={closeCronCreator}>
@@ -1077,7 +1200,7 @@ export function MainviewCronWorkspaceController({
                     : handleEditCronSubmit()
                 }
               >
-                {submitLabel}
+                {cronEditorMutationState.submitLabel}
               </AppButton>
             </div>
           </div>
