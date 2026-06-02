@@ -5,9 +5,11 @@ import { join } from "node:path";
 
 import {
   closeAppDatabase,
+  createCronJob,
   getCronJobById,
   initAppDatabase,
   resetResolvedAppDataDirectory,
+  runInTransaction,
   upsertProject,
 } from "./db";
 
@@ -43,6 +45,32 @@ async function loadProjectProcedures(): Promise<ProjectProceduresModule> {
   return (await import(
     `./project-procedures?cron-validation=${Date.now()}`
   )) as ProjectProceduresModule;
+}
+
+function seedCronJobs(
+  database: ReturnType<typeof initAppDatabase>,
+  project: ReturnType<typeof upsertProject>,
+  repoPath: string,
+  count: number,
+  options: { enabled: boolean },
+): void {
+  runInTransaction(database, () => {
+    for (let index = 0; index < count; index += 1) {
+      createCronJob(database, {
+        description: `Seed cron job ${index}`,
+        enabled: options.enabled,
+        model: "gpt-5.4",
+        permissions: ["metidos:threads"],
+        pluginAccessGroups: [],
+        projectId: project.id,
+        prompt: `echo seed ${index}`,
+        reasoningEffort: "medium",
+        schedule: "0 * * * *",
+        title: `Seed cron ${index}`,
+        worktreePath: repoPath,
+      });
+    }
+  });
 }
 
 afterEach(() => {
@@ -228,5 +256,62 @@ describe("cron procedure validation", () => {
       schedule: "0 * * * *",
       title: "Valid cron",
     });
+  });
+
+  it("rejects new cron jobs once the total job limit is reached", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-total-capacity-repo-",
+    );
+    seedCronJobs(database, project, repoPath, 512, { enabled: false });
+    const { listCronsProcedure, newCronProcedure } =
+      await loadProjectProcedures();
+
+    await expect(
+      newCronProcedure({
+        enabled: false,
+        permissions: ["metidos:threads"],
+        projectId: project.id,
+        prompt: "echo one too many",
+        schedule: "0 * * * *",
+        title: "Overflow cron",
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(/Cron jobs are limited to 512/);
+    await expect(listCronsProcedure(undefined)).resolves.toHaveLength(512);
+  });
+
+  it("rejects enabling cron jobs once the active job limit is reached", async () => {
+    const { database, project, repoPath } = createCronProcedureWorkspace(
+      "metidos-cron-active-capacity-repo-",
+    );
+    seedCronJobs(database, project, repoPath, 256, { enabled: true });
+    const { newCronProcedure, updateCronProcedure } =
+      await loadProjectProcedures();
+
+    await expect(
+      newCronProcedure({
+        enabled: true,
+        permissions: ["metidos:threads"],
+        projectId: project.id,
+        prompt: "echo active overflow",
+        schedule: "0 * * * *",
+        title: "Active overflow cron",
+        worktreePath: repoPath,
+      }),
+    ).rejects.toThrow(/Enabled cron jobs are limited to 256/);
+
+    const disabledCron = await newCronProcedure({
+      enabled: false,
+      permissions: ["metidos:threads"],
+      projectId: project.id,
+      prompt: "echo disabled ok",
+      schedule: "0 * * * *",
+      title: "Disabled cron",
+      worktreePath: repoPath,
+    });
+    await expect(
+      updateCronProcedure({ cronJobId: disabledCron.id, enabled: true }),
+    ).rejects.toThrow(/Enabled cron jobs are limited to 256/);
+    expect(getCronJobById(database, disabledCron.id)?.enabled).toBe(0);
   });
 });
