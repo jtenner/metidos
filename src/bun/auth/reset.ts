@@ -543,6 +543,10 @@ async function promptUsername(
  */
 
 async function runInteractiveCli(args: string[]): Promise<void> {
+  // Auth reset prompts collect live primary-factor and TOTP proofs and print
+  // view-once recovery codes, so both input and output must be attached to a
+  // real terminal. Refusing non-TTY execution avoids leaking prompts/secrets to
+  // pipes or logs and prevents unattended reset attempts.
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error("The auth reset CLI requires an interactive TTY.");
   }

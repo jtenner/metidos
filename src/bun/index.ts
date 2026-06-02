@@ -595,6 +595,10 @@ function buildNormalizedAllowedWsOrigins(
  * Runs the destructive local database wipe confirmation flow.
  */
 async function runUserDataWipeCli(): Promise<boolean> {
+  // This destructive maintenance command must only run from a real terminal:
+  // stdin receives the typed confirmation and stdout shows the exact database
+  // path being wiped. Refuse piped/non-interactive execution so automation,
+  // redirected logs, or background jobs cannot accidentally confirm the wipe.
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error("The --wipe-user-data flag requires an interactive TTY.");
   }
