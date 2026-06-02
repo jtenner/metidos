@@ -455,6 +455,46 @@ describe("executePluginFetch", () => {
     expect(response.bodyBase64).toBeUndefined();
   });
 
+  it("returns structured textual media types as decoded text", async () => {
+    const response = await executePluginFetch({
+      context: {
+        network: { allow: ["http://93.184.216.34/**"], enforceHttps: false },
+        permissions: ["network:fetch"],
+      },
+      fetch: async () =>
+        new Response('{"ok":true}', {
+          headers: {
+            "content-type": "application/activity+json; charset=utf-8",
+          },
+        }),
+      url: "http://93.184.216.34/activity",
+    });
+
+    expect(response).toEqual(
+      expect.objectContaining({ body: '{"ok":true}', status: 200 }),
+    );
+    expect(response.bodyBase64).toBeUndefined();
+  });
+
+  it("returns declared text with invalid UTF-8 as base64 bytes", async () => {
+    const response = await executePluginFetch({
+      context: {
+        network: { allow: ["http://93.184.216.34/**"], enforceHttps: false },
+        permissions: ["network:fetch"],
+      },
+      fetch: async () =>
+        new Response(new Uint8Array([0xff, 0xfe, 0xfd]), {
+          headers: { "content-type": "text/plain; charset=utf-8" },
+        }),
+      url: "http://93.184.216.34/not-utf8",
+    });
+
+    expect(response.body).toBeUndefined();
+    expect(response).toEqual(
+      expect.objectContaining({ bodyBase64: "//79", status: 200 }),
+    );
+  });
+
   it("returns large textual responses as base64 to avoid oversized strings", async () => {
     const largeJson = `{"payload":"${"x".repeat(MAX_PLUGIN_FETCH_TEXT_RESPONSE_BODY_BYTES)}"}`;
 
