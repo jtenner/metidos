@@ -42,6 +42,10 @@ const BLOCKED_PRIVATE_NETWORK_METADATA_HOSTS = new Set([
 ]);
 
 function isBlockedIpv4(hostname: string): boolean {
+  // SSRF-safe mode rejects non-public IPv4 space rather than only RFC1918.
+  // The blocked set covers wildcard/this-host (0/8), private networks,
+  // loopback, link-local metadata-adjacent space, carrier-grade NAT,
+  // benchmarking ranges, multicast, reserved future-use, and broadcast space.
   const parts = parseIpv4Address(hostname);
   if (!parts) {
     return true;
@@ -150,6 +154,10 @@ function ipv4FromHextets(hextets: number[]): string {
 }
 
 function isBlockedIpv6(hostname: string): boolean {
+  // SSRF-safe mode rejects localhost/unspecified, link-local, unique-local,
+  // multicast, 6to4, documentation/IETF protocol assignments, NAT64 well-known
+  // prefixes, and IPv4-compatible or IPv4-mapped forms whose embedded IPv4
+  // address is blocked. Unknown or malformed IPv6 literals fail closed.
   const hextets = parseIpv6Hextets(hostname);
   if (!hextets || hextets.length !== 8) {
     return true;

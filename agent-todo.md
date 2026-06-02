@@ -261,7 +261,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] F1: Review `src/bun/outbound-url-security.ts` `new Response(nodeResponse as unknown as BodyInit)`. If Bun/Node stream coercion is brittle or leaks sockets, wrap with a proper Web `ReadableStream`; otherwise comment runtime assumption and add a test.
 - [ ] F2: Review custom DNS `lookup` callback shape in `src/bun/outbound-url-security.ts`. Add tests/comments for `lookupOptions.all` and single-address callbacks.
-- [ ] F3: Review IPv4/IPv6 blocklists in `src/bun/outbound-url-security.ts`. If missing ranges matter, update; otherwise comment the intentionally blocked private/reserved ranges.
 - [ ] F5: Review `isIP` behavior for IPv4-in-IPv6 forms in `src/bun/outbound-url-security.ts`. Add tests/comments if not already covered.
 - [ ] F7: Review mixed A/AAAA DNS result rejection in `src/bun/outbound-url-security.ts`. Add comments/tests clarifying that any blocked resolved address rejects the hostname.
 - [ ] F8: Review DNS error handling in `src/bun/outbound-url-security.ts`. If transient DNS errors should be distinguishable from policy denials, improve error codes; otherwise comment current generic behavior.
