@@ -244,6 +244,92 @@ export async function executeCronEditMutation({
   return "updated";
 }
 
+export async function executeCronRunNowMutation({
+  cronJobId,
+  isCurrentRequest,
+  loadCronJobs,
+  markNotRunning,
+  markRunning,
+  openCronThreadInRecent,
+  runCronNow,
+  setCronJobsError,
+}: {
+  cronJobId: number;
+  isCurrentRequest: () => boolean;
+  loadCronJobs: () => Promise<void>;
+  markNotRunning: () => void;
+  markRunning: () => void;
+  openCronThreadInRecent: (threadId: number) => Promise<void>;
+  runCronNow: (payload: { cronJobId: number }) => Promise<{
+    success: boolean;
+    threadId: number;
+  }>;
+  setCronJobsError: (message: string) => void;
+}): Promise<"started" | "stale"> {
+  markRunning();
+  setCronJobsError("");
+  try {
+    const result = await runCronNow({ cronJobId });
+    if (!result.success)
+      throw new Error(`Cron job ${cronJobId} did not start.`);
+    if (!isCurrentRequest()) return "stale";
+    await openCronThreadInRecent(result.threadId);
+    if (!isCurrentRequest()) return "stale";
+    await loadCronJobs();
+    return "started";
+  } catch (error) {
+    if (isCurrentRequest()) {
+      setCronJobsError(error instanceof Error ? error.message : String(error));
+    }
+    throw error;
+  } finally {
+    markNotRunning();
+  }
+}
+
+export async function executeCronDeleteMutation({
+  closeCronCreatorIfEditing,
+  cronJob,
+  isCurrentRequest,
+  loadCronJobs,
+  markDeleting,
+  markNotDeleting,
+  removeCronJob,
+  setCronJobsError,
+  updateCron,
+}: {
+  closeCronCreatorIfEditing: (cronJobId: number) => void;
+  cronJob: Pick<RpcCronJob, "id">;
+  isCurrentRequest: () => boolean;
+  loadCronJobs: () => void | Promise<void>;
+  markDeleting: () => void;
+  markNotDeleting: () => void;
+  removeCronJob: (cronJobId: number) => void;
+  setCronJobsError: (message: string) => void;
+  updateCron: (payload: {
+    cronJobId: number;
+    deleted: true;
+  }) => Promise<unknown>;
+}): Promise<"deleted" | "stale"> {
+  markDeleting();
+  setCronJobsError("");
+  try {
+    await updateCron({ cronJobId: cronJob.id, deleted: true });
+    if (!isCurrentRequest()) return "stale";
+    removeCronJob(cronJob.id);
+    closeCronCreatorIfEditing(cronJob.id);
+    void loadCronJobs();
+    return "deleted";
+  } catch (error) {
+    if (isCurrentRequest()) {
+      setCronJobsError(error instanceof Error ? error.message : String(error));
+    }
+    throw error;
+  } finally {
+    markNotDeleting();
+  }
+}
+
 function CronWorkspaceLoadingFallback({
   label,
   variant,
@@ -515,35 +601,13 @@ export function MainviewCronWorkspaceController({
       if (!claimCronJobRun(runningCronJobIdsRef.current, cronJobId)) return;
       const requestId = (cronRunRequestIdsRef.current.get(cronJobId) ?? 0) + 1;
       cronRunRequestIdsRef.current.set(cronJobId, requestId);
-      void (async () => {
-        setRunningCronJobs((current) => new Set(current).add(cronJobId));
-        setCronJobsError("");
-        try {
-          const result = await procedures.runCronNow({ cronJobId });
-          if (!result.success)
-            throw new Error(`Cron job ${cronJobId} did not start.`);
-          if (
-            !isMountedRef.current ||
-            cronRunRequestIdsRef.current.get(cronJobId) !== requestId
-          )
-            return;
-          await openCronThreadInRecent(result.threadId);
-          if (
-            !isMountedRef.current ||
-            cronRunRequestIdsRef.current.get(cronJobId) !== requestId
-          )
-            return;
-          await loadCronJobs();
-        } catch (error) {
-          if (
-            isMountedRef.current &&
-            cronRunRequestIdsRef.current.get(cronJobId) === requestId
-          ) {
-            setCronJobsError(
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        } finally {
+      void executeCronRunNowMutation({
+        cronJobId,
+        isCurrentRequest: () =>
+          isMountedRef.current &&
+          cronRunRequestIdsRef.current.get(cronJobId) === requestId,
+        loadCronJobs,
+        markNotRunning: () => {
           releaseCronJobRun(runningCronJobIdsRef.current, cronJobId);
           if (cronRunRequestIdsRef.current.get(cronJobId) === requestId)
             cronRunRequestIdsRef.current.delete(cronJobId);
@@ -554,8 +618,13 @@ export function MainviewCronWorkspaceController({
               return next;
             });
           }
-        }
-      })();
+        },
+        markRunning: () =>
+          setRunningCronJobs((current) => new Set(current).add(cronJobId)),
+        openCronThreadInRecent,
+        runCronNow: procedures.runCronNow,
+        setCronJobsError,
+      }).catch(() => undefined);
     },
     [loadCronJobs, openCronThreadInRecent, procedures],
   );
@@ -583,31 +652,18 @@ export function MainviewCronWorkspaceController({
     const requestId =
       (cronDeleteRequestIdsRef.current.get(cronJob.id) ?? 0) + 1;
     cronDeleteRequestIdsRef.current.set(cronJob.id, requestId);
-    void (async () => {
-      setDeletingCronJobs((current) => new Set(current).add(cronJob.id));
-      setCronJobsError("");
-      try {
-        await procedures.updateCron({ cronJobId: cronJob.id, deleted: true });
-        if (
-          !isMountedRef.current ||
-          cronDeleteRequestIdsRef.current.get(cronJob.id) !== requestId
-        )
-          return;
-        setCronJobs((current) =>
-          current.filter((entry) => entry.id !== cronJob.id),
-        );
-        if (cronEditingCronJobId === cronJob.id) closeCronCreator();
-        void loadCronJobs();
-      } catch (error) {
-        if (
-          isMountedRef.current &&
-          cronDeleteRequestIdsRef.current.get(cronJob.id) === requestId
-        ) {
-          setCronJobsError(
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      } finally {
+    void executeCronDeleteMutation({
+      closeCronCreatorIfEditing: (cronJobId) => {
+        if (cronEditingCronJobId === cronJobId) closeCronCreator();
+      },
+      cronJob,
+      isCurrentRequest: () =>
+        isMountedRef.current &&
+        cronDeleteRequestIdsRef.current.get(cronJob.id) === requestId,
+      loadCronJobs,
+      markDeleting: () =>
+        setDeletingCronJobs((current) => new Set(current).add(cronJob.id)),
+      markNotDeleting: () => {
         if (cronDeleteRequestIdsRef.current.get(cronJob.id) === requestId)
           cronDeleteRequestIdsRef.current.delete(cronJob.id);
         if (isMountedRef.current) {
@@ -617,8 +673,14 @@ export function MainviewCronWorkspaceController({
             return next;
           });
         }
-      }
-    })();
+      },
+      removeCronJob: (cronJobId) =>
+        setCronJobs((current) =>
+          current.filter((entry) => entry.id !== cronJobId),
+        ),
+      setCronJobsError,
+      updateCron: procedures.updateCron,
+    }).catch(() => undefined);
   }, [
     closeCronCreator,
     cronEditingCronJobId,
