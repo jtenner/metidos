@@ -592,6 +592,12 @@ export function rewriteEntrypointExports(source: string): string {
 
   assertSupportedEntrypointExportSyntax(source);
 
+  // The QuickJS runtime executes plugin entrypoints from a script wrapper instead of
+  // loading native ES modules. This rewrite intentionally supports only the two
+  // forms emitted by the plugin bundler for QuickJS entrypoints: an expression
+  // default export and an export-list default alias. Other ESM/CommonJS export
+  // styles are rejected above so plugin authors get a stable diagnostic instead
+  // of a wrapper-time syntax error.
   let transformed = source.replace(
     /export\s*\{([\s\S]*?)\};?/g,
     (_match, specifiers: string) => {

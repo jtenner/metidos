@@ -77,12 +77,17 @@ afterEach(() => {
 });
 
 describe("rewriteEntrypointExports", () => {
-  it("rewrites default exports and export lists without touching ordinary source", () => {
+  it("rewrites default exports and export-list default aliases without touching ordinary source", () => {
     expect(
       rewriteEntrypointExports(
         "const plugin = {}; export { plugin as default };",
       ),
     ).toBe("const plugin = {}; globalThis.__metidosDefaultExport = plugin;");
+    expect(
+      rewriteEntrypointExports(
+        "const plugin = {};\nexport { helper, plugin as default };",
+      ),
+    ).toBe("const plugin = {};\nglobalThis.__metidosDefaultExport = plugin;");
     expect(
       rewriteEntrypointExports(
         "export default definePlugin({ name: 'demo' });",
