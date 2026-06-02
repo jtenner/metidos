@@ -377,11 +377,13 @@ describe("auth service", () => {
           (event) => event.eventType === "auth_invalid_credentials",
         ),
       ).toHaveLength(2);
-      expect(
-        failureEvents.filter(
-          (event) => event.eventType === "auth_lockout_started",
-        ),
-      ).toHaveLength(1);
+      const lockoutEvents = failureEvents.filter(
+        (event) => event.eventType === "auth_lockout_started",
+      );
+      expect(lockoutEvents).toHaveLength(1);
+      // The threshold-crossing failed attempt is represented by the lockout
+      // transition event rather than an extra invalid-credentials event.
+      expect(lockoutEvents[0]?.payloadJson).toContain('"method":"totp"');
       expect(failureEvents[0]?.payloadJson).toContain('"method":"totp"');
     });
   }

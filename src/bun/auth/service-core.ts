@@ -520,6 +520,13 @@ export function recordAuthAuditEvent(
 
 /**
  * Record failed auth attempts and lockout state transitions.
+ *
+ * The attempt that crosses the lockout threshold is intentionally recorded as
+ * `auth_lockout_started` instead of a second `auth_invalid_credentials` event.
+ * Callers increment the persisted failure counter first, then pass the returned
+ * `lockedUntil` value here so the audit log's terminal event describes the
+ * durable state transition that operators need to investigate.
+ *
  * @param database - Database handle.
  * @param input - Failure metadata.
  */
