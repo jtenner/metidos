@@ -2558,6 +2558,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// These structural limits are enforced per RPC request before procedure dispatch.
+// Aggregate abuse from many individually valid requests is handled by the RPC
+// WebSocket/HTTP rate limits and in-flight accounting instead of a connection-
+// lifetime byte budget here, so procedure validators can stay deterministic and
+// request-scoped.
 const MAX_RPC_RECORD_DEPTH = 12;
 const MAX_RPC_RECORD_KEYS = 1000;
 const MAX_RPC_RECORD_STRING_BYTES = 64 * 1024;

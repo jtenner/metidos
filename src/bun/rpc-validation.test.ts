@@ -359,6 +359,26 @@ describe("RPC request validation", () => {
     expect(classifyRpcWebSocketSendStatus(1)).toBe("sent");
   });
 
+  test("bounds generic RPC params per request", async () => {
+    useIsolatedAppDataDir();
+    const { validateRpcRequestParams } = await import("./index");
+
+    expect(() =>
+      validateRpcRequestParams("openProject", {
+        extra: Object.fromEntries(
+          Array.from({ length: 1001 }, (_, index) => [`key${index}`, "x"]),
+        ),
+        projectPath: "/tmp/metidos-project",
+      }),
+    ).toThrow(/openProject\.extra would raise the total/);
+    expect(() =>
+      validateRpcRequestParams("openProject", {
+        extra: [[[[[[[[[[[[["too-deep"]]]]]]]]]]]]],
+        projectPath: "/tmp/metidos-project",
+      }),
+    ).toThrow(/openProject must be at most 12 levels deep/);
+  });
+
   test("bounds generic RPC record params", async () => {
     useIsolatedAppDataDir();
     const { validateRpcRequestParams } = await import("./index");
