@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   decodeRpcBinaryFrame,
+  encodeRpcBinaryFrame,
   isRpcBinaryFrame,
 } from "../shared/rpc-binary-codec";
 import {
@@ -302,6 +303,70 @@ describe("RPC transport", () => {
     expect(harness.timedOut).toHaveLength(0);
   });
 
+  test("rejects compressed client binary frames before dispatch", async () => {
+    const harness = createHarness();
+    const transport = createRpcTransport(harness.options);
+    const socket = createFakeSocket();
+    transport.open(socket as never);
+
+    const raw = await encodeRpcBinaryFrame({
+      id: 4,
+      method: "listProjects",
+      params: { body: "x".repeat(64 * 1024) },
+      type: "request",
+    });
+    expect(isRpcBinaryFrame(raw)).toBeTrue();
+
+    transport.handleMessage(socket as never, raw as never);
+    await Bun.sleep(15);
+
+    expect(socket.sent).toHaveLength(0);
+    expect(harness.logger.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: "Invalid RPC client binary frame" }),
+      ]),
+    );
+    expect(harness.started).toHaveLength(0);
+    expect(harness.failed).toHaveLength(0);
+  });
+
+  test("closes clients when binary request frames exceed the wire payload cap", async () => {
+    const harness = createHarness(undefined, { maxPayloadBytes: 256 });
+    const transport = createRpcTransport(harness.options);
+    const socket = createFakeSocket();
+    transport.open(socket as never);
+
+    const raw = await encodeRpcBinaryFrame(
+      {
+        id: 5,
+        method: "listProjects",
+        params: { body: "x".repeat(1024) },
+        type: "request",
+      },
+      { compress: false },
+    );
+    expect(raw.byteLength).toBeGreaterThan(harness.options.maxPayloadBytes);
+
+    transport.handleMessage(socket as never, raw as never);
+    await waitFor(() => expect(socket.closed).toHaveLength(1));
+
+    expect(socket.closed[0]).toEqual({
+      code: 1009,
+      reason: "WebSocket message too large.",
+    });
+    expect(socket.sent).toHaveLength(0);
+    expect(harness.logger.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          limitBytes: 256,
+          message:
+            "WebSocket message rejected because it exceeds the size limit",
+        }),
+      ]),
+    );
+    expect(harness.started).toHaveLength(0);
+  });
+
   test("closes clients on pre-parse budget failure", async () => {
     const harness = createHarness(undefined, {
       consumePreParseBudget: () => ({ allowed: false }),
@@ -310,7 +375,7 @@ describe("RPC transport", () => {
     const socket = createFakeSocket();
     transport.open(socket as never);
 
-    transport.handleMessage(socket as never, request(4));
+    transport.handleMessage(socket as never, request(6));
     await waitFor(() => expect(socket.closed).toHaveLength(1));
     expect(socket.closed[0]).toEqual({
       code: 1008,
@@ -335,7 +400,7 @@ describe("RPC transport", () => {
     const socket = createFakeSocket();
     transport.open(socket as never);
 
-    transport.handleMessage(socket as never, request(5));
+    transport.handleMessage(socket as never, request(7));
     await waitFor(() => expect(transport.getPendingRequestCount()).toBe(1));
     const backlogSnapshot = transport.getHealthSnapshot();
     expect(backlogSnapshot).toEqual({
@@ -343,17 +408,17 @@ describe("RPC transport", () => {
       pendingRequests: { current: 1, peak: 1 },
     });
 
-    transport.handleMessage(socket as never, request(6));
+    transport.handleMessage(socket as never, request(8));
     await waitFor(() => expect(socket.sent).toHaveLength(1));
     expect(decodeJsonSend(sentAt(socket, 0))).toMatchObject({
       error: "RPC server is busy. Please retry shortly.",
-      id: 6,
+      id: 8,
       ok: false,
       type: "response",
     });
     expect(harness.logger.warnings.at(-1)).toMatchObject({
       error: "Too many pending RPC requests for this connection (1/1).",
-      requestId: 6,
+      requestId: 8,
     });
 
     deferred.resolve([]);
@@ -384,9 +449,9 @@ describe("RPC transport", () => {
     const socket = createFakeSocket();
     transport.open(socket as never);
 
-    transport.handleMessage(socket as never, request(7));
+    transport.handleMessage(socket as never, request(9));
     await waitFor(() => expect(transport.getPendingRequestCount()).toBe(1));
-    transport.handleMessage(socket as never, cancel(7));
+    transport.handleMessage(socket as never, cancel(9));
     await waitFor(() => expect(transport.getPendingRequestCount()).toBe(0));
 
     expect(socket.sent).toHaveLength(0);
@@ -400,7 +465,7 @@ describe("RPC transport", () => {
     socket.sendResults.push(-1);
     transport.open(socket as never);
 
-    transport.handleMessage(socket as never, request(8));
+    transport.handleMessage(socket as never, request(10));
     await waitFor(() => expect(socket.closed).toHaveLength(1));
     expect(socket.closed[0]).toEqual({
       code: 1013,
