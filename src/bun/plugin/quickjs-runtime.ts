@@ -284,9 +284,14 @@ function installPluginWebSocketHostFunction(input: {
 
 function pluginBytesHostPayload(value: unknown): unknown {
   if (value instanceof Uint8Array) {
+    // Copy host-owned bytes into a base64 JSON envelope before crossing into
+    // QuickJS. The guest receives a decoded Uint8Array copy and cannot retain
+    // or mutate the host buffer backing this result.
     return { __metidosBytesBase64: Buffer.from(value).toString("base64") };
   }
   if (value instanceof ArrayBuffer) {
+    // ArrayBuffer results are copied for the same reason as Uint8Array results:
+    // the QuickJS bridge exchanges plain JSON strings, not shared memory.
     return { __metidosBytesBase64: Buffer.from(value).toString("base64") };
   }
   return value;

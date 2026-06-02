@@ -1293,6 +1293,72 @@ describe("executePluginQuickJsRuntime", () => {
     }
   });
 
+  it("copies host byte payloads through JSON envelopes before returning them to QuickJS", async () => {
+    const pluginRoot = createTempDirectory("metidos-plugin-quickjs-bytes-");
+    writePluginFile(
+      pluginRoot,
+      "index.ts",
+      `
+        import { definePlugin } from "@metidos/plugin-api";
+        export default definePlugin((metidos) => {
+          metidos.addAgentTool({
+            tool: "bytes",
+            name: "Bytes",
+            description: "Exercise byte payload copies.",
+            timeoutMs: 5000,
+            validateProps(props) { return props; },
+            async action() {
+              const typed = await metidos.fs.read("typed");
+              typed[0] = 99;
+              const typedAgain = await metidos.fs.read("typed");
+              const buffer = await metidos.fs.read("buffer");
+              return {
+                buffer: Array.from(buffer),
+                typed: Array.from(typed),
+                typedAgain: Array.from(typedAgain),
+              };
+            },
+          });
+        });
+      `,
+    );
+    const buildResult = await buildPluginEntrypoint({ pluginRoot });
+    const hostTypedBytes = new Uint8Array([0, 1, 2, 255]);
+    const runtime = await startPluginQuickJsRuntime(buildResult, {
+      pluginApi: {
+        fs: async (_operation, request) => {
+          const path = (request.params as { path?: string }).path;
+          if (path === "typed") {
+            return hostTypedBytes.subarray(1, 3);
+          }
+          return new Uint8Array([9, 8, 7]).buffer;
+        },
+        permissions: ["storage:read"],
+      },
+      startupTimeoutMs: 1_000,
+    });
+    try {
+      const registrations = runtime.setupResult as {
+        tools: Array<{ actionHandle: string }>;
+      };
+      await expect(
+        runtime.invokeCallback({
+          args: [{ contextKind: "threadTool", ownerUserId: 7 }, {}],
+          deadlineMs: Date.now() + 1_000,
+          handle: registrations.tools[0]?.actionHandle ?? "missing",
+          label: "bytes action",
+        }),
+      ).resolves.toEqual({
+        buffer: [9, 8, 7],
+        typed: [99, 2],
+        typedAgain: [1, 2],
+      });
+      expect(Array.from(hostTypedBytes)).toEqual([0, 1, 2, 255]);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
   it("dispatches metidos.lancedb through the host API without exposing host paths", async () => {
     const pluginRoot = createTempDirectory("metidos-plugin-quickjs-lancedb-");
     writePluginFile(
