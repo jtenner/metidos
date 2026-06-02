@@ -1180,6 +1180,10 @@ export function runInTransaction<T>(database: Database, callback: () => T): T {
   }
 }
 
+// The legacy auth migration helpers below only use repository-owned table
+// names. tableExists binds the identifier as data for sqlite_master lookups;
+// countRows quotes the identifier before interpolating it into SQL, so dynamic
+// table names cannot extend the current statement.
 function tableExists(db: Database, tableName: string): boolean {
   return Boolean(
     db

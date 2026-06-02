@@ -265,7 +265,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 ### SQLite and persistence follow-up
 
-- [ ] C1: Review `tableExists` and `countRows` identifier use in `src/bun/db.ts`. Add a small comment/test confirming `quoteSqliteIdentifier` makes current dynamic table names safe.
 - [ ] C2: Review `assertSafeSqliteColumnDefinition` in `src/bun/app-schema-migration.ts`. If its name overstates validation, rename or add a comment saying it is only for repository-authored migration DDL, not user input.
 - [ ] C3: Review `rebuildProjectsTableForOwnerless` in `src/bun/app-schema-migration.ts`. If `GROUP BY path` can drop important legacy project rows, fix migration behavior; otherwise document expected data-consolidation semantics.
 - [ ] C4: Review `rebuildAppNotificationDeliveriesForLocalInbox` in `src/bun/app-schema-migration.ts`. If legacy multi-user notifications should not become local inbox entries, filter or migrate explicitly; otherwise comment the single-operator migration choice.
