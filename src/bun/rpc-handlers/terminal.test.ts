@@ -26,6 +26,7 @@ function createDependencies(
     throw new AuthServiceError(
       "admin_required",
       "Only the local app operator can manage terminals.",
+      403,
     );
   };
 

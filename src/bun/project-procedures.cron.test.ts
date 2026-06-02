@@ -62,7 +62,9 @@ function createAdminContextWithoutStepUp(): RpcRequestContext {
       userId: 1,
       username: "admin",
     },
+    priority: "default",
     signal: new AbortController().signal,
+    timeoutMs: null,
   };
 }
 
@@ -77,7 +79,9 @@ function createRegularContext(
       username: "alice",
       ...auth,
     },
+    priority: "default",
     signal: new AbortController().signal,
+    timeoutMs: null,
   };
 }
 
