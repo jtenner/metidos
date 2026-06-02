@@ -159,6 +159,31 @@ describe("executePluginQuickJsRuntime", () => {
     });
   });
 
+  it("drains pending QuickJS promise jobs during plugin setup", async () => {
+    const result = await buildAndRunPlugin(`
+      import { definePlugin } from "@metidos/plugin-api";
+      const value = await Promise.resolve()
+        .then(() => Promise.resolve("first"))
+        .then((first) => Promise.resolve(first + ":second"));
+      export default definePlugin({ value });
+    `);
+
+    expect(result.setupResult).toEqual({ value: "first:second" });
+  });
+
+  it("times out unresolved QuickJS setup promises", async () => {
+    await expect(
+      buildAndRunPlugin(
+        `
+          import { definePlugin } from "@metidos/plugin-api";
+          const value = await new Promise(() => {});
+          export default definePlugin({ value });
+        `,
+        { startupTimeoutMs: 25 },
+      ),
+    ).rejects.toThrow("Plugin QuickJS setup timed out after 25 ms.");
+  });
+
   it("exposes btoa and atob as bare top-level QuickJS plugin functions", async () => {
     const result = await buildAndRunPlugin(`
       import { definePlugin } from "@metidos/plugin-api";

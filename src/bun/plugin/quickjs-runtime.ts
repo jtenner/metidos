@@ -670,6 +670,10 @@ async function resolveQuickJsPromise(
   const promise = context.resolvePromise(promiseHandle);
   promiseHandle.dispose();
 
+  // QuickJS promises advance only when the host explicitly drains pending jobs.
+  // Drain currently queued microtasks before awaiting the host-side promise so
+  // immediately-resolving setup/callback chains cannot remain stuck until the
+  // wall-clock timeout fires.
   while (runtime.hasPendingJob()) {
     assertQuickJsDeadline(input.deadlineMs, input.timeoutMessage);
     const jobsResult = runtime.executePendingJobs();
@@ -695,6 +699,9 @@ async function resolveQuickJsPromise(
     const resolved = await Promise.race([promise, timeout]);
     return unwrapQuickJsResult(context, resolved, input.rejectionMessage);
   } finally {
+    // The host timeout is only a guard for unresolved guest promises. Always
+    // clear it after success or rejection so completed plugin work does not
+    // leave an unref'd timer behind until the original deadline.
     if (timeoutTimer) {
       clearTimeout(timeoutTimer);
     }
