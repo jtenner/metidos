@@ -11,6 +11,7 @@ This audit identifies cron-related tests still missing before publishing the rep
 - `src/bun/rpc-handlers/cron.test.ts` covers scheduler sync after cron create/update and no sync for list/manual-run RPC delegation.
 - `src/bun/sidecar-cron-scheduler.test.ts` covers registering enabled jobs, stopping jobs on shutdown, re-registering updated jobs, removing disabled jobs, and timezone sync removal/re-registration behavior.
 - `src/bun/sidecar-cron-runner.test.ts` covers cron run creation/execution behavior with the runtime test provider, including persisted run/thread metadata paths.
+- `src/bun/cron-store.test.ts` covers bound database use, `list`/`listActive`/`getById` soft-delete visibility, due scheduled job filtering for disabled/deleted jobs, stale last-run/in-progress state, active cron thread detection, scheduled/manual claim gates, returned claim metadata, and stop-in-progress run transitions.
 - `src/mainview/app/cron-describe-thread-access.test.ts` and `src/mainview/app/use-access-permissions.test.ts` cover small cron permission/access projection helpers.
 
 ## Missing tests to add before public release
@@ -20,16 +21,12 @@ This audit identifies cron-related tests still missing before publishing the rep
    - Cover deleted/untracked worktree contexts and missing user/project handling.
    - Include local-operator/admin contrast cases so the intended threat model is explicit.
 
-2. **Cron store persistence boundaries**
-   - Add direct `cron-store` tests for bound singleton database use, deleted-job filtering, due-job filtering, stale `lastRunAt`/`lastRunStatus` values, active cron thread detection, and stop-in-progress run transitions.
-   - Cover disabled/deleted jobs in due selection separately from scheduler registration tests.
-
-3. **Cron scheduler/runner failure and concurrency paths**
+2. **Cron scheduler/runner failure and concurrency paths**
    - Add tests for invalid schedules already stored in the database during scheduler startup/sync so one bad row does not prevent other cron jobs from registering.
    - Add tests for overlapping scheduled/manual triggers to prove only one run starts and the losing trigger reports/records a safe failure.
    - Add tests for runner failures before thread creation, during thread creation, and during runtime execution, including run status and telemetry/counter updates.
 
-4. **Cron mainview composition tests**
+3. **Cron mainview composition tests**
    - The existing mainview cron coverage is helper-level only. Add controller/composition tests for the cron workspace that mock RPC calls and cover loading, refresh invalidation, create/edit/delete/disable/run-now busy states, mutation failures, permission/workspace summaries, and empty states.
 
 ## Notes

@@ -91,6 +91,38 @@ describe("cron store", () => {
     }
   });
 
+  it("keeps soft-deleted jobs inspectable while excluding them from active registration", () => {
+    const database = createTestDatabase();
+    try {
+      const store = createBoundCronStore(database);
+      const activeCron = createCron(database, "visibility-active");
+      const disabledCron = createCron(database, "visibility-disabled");
+      const deletedCron = createCron(database, "visibility-deleted");
+
+      setCronJobEnabled(database, disabledCron.id, false);
+      softDeleteCronJob(database, deletedCron.id);
+
+      expect(store.list().map((cron) => cron.id)).toEqual([
+        deletedCron.id,
+        disabledCron.id,
+        activeCron.id,
+      ]);
+      expect(store.getById(deletedCron.id)).toMatchObject({
+        id: deletedCron.id,
+        enabled: 0,
+        title: "Cron Store visibility-deleted",
+      });
+      expect(store.getById(deletedCron.id)?.deletedAt).toEqual(
+        expect.any(Number),
+      );
+      expect(store.listActive().map((cron) => cron.id)).toEqual([
+        activeCron.id,
+      ]);
+    } finally {
+      database.close(false);
+    }
+  });
+
   it("filters due scheduled jobs by enabled, deleted, last-run, and active thread state", () => {
     const database = createTestDatabase();
     try {
