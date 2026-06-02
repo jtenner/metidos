@@ -1,6 +1,13 @@
 # Metidos
 
 <p align="center">
+  <a href="https://github.com/jtenner/metidos/actions/workflows/ci.yml"><img src="https://github.com/jtenner/metidos/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/jtenner/metidos/actions/workflows/codeql.yml"><img src="https://github.com/jtenner/metidos/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache 2.0"></a>
+  <img src="https://img.shields.io/badge/status-pre--1.0-orange.svg" alt="Status: pre-1.0">
+</p>
+
+<p align="center">
   <img src="bird.png" alt="Pixel art owl mascot for Metidos" width="96" height="96">
 </p>
 

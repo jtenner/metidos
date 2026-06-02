@@ -15,7 +15,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Add a polished hero screenshot near the top of `README.md` using fake/demo data only.
 - [ ] Add a screenshot gallery or visual feature section with safe demo data.
-- [ ] Add badges only after the underlying CI, license, release, and status items are real.
 - [ ] Verify all README commands work from a clean clone.
 
 ## 7. Install and First-Run Experience
