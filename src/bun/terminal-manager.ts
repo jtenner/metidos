@@ -272,6 +272,9 @@ export class TerminalOutputBuffer {
   private lineByteLength = 0;
   private lineEntries: TerminalLineEntry[] = [{ byteLength: 0, text: "" }];
   private lineHeadIndex = 0;
+  // Retained PTY output is an append-only logical stream with a movable head
+  // index. Trimming advances the head instead of shifting arrays on every
+  // chunk, and periodic compaction keeps old segment references bounded.
   private segments: TerminalOutputSegment[] = [];
 
   constructor(private readonly maxBytes: number) {}
@@ -292,6 +295,9 @@ export class TerminalOutputBuffer {
     });
     this.byteLength += segmentByteLength;
     this.appendLineEntries(segmentText);
+    // Keep both raw replay text and derived clean-line search indexes under
+    // the configured replay byte cap. This bounds memory and avoids rebuilding
+    // the full terminal transcript for line views or grep on every append.
     this.trimToMaxBytes();
     this.trimLineEntriesToMaxBytes();
   }
@@ -428,6 +434,9 @@ export class TerminalOutputBuffer {
   }
 
   private trimToMaxBytes(): void {
+    // This loop only touches the trimmed head segments. If a single oversized
+    // chunk arrives it is pre-trimmed in append(), so normal PTY appends do not
+    // repeatedly scan or copy the entire retained buffer.
     if (this.maxBytes <= 0) {
       return;
     }

@@ -254,7 +254,6 @@ For every item in this section: inspect the referenced code, decide whether the 
 
 - [ ] I3: Review `METIDOS_TERMINAL_EXTRA_ENV_ALLOWLIST` in `src/bun/terminal-manager.ts`. If warning on sensitive-looking keys is insufficient, block by default; otherwise document operator opt-in threat model.
 - [ ] I5: Review terminal Node binary ownership/permission checks in `src/bun/terminal-manager.ts`. Add tests/comments for world/group-writable binary denial.
-- [ ] I7: Review terminal output trimming complexity in `src/bun/terminal-manager.ts`. If large output can cause CPU pressure, optimize; otherwise comment current bounded-buffer assumptions.
 - [ ] I8: Review terminal socket ownership checks in `src/bun/terminal-manager.ts` (`socketCanAccessSession`). Add tests/comments proving terminal WebSockets cannot attach across sessions.
 - [ ] I9: Review terminal socket message rate limits in `src/bun/terminal-manager.ts`. Tune if abuse is possible; otherwise document chosen interactive-terminal limits.
 - [ ] I10: Review `assertTerminalNodeBinarySecurity` in `src/bun/terminal-manager.ts`. Add tests/comments for owner/root checks and group/world writable rejection.

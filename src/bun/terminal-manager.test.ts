@@ -142,6 +142,28 @@ describe("terminal clean output buffer", () => {
     expect(buffer.toString()).toBe("beta\ngamma\n");
     expect(buffer.cleanLines(0, 10)).toEqual(["beta", "gamma", ""]);
   });
+
+  it("bounds retained output and line indexes after many small appends", () => {
+    const buffer = new TerminalOutputBuffer(32);
+
+    for (let index = 0; index < 500; index += 1) {
+      buffer.append(`line-${index}\n`);
+    }
+
+    expect(Buffer.byteLength(buffer.toString(), "utf8")).toBeLessThanOrEqual(
+      32,
+    );
+    expect(buffer.cleanLines(0, 10)).toEqual([
+      "line-496",
+      "line-497",
+      "line-498",
+      "line-499",
+      "",
+    ]);
+    expect(buffer.grepCleanLines(/line-499/, 10, () => {})).toEqual([
+      "4: line-499",
+    ]);
+  });
 });
 
 describe("terminal websocket message validation", () => {
