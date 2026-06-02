@@ -85,7 +85,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Confirm the repository homepage URL points to the correct docs or repo-hosted website if one exists.
 - [ ] Confirm repository topics include relevant public discovery terms and avoid internal jargon.
 - [ ] Confirm the social preview image is uploaded and renders correctly.
-- [ ] Confirm license detection works after adding `LICENSE`.
 - [ ] Confirm CI runs publicly on pull requests and pushes without private secrets.
 - [ ] Confirm branch protection or rulesets are enabled for the default branch.
 - [ ] Confirm required checks match the actual CI workflow names.
