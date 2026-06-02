@@ -14,7 +14,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 7. Install and First-Run Experience
 
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.
-- [ ] Verify `bun run dev` works from a clean clone after documented setup only.
 - [ ] Verify `bun run start` works from a clean clone after documented setup only.
 - [ ] Verify `bun run validate` passes from a clean clone.
 - [ ] Verify local auth setup and reset flow are documented and work as described.
@@ -72,7 +71,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add settings and plugin administration composition tests. Context: `docs/mainview-test-gap-audit-2026-06-02.md` identified gaps around `settings-panel.tsx`, `use-plugin-administration-controller.ts`, and composed plugin admin flows; cover settings section navigation, plugin refresh/lifecycle feedback, reset-data, ingress route edits, declared settings save/clear-secret behavior, and step-up retry with mocked plugin RPC calls.
 - [ ] Add session revocation side-effect integration tests. Context: `docs/auth-session-test-gap-audit-2026-06-02.md` recommends fake/injected tests proving browser reset routes revoke sessions, clear session and websocket-ticket cookies, close websocket/terminal contexts, request thread-turn shutdown, and proving logout closes only the logged-out session while revoking its pending websocket tickets.
 - [ ] Add auth status privacy and multi-user/pending-user route tests. Context: `docs/auth-session-test-gap-audit-2026-06-02.md` recommends route-level tests proving unauthenticated or wrong-session status responses do not leak global user lists, authenticated responses expose only intended current-session identity metadata, pending-user states are handled, and missing/deleted/revoked sessions return deterministic contributor-friendly errors.
-- [ ] Smoke `bun run dev` from a clean clone after documented setup only. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies this as a remaining public-readiness gap; record exact OS, Bun version, commands, local URL output, pass/fail status, stop method, and any setup prerequisites.
 - [ ] Smoke `bun run start` from a clean clone after documented setup only. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies this as a remaining public-readiness gap; record exact OS, Bun version, commands, local URL output, pass/fail status, stop method, and any setup prerequisites.
 - [ ] Verify first-run Local Auth from a disposable setup. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies setup/login/logout/recovery/reset guidance as a remaining gap; record safe metadata only and do not capture secrets, cookies, TOTP seeds, recovery codes, or private screenshots.
 - [ ] Verify provider-free and fake-provider first-run behavior. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies no-provider UI behavior and fake/local provider setup as remaining gaps; record exact messages and prerequisites without real provider credentials.

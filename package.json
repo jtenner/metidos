@@ -6,9 +6,9 @@
   "packageManager": "bun@1.3.13",
   "scripts": {
     "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
-    "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch",
+    "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch=always",
     "website:build": "tailwindcss -i ./website/input.css -o ./website/styles.css --minify",
-    "website:watch": "tailwindcss -i ./website/input.css -o ./website/styles.css --watch",
+    "website:watch": "tailwindcss -i ./website/input.css -o ./website/styles.css --watch=always",
     "sync:core-plugins": "bun run src/bun/sync-core-plugins.ts",
     "start": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/start.ts",
     "start:telemetry": "bun run tailwind:build && bun run sync:core-plugins && bun run src/bun/start.ts --track-telemetry",
