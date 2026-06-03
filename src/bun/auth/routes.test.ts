@@ -22,6 +22,7 @@ import {
   resetResolvedAppDataDirectory,
 } from "../db";
 import { generateTotpCode } from "./";
+import { AuthServiceError, validateAndConsumeWebSocketTicket } from "./service";
 
 const originalAppDataDir = process.env.METIDOS_APP_DATA_DIR;
 let appDataDir: string | null = null;
@@ -1038,6 +1039,8 @@ describe("auth route HTTP security", () => {
       ticketSetCookie,
       "metidos_ws_ticket",
     );
+    const webSocketTicketId = webSocketTicketCookie.split("=")[1];
+    expect(webSocketTicketId).toBeTruthy();
 
     const logoutCsrfToken = await issueCsrfToken();
     const response = await handleAuthRequestForTest(
@@ -1083,5 +1086,12 @@ describe("auth route HTTP security", () => {
     expect(response?.headers.get("clear-site-data")).toBe(
       '"cache", "cookies", "storage"',
     );
+    expect(() =>
+      validateAndConsumeWebSocketTicket(initAppDatabase(), {
+        nowMs: Date.now(),
+        sessionId: sessionCookie.split("=")[1] ?? "",
+        ticketId: webSocketTicketId ?? "",
+      }),
+    ).toThrow(AuthServiceError);
   });
 });
