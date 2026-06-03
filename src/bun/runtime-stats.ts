@@ -489,15 +489,31 @@ function createEmptyRuntimeStatsState(now = new Date()): RuntimeStatsState {
 const RUNTIME_STATS_TOP_ENTRY_LIMIT = 5;
 const RUNTIME_STATS_DYNAMIC_KEY_LIMIT = 128;
 const RUNTIME_STATS_OVERFLOW_KEY = "__overflow__";
+const RUNTIME_STATS_REDACTED_KEY = "__redacted__";
+const SAFE_RUNTIME_STATS_DYNAMIC_KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,96}$/;
+const SECRET_LIKE_RUNTIME_STATS_DYNAMIC_KEY_PATTERN =
+  /(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]+|[A-Za-z0-9+/]{32,}={0,2})/;
 
 let runtimeStatsState = createEmptyRuntimeStatsState();
+
+function toSafeRuntimeStatsDynamicKey(key: string): string {
+  const normalized = key.trim();
+  if (
+    !SAFE_RUNTIME_STATS_DYNAMIC_KEY_PATTERN.test(normalized) ||
+    SECRET_LIKE_RUNTIME_STATS_DYNAMIC_KEY_PATTERN.test(normalized)
+  ) {
+    return RUNTIME_STATS_REDACTED_KEY;
+  }
+  return normalized;
+}
 
 function ensureBoundedRuntimeStatsEntry<Value extends Record<string, number>>(
   map: Map<string, Value>,
   key: string,
   createValue: () => Value,
 ): Value {
-  const existing = map.get(key);
+  const safeKey = toSafeRuntimeStatsDynamicKey(key);
+  const existing = map.get(safeKey);
   if (existing) {
     return existing;
   }
@@ -513,7 +529,7 @@ function ensureBoundedRuntimeStatsEntry<Value extends Record<string, number>>(
   }
 
   const created = createValue();
-  map.set(key, created);
+  map.set(safeKey, created);
   return created;
 }
 

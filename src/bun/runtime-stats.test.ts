@@ -303,6 +303,40 @@ describe("runtime stats collector", () => {
     });
   });
 
+  it("redacts secret-like dynamic labels from runtime diagnostics", () => {
+    const providerSecret = "sk-test-secret-value";
+    const localPath = "/home/example/.metidos/auth.sqlite";
+    const emailChannel = "operator@example.com";
+    const longToken = "abcdefghijklmnopqrstuvwxyzABCDEF0123456789";
+
+    const rpcToken = recordRpcStarted(providerSecret, 12);
+    recordRpcSucceeded(rpcToken, 24);
+    recordWebSocketPush({
+      deliveredClients: 1,
+      droppedClients: 0,
+      payloadBytes: 12,
+      type: localPath,
+    });
+    const toolToken = recordMetidosToolStarted(longToken);
+    recordMetidosToolSucceeded(toolToken);
+    recordNativeWebSearchDecision({
+      decision: "injected",
+      provider: providerSecret,
+    });
+    recordNotificationEnqueued(localPath, emailChannel);
+    recordMetidosUnsafeModeRequest({
+      allowed: true,
+      toolName: providerSecret,
+    });
+
+    const diagnosticsText = JSON.stringify(buildRuntimeDiagnosticsSnapshot());
+    expect(diagnosticsText).not.toContain(providerSecret);
+    expect(diagnosticsText).not.toContain(localPath);
+    expect(diagnosticsText).not.toContain(emailChannel);
+    expect(diagnosticsText).not.toContain(longToken);
+    expect(diagnosticsText).toContain("__redacted__");
+  });
+
   it("bounds dynamic telemetry key cardinality with an overflow bucket", () => {
     for (let index = 0; index < 135; index += 1) {
       const token = recordMetidosToolStarted(`plugin_tool_${index}`);
