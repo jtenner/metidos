@@ -26,6 +26,22 @@ The intended source image remains `docs/brand/github-social-preview.svg`. It is 
 
 A raster fallback is now tracked at `docs/brand/github-social-preview.png`. It was exported from the SVG with headless Chromium on 2026-06-03 for settings UI compatibility. A PNG header check confirmed `1280×640` dimensions and `30,583` bytes.
 
+## Recurring-agent recheck — 2026-06-03T09:24:00Z
+
+Command run from `/home/jtenner/Projects/jt-ide`:
+
+```sh
+gh repo view --json nameWithOwner,openGraphImageUrl,visibility
+```
+
+Observed output:
+
+```json
+{"nameWithOwner":"jtenner/metidos","openGraphImageUrl":"https://avatars.githubusercontent.com/u/3761339?s=400&v=4","visibility":"PRIVATE"}
+```
+
+Result: the Open Graph image still points to the owner avatar, so this recheck did not confirm a custom social preview upload.
+
 ## Result
 
 Not complete for launch: the social preview image still needs to be uploaded through GitHub repository settings and visually checked after upload.
