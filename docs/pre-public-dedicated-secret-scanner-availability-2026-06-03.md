@@ -152,3 +152,46 @@ detect-secrets MISSING
 ```
 
 Outcome: the dedicated scanner pass remains blocked on an operator/CI environment with at least one dedicated scanner available. No dedicated scanner scan was run in this workspace runtime.
+
+## Follow-up recheck: 2026-06-03T08:57:26Z
+
+A later recurring-agent slice rechecked dedicated scanner availability again without changing repository dependencies, host-level tools, or scanner configuration. The workspace still contained unrelated tracked modifications, so this slice only records the scanner availability blocker.
+
+Environment:
+
+- Local time: 2026-06-03T04:57:26-0400
+- Branch/HEAD: `master` at `2c3b4ea`
+- Workspace: `/home/jtenner/Projects/jt-ide`
+
+Command:
+
+```sh
+for tool in gitleaks trufflehog git-secrets detect-secrets; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    printf '%s: %s\n' "$tool" "$(command -v "$tool")"
+    "$tool" --version 2>&1 | head -n 3 || true
+  else
+    printf '%s: absent\n' "$tool"
+  fi
+done
+```
+
+Result:
+
+```text
+gitleaks: absent
+trufflehog: absent
+git-secrets: absent
+detect-secrets: absent
+```
+
+Additional availability check:
+
+```text
+python: /usr/bin/python3
+pipx: absent
+uvx: absent
+bunx: /usr/local/bin/bunx
+```
+
+Outcome: the dedicated scanner pass remains blocked on selecting or providing a runtime with at least one dedicated scanner available, or an equivalent CI-backed scanner. No dedicated scanner scan was run in this workspace runtime.
