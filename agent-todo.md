@@ -36,7 +36,6 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Choose or record the final public website URL (for example the deployed Pages/static-host URL) in the relevant GitHub/publication notes.
   - [ ] Replace `https://YOUR_DOMAIN_OR_PAGES_URL/` in `website/index.html` with the final URL, keeping `og.png` paths correct.
   - [ ] Update `website/README.md` to remove or narrow the placeholder-host go-live reminder after the real URL is checked in.
-- [ ] Ensure all screenshots hide usernames, hostnames, tokens, internal repositories, local paths, private branches, and real customer/user data. Context: README screenshots are now covered by `docs/images/readme-hero-demo.svg` and `docs/images/readme-feature-tour.svg`, referenced from `README.md`; the project/worktree feature screenshot is covered by `docs/images/feature-project-worktree-demo.svg`; the agent-thread feature screenshot is covered by `docs/images/feature-agent-thread-demo.svg` and referenced from `README.md`; the plugin administration feature screenshot is covered by `docs/images/feature-plugin-admin-demo.svg` and referenced from `README.md`; the provider settings/setup feature screenshot is covered by `docs/images/feature-provider-settings-demo.svg` and referenced from `README.md`; the cron workspace feature screenshot is covered by `docs/images/feature-cron-workspace-demo.svg` and referenced from `README.md`; a 2026-06-03 text scan for common secret/private-path markers found only self-descriptive safety copy in those SVGs.
 
 ## 9. Product Hardening
 
