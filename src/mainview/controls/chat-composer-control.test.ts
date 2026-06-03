@@ -239,6 +239,15 @@ describe("chat composer image file detection", () => {
 });
 
 describe("chat composer skill matching", () => {
+  it("ignores skill trigger text when no skills are available", () => {
+    expect(matchChatComposerSkillsTrigger("/skills:commit", 14, [])).toBeNull();
+    expect(matchChatComposerSkillsTrigger("/skills:commit", 14)).toBeNull();
+  });
+
+  it("does not suggest skills without an active trigger match", () => {
+    expect(filterChatComposerSkills(["commit", "research"], null)).toEqual([]);
+  });
+
   it("matches skills trigger text at the cursor", () => {
     expect(
       matchChatComposerSkillsTrigger("please /skills:comm", 20, ["commit"]),
