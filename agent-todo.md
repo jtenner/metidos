@@ -72,7 +72,7 @@ This checklist is for repository improvements only before making Metidos public/
 ## 11. GitHub Public Repository Setup Notes
 
 - [ ] Apply the recommended public repository description from `docs/github-public-repository-description-review-2026-06-03.md` when updating GitHub settings for publication. Context: review on 2026-06-03 found the current private-repo description accurate but too long and less aligned with the README tagline.
-- [ ] Confirm the repository homepage URL points to the correct docs or repo-hosted website if one exists.
+- [ ] Apply the recommended homepage URL decision from `docs/github-homepage-url-review-2026-06-03.md` when updating GitHub settings for publication. Context: review on 2026-06-03 found the current private-repo homepage URL empty; leave it empty unless a final static website URL is chosen and deployed before publication.
 - [ ] Apply the recommended public repository topics from `docs/github-public-repository-topics-review-2026-06-03.md` when updating GitHub settings for publication. Context: review on 2026-06-03 found the current private-repo topics partly accurate but incomplete for discovery; `personal-assistant` should be removed unless project positioning changes.
 - [ ] Confirm the social preview image is uploaded and renders correctly.
 - [ ] Confirm CI runs publicly on pull requests and pushes without private secrets.
