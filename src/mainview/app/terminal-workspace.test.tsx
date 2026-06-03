@@ -10,6 +10,7 @@ import type { RpcTerminal, RpcTerminalStatus } from "../../bun/rpc-schema";
 import {
   terminalCloseConfirmationDetails,
   terminalStatusView,
+  TerminalLocalOperatorWarning,
   TerminalRendererStateOverlay,
   TerminalWorkspace,
 } from "./terminal-workspace";
@@ -70,6 +71,25 @@ describe("TerminalWorkspace render states", () => {
     expect(markup).toContain("New Terminal");
     expect(markup).not.toContain("Select a worktree to create a terminal.");
     expect(markup).not.toContain('disabled=""');
+  });
+
+  it("renders a local-command warning for terminal access", () => {
+    const warningMarkup = renderToStaticMarkup(
+      <TerminalLocalOperatorWarning />,
+    );
+    const workspaceMarkup = renderTerminalWorkspace({
+      canCreateTerminal: true,
+      terminals: [fakeTerminal()],
+    });
+
+    for (const markup of [warningMarkup, workspaceMarkup]) {
+      expect(markup).toContain(
+        "Terminal sessions can run local commands in the selected worktree.",
+      );
+      expect(markup).toContain(
+        "Use only with repositories and commands you trust.",
+      );
+    }
   });
 
   it("renders terminal row labels from fake terminal payloads", () => {

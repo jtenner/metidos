@@ -433,6 +433,15 @@ export function TerminalCloseConfirmation({
   );
 }
 
+export function TerminalLocalOperatorWarning(): JSX.Element {
+  return (
+    <div className="border-b border-warning-border bg-warning-surface px-3 py-2 text-[11px] leading-4 text-warning-text">
+      Terminal sessions can run local commands in the selected worktree. Use
+      only with repositories and commands you trust.
+    </div>
+  );
+}
+
 export function TerminalWorkspace({
   activeTerminalId,
   canCreateTerminal,
@@ -496,6 +505,7 @@ export function TerminalWorkspace({
             New Terminal
           </AppButton>
         </div>
+        <TerminalLocalOperatorWarning />
         <div className="py-1">
           {terminals.map((terminal) => (
             <TerminalRow
