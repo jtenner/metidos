@@ -19,6 +19,20 @@ Observed results:
 - Repository rulesets API returned the same HTTP 403 feature-availability message.
 - `docs/github-required-checks-review-2026-06-03.md` already records the intended baseline required check recommendation: require at least the `CI` workflow's `Validate` job once branch protection or rulesets are available.
 
+Follow-up recheck on 2026-06-03 at 06:39 EDT:
+
+```sh
+gh repo view jtenner/metidos --json nameWithOwner,visibility --jq '{nameWithOwner, visibility}'
+gh api repos/jtenner/metidos/branches/master/protection --jq '{enabled: true, required_status_checks: .required_status_checks, enforce_admins: .enforce_admins.enabled, required_pull_request_reviews: .required_pull_request_reviews}'
+gh api repos/jtenner/metidos/rulesets --jq '.[] | {id,name,target,enforcement}'
+```
+
+Observed results:
+
+- Repository visibility remained `PRIVATE`.
+- Branch protection API still returned HTTP 403 with the GitHub Pro/public-repository availability message.
+- Repository rulesets API still returned HTTP 403 with the same availability message.
+
 ## Assessment
 
 The branch protection/ruleset setting cannot be confirmed or enabled from this repository's current private state with the available account/repository feature set. This is not a checked-in code or documentation defect; it is a GitHub settings availability blocker until the repository is public or the account/repository plan exposes private-repository branch protection and rulesets.
