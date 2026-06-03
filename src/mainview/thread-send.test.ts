@@ -386,6 +386,77 @@ describe("optimistic thread send helpers", () => {
     ]);
   });
 
+  it("rejects image sends for models without image input support before calling the RPC", async () => {
+    resetChatComposerImageAttachmentStoreForTest();
+    const draftKey = "thread:17";
+    const sendCalls: unknown[] = [];
+    let chatError = "";
+    let isSending = false;
+
+    setChatComposerDraft("Please inspect this", draftKey);
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 8,
+          data: "iVBORw0KGgo=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      draftKey,
+    );
+
+    const originalConsoleWarn = console.warn;
+    console.warn = () => {};
+    try {
+      sendThreadTurn({
+        activeCodexModel: "openai:text-only",
+        codexModels: [
+          {
+            id: "openai:text-only",
+            label: "Text only",
+            supportsImageInput: false,
+          } as unknown as RpcModelOption,
+        ],
+        draftKey,
+        initialChatInput: "",
+        isSending: false,
+        optimisticThreadMessageIdRef: { current: -1 },
+        procedures: {
+          sendThreadMessage: async (params) => {
+            sendCalls.push(params);
+            return threadDetail(params.threadId);
+          },
+        },
+        selectedThread: threadDetail(17).thread,
+        selectedThreadDetailRefreshKeyRef: { current: null },
+        selectedThreadIdRef: { current: 17 },
+        selectedThreadIsWorking: false,
+        selectedThreadRunStateRef: { current: "idle" },
+        setChatError: (value) => {
+          chatError = typeof value === "function" ? value(chatError) : value;
+        },
+        setIsSending: (value) => {
+          isSending = typeof value === "function" ? value(isSending) : value;
+        },
+        setThreadMessages: () => {},
+        upsertThread: () => {},
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+    } finally {
+      console.warn = originalConsoleWarn;
+    }
+
+    expect(sendCalls).toEqual([]);
+    expect(chatError).toBe("Current model does not support images.");
+    expect(readChatComposerDraft("", draftKey)).toBe("Please inspect this");
+    expect(readChatComposerImageAttachments(draftKey)).toHaveLength(1);
+    expect(isSending).toBeFalse();
+  });
+
   it("waits for in-flight image attachment reads before sending", async () => {
     const sendCalls: Array<{
       images?: unknown[];
