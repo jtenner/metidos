@@ -46,7 +46,8 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify diff review with small diffs, large diffs, binary files, deleted files, renamed files, and conflict-like scenarios.
 - [ ] Verify cron job creation, editing, run-now, disabling, and deletion. Context: `docs/cron-workspace-lifecycle-smoke-plan-2026-06-03.md` now defines a disposable safe Cron workspace lifecycle smoke covering create, edit persistence, run-now child Thread/error behavior, enable/disable, deletion/inactive state, and sanitized evidence requirements. Remaining 3-minute slice:
   - [ ] Run the smoke plan against a disposable App Data/profile and fake/demo repository, then commit sanitized evidence with exact OS, Bun version, commands, pass/fail status, stop method, teardown, and any documentation/UI corrections.
-- [ ] Verify plugin discovery, review, approval, disable, reset-data, and failure states.
+- [ ] Verify plugin discovery, review, approval, disable, reset-data, and failure states. Context: `docs/plugin-lifecycle-smoke-plan-2026-06-03.md` now defines a disposable Plugin System v1 lifecycle smoke covering discovery, Manifest/review details, Step-up Authentication-gated approval, Review Hash persistence, Activation, disable, Reset Plugin Data, controlled failure diagnostics, teardown, and sanitized evidence requirements. Remaining 3-minute slice:
+  - [ ] Run the smoke plan against a disposable App Data/profile and repo-owned or generated demo Plugin fixture, then commit sanitized evidence with exact OS, Bun version, commands, pass/fail status, lifecycle statuses, teardown, and any documentation/UI corrections.
 - [ ] Verify local auth session behavior, including login, logout, expiration, refresh, and invalid session handling.
 - [ ] Verify step-up authentication protects sensitive actions and fails safely.
 - [ ] Verify unsafe-mode warnings are visible, specific, and tied to the relevant risky action.
