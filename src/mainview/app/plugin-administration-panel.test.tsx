@@ -18,6 +18,7 @@ import {
   PluginSettingsGroup,
   UserIngressSourcesSection,
   pluginSettingListItemKeys,
+  resolvePluginAdminActionConfirmation,
 } from "./plugin-administration-panel";
 import {
   defaultIngressRouteAccess,
@@ -261,7 +262,7 @@ describe("plugin administration panel", () => {
 
     retry({ action: "enable", kind: "lifecycle", plugin });
     retry({
-      action: "repair",
+      action: "reset_data",
       confirmation: "alpha_plugin",
       kind: "admin",
       plugin,
@@ -270,9 +271,51 @@ describe("plugin administration panel", () => {
 
     expect(calls).toEqual([
       "lifecycle:enable",
-      "admin:repair:alpha_plugin",
+      "admin:reset_data:alpha_plugin",
       "settings",
     ]);
+  });
+
+  it("requires typed confirmation for destructive reset-data admin actions", () => {
+    const plugin = buildPluginInventoryPlugin();
+    const resetAction = {
+      action: "reset_data",
+      available: true,
+      destructive: true,
+      label: "Reset Data",
+      path: null,
+      reason: null,
+    } as const;
+    const prompts: string[] = [];
+
+    const confirmation = resolvePluginAdminActionConfirmation({
+      action: resetAction,
+      plugin,
+      promptForConfirmation: (message) => {
+        prompts.push(message);
+        return plugin.directoryName;
+      },
+    });
+
+    expect(confirmation).toBe(plugin.directoryName);
+    expect(prompts).toEqual(["Type alpha_plugin to confirm Reset Data."]);
+
+    expect(
+      resolvePluginAdminActionConfirmation({
+        action: resetAction,
+        plugin,
+        promptForConfirmation: () => null,
+      }),
+    ).toBeNull();
+    expect(
+      resolvePluginAdminActionConfirmation({
+        action: { ...resetAction, action: "run_gc", destructive: false },
+        plugin,
+        promptForConfirmation: () => {
+          throw new Error("non-destructive actions should not prompt");
+        },
+      }),
+    ).toBeUndefined();
   });
 
   it("renders pending feedback for secret replacement and clearing settings", () => {

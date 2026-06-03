@@ -1461,6 +1461,23 @@ export function UserIngressSourcesSection({
   );
 }
 
+export function resolvePluginAdminActionConfirmation({
+  action,
+  plugin,
+  promptForConfirmation = window.prompt,
+}: {
+  action: RpcPluginAdminActionAvailability;
+  plugin: RpcPluginInventoryPlugin;
+  promptForConfirmation?: (message: string) => string | null;
+}): string | null | undefined {
+  if (!action.destructive) {
+    return undefined;
+  }
+  return promptForConfirmation(
+    `Type ${plugin.directoryName} to confirm ${action.label}.`,
+  );
+}
+
 function PluginManagerDialog({
   actionError,
   actionLoadingKey,
@@ -1538,15 +1555,12 @@ function PluginManagerDialog({
       plugin,
     });
   const runAdminAction = (action: RpcPluginAdminActionAvailability): void => {
-    let confirmation: string | undefined;
-    if (action.destructive) {
-      const typedConfirmation = window.prompt(
-        `Type ${plugin.directoryName} to confirm ${action.label}.`,
-      );
-      if (typedConfirmation === null) {
-        return;
-      }
-      confirmation = typedConfirmation;
+    const confirmation = resolvePluginAdminActionConfirmation({
+      action,
+      plugin,
+    });
+    if (confirmation === null) {
+      return;
     }
     onAdminAction(plugin, action.action, confirmation);
   };
