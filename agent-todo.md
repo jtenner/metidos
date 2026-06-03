@@ -76,7 +76,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Confirm CI runs publicly on pull requests and pushes without private secrets.
 - [ ] Confirm branch protection or rulesets are enabled for the default branch. Context: `docs/github-required-checks-review-2026-06-03.md` documents the checked-in workflow/job names and recommends selecting required checks from GitHub's presented check list once branch protection/rulesets are available; at minimum require the `CI` workflow's `Validate` job.
 - [ ] Confirm Discussions are enabled only if the project intends to support them.
-- [ ] Confirm GitHub Wiki is disabled unless intentionally used.
 - [ ] Confirm private security reporting is configured if available for the repository.
 - [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
 
