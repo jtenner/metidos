@@ -28,6 +28,8 @@ setup and design tokens as the product UI.
 - `styles.css` — **generated** by the Tailwind CLI (git-ignored).
 - `favicon.svg`, `app-icon.svg`, and `site.webmanifest` — repo-owned generated
   website favicon/app-icon assets based on a terminal prompt motif.
+- `og.svg` and `og.png` — repo-owned generated 1200×630 Open Graph preview
+  source/export assets using only text, shapes, and the website color tokens.
 
 No JavaScript framework and no external images. The website currently tracks
 `bird.png`, a byte-identical copy of the root mascot asset used in the page
@@ -68,5 +70,5 @@ host. For GitHub Pages, either commit a built `styles.css` (remove the
 - Replace the placeholder GitHub URLs (`https://github.com/YOUR_ORG_OR_USER/metidos`)
   with the real org/repo.
 - Set the real canonical site URL in the `og:url` / Twitter meta.
-- Add a real 1200×630 Open Graph image and update the `og:image` /
-  `twitter:image` URLs (currently placeholders).
+- Replace the placeholder host in the `og:image` / `twitter:image` URLs after
+  the final public website URL is chosen.
