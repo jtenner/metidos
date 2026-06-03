@@ -29,6 +29,8 @@ const ACCESS_TINT_GIT = "var(--color-access-git)";
 const ACCESS_TINT_METIDOS = "var(--color-access-metidos)";
 const ACCESS_TINT_WARNING = "var(--color-warning-text)";
 const ACCESS_TINT_WEB = "var(--color-accent-strong)";
+const UNSAFE_MODE_WARNING =
+  "Unsafe Mode enables shell-capable and sandbox-escalating tools for this Thread or Cron Job. Use it only when the current task explicitly needs local command execution or unsafe child Thread/Cron access.";
 
 const FALLBACK_NATIVE_PERMISSION_DESCRIPTORS: RpcThreadPermissionDescriptor[] =
   [
@@ -179,9 +181,9 @@ const FALLBACK_NATIVE_PERMISSION_DESCRIPTORS: RpcThreadPermissionDescriptor[] =
       accessId: "unsafe",
       category: "security",
       defaultEnabled: false,
-      description: "Unsafe execution/sandbox escalation permission.",
+      description: UNSAFE_MODE_WARNING,
       id: "metidos:unsafe",
-      label: "Unsafe",
+      label: "Unsafe Mode",
       order: 12,
       providerDescription: "Metidos native tools",
       providerId: "metidos",
@@ -279,6 +281,17 @@ export function accessDescriptionPopoverPlacement(
   variant: ThreadAccessControlProps["variant"],
 ): "left" | "right" {
   return variant === "desktop" ? "right" : "left";
+}
+
+export function unsafeModeWarningText(
+  access: Pick<ThreadAccessValue, "permissions" | "unsafeMode">,
+  showUnsafeMode: boolean,
+): string | null {
+  const permissions = access.permissions ?? [];
+  return showUnsafeMode &&
+    (access.unsafeMode || permissions.includes("metidos:unsafe"))
+    ? UNSAFE_MODE_WARNING
+    : null;
 }
 
 function AccessDescriptionPopover({
@@ -467,6 +480,7 @@ export function ThreadAccessControl({
       (descriptor.id !== "metidos:unsafe" || showUnsafeMode),
   );
   const descriptorGroups = groupPermissionDescriptors(permissionDescriptors);
+  const unsafeWarningText = unsafeModeWarningText(value, showUnsafeMode);
 
   return (
     <DropdownControl
@@ -544,6 +558,17 @@ export function ThreadAccessControl({
             </AppButton>
           </div>
           <div className="max-h-[50vw] space-y-2 overflow-y-auto p-3">
+            {unsafeWarningText ? (
+              <div
+                className="border border-warning-border bg-warning-surface px-3 py-2 text-[11px] leading-5 text-warning-text"
+                role="status"
+              >
+                <span className="font-semibold uppercase tracking-[0.1em]">
+                  Unsafe Mode active:
+                </span>{" "}
+                {unsafeWarningText}
+              </div>
+            ) : null}
             {descriptorGroups.map(([groupKey, groupDescriptors]) => (
               <Fragment key={groupKey}>
                 {groupDescriptors.map((descriptor) => {

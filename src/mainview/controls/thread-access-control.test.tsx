@@ -5,6 +5,7 @@ import {
   accessDescriptionPopoverPlacement,
   ThreadAccessControl,
   type ThreadAccessValue,
+  unsafeModeWarningText,
 } from "./thread-access-control";
 
 const BASE_ACCESS_VALUE: ThreadAccessValue = {
@@ -25,6 +26,39 @@ describe("accessDescriptionPopoverPlacement", () => {
   it("keeps desktop descriptions away from the right-aligned access menu edge", () => {
     expect(accessDescriptionPopoverPlacement("desktop")).toBe("right");
     expect(accessDescriptionPopoverPlacement("mobile")).toBe("left");
+  });
+});
+
+describe("unsafeModeWarningText", () => {
+  it("shows a specific non-hover warning when unsafe access is selected", () => {
+    expect(
+      unsafeModeWarningText(
+        {
+          permissions: [
+            ...(BASE_ACCESS_VALUE.permissions ?? []),
+            "metidos:unsafe",
+          ],
+          unsafeMode: true,
+        },
+        true,
+      ),
+    ).toContain("shell-capable and sandbox-escalating tools");
+  });
+
+  it("hides the warning when unsafe controls are unavailable or inactive", () => {
+    expect(unsafeModeWarningText(BASE_ACCESS_VALUE, true)).toBeNull();
+    expect(
+      unsafeModeWarningText(
+        {
+          permissions: [
+            ...(BASE_ACCESS_VALUE.permissions ?? []),
+            "metidos:unsafe",
+          ],
+          unsafeMode: true,
+        },
+        false,
+      ),
+    ).toBeNull();
   });
 });
 
