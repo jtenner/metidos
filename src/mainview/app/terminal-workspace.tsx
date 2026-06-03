@@ -350,6 +350,36 @@ function TerminalRow({
   );
 }
 
+export function terminalCloseConfirmationDetails(
+  terminal: RpcTerminal,
+): string {
+  return `${terminal.title} - ${terminal.projectName} · ${terminal.worktreeFolder}`;
+}
+
+export function TerminalCloseConfirmation({
+  onCancel,
+  onConfirm,
+  pendingClose,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  pendingClose: RpcTerminal | null;
+}): JSX.Element {
+  return (
+    <ConfirmDialog
+      {...(pendingClose
+        ? {
+            details: terminalCloseConfirmationDetails(pendingClose),
+          }
+        : {})}
+      message="Are you sure you want to exit this terminal?"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      open={pendingClose !== null}
+    />
+  );
+}
+
 export function TerminalWorkspace({
   activeTerminalId,
   canCreateTerminal,
@@ -426,13 +456,7 @@ export function TerminalWorkspace({
           ))}
         </div>
       </aside>
-      <ConfirmDialog
-        {...(pendingClose
-          ? {
-              details: `${pendingClose.title} - ${pendingClose.projectName} · ${pendingClose.worktreeFolder}`,
-            }
-          : {})}
-        message="Are you sure you want to exit this terminal?"
+      <TerminalCloseConfirmation
         onCancel={() => {
           setPendingClose(null);
         }}
@@ -442,7 +466,7 @@ export function TerminalWorkspace({
           }
           setPendingClose(null);
         }}
-        open={pendingClose !== null}
+        pendingClose={pendingClose}
       />
     </div>
   );
