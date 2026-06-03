@@ -161,6 +161,28 @@ describe("chat composer image attachment store", () => {
     expect(settled).toBeTrue();
   });
 
+  it("keeps fake image attachment loading states scoped by draft key", async () => {
+    startChatComposerImageAttachmentRead("thread:loading");
+
+    let loadingSettled = false;
+    const waitForLoadingSettled = waitForChatComposerImageAttachments(
+      "thread:loading",
+    ).then(() => {
+      loadingSettled = true;
+    });
+
+    await waitForChatComposerImageAttachments("thread:ready");
+    expect(loadingSettled).toBeFalse();
+    expect(readChatComposerPendingImageAttachmentReads("thread:loading")).toBe(
+      1,
+    );
+    expect(readChatComposerPendingImageAttachmentReads("thread:ready")).toBe(0);
+
+    finishChatComposerImageAttachmentRead("thread:loading");
+    await waitForLoadingSettled;
+    expect(loadingSettled).toBeTrue();
+  });
+
   it("bounds retained image attachment draft keys", () => {
     for (
       let index = 0;
@@ -227,6 +249,12 @@ describe("chat composer skill matching", () => {
     });
   });
 
+  it("does not match stale skill trigger text after whitespace", () => {
+    expect(
+      matchChatComposerSkillsTrigger("/skills:commit send", 19, ["commit"]),
+    ).toBeNull();
+  });
+
   it("filters available skills by the trigger filter", () => {
     const match = matchChatComposerSkillsTrigger("/skills:co", 10, [
       "commit",
@@ -237,5 +265,16 @@ describe("chat composer skill matching", () => {
     expect(
       filterChatComposerSkills(["commit", "grill-me", "to-prd"], match),
     ).toEqual(["commit"]);
+  });
+
+  it("filters skill suggestions case-insensitively", () => {
+    const match = matchChatComposerSkillsTrigger("/skills:RE", 10, [
+      "research",
+      "commit",
+    ]);
+
+    expect(filterChatComposerSkills(["research", "commit"], match)).toEqual([
+      "research",
+    ]);
   });
 });
