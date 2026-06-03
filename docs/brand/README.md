@@ -37,6 +37,7 @@ For each new logo, mascot, icon, social preview, or screenshot asset:
 
 ## Pending decisions
 
+- Choose the canonical public identity asset before closing the logo/mascot launch tasks: generated terminal-prompt mark, bird mascot, crown artwork, or a new repo-owned asset. Record the answer here and in the asset provenance audit before wiring any unresolved artwork into public launch surfaces.
 - Confirm or replace the shared bird mascot before publishing the repository.
 - Confirm, replace, or remove `src/mainview/pixel-crown.png` before publishing the repository.
 - Upload `docs/brand/github-social-preview.svg` as the GitHub social preview when repository settings are prepared for publication, or use the tracked `docs/brand/github-social-preview.png` raster export if the settings UI rejects SVG uploads.
