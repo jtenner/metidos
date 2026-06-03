@@ -47,6 +47,10 @@ It is designed for one Local Operator running a local installation, not for host
 
 The generated tour image uses fake project names, fake provider state, fake schedules, and generated interface examples only. It highlights the everyday public-demo flow: choose a Project and Worktree, run or resume Agent Threads, inspect Diffs, review Plugin permissions, and schedule Cron Jobs without exposing private paths, usernames, hostnames, tokens, real repositories, branches, or customer/user data.
 
+![Metidos agent thread demo showing a fake safe-mode conversation and generated tool chips](docs/images/feature-agent-thread-demo.svg)
+
+The Agent Thread demo is generated from fake prompts, fake project names, fake worktree paths, and safe-mode status examples only. It is intended for public docs and avoids real logs, provider output, local paths, hostnames, usernames, tokens, private branches, and customer/user data.
+
 ## Core concepts
 
 - **Projects** are high-level entries for one or more Worktrees.

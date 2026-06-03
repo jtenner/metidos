@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Metidos agent thread demo screenshot</title>
+  <desc id="desc">Generated feature screenshot showing a fake agent thread with demo-only prompts, safe tool output, and no private paths, usernames, hostnames, tokens, or real repository data.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0b0c"/>
+      <stop offset="1" stop-color="#1d1730"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7e57ff"/>
+      <stop offset="1" stop-color="#49c2ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <path d="M0 48h1280M0 96h1280M0 144h1280M0 192h1280M0 240h1280M0 288h1280M0 336h1280M0 384h1280M0 432h1280M0 480h1280M0 528h1280M0 576h1280M0 624h1280M0 672h1280M48 0v720M96 0v720M144 0v720M192 0v720M240 0v720M288 0v720M336 0v720M384 0v720M432 0v720M480 0v720M528 0v720M576 0v720M624 0v720M672 0v720M720 0v720M768 0v720M816 0v720M864 0v720M912 0v720M960 0v720M1008 0v720M1056 0v720M1104 0v720M1152 0v720M1200 0v720M1248 0v720" stroke="#242a34" stroke-width="1" opacity="0.5"/>
+  <rect x="72" y="60" width="1136" height="600" rx="28" fill="#121417" stroke="#40464e" stroke-width="2"/>
+  <rect x="72" y="60" width="1136" height="72" rx="28" fill="#1d2025"/>
+  <rect x="72" y="104" width="1136" height="28" fill="#1d2025"/>
+  <circle cx="110" cy="96" r="9" fill="#ff5f57"/>
+  <circle cx="142" cy="96" r="9" fill="#ffbd2e"/>
+  <circle cx="174" cy="96" r="9" fill="#27c93f"/>
+  <text x="218" y="104" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800">Metidos · Agent Thread</text>
+  <text x="930" y="104" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Generated demo data only</text>
+
+  <rect x="104" y="164" width="288" height="464" rx="18" fill="#0d0f12" stroke="#343a42"/>
+  <text x="132" y="204" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800">Thread queue</text>
+  <rect x="132" y="232" width="232" height="92" rx="14" fill="#1b2340" stroke="#7e57ff"/>
+  <text x="154" y="262" fill="#ffffff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800">Plan README refresh</text>
+  <text x="154" y="286" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">safe mode · demo-launch-site</text>
+  <rect x="154" y="300" width="76" height="18" rx="9" fill="#13291d"/>
+  <text x="171" y="313" fill="#8df6a5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="800">running</text>
+  <rect x="132" y="342" width="232" height="72" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="154" y="371" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Review tutorial diff</text>
+  <text x="154" y="394" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">completed · fake branch</text>
+  <rect x="132" y="432" width="232" height="72" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="154" y="461" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Prepare release notes</text>
+  <text x="154" y="484" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">paused · demo data</text>
+  <rect x="132" y="548" width="166" height="36" rx="18" fill="url(#accent)"/>
+  <text x="154" y="571" fill="#ffffff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">New safe Thread</text>
+
+  <rect x="424" y="164" width="748" height="464" rx="18" fill="#0d0f12" stroke="#343a42"/>
+  <text x="456" y="205" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="800">Plan README refresh</text>
+  <text x="456" y="234" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Project: demo-launch-site · Worktree: /demo/workspaces/launch-site · Mode: Safe</text>
+  <rect x="1002" y="190" width="96" height="34" rx="17" fill="#13291d" stroke="#27c93f"/>
+  <text x="1027" y="212" fill="#8df6a5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800">Live</text>
+
+  <rect x="456" y="270" width="660" height="72" rx="14" fill="#15181d" stroke="#303740"/>
+  <circle cx="489" cy="306" r="16" fill="#17324a"/>
+  <text x="484" y="312" fill="#7bdcff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">L</text>
+  <text x="520" y="298" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">Local Operator</text>
+  <text x="520" y="322" fill="#c9d0da" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Use fake release notes to tighten the public README overview.</text>
+
+  <rect x="456" y="364" width="660" height="120" rx="14" fill="#101820" stroke="#49c2ff"/>
+  <circle cx="489" cy="400" r="16" fill="#241c3d"/>
+  <text x="484" y="406" fill="#c7b7ff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">A</text>
+  <text x="520" y="392" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">Agent</text>
+  <text x="520" y="417" fill="#c9d0da" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">I found the generated demo files and will update only overview copy.</text>
+  <rect x="520" y="438" width="136" height="26" rx="13" fill="#172338" stroke="#314866"/>
+  <text x="540" y="456" fill="#9ed8ff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800">read README.md</text>
+  <rect x="670" y="438" width="170" height="26" rx="13" fill="#172338" stroke="#314866"/>
+  <text x="690" y="456" fill="#9ed8ff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800">edit docs/demo.svg</text>
+
+  <rect x="456" y="506" width="660" height="62" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="482" y="543" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Status updates, tool chips, and safe-mode labels are visible without exposing private machine data.</text>
+  <rect x="456" y="588" width="520" height="20" rx="10" fill="#1d2025"/>
+  <rect x="456" y="588" width="340" height="20" rx="10" fill="url(#accent)"/>
+  <text x="994" y="604" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">Step 3 of 5</text>
+</svg>
