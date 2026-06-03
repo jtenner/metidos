@@ -17,6 +17,7 @@ import { join } from "node:path";
 
 import {
   closeAppDatabase,
+  createAuthSession,
   deleteAuthSession,
   initAppDatabase,
   resetResolvedAppDataDirectory,
@@ -540,6 +541,68 @@ describe("auth route HTTP security", () => {
         username: "metidos",
       },
     });
+    expect(JSON.stringify(body)).not.toContain("recovery");
+    expect(JSON.stringify(body)).not.toContain("totp");
+  });
+
+  it("returns only the owning user's metadata for another valid session", async () => {
+    const database = initAppDatabase();
+    database.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        display_name TEXT,
+        email TEXT,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        is_admin INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      )
+    `);
+    database.run(
+      "INSERT INTO users (id, username, is_admin) VALUES (1, 'metidos', 1), (2, 'alternate-operator', 0)",
+    );
+    createAuthSession(database, {
+      expiresAt: "2026-06-09T20:30:00.000Z",
+      id: "alternate-session",
+      issuedAt: "2026-06-02T20:30:00.000Z",
+      lastUsedAt: "2026-06-02T20:30:00.000Z",
+      stepUpValidUntil: null,
+      userId: 2,
+    });
+
+    const response = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          cookie: "metidos_session=alternate-session",
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+
+    expect(response).not.toBeNull();
+    if (!response) {
+      throw new Error("Expected auth status route to return a response");
+    }
+    expect(response.status).toBe(200);
+    const body = await readJson(response);
+    expect(body).toMatchObject({
+      ok: true,
+      status: {
+        authenticated: true,
+        configured: true,
+        isAdmin: false,
+        knownUsernames: ["alternate-operator"],
+        lockedUntil: null,
+        primaryFactorType: "pin",
+        sessionExpiresAt: expect.any(String),
+        username: "alternate-operator",
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain("metidos");
     expect(JSON.stringify(body)).not.toContain("recovery");
     expect(JSON.stringify(body)).not.toContain("totp");
   });

@@ -162,6 +162,7 @@ export const APP_SCHEMA_MIGRATION_REQUIRED_TABLES = [
 ] as const satisfies readonly AppSchemaTableName[];
 
 export const APP_SCHEMA_MIGRATION_REQUIRED_COLUMNS = {
+  auth_sessions: ["user_id"],
   cron_jobs: ["permissions", "plugin_access_groups"],
   plugin_ingress_audit_events: [
     "id",
@@ -1095,6 +1096,7 @@ export function migrateAppSchema(
     `
 			CREATE TABLE IF NOT EXISTS auth_sessions (
 				id TEXT PRIMARY KEY,
+				user_id INTEGER,
 				issued_at TEXT NOT NULL,
 				expires_at TEXT NOT NULL,
 				last_used_at TEXT NOT NULL,
@@ -1102,6 +1104,7 @@ export function migrateAppSchema(
 			);
 		`,
   );
+  ensureAppSchemaColumn(db, "auth_sessions", "user_id", "user_id INTEGER");
   runStatement(
     db,
     `

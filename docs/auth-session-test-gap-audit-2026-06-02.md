@@ -39,11 +39,10 @@ Current tests already cover the core auth service helpers well: primary-factor p
 
 4. **Auth status privacy and multi-user/pending-user route tests**
    - Current route tests cover unauthenticated status reads, authenticated status reads exposing only the current singleton local-operator identity, pending setup-start usernames staying private, stale session cookies, and explicitly revoked session cookies.
-   - True wrong-session `/auth/status` coverage is blocked until the auth persistence model has per-session user ownership or a test helper that can represent a session bound to a non-current user. Today `src/bun/db.ts` stores `auth_sessions` without a user id and resolves every session through the first configured auth user, so fabricating a second user would not produce a meaningful wrong-session case.
-   - When multi-user session ownership exists, add route-level tests proving wrong-session `/auth/status` responses do not leak a global user list while authenticated responses expose only that session's username and intended known-usernames metadata.
+   - Current route tests also cover a second valid session bound to a different persisted `auth_sessions.user_id`, proving `/auth/status` reports only the session owner's username/known-usernames metadata and does not leak the first local operator's username.
    - Pending-user setup/login route tests are not currently actionable: `createPendingUser` is a disabled legacy provisioning entrypoint for the single-local-operator model, and the HTTP auth routes do not expose pending-user provisioning. Revisit this only if pending users become HTTP-visible again.
    - If pending or multi-user HTTP endpoints return, assert deterministic, contributor-friendly error text and codes for missing users, pending users, and deleted/revoked sessions.
 
 ## Validation notes
 
-No implementation changed in this slice. This audit was based on repository inspection only; add the tests above with fake databases, fake clocks, and injected callbacks so they can run without private services, credentials, real repositories, or personal paths.
+A later slice added `auth_sessions.user_id` persistence and route-level wrong-session status coverage using fake in-memory state. Remaining future tests should continue using fake databases, fake clocks, and injected callbacks so they can run without private services, credentials, real repositories, or personal paths.

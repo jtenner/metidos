@@ -2440,14 +2440,16 @@ export function createAuthSession(
     `
 			INSERT INTO auth_sessions (
 				id,
+				user_id,
 				issued_at,
 				expires_at,
 				last_used_at,
 				step_up_valid_until
 			)
-			VALUES (?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?)
 		`,
     input.id,
+    userId,
     input.issuedAt,
     input.expiresAt,
     input.lastUsedAt,
@@ -2473,22 +2475,17 @@ export function getAuthSession(
   database: Database,
   sessionId: string,
 ): AuthSessionRecord | null {
-  const userId =
-    getFirstConfiguredAuthUserId(database) ??
-    resolveRequiredAuthUserId(database);
-  const user =
-    getUserById(database, userId) ?? buildSyntheticLocalOperatorUser();
-  if (!user.enabled) {
-    return null;
-  }
   const session = database
     .query<
-      Omit<AuthSessionRecord, "isAdmin" | "userId" | "username">,
+      Omit<AuthSessionRecord, "isAdmin" | "username"> & {
+        userId: number | null;
+      },
       [string]
     >(
       `
 			SELECT
 				id,
+				user_id AS userId,
 				issued_at AS issuedAt,
 				expires_at AS expiresAt,
 				last_used_at AS lastUsedAt,
@@ -2498,14 +2495,29 @@ export function getAuthSession(
 		`,
     )
     .get(sessionId);
-  return session
-    ? {
-        ...session,
-        isAdmin: user.isAdmin,
-        userId: user.id,
-        username: user.username,
-      }
-    : null;
+  if (!session) {
+    return null;
+  }
+  const fallbackUserId =
+    getFirstConfiguredAuthUserId(database) ??
+    resolveRequiredAuthUserId(database);
+  const userId = session.userId ?? fallbackUserId;
+  const user =
+    getUserById(database, userId) ??
+    (session.userId === null ||
+    (!tableExists(database, "users") &&
+      userId === LOCAL_SETTINGS_COMPAT_USER_ID)
+      ? buildSyntheticLocalOperatorUser()
+      : null);
+  if (!user?.enabled) {
+    return null;
+  }
+  return {
+    ...session,
+    isAdmin: user.isAdmin,
+    userId: user.id,
+    username: user.username,
+  };
 }
 /**
  * Touches auth session.
