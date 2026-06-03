@@ -195,3 +195,54 @@ bunx: /usr/local/bin/bunx
 ```
 
 Outcome: the dedicated scanner pass remains blocked on selecting or providing a runtime with at least one dedicated scanner available, or an equivalent CI-backed scanner. No dedicated scanner scan was run in this workspace runtime.
+
+## Follow-up recheck: 2026-06-03T09:09:39Z
+
+A later recurring-agent slice rechecked dedicated scanner availability. The workspace still contained unrelated tracked modifications, so this slice only records the scanner/container availability blocker and does not change scanner configuration or dependencies.
+
+Environment:
+
+- Branch/HEAD: `master` at `8a397e6`
+- OS/kernel: Linux `bf28335b6a4b` 6.12.90+deb13.1-amd64, Debian kernel build `6.12.90-2 (2026-05-27)`, x86_64
+- Workspace: `/home/jtenner/Projects/jt-ide`
+
+Command:
+
+```sh
+date -u +%Y-%m-%dT%H:%M:%SZ
+git rev-parse --abbrev-ref HEAD
+git rev-parse --short HEAD
+uname -a
+for tool in gitleaks trufflehog git-secrets detect-secrets; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    printf '%s: %s\n' "$tool" "$(command -v "$tool")"
+    "$tool" --version 2>&1 | head -n 3 || true
+  else
+    printf '%s: absent\n' "$tool"
+  fi
+done
+for runner in docker podman; do
+  if command -v "$runner" >/dev/null 2>&1; then
+    printf '%s: %s\n' "$runner" "$(command -v "$runner")"
+  else
+    printf '%s: absent\n' "$runner"
+  fi
+done
+```
+
+Result:
+
+```text
+2026-06-03T09:09:39Z
+master
+8a397e6
+Linux bf28335b6a4b 6.12.90+deb13.1-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.90-2 (2026-05-27) x86_64 GNU/Linux
+gitleaks: absent
+trufflehog: absent
+git-secrets: absent
+detect-secrets: absent
+docker: absent
+podman: absent
+```
+
+Outcome: the dedicated scanner pass remains blocked on an operator/CI/runtime environment with at least one dedicated scanner available, or a container engine that can run an equivalent scanner image. No dedicated scanner scan was run in this workspace runtime.
