@@ -28,7 +28,10 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] If the generated terminal-prompt mark is canonical, document required source/export paths and mark this logo task complete after confirming `website/favicon.svg` and `website/app-icon.svg` are sufficient.
   - [ ] If the bird mascot or crown artwork is canonical, complete the corresponding artwork provenance task first, then add any missing source/export files.
   - [ ] If a new logo is required, add a repo-owned source file plus public exports, update the asset provenance audit, and wire only the approved exports into README/website/app metadata.
-- [ ] Add or polish mascot/icon files if they are part of the project identity.
+- [ ] Add or polish mascot/icon files if they are part of the project identity. Current blocker clarified 2026-06-03: this cannot be completed independently from the canonical-logo and artwork-provenance decisions above because the only mascot-like tracked asset is the pending bird asset (`bird.png` / `website/bird.png`) and the crown icon also has unresolved provenance. Remaining 3-minute slices:
+  - [ ] After the public identity decision is made, document whether the bird mascot, crown icon, generated terminal-prompt mark, or a new repo-owned asset is the mascot/icon source of truth.
+  - [ ] If the bird or crown is part of the public identity, complete its provenance approval first, then add or polish any missing source/export files.
+  - [ ] If no mascot/icon will be used for launch beyond the generated terminal-prompt mark, record that decision in the relevant visual/provenance docs and remove this task.
 - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided. Current blocker clarified 2026-06-03: no final public website URL is recorded yet. Known placeholders are in `website/index.html` (`og:url`, `og:image`, `twitter:image`) and `website/README.md` still lists the go-live reminder. Remaining 3-minute slices:
   - [ ] Choose or record the final public website URL (for example the deployed Pages/static-host URL) in the relevant GitHub/publication notes.
   - [ ] Replace `https://YOUR_DOMAIN_OR_PAGES_URL/` in `website/index.html` with the final URL, keeping `og.png` paths correct.
