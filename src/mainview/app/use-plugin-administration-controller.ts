@@ -204,6 +204,46 @@ export async function loadPluginSettingsStateForInventory({
   };
 }
 
+export async function submitPluginSettingsPatchesForInventory({
+  inventory,
+  priority = "foreground",
+  procedures,
+  snapshots,
+  values,
+}: {
+  inventory: RpcPluginInventory | null;
+  priority?: RpcRequestPriority;
+  procedures: ProjectProcedures;
+  snapshots: PluginSettingsSnapshots;
+  values: PluginSettingFormValues;
+}): Promise<PluginSettingsSnapshots> {
+  const plugins = pluginsWithDeclaredSettings(inventory);
+  if (plugins.length === 0) {
+    return {};
+  }
+  const pluginPatches = buildPluginSettingsPatchRecords({
+    plugins,
+    snapshots,
+    values,
+  });
+  if (pluginPatches.length === 0) {
+    return {};
+  }
+
+  const updatedSnapshots: PluginSettingsSnapshots = {};
+  for (const { patch, plugin } of pluginPatches) {
+    const snapshot = await procedures.updatePluginSettings(
+      {
+        directoryName: plugin.directoryName,
+        values: patch,
+      },
+      { priority },
+    );
+    updatedSnapshots[plugin.directoryName] = snapshot;
+  }
+  return updatedSnapshots;
+}
+
 export function usePluginAdministrationController({
   active,
   availablePluginAccessGroups,
@@ -526,29 +566,20 @@ export function usePluginAdministrationController({
       if (plugins.length === 0) {
         return;
       }
-      const pluginPatches = buildPluginSettingsPatchRecords({
-        plugins,
-        snapshots: pluginSettingsSnapshots,
-        values: pluginSettingsValues,
-      });
-      if (pluginPatches.length === 0) {
-        setPluginSettingsStatus("");
-        return;
-      }
       setPluginSettingsStatus("");
       const editGeneration = pluginSettingsEditGenerationRef.current;
       pluginSettingsSaveInFlightCountRef.current += 1;
       try {
-        const updatedSnapshots: PluginSettingsSnapshots = {};
-        for (const { patch, plugin } of pluginPatches) {
-          const snapshot = await procedures.updatePluginSettings(
-            {
-              directoryName: plugin.directoryName,
-              values: patch,
-            },
-            { priority: options?.priority ?? "foreground" },
-          );
-          updatedSnapshots[plugin.directoryName] = snapshot;
+        const updatedSnapshots = await submitPluginSettingsPatchesForInventory({
+          inventory: pluginInventory,
+          priority: options?.priority ?? "foreground",
+          procedures,
+          snapshots: pluginSettingsSnapshots,
+          values: pluginSettingsValues,
+        });
+        if (Object.keys(updatedSnapshots).length === 0) {
+          setPluginSettingsStatus("");
+          return;
         }
         setPluginSettingsSnapshots((currentSnapshots) => ({
           ...currentSnapshots,

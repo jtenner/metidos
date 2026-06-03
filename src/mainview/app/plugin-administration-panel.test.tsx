@@ -26,6 +26,7 @@ import {
 import {
   loadPluginSettingsStateForInventory,
   retryPendingPluginStepUpAction,
+  submitPluginSettingsPatchesForInventory,
 } from "./use-plugin-administration-controller";
 
 function buildPluginInventoryPlugin(
@@ -336,6 +337,105 @@ describe("plugin administration panel", () => {
     expect(clearMarkup).toContain("Clear pending");
     expect(clearMarkup).toContain("Will clear on save");
     expect(clearMarkup).toContain('aria-label="Clear stored API token"');
+  });
+
+  it("submits declared settings patches, including stored secret clears", async () => {
+    const plugin = buildPluginInventoryPlugin({
+      manifest: {
+        ...buildPluginInventoryPlugin().manifest,
+        settings: [
+          {
+            defaultValue: "digest",
+            description: "Delivery mode",
+            hasDefault: true,
+            items: null,
+            key: "mode",
+            kind: "string",
+            label: "Mode",
+            options: [],
+            required: null,
+          },
+          {
+            defaultValue: null,
+            description: "API token",
+            hasDefault: false,
+            items: null,
+            key: "api_token",
+            kind: "secret",
+            label: "API token",
+            options: [],
+            required: null,
+          },
+        ],
+      },
+    });
+    const originalSnapshot: RpcPluginSettingsSnapshot = {
+      directoryName: plugin.directoryName,
+      pluginId: plugin.pluginId,
+      settings: [
+        {
+          defaultValue: "digest",
+          hasDefault: true,
+          hasStoredValue: true,
+          key: "mode",
+          kind: "string",
+          readable: true,
+          secret: false,
+          value: "digest",
+        },
+        {
+          defaultValue: null,
+          hasDefault: false,
+          hasStoredValue: true,
+          key: "api_token",
+          kind: "secret",
+          readable: false,
+          secret: true,
+          value: null,
+        },
+      ],
+    };
+    const updatedSnapshot: RpcPluginSettingsSnapshot = {
+      ...originalSnapshot,
+      settings: [
+        { ...originalSnapshot.settings[0], value: "realtime" },
+        { ...originalSnapshot.settings[1], hasStoredValue: false },
+      ],
+    };
+    const calls: unknown[] = [];
+
+    const updatedSnapshots = await submitPluginSettingsPatchesForInventory({
+      inventory: buildPluginInventory([plugin]),
+      procedures: {
+        updatePluginSettings: async (input, options) => {
+          calls.push({ input, options });
+          return updatedSnapshot;
+        },
+      } as ProjectProcedures,
+      snapshots: { [plugin.directoryName]: originalSnapshot },
+      values: {
+        [plugin.directoryName]: {
+          api_token: null,
+          mode: " realtime ",
+        },
+      },
+    });
+
+    expect(calls).toEqual([
+      {
+        input: {
+          directoryName: plugin.directoryName,
+          values: {
+            api_token: null,
+            mode: "realtime",
+          },
+        },
+        options: { priority: "foreground" },
+      },
+    ]);
+    expect(updatedSnapshots).toEqual({
+      [plugin.directoryName]: updatedSnapshot,
+    });
   });
 
   it("renders ingress link codes, binding actions, and route drafts through the section seam", () => {
