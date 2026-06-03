@@ -110,8 +110,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] CI passes on the default branch.
 - [ ] Working-tree and Git-history secret scans are completed and findings are resolved.
-- [ ] README is updated and accurate. Context: `docs/readme-public-readiness-link-audit-2026-06-03.md` records a 2026-06-03 bounded audit confirming all 28 local README links/assets resolve within the workspace; this does not validate product claims, screenshots, installation behavior, or external URLs. Remaining 3-minute slices:
-  - [ ] Validate README product/security claims against `docs/security-model.md`, `docs/known-limitations.md`, and current implementation notes; update README or docs if any claim is stale.
+- [ ] README is updated and accurate. Context: `docs/readme-public-readiness-link-audit-2026-06-03.md` records a 2026-06-03 bounded audit confirming all 28 local README links/assets resolve within the workspace. `docs/readme-product-security-claims-audit-2026-06-03.md` records a 2026-06-03 bounded audit confirming README product/security claims align with `docs/security-model.md` and `docs/known-limitations.md`; no README text changes were needed for that slice. This does not validate screenshots, install behavior, external URLs, or public rendering. Remaining 3-minute slices:
   - [ ] Validate README screenshot/visual-asset references after the remaining artwork provenance and canonical logo/mascot decisions are complete.
   - [ ] Validate external README badge/workflow URLs and public rendering after the repository is public or public-like CI evidence is available.
 - [ ] Install docs are tested on a clean machine or container.
