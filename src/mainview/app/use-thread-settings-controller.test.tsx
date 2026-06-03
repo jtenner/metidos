@@ -96,7 +96,7 @@ function renderController(input?: {
       availableThreadPermissionDescriptors: [
         {
           accessId: "git",
-          category: "builtin",
+          category: "data",
           defaultEnabled: false,
           description: "Git access",
           id: "metidos:git",
@@ -116,7 +116,10 @@ function renderController(input?: {
         input?.isUpdatingThreadReasoningEffort ?? false,
       procedures: {
         updateThreadAccess: async ({ permissions }) =>
-          thread({ permissions, updatedAt: "2026-06-03T00:01:00.000Z" }),
+          thread({
+            permissions: permissions ?? [],
+            updatedAt: "2026-06-03T00:01:00.000Z",
+          }),
         updateThreadModel: async ({ model }) =>
           thread({ model, updatedAt: "2026-06-03T00:01:00.000Z" }),
         updateThreadReasoningEffort: async ({ reasoningEffort }) =>
@@ -255,8 +258,9 @@ describe("useThreadSettingsController", () => {
     const { controller, readState } = renderController({
       procedures: {
         updateThreadAccess: async ({ permissions }) => {
-          receivedPermissions.push(permissions);
-          return thread({ permissions });
+          const nextPermissions = permissions ?? [];
+          receivedPermissions.push(nextPermissions);
+          return thread({ permissions: nextPermissions });
         },
       },
     });

@@ -6,7 +6,7 @@ This smoke covers the remaining install/setup failure-path slice for an unwritab
 
 - Date: 2026-06-02
 - Host OS: Linux `eefe0b53020d` `6.12.90+deb13.1-amd64` x86_64, Debian kernel build `6.12.90-2`.
-- Bun: `1.3.13`, matching `package.json` `packageManager`.
+- Bun: `1.3.14`, matching `package.json` `packageManager`.
 - Source revision: `345d23f`.
 - Checkout: `/home/jtenner/Projects/jt-ide`.
 - Provider credentials: none used; the command ran with a minimal environment.

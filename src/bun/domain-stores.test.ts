@@ -131,9 +131,13 @@ describe("domain persistence stores", () => {
     });
 
     expect(page.messages).toHaveLength(200);
-    expect(page.messages.at(0)?.text).toBe("message 5");
+    const firstMessage = page.messages.at(0);
+    expect(firstMessage?.text).toBe("message 5");
     expect(page.messages.at(-1)?.text).toBe("message 204");
-    expect(page.nextCursor).toBe(page.messages[0]!.id);
+    if (!firstMessage) {
+      throw new Error("Expected paged messages to include a first item");
+    }
+    expect(page.nextCursor).toBe(firstMessage.id);
   });
 
   it("hydrates cron jobs and due scheduled job ids through ownerless reads", () => {

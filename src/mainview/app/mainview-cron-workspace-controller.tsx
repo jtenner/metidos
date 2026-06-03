@@ -1277,14 +1277,20 @@ export function MainviewCronWorkspaceController({
         }
       >
         <CronjobWorkspace
+          availablePluginAccessGroups={availablePluginAccessGroups}
+          availableThreadPermissionDescriptors={
+            availableThreadPermissionDescriptors
+          }
           cronJobs={cronJobs}
           cronJobsError={cronJobsError}
           deletingCronJobs={deletingCronJobs}
+          homeDirectory={homeDirectory}
           isLoadingCronJobs={isLoadingCronJobs}
           onDeleteCron={handleDeleteCron}
           onEditCron={openCronEditor}
           onRunCron={handleRunCronNow}
           runningCronJobs={runningCronJobs}
+          supportsTildePath={supportsTildePath}
         />
       </Suspense>
       <ConfirmDialog

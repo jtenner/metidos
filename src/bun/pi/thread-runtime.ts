@@ -188,7 +188,7 @@ function isBinaryPiThinkingModel(model: string | null | undefined): boolean {
     return false;
   }
   const [provider] = normalized.split(":", 2);
-  return provider === "mistral" || provider === "zai";
+  return provider === "mistral" || provider === "ollama" || provider === "zai";
 }
 
 export function resolvePiThinkingLevel(

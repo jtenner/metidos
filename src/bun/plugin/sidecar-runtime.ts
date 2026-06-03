@@ -16,7 +16,7 @@ const TEXT_ENCODER = new TextEncoder();
 export const DEFAULT_PLUGIN_QUICKJS_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024;
 // This is a virtual-memory ceiling for the Bun sidecar host process, not a
 // target RSS allocation. Bun/JSC reserves substantially more address space than
-// it commits; Bun 1.3.13 plugin sidecar startup in the Podman image can need a
+// it commits; Bun 1.3.14 plugin sidecar startup in the Podman image can need a
 // multi-GiB virtual address ceiling for heavier plugins while resident memory
 // stays around tens of MiB.
 export const DEFAULT_PLUGIN_SIDECAR_MEMORY_LIMIT_BYTES = 4 * 1024 * 1024 * 1024;

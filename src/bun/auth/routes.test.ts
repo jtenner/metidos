@@ -51,6 +51,14 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
 }
 
+function expectTestResponse(response: Response | null): Response {
+  expect(response).not.toBeNull();
+  if (response === null) {
+    throw new Error("Expected auth route to return a response");
+  }
+  return response;
+}
+
 async function issueCsrfToken(): Promise<string> {
   const response = await handleAuthRequestForTest(
     new Request("http://127.0.0.1:7599/auth/csrf", {
@@ -64,7 +72,7 @@ async function issueCsrfToken(): Promise<string> {
   );
   expect(response).not.toBeNull();
   expect(response?.status).toBe(200);
-  const body = await readJson(response!);
+  const body = await readJson(expectTestResponse(response));
   expect(typeof body.csrfToken).toBe("string");
   return body.csrfToken as string;
 }
@@ -269,7 +277,7 @@ describe("auth route HTTP security", () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
-    const body = await readJson(response!);
+    const body = await readJson(expectTestResponse(response));
     expect(body.ok).toBe(true);
     expect(typeof body.csrfToken).toBe("string");
     expect((body.csrfToken as string).length).toBeGreaterThan(20);
@@ -296,7 +304,7 @@ describe("auth route HTTP security", () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
-    const body = await readJson(response!);
+    const body = await readJson(expectTestResponse(response));
     expect(body.ok).toBe(true);
     expect(body.status).toMatchObject({ authenticated: false });
     expect(JSON.stringify(body)).not.toContain("users");
@@ -381,7 +389,7 @@ describe("auth route HTTP security", () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
-    const body = await readJson(response!);
+    const body = await readJson(expectTestResponse(response));
     expect(body.ok).toBe(true);
     expect(body.enrollment).toMatchObject({
       totpSecret: expect.any(String),
@@ -458,7 +466,7 @@ describe("auth route HTTP security", () => {
     );
     expect(startResponse).not.toBeNull();
     expect(startResponse?.status).toBe(200);
-    const startBody = await readJson(startResponse!);
+    const startBody = await readJson(expectTestResponse(startResponse));
     const enrollment = startBody.enrollment as {
       totpSecret: string;
     };
@@ -481,7 +489,7 @@ describe("auth route HTTP security", () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
-    const body = await readJson(response!);
+    const body = await readJson(expectTestResponse(response));
     expect(body.ok).toBe(true);
     expect(body.recoveryCodes).toEqual(expect.any(Array));
     const recoveryCodes = body.recoveryCodes as string[];
@@ -975,7 +983,7 @@ describe("auth route HTTP security", () => {
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
-    const body = await readJson(response!);
+    const body = await readJson(expectTestResponse(response));
     expect(body).toMatchObject({
       ok: true,
       ticket: { expiresAt: expect.any(String) },

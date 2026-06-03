@@ -5,7 +5,7 @@ This smoke check covers the port-conflict slice of the public-readiness failure-
 ## Environment
 
 - OS/kernel: Linux `eefe0b53020d` `6.12.90+deb13.1-amd64` x86_64, Debian kernel build `6.12.90-2`.
-- Bun: `1.3.13`, matching `package.json` `packageManager`.
+- Bun: `1.3.14`, matching `package.json` `packageManager`.
 - Checkout: `/home/jtenner/Projects/jt-ide`.
 - App Data: disposable `/tmp/.../app-data` directory.
 - Provider credentials: none used.

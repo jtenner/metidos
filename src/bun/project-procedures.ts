@@ -2128,10 +2128,28 @@ export function missingAssistantResponseErrorMessage(
 ): string {
   const baseMessage =
     "Thread run completed without returning an assistant response.";
-  if (codexModelProvider(model) === "xai") {
+  const provider = safeCodexModelProvider(model);
+  if (provider === "ollama") {
+    return `${baseMessage} The Ollama model may have emitted only thinking output without a final answer; try the Instant thinking level for chat, or use a non-thinking Ollama model.`;
+  }
+  if (provider === "xai") {
     return `${baseMessage} The xAI provider may have stopped after reasoning without emitting a final answer or tool call.`;
   }
   return baseMessage;
+}
+
+function safeCodexModelProvider(
+  model: string | null | undefined,
+): string | null {
+  try {
+    return codexModelProvider(model);
+  } catch {
+    const normalized = model?.trim();
+    if (!normalized?.includes(":")) {
+      return null;
+    }
+    return normalized.split(":", 2)[0] || null;
+  }
 }
 
 const FINISHED_WITH_IMAGE_RESPONSE_MESSAGE = "Generated image.";

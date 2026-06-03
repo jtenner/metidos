@@ -395,6 +395,15 @@ test("resolvePiThinkingLevel maps provider-specific reasoning controls", () => {
     resolvePiThinkingLevel("mistral:magistral-medium-latest", "high"),
   ).toBe("high");
   expect(resolvePiThinkingLevel("zai:glm-5", "medium")).toBe("high");
+  expect(
+    resolvePiThinkingLevel(
+      "ollama:titus-cybersecurity-tools:latest",
+      "minimal",
+    ),
+  ).toBe("off");
+  expect(
+    resolvePiThinkingLevel("ollama:titus-cybersecurity-tools:latest", "medium"),
+  ).toBe("high");
   expect(resolvePiThinkingLevel("xai:grok-4-1-fast", "minimal")).toBe(
     "minimal",
   );

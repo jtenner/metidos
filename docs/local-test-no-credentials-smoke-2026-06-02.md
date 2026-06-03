@@ -11,7 +11,7 @@ This smoke run intentionally disabled Bun's automatic `.env` loading and unset c
 - Date: 2026-06-02
 - Workspace: `/home/jtenner/Projects/jt-ide`
 - OS/kernel: Linux `eefe0b53020d` `6.12.90+deb13.1-amd64` x86_64
-- Bun version: `1.3.13`
+- Bun version: `1.3.14`
 
 ## Command
 

@@ -4,7 +4,7 @@
   "type": "module",
   "version": "0.0.1",
   "license": "Apache-2.0",
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@1.3.14",
   "scripts": {
     "tailwind:build": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --minify",
     "tailwind:watch": "tailwindcss -i ./src/mainview/input.css -o ./src/mainview/index.css --watch=always",

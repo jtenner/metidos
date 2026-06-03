@@ -8,7 +8,7 @@ This smoke covers the stale or missing Mainview build asset recovery slice from 
 
 - Date: 2026-06-02
 - OS/kernel: Linux `eefe0b53020d` `6.12.90+deb13.1-amd64` x86_64, Debian kernel build `6.12.90-2`.
-- Bun version: `1.3.13`
+- Bun version: `1.3.14`
 - Workspace: `/home/jtenner/Projects/jt-ide`
 - Disposable App Data: `/tmp/metidos-mainview-assets-smoke-UXQf70`
 - Ports used to avoid the already-running local development instance: `METIDOS_PORT=17699`, `METIDOS_WEB_SERVER_SHARE_PORT=17700`

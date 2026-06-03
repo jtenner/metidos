@@ -201,7 +201,7 @@ Metidos is intended to run as a local, operator-owned application.
 - Optional: Docker or Podman for container installs.
 - Optional: provider CLIs or local model servers depending on selected providers.
 
-If the package manager says `bun@1.3.13`, use Bun `1.3.13` for reproducible installs and validation.
+If the package manager says `bun@1.3.14`, use Bun `1.3.14` for reproducible installs and validation.
 
 ### Configuration files and App Data
 

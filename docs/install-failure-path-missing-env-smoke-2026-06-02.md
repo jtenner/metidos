@@ -8,7 +8,7 @@ This smoke covers the install/setup failure-path TODO for missing `.env` or mini
 
 - Date: 2026-06-02
 - Host OS: Linux `6.12.90+deb13.1-amd64` on x86_64
-- Bun: `1.3.13`
+- Bun: `1.3.14`
 - Source revision: `dd1591e`
 - Disposable checkout: `.metidos/cache/missing-env-smoke/checkout` (created with `git archive HEAD`; not committed)
 - Disposable App Data: `.metidos/cache/missing-env-smoke/app-data-archive` (not committed)

@@ -8,7 +8,7 @@ This note records the public-readiness smoke for `bun run dev` from a disposable
 - Workspace: `/home/jtenner/Projects/jt-ide`
 - Disposable checkout root: `.metidos/cache/dev-clean-clone-smoke-2026-06-02/checkout` (gitignored)
 - Disposable App Data: `.metidos/cache/dev-clean-clone-smoke-2026-06-02/app-data` (gitignored)
-- Bun version: `1.3.13`, matching `package.json`
+- Bun version: `1.3.14`, matching `package.json`
 - Ports: `METIDOS_PORT=17613`, `METIDOS_WEB_SERVER_SHARE_PORT=17614`
 
 ## Initial finding
@@ -71,7 +71,7 @@ Clean-clone result:
 
 - Commit under test: `737d9528055ec2f44405a646b60f574c9c9b0b18`
 - OS: `Linux eefe0b53020d 6.12.90+deb13.1-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.90-2 (2026-05-27) x86_64 GNU/Linux`
-- Bun version: `1.3.13`
+- Bun version: `1.3.14`
 - `git status --short`: empty
 - `bun install --frozen-lockfile`: passed
 - `bun run dev`: reached the local web server and stayed running until the 30-second timeout sent `SIGTERM` (`124`)

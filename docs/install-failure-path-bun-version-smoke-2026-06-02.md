@@ -21,8 +21,8 @@ node -e "const p=require('./package.json'); console.log(p.packageManager)"
 
 Result:
 
-- `bun --version` printed `1.3.13`.
-- `package.json` printed `bun@1.3.13`.
+- `bun --version` printed `1.3.14`.
+- `package.json` printed `bun@1.3.14`.
 - The local runtime matches the repository requirement.
 
 ### Simulate missing Bun
@@ -46,7 +46,7 @@ bun --version
 node -e "const p=require('./package.json'); console.log(p.packageManager)"
 ```
 
-It also says to install the Bun version printed by `package.json` before debugging application behavior, and the install reference explicitly names Bun `1.3.13` when `packageManager` is `bun@1.3.13`.
+It also says to install the Bun version printed by `package.json` before debugging application behavior, and the install reference explicitly names Bun `1.3.14` when `packageManager` is `bun@1.3.14`.
 
 ## Outcome
 

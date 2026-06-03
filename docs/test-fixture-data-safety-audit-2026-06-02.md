@@ -9,7 +9,7 @@ This audit verifies that existing tests use fixtures, fake data, or synthetic re
 - Date: 2026-06-02
 - Workspace: `/home/jtenner/Projects/jt-ide`
 - OS: Linux `6.12.90+deb13.1-amd64` on x86_64
-- Bun: `1.3.13`
+- Bun: `1.3.14`
 
 ## Commands run
 

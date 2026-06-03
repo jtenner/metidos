@@ -300,7 +300,7 @@ export function useTerminalsController({
         activeThreadId,
         activeWorktreePath,
         isAdmin,
-        options,
+        ...(options === undefined ? {} : { options }),
         selectedTerminalId,
         terminals,
       });

@@ -92,4 +92,20 @@ describe("assistantResponseTextOrToolUseFallback", () => {
       ),
     ).toThrow("Thread run completed without returning an assistant response.");
   });
+
+  it("explains Ollama thinking-only completions", () => {
+    expect(() =>
+      assistantResponseTextOrToolUseFallback(
+        "",
+        {
+          content: [],
+          role: "assistant",
+          stopReason: "stop",
+        },
+        "ollama:titus-cybersecurity-tools:latest",
+      ),
+    ).toThrow(
+      "The Ollama model may have emitted only thinking output without a final answer",
+    );
+  });
 });

@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.13-debian
+FROM oven/bun:1.3.14-debian
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends build-essential ca-certificates caddy nodejs python3 tini \

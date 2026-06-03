@@ -49,14 +49,18 @@ function renderCronWorkspace(props?: {
 }): string {
   return renderToStaticMarkup(
     <CronjobWorkspace
+      availablePluginAccessGroups={[]}
+      availableThreadPermissionDescriptors={[]}
       cronJobs={props?.cronJobs ?? []}
       cronJobsError={props?.cronJobsError ?? ""}
       deletingCronJobs={props?.deletingCronJobs ?? new Set()}
+      homeDirectory=""
       isLoadingCronJobs={props?.isLoadingCronJobs ?? false}
       onDeleteCron={() => undefined}
       onEditCron={() => undefined}
       onRunCron={() => undefined}
       runningCronJobs={props?.runningCronJobs ?? new Set()}
+      supportsTildePath={false}
     />,
   );
 }
@@ -72,13 +76,13 @@ describe("CronjobWorkspace presentation states", () => {
     expect(renderCronWorkspace()).toContain("No cron jobs found.");
   });
 
-  it("renders enabled cron rows with schedule, next-run, workspace, and permission summaries", () => {
+  it("renders cron rows with title, schedule summary, workspace, and permission counts", () => {
     const markup = renderCronWorkspace({
       cronJobs: [
         makeCronJob({
           cronsAccess: true,
           gitAccess: true,
-          pluginAccessGroups: ["demo:workspace"],
+          pluginAccessGroups: ["demo/workspace"],
           title: "Daily fixture cron",
         }),
       ],
@@ -86,11 +90,9 @@ describe("CronjobWorkspace presentation states", () => {
 
     expect(markup).toContain("Daily fixture cron");
     expect(markup).toContain("0 14 * * *");
-    expect(markup).toContain("Enabled");
     expect(markup).toContain("At 02:00 PM");
-    expect(markup).toContain("Project #7");
     expect(markup).toContain("/tmp/metidos-demo");
-    expect(markup).toContain("Git, Crons, 1 plugin group");
+    expect(markup).toContain("3 permissions");
     expect(markup).toContain("Run cron job Daily fixture cron");
     expect(markup).toContain("Delete cron job Daily fixture cron");
   });
@@ -98,16 +100,12 @@ describe("CronjobWorkspace presentation states", () => {
   it("summarizes explicit cron permissions without exposing raw permission ids in rows", () => {
     const cronJob = makeCronJob({
       permissions: ["metidos:threads", "metidos:crons"],
-      pluginAccessGroups: ["plugin:read", "plugin:write"],
+      pluginAccessGroups: ["plugin/read", "plugin/write"],
       worktreePath: "",
     });
 
-    expect(describeCronWorkspace(cronJob)).toBe(
-      "Project #7 · No worktree path",
-    );
-    expect(describeCronPermissions(cronJob)).toBe(
-      "2 permissions, 2 plugin groups",
-    );
+    expect(describeCronWorkspace(cronJob)).toBe("No worktree path");
+    expect(describeCronPermissions(cronJob)).toBe("4 permissions");
   });
 
   it("renders busy run/delete labels and disabled affordances per cron row", () => {
@@ -118,7 +116,6 @@ describe("CronjobWorkspace presentation states", () => {
     });
 
     expect(markup).toContain("Paused cleanup");
-    expect(markup).toContain("Disabled");
     expect(markup).toContain("Cron job Paused cleanup is running");
     expect(markup).toContain("Cron job Paused cleanup is being deleted");
     expect(markup).toContain("Running…");

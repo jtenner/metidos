@@ -1,0 +1,8 @@
+FROM titus-cybersecurity:latest
+
+RENDERER qwen3.5
+PARSER qwen3.5
+
+PARAMETER stop "<|im_end|>"
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95

@@ -14,7 +14,7 @@ Scope: repository-owned GitHub workflow configuration, release-note configuratio
 
 ## Findings
 
-- The root CI workflow checks out the repository, installs dependencies with `bun install --frozen-lockfile`, and runs `bun run validate` on `ubuntu-latest` with Bun `1.3.13`.
+- The root CI workflow checks out the repository, installs dependencies with `bun install --frozen-lockfile`, and runs `bun run validate` on `ubuntu-latest` with Bun `1.3.14`.
 - No repository-owned GitHub workflow currently uploads artifacts, downloads artifacts, writes custom job summaries, enables dependency caches, or publishes coverage/JUnit/test-output files.
 - The CodeQL workflow uses the GitHub CodeQL action and writes only security events through the standard `security-events: write` permission.
 - The dependency-review workflow can post dependency summaries on pull requests, but it is limited to dependency manifests and lockfiles and does not run repository scripts.
