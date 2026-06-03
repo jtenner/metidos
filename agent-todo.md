@@ -91,7 +91,10 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Check the repository's GitHub settings UI for private security reporting availability after publication settings are being finalized.
   - [ ] If available, enable private security reporting and record verification evidence.
   - [ ] If unavailable, record the GitHub/account/repository reason and confirm `SECURITY.md` is the intended public fallback disclosure path.
-- [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
+- [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project. Context: `docs/github-visibility-fork-actions-settings-review-2026-06-03.md` documents a pre-public settings review: current repo is private, canonical/non-fork, forking enabled, Actions enabled, workflow token default read-only, workflow PR approval disabled, and all Actions currently allowed. Remaining 3-minute slices:
+  - [ ] After the final pre-public checklist is complete, change repository visibility to public and re-check visibility is `PUBLIC`.
+  - [ ] After publication, confirm forking remains enabled and fork pull request contributor approval behavior is available and intentionally configured.
+  - [ ] After publication, confirm Actions remain enabled, default workflow token permission remains read-only, and the `allowed_actions=all` policy is still accepted or tightened to a selected-actions allowlist.
 
 ## 12. Final Pre-Public Checklist
 
