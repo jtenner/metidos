@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Metidos cron workspace demo screenshot</title>
+  <desc id="desc">Generated feature screenshot showing fake cron jobs, demo schedules, safe-mode status, and sanitized run history with no private paths, usernames, hostnames, tokens, or real repository data.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0b0c"/>
+      <stop offset="1" stop-color="#16251f"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7e57ff"/>
+      <stop offset="1" stop-color="#49c2ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <path d="M0 48h1280M0 96h1280M0 144h1280M0 192h1280M0 240h1280M0 288h1280M0 336h1280M0 384h1280M0 432h1280M0 480h1280M0 528h1280M0 576h1280M0 624h1280M0 672h1280M48 0v720M96 0v720M144 0v720M192 0v720M240 0v720M288 0v720M336 0v720M384 0v720M432 0v720M480 0v720M528 0v720M576 0v720M624 0v720M672 0v720M720 0v720M768 0v720M816 0v720M864 0v720M912 0v720M960 0v720M1008 0v720M1056 0v720M1104 0v720M1152 0v720M1200 0v720M1248 0v720" stroke="#242a34" stroke-width="1" opacity="0.5"/>
+  <rect x="72" y="60" width="1136" height="600" rx="28" fill="#121417" stroke="#40464e" stroke-width="2"/>
+  <rect x="72" y="60" width="1136" height="72" rx="28" fill="#1d2025"/>
+  <rect x="72" y="104" width="1136" height="28" fill="#1d2025"/>
+  <circle cx="110" cy="96" r="9" fill="#ff5f57"/>
+  <circle cx="142" cy="96" r="9" fill="#ffbd2e"/>
+  <circle cx="174" cy="96" r="9" fill="#27c93f"/>
+  <text x="218" y="104" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="800">Metidos · Cron Workspace</text>
+  <text x="916" y="104" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Generated demo data only</text>
+
+  <rect x="104" y="164" width="326" height="464" rx="18" fill="#0d0f12" stroke="#343a42"/>
+  <text x="132" y="204" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800">Scheduled agent work</text>
+  <rect x="132" y="232" width="270" height="96" rx="14" fill="#1b2340" stroke="#7e57ff"/>
+  <text x="154" y="262" fill="#ffffff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800">Daily docs polish</text>
+  <text x="154" y="286" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">0 9 * * 1-5 · safe mode</text>
+  <rect x="154" y="302" width="84" height="18" rx="9" fill="#13291d"/>
+  <text x="174" y="315" fill="#8df6a5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="800">enabled</text>
+  <rect x="252" y="302" width="116" height="18" rx="9" fill="#172338"/>
+  <text x="270" y="315" fill="#9ed8ff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="800">demo-launch-site</text>
+
+  <rect x="132" y="348" width="270" height="86" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="154" y="378" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Weekly dependency notes</text>
+  <text x="154" y="402" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">30 14 * * 3 · safe mode</text>
+  <rect x="154" y="416" width="82" height="18" rx="9" fill="#26220f"/>
+  <text x="174" y="429" fill="#ffd97a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="800">paused</text>
+
+  <rect x="132" y="454" width="270" height="86" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="154" y="484" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Release checklist sweep</text>
+  <text x="154" y="508" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">15 8 * * 2 · safe mode</text>
+  <rect x="154" y="522" width="100" height="18" rx="9" fill="#13291d"/>
+  <text x="174" y="535" fill="#8df6a5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="800">next today</text>
+
+  <rect x="132" y="572" width="164" height="36" rx="18" fill="url(#accent)"/>
+  <text x="154" y="595" fill="#ffffff" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">New Cron Job</text>
+
+  <rect x="462" y="164" width="710" height="464" rx="18" fill="#0d0f12" stroke="#343a42"/>
+  <text x="494" y="205" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="800">Daily docs polish</text>
+  <text x="494" y="234" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15">Project: demo-launch-site · Worktree: /demo/workspaces/launch-site · Mode: Safe</text>
+  <rect x="998" y="190" width="112" height="34" rx="17" fill="#13291d" stroke="#27c93f"/>
+  <text x="1023" y="212" fill="#8df6a5" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800">Enabled</text>
+
+  <rect x="494" y="270" width="284" height="92" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="520" y="302" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">Schedule</text>
+  <text x="520" y="328" fill="#c9d0da" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Weekdays at 09:00</text>
+  <text x="520" y="350" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">Cron: 0 9 * * 1-5</text>
+  <rect x="806" y="270" width="286" height="92" rx="14" fill="#15181d" stroke="#303740"/>
+  <text x="832" y="302" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="800">Prompt summary</text>
+  <text x="832" y="328" fill="#c9d0da" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">Review public docs for stale setup steps.</text>
+  <text x="832" y="350" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">No credentials or real project names.</text>
+
+  <text x="494" y="412" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800">Recent runs</text>
+  <rect x="494" y="438" width="598" height="50" rx="14" fill="#101820" stroke="#49c2ff"/>
+  <circle cx="522" cy="463" r="9" fill="#27c93f"/>
+  <text x="548" y="466" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">Pass · generated docs diff reviewed</text>
+  <text x="888" y="466" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">today 09:00</text>
+  <rect x="494" y="502" width="598" height="50" rx="14" fill="#15181d" stroke="#303740"/>
+  <circle cx="522" cy="527" r="9" fill="#27c93f"/>
+  <text x="548" y="530" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">Pass · no changes needed</text>
+  <text x="888" y="530" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">yesterday 09:00</text>
+  <rect x="494" y="566" width="168" height="36" rx="18" fill="#1d2025" stroke="#40464e"/>
+  <text x="522" y="589" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">Run now</text>
+  <rect x="680" y="566" width="164" height="36" rx="18" fill="#1d2025" stroke="#40464e"/>
+  <text x="708" y="589" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">Edit schedule</text>
+  <rect x="862" y="566" width="168" height="36" rx="18" fill="#26181d" stroke="#6f3444"/>
+  <text x="890" y="589" fill="#ffb4c3" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800">Disable safely</text>
+</svg>
