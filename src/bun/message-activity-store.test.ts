@@ -153,9 +153,13 @@ describe("message activity store", () => {
         "Done thinking",
         "Running command",
       ]);
-      expect(firstPage.nextCursor).toBe(activityIds[0]);
+      const [firstActivityId] = activityIds;
+      if (firstActivityId === undefined) {
+        throw new Error("expected at least one activity id");
+      }
+      expect(firstPage.nextCursor).toBe(firstActivityId);
       const secondPage = store.listMessagesPage(thread.id, {
-        cursor: firstPage.nextCursor,
+        cursor: firstPage.nextCursor ?? null,
         limit: 2,
       });
       expect(secondPage.messages.map((row) => row.text)).toEqual([

@@ -15,7 +15,6 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.
 - [ ] Verify `bun run start` works from a clean clone after documented setup only.
-- [ ] Verify `bun run validate` passes from a clean clone.
 - [ ] Verify local auth setup and reset flow are documented and work as described.
 - [ ] Verify missing dependencies produce readable errors with next-step guidance.
 - [ ] Verify backup and restore paths are documented and tested.
@@ -89,7 +88,6 @@ This checklist is for repository improvements only before making Metidos public/
 ## 12. Final Pre-Public Checklist
 
 - [ ] CI passes on the default branch.
-- [ ] `bun run validate` passes from a clean clone.
 - [ ] Working-tree and Git-history secret scans are completed and findings are resolved.
 - [ ] README is updated and accurate.
 - [ ] Install docs are tested on a clean machine or container.
