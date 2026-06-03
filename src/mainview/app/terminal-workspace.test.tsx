@@ -10,6 +10,7 @@ import type { RpcTerminal, RpcTerminalStatus } from "../../bun/rpc-schema";
 import {
   terminalCloseConfirmationDetails,
   terminalStatusView,
+  TerminalRendererStateOverlay,
   TerminalWorkspace,
 } from "./terminal-workspace";
 
@@ -157,6 +158,29 @@ describe("TerminalWorkspace render states", () => {
       summary: "Failed",
       tone: "danger",
     });
+  });
+
+  it("renders terminal renderer loading state through a static test seam", () => {
+    const markup = renderToStaticMarkup(
+      <TerminalRendererStateOverlay errorMessage={null} loading={true} />,
+    );
+
+    expect(markup).toContain("Loading terminal renderer.");
+    expect(markup).toContain("sr-only");
+  });
+
+  it("renders terminal renderer failure guidance without loading ghostty-web", () => {
+    const markup = renderToStaticMarkup(
+      <TerminalRendererStateOverlay
+        errorMessage="fixture wasm load failure"
+        loading={false}
+      />,
+    );
+
+    expect(markup).toContain(
+      "Terminal renderer failed to load. Refresh the window and try again.",
+    );
+    expect(markup).toContain("fixture wasm load failure");
   });
 
   it("formats close-confirmation copy for a pending running terminal", () => {

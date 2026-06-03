@@ -100,6 +100,27 @@ function readCssVariable(name: string, fallback = ""): string {
   return value || fallback;
 }
 
+export function TerminalRendererStateOverlay({
+  errorMessage,
+  loading,
+}: {
+  errorMessage: string | null;
+  loading: boolean;
+}): JSX.Element | null {
+  if (errorMessage) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-bg-app px-4 text-center text-sm text-danger-text">
+        Terminal renderer failed to load. Refresh the window and try again.
+        <span className="sr-only"> {errorMessage}</span>
+      </div>
+    );
+  }
+  if (loading) {
+    return <span className="sr-only">Loading terminal renderer.</span>;
+  }
+  return null;
+}
+
 const GhosttyTerminal = memo(function GhosttyTerminal({
   active,
   terminal,
@@ -111,6 +132,7 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
   const fitRef = useRef<{ fit: () => void; observeResize?: () => void } | null>(
     null,
   );
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -119,12 +141,14 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
     let term: InstanceType<GhosttyModule["Terminal"]> | null = null;
     const disposables: Array<{ dispose?: () => void }> = [];
 
+    setLoading(true);
     setLoadError(null);
     void loadGhostty()
       .then(({ ghostty, module }) => {
         if (disposed || !containerRef.current) {
           return;
         }
+        setLoading(false);
         const nextTerm = new module.Terminal({
           ghostty,
           cursorBlink: true,
@@ -200,6 +224,7 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
         logClientError("Failed to load terminal renderer", error, {
           context: `terminalId:${terminal.terminalId}`,
         });
+        setLoading(false);
         setLoadError(
           error instanceof Error && error.message
             ? error.message
@@ -239,12 +264,10 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
         className="h-full w-full overflow-hidden p-2 caret-transparent [&_textarea]:caret-transparent"
         ref={containerRef}
       />
-      {loadError ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-bg-app px-4 text-center text-sm text-danger-text">
-          Terminal renderer failed to load. Refresh the window and try again.
-          <span className="sr-only"> {loadError}</span>
-        </div>
-      ) : null}
+      <TerminalRendererStateOverlay
+        errorMessage={loadError}
+        loading={loading && !loadError}
+      />
     </div>
   );
 });
