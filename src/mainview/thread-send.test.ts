@@ -386,6 +386,71 @@ describe("optimistic thread send helpers", () => {
     ]);
   });
 
+  it("preserves draft-scoped text and images when the selected Thread is already working", async () => {
+    resetChatComposerImageAttachmentStoreForTest();
+    const draftKey = "thread:17";
+    const sendCalls: unknown[] = [];
+    let chatError = "existing error";
+    let isSending = false;
+
+    setChatComposerDraft("Please wait", draftKey);
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 8,
+          data: "iVBORw0KGgo=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      draftKey,
+    );
+
+    sendThreadTurn({
+      activeCodexModel: "openai:gpt-5.4",
+      codexModels: [
+        {
+          id: "openai:gpt-5.4",
+          label: "GPT-5.4",
+          supportsImageInput: true,
+        } as unknown as RpcModelOption,
+      ],
+      draftKey,
+      initialChatInput: "",
+      isSending: false,
+      optimisticThreadMessageIdRef: { current: -1 },
+      procedures: {
+        sendThreadMessage: async (params) => {
+          sendCalls.push(params);
+          return threadDetail(params.threadId);
+        },
+      },
+      selectedThread: threadDetail(17).thread,
+      selectedThreadDetailRefreshKeyRef: { current: null },
+      selectedThreadIdRef: { current: 17 },
+      selectedThreadIsWorking: true,
+      selectedThreadRunStateRef: { current: "working" },
+      setChatError: (value) => {
+        chatError = typeof value === "function" ? value(chatError) : value;
+      },
+      setIsSending: (value) => {
+        isSending = typeof value === "function" ? value(isSending) : value;
+      },
+      setThreadMessages: () => {},
+      upsertThread: () => {},
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sendCalls).toEqual([]);
+    expect(chatError).toBe("existing error");
+    expect(readChatComposerDraft("", draftKey)).toBe("Please wait");
+    expect(readChatComposerImageAttachments(draftKey)).toHaveLength(1);
+    expect(isSending).toBeFalse();
+  });
+
   it("rejects image sends for models without image input support before calling the RPC", async () => {
     resetChatComposerImageAttachmentStoreForTest();
     const draftKey = "thread:17";
