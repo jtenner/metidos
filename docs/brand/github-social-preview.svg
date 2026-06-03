@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+	<title id="title">Metidos GitHub social preview image</title>
+	<desc id="desc">A safe generated social preview for Metidos with terminal-inspired panels and no private data.</desc>
+	<rect width="1280" height="640" fill="#0a0b0c" />
+	<path d="M0 40h1280M0 80h1280M0 120h1280M0 160h1280M0 200h1280M0 240h1280M0 280h1280M0 320h1280M0 360h1280M0 400h1280M0 440h1280M0 480h1280M0 520h1280M0 560h1280M0 600h1280M40 0v640M80 0v640M120 0v640M160 0v640M200 0v640M240 0v640M280 0v640M320 0v640M360 0v640M400 0v640M440 0v640M480 0v640M520 0v640M560 0v640M600 0v640M640 0v640M680 0v640M720 0v640M760 0v640M800 0v640M840 0v640M880 0v640M920 0v640M960 0v640M1000 0v640M1040 0v640M1080 0v640M1120 0v640M1160 0v640M1200 0v640M1240 0v640" stroke="#111418" stroke-width="1" />
+	<circle cx="1000" cy="214" r="220" fill="#7e57ff" opacity="0.12" />
+	<circle cx="1086" cy="320" r="170" fill="#49c2ff" opacity="0.1" />
+	<rect x="88" y="72" width="1096" height="496" rx="0" fill="#121417" stroke="#40464e" stroke-width="3" />
+	<g aria-hidden="true">
+		<rect x="136" y="128" width="430" height="288" fill="#0d0f12" stroke="#343a42" stroke-width="2" />
+		<rect x="136" y="128" width="430" height="48" fill="#1d2025" />
+		<circle cx="174" cy="154" r="8" fill="#ff5f57" />
+		<circle cx="208" cy="154" r="8" fill="#ffbd2e" />
+		<circle cx="242" cy="154" r="8" fill="#27c93f" />
+		<path d="M188 238h54v18h-54zm54 18h18v18h-18zm-54 18h54v18h-54z" fill="#49c2ff" />
+		<rect x="292" y="240" width="166" height="16" fill="#7e57ff" />
+		<rect x="292" y="288" width="228" height="16" fill="#a8afb9" />
+		<rect x="292" y="334" width="176" height="16" fill="#a8afb9" />
+		<rect x="638" y="132" width="374" height="76" fill="#15181d" stroke="#363c44" stroke-width="2" />
+		<rect x="638" y="236" width="446" height="76" fill="#15181d" stroke="#363c44" stroke-width="2" />
+		<rect x="638" y="340" width="330" height="76" fill="#15181d" stroke="#363c44" stroke-width="2" />
+		<rect x="668" y="160" width="54" height="16" fill="#7e57ff" />
+		<rect x="744" y="160" width="218" height="16" fill="#a8afb9" />
+		<rect x="668" y="264" width="54" height="16" fill="#49c2ff" />
+		<rect x="744" y="264" width="284" height="16" fill="#a8afb9" />
+		<rect x="668" y="368" width="54" height="16" fill="#49c2ff" />
+		<rect x="744" y="368" width="176" height="16" fill="#a8afb9" />
+	</g>
+	<text x="136" y="500" fill="#f2f4f8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="92" font-weight="800" letter-spacing="-2">Metidos</text>
+	<text x="142" y="556" fill="#a8afb9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="30" font-weight="700" letter-spacing="1.1">Local command center for AI coding agents</text>
+</svg>

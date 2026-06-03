@@ -13,6 +13,8 @@ This folder is the public-readiness home for Metidos brand asset guidance. Keep 
 | `src/mainview/pixel-crown.png` | Mainview app artwork | PNG artwork from the initial open-source snapshot. Provenance is still pending maintainer confirmation. | Do not treat as public-ready until `docs/public-asset-provenance-audit-2026-06-02.md` is resolved or the asset is replaced/removed. |
 | `docs/images/readme-hero-demo.svg` | README/demo image | Repo-owned generated SVG with fake/demo data only. | Safe to redistribute. |
 | `docs/images/readme-feature-tour.svg` | README/demo image | Repo-owned generated SVG with fake/demo data only. | Safe to redistribute. |
+| `docs/brand/github-social-preview.svg` | GitHub social preview source image | Repo-owned generated 1280×640 SVG using only text, shapes, and project colors. No external artwork or private data. | Safe to redistribute and upload in GitHub repository settings. |
+| `website/og.svg` / `website/og.png` | Website Open Graph preview source/export | Repo-owned generated 1200×630 preview using only text, shapes, and website color tokens. | Safe to redistribute; keep separate from the GitHub social preview unless website metadata changes. |
 
 The canonical tracked-asset audit is `docs/public-asset-provenance-audit-2026-06-02.md`. Update that audit first when asset ownership or redistribution status changes, then mirror durable brand guidance here if the asset remains part of the project identity.
 
@@ -30,4 +32,4 @@ For each new logo, mascot, icon, social preview, or screenshot asset:
 
 - Confirm or replace the shared bird mascot before publishing the repository.
 - Confirm, replace, or remove `src/mainview/pixel-crown.png` before publishing the repository.
-- Add a final GitHub social preview and Open Graph image only after the safe, repo-owned brand artwork set is decided.
+- Upload `docs/brand/github-social-preview.svg` as the GitHub social preview when repository settings are prepared for publication.
