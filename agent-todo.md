@@ -24,7 +24,11 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 8. Visual Assets
 
-- [ ] Add or polish logo files in appropriate source and export formats.
+- [ ] Add or polish logo files in appropriate source and export formats. Current blocker clarified 2026-06-03: repo already has generated source/export icon assets for the website (`website/favicon.svg`, `website/app-icon.svg`) and generated preview assets (`website/og.svg`, `website/og.png`, `docs/brand/github-social-preview.svg`), but no canonical app/product logo requirement is recorded beyond the pending bird/crown artwork provenance decisions. Remaining 3-minute slices:
+  - [ ] Decide whether the canonical public logo should be the generated terminal-prompt mark, the bird mascot, the crown artwork, or a new asset; record the decision in the relevant visual/provenance docs.
+  - [ ] If the generated terminal-prompt mark is canonical, document required source/export paths and mark this logo task complete after confirming `website/favicon.svg` and `website/app-icon.svg` are sufficient.
+  - [ ] If the bird mascot or crown artwork is canonical, complete the corresponding artwork provenance task first, then add any missing source/export files.
+  - [ ] If a new logo is required, add a repo-owned source file plus public exports, update the asset provenance audit, and wire only the approved exports into README/website/app metadata.
 - [ ] Add or polish mascot/icon files if they are part of the project identity.
 - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided. Current blocker clarified 2026-06-03: no final public website URL is recorded yet. Known placeholders are in `website/index.html` (`og:url`, `og:image`, `twitter:image`) and `website/README.md` still lists the go-live reminder. Remaining 3-minute slices:
   - [ ] Choose or record the final public website URL (for example the deployed Pages/static-host URL) in the relevant GitHub/publication notes.
