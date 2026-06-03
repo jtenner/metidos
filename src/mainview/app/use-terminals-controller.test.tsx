@@ -4,6 +4,7 @@ import {
   buildCreateTerminalRequest,
   chatDraftStorageKey,
   loadVisibleTerminalsForUser,
+  resolveInteractionModeAfterTerminalRefresh,
   resolveSelectedTerminalId,
 } from "./use-terminals-controller";
 
@@ -81,6 +82,24 @@ describe("terminal controller helpers", () => {
       loadVisibleTerminalsForUser({ isAdmin: true, listTerminals }),
     ).resolves.toEqual(terminals);
     expect(listCalls).toBe(1);
+  });
+
+  it("keeps terminal mode after refresh when fake terminal sessions remain", () => {
+    expect(
+      resolveInteractionModeAfterTerminalRefresh({
+        interactionMode: "terminal",
+        terminals: [terminal("terminal-a")],
+      }),
+    ).toBe("terminal");
+  });
+
+  it("returns to chat mode after refresh when no terminal sessions remain", () => {
+    expect(
+      resolveInteractionModeAfterTerminalRefresh({
+        interactionMode: "terminal",
+        terminals: [],
+      }),
+    ).toBe("chat");
   });
 
   it("blocks terminal create requests for non-admin users", () => {

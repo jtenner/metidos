@@ -97,6 +97,19 @@ export async function loadVisibleTerminalsForUser({
   return await listTerminals(undefined, { priority: "background" });
 }
 
+export function resolveInteractionModeAfterTerminalRefresh({
+  interactionMode,
+  terminals,
+}: {
+  interactionMode: InteractionMode;
+  terminals: RpcTerminal[];
+}): InteractionMode {
+  if (terminals.length === 0 && interactionMode === "terminal") {
+    return "chat";
+  }
+  return interactionMode;
+}
+
 export function buildCreateTerminalRequest({
   activeProjectId,
   activeThreadId,
@@ -210,13 +223,17 @@ export function useTerminalsController({
 
   useEffect(() => {
     void refreshTerminals().then((result) => {
-      if (
-        mountedRef.current &&
-        result.length === 0 &&
-        readInteractionMode() === "terminal"
-      ) {
-        setInteractionModeState("chat");
-        writeInteractionMode("chat");
+      if (!mountedRef.current) {
+        return;
+      }
+      const currentInteractionMode = readInteractionMode();
+      const nextInteractionMode = resolveInteractionModeAfterTerminalRefresh({
+        interactionMode: currentInteractionMode,
+        terminals: result,
+      });
+      if (nextInteractionMode !== currentInteractionMode) {
+        setInteractionModeState(nextInteractionMode);
+        writeInteractionMode(nextInteractionMode);
       }
     });
   }, [refreshTerminals]);
