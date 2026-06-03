@@ -39,7 +39,8 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 9. Product Hardening
 
-- [ ] Verify project creation, opening, closing, and error handling work from a clean setup.
+- [ ] Verify project creation, opening, closing, and error handling work from a clean setup. Context: `docs/project-lifecycle-smoke-plan-2026-06-03.md` now defines a disposable Project lifecycle smoke covering add/open/reload/remove/re-add, Worktree context, invalid/missing/non-Git/file-path errors, teardown, and sanitized evidence requirements. Remaining 3-minute slice:
+  - [ ] Run the smoke plan against a disposable App Data/profile and fake/demo repository, then commit sanitized evidence with exact OS, browser, Bun version, commands, pass/fail status, Project/Worktree labels, invalid-path error summaries, stop method, teardown, and any documentation/UI/Backend corrections.
 - [ ] Verify Git worktree listing, opening, switching, and failure states work with small and realistic repositories.
 - [ ] Verify agent thread creation, monitoring, stopping, and resuming behavior.
 - [ ] Verify diff review with small diffs, large diffs, binary files, deleted files, renamed files, and conflict-like scenarios.
