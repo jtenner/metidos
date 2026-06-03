@@ -999,18 +999,42 @@ describe("auth route HTTP security", () => {
       throw new Error("Expected setup test to provide a TOTP secret");
     }
 
-    const csrfToken = await issueCsrfToken();
-    const response = await handleAuthRequestForTest(
-      new Request("http://127.0.0.1:7599/auth/reset-pin", {
-        body: JSON.stringify({
-          newPin: "719204",
-          totpCode: await generateFreshTotpCode(totpSecret),
+    const closedSessions: unknown[] = [];
+    const closedUsers: Array<{
+      options: { terminateTerminalPtys?: boolean };
+      reason: string;
+      userId: number;
+    }> = [];
+    let threadShutdownCount = 0;
+    setAuthRouteSideEffectHooksForTest({
+      closeWebSocketsForSession: (...args) => {
+        closedSessions.push(args);
+      },
+      closeWebSocketsForUser: (userId, reason, options) => {
+        closedUsers.push({ options, reason, userId });
+      },
+      shutdownActiveThreadTurns: () => {
+        threadShutdownCount += 1;
+      },
+    });
+
+    let response: Response | null = null;
+    try {
+      const csrfToken = await issueCsrfToken();
+      response = await handleAuthRequestForTest(
+        new Request("http://127.0.0.1:7599/auth/reset-pin", {
+          body: JSON.stringify({
+            newPin: "719204",
+            totpCode: await generateFreshTotpCode(totpSecret),
+          }),
+          headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
+          method: "POST",
         }),
-        headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
-        method: "POST",
-      }),
-      buildAuthServer(),
-    );
+        buildAuthServer(),
+      );
+    } finally {
+      setAuthRouteSideEffectHooksForTest(null);
+    }
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
@@ -1019,6 +1043,15 @@ describe("auth route HTTP security", () => {
       status: { authenticated: false },
     });
     expectClearedAuthCookies(response);
+    expect(closedSessions).toEqual([]);
+    expect(closedUsers).toEqual([
+      {
+        options: { terminateTerminalPtys: true },
+        reason: "Authenticated sessions were revoked.",
+        userId: 1,
+      },
+    ]);
+    expect(threadShutdownCount).toBe(1);
 
     const statusResponse = await handleAuthRequestForTest(
       new Request("http://127.0.0.1:7599/auth/status", {
@@ -1057,18 +1090,42 @@ describe("auth route HTTP security", () => {
       throw new Error("Expected setup test to provide a TOTP secret");
     }
 
-    const csrfToken = await issueCsrfToken();
-    const response = await handleAuthRequestForTest(
-      new Request("http://127.0.0.1:7599/auth/reset-password", {
-        body: JSON.stringify({
-          newPassword: "correct horse battery staple",
-          totpCode: await generateFreshTotpCode(totpSecret),
+    const closedSessions: unknown[] = [];
+    const closedUsers: Array<{
+      options: { terminateTerminalPtys?: boolean };
+      reason: string;
+      userId: number;
+    }> = [];
+    let threadShutdownCount = 0;
+    setAuthRouteSideEffectHooksForTest({
+      closeWebSocketsForSession: (...args) => {
+        closedSessions.push(args);
+      },
+      closeWebSocketsForUser: (userId, reason, options) => {
+        closedUsers.push({ options, reason, userId });
+      },
+      shutdownActiveThreadTurns: () => {
+        threadShutdownCount += 1;
+      },
+    });
+
+    let response: Response | null = null;
+    try {
+      const csrfToken = await issueCsrfToken();
+      response = await handleAuthRequestForTest(
+        new Request("http://127.0.0.1:7599/auth/reset-password", {
+          body: JSON.stringify({
+            newPassword: "correct horse battery staple",
+            totpCode: await generateFreshTotpCode(totpSecret),
+          }),
+          headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
+          method: "POST",
         }),
-        headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
-        method: "POST",
-      }),
-      buildAuthServer(),
-    );
+        buildAuthServer(),
+      );
+    } finally {
+      setAuthRouteSideEffectHooksForTest(null);
+    }
 
     expect(response).not.toBeNull();
     expect(response?.status).toBe(200);
@@ -1077,6 +1134,15 @@ describe("auth route HTTP security", () => {
       status: { authenticated: false },
     });
     expectClearedAuthCookies(response);
+    expect(closedSessions).toEqual([]);
+    expect(closedUsers).toEqual([
+      {
+        options: { terminateTerminalPtys: true },
+        reason: "Authenticated sessions were revoked.",
+        userId: 1,
+      },
+    ]);
+    expect(threadShutdownCount).toBe(1);
 
     const statusResponse = await handleAuthRequestForTest(
       new Request("http://127.0.0.1:7599/auth/status", {
