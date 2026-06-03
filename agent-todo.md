@@ -84,7 +84,9 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] After the repository is public, or after a public-like test pull request is available, confirm a pull request and a push to `master` create the expected public Actions runs and record pass/fail evidence.
   - [ ] If public runs fail, update the workflow or installation documentation with the exact failure mode and remediation.
 - [ ] Confirm branch protection or rulesets are enabled for the default branch. Context: `docs/github-required-checks-review-2026-06-03.md` documents the checked-in workflow/job names and recommends selecting required checks from GitHub's presented check list once branch protection/rulesets are available; at minimum require the `CI` workflow's `Validate` job.
-- [ ] Confirm Discussions are enabled only if the project intends to support them.
+- [ ] Confirm Discussions are enabled only if the project intends to support them. Context: `docs/github-discussions-setting-review-2026-06-03.md` records that `gh repo view --json nameWithOwner,hasDiscussionsEnabled,visibility` observed Discussions enabled on the private repo, and that `SUPPORT.md` is compatible with either Discussions or documentation issues. Remaining 3-minute slices:
+  - [ ] Decide whether the public launch will actively support GitHub Discussions as a monitored usage-question channel, or disable Discussions for launch and rely on documentation issues.
+  - [ ] After the decision, update GitHub settings if needed and adjust `SUPPORT.md` only if the chosen support path needs clearer wording.
 - [ ] Confirm private security reporting is configured if available for the repository.
 - [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
 
