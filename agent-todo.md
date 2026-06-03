@@ -133,16 +133,3 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Confirm private security reporting is enabled, or record why `SECURITY.md` is the intended fallback if the setting is unavailable.
   - [ ] After publication, re-check repository visibility, forking, Actions permissions, fork PR approval behavior, and public CI runs.
 
-## 14. Backend Audit Follow-up: `src/bun` Bugs, Security Findings, and Threat-Model Clarifications
-
-For every item in this section: inspect the referenced code, decide whether the audit note is a real bug/security issue or an expected threat-model/design tradeoff, then either fix it with tests or add/adjust code comments and/or docs so future auditors understand why the behavior is safe. Mark an item complete only after the codebase itself contains the fix, regression test, or clarifying comment/docs.
-
-### Auth and session follow-up
-
-### Authorization and capability follow-up
-
-
-### HTTP and RPC transport follow-up
-
-### Miscellaneous backend hardening follow-up
-
