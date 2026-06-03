@@ -28,6 +28,12 @@ Before making the repository public, choose one of these outcomes:
 1. Keep Discussions enabled and treat them as the primary place for usage questions. Record who monitors them and how often.
 2. Disable Discussions for the initial public launch and rely on documentation issues for usage questions until the project is ready for another support channel.
 
+## Maintainer question to resolve the blocker
+
+For public launch, should GitHub Discussions be actively monitored for usage questions, or should Discussions be disabled and usage questions routed to documentation issues only?
+
+If Discussions stay enabled, record the owner or role responsible for monitoring them and the expected review cadence here. If Discussions are disabled, no repository documentation change is required unless the fallback wording in `SUPPORT.md` should be made stronger.
+
 ## Acceptance decision
 
-This checklist slice is not fully complete because the setting was inspected, but maintainer intent is still unrecorded. The remaining action is a repository-setting/product-support decision, not a code change.
+This checklist slice is not fully complete because the setting was inspected, but maintainer intent is still unrecorded. The remaining action is a repository-setting/product-support decision, not a code change. The next actionable slice is to answer the maintainer question above and either record the monitoring plan or disable Discussions in GitHub settings.
