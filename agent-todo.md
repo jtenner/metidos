@@ -82,7 +82,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Confirm Discussions are enabled only if the project intends to support them.
 - [ ] Confirm GitHub Wiki is disabled unless intentionally used.
 - [ ] Confirm private security reporting is configured if available for the repository.
-- [ ] Confirm default branch naming is intentional and documented where needed.
 - [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
 
 ## 12. Final Pre-Public Checklist
