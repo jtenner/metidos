@@ -21,12 +21,13 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify backup and restore paths are documented and tested.
 - [ ] Verify installation failure paths do not leave behind confusing or unsafe partial state.
 
-## 8. Visual Assets and Repo-Hosted Website
+## 8. Visual Assets
 
 - [ ] Add or polish logo files in appropriate source and export formats.
 - [ ] Add or polish mascot/icon files if they are part of the project identity.
 - [ ] Add a GitHub social preview image using safe, repo-owned assets.
-- [ ] Add an Open Graph image for the website if the website lives in the repository.
+- [ ] Add an Open Graph image for the website using safe, repo-owned assets.
+- [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
 - [ ] Add README screenshots with fake/demo data only.
 - [ ] Add feature screenshots for project/worktree view using fake/demo data only.
 - [ ] Add feature screenshots for agent threads using fake/demo data only.
@@ -35,9 +36,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Add feature screenshots for plugin administration using fake/demo data only.
 - [ ] Add feature screenshots for settings/provider setup using fake/demo data only.
 - [ ] Ensure all screenshots hide usernames, hostnames, tokens, internal repositories, local paths, private branches, and real customer/user data.
-- [ ] Polish the repo-hosted website home page in `website/index.html`. Context: the home page already exists with hero, feature, permissions/plugin, and CTA sections. Remaining 3-minute slices:
-  - [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
-  - [ ] Verify all home-page CTAs point to existing public repository/docs paths after the final org/repo and docs locations are decided.
 
 ## 9. Product Hardening
 
