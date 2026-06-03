@@ -59,6 +59,10 @@ The Diff Review demo is generated from fake file names, fake branches, and synth
 
 The Plugin Administration demo is generated from fake plugin names, fake permissions, fake settings state, and synthetic review controls only. It shows review-first approval, access groups, settings, reset-data, and disable states without exposing private paths, usernames, hostnames, tokens, real repositories, private branches, or customer/user data.
 
+![Metidos provider settings demo showing fake provider setup state and generated credential-safety controls](docs/images/feature-provider-settings-demo.svg)
+
+The Provider Settings demo is generated from fake provider names, fake model IDs, loopback-only demo endpoints, and synthetic credential-safety controls only. It shows local, plugin-backed, and fake-provider first-run setup states without exposing private paths, usernames, hostnames, tokens, real repositories, private branches, or customer/user data.
+
 ![Metidos cron workspace demo showing fake schedules, safe-mode status, and sanitized run history](docs/images/feature-cron-workspace-demo.svg)
 
 The Cron Workspace demo is generated from fake schedules, fake project names, fake worktree paths, synthetic run outcomes, and safe-mode status examples only. It shows schedule review, run-now, edit, disable, and recent-run states without exposing private paths, usernames, hostnames, tokens, real repositories, private branches, or customer/user data.
