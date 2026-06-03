@@ -40,18 +40,21 @@ Add tests covering:
 
 Acceptance criteria: tests mock RPC calls and websocket invalidation events, assert no real cron jobs are created, and verify both successful and failed mutation paths.
 
-### 3. Terminal workspace safety and local-operator affordances
+### 3. Terminal workspace safety and local-operator affordances — closed 2026-06-03
 
 Relevant modules include `src/mainview/app/terminal-workspace.tsx` and `src/mainview/app/use-terminals-controller.ts`.
 
-Add tests covering:
+This gap is covered by `src/mainview/app/terminal-workspace.test.tsx` and `src/mainview/app/use-terminals-controller.test.tsx`. The completed coverage uses fake terminal session payloads and verifies:
 
-- Empty, loading, connected, disconnected, and failed terminal session states.
-- Unsafe/local-operator warnings remaining visible next to terminal actions.
-- Terminal selection and refresh behavior when sessions are created, removed, or fail to load.
-- Output controls not exposing hidden/private command data in summaries.
+- No-worktree and enabled empty states, including disabled/enabled create affordances.
+- Renderer loading and failed states through a static seam that does not load `ghostty-web`.
+- Starting, running, closing, exited, and error status summaries for terminal rows.
+- Unsafe/local-operator warnings next to terminal actions.
+- Terminal selection fallback/clearing and mode refresh behavior when sessions remain or disappear.
+- Output summaries do not expose mocked command/output data.
+- Non-admin users cannot list or build create requests for terminals, while admin requests are constructed from fake payloads.
 
-Acceptance criteria: tests use fake terminal session payloads and assert warnings/error text are specific enough for a public contributor to understand next steps.
+Acceptance criteria status: closed; future terminal test work should be filed as a specific regression or feature gap rather than as this broad audit item.
 
 ### 4. Thread composer/controller flows around permissions, attachments, and turn lifecycle
 
