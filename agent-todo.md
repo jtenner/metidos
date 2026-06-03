@@ -102,7 +102,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Working-tree and Git-history secret scans are completed and findings are resolved.
 - [ ] README is updated and accurate.
 - [ ] Install docs are tested on a clean machine or container.
-- [ ] Roadmap and project status are clear.
 - [ ] Screenshots and visual assets are safe, owned, and license-compatible.
 - [ ] First release draft is prepared.
 - [ ] Known limitations are documented.
