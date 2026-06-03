@@ -16,7 +16,10 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Test clean install on a fresh machine or disposable container and record the exact OS, Bun version, commands, and outcome.
 - [ ] Verify `bun run start` works from a clean clone after documented setup only.
 - [ ] Verify local auth setup and reset flow are documented and work as described.
-- [ ] Verify missing dependencies produce readable errors with next-step guidance.
+- [ ] Verify missing dependencies produce readable errors with next-step guidance. Current blocker discovered 2026-06-02: local `bun --version` prints `1.3.13` while the working tree `package.json` declares `bun@1.3.14`, so install/failure-path smoke evidence should not be refreshed until the runtime matches the repository requirement. Remaining 3-minute slices:
+  - [ ] Install or select Bun `1.3.14`, then re-run `bun --version` and `node -e "const p=require('./package.json'); console.log(p.packageManager)"` and record matching output.
+  - [ ] Re-read the existing install failure-path smoke docs under `docs/install-failure-path-*-smoke-2026-06-02.md` and confirm they still cover missing Bun, missing/minimal `.env`, unwritable App Data, main port conflict, and missing generated Mainview assets.
+  - [ ] If the smoke docs still match current behavior, remove this TODO; otherwise add a narrow follow-up for the failing path with the exact command, observed message, and expected next-step guidance.
 - [ ] Verify backup and restore paths are documented and tested.
 - [ ] Verify installation failure paths do not leave behind confusing or unsafe partial state.
 
