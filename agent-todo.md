@@ -104,7 +104,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Install docs are tested on a clean machine or container.
 - [ ] Screenshots and visual assets are safe, owned, and license-compatible.
 - [ ] First release draft is prepared.
-- [ ] Known limitations are documented.
 - [ ] Public repository settings have been reviewed.
 - [ ] No external social media, launch-posting, newsletter, Discord, Product Hunt, Hacker News, Reddit, LinkedIn, YouTube promotion, or other off-repo marketing tasks are included in this checklist.
 

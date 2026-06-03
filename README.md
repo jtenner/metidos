@@ -105,6 +105,7 @@ Useful reference docs:
 - [`docs/security-model.md`](docs/security-model.md) — Local Auth, secrets, Plugins, filesystem, network, backups, and safe issue reporting.
 - [`docs/plugin-system.md`](docs/plugin-system.md) — Plugin System v1 overview.
 - [`docs/development.md`](docs/development.md) — contributor workflow, validation, and debugging.
+- [`docs/known-limitations.md`](docs/known-limitations.md) — current pre-1.0 product, launch-readiness, and operations limitations.
 - [`SUPPORT.md`](SUPPORT.md), [`SECURITY.md`](SECURITY.md), and [`ROADMAP.md`](ROADMAP.md) — support, disclosure, and project direction.
 
 ## Repository map

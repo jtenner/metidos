@@ -32,6 +32,7 @@ This directory contains the public operator and contributor documentation for Me
 - [Development](./development.md) — local dev setup, validation, tests, style, docs workflow, and debugging.
 - [Release process](./release-process.md) — versioning, changelog, tagging, release notes, validation, and rollback expectations.
 - [Repository publication checklist](./repository-publication-checklist.md) — GitHub metadata, public-readiness, safety, and repository settings checklist.
+- [Known limitations](./known-limitations.md) — current pre-1.0 product, launch-readiness, and operations limitations.
 - [Glossary](./glossary.md) — canonical terms for projects, worktrees, threads, diffs, cron jobs, plugins, providers, approvals, and unsafe mode.
 
 ## Community and governance
