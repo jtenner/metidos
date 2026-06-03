@@ -31,6 +31,7 @@ let authenticatedSessionCookie: string | null = null;
 let configuredTotpSecret: string | null = null;
 let initialRecoveryCode: string | null = null;
 let handleAuthRequestForTest: typeof import("../index").handleAuthRequestForTest;
+let setAuthRouteSideEffectHooksForTest: typeof import("../index").setAuthRouteSideEffectHooksForTest;
 let totpClockMs = Date.parse("2026-06-02T20:30:00.000Z");
 
 function buildAuthServer(
@@ -185,10 +186,12 @@ beforeAll(async () => {
   resetResolvedAppDataDirectory();
   appDataDir = mkdtempSync(join(tmpdir(), "metidos-auth-routes-"));
   process.env.METIDOS_APP_DATA_DIR = appDataDir;
-  ({ handleAuthRequestForTest } = await import("../index"));
+  ({ handleAuthRequestForTest, setAuthRouteSideEffectHooksForTest } =
+    await import("../index"));
 });
 
 afterAll(() => {
+  setAuthRouteSideEffectHooksForTest?.(null);
   setSystemTime();
   closeAppDatabase();
   resetResolvedAppDataDirectory();
@@ -1174,5 +1177,65 @@ describe("auth route HTTP security", () => {
         ticketId: webSocketTicketId ?? "",
       }),
     ).toThrow(AuthServiceError);
+  });
+
+  it("closes only websocket contexts for the logged-out session", async () => {
+    const loggedOutSessionCookie = await loginWithTotp(
+      "correct horse battery staple",
+    );
+    const retainedSessionCookie = await loginWithTotp(
+      "correct horse battery staple",
+    );
+    const loggedOutSessionId = loggedOutSessionCookie.split("=")[1] ?? "";
+    const retainedSessionId = retainedSessionCookie.split("=")[1] ?? "";
+    expect(loggedOutSessionId).toBeTruthy();
+    expect(retainedSessionId).toBeTruthy();
+    expect(loggedOutSessionId).not.toBe(retainedSessionId);
+
+    const closedSessions: Array<{ reason: string; sessionId: string }> = [];
+    const closedUsers: unknown[] = [];
+    let threadShutdownCount = 0;
+    setAuthRouteSideEffectHooksForTest({
+      closeWebSocketsForSession: (sessionId, reason) => {
+        closedSessions.push({ reason, sessionId });
+      },
+      closeWebSocketsForUser: (...args) => {
+        closedUsers.push(args);
+      },
+      shutdownActiveThreadTurns: () => {
+        threadShutdownCount += 1;
+      },
+    });
+
+    try {
+      const logoutCsrfToken = await issueCsrfToken();
+      const response = await handleAuthRequestForTest(
+        new Request("http://127.0.0.1:7599/auth/logout", {
+          body: JSON.stringify({}),
+          headers: buildCsrfHeaders(logoutCsrfToken, [loggedOutSessionCookie]),
+          method: "POST",
+        }),
+        buildAuthServer(),
+      );
+
+      expect(response?.status).toBe(200);
+      await expect(response?.json()).resolves.toMatchObject({
+        ok: true,
+        status: { authenticated: false },
+      });
+      expect(closedSessions).toEqual([
+        {
+          reason: "Authenticated session logged out.",
+          sessionId: loggedOutSessionId,
+        },
+      ]);
+      expect(closedSessions).not.toContainEqual(
+        expect.objectContaining({ sessionId: retainedSessionId }),
+      );
+      expect(closedUsers).toEqual([]);
+      expect(threadShutdownCount).toBe(0);
+    } finally {
+      setAuthRouteSideEffectHooksForTest(null);
+    }
   });
 });

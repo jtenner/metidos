@@ -651,7 +651,31 @@ function revalidateAuthenticatedWebSocketSession<
   return false;
 }
 
+type AuthRouteSideEffectHooks = {
+  closeWebSocketsForSession?: (sessionId: string, reason: string) => void;
+  closeWebSocketsForUser?: (
+    userId: number,
+    reason: string,
+    options: { terminateTerminalPtys?: boolean },
+  ) => void;
+  shutdownActiveThreadTurns?: () => Promise<void> | void;
+};
+
+let authRouteSideEffectHooks: AuthRouteSideEffectHooks | null = null;
+
+export function setAuthRouteSideEffectHooksForTest(
+  hooks: AuthRouteSideEffectHooks | null,
+): void {
+  authRouteSideEffectHooks = hooks;
+}
+
 function closeWebSocketsForSession(sessionId: string, reason: string): void {
+  const testHook = authRouteSideEffectHooks?.closeWebSocketsForSession;
+  if (testHook) {
+    testHook(sessionId, reason);
+    return;
+  }
+
   const rpcClosedCount = rpcTransport.closeSession(sessionId, reason);
   const terminalClosedCount = terminalManager.closeSocketsForSession(
     sessionId,
@@ -671,6 +695,12 @@ function closeWebSocketsForUser(
   reason: string,
   options: { terminateTerminalPtys?: boolean } = {},
 ): void {
+  const testHook = authRouteSideEffectHooks?.closeWebSocketsForUser;
+  if (testHook) {
+    testHook(userId, reason, options);
+    return;
+  }
+
   const rpcClosedCount = rpcTransport.closeUser(userId, reason);
   const terminalClosedCount = terminalManager.closeSocketsForUser(
     userId,
@@ -685,6 +715,15 @@ function closeWebSocketsForUser(
     terminateTerminalPtys: options.terminateTerminalPtys === true,
     userId,
   });
+}
+
+async function shutdownActiveThreadTurnsForAuthReset(): Promise<void> {
+  const testHook = authRouteSideEffectHooks?.shutdownActiveThreadTurns;
+  if (testHook) {
+    await testHook();
+    return;
+  }
+  await shutdownActiveThreadTurns();
 }
 
 const rpcHandlers = createBackendRpcHandlers({
@@ -1999,7 +2038,7 @@ export async function handleAuthRequestForTest(
       // Pi thread runtimes are owned by the single persisted local operator, not
       // individual browser sessions, so a primary-factor reset aborts all active
       // thread turns to provide an explicit process-containment boundary.
-      await shutdownActiveThreadTurns();
+      await shutdownActiveThreadTurnsForAuthReset();
 
       const headers = new Headers();
       appendAllClearedSessionCookies(headers);
@@ -2055,7 +2094,7 @@ export async function handleAuthRequestForTest(
       // Pi thread runtimes are owned by the single persisted local operator, not
       // individual browser sessions, so a primary-factor reset aborts all active
       // thread turns to provide an explicit process-containment boundary.
-      await shutdownActiveThreadTurns();
+      await shutdownActiveThreadTurnsForAuthReset();
 
       const headers = new Headers();
       appendAllClearedSessionCookies(headers);
