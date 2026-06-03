@@ -15,6 +15,7 @@ import type {
   RpcPluginSettingsSnapshot,
 } from "../../bun/rpc-schema";
 import {
+  PluginInventorySection,
   PluginSettingsGroup,
   UserIngressSourcesSection,
   pluginSettingListItemKeys,
@@ -24,6 +25,11 @@ import {
   defaultIngressRouteAccess,
   pluginIngressLinkCodeKey,
 } from "./plugin-ingress-route-state";
+import {
+  pluginActionFeedbackState,
+  pluginLifecycleActionButtonState,
+  pluginLifecycleActionKey,
+} from "./plugin-lifecycle-action-state";
 import {
   loadPluginSettingsStateForInventory,
   retryPendingPluginStepUpAction,
@@ -478,6 +484,48 @@ describe("plugin administration panel", () => {
     ]);
     expect(updatedSnapshots).toEqual({
       [plugin.directoryName]: updatedSnapshot,
+    });
+  });
+
+  it("renders plugin refresh state and resolves lifecycle feedback state for admin flows", () => {
+    const plugin = buildPluginInventoryPlugin();
+    const inventory = buildPluginInventory([plugin]);
+    const disableKey = pluginLifecycleActionKey(plugin, "disable");
+    const markup = renderToStaticMarkup(
+      <PluginInventorySection
+        error=""
+        inventory={inventory}
+        isAdmin={true}
+        loading={true}
+        onRefresh={() => {}}
+      />,
+    );
+
+    expect(markup).toContain("Refreshing…");
+    expect(markup).toContain('disabled=""');
+    expect(
+      pluginLifecycleActionButtonState({
+        action: "disable",
+        actionLoadingKey: disableKey,
+        isAdmin: true,
+        plugin,
+      }),
+    ).toMatchObject({
+      busy: true,
+      disabled: true,
+      key: disableKey,
+      label: "Working...",
+    });
+    expect(
+      pluginActionFeedbackState({
+        error: "Lifecycle action failed",
+        message: "Plugin inventory refreshed",
+      }),
+    ).toEqual({
+      error: "Lifecycle action failed",
+      hasError: true,
+      hasMessage: true,
+      message: "Plugin inventory refreshed",
     });
   });
 
