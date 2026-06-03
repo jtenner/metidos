@@ -76,8 +76,7 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Apply the recommended public repository topics from `docs/github-public-repository-topics-review-2026-06-03.md` when updating GitHub settings for publication. Context: review on 2026-06-03 found the current private-repo topics partly accurate but incomplete for discovery; `personal-assistant` should be removed unless project positioning changes.
 - [ ] Confirm the social preview image is uploaded and renders correctly.
 - [ ] Confirm CI runs publicly on pull requests and pushes without private secrets.
-- [ ] Confirm branch protection or rulesets are enabled for the default branch.
-- [ ] Confirm required checks match the actual CI workflow names.
+- [ ] Confirm branch protection or rulesets are enabled for the default branch. Context: `docs/github-required-checks-review-2026-06-03.md` documents the checked-in workflow/job names and recommends selecting required checks from GitHub's presented check list once branch protection/rulesets are available; at minimum require the `CI` workflow's `Validate` job.
 - [ ] Confirm Discussions are enabled only if the project intends to support them.
 - [ ] Confirm GitHub Wiki is disabled unless intentionally used.
 - [ ] Confirm private security reporting is configured if available for the repository.
