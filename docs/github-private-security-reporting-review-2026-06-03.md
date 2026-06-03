@@ -18,10 +18,14 @@ Review whether the repository's private security reporting setting can be confir
 - Private vulnerability reporting endpoint command:
   - `gh api repos/jtenner/metidos/private-vulnerability-reporting -i`
   - Result: `404 Not Found`
+- Follow-up API recheck on 2026-06-03 at 09:12 UTC:
+  - `gh repo view jtenner/metidos --json nameWithOwner,visibility,url --jq '{nameWithOwner, visibility, url}'` still returned `visibility=PRIVATE` for `jtenner/metidos`.
+  - `gh api repos/jtenner/metidos --jq '{name:.full_name, visibility:.visibility, private:.private, security_and_analysis:.security_and_analysis}'` still returned `security_and_analysis=null`.
+  - `gh api repos/jtenner/metidos/private-vulnerability-reporting -i` still returned `HTTP/2.0 404 Not Found` with accepted OAuth scope `repo`.
 
 ## Interpretation
 
-The repository is still private, and this run could not confirm the private security reporting setting from API output. The `404 Not Found` response from the private vulnerability reporting endpoint should not be treated as launch-ready evidence that the feature is enabled; it may indicate the setting is disabled, unavailable for the current repository state/account, or not exposed through this API path for this repository.
+The repository is still private, and the initial check plus the 2026-06-03 09:12 UTC follow-up check could not confirm the private security reporting setting from API output. The `404 Not Found` response from the private vulnerability reporting endpoint should not be treated as launch-ready evidence that the feature is enabled; it may indicate the setting is disabled, unavailable for the current repository state/account, or not exposed through this API path for this repository.
 
 ## Recommendation
 
