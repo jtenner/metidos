@@ -51,6 +51,10 @@ The generated tour image uses fake project names, fake provider state, fake sche
 
 The Agent Thread demo is generated from fake prompts, fake project names, fake worktree paths, and safe-mode status examples only. It is intended for public docs and avoids real logs, provider output, local paths, hostnames, usernames, tokens, private branches, and customer/user data.
 
+![Metidos diff review demo showing fake file changes and generated review controls](docs/images/feature-diff-review-demo.svg)
+
+The Diff Review demo is generated from fake file names, fake branches, and synthetic code/documentation changes only. It shows file selection, hunk review, and keep/discard controls without exposing private paths, usernames, hostnames, tokens, real repositories, private branches, or customer/user data.
+
 ## Core concepts
 
 - **Projects** are high-level entries for one or more Worktrees.

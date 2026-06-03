@@ -36,7 +36,6 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] Choose or record the final public website URL (for example the deployed Pages/static-host URL) in the relevant GitHub/publication notes.
   - [ ] Replace `https://YOUR_DOMAIN_OR_PAGES_URL/` in `website/index.html` with the final URL, keeping `og.png` paths correct.
   - [ ] Update `website/README.md` to remove or narrow the placeholder-host go-live reminder after the real URL is checked in.
-- [ ] Add feature screenshots for diff review using fake/demo data only.
 - [ ] Add feature screenshots for cron workspace using fake/demo data only.
 - [ ] Add feature screenshots for plugin administration using fake/demo data only.
 - [ ] Add feature screenshots for settings/provider setup using fake/demo data only.
