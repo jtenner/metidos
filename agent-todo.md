@@ -68,7 +68,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify the first Project, Worktree, safe Thread, and Diff review tutorial path with a disposable demo repository. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies this as a remaining gap; use fake/demo data only.
 - [ ] Smoke backup, restore, and auth reset procedures with disposable App Data. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies these as remaining gaps; verify docs do not require private paths or secret values.
 - [ ] Smoke Docker and/or Podman install guidance in a disposable container. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies container setup as a remaining gap; record host OS, engine/version, commands, pass/fail status, first-run auth outcome, provider expectations, backup/restore notes, and teardown.
-- [ ] Dry-run or execute the installer skill workflow in an approved disposable scenario. Context: `docs/install-setup-smoke-gap-audit-2026-06-02.md` identifies `.pi/skills/metidos-installation/SKILL.md` as a remaining gap; verify it asks expected questions, emits a secret-safe `metidos-config.md`, and does not apply host changes before approval.
 
 ## 11. GitHub Public Repository Setup Notes
 
