@@ -6,6 +6,8 @@ This note covers the GitHub public repository setup checklist item to confirm wh
 
 ## Evidence
 
+### Initial review
+
 - Command run from the repository root:
   - `gh repo view --json name,description,homepageUrl,repositoryTopics,visibility,isFork,defaultBranchRef`
 - Observed repository: `jtenner/metidos`
@@ -46,6 +48,29 @@ Use this topic set when public repository settings are updated:
 
 - Remove `personal-assistant` unless the project positioning changes to include general personal-assistant behavior.
 
+## Settings update evidence
+
+On 2026-06-03, an authenticated GitHub CLI settings update applied the recommended topic set while the repository was still private:
+
+```sh
+gh repo edit jtenner/metidos --add-topic ai,ai-tools,ai-agents,coding-agents,developer-tools,local-first,automation,git,bun,react,typescript --remove-topic personal-assistant
+gh repo view jtenner/metidos --json nameWithOwner,repositoryTopics,visibility
+```
+
+The verification command returned `visibility: PRIVATE` and these topics:
+
+- `ai`
+- `ai-tools`
+- `automation`
+- `ai-agents`
+- `bun`
+- `coding-agents`
+- `developer-tools`
+- `git`
+- `local-first`
+- `react`
+- `typescript`
+
 ## Acceptance decision
 
-This checklist slice is complete for topic review: the current setting was inspected, compared with the README, and a replacement topic set was recorded. The repository settings still need to be updated manually or through an authenticated GitHub settings workflow before publication.
+This checklist slice is complete: the repository topics were inspected, compared with the README, updated through the authenticated GitHub CLI workflow, and re-read from GitHub. The previous `personal-assistant` topic is no longer configured.
