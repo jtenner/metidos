@@ -67,6 +67,19 @@ export function writePersistedChatDraft(
   window.localStorage.setItem(chatDraftStorageKey(threadId), draft);
 }
 
+export function resolveSelectedTerminalId(
+  selectedTerminalId: string | null,
+  terminals: RpcTerminal[],
+): string | null {
+  if (
+    selectedTerminalId &&
+    terminals.some((terminal) => terminal.terminalId === selectedTerminalId)
+  ) {
+    return selectedTerminalId;
+  }
+  return terminals.at(-1)?.terminalId ?? null;
+}
+
 export function useTerminalsController({
   activeProjectId,
   activeThreadId,
@@ -144,11 +157,11 @@ export function useTerminalsController({
   }, [refreshTerminals]);
 
   useEffect(() => {
-    if (
-      selectedTerminalId &&
-      !terminals.some((terminal) => terminal.terminalId === selectedTerminalId)
-    ) {
-      const next = terminals.at(-1)?.terminalId ?? null;
+    if (!selectedTerminalId) {
+      return;
+    }
+    const next = resolveSelectedTerminalId(selectedTerminalId, terminals);
+    if (next !== selectedTerminalId) {
       setSelectedTerminalIdState(next);
       writeSelectedTerminalId(next);
     }
