@@ -28,15 +28,60 @@ This is a public-readiness smoke-test plan for the active TODO item: verify back
    node -e "const p=require('./package.json'); console.log(p.packageManager)"
    ```
 
-2. Start Metidos with disposable App Data and minimal documented configuration.
-3. Complete first-run Local Auth with fake/demo values.
-4. Stop Metidos cleanly.
-5. Copy the disposable App Data directory to a second disposable backup path without printing file contents.
-6. Restore by pointing `METIDOS_APP_DATA_DIR` at the copied path.
-7. Start Metidos and confirm sign-in reaches the expected post-auth state.
-8. Exercise documented auth reset commands from `docs/operator-runbook.md` using fake/demo identity values only.
-9. Confirm old sessions are invalidated as documented, without recording cookie values.
-10. Tear down all disposable App Data and backup paths.
+2. Create disposable App Data and backup paths under `/tmp` or another throwaway location.
+3. Start Metidos with disposable App Data and minimal documented configuration.
+4. Complete first-run Local Auth with fake/demo values.
+5. Stop Metidos cleanly.
+6. Copy the disposable App Data directory to the disposable backup path without printing file contents.
+7. Restore by pointing `METIDOS_APP_DATA_DIR` at the copied path.
+8. Start Metidos and confirm sign-in reaches the expected post-auth state.
+9. Exercise documented auth reset commands from `docs/operator-runbook.md` using fake/demo identity values only.
+10. Confirm old sessions are invalidated as documented, without recording cookie values.
+11. Tear down all disposable App Data and backup paths.
+
+## Command-ready smoke outline
+
+Use this outline when Bun matches the repository `packageManager`. Replace the fake username with the same fake/demo local operator identity used during first-run setup. Do not paste real prompts, TOTP codes, recovery codes, cookies, or App Data contents into the evidence note.
+
+```bash
+set -euo pipefail
+
+bun --version
+node -e "const p=require('./package.json'); console.log(p.packageManager)"
+uname -a
+
+appdata="$(mktemp -d /tmp/metidos-backup-smoke-appdata-XXXXXX)"
+backup="$(mktemp -d /tmp/metidos-backup-smoke-backup-XXXXXX)"
+restore="$(mktemp -d /tmp/metidos-backup-smoke-restore-XXXXXX)"
+port="7599"
+
+METIDOS_APP_DATA_DIR="$appdata" METIDOS_PORT="$port" bun run start
+```
+
+In a browser, complete first-run Local Auth with fake/demo values, then stop the process with `Ctrl-C` and record that stop method.
+
+```bash
+rsync -a --delete "$appdata/" "$backup/"
+rsync -a --delete "$backup/" "$restore/"
+METIDOS_APP_DATA_DIR="$restore" METIDOS_PORT="$port" bun run start
+```
+
+In a browser, confirm sign-in reaches the expected post-auth state, then stop the process with `Ctrl-C`.
+
+Run the documented CLI reset commands only against the disposable restored App Data directory:
+
+```bash
+METIDOS_APP_DATA_DIR="$restore" bun run auth:reset regenerate-recovery-codes --username FAKE_DEMO_USERNAME
+METIDOS_APP_DATA_DIR="$restore" bun run auth:reset reset-primary-factor --username FAKE_DEMO_USERNAME --new-type pin
+```
+
+When the smoke is complete, remove disposable paths without printing their contents:
+
+```bash
+rm -rf "$appdata" "$backup" "$restore"
+```
+
+If any step fails, keep the evidence sanitized: record the exact command, exit status, and user-facing message summary only. Do not commit temporary App Data, copied backup directories, screenshots, cookies, TOTP seeds, recovery codes, or private paths.
 
 ## Acceptance criteria for future evidence
 
