@@ -87,7 +87,10 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Confirm Discussions are enabled only if the project intends to support them. Context: `docs/github-discussions-setting-review-2026-06-03.md` records that `gh repo view --json nameWithOwner,hasDiscussionsEnabled,visibility` observed Discussions enabled on the private repo, and that `SUPPORT.md` is compatible with either Discussions or documentation issues. Remaining 3-minute slices:
   - [ ] Decide whether the public launch will actively support GitHub Discussions as a monitored usage-question channel, or disable Discussions for launch and rely on documentation issues.
   - [ ] After the decision, update GitHub settings if needed and adjust `SUPPORT.md` only if the chosen support path needs clearer wording.
-- [ ] Confirm private security reporting is configured if available for the repository.
+- [ ] Confirm private security reporting is configured if available for the repository. Context: `docs/github-private-security-reporting-review-2026-06-03.md` documents an API/CLI check on 2026-06-03: the repo was still private, `security_and_analysis` returned `null`, and `gh api repos/jtenner/metidos/private-vulnerability-reporting` returned `404 Not Found`, so API evidence did not confirm the setting. Remaining 3-minute slices:
+  - [ ] Check the repository's GitHub settings UI for private security reporting availability after publication settings are being finalized.
+  - [ ] If available, enable private security reporting and record verification evidence.
+  - [ ] If unavailable, record the GitHub/account/repository reason and confirm `SECURITY.md` is the intended public fallback disclosure path.
 - [ ] Confirm repository visibility, fork settings, and Actions permissions are appropriate for a public project.
 
 ## 12. Final Pre-Public Checklist
