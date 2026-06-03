@@ -1,0 +1,101 @@
+{
+  "id": "kraken",
+  "name": "Kraken Trading Operations",
+  "version": "1.0.0",
+  "metidosApiVersion": "v1",
+  "main": "./index.ts",
+  "description": "Constrained Kraken trading operations plugin. Agents stage intentions only; a minute cron routes intentions through deterministic safety checks before paper simulation or approved live limit-order execution.",
+  "color": "#5741d9",
+  "permissions": [
+    "network:fetch",
+    "network:websocket",
+    "storage:read",
+    "storage:write",
+    "cron:create",
+    "notification:send"
+  ],
+  "network": {
+    "allow": ["https://api.kraken.com/0/**"],
+    "webSocketAllow": ["wss://ws.kraken.com/v2", "wss://ws-auth.kraken.com/v2"],
+    "enforceHttps": true
+  },
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Enable Kraken trading cron",
+      "kind": "boolean",
+      "required": true,
+      "default": false,
+      "description": "When false, the minute cron exits before evaluating or executing staged intentions. Keep disabled until the local operator is ready."
+    }
+  ],
+  "env": [
+    {
+      "key": "KRAKEN_API_KEY",
+      "description": "Kraken API key used internally by the execution guard for approved private Spot REST calls. Agents cannot directly sign or call raw endpoints.",
+      "required": true,
+      "secret": true
+    },
+    {
+      "key": "KRAKEN_PRIVATE_KEY",
+      "description": "Kraken private key/API secret used internally to generate API-Sign headers for approved private Spot REST calls.",
+      "required": true,
+      "secret": true
+    }
+  ],
+  "access": [
+    {
+      "id": "trading_ops",
+      "name": "Kraken Trading Operations",
+      "description": "Expose constrained intention-only Kraken trading operations tools to selected threads.",
+      "tools": [
+        {
+          "name": "get_status",
+          "description": "Read compact Kraken trading operations status.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "get_runtime_snapshot",
+          "description": "Read a redacted Kraken trading runtime snapshot.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "stage_intention",
+          "description": "Validate and store a trade intention for deterministic cron review; never places orders.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "list_intentions",
+          "description": "List staged and historical trade intentions.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "cancel_intention",
+          "description": "Cancel a local staged trade intention; does not cancel exchange orders.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "get_policy",
+          "description": "Read the active conservative trading policy.",
+          "timeoutMs": 10000
+        },
+        {
+          "name": "get_journal_summary",
+          "description": "Read recent safe Kraken trading journal summaries.",
+          "timeoutMs": 10000
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "defaults": {
+      "maxDataBytes": 104857600,
+      "maxFileBytes": 10485760,
+      "maxFiles": 10000
+    }
+  },
+  "limits": {
+    "maxNetworkResponseBytes": 26214400,
+    "maxTextResultBytes": 262144
+  }
+}
