@@ -59,7 +59,6 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify unsafe-mode boundaries are documented and enforced where applicable.
 - [ ] Verify the app remains usable during long-running agent work, large logs, slow providers, and background cron activity.
 - [ ] Verify major error paths produce actionable messages with next steps.
-- [ ] Add or improve diagnostics export with redaction if feasible. Context: runtime diagnostics now redact unsafe/secret-like dynamic labels before publishing stats keys, and `src/bun/runtime-stats.test.ts` covers provider-key-like strings, local paths, email-like notification channels, long token-like labels, and unsafe-mode tool labels not appearing in the diagnostics JSON.
 
 ## 10. Testing
 
