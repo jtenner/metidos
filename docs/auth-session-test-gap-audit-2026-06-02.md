@@ -33,8 +33,10 @@ Current tests already cover the core auth service helpers well: primary-factor p
    - Confirm `/auth/csrf` remains unauthenticated and rate limited while setting only the CSRF cookie.
 
 3. **Session revocation side-effect integration tests**
-   - Add tests proving browser reset routes revoke existing sessions, clear session and websocket-ticket cookies, close authenticated websocket/terminal contexts through the injected close callbacks, and request active thread-turn shutdown.
-   - Add tests proving logout closes only the logged-out session's websocket contexts and revokes pending websocket tickets for that session.
+   - Current route tests prove browser reset routes clear session and websocket-ticket cookies, revoke the pre-reset browser session, and make its pending websocket ticket unusable.
+   - Add tests proving browser reset routes close authenticated websocket/terminal contexts through injected close callbacks and request active thread-turn shutdown.
+   - Current route tests prove logout clears session and websocket-ticket cookies and revokes pending websocket tickets for the logged-out session.
+   - Add tests proving logout closes only the logged-out session's websocket contexts.
    - Keep tests fake/injected; do not spawn real terminals, providers, or thread turns.
 
 4. **Auth status privacy and multi-user/pending-user route tests**

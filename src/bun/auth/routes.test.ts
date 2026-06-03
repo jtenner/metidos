@@ -155,6 +155,31 @@ async function loginWithTotp(primaryFactor: string): Promise<string> {
   );
 }
 
+async function issueWebSocketTicketForSession(sessionCookie: string): Promise<{
+  ticketCookie: string;
+  ticketId: string;
+}> {
+  const csrfToken = await issueCsrfToken();
+  const response = await handleAuthRequestForTest(
+    new Request("http://127.0.0.1:7599/auth/ws-ticket", {
+      body: JSON.stringify({}),
+      headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+      method: "POST",
+    }),
+    buildAuthServer(),
+  );
+
+  expect(response).not.toBeNull();
+  expect(response?.status).toBe(200);
+  const ticketCookie = extractCookiePair(
+    readSetCookieHeaders(response),
+    "metidos_ws_ticket",
+  );
+  const ticketId = ticketCookie.split("=")[1] ?? "";
+  expect(ticketId).toBeTruthy();
+  return { ticketCookie, ticketId };
+}
+
 beforeAll(async () => {
   closeAppDatabase();
   resetResolvedAppDataDirectory();
@@ -959,8 +984,12 @@ describe("auth route HTTP security", () => {
     ).toHaveLength(4);
   });
 
-  it("resets PIN from an authenticated browser session and clears auth cookies", async () => {
+  it("resets PIN from an authenticated browser session and revokes pre-reset browser state", async () => {
     const sessionCookie = await loginWithTotp("482913");
+    const sessionId = sessionCookie.split("=")[1] ?? "";
+    expect(sessionId).toBeTruthy();
+    const { ticketCookie, ticketId } =
+      await issueWebSocketTicketForSession(sessionCookie);
     const totpSecret = configuredTotpSecret;
     expect(totpSecret).toBeTruthy();
     if (!totpSecret) {
@@ -974,7 +1003,7 @@ describe("auth route HTTP security", () => {
           newPin: "719204",
           totpCode: await generateFreshTotpCode(totpSecret),
         }),
-        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
         method: "POST",
       }),
       buildAuthServer(),
@@ -987,10 +1016,38 @@ describe("auth route HTTP security", () => {
       status: { authenticated: false },
     });
     expectClearedAuthCookies(response);
+
+    const statusResponse = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          cookie: sessionCookie,
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+    expect(statusResponse?.status).toBe(200);
+    await expect(statusResponse?.json()).resolves.toMatchObject({
+      ok: true,
+      status: { authenticated: false },
+    });
+    expect(() =>
+      validateAndConsumeWebSocketTicket(initAppDatabase(), {
+        nowMs: Date.now(),
+        sessionId,
+        ticketId,
+      }),
+    ).toThrow(AuthServiceError);
   });
 
-  it("resets password from an authenticated browser session and clears auth cookies", async () => {
+  it("resets password from an authenticated browser session and revokes pre-reset browser state", async () => {
     const sessionCookie = await loginWithTotp("719204");
+    const sessionId = sessionCookie.split("=")[1] ?? "";
+    expect(sessionId).toBeTruthy();
+    const { ticketCookie, ticketId } =
+      await issueWebSocketTicketForSession(sessionCookie);
     const totpSecret = configuredTotpSecret;
     expect(totpSecret).toBeTruthy();
     if (!totpSecret) {
@@ -1004,7 +1061,7 @@ describe("auth route HTTP security", () => {
           newPassword: "correct horse battery staple",
           totpCode: await generateFreshTotpCode(totpSecret),
         }),
-        headers: buildCsrfHeaders(csrfToken, [sessionCookie]),
+        headers: buildCsrfHeaders(csrfToken, [sessionCookie, ticketCookie]),
         method: "POST",
       }),
       buildAuthServer(),
@@ -1017,6 +1074,30 @@ describe("auth route HTTP security", () => {
       status: { authenticated: false },
     });
     expectClearedAuthCookies(response);
+
+    const statusResponse = await handleAuthRequestForTest(
+      new Request("http://127.0.0.1:7599/auth/status", {
+        headers: {
+          cookie: sessionCookie,
+          origin: "http://127.0.0.1:7599",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      buildAuthServer(),
+    );
+    expect(statusResponse?.status).toBe(200);
+    await expect(statusResponse?.json()).resolves.toMatchObject({
+      ok: true,
+      status: { authenticated: false },
+    });
+    expect(() =>
+      validateAndConsumeWebSocketTicket(initAppDatabase(), {
+        nowMs: Date.now(),
+        sessionId,
+        ticketId,
+      }),
+    ).toThrow(AuthServiceError);
   });
 
   it("logs out by clearing session, websocket-ticket cookies, and browser storage", async () => {
