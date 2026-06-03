@@ -1161,7 +1161,10 @@ export function CommandExecutionMessage({
   expanded?: boolean;
   onToggleExpanded?: (() => void) | undefined;
 }): JSX.Element {
-  const hasOutput = output.trim().length > 0 || !outputLoaded;
+  // Command rows should remain expandable even after a successful command
+  // produces an empty output stream. Otherwise the controlled expansion state can
+  // say "open" while the row hides its caret and output pane.
+  const hasVisibleOutput = output.trim().length > 0;
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
   const [commandCopied, setCommandCopied] = useState(false);
   const [commandPreviewLayout, setCommandPreviewLayout] = useState({
@@ -1286,26 +1289,17 @@ export function CommandExecutionMessage({
           <div className="flex min-w-0 items-baseline gap-2">
             <span className="shrink-0 uppercase-label text-accent">CMD</span>
             <div className="group/command-preview min-w-0 flex-1">
-              {hasOutput ? (
-                <AppButton
-                  unstyled
-                  aria-expanded={isExpanded}
-                  aria-label={`Toggle command output for ${command}`}
-                  className="block max-w-full truncate font-mono text-left text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1"
-                  onClick={toggleExpanded}
-                  ref={setCommandPreviewAnchor}
-                  type="button"
-                >
-                  {command}
-                </AppButton>
-              ) : (
-                <div
-                  className="max-w-full truncate font-mono text-sm text-text-muted"
-                  ref={setCommandPreviewAnchor}
-                >
-                  {command}
-                </div>
-              )}
+              <AppButton
+                unstyled
+                aria-expanded={isExpanded}
+                aria-label={`Toggle command output for ${command}`}
+                className="block max-w-full truncate font-mono text-left text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1"
+                onClick={toggleExpanded}
+                ref={setCommandPreviewAnchor}
+                type="button"
+              >
+                {command}
+              </AppButton>
               <div className={commandPreviewClassName}>
                 <div className="relative box-border w-full border border-border-default bg-surface-1 px-3 py-3 pr-16 shadow-overlay">
                   <AppButton
@@ -1335,33 +1329,35 @@ export function CommandExecutionMessage({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="status-pill">{stateLabel}</div>
-          {hasOutput ? (
-            <AppButton
-              unstyled
-              aria-expanded={isExpanded}
-              aria-label={`Toggle command output for ${command}`}
-              className="flex items-center text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
-              onClick={toggleExpanded}
-              type="button"
-            >
-              {materialSymbol(
-                isExpanded ? "expand_less" : "expand_more",
-                "text-base",
-              )}
-            </AppButton>
-          ) : null}
+          <AppButton
+            unstyled
+            aria-expanded={isExpanded}
+            aria-label={`Toggle command output for ${command}`}
+            className="flex items-center text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
+            onClick={toggleExpanded}
+            type="button"
+          >
+            {materialSymbol(
+              isExpanded ? "expand_less" : "expand_more",
+              "text-base",
+            )}
+          </AppButton>
         </div>
       </div>
-      {hasOutput && isExpanded ? (
+      {isExpanded ? (
         <div className="px-4 pb-4">
           {!outputLoaded ? (
             <div className="border border-border-subtle bg-surface-1 px-3 py-3 text-[12px] text-text-muted">
               Loading output...
             </div>
-          ) : (
+          ) : hasVisibleOutput ? (
             <pre className="app-scrollbar max-h-[16rem] overflow-auto border border-border-subtle bg-surface-1 px-3 py-3 text-[11px] leading-5 text-text-secondary">
               {output}
             </pre>
+          ) : (
+            <div className="border border-border-subtle bg-surface-1 px-3 py-3 text-[12px] text-text-muted">
+              No command output.
+            </div>
           )}
         </div>
       ) : null}

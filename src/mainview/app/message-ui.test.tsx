@@ -8,6 +8,7 @@ import { renderToReadableStream } from "react-dom/server";
 
 import { loadRichMarkdownModule } from "./message-markdown-loader";
 import {
+  CommandExecutionMessage,
   MarkdownMessage,
   ReasoningMessage,
   ToolCallMessage,
@@ -67,6 +68,27 @@ describe("ReasoningMessage", () => {
     expect(markup).not.toContain(">Complete<");
     expect(markup).not.toContain(">Working<");
     expect(markup).not.toContain(">Stopped<");
+  });
+});
+
+describe("CommandExecutionMessage", () => {
+  it("keeps empty command output rows expandable", async () => {
+    const stream = await renderToReadableStream(
+      <CommandExecutionMessage
+        command="true"
+        exitCode={0}
+        expanded={true}
+        output=""
+        outputLoaded={true}
+        state="completed"
+      />,
+    );
+    await stream.allReady;
+    const markup = await new Response(stream).text();
+
+    expect(markup).toContain('aria-expanded="true"');
+    expect(markup.match(/Toggle command output for true/g)?.length).toBe(2);
+    expect(markup).toContain("No command output.");
   });
 });
 
