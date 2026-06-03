@@ -26,7 +26,10 @@ This checklist is for repository improvements only before making Metidos public/
 
 - [ ] Add or polish logo files in appropriate source and export formats.
 - [ ] Add or polish mascot/icon files if they are part of the project identity.
-- [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided.
+- [ ] Replace any remaining placeholder canonical/OG URLs with the chosen public website URL after hosting is decided. Current blocker clarified 2026-06-03: no final public website URL is recorded yet. Known placeholders are in `website/index.html` (`og:url`, `og:image`, `twitter:image`) and `website/README.md` still lists the go-live reminder. Remaining 3-minute slices:
+  - [ ] Choose or record the final public website URL (for example the deployed Pages/static-host URL) in the relevant GitHub/publication notes.
+  - [ ] Replace `https://YOUR_DOMAIN_OR_PAGES_URL/` in `website/index.html` with the final URL, keeping `og.png` paths correct.
+  - [ ] Update `website/README.md` to remove or narrow the placeholder-host go-live reminder after the real URL is checked in.
 - [ ] Add README screenshots with fake/demo data only.
 - [ ] Add feature screenshots for project/worktree view using fake/demo data only.
 - [ ] Add feature screenshots for agent threads using fake/demo data only.
