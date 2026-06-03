@@ -49,3 +49,41 @@ detect-secrets: not found
 The dedicated scanner pass was **not run** in this workspace runtime because no dedicated secret-scanning tool was installed or otherwise available on `PATH`.
 
 The pre-public secret-scan checklist item remains open. A future run must use an environment with at least one dedicated scanner installed, or a CI-backed equivalent, then record the scanner name/version, exact command, pass/fail status, and any resolved findings.
+
+## Follow-up recheck: 2026-06-03T08:09:24+00:00
+
+A later recurring-agent slice rechecked the same scanner availability without changing repository dependencies or host-level tools.
+
+Environment:
+
+- OS/kernel: Linux `bf28335b6a4b` 6.12.90+deb13.1-amd64, Debian GNU/Linux 13 (trixie), x86_64
+- Workspace: `/home/jtenner/Projects/jt-ide`
+
+Command:
+
+```sh
+for tool in gitleaks trufflehog git-secrets detect-secrets; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    printf '%s %s\n' "$tool" "$(command -v "$tool")"
+    case "$tool" in
+      gitleaks) gitleaks version 2>/dev/null | head -5 ;;
+      trufflehog) trufflehog --version 2>&1 | head -5 ;;
+      git-secrets) git secrets --version 2>&1 | head -5 ;;
+      detect-secrets) detect-secrets --version 2>&1 | head -5 ;;
+    esac
+  else
+    printf '%s not found\n' "$tool"
+  fi
+done
+```
+
+Result:
+
+```text
+gitleaks not found
+trufflehog not found
+git-secrets not found
+detect-secrets not found
+```
+
+Outcome: the dedicated scanner pass remains blocked on selecting an environment with one of these tools, or an equivalent CI-backed scanner, available.
