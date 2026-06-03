@@ -4,6 +4,8 @@ This file tracks active TODOs only. When a task is completed, remove it from thi
 
 This checklist is for repository improvements only before making Metidos public/open source. Do not treat this as a marketing or launch-promotion plan. Work through items in small, reviewable PRs or commits.
 
+Recurring unattended runner status (2026-06-03 06:57 EDT): no remaining 3-minute repository-only slice is currently actionable in this workspace. The open items below require maintainer decisions, GitHub settings/UI actions, public-repository state, clean/manual smoke environments, Docker/Podman availability, or a host/runtime update to Bun `1.3.14` before evidence can be refreshed. The cron runner should stay disabled until one of those prerequisites is satisfied or a new repository-only task is added.
+
 ## 1. Repository Hygiene and Public Readiness
 
 - [ ] Finish checked-in artwork ownership review. Context: `docs/public-asset-provenance-audit-2026-06-02.md` inventories tracked PNG/font assets, confirms font license coverage, and documents `docs/uploadthing-test.png` as a repo-owned generated fixture; `website/README.md` now acknowledges the tracked `website/bird.png` asset. `docs/artwork-provenance-maintainer-request-2026-06-02.md` now contains the exact maintainer questions for the remaining unapproved artwork. Remaining 3-minute slices:
