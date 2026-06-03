@@ -62,7 +62,10 @@ export function pluginSettingFormValue(
       ? summary.value.map((item) => String(item))
       : [];
   }
-  if (summary.secret && !summary.readable && summary.hasStoredValue) {
+  // Secret settings are write-only in the mainview. Even if a caller ever
+  // receives a readable secret snapshot, the settings form must distinguish it
+  // from safe display values and require an explicit pasted replacement.
+  if (summary.secret) {
     return "";
   }
   return summary.value === null ? "" : String(summary.value);

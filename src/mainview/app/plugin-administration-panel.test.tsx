@@ -25,6 +25,7 @@ import {
   defaultIngressRouteAccess,
   pluginIngressLinkCodeKey,
 } from "./plugin-ingress-route-state";
+import { pluginSettingsFormValuesFromSnapshot } from "./plugin-settings-form-state";
 import {
   pluginActionFeedbackState,
   pluginLifecycleActionButtonState,
@@ -323,6 +324,80 @@ describe("plugin administration panel", () => {
         },
       }),
     ).toBeUndefined();
+  });
+
+  it("keeps secret setting values out of the rendered settings form", () => {
+    const plugin = buildPluginInventoryPlugin({
+      manifest: {
+        ...buildPluginInventoryPlugin().manifest,
+        settings: [
+          {
+            defaultValue: null,
+            description: "API token",
+            hasDefault: false,
+            items: null,
+            key: "api_token",
+            kind: "secret",
+            label: "API token",
+            options: [],
+            required: null,
+          },
+          {
+            defaultValue: "digest",
+            description: "Delivery mode",
+            hasDefault: true,
+            items: null,
+            key: "mode",
+            kind: "string",
+            label: "Mode",
+            options: [],
+            required: null,
+          },
+        ],
+      },
+    });
+    const snapshot: RpcPluginSettingsSnapshot = {
+      directoryName: plugin.directoryName,
+      pluginId: plugin.pluginId,
+      settings: [
+        {
+          defaultValue: null,
+          hasDefault: false,
+          hasStoredValue: true,
+          key: "api_token",
+          kind: "secret",
+          readable: true,
+          secret: true,
+          value: "raw-secret-from-defensive-fixture",
+        },
+        {
+          defaultValue: "digest",
+          hasDefault: true,
+          hasStoredValue: true,
+          key: "mode",
+          kind: "string",
+          readable: true,
+          secret: false,
+          value: "realtime",
+        },
+      ],
+    };
+    const values = pluginSettingsFormValuesFromSnapshot(snapshot);
+
+    expect(values).toEqual({ api_token: "", mode: "realtime" });
+
+    const markup = renderToStaticMarkup(
+      <PluginSettingsGroup
+        onValueChange={() => {}}
+        plugin={plugin}
+        snapshots={{ [plugin.directoryName]: snapshot }}
+        values={{ [plugin.directoryName]: values }}
+      />,
+    );
+
+    expect(markup).toContain("Configured");
+    expect(markup).toContain("realtime");
+    expect(markup).not.toContain("raw-secret-from-defensive-fixture");
   });
 
   it("renders pending feedback for secret replacement and clearing settings", () => {
