@@ -54,7 +54,8 @@ This checklist is for repository improvements only before making Metidos public/
 - [ ] Verify unsafe-mode warnings are visible, specific, and tied to the relevant risky action. Context: 2026-06-03 slice made active Unsafe Mode access warnings visible inline in the Thread/Cron access panel instead of relying only on the `?` description popover; `src/mainview/controls/thread-access-control.test.tsx` covers the warning text seam. Remaining 3-minute slice:
   - [ ] Manually smoke the Thread creation and Cron editor access menus with Unsafe Mode toggled on and off, then record pass/fail evidence that the inline warning is visible, specific to shell/sandbox escalation and unsafe child Thread/Cron access, and not hidden behind hover-only UI.
 - [ ] Verify the app remains usable during long-running agent work, large logs, slow providers, and background cron activity.
-- [ ] Verify major error paths produce actionable messages with next steps.
+- [ ] Verify major error paths produce actionable messages with next steps. Context: `docs/actionable-error-paths-smoke-plan-2026-06-03.md` now defines a disposable smoke plan covering startup/configuration, Local Auth/session, provider/model, Project/Worktree, Thread, Cron, Plugin, WebSocket/RPC, and Diff review failure messages plus sanitized evidence requirements. Remaining 3-minute slice:
+  - [ ] Run the smoke plan against a disposable App Data/profile and fake/demo repository, then commit sanitized evidence with exact OS, Bun version, commands, pass/fail status, user-visible error summaries, stop method, teardown, and any documentation/UI corrections.
 
 ## 10. Testing
 
