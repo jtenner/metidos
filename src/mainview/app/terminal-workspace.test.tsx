@@ -6,9 +6,10 @@
 import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { RpcTerminal } from "../../bun/rpc-schema";
+import type { RpcTerminal, RpcTerminalStatus } from "../../bun/rpc-schema";
 import {
   terminalCloseConfirmationDetails,
+  terminalStatusView,
   TerminalWorkspace,
 } from "./terminal-workspace";
 
@@ -96,6 +97,66 @@ describe("TerminalWorkspace render states", () => {
     expect(markup).toContain("/repo/demo/packages/app");
     expect(markup).toContain("Rename App tests");
     expect(markup).toContain("Close App tests");
+  });
+
+  it("summarizes terminal lifecycle states without exposing terminal output", () => {
+    const statuses: RpcTerminalStatus[] = [
+      "starting",
+      "running",
+      "closing",
+      "exited",
+      "error",
+    ];
+    const markup = renderTerminalWorkspace({
+      terminals: statuses.map((status, index) =>
+        fakeTerminal({
+          command: index === 4 ? "echo secret-output" : null,
+          cwd: `/repo/demo/${status}`,
+          status,
+          terminalId: `terminal-${status}`,
+          title: `Demo ${status}`,
+        }),
+      ),
+    });
+
+    for (const expected of [
+      "Connecting",
+      "Connected",
+      "Disconnecting",
+      "Disconnected",
+      "Failed",
+    ]) {
+      expect(markup).toContain(expected);
+    }
+    expect(markup).not.toContain("secret-output");
+  });
+
+  it("maps terminal statuses to accessible labels and semantic tones", () => {
+    expect(terminalStatusView("starting")).toEqual({
+      label: "Starting",
+      summary: "Connecting",
+      tone: "info",
+    });
+    expect(terminalStatusView("running")).toEqual({
+      label: "Running",
+      summary: "Connected",
+      tone: "success",
+    });
+    expect(terminalStatusView("closing")).toEqual({
+      label: "Closing",
+      summary: "Disconnecting",
+      tone: "warning",
+    });
+    expect(terminalStatusView("exited")).toEqual({
+      label: "Exited",
+      summary: "Disconnected",
+      tone: "neutral",
+    });
+    expect(terminalStatusView("error")).toEqual({
+      label: "Error",
+      summary: "Failed",
+      tone: "danger",
+    });
   });
 
   it("formats close-confirmation copy for a pending running terminal", () => {

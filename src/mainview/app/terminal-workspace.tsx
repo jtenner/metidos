@@ -6,7 +6,7 @@
 import type { JSX } from "react";
 import { AppButton } from "../controls/button";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RpcTerminal } from "../../bun/rpc-schema";
+import type { RpcTerminal, RpcTerminalStatus } from "../../bun/rpc-schema";
 import {
   dispatchAuthRequired,
   isAuthRequiredError,
@@ -17,6 +17,7 @@ import { ConfirmDialog } from "../controls/confirm-dialog";
 import { materialSymbol } from "../controls/icons";
 import { ListRow, ListRowIconButton } from "../controls/list-row";
 import { PopoverSurface } from "../controls/popover";
+import { StatusIcon, type StatusIconTone } from "../controls/status-icon";
 
 export type TerminalWorkspaceProps = {
   activeTerminalId: string | null;
@@ -43,6 +44,29 @@ type TerminalRowProps = {
 };
 
 const CLIENT_TERMINAL_SCROLLBACK_LINES = 2_000;
+
+type TerminalStatusView = {
+  label: string;
+  summary: string;
+  tone: StatusIconTone;
+};
+
+export function terminalStatusView(
+  status: RpcTerminalStatus,
+): TerminalStatusView {
+  switch (status) {
+    case "starting":
+      return { label: "Starting", summary: "Connecting", tone: "info" };
+    case "running":
+      return { label: "Running", summary: "Connected", tone: "success" };
+    case "closing":
+      return { label: "Closing", summary: "Disconnecting", tone: "warning" };
+    case "exited":
+      return { label: "Exited", summary: "Disconnected", tone: "neutral" };
+    case "error":
+      return { label: "Error", summary: "Failed", tone: "danger" };
+  }
+}
 
 let ghosttyInitPromise: Promise<LoadedGhostty> | null = null;
 
@@ -235,6 +259,7 @@ function TerminalRow({
   const editButtonRef = useRef<HTMLButtonElement | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(terminal.title);
+  const status = terminalStatusView(terminal.status);
 
   useEffect(() => {
     if (!editing) {
@@ -273,6 +298,11 @@ function TerminalRow({
             <span className="font-mono text-[11px] text-text-muted">
               {terminal.cwd}
             </span>
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-muted">
+            <StatusIcon size="sm" tone={status.tone} />
+            <span>{status.summary}</span>
+            <span className="sr-only">: {status.label}</span>
           </div>
         </AppButton>
         <div className="flex shrink-0 items-center gap-1 pl-2">
