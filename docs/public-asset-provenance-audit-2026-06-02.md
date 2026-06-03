@@ -10,7 +10,7 @@ Command used:
 git ls-files '*png' '*jpg' '*jpeg' '*svg' '*ico' '*webp' '*gif' '*woff2' '*ttf' '*otf' | sort
 ```
 
-The inventory below covers only assets tracked by Git. Dependency assets under ignored or vendored package directories are out of scope unless they are copied into tracked repository paths. The inventory was updated after adding the generated website favicon/app-icon SVGs.
+The inventory below covers only assets tracked by Git. Dependency assets under ignored or vendored package directories are out of scope unless they are copied into tracked repository paths. The inventory was updated after adding the generated website favicon/app-icon SVGs. The same inventory command was re-run on 2026-06-03 before the remaining human artwork decisions were available; the tracked asset list was unchanged.
 
 ## Inventory
 
@@ -45,4 +45,4 @@ The inventory below covers only assets tracked by Git. Dependency assets under i
 1. Send or answer the maintainer confirmation questions drafted in `docs/artwork-provenance-maintainer-request-2026-06-02.md` for the shared bird mascot at `bird.png` / `website/bird.png` and the app artwork at `src/mainview/pixel-crown.png`.
 2. Record the creator/source, creation date if known, license or assignment status, redistribution approval, and whether the website still needs a self-contained bird duplicate.
 3. Add a durable provenance note for repo-owned artwork (`bird.png`, `website/bird.png`, `src/mainview/pixel-crown.png`) that names the creator/source, creation date if known, license or assignment status, redistribution approval, and why both bird copies are needed if both remain tracked.
-4. Re-run the `git ls-files` inventory after any asset additions or removals.
+4. Re-run the `git ls-files` inventory after any asset additions or removals. Interim check: the command was re-run on 2026-06-03 and found no tracked asset list changes; run it again after the remaining artwork provenance decisions are documented.
