@@ -71,7 +71,7 @@ This checklist is for repository improvements only before making Metidos public/
 
 ## 11. GitHub Public Repository Setup Notes
 
-- [ ] Confirm the repository description is accurate, concise, and aligned with the README tagline.
+- [ ] Apply the recommended public repository description from `docs/github-public-repository-description-review-2026-06-03.md` when updating GitHub settings for publication. Context: review on 2026-06-03 found the current private-repo description accurate but too long and less aligned with the README tagline.
 - [ ] Confirm the repository homepage URL points to the correct docs or repo-hosted website if one exists.
 - [ ] Confirm repository topics include relevant public discovery terms and avoid internal jargon.
 - [ ] Confirm the social preview image is uploaded and renders correctly.
