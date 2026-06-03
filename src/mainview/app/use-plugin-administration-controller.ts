@@ -108,6 +108,29 @@ function toDisplayError(error: unknown): string {
     : String(error ?? "Unknown error");
 }
 
+export async function runPluginAdminActionProcedure({
+  action,
+  confirmation,
+  plugin,
+  procedures,
+}: {
+  action: RpcPluginAdminAction;
+  confirmation?: string;
+  plugin: RpcPluginInventoryPlugin;
+  procedures: ProjectProcedures;
+}) {
+  return procedures.runPluginAdminAction(
+    {
+      action,
+      ...(confirmation === undefined ? {} : { confirmation }),
+      directoryName: plugin.directoryName,
+    },
+    {
+      priority: "foreground",
+    },
+  );
+}
+
 export function retryPendingPluginStepUpAction({
   actionToRetry,
   executePluginAdminAction,
@@ -744,16 +767,12 @@ export function usePluginAdministrationController({
       setPluginLifecycleActionMessage("");
       setPluginLifecycleActionError("");
       try {
-        const result = await procedures.runPluginAdminAction(
-          {
-            action,
-            ...(confirmation === undefined ? {} : { confirmation }),
-            directoryName: plugin.directoryName,
-          },
-          {
-            priority: "foreground",
-          },
-        );
+        const result = await runPluginAdminActionProcedure({
+          action,
+          ...(confirmation === undefined ? {} : { confirmation }),
+          plugin,
+          procedures,
+        });
         setPluginInventory(result.inventory);
         void loadPluginSidecarDiagnostics({ priority: "foreground" });
         setPluginLifecycleActionMessage(result.message);

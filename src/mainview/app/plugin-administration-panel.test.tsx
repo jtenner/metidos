@@ -33,6 +33,7 @@ import {
 import {
   loadPluginSettingsStateForInventory,
   retryPendingPluginStepUpAction,
+  runPluginAdminActionProcedure,
   submitPluginSettingsPatchesForInventory,
 } from "./use-plugin-administration-controller";
 
@@ -484,6 +485,97 @@ describe("plugin administration panel", () => {
     ]);
     expect(updatedSnapshots).toEqual({
       [plugin.directoryName]: updatedSnapshot,
+    });
+  });
+
+  it("surfaces reset-data RPC success and failure feedback for admin flows", async () => {
+    const plugin = buildPluginInventoryPlugin({
+      adminActions: [
+        {
+          action: "reset_data",
+          available: true,
+          destructive: true,
+          label: "Reset Data",
+          path: null,
+          reason: null,
+        },
+      ],
+    });
+    const resetPlugin = buildPluginInventoryPlugin({
+      ...plugin,
+      dataUsage: {
+        bytes: 0,
+        files: 0,
+        scannedAt: "2026-04-28T00:01:00.000Z",
+        unavailableReason: null,
+      },
+    });
+    const resetInventory = buildPluginInventory([resetPlugin]);
+    const calls: unknown[] = [];
+
+    const result = await runPluginAdminActionProcedure({
+      action: "reset_data",
+      confirmation: plugin.directoryName,
+      plugin,
+      procedures: {
+        runPluginAdminAction: async (input, options) => {
+          calls.push({ input, options });
+          return {
+            action: "reset_data",
+            directoryName: plugin.directoryName,
+            inventory: resetInventory,
+            message: "Plugin data reset.",
+            path: "/tmp/plugins/alpha_plugin/.metidos-data",
+            plugin: resetPlugin,
+          };
+        },
+      } as ProjectProcedures,
+    });
+
+    expect(calls).toEqual([
+      {
+        input: {
+          action: "reset_data",
+          confirmation: plugin.directoryName,
+          directoryName: plugin.directoryName,
+        },
+        options: { priority: "foreground" },
+      },
+    ]);
+    expect(result.inventory).toBe(resetInventory);
+    expect(result.message).toBe("Plugin data reset.");
+    expect(
+      pluginActionFeedbackState({ error: "", message: result.message }),
+    ).toEqual({
+      error: "",
+      hasError: false,
+      hasMessage: true,
+      message: "Plugin data reset.",
+    });
+
+    let failureMessage = "";
+    try {
+      await runPluginAdminActionProcedure({
+        action: "reset_data",
+        confirmation: plugin.directoryName,
+        plugin,
+        procedures: {
+          runPluginAdminAction: async () => {
+            throw new Error("reset failed");
+          },
+        } as ProjectProcedures,
+      });
+    } catch (error) {
+      failureMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(
+      pluginActionFeedbackState({ error: failureMessage, message: "" }),
+    ).toEqual({
+      error: "reset failed",
+      hasError: true,
+      hasMessage: false,
+      message: "",
     });
   });
 
