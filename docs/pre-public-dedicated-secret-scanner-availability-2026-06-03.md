@@ -87,3 +87,37 @@ detect-secrets not found
 ```
 
 Outcome: the dedicated scanner pass remains blocked on selecting an environment with one of these tools, or an equivalent CI-backed scanner, available.
+
+## Follow-up recheck: 2026-06-03T08:27:17Z
+
+A later recurring-agent slice rechecked the same scanner availability. No repository dependencies, host-level tools, or scanner configuration were changed.
+
+Environment:
+
+- Workspace: `/home/jtenner/Projects/jt-ide`
+
+Command:
+
+```sh
+date -u +%Y-%m-%dT%H:%M:%SZ
+for tool in gitleaks trufflehog git-secrets detect-secrets; do
+  if command -v "$tool" >/dev/null 2>&1; then
+    printf '%s FOUND %s\n' "$tool" "$(command -v "$tool")"
+    "$tool" --version 2>&1 | head -n 3
+  else
+    printf '%s MISSING\n' "$tool"
+  fi
+done
+```
+
+Result:
+
+```text
+2026-06-03T08:27:17Z
+gitleaks MISSING
+trufflehog MISSING
+git-secrets MISSING
+detect-secrets MISSING
+```
+
+Outcome: the dedicated scanner pass remains blocked on an operator/CI environment with at least one dedicated scanner available. The next actionable repository slice is still to run and document the scanner pass once that environment exists.
