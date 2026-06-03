@@ -4,7 +4,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ProjectProcedures, RpcTerminal } from "../../bun/rpc-schema";
+import type {
+  ProjectProcedures,
+  RpcCreateTerminalRequest,
+  RpcTerminal,
+} from "../../bun/rpc-schema";
 
 export type InteractionMode = "chat" | "terminal";
 
@@ -80,6 +84,66 @@ export function resolveSelectedTerminalId(
   return terminals.at(-1)?.terminalId ?? null;
 }
 
+export async function loadVisibleTerminalsForUser({
+  isAdmin,
+  listTerminals,
+}: {
+  isAdmin: boolean;
+  listTerminals: ProjectProcedures["listTerminals"];
+}): Promise<RpcTerminal[]> {
+  if (!isAdmin) {
+    return [];
+  }
+  return await listTerminals(undefined, { priority: "background" });
+}
+
+export function buildCreateTerminalRequest({
+  activeProjectId,
+  activeThreadId,
+  activeWorktreePath,
+  isAdmin,
+  options,
+  selectedTerminalId,
+  terminals,
+}: {
+  activeProjectId: number | null;
+  activeThreadId: number | null;
+  activeWorktreePath: string | null;
+  isAdmin: boolean;
+  options?: {
+    copyActive?: boolean;
+    command?: string;
+    title?: string;
+  };
+  selectedTerminalId: string | null;
+  terminals: RpcTerminal[];
+}): RpcCreateTerminalRequest | null {
+  if (!isAdmin) {
+    return null;
+  }
+  const activeTerminal = terminals.find(
+    (terminal) => terminal.terminalId === selectedTerminalId,
+  );
+  const projectId =
+    options?.copyActive && activeTerminal
+      ? activeTerminal.projectId
+      : activeProjectId;
+  const worktreePath =
+    options?.copyActive && activeTerminal
+      ? activeTerminal.worktreePath
+      : activeWorktreePath;
+  if (projectId === null || !worktreePath) {
+    return null;
+  }
+  return {
+    command: options?.command ?? null,
+    createdFromThreadId: activeThreadId,
+    projectId,
+    ...(options?.title ? { title: options.title } : {}),
+    worktreePath,
+  };
+}
+
 export function useTerminalsController({
   activeProjectId,
   activeThreadId,
@@ -124,8 +188,9 @@ export function useTerminalsController({
       return [];
     }
     try {
-      const result = await procedures.listTerminals(undefined, {
-        priority: "background",
+      const result = await loadVisibleTerminalsForUser({
+        isAdmin,
+        listTerminals: procedures.listTerminals,
       });
       if (mountedRef.current && requestId === refreshRequestIdRef.current) {
         setTerminals(result);
@@ -213,30 +278,19 @@ export function useTerminalsController({
       command?: string;
       title?: string;
     }) => {
-      if (!isAdmin) {
-        return null;
-      }
-      const activeTerminal = terminals.find(
-        (terminal) => terminal.terminalId === selectedTerminalId,
-      );
-      const projectId =
-        options?.copyActive && activeTerminal
-          ? activeTerminal.projectId
-          : activeProjectId;
-      const worktreePath =
-        options?.copyActive && activeTerminal
-          ? activeTerminal.worktreePath
-          : activeWorktreePath;
-      if (projectId === null || !worktreePath) {
-        return null;
-      }
-      const result = await procedures.createTerminal({
-        command: options?.command ?? null,
-        createdFromThreadId: activeThreadId,
-        projectId,
-        ...(options?.title ? { title: options.title } : {}),
-        worktreePath,
+      const request = buildCreateTerminalRequest({
+        activeProjectId,
+        activeThreadId,
+        activeWorktreePath,
+        isAdmin,
+        options,
+        selectedTerminalId,
+        terminals,
       });
+      if (!request) {
+        return null;
+      }
+      const result = await procedures.createTerminal(request);
       const next = await refreshTerminals();
       const terminal =
         next.find(

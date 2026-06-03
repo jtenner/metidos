@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import type { RpcTerminal } from "../../bun/rpc-schema";
+import type { ProjectProcedures, RpcTerminal } from "../../bun/rpc-schema";
 import {
+  buildCreateTerminalRequest,
   chatDraftStorageKey,
+  loadVisibleTerminalsForUser,
   resolveSelectedTerminalId,
 } from "./use-terminals-controller";
 
@@ -47,5 +49,71 @@ describe("terminal controller helpers", () => {
 
   it("clears terminal selection when no terminals remain", () => {
     expect(resolveSelectedTerminalId("missing-terminal", [])).toBeNull();
+  });
+
+  it("hides terminal lists from non-admin users without calling ProjectProcedures", async () => {
+    let listCalls = 0;
+    const listTerminals: ProjectProcedures["listTerminals"] = async () => {
+      listCalls += 1;
+      return [terminal("terminal-a")];
+    };
+
+    await expect(
+      loadVisibleTerminalsForUser({ isAdmin: false, listTerminals }),
+    ).resolves.toEqual([]);
+    expect(listCalls).toBe(0);
+  });
+
+  it("loads terminal lists for admin users through ProjectProcedures", async () => {
+    let listCalls = 0;
+    const terminals = [terminal("terminal-a")];
+    const listTerminals: ProjectProcedures["listTerminals"] = async (
+      params,
+      options,
+    ) => {
+      listCalls += 1;
+      expect(params).toBeUndefined();
+      expect(options?.priority).toBe("background");
+      return terminals;
+    };
+
+    await expect(
+      loadVisibleTerminalsForUser({ isAdmin: true, listTerminals }),
+    ).resolves.toEqual(terminals);
+    expect(listCalls).toBe(1);
+  });
+
+  it("blocks terminal create requests for non-admin users", () => {
+    expect(
+      buildCreateTerminalRequest({
+        activeProjectId: 7,
+        activeThreadId: 42,
+        activeWorktreePath: "/repo",
+        isAdmin: false,
+        options: { command: "pwd", title: "Blocked" },
+        selectedTerminalId: null,
+        terminals: [terminal("terminal-a")],
+      }),
+    ).toBeNull();
+  });
+
+  it("builds terminal create requests for admin users with fake terminal payloads", () => {
+    expect(
+      buildCreateTerminalRequest({
+        activeProjectId: 7,
+        activeThreadId: 42,
+        activeWorktreePath: "/repo",
+        isAdmin: true,
+        options: { command: "pwd", title: "Demo shell" },
+        selectedTerminalId: null,
+        terminals: [],
+      }),
+    ).toEqual({
+      command: "pwd",
+      createdFromThreadId: 42,
+      projectId: 7,
+      title: "Demo shell",
+      worktreePath: "/repo",
+    });
   });
 });
