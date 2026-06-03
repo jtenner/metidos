@@ -45,6 +45,22 @@ describe("unsafeModeWarningText", () => {
     ).toContain("shell-capable and sandbox-escalating tools");
   });
 
+  it("keeps the unsafe warning specific to cron job and child-access risks", () => {
+    const warning = unsafeModeWarningText(
+      {
+        permissions: ["metidos:unsafe"],
+        unsafeMode: false,
+      },
+      true,
+    );
+
+    expect(warning).not.toBeNull();
+    expect(warning).toContain(
+      "local command execution or unsafe child Thread/Cron access",
+    );
+    expect(warning).toContain("Cron Job");
+  });
+
   it("hides the warning when unsafe controls are unavailable or inactive", () => {
     expect(unsafeModeWarningText(BASE_ACCESS_VALUE, true)).toBeNull();
     expect(
