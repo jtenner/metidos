@@ -170,6 +170,22 @@ Observed output:
 
 Result: the Open Graph image still points to the owner avatar while the repository is private, so this recheck did not confirm a custom social preview upload.
 
+## Recurring-agent recheck — 2026-06-03T10:12:00Z
+
+Command run from `/home/jtenner/Projects/jt-ide`:
+
+```sh
+gh repo view --json nameWithOwner,visibility,openGraphImageUrl
+```
+
+Observed output:
+
+```json
+{"nameWithOwner":"jtenner/metidos","openGraphImageUrl":"https://avatars.githubusercontent.com/u/3761339?s=400&v=4","visibility":"PRIVATE"}
+```
+
+Result: the Open Graph image still points to the owner avatar while the repository is private, so this recheck did not confirm a custom social preview upload.
+
 ## Result
 
 Not complete for launch: the social preview image still needs to be uploaded through GitHub repository settings and visually checked after upload.
@@ -177,5 +193,5 @@ Not complete for launch: the social preview image still needs to be uploaded thr
 ## Follow-up
 
 1. In GitHub repository settings, upload `docs/brand/github-social-preview.svg` as the repository social preview image, or upload the tracked raster fallback at `docs/brand/github-social-preview.png` if the settings UI rejects SVG uploads.
-2. After upload, re-run `gh repo view --json openGraphImageUrl` and confirm it no longer returns the owner avatar URL.
+2. After upload, re-run `gh repo view --json nameWithOwner,visibility,openGraphImageUrl` and confirm it no longer returns the owner avatar URL.
 3. Open or otherwise visually check the repository social preview/Open Graph render and record the final image URL plus pass/fail evidence.
