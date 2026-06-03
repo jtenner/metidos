@@ -123,7 +123,12 @@ This checklist is for repository improvements only before making Metidos public/
   - [ ] If using Docker or Podman, run the container install smoke from the checked-in container guidance and record engine/version, commands, first-run auth outcome, provider expectations, stop method, teardown, and any docs corrections.
   - [ ] When both native clean-install and chosen container smoke evidence are recorded or intentionally waived, mark this final checklist item complete.
 - [ ] Screenshots and visual assets are safe, owned, and license-compatible.
-- [ ] Public repository settings have been reviewed.
+- [ ] Public repository settings have been reviewed. Context: `docs/public-repository-settings-final-checklist-rollup-2026-06-03.md` now consolidates the completed GitHub settings reviews and names the remaining blockers. Remaining 3-minute slices:
+  - [ ] Upload and verify the repository social preview image, then record `openGraphImageUrl` and visual pass/fail evidence.
+  - [ ] Enable branch protection or a repository ruleset for `master` when GitHub exposes the feature, requiring at least the `CI` workflow's `Validate` job.
+  - [ ] Resolve the Discussions support-policy decision by recording a monitoring owner/cadence or disabling Discussions for launch.
+  - [ ] Confirm private security reporting is enabled, or record why `SECURITY.md` is the intended fallback if the setting is unavailable.
+  - [ ] After publication, re-check repository visibility, forking, Actions permissions, fork PR approval behavior, and public CI runs.
 
 ## 14. Backend Audit Follow-up: `src/bun` Bugs, Security Findings, and Threat-Model Clarifications
 
