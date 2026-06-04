@@ -27,7 +27,10 @@ export type TradingPolicy = {
     allowWithdrawals: boolean;
     postOnlyByDefault: boolean;
   };
-  live: { requiresHumanApproval: boolean };
+  live: {
+    requiresHumanApproval: boolean;
+    maxAutonomousNotionalUsd: number;
+  };
 };
 
 export type TradingRuntime = {
@@ -172,7 +175,10 @@ export const DEFAULT_POLICY: TradingPolicy = {
     allowWithdrawals: false,
     postOnlyByDefault: true,
   },
-  live: { requiresHumanApproval: true },
+  live: {
+    requiresHumanApproval: true,
+    maxAutonomousNotionalUsd: 10,
+  },
 };
 
 export const DEFAULT_RUNTIME: TradingRuntime = {

@@ -118,6 +118,28 @@ export function validateSystemSafety(input: {
   };
 }
 
+function intentionNotionalUsd(intent: TradeIntention): number {
+  return intent.limit_price * intent.quantity;
+}
+
+function validateAutonomousLiveNotional(
+  intent: TradeIntention,
+  policy: TradingPolicy,
+): ValidationResult {
+  if (intent.mode !== "live" || policy.live.requiresHumanApproval)
+    return { ok: true, reasons: [] };
+  const cap = policy.live.maxAutonomousNotionalUsd;
+  const notional = intentionNotionalUsd(intent);
+  const reasons: string[] = [];
+  if (!Number.isFinite(cap) || cap <= 0)
+    reasons.push("autonomous live notional cap must be positive");
+  if (!Number.isFinite(notional) || notional <= 0)
+    reasons.push("autonomous live notional cannot be calculated");
+  else if (Number.isFinite(cap) && cap > 0 && notional > cap)
+    reasons.push("autonomous live notional exceeds policy cap");
+  return { ok: reasons.length === 0, reasons };
+}
+
 export function validateIntention(
   intent: TradeIntention,
   context: {
@@ -189,6 +211,8 @@ export function validateIntention(
     );
     if (!approvalResult.ok) reasons.push(...approvalResult.reasons);
   }
+  const autonomousNotional = validateAutonomousLiveNotional(intent, policy);
+  if (!autonomousNotional.ok) reasons.push(...autonomousNotional.reasons);
   return { ok: reasons.length === 0, reasons };
 }
 

@@ -14,6 +14,14 @@ import {
   stageIntention,
 } from "../../../core_plugins/kraken/trading-ops";
 import {
+  createDefaultProjectPolicy,
+  defaultLoadedPolicy,
+  loadProjectPolicy,
+  parsePolicyYaml,
+  publicPolicyResult,
+  validatePolicy,
+} from "../../../core_plugins/kraken/policy-loader";
+import {
   DEFAULT_KILL_SWITCH,
   DEFAULT_POLICY,
   DEFAULT_RUNTIME,
@@ -95,11 +103,20 @@ class MemoryStorage {
   incidents: Record<string, unknown>[] = [];
   locked = false;
   async initialize() {}
+  policyState = defaultLoadedPolicy();
   async readPolicy() {
     return this.policy;
   }
   async writePolicy(policy: TradingPolicy) {
     this.policy = policy;
+    this.policyState = { ...defaultLoadedPolicy(), policy };
+  }
+  async readPolicyState() {
+    return { ...this.policyState, policy: this.policy };
+  }
+  async writePolicyState(state: typeof this.policyState) {
+    this.policyState = state;
+    this.policy = state.policy;
   }
   async readRuntime() {
     return this.runtime;
@@ -170,6 +187,9 @@ function adapter(
     async getExchangeStatus() {
       return snapshot.exchange_status;
     },
+    async getBalances() {
+      return [{ asset: "ZUSD", source: "Balance" as const, total: 100 }];
+    },
     async getMarketSnapshot(symbol: string) {
       const market = snapshot.market_data[symbol];
       if (!market) throw new Error(`missing market snapshot for ${symbol}`);
@@ -220,9 +240,11 @@ describe("Kraken core plugin", () => {
     expect(toolNames).toEqual([
       "get_status",
       "get_runtime_snapshot",
+      "get_balances",
       "stage_intention",
       "list_intentions",
       "cancel_intention",
+      "new_policy",
       "get_policy",
       "get_journal_summary",
     ]);
@@ -245,6 +267,199 @@ describe("Kraken core plugin", () => {
     expect(bytesToBase64(hmacSha512(base64ToBytes(privateKey), message))).toBe(
       "4/dpxb3iT4tp/ZCVEwSnEsLxx0bqyhLpdfOpc6fn7OR8+UClSV5n9E6aSS8MPtnRfp32bAb0nmbRn6H8ndwLUQ==",
     );
+  });
+
+  it("loads valid project policy and exposes metadata", () => {
+    const loaded = validatePolicy(
+      parsePolicyYaml(`id: btc_micro_experiment_v1
+enabled: true
+mode: live
+
+allowedSymbols:
+  - BTC/USD
+
+maxOpenOrders: 1
+maxOpenPositions: 1
+maxDailyLossFraction: 0.60
+maxWeeklyLossFraction: 1.00
+maxRiskPerTradeFraction: 0.50
+maxMarketDataAgeMs: 10000
+maxOrderAgeSeconds: 180
+
+execution:
+  allowMarketOrders: false
+  allowLeverage: false
+  allowMargin: false
+  allowWithdrawals: false
+  postOnlyByDefault: true
+
+live:
+  requiresHumanApproval: true
+  maxAutonomousNotionalUsd: 10
+`),
+    );
+    expect(loaded.valid).toBe(true);
+    expect(loaded.policy.maxRiskPerTradeFraction).toBe(0.5);
+    expect(loaded.policy.allowedSymbols).toEqual(["BTC/USD"]);
+    expect(publicPolicyResult(loaded)).toMatchObject({
+      loaded_at: expect.any(String),
+      path: ".kraken-bot/policy.yml",
+      source: "project_file",
+      validation_errors: [],
+    });
+    expect(loaded.validation_warnings).toContain(
+      "maxRiskPerTradeFraction is above 0.05 and is high risk",
+    );
+  });
+
+  it("missing project policy falls back safely without creating a file", async () => {
+    const files = new Map<string, string>();
+    const metidos = {
+      fs: {
+        async exists(path: string) {
+          return files.has(path);
+        },
+        async mkdir() {},
+        async readText(path: string) {
+          return files.get(path) ?? "";
+        },
+        async writeText(path: string, value: string) {
+          files.set(path, value);
+        },
+      },
+    };
+    const loaded = await loadProjectPolicy(metidos as never);
+    expect(loaded).toMatchObject({ source: "default", valid: true });
+    expect(loaded.validation_warnings[0]).toContain("new_policy");
+    expect(files.has("./.kraken-bot/policy.yml")).toBe(false);
+  });
+
+  it("new_policy creates safe default project policy explicitly", async () => {
+    const files = new Map<string, string>();
+    const metidos = {
+      fs: {
+        async exists(path: string) {
+          return files.has(path);
+        },
+        async mkdir() {},
+        async readText(path: string) {
+          return files.get(path) ?? "";
+        },
+        async writeText(path: string, value: string) {
+          files.set(path, value);
+        },
+      },
+    };
+    expect(await createDefaultProjectPolicy(metidos as never)).toMatchObject({
+      created: true,
+      ok: true,
+      path: ".kraken-bot/policy.yml",
+    });
+    expect(files.get("./.kraken-bot/policy.yml")).toContain(
+      "id: conservative_spot_only_v1",
+    );
+    expect(await createDefaultProjectPolicy(metidos as never)).toMatchObject({
+      created: false,
+      ok: false,
+    });
+  });
+
+  it("malformed policy YAML disables trading", () => {
+    const loaded = validatePolicy(
+      parsePolicyYaml("id: ok\nenabled: true\nmode: paper\n"),
+    );
+    expect(loaded.valid).toBe(false);
+    expect(loaded.policy.enabled).toBe(false);
+    expect(loaded.validation_errors).toContain(
+      "allowedSymbols must be a non-empty array",
+    );
+  });
+
+  it("malformed YAML load returns invalid fail-closed policy", async () => {
+    const metidos = {
+      fs: {
+        async exists() {
+          return true;
+        },
+        async mkdir() {},
+        async readText() {
+          return "  - bad";
+        },
+        async writeText() {},
+      },
+    };
+    const loaded = await loadProjectPolicy(metidos as never);
+    expect(loaded.valid).toBe(false);
+    expect(loaded.policy.enabled).toBe(false);
+    expect(loaded.validation_errors[0]).toContain(
+      "policy YAML could not be loaded",
+    );
+  });
+
+  it("market orders and withdrawals true are rejected", () => {
+    for (const unsafe of [
+      "allowMarketOrders: true\n  allowWithdrawals: false",
+      "allowMarketOrders: false\n  allowWithdrawals: true",
+    ]) {
+      const loaded = validatePolicy(
+        parsePolicyYaml(`id: p
+enabled: true
+mode: paper
+allowedSymbols:
+  - BTC/USD
+maxOpenOrders: 1
+maxOpenPositions: 1
+maxDailyLossFraction: 0.01
+maxWeeklyLossFraction: 0.03
+maxRiskPerTradeFraction: 0.01
+maxMarketDataAgeMs: 10000
+maxOrderAgeSeconds: 180
+execution:
+  ${unsafe}
+  allowLeverage: false
+  allowMargin: false
+  postOnlyByDefault: true
+live:
+  requiresHumanApproval: true
+  maxAutonomousNotionalUsd: 10
+`),
+      );
+      expect(loaded.valid).toBe(false);
+    }
+  });
+
+  it("stageIntention rejects trades over the loaded risk limit", async () => {
+    const storage = new MemoryStorage();
+    await storage.writePolicy({
+      ...storage.policy,
+      maxRiskPerTradeFraction: 0.5,
+    });
+    expect(
+      await stageIntention(
+        storage as never,
+        validIntention({ risk_fraction: 0.51 }),
+      ),
+    ).toMatchObject({ ok: false, status: "rejected" });
+  });
+
+  it("stageIntention rejects when loaded policy is invalid", async () => {
+    const storage = new MemoryStorage();
+    await storage.writePolicyState({
+      ...defaultLoadedPolicy(),
+      policy: { ...storage.policy, enabled: false },
+      valid: false,
+      validation_errors: ["mode must be one of: paper, live"],
+    });
+    expect(
+      await stageIntention(storage as never, validIntention()),
+    ).toMatchObject({
+      ok: false,
+      reasons: [
+        "policy invalid: mode must be one of: paper, live",
+        "policy is disabled",
+      ],
+      status: "rejected",
+    });
   });
 
   it("stageIntention stores but does not execute", async () => {
@@ -292,13 +507,17 @@ describe("Kraken core plugin", () => {
   it("stale market data halts trading", async () => {
     const storage = new MemoryStorage();
     await storage.saveIntention(validIntention());
+    const fresh = freshSnapshot();
+    const btcMarket = fresh.market_data["BTC/USD"];
+    const ethMarket = fresh.market_data["ETH/USD"];
+    if (!btcMarket || !ethMarket) throw new Error("missing test market data");
     const stale = freshSnapshot({
       market_data: {
         "BTC/USD": {
-          ...freshSnapshot().market_data["BTC/USD"]!,
+          ...btcMarket,
           last_update_at: new Date(0).toISOString(),
         },
-        "ETH/USD": { ...freshSnapshot().market_data["ETH/USD"]! },
+        "ETH/USD": { ...ethMarket },
       },
     });
     const result = await runMinuteCron(storage as never, adapter(stale));
@@ -349,6 +568,61 @@ describe("Kraken core plugin", () => {
       }),
     );
     expect(result).toMatchObject({ status: "approval_requested" });
+    expect(placed).toBe(0);
+  });
+
+  it("live intention can execute without approval when file-backed policy disables approval and stays under cap", async () => {
+    const storage = new MemoryStorage();
+    storage.policy = {
+      ...storage.policy,
+      live: { maxAutonomousNotionalUsd: 10, requiresHumanApproval: false },
+      mode: "live",
+    };
+    await storage.saveIntention(
+      validIntention({
+        mode: "live",
+        quantity: 0.0001,
+        requires_human_approval: false,
+      }),
+    );
+    let placed = 0;
+    const result = await runMinuteCron(
+      storage as never,
+      adapter(freshSnapshot(), {
+        async placeLimitOrder(orderIntent) {
+          placed++;
+          return { clientOrderId: `live-${orderIntent.id}` };
+        },
+      }),
+    );
+    expect(result).toMatchObject({ status: "live_order" });
+    expect(placed).toBe(1);
+  });
+
+  it("autonomous live intention above notional cap is rejected", async () => {
+    const storage = new MemoryStorage();
+    storage.policy = {
+      ...storage.policy,
+      live: { maxAutonomousNotionalUsd: 10, requiresHumanApproval: false },
+      mode: "live",
+    };
+    await storage.saveIntention(
+      validIntention({ mode: "live", requires_human_approval: false }),
+    );
+    let placed = 0;
+    const result = await runMinuteCron(
+      storage as never,
+      adapter(freshSnapshot(), {
+        async placeLimitOrder() {
+          placed++;
+          return { clientOrderId: "bad" };
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      reasons: ["autonomous live notional exceeds policy cap"],
+      status: "rejected",
+    });
     expect(placed).toBe(0);
   });
 

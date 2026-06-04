@@ -54,8 +54,16 @@ export async function krakenPrivateRequest(
   path: string,
   params: Record<string, Scalar | Scalar[]> = {},
 ): Promise<unknown> {
-  const apiKey = metidos.env.get("KRAKEN_API_KEY");
-  const privateKey = metidos.env.get("KRAKEN_PRIVATE_KEY");
+  const apiKeySetting = metidos.settings.get("api_key");
+  const personalKeySetting = metidos.settings.get("personal_key");
+  const apiKey =
+    (typeof apiKeySetting === "string" && apiKeySetting.trim()
+      ? apiKeySetting
+      : null) ?? metidos.env.get("KRAKEN_API_KEY");
+  const privateKey =
+    (typeof personalKeySetting === "string" && personalKeySetting.trim()
+      ? personalKeySetting
+      : null) ?? metidos.env.get("KRAKEN_PRIVATE_KEY");
   if (!apiKey || !privateKey)
     throw new Error("Kraken API credentials are not configured.");
   const bodyParams = { ...params, nonce: nonce() };
@@ -78,10 +86,21 @@ export async function krakenPrivateRequest(
   return response.json();
 }
 
+export type KrakenBalance = {
+  asset: string;
+  total: number;
+  available?: number;
+  credit?: number;
+  creditUsed?: number;
+  holdTrade?: number;
+  source: "Balance" | "BalanceEx";
+};
+
 export type TradingAdapter = {
   getRuntimeSnapshot(): Promise<RuntimeSnapshot>;
   getExchangeStatus(): Promise<RuntimeSnapshot["exchange_status"]>;
   getAccountSnapshot(): Promise<RuntimeSnapshot["account"]>;
+  getBalances(): Promise<KrakenBalance[]>;
   getMarketSnapshot(
     symbol: string,
   ): Promise<RuntimeSnapshot["market_data"][string]>;
@@ -246,6 +265,102 @@ export function createKrakenAdapter(
     }
   }
 
+  function krakenErrors(response: { error?: unknown[] }): string[] {
+    return (response.error ?? [])
+      .map((entry) => String(entry))
+      .filter((entry) => entry.trim().length > 0);
+  }
+
+  function nonZeroBalance(balance: KrakenBalance): boolean {
+    return [
+      balance.total,
+      balance.available,
+      balance.credit,
+      balance.creditUsed,
+      balance.holdTrade,
+    ].some((value) => typeof value === "number" && value !== 0);
+  }
+
+  async function getBalances(): Promise<KrakenBalance[]> {
+    const extended = (await krakenPrivateRequest(
+      metidos,
+      "/0/private/BalanceEx",
+      {},
+    )) as {
+      error?: unknown[];
+      result?: Record<
+        string,
+        | string
+        | number
+        | {
+            balance?: string | number;
+            credit?: string | number;
+            credit_used?: string | number;
+            hold_trade?: string | number;
+          }
+      >;
+    };
+    const extendedErrors = krakenErrors(extended);
+    if (extendedErrors.length > 0) {
+      // Fall back for Kraken accounts/API keys where BalanceEx is unavailable,
+      // but do not silently hide failures if the legacy endpoint also fails.
+      const legacy = (await krakenPrivateRequest(
+        metidos,
+        "/0/private/Balance",
+        {},
+      )) as { error?: unknown[]; result?: Record<string, string | number> };
+      const legacyErrors = krakenErrors(legacy);
+      if (legacyErrors.length > 0) {
+        throw new Error(
+          `Kraken balance requests failed: BalanceEx=${extendedErrors.join("; ")}; Balance=${legacyErrors.join("; ")}`,
+        );
+      }
+      return Object.entries(legacy.result ?? {})
+        .map(([asset, rawTotal]) => ({
+          asset,
+          source: "Balance" as const,
+          total: Number(rawTotal),
+        }))
+        .filter(
+          (balance) => Number.isFinite(balance.total) && balance.total !== 0,
+        )
+        .sort((left, right) => left.asset.localeCompare(right.asset));
+    }
+
+    const balances: KrakenBalance[] = [];
+    for (const [asset, raw] of Object.entries(extended.result ?? {})) {
+      if (typeof raw === "string" || typeof raw === "number") {
+        const total = Number(raw);
+        if (Number.isFinite(total) && total !== 0) {
+          balances.push({ asset, source: "BalanceEx", total });
+        }
+        continue;
+      }
+      if (!raw || typeof raw !== "object") continue;
+      const total = Number(raw.balance ?? 0);
+      const holdTrade = Number(raw.hold_trade ?? 0);
+      const credit = Number(raw.credit ?? 0);
+      const creditUsed = Number(raw.credit_used ?? 0);
+      const available =
+        Number.isFinite(total) && Number.isFinite(holdTrade)
+          ? total - holdTrade
+          : undefined;
+      const balance: KrakenBalance = {
+        asset,
+        source: "BalanceEx",
+        total: Number.isFinite(total) ? total : 0,
+      };
+      if (available !== undefined) balance.available = available;
+      if (Number.isFinite(holdTrade)) balance.holdTrade = holdTrade;
+      if (Number.isFinite(credit)) balance.credit = credit;
+      if (Number.isFinite(creditUsed)) balance.creditUsed = creditUsed;
+      if (nonZeroBalance(balance)) balances.push(balance);
+    }
+    return balances.sort((left, right) =>
+      left.asset.localeCompare(right.asset),
+    );
+  }
+
   async function getAccountSnapshot(): Promise<RuntimeSnapshot["account"]> {
     const runtime = await runtimeProvider();
     let equity: number | null = null;
@@ -282,6 +397,7 @@ export function createKrakenAdapter(
       });
     },
     getAccountSnapshot,
+    getBalances,
     getExchangeStatus,
     getMarketSnapshot,
     async getRuntimeSnapshot() {

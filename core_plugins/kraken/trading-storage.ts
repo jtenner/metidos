@@ -10,8 +10,10 @@ import {
   type TradingPolicy,
   type TradingRuntime,
 } from "./trading-types";
+import { defaultLoadedPolicy, type LoadedPolicy } from "./policy-loader";
 
 const POLICY_PATH = "~/trading/policy.json";
+const POLICY_STATE_PATH = "~/trading/policy-state.json";
 const RUNTIME_PATH = "~/trading/runtime.json";
 const KILL_SWITCH_PATH = "~/trading/kill-switch.json";
 const LOCK_PATH = "~/trading/runtime-lock.json";
@@ -66,18 +68,43 @@ export class TradingStorage {
     await ensureTradingDirs(this.metidos);
     if (!(await this.metidos.fs.exists(POLICY_PATH)))
       await this.writePolicy(DEFAULT_POLICY);
+    if (!(await this.metidos.fs.exists(POLICY_STATE_PATH)))
+      await this.writePolicyState(defaultLoadedPolicy());
     if (!(await this.metidos.fs.exists(RUNTIME_PATH)))
       await this.writeRuntime(DEFAULT_RUNTIME);
     if (!(await this.metidos.fs.exists(KILL_SWITCH_PATH)))
       await this.writeKillSwitch(DEFAULT_KILL_SWITCH);
   }
 
-  readPolicy(): Promise<TradingPolicy> {
-    return readJson(this.metidos, POLICY_PATH, DEFAULT_POLICY);
+  async readPolicy(): Promise<TradingPolicy> {
+    return (await this.readPolicyState()).policy;
   }
 
   writePolicy(policy: TradingPolicy): Promise<void> {
-    return writeJson(this.metidos, POLICY_PATH, policy);
+    return this.writePolicyState({
+      ...defaultLoadedPolicy(),
+      policy,
+      source: "default",
+      validation_warnings: [
+        "policy was written to plugin storage; project .kraken-bot/policy.yml remains the human-editable source of truth",
+      ],
+    });
+  }
+
+  async readPolicyState(): Promise<LoadedPolicy> {
+    const state = await readJson<LoadedPolicy | null>(
+      this.metidos,
+      POLICY_STATE_PATH,
+      null,
+    );
+    if (state?.policy) return state;
+    const legacy = await readJson(this.metidos, POLICY_PATH, DEFAULT_POLICY);
+    return { ...defaultLoadedPolicy(), policy: legacy };
+  }
+
+  async writePolicyState(state: LoadedPolicy): Promise<void> {
+    await writeJson(this.metidos, POLICY_STATE_PATH, state);
+    await writeJson(this.metidos, POLICY_PATH, state.policy);
   }
 
   readRuntime(): Promise<TradingRuntime> {

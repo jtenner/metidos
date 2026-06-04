@@ -47,7 +47,8 @@ function normalizeIntention(
     raw.expires_at,
     new Date(Date.now() + policy.maxOrderAgeSeconds * 1000).toISOString(),
   );
-  const mode = raw.mode === "live" ? "live" : "paper";
+  const mode =
+    raw.mode === "live" ? "live" : raw.mode === "paper" ? "paper" : policy.mode;
   return {
     created_at: createdAt,
     expires_at: expiresAt,
@@ -78,9 +79,17 @@ export async function stageIntention(
   input: unknown,
 ): Promise<Record<string, unknown>> {
   await storage.initialize();
-  const policy = await storage.readPolicy();
+  const policyState = await storage.readPolicyState();
+  const policy = policyState.policy;
   const intention = normalizeIntention(input, policy);
   const reasons: string[] = [];
+  if (!policyState.valid)
+    reasons.push(
+      ...policyState.validation_errors.map(
+        (reason) => `policy invalid: ${reason}`,
+      ),
+    );
+  if (!policy.enabled) reasons.push("policy is disabled");
   if (!intention.id) reasons.push("id is required");
   if (!policy.allowedSymbols.includes(intention.symbol))
     reasons.push("symbol must be in policy.allowedSymbols");
@@ -105,8 +114,19 @@ export async function stageIntention(
     reasons.push("expires_at must be in the future when staged");
   if (intention.policy_id !== policy.id)
     reasons.push("policy_id must match active policy");
+  if (intention.mode !== policy.mode)
+    reasons.push(
+      "intention mode must match the operator-selected trading mode",
+    );
   if (intention.risk_fraction > policy.maxRiskPerTradeFraction)
     reasons.push("risk_fraction exceeds policy.maxRiskPerTradeFraction");
+  if (
+    intention.mode === "live" &&
+    !policy.live.requiresHumanApproval &&
+    intention.limit_price * intention.quantity >
+      policy.live.maxAutonomousNotionalUsd
+  )
+    reasons.push("autonomous live notional exceeds policy cap");
   if (
     (input as Record<string, unknown>)?.leverage ||
     (input as Record<string, unknown>)?.margin ||
@@ -250,25 +270,30 @@ export async function runMinuteCron(
   if (!(await storage.acquireLock(CRON_LOCK, 90_000)))
     return { status: "locked" };
   try {
-    const policy = await storage.readPolicy();
+    const policyState = await storage.readPolicyState();
+    const policy = policyState.policy;
     let runtime = await storage.readRuntime();
     const killSwitch = await storage.readKillSwitch();
     runtime = { ...runtime, lastCronAt: nowIso() };
     await storage.writeRuntime(runtime);
 
-    if (!policy.enabled) {
+    if (!policyState.valid || !policy.enabled) {
       await storage.appendJournal(
         makeJournalEntry({
           intention_id: null,
           policy_id: policy.id,
-          safe_details: {},
+          safe_details: { validation_errors: policyState.validation_errors },
           strategy_id: null,
-          summary: "Policy disabled; no action.",
+          summary: policyState.valid
+            ? "Policy disabled; no action."
+            : "Policy invalid; trading disabled fail-closed.",
           symbol: null,
           type: "NO_ACTION",
         }),
       );
-      return { status: "disabled" };
+      return policyState.valid
+        ? { status: "disabled" }
+        : { reasons: policyState.validation_errors, status: "policy_invalid" };
     }
     if (killSwitch.latched || killSwitch.panic) {
       await storage.appendJournal(

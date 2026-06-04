@@ -4,13 +4,15 @@
   "version": "1.0.0",
   "metidosApiVersion": "v1",
   "main": "./index.ts",
-  "description": "Constrained Kraken trading operations plugin. Agents stage intentions only; a minute cron routes intentions through deterministic safety checks before paper simulation or approved live limit-order execution.",
+  "description": "Constrained Kraken trading operations plugin. Agents stage intentions only; a minute cron routes intentions through deterministic safety checks before paper simulation or live limit-order execution gated by human approval or a capped autonomous budget.",
   "color": "#5741d9",
   "permissions": [
     "network:fetch",
     "network:websocket",
     "storage:read",
     "storage:write",
+    "files:read",
+    "files:write",
     "cron:create",
     "notification:send"
   ],
@@ -19,6 +21,12 @@
     "webSocketAllow": ["wss://ws.kraken.com/v2", "wss://ws-auth.kraken.com/v2"],
     "enforceHttps": true
   },
+  "files": {
+    "allow": {
+      "read": ["./.kraken-bot/policy.yml"],
+      "write": ["./.kraken-bot/**"]
+    }
+  },
   "settings": [
     {
       "key": "enabled",
@@ -26,20 +34,34 @@
       "kind": "boolean",
       "required": true,
       "default": false,
-      "description": "When false, the minute cron exits before evaluating or executing staged intentions. Keep disabled until the local operator is ready."
+      "description": "When false, the minute cron exits before evaluating or executing staged intentions. Keep disabled until the local operator is ready. Bot policy is controlled by .kraken-bot/policy.yml."
+    },
+    {
+      "key": "api_key",
+      "label": "API key",
+      "kind": "secret",
+      "required": true,
+      "description": "Kraken API key used internally by the execution guard for approved private Spot REST calls. Agents cannot directly sign or call raw endpoints."
+    },
+    {
+      "key": "personal_key",
+      "label": "Personal key",
+      "kind": "secret",
+      "required": true,
+      "description": "Kraken personal/private key (API secret) used internally to generate API-Sign headers for approved private Spot REST calls."
     }
   ],
   "env": [
     {
       "key": "KRAKEN_API_KEY",
-      "description": "Kraken API key used internally by the execution guard for approved private Spot REST calls. Agents cannot directly sign or call raw endpoints.",
-      "required": true,
+      "description": "Optional environment fallback for the Kraken API key when the api_key plugin setting is unset.",
+      "required": false,
       "secret": true
     },
     {
       "key": "KRAKEN_PRIVATE_KEY",
-      "description": "Kraken private key/API secret used internally to generate API-Sign headers for approved private Spot REST calls.",
-      "required": true,
+      "description": "Optional environment fallback for the Kraken personal/private key when the personal_key plugin setting is unset.",
+      "required": false,
       "secret": true
     }
   ],
@@ -60,6 +82,11 @@
           "timeoutMs": 10000
         },
         {
+          "name": "get_balances",
+          "description": "Read normalized non-zero Kraken account balances. Read-only.",
+          "timeoutMs": 10000
+        },
+        {
           "name": "stage_intention",
           "description": "Validate and store a trade intention for deterministic cron review; never places orders.",
           "timeoutMs": 10000
@@ -75,8 +102,13 @@
           "timeoutMs": 10000
         },
         {
+          "name": "new_policy",
+          "description": "Create .kraken-bot/policy.yml from safe defaults.",
+          "timeoutMs": 10000
+        },
+        {
           "name": "get_policy",
-          "description": "Read the active conservative trading policy.",
+          "description": "Read the active project-file-backed trading policy.",
           "timeoutMs": 10000
         },
         {
