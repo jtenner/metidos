@@ -253,8 +253,13 @@ type DiffWorkspaceProps = {
   activeWorktreeChanges: RpcWorktreeChange[];
   diffFilePatchState: DiffFilePatchState;
   diffFileTree: DiffFileTreeNode[];
+  gitInitializationError: string;
+  gitInitializationState: "idle" | "initializing";
   hasActiveWorktreeSnapshot: boolean;
   isRefreshingWorktreeSnapshot: boolean;
+  nonGitRepositoryDeclined: boolean;
+  onDeclineGitInitialization: () => void;
+  onInitializeGitRepository: () => void;
   onRefresh: () => void;
   onSelectedDiffFilePathChange: (path: string) => void;
   refreshDisabled: boolean;
@@ -264,6 +269,15 @@ type DiffWorkspaceProps = {
   variant: "desktop" | "mobile";
   worktreeDiffError: string;
 };
+
+export function isNonGitRepositoryDiffError(error: string): boolean {
+  const normalized = error.toLowerCase();
+  return (
+    normalized.includes("not a git repository") ||
+    normalized.includes("must be run in a work tree") ||
+    normalized.includes("worktree not found for project")
+  );
+}
 
 function diffWorkspaceIds(variant: "desktop" | "mobile") {
   return {
@@ -286,8 +300,13 @@ export function DiffWorkspace({
   activeWorktreeChanges,
   diffFilePatchState,
   diffFileTree,
+  gitInitializationError,
+  gitInitializationState,
   hasActiveWorktreeSnapshot,
   isRefreshingWorktreeSnapshot,
+  nonGitRepositoryDeclined,
+  onDeclineGitInitialization,
+  onInitializeGitRepository,
   onRefresh,
   onSelectedDiffFilePathChange,
   refreshDisabled,
@@ -301,6 +320,11 @@ export function DiffWorkspace({
   const parsedDiffState = useDiffParseResult(diffFilePatchState.diffText);
   const diffStats = parsedDiffState.result.summary;
   const ids = diffWorkspaceIds(variant);
+  const shouldShowNonGitRepositoryState = Boolean(
+    worktreeDiffError &&
+      !hasActiveWorktreeSnapshot &&
+      isNonGitRepositoryDiffError(worktreeDiffError),
+  );
 
   // Left panel renders a single fallback/content state using ordered branches.
   const selectorContent =
@@ -311,6 +335,39 @@ export function DiffWorkspace({
     ) : !activeSelectedWorktreeOpened ? (
       <div className="border border-border-subtle bg-surface-1 px-4 py-4 text-sm text-text-muted">
         Open this worktree from the Projects panel to inspect its live diff.
+      </div>
+    ) : nonGitRepositoryDeclined && !hasActiveWorktreeSnapshot ? (
+      <div className="border border-border-default bg-surface-1 px-4 py-4 text-sm text-text-secondary">
+        This is not a git repo, cannot display diff.
+      </div>
+    ) : shouldShowNonGitRepositoryState ? (
+      <div className="border border-border-default bg-surface-1 px-4 py-4 text-sm text-text-secondary">
+        <p className="text-text-primary">
+          Would you like to make this project {selectedProject.name} a git repo?
+        </p>
+        {gitInitializationError ? (
+          <p className="mt-2 text-xs text-danger-text">
+            {gitInitializationError}
+          </p>
+        ) : null}
+        <div className="mt-3 flex items-center gap-2">
+          <AppButton
+            type="button"
+            buttonStyle="primary"
+            onClick={onInitializeGitRepository}
+            disabled={gitInitializationState === "initializing"}
+          >
+            {gitInitializationState === "initializing" ? "Initializing" : "Yes"}
+          </AppButton>
+          <AppButton
+            type="button"
+            buttonStyle="muted"
+            onClick={onDeclineGitInitialization}
+            disabled={gitInitializationState === "initializing"}
+          >
+            No
+          </AppButton>
+        </div>
       </div>
     ) : isRefreshingWorktreeSnapshot && !hasActiveWorktreeSnapshot ? (
       <div className="border border-border-default bg-surface-2 px-4 py-4 text-sm text-text-secondary">
@@ -420,7 +477,9 @@ export function DiffWorkspace({
               {isRefreshingWorktreeSnapshot ? "Syncing" : "Refresh"}
             </AppButton>
           </div>
-          {worktreeDiffError && hasActiveWorktreeSnapshot ? (
+          {worktreeDiffError &&
+          hasActiveWorktreeSnapshot &&
+          !isNonGitRepositoryDiffError(worktreeDiffError) ? (
             <div className="mt-3 border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text">
               {worktreeDiffError}
             </div>

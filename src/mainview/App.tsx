@@ -67,6 +67,7 @@ import {
   applyMainviewShellThreadStartRequestResolved,
   applyMainviewShellThreadStatusEvent,
   buildMainviewShellHiddenWorktreeHydration,
+  buildMainviewShellOpenedWorktreeHydration,
   buildMainviewShellProjectWorktreeHydration,
   buildMainviewShellSelectedThreadDetailRefreshState,
   buildMainviewShellWorktreePinRollback,
@@ -478,6 +479,12 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   const [threadActionMenu, setThreadActionMenu] =
     useState<ThreadActionMenuState | null>(null);
   const [projectActionMenuError, setProjectActionMenuError] = useState("");
+  const [gitInitializationState, setGitInitializationState] = useState<
+    "idle" | "initializing"
+  >("idle");
+  const [gitInitializationError, setGitInitializationError] = useState("");
+  const [declinedGitInitializationKeys, setDeclinedGitInitializationKeys] =
+    useState<Set<string>>(() => new Set());
   const [
     projectActionMenuHiddenWorktreePath,
     setProjectActionMenuHiddenWorktreePath,
@@ -1735,6 +1742,105 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
     setSelectedDiffFilePath,
     setWorktreeState,
   });
+  const gitInitializationKey =
+    selectedProject && activeSelectedWorktreePath
+      ? `${selectedProject.id}:${activeSelectedWorktreePath}`
+      : null;
+  const nonGitRepositoryDeclined = gitInitializationKey
+    ? declinedGitInitializationKeys.has(gitInitializationKey)
+    : false;
+
+  const handleDeclineGitInitialization = useCallback(() => {
+    if (!gitInitializationKey) {
+      return;
+    }
+    setGitInitializationError("");
+    setDeclinedGitInitializationKeys((current) => {
+      const next = new Set(current);
+      next.add(gitInitializationKey);
+      return next;
+    });
+  }, [gitInitializationKey]);
+
+  const handleInitializeGitRepository = useCallback(async (): Promise<void> => {
+    if (!selectedProject || !activeSelectedWorktreePath) {
+      return;
+    }
+
+    setGitInitializationState("initializing");
+    setGitInitializationError("");
+    try {
+      const result = await procedures.openProject({
+        projectPath: selectedProject.path,
+        name: selectedProject.name,
+        initGitIfNeeded: true,
+        pinWorktree: true,
+      });
+      upsertProject(result.project);
+      setProjectState(
+        result.project.id,
+        buildMainviewShellProjectWorktreeHydration(result.worktrees),
+      );
+      setWorktreeState(result.project.id, activeSelectedWorktreePath, {
+        loading: true,
+        opened: true,
+        error: "",
+      });
+      const openedWorktree = await procedures.openWorktree({
+        projectId: result.project.id,
+        worktreePath: activeSelectedWorktreePath,
+      });
+      primeGitHistoryResult(openedWorktree.history);
+      setWorktreeState(result.project.id, activeSelectedWorktreePath, {
+        loading: false,
+        opened: true,
+        snapshot: openedWorktree.worktree,
+        error: "",
+      });
+      setProjectState(
+        result.project.id,
+        buildMainviewShellOpenedWorktreeHydration({
+          currentProjectState: getProjectState(result.project.id),
+          worktreePath: activeSelectedWorktreePath,
+          worktrees: openedWorktree.worktrees,
+        }),
+      );
+      if (gitInitializationKey) {
+        setDeclinedGitInitializationKeys((current) => {
+          if (!current.has(gitInitializationKey)) {
+            return current;
+          }
+          const next = new Set(current);
+          next.delete(gitInitializationKey);
+          return next;
+        });
+      }
+      await refreshActiveWorktreeSnapshot();
+    } catch (error) {
+      setWorktreeState(selectedProject.id, activeSelectedWorktreePath, {
+        loading: false,
+        opened: false,
+        snapshot: undefined,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setGitInitializationError(
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setGitInitializationState("idle");
+    }
+  }, [
+    activeSelectedWorktreePath,
+    getProjectState,
+    gitInitializationKey,
+    primeGitHistoryResult,
+    procedures,
+    refreshActiveWorktreeSnapshot,
+    selectedProject,
+    setProjectState,
+    setWorktreeState,
+    upsertProject,
+  ]);
 
   const discardThreadIfEmpty = useCallback(
     async (threadId: number): Promise<void> => {
@@ -3697,8 +3803,13 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                     activeWorktreeChanges={activeWorktreeChanges}
                     diffFilePatchState={diffFilePatchState}
                     diffFileTree={diffFileTree}
+                    gitInitializationError={gitInitializationError}
+                    gitInitializationState={gitInitializationState}
                     hasActiveWorktreeSnapshot={Boolean(activeWorktreeSnapshot)}
                     isRefreshingWorktreeSnapshot={isRefreshingWorktreeSnapshot}
+                    nonGitRepositoryDeclined={nonGitRepositoryDeclined}
+                    onDeclineGitInitialization={handleDeclineGitInitialization}
+                    onInitializeGitRepository={handleInitializeGitRepository}
                     onRefresh={handleRefreshActiveDiff}
                     onSelectedDiffFilePathChange={setSelectedDiffFilePath}
                     refreshDisabled={
@@ -4049,8 +4160,13 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                   activeWorktreeChanges={activeWorktreeChanges}
                   diffFilePatchState={diffFilePatchState}
                   diffFileTree={diffFileTree}
+                  gitInitializationError={gitInitializationError}
+                  gitInitializationState={gitInitializationState}
                   hasActiveWorktreeSnapshot={Boolean(activeWorktreeSnapshot)}
                   isRefreshingWorktreeSnapshot={isRefreshingWorktreeSnapshot}
+                  nonGitRepositoryDeclined={nonGitRepositoryDeclined}
+                  onDeclineGitInitialization={handleDeclineGitInitialization}
+                  onInitializeGitRepository={handleInitializeGitRepository}
                   onRefresh={handleRefreshActiveDiff}
                   onSelectedDiffFilePathChange={setSelectedDiffFilePath}
                   refreshDisabled={
