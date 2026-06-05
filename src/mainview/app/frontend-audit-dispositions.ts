@@ -66,7 +66,9 @@
  *     propagation on the inline copy control.
  * 29. Sidebar collapsed ref/state: accepted; the ref is a synchronous bridge for
  *     callback logic while React state remains the render source of truth.
- * 30. Remote markdown image loading policy: deferred to a future security-hardening slice.
+ * 30. Remote markdown image loading policy: fixed; markdown images render as
+ *     blocked placeholders until the user explicitly loads a sanitized HTTP(S)
+ *     or generated data-image source, and unsafe schemes have no load affordance.
  */
 
 export {};
