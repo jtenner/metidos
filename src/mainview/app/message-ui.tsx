@@ -1441,13 +1441,15 @@ export function FileChangeMessage({
 
   const headerContent = (
     <>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="uppercase-label text-accent">
           File Change -{" "}
-          <span className="truncate font-mono text-text-primary">{path}</span>
+          <span className="font-mono text-text-primary break-words">
+            {path}
+          </span>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 self-start">
         <div className="status-pill">{rendering.stateLabel}</div>
         {rendering.hasDiff ? (
           <span className="text-text-muted">
@@ -1468,7 +1470,7 @@ export function FileChangeMessage({
           <AppButton
             unstyled
             type="button"
-            className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
+            className="flex min-w-0 flex-1 items-start justify-between gap-4 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
             onClick={toggleExpanded}
             aria-controls={rendering.diffRegionId}
             aria-expanded={isExpanded}
@@ -1477,7 +1479,7 @@ export function FileChangeMessage({
             {headerContent}
           </AppButton>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
             {headerContent}
           </div>
         )}
