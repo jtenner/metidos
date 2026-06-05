@@ -5,7 +5,11 @@
 
 import { describe, expect, it } from "bun:test";
 
-import type { RpcModelOption, RpcThreadDetail } from "../bun/rpc-schema";
+import type {
+  RpcModelOption,
+  RpcThreadDetail,
+  RpcThreadMessage,
+} from "../bun/rpc-schema";
 import {
   finishChatComposerImageAttachmentRead,
   readChatComposerImageAttachments,
@@ -24,6 +28,7 @@ import {
   removeOptimisticThreadMessageById,
   SEND_THREAD_MESSAGE_TIMEOUT_MS,
   sendThreadTurn,
+  shouldApplyOptimisticThreadSendToSelection,
   shouldApplySentThreadDetailToSelection,
   shouldApplyThreadSendFailureToSelection,
 } from "./thread-send";
@@ -89,6 +94,21 @@ describe("thread send selection helpers", () => {
     ).toBeTrue();
     expect(
       shouldApplyThreadSendFailureToSelection({
+        requestedThreadId: 17,
+        selectedThreadId: 42,
+      }),
+    ).toBeFalse();
+  });
+
+  it("only appends optimistic send content while the initiating thread remains selected", () => {
+    expect(
+      shouldApplyOptimisticThreadSendToSelection({
+        requestedThreadId: 17,
+        selectedThreadId: 17,
+      }),
+    ).toBeTrue();
+    expect(
+      shouldApplyOptimisticThreadSendToSelection({
         requestedThreadId: 17,
         selectedThreadId: 42,
       }),
@@ -520,6 +540,72 @@ describe("optimistic thread send helpers", () => {
     expect(readChatComposerDraft("", draftKey)).toBe("Please inspect this");
     expect(readChatComposerImageAttachments(draftKey)).toHaveLength(1);
     expect(isSending).toBeFalse();
+  });
+
+  it("does not append an optimistic message after switching threads during image reads", async () => {
+    const selectedThreadIdRef = { current: 17 as number | null };
+    const messages: RpcThreadMessage[] = [];
+    const upsertedThreadStates: string[] = [];
+    const selectedThreadRunStateRef = { current: "idle" as const };
+
+    resetChatComposerImageAttachmentStoreForTest();
+    setChatComposerDraft("", "thread:17");
+    setChatComposerImageAttachments([], "thread:17");
+    startChatComposerImageAttachmentRead("thread:17");
+
+    sendThreadTurn({
+      activeCodexModel: "openai:gpt-5.4",
+      codexModels: [
+        {
+          id: "openai:gpt-5.4",
+          label: "GPT-5.4",
+          supportsImageInput: true,
+        } as unknown as RpcModelOption,
+      ],
+      draftKey: "thread:17",
+      initialChatInput: "",
+      isSending: false,
+      optimisticThreadMessageIdRef: { current: -1 },
+      procedures: {
+        sendThreadMessage: async (params) => threadDetail(params.threadId),
+      },
+      selectedThread: threadDetail(17).thread,
+      selectedThreadDetailRefreshKeyRef: { current: null },
+      selectedThreadIdRef,
+      selectedThreadIsWorking: false,
+      selectedThreadRunStateRef,
+      setChatError: () => {},
+      setIsSending: () => {},
+      setThreadMessages: (value) => {
+        const next = typeof value === "function" ? value(messages) : value;
+        messages.splice(0, messages.length, ...next);
+      },
+      upsertThread: (thread) => {
+        upsertedThreadStates.push(thread.runStatus.state);
+      },
+    });
+
+    await Promise.resolve();
+    selectedThreadIdRef.current = 42;
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 16_384,
+          data: "iVBORw0KGgo=",
+          id: "image-1",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      "thread:17",
+    );
+    finishChatComposerImageAttachmentRead("thread:17");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(messages).toEqual([]);
+    expect(selectedThreadRunStateRef.current).toBe("idle");
+    expect(upsertedThreadStates).toContain("working");
   });
 
   it("waits for in-flight image attachment reads before sending", async () => {

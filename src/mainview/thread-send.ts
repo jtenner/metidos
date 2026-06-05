@@ -97,6 +97,17 @@ export function shouldApplyThreadSendFailureToSelection(
 }
 
 /**
+ * Only append local optimistic transcript content while the initiating thread
+ * remains selected. Async prerequisites (image reads, first-thread creation) can
+ * finish after the user has moved to another thread.
+ */
+export function shouldApplyOptimisticThreadSendToSelection(
+  options: ThreadSendFailureSelectionOptions,
+): boolean {
+  return shouldApplyThreadSendFailureToSelection(options);
+}
+
+/**
  * Only replace the visible transcript when the send completion still belongs
  * to the selected thread that initiated the request.
  */
@@ -315,22 +326,31 @@ export function sendThreadTurn({
       }
       const requestThreadId = sendingThreadId;
 
-      setThreadMessages((current) => [
-        ...current,
-        buildOptimisticUserThreadMessage({
-          createdAt: optimisticStartedAt,
-          id: optimisticMessageId,
-          images: pendingImages.map(({ data, mimeType, type }) => ({
-            data,
-            mimeType,
-            type,
-          })),
-          text: pendingDisplayText,
-          threadId: requestThreadId,
-        }),
-      ]);
+      const shouldApplyOptimisticSend =
+        shouldApplyOptimisticThreadSendToSelection({
+          requestedThreadId: requestThreadId,
+          selectedThreadId: selectedThreadIdRef.current,
+        });
+      if (shouldApplyOptimisticSend) {
+        setThreadMessages((current) => [
+          ...current,
+          buildOptimisticUserThreadMessage({
+            createdAt: optimisticStartedAt,
+            id: optimisticMessageId,
+            images: pendingImages.map(({ data, mimeType, type }) => ({
+              data,
+              mimeType,
+              type,
+            })),
+            text: pendingDisplayText,
+            threadId: requestThreadId,
+          }),
+        ]);
+      }
       if (targetThread) {
-        selectedThreadRunStateRef.current = "working";
+        if (shouldApplyOptimisticSend) {
+          selectedThreadRunStateRef.current = "working";
+        }
         upsertThread({
           ...targetThread,
           updatedAt: optimisticStartedAt,
