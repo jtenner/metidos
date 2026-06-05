@@ -27,8 +27,17 @@ interface ReuseIndex {
 type LinkReferenceDefinitions = ReadonlyMap<string, LinkReferenceDefinition>;
 
 const emptyLinkReferenceDefinitions: LinkReferenceDefinitions = new Map();
+const MAX_BLOCKQUOTE_NESTING = 256;
 
 export function parseDocument(content: string, previous?: ParsedDocument | null): ParsedDocument {
+  return parseDocumentInternal(content, previous, 0);
+}
+
+function parseDocumentInternal(
+  content: string,
+  previous: ParsedDocument | null | undefined,
+  blockquoteNestingDepth: number,
+): ParsedDocument {
   const normalized = normalizeSource(content);
   if (previous?.content === normalized) return previous;
 
@@ -51,7 +60,7 @@ export function parseDocument(content: string, previous?: ParsedDocument | null)
       continue;
     }
 
-    const blockQuote = parseBlockQuote(lines, lineIndex, reuse);
+    const blockQuote = parseBlockQuote(lines, lineIndex, reuse, blockquoteNestingDepth);
     if (blockQuote) {
       blocks.push(blockQuote.block);
       lineIndex = blockQuote.nextLine;
@@ -117,6 +126,7 @@ function parseBlockQuote(
   lines: readonly SourceLine[],
   startLine: number,
   reuse: ReuseIndex | null,
+  blockquoteNestingDepth: number,
 ): { block: BlockQuoteBlock; nextLine: number } | null {
   if (!isBlockQuoteLine(lines[startLine]!.text)) return null;
 
@@ -149,16 +159,45 @@ function parseBlockQuote(
   const reusable = consumeReusableBlock<BlockQuoteBlock>("blockquote", lines[startLine]!.start, raw, reuse);
   if (reusable) return { block: reusable, nextLine };
   const childContent = parts.join("\n").trim() === "" ? "" : parts.join("\n");
-  const childDocument = parseDocument(childContent);
+  const childBlocks =
+    blockquoteNestingDepth >= MAX_BLOCKQUOTE_NESTING
+      ? parseCappedBlockQuoteChildren(childContent, lines[startLine]!.start, raw)
+      : parseDocumentInternal(
+          childContent,
+          null,
+          blockquoteNestingDepth + 1,
+        ).blocks;
   const block: BlockQuoteBlock = {
     id: blockId("blockquote", lines[startLine]!.start, raw),
     kind: "blockquote",
     raw,
     start: lines[startLine]!.start,
     end,
-    blocks: childDocument.blocks,
+    blocks: childBlocks,
   };
   return { block: reuseBlock(block, reuse), nextLine };
+}
+
+function parseCappedBlockQuoteChildren(
+  childContent: string,
+  start: number,
+  raw: string,
+): readonly MarkdownBlockNode[] {
+  const text = normalizeParagraphText(childContent);
+  if (text.length === 0) {
+    return [];
+  }
+
+  const paragraph: ParagraphBlock = {
+    id: blockId("paragraph", start, raw),
+    kind: "paragraph",
+    raw: childContent,
+    start,
+    end: start + raw.length,
+    text,
+    children: parseInlines(text, emptyLinkReferenceDefinitions),
+  };
+  return [paragraph];
 }
 
 function isBlockQuoteLine(line: string): boolean {

@@ -15,6 +15,14 @@ export type InteractionMode = "chat" | "terminal";
 const SELECTED_TERMINAL_KEY = "metidos:terminal:selected-id";
 const INTERACTION_MODE_KEY = "metidos:interaction-mode";
 const CHAT_DRAFT_KEY_PREFIX = "metidos:thread:";
+export const CHAT_DRAFT_PERSIST_DEBOUNCE_MS = 300;
+
+type PendingChatDraftWrite = {
+  draft: string;
+  timerId: number;
+};
+
+const pendingChatDraftWrites = new Map<number, PendingChatDraftWrite>();
 
 function readInteractionMode(): InteractionMode {
   if (typeof window === "undefined") {
@@ -69,6 +77,45 @@ export function writePersistedChatDraft(
     return;
   }
   window.localStorage.setItem(chatDraftStorageKey(threadId), draft);
+}
+
+export function flushPendingPersistedChatDraftWrites(): void {
+  if (typeof window === "undefined") {
+    pendingChatDraftWrites.clear();
+    return;
+  }
+
+  for (const [threadId, pendingWrite] of pendingChatDraftWrites) {
+    window.clearTimeout(pendingWrite.timerId);
+    writePersistedChatDraft(threadId, pendingWrite.draft);
+  }
+  pendingChatDraftWrites.clear();
+}
+
+export function schedulePersistedChatDraftWrite(
+  threadId: number | null,
+  draft: string,
+): void {
+  if (typeof window === "undefined" || threadId === null) {
+    return;
+  }
+
+  const pendingWrite = pendingChatDraftWrites.get(threadId);
+  if (pendingWrite) {
+    window.clearTimeout(pendingWrite.timerId);
+  }
+
+  const timerId = window.setTimeout(() => {
+    pendingChatDraftWrites.delete(threadId);
+    writePersistedChatDraft(threadId, draft);
+  }, CHAT_DRAFT_PERSIST_DEBOUNCE_MS);
+
+  pendingChatDraftWrites.set(threadId, { draft, timerId });
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flushPendingPersistedChatDraftWrites);
+  window.addEventListener("beforeunload", flushPendingPersistedChatDraftWrites);
 }
 
 export function resolveSelectedTerminalId(

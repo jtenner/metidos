@@ -15,6 +15,9 @@ type HotImportMeta = ImportMeta & {
   };
 };
 
+export const CHAT_COMPOSER_AUTOSIZE_MAX_CHARS = 24_000;
+export const CHAT_COMPOSER_CARET_MIRROR_MAX_PREFIX_CHARS = 8_000;
+
 let cachedTextareaCaretMirror: TextareaCaretMirror | null = null;
 
 export function disposeTextareaCaretMirror(): void {
@@ -78,10 +81,19 @@ export function resizeComposerTextarea(
   if (!textarea) {
     return;
   }
-  textarea.style.height = "auto";
-
   const computedMaxHeight = window.getComputedStyle(textarea).maxHeight;
   const maxHeight = Number.parseFloat(computedMaxHeight);
+
+  if (
+    textarea.value.length > CHAT_COMPOSER_AUTOSIZE_MAX_CHARS &&
+    Number.isFinite(maxHeight)
+  ) {
+    textarea.style.height = `${Math.max(maxHeight, minHeight)}px`;
+    return;
+  }
+
+  textarea.style.height = "auto";
+
   const desiredHeight = Math.max(textarea.scrollHeight, minHeight);
   const nextHeight = Number.isFinite(maxHeight)
     ? Math.min(desiredHeight, maxHeight)
@@ -100,9 +112,19 @@ export function getTextareaCaretViewportPosition(
   y: number;
   height: number;
 } {
-  const textBeforeCursor = textarea.value.slice(0, textarea.selectionStart);
+  const selectionStart = textarea.selectionStart;
   const computed = window.getComputedStyle(textarea);
   const textareaRect = textarea.getBoundingClientRect();
+
+  if (selectionStart > CHAT_COMPOSER_CARET_MIRROR_MAX_PREFIX_CHARS) {
+    return {
+      height: parseFloat(computed.lineHeight) || textareaRect.height,
+      x: textareaRect.left,
+      y: textareaRect.bottom,
+    };
+  }
+
+  const textBeforeCursor = textarea.value.slice(0, selectionStart);
 
   if (!document.body) {
     // The composer only calls this from mounted browser event handlers, but a

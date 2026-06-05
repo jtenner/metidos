@@ -1,12 +1,47 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import type { ProjectProcedures, RpcTerminal } from "../../bun/rpc-schema";
 import {
   buildCreateTerminalRequest,
   chatDraftStorageKey,
+  flushPendingPersistedChatDraftWrites,
   loadVisibleTerminalsForUser,
   resolveInteractionModeAfterTerminalRefresh,
   resolveSelectedTerminalId,
+  schedulePersistedChatDraftWrite,
+  writePersistedChatDraft,
 } from "./use-terminals-controller";
+
+type StorageRecord = Record<string, string>;
+
+function installWindowStorage(
+  initialEntries: StorageRecord = {},
+): StorageRecord {
+  const entries: StorageRecord = { ...initialEntries };
+  const localStorage = {
+    getItem(key: string): string | null {
+      return Object.hasOwn(entries, key) ? (entries[key] ?? null) : null;
+    },
+    setItem(key: string, value: string): void {
+      entries[key] = value;
+    },
+  };
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      localStorage,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+    },
+  });
+
+  return entries;
+}
+
+afterEach(() => {
+  flushPendingPersistedChatDraftWrites();
+  Reflect.deleteProperty(globalThis, "window");
+});
 
 function terminal(terminalId: string): RpcTerminal {
   return {
@@ -28,6 +63,27 @@ function terminal(terminalId: string): RpcTerminal {
 describe("terminal controller helpers", () => {
   it("uses per-thread chat draft storage keys", () => {
     expect(chatDraftStorageKey(42)).toBe("metidos:thread:42:chat-draft");
+  });
+
+  it("writes chat drafts to browser storage", () => {
+    const entries = installWindowStorage();
+
+    writePersistedChatDraft(42, "hello");
+
+    expect(entries[chatDraftStorageKey(42)]).toBe("hello");
+  });
+
+  it("debounces chat draft persistence until pending writes flush", () => {
+    const entries = installWindowStorage();
+
+    schedulePersistedChatDraftWrite(42, "h");
+    schedulePersistedChatDraftWrite(42, "hello");
+
+    expect(entries[chatDraftStorageKey(42)]).toBeUndefined();
+
+    flushPendingPersistedChatDraftWrites();
+
+    expect(entries[chatDraftStorageKey(42)]).toBe("hello");
   });
 
   it("keeps a selected terminal when it is still present", () => {

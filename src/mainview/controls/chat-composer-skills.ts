@@ -9,7 +9,9 @@ export type ChatComposerSkillsMatch = {
   startIndex: number;
 };
 
-const SKILLS_TRIGGER_REGEX = /\/skills:([^\s]*)$/;
+const SKILLS_TRIGGER = "/skills:";
+const SKILLS_TRIGGER_MAX_FILTER_CHARS = 96;
+const SKILLS_TRIGGER_BOUNDARY_REGEX = /\s/u;
 
 export function matchChatComposerSkillsTrigger(
   draft: string,
@@ -20,16 +22,31 @@ export function matchChatComposerSkillsTrigger(
     return null;
   }
 
-  const textBeforeCursor = draft.slice(0, cursorIndex);
-  const match = SKILLS_TRIGGER_REGEX.exec(textBeforeCursor);
-  if (!match) {
+  const boundedCursorIndex = Math.max(0, Math.min(cursorIndex, draft.length));
+  if (boundedCursorIndex <= 0) {
+    return null;
+  }
+
+  const startIndex = draft.lastIndexOf(SKILLS_TRIGGER, boundedCursorIndex - 1);
+  if (startIndex < 0) {
+    return null;
+  }
+
+  const filterStartIndex = startIndex + SKILLS_TRIGGER.length;
+  const filterLength = boundedCursorIndex - filterStartIndex;
+  if (filterLength < 0 || filterLength > SKILLS_TRIGGER_MAX_FILTER_CHARS) {
+    return null;
+  }
+
+  const filter = draft.slice(filterStartIndex, boundedCursorIndex);
+  if (SKILLS_TRIGGER_BOUNDARY_REGEX.test(filter)) {
     return null;
   }
 
   return {
-    filter: (match[1] ?? "").toLowerCase(),
-    startIndex: textBeforeCursor.lastIndexOf("/skills:"),
-    endIndex: cursorIndex,
+    filter: filter.toLowerCase(),
+    startIndex,
+    endIndex: boundedCursorIndex,
   };
 }
 

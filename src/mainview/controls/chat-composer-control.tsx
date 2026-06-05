@@ -394,13 +394,8 @@ export function ChatComposerControl({
       const nextValue = event.currentTarget.value;
       setChatComposerDraft(nextValue, draftKey);
       onDraftChange?.(nextValue);
-      if (fillHeight) {
-        event.currentTarget.style.height = "";
-      } else {
-        resizeComposerTextarea(event.currentTarget, minHeightPx);
-      }
     },
-    [draftKey, fillHeight, minHeightPx, onDraftChange],
+    [draftKey, onDraftChange],
   );
 
   const refreshSkillsAutocompleteForCaret = useCallback((): void => {

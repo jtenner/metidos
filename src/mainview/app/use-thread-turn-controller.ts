@@ -182,10 +182,14 @@ export function useThreadTurnController({
         }
       } catch (error) {
         if (previousThread) {
-          selectedThreadRunStateRef.current = previousThread.runStatus.state;
           upsertThread(previousThread);
+          if (selectedThreadIdRef.current === previousThread.id) {
+            selectedThreadRunStateRef.current = previousThread.runStatus.state;
+          }
         }
-        setChatError(error instanceof Error ? error.message : String(error));
+        if (selectedThreadIdRef.current === selectedThreadId) {
+          setChatError(error instanceof Error ? error.message : String(error));
+        }
       } finally {
         setIsStoppingThread(false);
       }

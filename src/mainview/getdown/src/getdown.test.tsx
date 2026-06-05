@@ -25,6 +25,14 @@ function normalizeStaticMarkup(html: string): string {
     .replace(/<img([^>]*?)\s*\/>/g, "<img$1 />");
 }
 
+describe("GetDown resilience", () => {
+  test("renders deeply nested blockquotes without overflowing the React stack", () => {
+    expect(render(`${">".repeat(2_000)} deeply nested`)).toContain(
+      "deeply nested",
+    );
+  });
+});
+
 export const gfmRenderingCases: GfmRenderingCase[] = [
   {
     section: "paragraphs",

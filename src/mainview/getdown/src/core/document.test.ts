@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { parseDocument } from "./document";
 
+function blockquoteDepth(blocks: ReturnType<typeof parseDocument>["blocks"]): number {
+  const block = blocks[0];
+  if (block?.kind !== "blockquote") {
+    return 0;
+  }
+  return 1 + blockquoteDepth(block.blocks);
+}
+
 describe("parseDocument structural sharing", () => {
   test("reuses unchanged leading blocks when content appends to the final block", () => {
     const previous = parseDocument("# Title\n\nHello wor");
@@ -90,6 +98,12 @@ describe("parseDocument structural sharing", () => {
     const next = parseDocument("# Title\n\nParagraph with **bold** and `code`.\n\n> Quote", previous);
 
     expect(next).toBe(previous);
+  });
+
+  test("caps deeply nested blockquotes instead of overflowing the parser stack", () => {
+    const document = parseDocument(`${">".repeat(10_000)} deeply nested`);
+
+    expect(blockquoteDepth(document.blocks)).toBeLessThanOrEqual(257);
   });
 
   test("assigns stable block ids across reparses of identical content", () => {

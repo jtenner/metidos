@@ -155,8 +155,8 @@ import { useProjectSkills } from "./app/use-project-skills";
 import { useProjectWorktreeController } from "./app/use-project-worktree-controller";
 import {
   readPersistedChatDraft,
+  schedulePersistedChatDraftWrite,
   useTerminalsController,
-  writePersistedChatDraft,
 } from "./app/use-terminals-controller";
 import { useThreadExtensionUiController } from "./app/use-thread-extension-ui-controller";
 import { useThreadWorkspaceController } from "./app/use-thread-workspace-controller";
@@ -3710,7 +3710,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                     void terminalsController.closeTerminal(terminal);
                   }}
                   onComposerDraftChange={(value) => {
-                    writePersistedChatDraft(selectedThreadId, value);
+                    schedulePersistedChatDraftWrite(selectedThreadId, value);
                     syncThreadExtensionEditor(selectedThreadId, value);
                   }}
                   onCreateTerminal={(options) => {
@@ -4072,7 +4072,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                   void handleRefreshModelCatalog();
                 }}
                 onComposerDraftChange={(value) => {
-                  writePersistedChatDraft(selectedThreadId, value);
+                  schedulePersistedChatDraftWrite(selectedThreadId, value);
                   syncThreadExtensionEditor(selectedThreadId, value);
                 }}
                 onSubmit={onSubmit}

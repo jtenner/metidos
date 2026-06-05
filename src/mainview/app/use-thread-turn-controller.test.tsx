@@ -208,6 +208,40 @@ describe("useThreadTurnController", () => {
     );
   });
 
+  it("does not surface a stale stop failure after switching threads", async () => {
+    let rejectStop!: (error: Error) => void;
+    const stopPromise = new Promise<RpcThreadDetail>((_, reject) => {
+      rejectStop = reject;
+    });
+    const previousThread = thread({ id: 42 });
+    const selectedThreadIdRef = { current: 42 as number | null };
+    const selectedThreadRunStateRef: {
+      current: RpcThreadRunStatus["state"];
+    } = { current: "working" };
+    const { controller, readState } = renderController({
+      procedures: {
+        stopThreadTurn: async () => stopPromise,
+      },
+      selectedThread: previousThread,
+      selectedThreadIdRef,
+      selectedThreadRunStateRef,
+    });
+
+    controller.stopSelectedThreadTurn();
+    selectedThreadIdRef.current = 99;
+    selectedThreadRunStateRef.current = "idle";
+    rejectStop(new Error("stop RPC unavailable"));
+    await stopPromise.catch(() => null);
+    await flushAsyncTurn();
+
+    expect(readState()).toMatchObject({
+      chatError: "",
+      selectedThreadRunState: "idle",
+      stoppingCalls: [true, false],
+    });
+    expect(readState().upsertedThreads.at(-1)).toEqual(previousThread);
+  });
+
   it("rolls back the optimistic stop state when the stop RPC fails", async () => {
     const previousThread = thread({
       runStatus: {

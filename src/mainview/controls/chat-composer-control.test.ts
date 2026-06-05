@@ -250,9 +250,9 @@ describe("chat composer skill matching", () => {
 
   it("matches skills trigger text at the cursor", () => {
     expect(
-      matchChatComposerSkillsTrigger("please /skills:comm", 20, ["commit"]),
+      matchChatComposerSkillsTrigger("please /skills:comm", 19, ["commit"]),
     ).toEqual({
-      endIndex: 20,
+      endIndex: 19,
       filter: "comm",
       startIndex: 7,
     });
