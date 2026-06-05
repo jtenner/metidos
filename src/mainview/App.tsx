@@ -1349,7 +1349,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
           }
         });
     },
-    [procedures, selectedThreadIdRef.current],
+    [procedures, selectedThreadIdRef],
   );
 
   const toggleTranscriptItemExpanded = useCallback((messageKey: string) => {
@@ -2053,7 +2053,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
       applyOptimisticThreadErrorSeenToDetail,
       applyOptimisticThreadErrorSeenToStore,
       requestThreadErrorSeen,
-      selectedThreadIdRef.current,
+      selectedThreadIdRef,
     ],
   );
 
