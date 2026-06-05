@@ -487,17 +487,19 @@ export function CalendarWorkspace({
   );
 
   useEffect(() => {
+    void focusedCalendarDateValue;
     const pendingDate = pendingCalendarGridFocusRef.current;
     if (!pendingDate) {
       return;
     }
     pendingCalendarGridFocusRef.current = null;
-    window.requestAnimationFrame(() => {
+    const animationFrameId = window.requestAnimationFrame(() => {
       calendarDayButtonRefs.current.get(pendingDate)?.focus({
         preventScroll: true,
       });
     });
-  });
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [focusedCalendarDateValue]);
 
   const openCalendarMenuAtElement = useCallback(
     (calendarId: number, element: HTMLElement): void => {
