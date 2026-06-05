@@ -239,7 +239,7 @@ export function useTerminalsController({
   }, [refreshTerminals]);
 
   useEffect(() => {
-    if (!selectedTerminalId) {
+    if (!selectedTerminalId || terminals.length === 0) {
       return;
     }
     const next = resolveSelectedTerminalId(selectedTerminalId, terminals);
