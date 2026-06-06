@@ -52,7 +52,11 @@ import {
   issueWebSocketTicket,
 } from "./auth-client";
 import AuthShell from "./auth-shell";
-import { configureClientLogger, logClientError } from "./client-logging";
+import {
+  configureClientLogger,
+  logClientError,
+  logClientEvent,
+} from "./client-logging";
 import { installBrandFavicon } from "./controls/brand-logo";
 import { devLog } from "./dev-log";
 import {
@@ -189,6 +193,7 @@ const RPC_RECONNECT_BASE_DELAY_MS = 250;
 const RPC_RECONNECT_MAX_DELAY_MS = 2_000;
 const DEFAULT_RPC_REQUEST_TIMEOUT_MS = 120_000;
 const MAX_IN_FLIGHT_RPC_REQUESTS = 48;
+const DEV_RELOAD_SESSION_STORAGE_KEY = "metidos:dev-client-reload";
 
 declare global {
   interface WindowEventMap {
@@ -402,6 +407,63 @@ function clearRpcReconnectTimer(): void {
  * @param reason - Human-readable reason for the reload.
  */
 
+function rememberDevReload(reason: string): void {
+  try {
+    window.sessionStorage.setItem(
+      DEV_RELOAD_SESSION_STORAGE_KEY,
+      JSON.stringify({
+        reason,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  } catch {
+    // Session storage may be unavailable; console logging still identifies the reload.
+  }
+}
+
+function consumeRememberedDevReload(): {
+  reason: string;
+  timestamp: string;
+} | null {
+  try {
+    const raw = window.sessionStorage.getItem(DEV_RELOAD_SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(DEV_RELOAD_SESSION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<{
+      reason: unknown;
+      timestamp: unknown;
+    }>;
+    if (typeof parsed.reason !== "string") {
+      return null;
+    }
+    return {
+      reason: parsed.reason,
+      timestamp:
+        typeof parsed.timestamp === "string" ? parsed.timestamp : "unknown",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function logRememberedDevReload(): void {
+  const rememberedReload = consumeRememberedDevReload();
+  if (!rememberedReload) {
+    return;
+  }
+
+  logClientEvent({
+    severity: "info",
+    message: "Dev client reloaded after backend recovery",
+    details: rememberedReload,
+    route: window.location.pathname,
+    context: "dev-client-reload",
+    timestamp: new Date().toISOString(),
+  });
+}
+
 function reloadWindow(reason: string): void {
   // In dev mode only, reload after backend reports readiness.
   if (!runtimeConfig.devServer || isPageUnloading) {
@@ -409,6 +471,7 @@ function reloadWindow(reason: string): void {
   }
 
   console.info(`[metidos] reloading dev client (${reason})`);
+  rememberDevReload(reason);
   isPageUnloading = true;
   clearDevRecoveryTimer();
   window.location.reload();
@@ -1252,6 +1315,7 @@ function installGlobalClientErrorLogging(): void {
 }
 
 installGlobalClientErrorLogging();
+logRememberedDevReload();
 
 window.metidosProcedures = procedures;
 
