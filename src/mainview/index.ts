@@ -933,6 +933,13 @@ async function waitForOpenSocket(
  * @param message - Serialized payload to send.
  */
 
+function rpcClientMessageContext(message: RpcClientMessage): string {
+  if (message.type === "request") {
+    return `rpc-send:${String(message.method)}:${message.id}`;
+  }
+  return `rpc-send:${message.type}:${message.id}`;
+}
+
 async function sendSocketMessage(
   targetSocket: WebSocket,
   message: RpcClientMessage,
@@ -957,7 +964,25 @@ async function sendSocketMessage(
       });
     }
   }
-  assertClientWebSocketSendSucceeded(targetSocket.send(frame as BufferSource));
+  try {
+    assertClientWebSocketSendSucceeded(
+      targetSocket.send(frame as BufferSource),
+    );
+  } catch (error) {
+    logClientError(
+      "Failed to send RPC websocket frame",
+      {
+        error,
+        frameBytes: frame.byteLength,
+        messageType: message.type,
+        ...(message.type === "request"
+          ? { method: String(message.method) }
+          : {}),
+      },
+      { context: rpcClientMessageContext(message) },
+    );
+    throw error;
+  }
 }
 /**
  * Sends an RPC request and returns a typed response promise.
@@ -1020,6 +1045,9 @@ async function sendRequest<K extends RpcMethodName>(
               void sendSocketMessage(requestSocket, {
                 type: "cancel",
                 id,
+              }).catch(() => {
+                // sendSocketMessage already logs send failures; avoid creating
+                // an unhandled rejection while the local request is aborting.
               });
             }
             reject(
