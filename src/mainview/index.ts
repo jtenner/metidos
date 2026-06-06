@@ -748,7 +748,7 @@ function connectRpcSocket(reason: "initial" | "reconnect"): void {
         }
         pending.reject(error);
       })().catch((error) => {
-        logClientError(error, "Failed to decode RPC websocket message");
+        logClientError("Failed to decode RPC websocket message", error);
       });
     });
 
