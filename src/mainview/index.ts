@@ -31,6 +31,10 @@ import {
   RUNTIME_CONFIG_ELEMENT_ID,
 } from "../shared/runtime-config";
 import {
+  MainviewCrashFallback,
+  MainviewErrorBoundary,
+} from "./app/error-boundary";
+import {
   publishCronJobsChanged,
   publishWorktreeGitHistoryChanged,
 } from "./app/invalidation-events";
@@ -1198,6 +1202,29 @@ const procedures: ProjectProcedures = {
 
 configureClientLogger(procedures);
 
+function installGlobalClientErrorLogging(): void {
+  window.addEventListener("error", (event) => {
+    logClientError(
+      "Uncaught window error",
+      event.error ?? {
+        column: event.colno,
+        filename: event.filename,
+        line: event.lineno,
+        message: event.message,
+      },
+      { context: "window.onerror" },
+    );
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    logClientError("Unhandled promise rejection", event.reason, {
+      context: "window.unhandledrejection",
+    });
+  });
+}
+
+installGlobalClientErrorLogging();
+
 window.metidosProcedures = procedures;
 
 const appRoot = document.getElementById("app");
@@ -1227,11 +1254,19 @@ if (!appRoot) {
   const root = createRoot(appRoot);
   try {
     root.render(
-      createElement(AuthShell, {
-        connectRpcTransport: enableRpcTransport,
-        disconnectRpcTransport: disableRpcTransport,
-        procedures,
-      }),
+      createElement(
+        MainviewErrorBoundary,
+        {
+          context: "mainview-root",
+          fallback: ({ error, reset }) =>
+            createElement(MainviewCrashFallback, { error, reset }),
+        },
+        createElement(AuthShell, {
+          connectRpcTransport: enableRpcTransport,
+          disconnectRpcTransport: disableRpcTransport,
+          procedures,
+        }),
+      ),
     );
     window.__metidosAppMountedAt = Date.now();
     if (typeof window.requestIdleCallback === "function") {
