@@ -138,6 +138,7 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
   useEffect(() => {
     let disposed = false;
     let socket: WebSocket | null = null;
+    let terminalWriteErrorLogged = false;
     let term: InstanceType<GhosttyModule["Terminal"]> | null = null;
     const disposables: Array<{ dispose?: () => void }> = [];
 
@@ -178,16 +179,39 @@ const GhosttyTerminal = memo(function GhosttyTerminal({
             }
             socket = new WebSocket(terminalWebSocketUrl(terminal.terminalId));
             socket.onmessage = (event) => {
+              let message: { type: string; data?: string };
               try {
-                const message = JSON.parse(String(event.data)) as {
+                message = JSON.parse(String(event.data)) as {
                   type: string;
                   data?: string;
                 };
-                if (message.type === "output" || message.type === "replay") {
-                  nextTerm.write(message.data ?? "");
-                }
               } catch {
                 // Terminal messages are JSON envelopes; ignore malformed frames.
+                return;
+              }
+
+              if (
+                disposed ||
+                term !== nextTerm ||
+                (message.type !== "output" && message.type !== "replay")
+              ) {
+                return;
+              }
+
+              try {
+                nextTerm.write(message.data ?? "");
+              } catch (error) {
+                if (terminalWriteErrorLogged) {
+                  return;
+                }
+                terminalWriteErrorLogged = true;
+                logClientError(
+                  "Failed to write terminal websocket output",
+                  error,
+                  {
+                    context: `terminalId:${terminal.terminalId}`,
+                  },
+                );
               }
             };
           } catch (error) {
