@@ -25,6 +25,7 @@ import {
 } from "../controls/popover";
 import { useDynamicCssVariablesClassName } from "../dynamic-css-variables";
 import { mergeClassNames } from "../dynamic-styles";
+import { MainviewErrorBoundary } from "./error-boundary";
 import { useBase64ObjectUrl } from "./base64-object-url";
 import {
   LazyPreparedRichMarkdownMessage,
@@ -129,9 +130,15 @@ function LargeMarkdownMessage({ text }: { text: string }): JSX.Element {
   }
 
   return (
-    <Suspense fallback={<PreparingLargeMarkdownMessage />}>
-      <LazyPreparedRichMarkdownMessage plan={preprocessedMessage.plan} />
-    </Suspense>
+    <MainviewErrorBoundary
+      context="message-markdown:prepared"
+      fallback={<PlainTextMessage text={text} />}
+      message="Failed to render prepared markdown message"
+    >
+      <Suspense fallback={<PreparingLargeMarkdownMessage />}>
+        <LazyPreparedRichMarkdownMessage plan={preprocessedMessage.plan} />
+      </Suspense>
+    </MainviewErrorBoundary>
   );
 }
 
@@ -156,9 +163,18 @@ export const MarkdownMessage = memo(function MarkdownMessage({
   }
 
   return (
-    <Suspense fallback={<PlainTextMessage text={text} />}>
-      <LazyRichMarkdownMessage streaming={renderRoute.streaming} text={text} />
-    </Suspense>
+    <MainviewErrorBoundary
+      context="message-markdown:rich"
+      fallback={<PlainTextMessage text={text} />}
+      message="Failed to render markdown message"
+    >
+      <Suspense fallback={<PlainTextMessage text={text} />}>
+        <LazyRichMarkdownMessage
+          streaming={renderRoute.streaming}
+          text={text}
+        />
+      </Suspense>
+    </MainviewErrorBoundary>
   );
 });
 
