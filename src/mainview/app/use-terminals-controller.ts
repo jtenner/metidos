@@ -9,6 +9,10 @@ import type {
   RpcCreateTerminalRequest,
   RpcTerminal,
 } from "../../bun/rpc-schema";
+import {
+  safeLocalStorageRemoveItem,
+  safeLocalStorageSetItem,
+} from "./browser-storage";
 
 export type InteractionMode = "chat" | "terminal";
 
@@ -37,7 +41,11 @@ function writeInteractionMode(mode: InteractionMode): void {
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(INTERACTION_MODE_KEY, mode);
+  safeLocalStorageSetItem(
+    INTERACTION_MODE_KEY,
+    mode,
+    "terminal-interaction-mode",
+  );
 }
 
 function readSelectedTerminalId(): string | null {
@@ -52,10 +60,14 @@ function writeSelectedTerminalId(terminalId: string | null): void {
     return;
   }
   if (terminalId) {
-    window.localStorage.setItem(SELECTED_TERMINAL_KEY, terminalId);
+    safeLocalStorageSetItem(
+      SELECTED_TERMINAL_KEY,
+      terminalId,
+      "selected-terminal",
+    );
     return;
   }
-  window.localStorage.removeItem(SELECTED_TERMINAL_KEY);
+  safeLocalStorageRemoveItem(SELECTED_TERMINAL_KEY, "selected-terminal");
 }
 
 export function chatDraftStorageKey(threadId: number): string {
@@ -76,7 +88,11 @@ export function writePersistedChatDraft(
   if (typeof window === "undefined" || threadId === null) {
     return;
   }
-  window.localStorage.setItem(chatDraftStorageKey(threadId), draft);
+  safeLocalStorageSetItem(
+    chatDraftStorageKey(threadId),
+    draft,
+    "thread-chat-draft",
+  );
 }
 
 export function flushPendingPersistedChatDraftWrites(): void {

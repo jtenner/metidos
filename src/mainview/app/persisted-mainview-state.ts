@@ -3,6 +3,8 @@
  * @description Browser storage helpers for persisted Mainview UI state.
  */
 
+import { safeLocalStorageSetItem } from "./browser-storage";
+
 /**
  * Persisted tuple describing an expanded/open worktree.
  */
@@ -316,9 +318,10 @@ export function writePersistedMainviewState(
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(
+  safeLocalStorageSetItem(
     MAINVIEW_STATE_STORAGE_KEY,
     JSON.stringify(serializePersistedMainviewState(state)),
+    "persisted-mainview-state",
   );
 }
 
@@ -350,8 +353,9 @@ export function writePersistedTreeViewState(
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(
+  safeLocalStorageSetItem(
     TREE_VIEW_STATE_STORAGE_KEY,
     JSON.stringify(state),
+    "persisted-tree-view-state",
   );
 }

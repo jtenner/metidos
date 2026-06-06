@@ -65,6 +65,7 @@ import {
   shouldRepinChatTranscriptOnItemSizeChange,
   type TranscriptViewportAnchor,
 } from "./chat-transcript-scroll";
+import { safeLocalStorageSetItem } from "./browser-storage";
 import { APP_TITLE } from "./mainview-ui-state";
 import { useBase64ObjectUrl } from "./base64-object-url";
 import { MarkdownMessage, TranscriptMessageContent } from "./message-ui";
@@ -1943,9 +1944,10 @@ export function DesktopChatView({
       return;
     }
     resizeStartRef.current = null;
-    window.localStorage.setItem(
+    safeLocalStorageSetItem(
       DESKTOP_INTERACTION_PANEL_HEIGHT_KEY,
       String(interactionPanelHeight),
+      "desktop-interaction-panel-height",
     );
   }, [interactionPanelHeight]);
   const terminalCountLabel =
