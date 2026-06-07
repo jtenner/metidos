@@ -1650,6 +1650,13 @@ const ChatTranscript = memo(function ChatTranscript({
   }, [canVirtualizeTranscript, updateTranscriptScrollMargin]);
 
   useLayoutEffect(() => {
+    // Keep the virtualizer instance in the dependency list intentionally. Row
+    // measurements can arrive after markdown, images, or code blocks resize;
+    // rerunning this effect with the latest measurement cache lets free-scroll
+    // mode restore the captured viewport anchor. Pinned mode is also safe here:
+    // `setProgrammaticScrollTop` no-ops when already at the requested offset and
+    // marks the scroll as programmatic for one animation frame, so measurement
+    // churn does not accumulate listeners or create a feedback loop.
     const tailMessage = messages[messages.length - 1] ?? null;
     if (
       shouldForcePinChatTranscript(
