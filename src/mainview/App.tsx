@@ -633,6 +633,10 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   );
   const [openCalendarNotificationEvent, setOpenCalendarNotificationEvent] =
     useState<RpcCalendarReminderDelivery | null>(null);
+  // Notification tray projection is intentionally local to App: the memo only
+  // depends on notification arrays, so unrelated shell renders do not re-sort
+  // tray items. The slice cap keeps the rendered tray bounded even if backend
+  // notification retention grows.
   const notificationPanelItems = useMemo(
     () =>
       [
