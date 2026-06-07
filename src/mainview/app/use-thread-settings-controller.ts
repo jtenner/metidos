@@ -9,6 +9,7 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useRef,
 } from "react";
 import type {
   ProjectProcedures,
@@ -59,6 +60,18 @@ export type ThreadSettingsController = {
   updateActiveThreadAccess: (access: ThreadAccessValue) => Promise<void>;
 };
 
+export function shouldSyncThreadSettingsDraft({
+  currentThreadId,
+  isUpdating,
+  nextThreadId,
+}: {
+  currentThreadId: number | null;
+  isUpdating: boolean;
+  nextThreadId: number | null;
+}): boolean {
+  return currentThreadId !== nextThreadId || !isUpdating;
+}
+
 export function useThreadSettingsController({
   availablePluginAccessGroups,
   availableThreadPermissionDescriptors,
@@ -81,7 +94,22 @@ export function useThreadSettingsController({
   setThreadAccessControlError,
   upsertThread,
 }: ThreadSettingsControllerProps): ThreadSettingsController {
+  const previousModelDraftThreadIdRef = useRef<number | null>(null);
+  const previousReasoningDraftThreadIdRef = useRef<number | null>(null);
+  const previousAccessDraftThreadIdRef = useRef<number | null>(null);
+
   useEffect(() => {
+    const nextThreadId = selectedThread?.id ?? null;
+    if (
+      !shouldSyncThreadSettingsDraft({
+        currentThreadId: previousModelDraftThreadIdRef.current,
+        isUpdating: isUpdatingThreadModel,
+        nextThreadId,
+      })
+    ) {
+      return;
+    }
+    previousModelDraftThreadIdRef.current = nextThreadId;
     if (selectedThread?.model) {
       setPendingThreadModel(selectedThread.model);
       setModelControlError("");
@@ -92,12 +120,24 @@ export function useThreadSettingsController({
     }
   }, [
     defaultCodexModel,
+    isUpdatingThreadModel,
     selectedThread,
     setModelControlError,
     setPendingThreadModel,
   ]);
 
   useEffect(() => {
+    const nextThreadId = selectedThread?.id ?? null;
+    if (
+      !shouldSyncThreadSettingsDraft({
+        currentThreadId: previousReasoningDraftThreadIdRef.current,
+        isUpdating: isUpdatingThreadReasoningEffort,
+        nextThreadId,
+      })
+    ) {
+      return;
+    }
+    previousReasoningDraftThreadIdRef.current = nextThreadId;
     if (selectedThread?.reasoningEffort) {
       setPendingThreadReasoningEffort(selectedThread.reasoningEffort);
       setReasoningEffortControlError("");
@@ -108,18 +148,31 @@ export function useThreadSettingsController({
     }
   }, [
     defaultCodexReasoningEffort,
+    isUpdatingThreadReasoningEffort,
     selectedThread,
     setPendingThreadReasoningEffort,
     setReasoningEffortControlError,
   ]);
 
   useEffect(() => {
+    const nextThreadId = selectedThread?.id ?? null;
+    if (
+      !shouldSyncThreadSettingsDraft({
+        currentThreadId: previousAccessDraftThreadIdRef.current,
+        isUpdating: isUpdatingThreadAccess,
+        nextThreadId,
+      })
+    ) {
+      return;
+    }
+    previousAccessDraftThreadIdRef.current = nextThreadId;
     if (!selectedThread) {
       return;
     }
     setPendingThreadAccessValue(accessPermissionsFromThread(selectedThread));
     setThreadAccessControlError("");
   }, [
+    isUpdatingThreadAccess,
     selectedThread,
     setPendingThreadAccessValue,
     setThreadAccessControlError,

@@ -7,6 +7,7 @@ import type {
 } from "../../bun/rpc-schema";
 import type { ThreadAccessValue } from "../controls/thread-access-control";
 import {
+  shouldSyncThreadSettingsDraft,
   type ThreadSettingsController,
   useThreadSettingsController,
 } from "./use-thread-settings-controller";
@@ -190,6 +191,28 @@ function renderController(input?: {
     selectedThreadIdRef,
   };
 }
+
+describe("shouldSyncThreadSettingsDraft", () => {
+  it("keeps in-flight edits for the same Thread from being overwritten by polling", () => {
+    expect(
+      shouldSyncThreadSettingsDraft({
+        currentThreadId: 11,
+        isUpdating: true,
+        nextThreadId: 11,
+      }),
+    ).toBeFalse();
+  });
+
+  it("syncs drafts when selection changes even if another update is in flight", () => {
+    expect(
+      shouldSyncThreadSettingsDraft({
+        currentThreadId: 11,
+        isUpdating: true,
+        nextThreadId: 12,
+      }),
+    ).toBeTrue();
+  });
+});
 
 describe("useThreadSettingsController", () => {
   it("updates draft model locally without issuing an RPC before a Thread is selected", async () => {
