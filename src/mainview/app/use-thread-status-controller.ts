@@ -596,7 +596,14 @@ export function useThreadStatusController(
 
   useEffect(() => {
     // Restart discovery only when the semantic thread seed changes, not when
-    // parent renders allocate an equivalent `options.threads` array.
+    // parent renders allocate an equivalent `options.threads` array. This is
+    // intentionally a timer reset rather than a leak: the cleanup below aborts
+    // the active controller and clears the previous interval, while
+    // `threadDiscoveryPollPromiseRef` prevents overlapping list-discovery RPCs
+    // if a seed changes while a request is already in flight. Restarting here
+    // lets semantic thread mutations (new threads, pin changes, terminal run
+    // states, or unread errors) trigger a fresh leading-edge discovery poll
+    // without accumulating orphaned intervals.
     void threadDiscoverySeedKey;
     if (!options.isDocumentVisible) {
       return;
