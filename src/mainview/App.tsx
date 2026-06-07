@@ -1112,6 +1112,10 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
     );
   }, [normalizedSidebarSearchQuery, filteredWorkspaceActiveThreads]);
 
+  // Pinned-folder projection scans all hydrated worktrees, but it is memoized
+  // to project/worktree display inputs and returns only pinned rows. Keeping it
+  // derived here avoids storing a second mutable pinned-folder index that could
+  // drift from project/worktree hydration state.
   const sidebarPinnedFolders = useMemo(() => {
     const rows: SidebarPinnedFolderRow[] = [];
 
