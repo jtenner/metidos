@@ -46,6 +46,7 @@ import {
   worktreeKey,
 } from "./project-worktree-state";
 import { preferredThreadForWorktree, type ThreadStore } from "./thread-store";
+import { retainRecentThreadMessages } from "./thread-message-retention";
 import {
   CONTEXT_FOCUS_CHANGED_EVENT_NAME,
   type OpenThreadOptions,
@@ -518,7 +519,7 @@ export function useThreadWorkspaceSelectionController({
           setSelectedThreadId(detail.thread.id);
           selectedThreadIdRef.current = detail.thread.id;
           selectedThreadRunStateRef.current = detail.thread.runStatus.state;
-          setThreadMessages(detail.messages);
+          setThreadMessages(retainRecentThreadMessages(detail.messages));
           syncThreadContext(detail.thread);
           setPrimaryView("chat");
           setMobileProjectListOpen(false);

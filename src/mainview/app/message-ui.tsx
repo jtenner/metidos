@@ -58,7 +58,7 @@ import type {
 const DIFF_LINE_ESTIMATE_PX = 24;
 const estimateDiffLineSize = (): number => DIFF_LINE_ESTIMATE_PX;
 const DIFF_VIRTUALIZATION_OVERSCAN = 20;
-const MIN_VIRTUALIZED_DIFF_LINES = 400;
+const MIN_VIRTUALIZED_DIFF_LINES = 80;
 const MARKDOWN_LINK_CLASS_NAME =
   "text-text-secondary underline decoration-accent underline-offset-2 transition-colors hover:text-text-primary";
 const INLINE_COMMAND_COPY_BUTTON_CLASS_NAME =

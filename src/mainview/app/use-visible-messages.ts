@@ -62,6 +62,9 @@ export function useVisibleMessages({
   threadMessages,
 }: UseVisibleMessagesParams): UseVisibleMessagesResult {
   const visibleMessageCacheRef = useRef(createVisibleTranscriptStateCache());
+  const mediaPayloadsCacheRef = useRef<
+    VisibleTranscriptState["mediaPayloads"] | null
+  >(null);
   const previousSelectedThreadIdRef = useRef<number | null>(selectedThreadId);
   const currentThreadDetail = useMemo(
     () => ({ selectedThreadId, threadMessages }),
@@ -83,10 +86,11 @@ export function useVisibleMessages({
   return useMemo<UseVisibleMessagesResult>(() => {
     if (previousSelectedThreadIdRef.current !== selectedThreadId) {
       visibleMessageCacheRef.current.clear();
+      mediaPayloadsCacheRef.current = null;
       previousSelectedThreadIdRef.current = selectedThreadId;
     }
 
-    return buildVisibleTranscriptState({
+    const visibleState = buildVisibleTranscriptState({
       activeChatError,
       activeChatNotice,
       activeSelectedWorktreeFolder,
@@ -97,11 +101,14 @@ export function useVisibleMessages({
       initialTranscriptIsBusy: immediateTranscriptIsBusy,
       isCreatingThread,
       isThreadLoading,
+      mediaPayloadsCache: mediaPayloadsCacheRef.current,
       selectedProject,
       selectedThread,
       selectedThreadId,
       threadMessages: deferredThreadMessages,
     });
+    mediaPayloadsCacheRef.current = visibleState.mediaPayloads;
+    return visibleState;
   }, [
     activeChatError,
     activeChatNotice,

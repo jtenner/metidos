@@ -90,7 +90,11 @@ function compactThreadMessageForRetention(
     case "tool_call": {
       const argumentsText = truncateStringForRetention(message.argumentsText);
       const output = truncateStringForRetention(message.output);
-      if (!argumentsText.changed && !output.changed) {
+      const outputImages = message.outputImages?.map(stripImagePayload);
+      const outputImagesChanged = outputImages?.some(
+        (image, index) => image !== message.outputImages?.[index],
+      );
+      if (!argumentsText.changed && !output.changed && !outputImagesChanged) {
         return message;
       }
       return {
@@ -98,6 +102,7 @@ function compactThreadMessageForRetention(
         argumentsText: argumentsText.value,
         output: output.value,
         ...(output.changed ? { outputLoaded: false } : {}),
+        ...(outputImages ? { outputImages } : {}),
       };
     }
     case "file_change": {
@@ -139,7 +144,12 @@ export function estimateThreadMessageRetainedBytes(
     case "tool_call":
       return (
         stringByteLength(message.argumentsText) +
-        stringByteLength(message.output)
+        stringByteLength(message.output) +
+        (message.outputImages ?? []).reduce(
+          (totalBytes, image) =>
+            totalBytes + estimateBase64ByteLength(image.data),
+          0,
+        )
       );
     case "file_change":
       return stringByteLength(message.diffText);

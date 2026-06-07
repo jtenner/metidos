@@ -70,10 +70,11 @@ import { APP_TITLE } from "./mainview-ui-state";
 import { useBase64ObjectUrl } from "./base64-object-url";
 import { MarkdownMessage, TranscriptMessageContent } from "./message-ui";
 import {
-  buildTranscriptItemViewModels,
   deriveGroupedVisibleMessages,
+  deriveTranscriptItemViewModels,
   type GroupedVisibleMessagesCache,
   type TranscriptItemViewModel,
+  type TranscriptItemViewModelsCache,
   type TranscriptPipelineGroup as TranscriptMessageGroup,
 } from "./transcript-pipeline";
 import type { InteractionMode } from "./use-terminals-controller";
@@ -1184,6 +1185,9 @@ const ChatTranscript = memo(function ChatTranscript({
   const groupedMessagesCacheRef = useRef<GroupedVisibleMessagesCache | null>(
     null,
   );
+  const transcriptItemsCacheRef = useRef<TranscriptItemViewModelsCache | null>(
+    null,
+  );
   const autoScrollResetRafRef = useRef<number | null>(null);
   const autoScrollGenerationRef = useRef(0);
   const pinnedResizeScrollRafRef = useRef<number | null>(null);
@@ -1205,10 +1209,13 @@ const ChatTranscript = memo(function ChatTranscript({
   // already replaced the transcript groups. Keep the latest keys in a ref so
   // scroll anchoring never relies on a stale measured-row closure.
   groupedMessageKeysRef.current = groupedMessageKeys;
-  const transcriptItems = useMemo(
-    () => buildTranscriptItemViewModels(messages, expandedItemIds),
-    [expandedItemIds, messages],
+  const transcriptItemsCache = deriveTranscriptItemViewModels(
+    messages,
+    expandedItemIds,
+    transcriptItemsCacheRef.current,
   );
+  transcriptItemsCacheRef.current = transcriptItemsCache;
+  const transcriptItems = transcriptItemsCache.items;
   const canVirtualizeTranscript =
     typeof window !== "undefined" && typeof document !== "undefined";
 
@@ -1288,7 +1295,7 @@ const ChatTranscript = memo(function ChatTranscript({
       return;
     }
     if (pinnedResizeScrollRafRef.current !== null) {
-      window.cancelAnimationFrame(pinnedResizeScrollRafRef.current);
+      return;
     }
 
     pinnedResizeScrollRafRef.current = window.requestAnimationFrame(() => {

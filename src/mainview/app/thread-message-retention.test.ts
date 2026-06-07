@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type {
   RpcChatThreadMessage,
   RpcThreadMessage,
+  RpcToolCallThreadMessage,
 } from "../../bun/rpc-schema";
 import {
   estimateThreadMessageRetainedBytes,
@@ -68,6 +69,46 @@ describe("retainRecentThreadMessages", () => {
     ).toBe("");
     expect(
       chatMessage?.kind === "chat" ? chatMessage.images?.[0]?.dataLoaded : null,
+    ).toBe(false);
+  });
+
+  it("keeps tool-call output image payloads out of retained state", () => {
+    const toolCall = {
+      id: 2,
+      threadId: 1,
+      kind: "tool_call",
+      server: "pi",
+      tool: "browser_screenshot",
+      argumentsText: "{}",
+      output: "screenshot",
+      outputImages: [
+        {
+          type: "image",
+          data: "aGVsbG8=",
+          mimeType: "image/png",
+        },
+      ],
+      state: "completed",
+      createdAt: "2026-05-02T10:02:00.000Z",
+      updatedAt: "2026-05-02T10:02:00.000Z",
+    } as RpcToolCallThreadMessage;
+
+    expect(estimateThreadMessageRetainedBytes(toolCall)).toBe(
+      "{}".length * 2 + "screenshot".length * 2 + 5,
+    );
+
+    const retained = retainRecentThreadMessages([toolCall]);
+    const retainedToolCall = retained[0];
+
+    expect(
+      retainedToolCall?.kind === "tool_call"
+        ? retainedToolCall.outputImages?.[0]?.data
+        : null,
+    ).toBe("");
+    expect(
+      retainedToolCall?.kind === "tool_call"
+        ? retainedToolCall.outputImages?.[0]?.dataLoaded
+        : null,
     ).toBe(false);
   });
 

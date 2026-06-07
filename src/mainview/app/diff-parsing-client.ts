@@ -17,6 +17,8 @@ import type {
 } from "./diff-parsing-worker";
 
 export const DIFF_PARSE_CACHE_LIMIT = 12;
+export const DIFF_PARSE_CACHE_MAX_BYTES = 2 * 1024 * 1024;
+const DIFF_PARSE_LINE_RETAINED_BYTES = 96;
 const DIFF_PARSE_MAX_PENDING_WORKER_REQUESTS = 3;
 const DIFF_PARSE_WORKER_REQUEST_TIMEOUT_MS = 30_000;
 const DIFF_PARSE_WORKER_IDLE_TIMEOUT_MS = 60_000;
@@ -58,6 +60,19 @@ type HotImportMeta = ImportMeta & {
   };
 };
 
+export function estimateDiffParseResultRetainedBytes(
+  result: DiffParseResult,
+): number {
+  return result.lines.reduce(
+    (totalBytes, line) =>
+      totalBytes +
+      line.text.length * 2 +
+      line.key.length * 2 +
+      DIFF_PARSE_LINE_RETAINED_BYTES,
+    0,
+  );
+}
+
 function createBrowserDiffParsingWorker(): DiffParseWorkerLike {
   return new Worker(new URL("./diff-parsing-worker.ts", import.meta.url), {
     name: "diff-parsing",
@@ -85,6 +100,9 @@ export class DiffParseRequestManager {
   private readonly requestToDiffKey = new Map<number, string>();
   private readonly canUseWorker: () => boolean;
   private readonly createWorker: () => DiffParseWorkerLike;
+  private readonly cacheEntryByteSizes = new Map<string, number>();
+  private cacheBytes = 0;
+  private readonly maxCacheBytes: number;
   private readonly maxCacheEntries: number;
   private readonly maxPendingWorkerRequests: number;
   private readonly parseSynchronously: (diffText: string) => DiffParseResult;
@@ -105,6 +123,7 @@ export class DiffParseRequestManager {
   constructor({
     canUseWorker = isBrowserWorkerAvailable,
     createWorker = createBrowserDiffParsingWorker,
+    maxCacheBytes = DIFF_PARSE_CACHE_MAX_BYTES,
     maxCacheEntries = DIFF_PARSE_CACHE_LIMIT,
     maxPendingWorkerRequests = DIFF_PARSE_MAX_PENDING_WORKER_REQUESTS,
     parseSynchronously = parseUnifiedDiffText,
@@ -113,6 +132,7 @@ export class DiffParseRequestManager {
   }: {
     canUseWorker?: () => boolean;
     createWorker?: () => DiffParseWorkerLike;
+    maxCacheBytes?: number;
     maxCacheEntries?: number;
     maxPendingWorkerRequests?: number;
     parseSynchronously?: (diffText: string) => DiffParseResult;
@@ -121,6 +141,7 @@ export class DiffParseRequestManager {
   } = {}) {
     this.canUseWorker = canUseWorker;
     this.createWorker = createWorker;
+    this.maxCacheBytes = maxCacheBytes;
     this.maxCacheEntries = maxCacheEntries;
     this.maxPendingWorkerRequests = maxPendingWorkerRequests;
     this.parseSynchronously = parseSynchronously;
@@ -137,6 +158,8 @@ export class DiffParseRequestManager {
       this.clearPendingDiff(diffKey, pending);
     }
     this.cache.clear();
+    this.cacheEntryByteSizes.clear();
+    this.cacheBytes = 0;
     this.pendingByDiffKey.clear();
     this.pendingDiffTextByKey.clear();
     this.requestToDiffKey.clear();
@@ -383,6 +406,26 @@ export class DiffParseRequestManager {
       listener(readySnapshot);
     }
   }
+  private removeCachedSnapshot(diffKey: string): void {
+    const retainedBytes = this.cacheEntryByteSizes.get(diffKey) ?? 0;
+    this.cache.delete(diffKey);
+    this.cacheEntryByteSizes.delete(diffKey);
+    this.cacheBytes = Math.max(0, this.cacheBytes - retainedBytes);
+  }
+
+  private trimCache(): void {
+    while (
+      this.cache.size > this.maxCacheEntries ||
+      (this.cache.size > 1 && this.cacheBytes > this.maxCacheBytes)
+    ) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey === undefined) {
+        break;
+      }
+      this.removeCachedSnapshot(oldestKey);
+    }
+  }
+
   /**
    * Cache a ready snapshot and trim old entries when over capacity.
    * @param diffKey - Compact diff text cache key.
@@ -399,17 +442,15 @@ export class DiffParseRequestManager {
     };
 
     if (this.cache.has(diffKey)) {
-      this.cache.delete(diffKey);
+      this.removeCachedSnapshot(diffKey);
     }
-    this.cache.set(diffKey, snapshot);
 
-    while (this.cache.size > this.maxCacheEntries) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey === undefined) {
-        break;
-      }
-      this.cache.delete(oldestKey);
-    }
+    const retainedBytes = estimateDiffParseResultRetainedBytes(result);
+    this.cache.set(diffKey, snapshot);
+    this.cacheEntryByteSizes.set(diffKey, retainedBytes);
+    this.cacheBytes += retainedBytes;
+
+    this.trimCache();
 
     return snapshot;
   }

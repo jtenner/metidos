@@ -15,6 +15,7 @@ import type {
 } from "../bun/rpc-schema";
 import { resolveChatPromptText } from "../shared/chat-images";
 import { logClientError } from "./client-logging";
+import { retainRecentThreadMessages } from "./app/thread-message-retention";
 import { mergeThreadMessageHistory } from "./app/transcript-state";
 import {
   readChatComposerDraft,
@@ -407,9 +408,11 @@ export function sendThreadTurn({
         selectedThreadDetailRefreshKeyRef.current =
           buildSelectedThreadDetailRefreshKey(detail.thread);
         setThreadMessages((current) =>
-          mergeThreadMessageHistory(
-            removeOptimisticThreadMessageById(current, optimisticMessageId),
-            detail.messages,
+          retainRecentThreadMessages(
+            mergeThreadMessageHistory(
+              removeOptimisticThreadMessageById(current, optimisticMessageId),
+              detail.messages,
+            ),
           ),
         );
       }

@@ -3,7 +3,8 @@
  * @description Module for diff parsing.
  */
 
-export const LARGE_DIFF_WORKER_TEXT_LENGTH = 24_000;
+export const LARGE_DIFF_WORKER_TEXT_LENGTH = 4_000;
+export const LARGE_DIFF_WORKER_LINE_COUNT = 160;
 
 export type DiffLineKind =
   | "meta"
@@ -44,7 +45,21 @@ export const EMPTY_DIFF_PARSE_RESULT: DiffParseResult = {
  */
 
 export function shouldWorkerizeDiffParsing(diffText: string): boolean {
-  return diffText.length >= LARGE_DIFF_WORKER_TEXT_LENGTH;
+  if (diffText.length >= LARGE_DIFF_WORKER_TEXT_LENGTH) {
+    return true;
+  }
+
+  let lineBreaks = 0;
+  for (let index = 0; index < diffText.length; index += 1) {
+    if (diffText.charCodeAt(index) === 10) {
+      lineBreaks += 1;
+      if (lineBreaks >= LARGE_DIFF_WORKER_LINE_COUNT) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 /**
  * Classify a unified-diff line by prefix marker.

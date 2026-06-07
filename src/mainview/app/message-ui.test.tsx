@@ -20,7 +20,7 @@ import type { VisibleMessage } from "./visible-message-state";
 describe("MarkdownMessage", () => {
   const largeMarkdownText = `${"Intro text. ".repeat(220)}\n\n**Important:** [OpenAI](https://openai.com)`;
 
-  it("renders large in-progress markdown as rich markdown", async () => {
+  it("keeps large in-progress markdown on the lightweight streaming path", async () => {
     await loadRichMarkdownModule();
 
     const stream = await renderToReadableStream(
@@ -29,9 +29,9 @@ describe("MarkdownMessage", () => {
     await stream.allReady;
     const markup = await new Response(stream).text();
 
-    expect(markup).toContain("<strong>Important:</strong>");
+    expect(markup).toContain("**Important:**");
     expect(markup).toContain('href="https://openai.com"');
-    expect(markup).not.toContain("**Important:**");
+    expect(markup).not.toContain("<strong>Important:</strong>");
   });
 
   it("upgrades large completed markdown to rich rendering", async () => {

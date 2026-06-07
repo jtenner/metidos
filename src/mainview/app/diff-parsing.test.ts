@@ -13,6 +13,7 @@ import {
   DiffParseRequestManager,
   type DiffParseSnapshot,
   diffTextCacheKey,
+  estimateDiffParseResultRetainedBytes,
 } from "./diff-parsing-client";
 import type {
   DiffParsingWorkerRequest,
@@ -115,9 +116,14 @@ describe("parseUnifiedDiffText", () => {
     });
   });
 
-  it("only workerizes materially large diff bodies", () => {
+  it("workerizes materially large diff bodies and dense many-line diffs", () => {
     expect(shouldWorkerizeDiffParsing("+small change")).toBeFalse();
     expect(shouldWorkerizeDiffParsing(buildLargeDiff())).toBeTrue();
+    expect(
+      shouldWorkerizeDiffParsing(
+        Array.from({ length: 180 }, () => "+").join("\n"),
+      ),
+    ).toBeTrue();
   });
 });
 
@@ -226,5 +232,31 @@ describe("DiffParseRequestManager", () => {
       isLoading: false,
       result: parseUnifiedDiffText(diffText),
     });
+  });
+
+  it("evicts parsed diff cache entries by retained byte budget", () => {
+    let parseCount = 0;
+    const firstDiff = ["+first", "+alpha", "+omega"].join("\n");
+    const secondDiff = ["+second", "+bravo", "+delta"].join("\n");
+    const firstBytes = estimateDiffParseResultRetainedBytes(
+      parseUnifiedDiffText(firstDiff),
+    );
+    const secondBytes = estimateDiffParseResultRetainedBytes(
+      parseUnifiedDiffText(secondDiff),
+    );
+    const manager = new DiffParseRequestManager({
+      canUseWorker: () => false,
+      maxCacheBytes: firstBytes + secondBytes - 1,
+      parseSynchronously: (diffText) => {
+        parseCount += 1;
+        return parseUnifiedDiffText(diffText);
+      },
+    });
+
+    manager.read(firstDiff);
+    manager.read(secondDiff);
+    manager.read(firstDiff);
+
+    expect(parseCount).toBe(3);
   });
 });

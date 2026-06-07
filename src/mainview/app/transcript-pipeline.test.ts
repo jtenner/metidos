@@ -9,6 +9,7 @@ import {
   buildTranscriptItemViewModels,
   classifyTranscriptPipelineItem,
   deriveGroupedVisibleMessages,
+  deriveTranscriptItemViewModels,
   formatTranscriptDiffSummaryLabel,
   isPlainAssistantTranscriptTextMessage,
   isTranscriptAssistantVisibleMessage,
@@ -113,25 +114,29 @@ describe("transcript markdown routing", () => {
     });
   });
 
-  it("routes large in-progress markdown through preprocessing instead of raw plain text", () => {
+  it("routes large in-progress markdown to plain text while streaming", () => {
     const text = buildLargeMarkdownMessage();
 
-    expect(routeTranscriptMarkdownText({ state: "in_progress", text })).toEqual(
-      {
-        kind: "preprocessed",
-      },
-    );
+    const route = routeTranscriptMarkdownText({ state: "in_progress", text });
+
+    expect(route.kind).toBe("plain");
+    if (route.kind !== "plain") {
+      throw new Error("Expected plain route");
+    }
+    expect(route.segments.map((segment) => segment.text).join("")).toBe(text);
   });
 
-  it("routes in-progress markdown below the worker threshold to rich streaming markdown", () => {
+  it("routes in-progress markdown below the worker threshold to plain text", () => {
+    const text = "## Working\n\n- item";
+
     expect(
       routeTranscriptMarkdownText({
         state: "in_progress",
-        text: "## Working\n\n- item",
+        text,
       }),
     ).toEqual({
-      kind: "rich",
-      streaming: true,
+      kind: "plain",
+      segments: [{ key: "0:0", kind: "text", text }],
     });
   });
 
@@ -540,6 +545,41 @@ describe("transcript pipeline item classification", () => {
         textMode: "tool-summary",
       },
     });
+  });
+
+  it("reuses transcript view-model items for unchanged streaming rows", () => {
+    const expandedItemIds = new Set<string>();
+    const firstAssistant = visibleChatMessage("thread-message:11", "assistant");
+    const streamingAssistant = visibleChatMessage(
+      "thread-message:12",
+      "assistant",
+      {
+        state: "in_progress",
+        text: "partial",
+      },
+    );
+    const firstCache = deriveTranscriptItemViewModels(
+      [firstAssistant, streamingAssistant],
+      expandedItemIds,
+    );
+    const nextStreamingAssistant = visibleChatMessage(
+      "thread-message:12",
+      "assistant",
+      {
+        state: "in_progress",
+        text: "partial update",
+      },
+    );
+
+    const nextCache = deriveTranscriptItemViewModels(
+      [firstAssistant, nextStreamingAssistant],
+      expandedItemIds,
+      firstCache,
+    );
+
+    expect(nextCache.items).not.toBe(firstCache.items);
+    expect(nextCache.items[0]).toBe(firstCache.items[0]);
+    expect(nextCache.items[1]).not.toBe(firstCache.items[1]);
   });
 
   it("keeps large assistant text attached only to the source message", () => {

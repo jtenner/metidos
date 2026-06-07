@@ -495,6 +495,7 @@ export type BuildVisibleTranscriptStateParams = {
   selectedThread: RpcThread | null;
   selectedThreadId: number | null;
   threadMessages: RpcThreadMessage[];
+  mediaPayloadsCache?: VisibleMediaPayloads | null;
 };
 
 export type VisibleTranscriptState = {
@@ -539,8 +540,24 @@ export function stripThreadMessageMediaPayloadData(
   return message;
 }
 
+function visibleMediaPayloadsEqual(
+  left: VisibleMediaPayloads,
+  right: VisibleMediaPayloads,
+): boolean {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const [key, value] of left) {
+    if (right.get(key) !== value) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function deriveVisibleTranscriptMediaPayloads(
   threadMessages: RpcThreadMessage[],
+  previous?: VisibleMediaPayloads | null,
 ): VisibleMediaPayloads {
   const mediaPayloads = new Map<string, string>();
   for (const message of threadMessages) {
@@ -559,7 +576,9 @@ export function deriveVisibleTranscriptMediaPayloads(
       });
     }
   }
-  return mediaPayloads;
+  return previous && visibleMediaPayloadsEqual(mediaPayloads, previous)
+    ? previous
+    : mediaPayloads;
 }
 
 export function buildVisibleTranscriptState({
@@ -573,6 +592,7 @@ export function buildVisibleTranscriptState({
   initialTranscriptIsBusy,
   isCreatingThread,
   isThreadLoading,
+  mediaPayloadsCache,
   selectedProject,
   selectedThread,
   selectedThreadId,
@@ -726,7 +746,10 @@ export function buildVisibleTranscriptState({
     messages.map((message) => message.key),
   );
 
-  const mediaPayloads = deriveVisibleTranscriptMediaPayloads(threadMessages);
+  const mediaPayloads = deriveVisibleTranscriptMediaPayloads(
+    threadMessages,
+    mediaPayloadsCache,
+  );
 
   return { mediaPayloads, messages, transcriptIsBusy };
 }

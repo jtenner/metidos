@@ -414,12 +414,14 @@ describe("buildVisibleTranscriptState", () => {
       isCreatingThread: false,
       isThreadLoading: false,
       selectedProject: project(),
+      mediaPayloadsCache: firstState.mediaPayloads,
       selectedThread: thread(),
       selectedThreadId: 7,
       threadMessages: [firstMessage, secondMessage],
     });
 
     expect(nextState.messages[0]).toBe(firstUserRow);
+    expect(nextState.mediaPayloads).toBe(firstState.mediaPayloads);
     expect(nextState.messages.map((message) => message.key)).toEqual([
       "thread-message:1",
       "thread-message:2",

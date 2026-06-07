@@ -115,6 +115,12 @@ export type TranscriptItemViewModel = {
   model: TranscriptPipelineItemModel;
 };
 
+export type TranscriptItemViewModelsCache = {
+  expandedItemIds: ReadonlySet<string>;
+  items: TranscriptItemViewModel[];
+  messages: VisibleMessage[];
+};
+
 export type TranscriptPipelineGroup =
   | {
       kind: "assistant";
@@ -183,7 +189,10 @@ export function routeTranscriptMarkdownText({
 }): TranscriptMarkdownRenderRoute {
   const shouldUseRichRenderer = shouldUseRichMarkdownRenderer(text);
 
-  if (!shouldUseRichRenderer) {
+  if (!shouldUseRichRenderer || state === "in_progress") {
+    // Streaming rich markdown reparses the full growing string on every chunk.
+    // Keep active assistant output on the lightweight text path, then render the
+    // completed message with markdown once content stops changing.
     return {
       kind: "plain",
       segments: splitTranscriptPlainTextMessage(text),
@@ -196,7 +205,7 @@ export function routeTranscriptMarkdownText({
 
   return {
     kind: "rich",
-    streaming: state === "in_progress",
+    streaming: false,
   };
 }
 
@@ -599,23 +608,82 @@ export function resolveTranscriptItemExpansionState(
  * state. Chat surfaces should render these prepared items instead of repeating
  * classification and expansion decisions at every desktop/mobile call site.
  */
+function buildTranscriptItemViewModel(
+  message: VisibleMessage,
+  expandedItemIds: ReadonlySet<string>,
+): TranscriptItemViewModel {
+  const item = classifyTranscriptPipelineItem(message);
+  return {
+    expansionState: resolveTranscriptPipelineItemExpansionState(
+      item,
+      expandedItemIds,
+    ),
+    isAssistantVisible: isTranscriptAssistantVisibleMessage(message),
+    isPlainAssistantText: isPlainAssistantTranscriptTextMessage(message),
+    message,
+    model: item,
+  };
+}
+
+export function deriveTranscriptItemViewModels(
+  messages: VisibleMessage[],
+  expandedItemIds: ReadonlySet<string>,
+  previous: TranscriptItemViewModelsCache | null = null,
+): TranscriptItemViewModelsCache {
+  if (
+    previous &&
+    previous.messages === messages &&
+    previous.expandedItemIds === expandedItemIds
+  ) {
+    return previous;
+  }
+
+  const canReuseItems = previous?.expandedItemIds === expandedItemIds;
+  const reusableItemsByMessage = new Map<
+    VisibleMessage,
+    TranscriptItemViewModel
+  >();
+  if (previous && canReuseItems) {
+    previous.messages.forEach((message, index) => {
+      const item = previous.items[index];
+      if (item) {
+        reusableItemsByMessage.set(message, item);
+      }
+    });
+  }
+
+  let orderChanged = previous?.messages.length !== messages.length;
+  const items = messages.map((message, index) => {
+    const reusedItem = canReuseItems
+      ? reusableItemsByMessage.get(message)
+      : undefined;
+    if (reusedItem) {
+      if (previous?.items[index] !== reusedItem) {
+        orderChanged = true;
+      }
+      return reusedItem;
+    }
+
+    orderChanged = true;
+    return buildTranscriptItemViewModel(message, expandedItemIds);
+  });
+
+  if (previous && !orderChanged) {
+    return previous;
+  }
+
+  return {
+    expandedItemIds,
+    items,
+    messages,
+  };
+}
+
 export function buildTranscriptItemViewModels(
   messages: VisibleMessage[],
   expandedItemIds: ReadonlySet<string>,
 ): TranscriptItemViewModel[] {
-  return messages.map((message) => {
-    const item = classifyTranscriptPipelineItem(message);
-    return {
-      expansionState: resolveTranscriptPipelineItemExpansionState(
-        item,
-        expandedItemIds,
-      ),
-      isAssistantVisible: isTranscriptAssistantVisibleMessage(message),
-      isPlainAssistantText: isPlainAssistantTranscriptTextMessage(message),
-      message,
-      model: item,
-    };
-  });
+  return deriveTranscriptItemViewModels(messages, expandedItemIds).items;
 }
 
 /**
