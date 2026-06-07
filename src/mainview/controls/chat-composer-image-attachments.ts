@@ -340,7 +340,7 @@ export function startChatComposerImageAttachmentRead(
     ),
   );
   const timeoutHandle = setTimeout(() => {
-    finishChatComposerImageAttachmentRead(normalizedKey);
+    finishChatComposerImageAttachmentRead(normalizedKey, timeoutHandle);
   }, timeoutMs);
   // Browser timers are numeric, while Bun/Node timers can expose unref(). Keep
   // the cleanup timeout from pinning non-browser test or tooling processes.
@@ -354,6 +354,7 @@ export function startChatComposerImageAttachmentRead(
 
 export function finishChatComposerImageAttachmentRead(
   draftKey?: string | null,
+  timeoutHandleToClear?: ReturnType<typeof setTimeout>,
 ): void {
   const normalizedKey = normalizeImageAttachmentKey(draftKey);
   const pendingImageAttachmentReads =
@@ -364,7 +365,13 @@ export function finishChatComposerImageAttachmentRead(
   const nextPendingReads = pendingImageAttachmentReads - 1;
   const timeoutHandles =
     pendingImageAttachmentReadTimeoutsByKey.get(normalizedKey);
-  const timeoutHandle = timeoutHandles?.shift();
+  const timeoutHandle = timeoutHandleToClear ?? timeoutHandles?.shift();
+  if (timeoutHandles && timeoutHandleToClear) {
+    const timeoutIndex = timeoutHandles.indexOf(timeoutHandleToClear);
+    if (timeoutIndex >= 0) {
+      timeoutHandles.splice(timeoutIndex, 1);
+    }
+  }
   if (timeoutHandle) {
     clearTimeout(timeoutHandle);
   }

@@ -163,6 +163,25 @@ describe("chat composer image attachment store", () => {
     expect(settled).toBeTrue();
   });
 
+  it("tracks image attachment read timeout handles independently", async () => {
+    startChatComposerImageAttachmentRead("thread:out-of-order", {
+      timeoutMs: 20,
+    });
+    startChatComposerImageAttachmentRead("thread:out-of-order", {
+      timeoutMs: 1,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(
+      readChatComposerPendingImageAttachmentReads("thread:out-of-order"),
+    ).toBe(1);
+
+    await waitForChatComposerImageAttachments("thread:out-of-order");
+    expect(
+      readChatComposerPendingImageAttachmentReads("thread:out-of-order"),
+    ).toBe(0);
+  });
+
   it("keeps fake image attachment loading states scoped by draft key", async () => {
     startChatComposerImageAttachmentRead("thread:loading");
 
