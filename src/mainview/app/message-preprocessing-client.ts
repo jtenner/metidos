@@ -244,6 +244,11 @@ export class MessagePreprocessingRequestManager {
     const requestId = this.nextRequestId + 1;
     this.nextRequestId = requestId;
 
+    // `read()` may run during render before `subscribe()` installs a listener.
+    // That render-to-effect gap is bounded rather than a leak: pending worker
+    // requests are capped, each entry has a timeout fallback, and worker
+    // response/failure/timeout paths all clear the pending maps. Keeping the
+    // request here lets committed subscribers share the same in-flight work.
     const pendingEntry: PendingMessagePreprocessingEntry = {
       cacheKey,
       listeners: new Set<MessagePreprocessingListener>(),

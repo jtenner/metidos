@@ -184,6 +184,11 @@ export class DiffParseRequestManager {
       isLoading: true,
       result: EMPTY_DIFF_PARSE_RESULT,
     };
+    // `read()` can be called during render before `subscribe()` attaches a
+    // listener. That temporary listener-less entry is bounded by the pending
+    // request cap and request timeout, and every worker response/failure/timeout
+    // path clears the pending maps. Starting the request here lets all committed
+    // subscribers share one parse instead of spawning duplicate workers.
     const requestId = this.nextRequestId + 1;
     this.nextRequestId = requestId;
 
