@@ -12,11 +12,13 @@ import {
   fileLooksLikeChatImage,
 } from "./chat-composer-control";
 import {
+  CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES,
   CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS,
   clearChatComposerImageAttachments,
   finishChatComposerImageAttachmentRead,
   migrateChatComposerImageAttachmentKey,
   readChatComposerImageAttachments,
+  readChatComposerImageAttachmentStoreTelemetry,
   readChatComposerPendingImageAttachmentReads,
   resetChatComposerImageAttachmentStoreForTest,
   waitForChatComposerImageAttachments,
@@ -207,6 +209,41 @@ describe("chat composer image attachment store", () => {
     expect(
       readChatComposerImageAttachments(
         `thread:${CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS}`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("bounds migrated image attachment key aliases", () => {
+    for (
+      let index = 0;
+      index <= CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES;
+      index += 1
+    ) {
+      migrateChatComposerImageAttachmentKey(
+        `thread:optimistic-${index}`,
+        `thread:persisted-${index}`,
+      );
+    }
+
+    setChatComposerImageAttachments(
+      [
+        {
+          byteSize: 1,
+          data: "aA==",
+          id: "image-latest",
+          mimeType: "image/png",
+          type: "image",
+        },
+      ],
+      `thread:persisted-${CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES}`,
+    );
+
+    expect(
+      readChatComposerImageAttachmentStoreTelemetry().aliasKeys,
+    ).toBeLessThanOrEqual(CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES);
+    expect(
+      readChatComposerImageAttachments(
+        `thread:optimistic-${CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES}`,
       ),
     ).toHaveLength(1);
   });

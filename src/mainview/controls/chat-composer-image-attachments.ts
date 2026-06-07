@@ -13,6 +13,8 @@ import {
 const DEFAULT_CHAT_COMPOSER_IMAGE_KEY = "__default__";
 const EMPTY_CHAT_COMPOSER_IMAGE_ATTACHMENTS: ChatImageDraftAttachment[] = [];
 export const CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS = 128;
+export const CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES =
+  CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_KEYS * 4;
 export const CHAT_COMPOSER_IMAGE_ATTACHMENT_STORE_MAX_BYTES =
   MAX_CHAT_IMAGE_ATTACHMENTS * MAX_CHAT_IMAGE_BYTES;
 export const CHAT_COMPOSER_IMAGE_ATTACHMENT_READ_TIMEOUT_MS = 60_000;
@@ -107,6 +109,52 @@ function deleteChatComposerImageAttachmentKey(normalizedKey: string): void {
     pendingImageAttachmentReadsByKey.delete(normalizedKey);
     clearPendingImageAttachmentReadTimeouts(normalizedKey);
     imageAttachmentSettledResolversByKey.delete(normalizedKey);
+  }
+}
+
+function pruneChatComposerImageAttachmentAliases(
+  protectedKeys: ReadonlySet<string>,
+): void {
+  if (
+    chatComposerImageAttachmentKeyAliases.size <=
+    CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES
+  ) {
+    return;
+  }
+
+  const activeTargets = new Set<string>([
+    ...chatComposerImageAttachmentsByKey.keys(),
+    ...pendingImageAttachmentReadsByKey.keys(),
+    ...pendingImageAttachmentReadTimeoutsByKey.keys(),
+    ...imageAttachmentSettledResolversByKey.keys(),
+  ]);
+
+  for (const [aliasKey, aliasTarget] of chatComposerImageAttachmentKeyAliases) {
+    if (
+      chatComposerImageAttachmentKeyAliases.size <=
+      CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES
+    ) {
+      return;
+    }
+    if (protectedKeys.has(aliasKey) || protectedKeys.has(aliasTarget)) {
+      continue;
+    }
+    if (!activeTargets.has(aliasTarget)) {
+      chatComposerImageAttachmentKeyAliases.delete(aliasKey);
+    }
+  }
+
+  for (const [aliasKey, aliasTarget] of chatComposerImageAttachmentKeyAliases) {
+    if (
+      chatComposerImageAttachmentKeyAliases.size <=
+      CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES
+    ) {
+      return;
+    }
+    if (protectedKeys.has(aliasKey) || protectedKeys.has(aliasTarget)) {
+      continue;
+    }
+    chatComposerImageAttachmentKeyAliases.delete(aliasKey);
   }
 }
 
@@ -250,6 +298,9 @@ export function migrateChatComposerImageAttachmentKey(
     imageAttachmentSettledResolversByKey.delete(normalizedFromKey);
   }
 
+  pruneChatComposerImageAttachmentAliases(
+    new Set([rawFromKey, rawToKey, normalizedFromKey, normalizedToKey]),
+  );
   pruneChatComposerImageAttachmentStore(normalizedToKey);
   emitImageAttachmentChange();
 }
@@ -356,6 +407,22 @@ export function clearChatComposerImageAttachments(
   draftKey?: string | null,
 ): void {
   setChatComposerImageAttachments([], draftKey);
+}
+
+export function readChatComposerImageAttachmentStoreTelemetry(): {
+  aliasKeys: number;
+  attachmentKeys: number;
+  pendingReadKeys: number;
+  pendingReadTimeoutKeys: number;
+  settledResolverKeys: number;
+} {
+  return {
+    aliasKeys: chatComposerImageAttachmentKeyAliases.size,
+    attachmentKeys: chatComposerImageAttachmentsByKey.size,
+    pendingReadKeys: pendingImageAttachmentReadsByKey.size,
+    pendingReadTimeoutKeys: pendingImageAttachmentReadTimeoutsByKey.size,
+    settledResolverKeys: imageAttachmentSettledResolversByKey.size,
+  };
 }
 
 export function resetChatComposerImageAttachmentStoreForTest(): void {
