@@ -77,6 +77,14 @@ export function useThreadMessageHistoryController({
       const controller = new AbortController();
       threadHistoryBackfillAbortControllerRef.current = controller;
       void (async () => {
+        // The async backfill intentionally captures `procedures` from this hook
+        // invocation but does not leak stale work across selections: every new
+        // open/replace path calls `abortThreadHistoryBackfill`, the unmount
+        // cleanup aborts the active controller, and the stable
+        // `selectedThreadIdRef` guard is checked before fetching and before
+        // committing accumulated pages. If the user navigates away or the
+        // controller is replaced, the AbortSignal and selected-thread guard stop
+        // the loop before stale messages can enter state.
         await new Promise<void>((resolve) => {
           if (
             typeof window === "undefined" ||
