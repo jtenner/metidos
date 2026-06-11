@@ -5,7 +5,6 @@
 
 import {
   type ChangeEvent,
-  type ClipboardEvent,
   type DragEvent,
   type JSX,
   type KeyboardEvent,
@@ -601,19 +600,6 @@ export function ChatComposerControl({
     [draftKey, supportsImageInput],
   );
 
-  const onPaste = useCallback(
-    (event: ClipboardEvent<HTMLTextAreaElement>): void => {
-      const files = getPastedChatImageFiles(event.clipboardData);
-      if (files.length === 0) {
-        return;
-      }
-
-      event.preventDefault();
-      appendImageFiles(files);
-    },
-    [appendImageFiles],
-  );
-
   const onSelectImageFiles = useCallback((): void => {
     imageFileInputRef.current?.click();
   }, []);
@@ -863,7 +849,6 @@ export function ChatComposerControl({
             onKeyDown={onComposerKeyDown}
             onKeyUp={refreshSkillsAutocompleteForCaret}
             onDrop={onImageFileDrop}
-            onPaste={onPaste}
             onSelect={refreshSkillsAutocompleteForCaret}
             disabled={disabled}
           />
@@ -922,7 +907,6 @@ export function ChatComposerControl({
           onKeyDown={onComposerKeyDown}
           onKeyUp={refreshSkillsAutocompleteForCaret}
           onDrop={onImageFileDrop}
-          onPaste={onPaste}
           onSelect={refreshSkillsAutocompleteForCaret}
           disabled={disabled}
         />
