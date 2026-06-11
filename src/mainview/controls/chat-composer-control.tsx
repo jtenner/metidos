@@ -135,6 +135,53 @@ export function fileLooksLikeChatImage(
   );
 }
 
+function clipboardTypesSuggestFiles(
+  types: readonly string[] | DOMStringList,
+): boolean {
+  for (let index = 0; index < types.length; index += 1) {
+    const type = types[index];
+    if (type && (type === "Files" || type.toLowerCase().startsWith("image/"))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function getPastedChatImageFiles(
+  clipboardData: Pick<DataTransfer, "files" | "items" | "types">,
+): File[] {
+  // Chrome has historically been fragile around file-like clipboard entries.
+  // Keep plain-text paste on the native textarea path by avoiding item/file
+  // enumeration unless the clipboard explicitly advertises files or images.
+  if (
+    !clipboardTypesSuggestFiles(clipboardData.types) &&
+    clipboardData.files.length === 0
+  ) {
+    return [];
+  }
+
+  const pastedFiles: File[] = [];
+  for (let index = 0; index < clipboardData.items.length; index += 1) {
+    const item = clipboardData.items[index];
+    if (!item || item.kind !== "file") {
+      continue;
+    }
+    if (item.type.trim() !== "" && !item.type.startsWith("image/")) {
+      continue;
+    }
+    const file = item.getAsFile();
+    if (file && fileLooksLikeChatImage(file)) {
+      pastedFiles.push(file);
+    }
+  }
+
+  if (pastedFiles.length > 0 || clipboardData.items.length > 0) {
+    return pastedFiles;
+  }
+
+  return Array.from(clipboardData.files).filter(fileLooksLikeChatImage);
+}
+
 function logChatImageComposerEvent(
   event: string,
   details?: Record<string, unknown>,
@@ -556,15 +603,7 @@ export function ChatComposerControl({
 
   const onPaste = useCallback(
     (event: ClipboardEvent<HTMLTextAreaElement>): void => {
-      const clipboardItems = Array.from(event.clipboardData.items);
-      const pastedFiles =
-        clipboardItems.length > 0
-          ? clipboardItems
-              .filter((item) => item.kind === "file")
-              .map((item) => item.getAsFile())
-              .filter((file): file is File => file !== null)
-          : Array.from(event.clipboardData.files);
-      const files = pastedFiles.filter(fileLooksLikeChatImage);
+      const files = getPastedChatImageFiles(event.clipboardData);
       if (files.length === 0) {
         return;
       }

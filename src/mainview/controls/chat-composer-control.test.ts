@@ -10,6 +10,7 @@ import {
   chatComposerTextareaLabel,
   createImageAttachmentId,
   fileLooksLikeChatImage,
+  getPastedChatImageFiles,
 } from "./chat-composer-control";
 import {
   CHAT_COMPOSER_IMAGE_ATTACHMENT_ALIAS_MAX_ENTRIES,
@@ -291,6 +292,64 @@ describe("chat composer image file detection", () => {
 
   it("rejects non-image file selections", () => {
     expect(fileLooksLikeChatImage({ name: "notes.txt", type: "" })).toBeFalse();
+  });
+});
+
+describe("chat composer paste handling", () => {
+  function createClipboardData({
+    files = [],
+    items = [],
+    types = [],
+  }: {
+    files?: File[];
+    items?: Array<Pick<DataTransferItem, "getAsFile" | "kind" | "type">>;
+    types?: string[];
+  }): Pick<DataTransfer, "files" | "items" | "types"> {
+    return {
+      files: files as unknown as FileList,
+      items: items as unknown as DataTransferItemList,
+      types,
+    };
+  }
+
+  it("leaves plain text paste on the native textarea path", () => {
+    let getAsFileCalled = false;
+    const files = getPastedChatImageFiles(
+      createClipboardData({
+        items: [
+          {
+            getAsFile: () => {
+              getAsFileCalled = true;
+              return null;
+            },
+            kind: "string",
+            type: "text/plain",
+          },
+        ],
+        types: ["text/plain"],
+      }),
+    );
+
+    expect(files).toEqual([]);
+    expect(getAsFileCalled).toBeFalse();
+  });
+
+  it("extracts image files from image clipboard items", () => {
+    const image = new File(["image"], "clipboard.png", { type: "image/png" });
+    const files = getPastedChatImageFiles(
+      createClipboardData({
+        items: [
+          {
+            getAsFile: () => image,
+            kind: "file",
+            type: "image/png",
+          },
+        ],
+        types: ["image/png"],
+      }),
+    );
+
+    expect(files).toEqual([image]);
   });
 });
 
