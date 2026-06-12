@@ -385,6 +385,32 @@ describe("terminal websocket message validation", () => {
     }
   });
 
+  it("removes the last terminal without spinning on sparse terminal order cleanup", () => {
+    const manager = new TerminalManager();
+    addMockTerminalSession(manager, "terminal-1", []);
+    const session = (
+      manager as unknown as {
+        sessions: Map<
+          string,
+          { status: string; waitingForKeyToClose: boolean }
+        >;
+      }
+    ).sessions.get("terminal-1");
+    if (!session) {
+      throw new Error("Expected mock terminal session.");
+    }
+    session.status = "exited";
+    session.waitingForKeyToClose = true;
+
+    manager.closeTerminal("terminal-1");
+
+    expect(manager.listTerminals()).toEqual([]);
+    expect(
+      (manager as unknown as { terminalOrder: Array<string | undefined> })
+        .terminalOrder,
+    ).toEqual([]);
+  });
+
   it("accepts only string terminal input up to 64 KiB", () => {
     expect(normalizeTerminalInputData("a".repeat(64 * 1024))).toBe(
       "a".repeat(64 * 1024),

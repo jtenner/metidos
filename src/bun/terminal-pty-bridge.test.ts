@@ -55,6 +55,50 @@ function runBridgeWithConfig(
   return runBridgeWithRawInput(`${encodedConfig}\n`, options);
 }
 
+function runBridgeWithRuntimeMessage(
+  config: unknown,
+  message: unknown,
+): Promise<{
+  code: number | null;
+  stderr: string;
+  stdout: string;
+}> {
+  const encodedConfig = Buffer.from(JSON.stringify(config), "utf8").toString(
+    "base64",
+  );
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [TERMINAL_PTY_BRIDGE_PATH], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Timed out waiting for terminal bridge to exit."));
+    }, 2_000);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("exit", (code) => {
+      clearTimeout(timeout);
+      resolve({ code, stderr, stdout });
+    });
+    child.stdin.write(`${encodedConfig}\n`);
+    setTimeout(() => {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    }, 50).unref?.();
+  });
+}
+
 describe("terminal PTY bridge", () => {
   it("exits successfully when the host closes stdin before configuration", async () => {
     const result = await runBridgeWithRawInput("");
@@ -85,6 +129,29 @@ describe("terminal PTY bridge", () => {
       exitCode: 1,
       signal: 0,
     });
+  });
+
+  it("exits through the bridge protocol after a runtime kill request", async () => {
+    const result = await runBridgeWithRuntimeMessage(
+      {
+        args: ["5"],
+        cols: 80,
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" },
+        file: "/bin/sleep",
+        name: "xterm-256color",
+        rows: 24,
+      },
+      { type: "kill", signal: "SIGTERM" },
+    );
+    const messages = result.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(messages.at(-1)).toMatchObject({ type: "exit" });
   });
 
   it("exits after an oversized partial input buffer", async () => {

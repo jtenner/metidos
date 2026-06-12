@@ -135,6 +135,10 @@ class BridgeManagedPty implements ManagedPty {
     child.stderr.on("data", (chunk: string) => {
       this.emitData(`\r\nTerminal bridge: ${chunk}`);
     });
+    child.stdin.on("error", () => {
+      // Broken stdin means the bridge is already exiting or gone; shutdown
+      // fallback below still handles final cleanup.
+    });
     child.on("exit", (code, signal) => {
       if (this.exited) {
         return;
@@ -169,17 +173,29 @@ class BridgeManagedPty implements ManagedPty {
   }
 
   kill(signal?: NodeJS.Signals): void {
-    if (!this.child.killed) {
-      this.child.kill(signal ?? "SIGTERM");
-    }
-    // If the Node bridge stops reading or ignores SIGTERM, fail closed quickly.
-    // The visible terminal lifecycle is driven by TerminalSession cleanup, which
-    // separately gives the underlying PTY time to exit before force-killing it.
-    safeSetTimeout(() => {
-      if (!this.exited) {
-        this.child.kill("SIGKILL");
+    const requestedSignal = signal ?? "SIGTERM";
+    this.send({ type: "kill", signal: requestedSignal });
+    // Prefer the bridge protocol so node-pty reports the child exit and the
+    // bridge exits normally. If the bridge stops reading or ignores the request,
+    // close stdin and then signal the proxy process as a bounded fallback.
+    const fallbackTimer = safeSetTimeout(() => {
+      if (this.exited) {
+        return;
       }
+      if (!this.child.stdin.destroyed) {
+        this.child.stdin.end();
+      }
+      if (!this.child.killed) {
+        this.child.kill(requestedSignal === "SIGKILL" ? "SIGKILL" : "SIGTERM");
+      }
+      const forceTimer = safeSetTimeout(() => {
+        if (!this.exited) {
+          this.child.kill("SIGKILL");
+        }
+      }, TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS);
+      forceTimer.unref?.();
     }, TERMINAL_BRIDGE_FALLBACK_KILL_DELAY_MS);
+    fallbackTimer.unref?.();
   }
 
   private send(message: Record<string, unknown>): void {
@@ -1642,7 +1658,10 @@ export class TerminalManager {
     this.sessions.delete(session.terminalId);
     if (this.terminalOrder[session.terminalIndex] === session.terminalId) {
       this.terminalOrder[session.terminalIndex] = undefined;
-      while (this.terminalOrder.at(-1) === undefined) {
+      while (
+        this.terminalOrder.length > 0 &&
+        this.terminalOrder.at(-1) === undefined
+      ) {
         this.terminalOrder.pop();
       }
     }
