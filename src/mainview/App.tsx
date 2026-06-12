@@ -150,6 +150,7 @@ import { useDesktopThreadSwitcher } from "./app/use-desktop-thread-switcher";
 import { useGitHistoryController } from "./app/use-git-history-controller";
 import { useMainviewDerivedState } from "./app/use-mainview-derived-state";
 import { useMainviewStartupController } from "./app/use-mainview-startup-controller";
+import { useMainviewStalenessRefreshController } from "./app/use-mainview-staleness-refresh-controller";
 import { useThreadTurnBusyState } from "./app/use-thread-turn-controller";
 import { useProjectSkills } from "./app/use-project-skills";
 import { useProjectWorktreeController } from "./app/use-project-worktree-controller";
@@ -163,7 +164,7 @@ import { useThreadWorkspaceController } from "./app/use-thread-workspace-control
 import { stripThreadMessageMediaPayloadData } from "./app/transcript-state";
 import { useVisibleMessages } from "./app/use-visible-messages";
 import { useWorktreeDiff } from "./app/use-worktree-diff";
-import { logClientError } from "./client-logging";
+import { logClientError, logClientEvent } from "./client-logging";
 import { brandLogoIcon } from "./controls/brand-logo";
 import { AppButton, NotificationButton, TabButton } from "./controls/button";
 import {
@@ -790,6 +791,9 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
   const modelCatalogRefreshStartedRef = useRef(false);
 
   const activeWorktreeSyncAbortControllerRef = useRef<AbortController | null>(
+    null,
+  );
+  const stalenessRefreshAbortControllerRef = useRef<AbortController | null>(
     null,
   );
   const homeDirectoryPrefetchQueryRef = useRef<string | null>(null);
@@ -2225,6 +2229,135 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
     setThreadsError,
     setWorktreeState,
   });
+
+  const requestMainviewStalenessRefresh = useCallback(
+    (reason: "event-loop-gap" | "visibility-return"): void => {
+      if (stalenessRefreshAbortControllerRef.current !== null) {
+        return;
+      }
+
+      const controller = new AbortController();
+      stalenessRefreshAbortControllerRef.current = controller;
+      logClientEvent({
+        severity: "info",
+        message: "Refreshing mainview state after stale client interval",
+        context: reason,
+        route: typeof window !== "undefined" ? window.location.pathname : null,
+      });
+      void procedures
+        .getAppBootstrap(
+          {
+            selectedProjectId: selectedProjectIdRef.current,
+            selectedWorktreePath: selectedWorktreePathRef.current,
+            threadIdHint: selectedThreadIdRef.current,
+          },
+          {
+            priority: "background",
+            signal: controller.signal,
+          },
+        )
+        .then(async (bootstrapResult) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          replaceProjects(bootstrapResult.projects);
+          hydrateProjectRows(bootstrapResult.projects);
+          replaceThreads(
+            applyOptimisticThreadErrorSeenToList(bootstrapResult.threads),
+          );
+          applyModelCatalog(bootstrapResult.modelCatalog);
+          setAvailablePluginAccessGroups(bootstrapResult.pluginAccessGroups);
+          setAvailableThreadPermissionDescriptors(
+            bootstrapResult.threadPermissionDescriptors,
+          );
+          setHomeDirectory(bootstrapResult.homeDirectory.homeDirectory);
+          setSupportsTildePath(bootstrapResult.homeDirectory.supportsTildePath);
+          seedAddProjectPath(
+            bootstrapResult.homeDirectory.homeDirectory,
+            bootstrapResult.homeDirectory.supportsTildePath,
+          );
+
+          const selectedThreadId = selectedThreadIdRef.current;
+          const inlineDetail = bootstrapResult.threadDetail;
+          const detail =
+            inlineDetail !== null && inlineDetail.thread.id === selectedThreadId
+              ? inlineDetail
+              : selectedThreadId === null
+                ? null
+                : await procedures.getThread(
+                    { threadId: selectedThreadId },
+                    {
+                      priority: "background",
+                      signal: controller.signal,
+                    },
+                  );
+          if (
+            detail !== null &&
+            !controller.signal.aborted &&
+            selectedThreadIdRef.current === detail.thread.id
+          ) {
+            const preparedDetail = prepareOpenedThreadDetail(detail);
+            const refreshState =
+              buildMainviewShellSelectedThreadDetailRefreshState(
+                preparedDetail,
+              );
+            selectedThreadRunStateRef.current = refreshState.runState;
+            selectedThreadDetailRefreshKeyRef.current =
+              refreshState.detailRefreshKey;
+            mergeSelectedThreadMessageHistoryRef.current(preparedDetail);
+          }
+        })
+        .catch((error) => {
+          if (isAbortError(error)) {
+            return;
+          }
+          logClientError("Failed to refresh stale mainview state", error, {
+            context: reason,
+          });
+        })
+        .finally(() => {
+          if (stalenessRefreshAbortControllerRef.current === controller) {
+            stalenessRefreshAbortControllerRef.current = null;
+          }
+        });
+    },
+    [
+      applyModelCatalog,
+      applyOptimisticThreadErrorSeenToList,
+      hydrateProjectRows,
+      prepareOpenedThreadDetail,
+      procedures,
+      replaceProjects,
+      replaceThreads,
+      seedAddProjectPath,
+      selectedProjectIdRef,
+      selectedThreadIdRef,
+      selectedWorktreePathRef,
+      setAvailablePluginAccessGroups,
+      setAvailableThreadPermissionDescriptors,
+      setHomeDirectory,
+      setSupportsTildePath,
+    ],
+  );
+
+  useMainviewStalenessRefreshController({
+    enabled: sessionStateReady,
+    requestRefresh: requestMainviewStalenessRefresh,
+  });
+
+  useEffect(
+    () => () => {
+      const controller = stalenessRefreshAbortControllerRef.current;
+      if (controller !== null) {
+        stalenessRefreshAbortControllerRef.current = null;
+        controller.abort(
+          createAbortError(null, "Stale mainview refresh was canceled."),
+        );
+      }
+    },
+    [],
+  );
 
   const closeProjectActionMenu = useCallback(() => {
     setProjectActionMenu(null);
