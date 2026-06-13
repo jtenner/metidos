@@ -133,7 +133,7 @@ describe("stripThreadMessageMediaPayloadData", () => {
 });
 
 describe("shouldRenderThreadMessageControl", () => {
-  it("hides edit tool-call controls because file-change rows show the result", () => {
+  it("hides edit and write tool-call controls because file-change rows show the result", () => {
     const editToolCall = chatMessage(3, "edit result", {
       argumentsText: '{"path":"src/example.ts"}',
       kind: "tool_call",
@@ -143,13 +143,20 @@ describe("shouldRenderThreadMessageControl", () => {
       state: "completed",
       tool: "edit",
     }) as RpcToolCallThreadMessage;
-    const readToolCall = {
+    const writeToolCall = {
       ...editToolCall,
       id: 4,
+      output: "Wrote src/example.ts",
+      tool: "write",
+    } satisfies RpcToolCallThreadMessage;
+    const readToolCall = {
+      ...editToolCall,
+      id: 5,
       tool: "read",
     } satisfies RpcToolCallThreadMessage;
 
     expect(shouldRenderThreadMessageControl(editToolCall)).toBe(false);
+    expect(shouldRenderThreadMessageControl(writeToolCall)).toBe(false);
     expect(shouldRenderThreadMessageControl(readToolCall)).toBe(true);
   });
 });

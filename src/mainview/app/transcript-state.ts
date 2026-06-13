@@ -369,7 +369,10 @@ function threadMessageKeepsTranscriptBusy(message: RpcThreadMessage): boolean {
 export function shouldRenderThreadMessageControl(
   message: RpcThreadMessage,
 ): boolean {
-  return message.kind !== "tool_call" || message.tool !== "edit";
+  return (
+    message.kind !== "tool_call" ||
+    (message.tool !== "edit" && message.tool !== "write")
+  );
 }
 
 function buildThreadVisibleMessage(message: RpcThreadMessage): VisibleMessage {
