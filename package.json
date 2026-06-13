@@ -53,7 +53,7 @@
     "cronstrue": "^3.14.0",
     "ghostty-web": "^0.4.0",
     "ical.js": "^2.2.1",
-    "node-gyp": "^12.3.0",
+    "node-gyp": "^13.0.0",
     "node-pty": "^1.1.0",
     "pyodide": "^0.29.4",
     "qrcode": "^1.5.4",
