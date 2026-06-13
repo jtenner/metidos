@@ -59,7 +59,7 @@
     "qrcode": "^1.5.4",
     "re2-wasm": "^1.0.2",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
+    "react-dom": "^19.2.7",
     "react-shiki": "^0.10.1",
     "rrule": "^2.8.1",
     "turndown": "^7.2.4",
