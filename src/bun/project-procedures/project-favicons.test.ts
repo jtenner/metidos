@@ -128,6 +128,24 @@ describe("discoverProjectFaviconDataUrl", () => {
     expect(discoveredDataUrl).toBe(dataUrl("image/x-icon", ICON_BYTES));
   });
 
+  it("ignores favicon links that resolve inside node_modules", async () => {
+    const root = await makeTempProject("skip-node-modules-hrefs");
+    await mkdir(join(root, "node_modules", "pkg"), { recursive: true });
+    await writeFile(
+      join(root, "node_modules", "pkg", "bad.ico"),
+      new Uint8Array([8, 8, 8, 8]),
+    );
+    await writeFile(join(root, "favicon.ico"), ICON_BYTES);
+    await writeFile(
+      join(root, "index.html"),
+      '<link rel="icon" href="node_modules/pkg/bad.ico">',
+    );
+
+    const discoveredDataUrl = await discoverProjectFaviconDataUrl(root);
+
+    expect(discoveredDataUrl).toBe(dataUrl("image/x-icon", ICON_BYTES));
+  });
+
   it("resolves asset-root favicon placeholders to root png files", async () => {
     const root = await makeTempProject("asset-root");
     await mkdir(join(root, "src", "mainview"), { recursive: true });

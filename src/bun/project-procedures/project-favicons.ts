@@ -24,6 +24,27 @@ const MAX_SCANNED_ENTRIES = 10_000;
 const MAX_SCAN_DEPTH = 12;
 const MAX_ICON_BYTES = 128 * 1024;
 const SKIPPED_DIRECTORY_NAMES = new Set([".git", "node_modules"]);
+function isSkippedDirectoryName(name: string): boolean {
+  return SKIPPED_DIRECTORY_NAMES.has(name.toLowerCase());
+}
+
+function isPathInSkippedDirectory(
+  projectPath: string,
+  candidatePath: string,
+): boolean {
+  const relativePath = relative(resolve(projectPath), resolve(candidatePath));
+  if (
+    !relativePath ||
+    relativePath.startsWith("..") ||
+    isAbsolute(relativePath)
+  ) {
+    return false;
+  }
+  return relativePath
+    .split(/[\\/]+/u)
+    .some((segment) => isSkippedDirectoryName(segment));
+}
+
 const ICON_MIME_TYPES: Record<string, string> = {
   ".avif": "image/avif",
   ".gif": "image/gif",
@@ -117,6 +138,9 @@ function resolveFaviconHref(
     candidatePath !== normalizedProjectPath &&
     !isInsideDirectory(normalizedProjectPath, candidatePath)
   ) {
+    return null;
+  }
+  if (isPathInSkippedDirectory(normalizedProjectPath, candidatePath)) {
     return null;
   }
   return candidatePath;
@@ -393,7 +417,7 @@ async function collectFaviconCandidates(
       scannedEntries += 1;
       const entryPath = join(current.path, entry.name);
       if (entry.isDirectory()) {
-        if (!SKIPPED_DIRECTORY_NAMES.has(entry.name)) {
+        if (!isSkippedDirectoryName(entry.name)) {
           queue.push({ depth: current.depth + 1, path: entryPath });
         }
         continue;
