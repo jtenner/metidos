@@ -267,6 +267,35 @@ describe("mergeThreadMessageHistory", () => {
     });
   });
 
+  it("does not pin an opened in-progress tool call as loaded", () => {
+    const currentMessage = chatMessage(1, "tool result", {
+      argumentsText: "{}",
+      kind: "tool_call",
+      output: "",
+      outputLoaded: true,
+      server: "pi",
+      state: "in_progress",
+      tool: "read",
+    }) as RpcToolCallThreadMessage;
+    const incomingMessage = chatMessage(1, "tool result", {
+      argumentsText: "{}",
+      kind: "tool_call",
+      output: "",
+      outputLoaded: false,
+      server: "pi",
+      state: "completed",
+      tool: "read",
+      updatedAt: "2026-04-12T16:19:00Z",
+    }) as RpcToolCallThreadMessage;
+
+    const merged = mergeThreadMessageHistory(
+      [currentMessage],
+      [incomingMessage],
+    );
+
+    expect(merged[0]).toBe(incomingMessage);
+  });
+
   it("backfills older history without replacing cached visible rows", () => {
     const cache = createVisibleTranscriptStateCache();
     const current = [chatMessage(5, "epsilon"), chatMessage(6, "zeta")];

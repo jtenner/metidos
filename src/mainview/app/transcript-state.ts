@@ -49,6 +49,7 @@ function mergeThreadMessageContent(
   if (
     (current.kind === "command" || current.kind === "tool_call") &&
     incoming.kind === current.kind &&
+    current.state !== "in_progress" &&
     current.outputLoaded !== false &&
     incoming.outputLoaded === false
   ) {

@@ -958,7 +958,12 @@ function maybeRequestTranscriptDeferredContent({
   onRequestMessageContent: (threadId: number, messageId: number) => void;
 }): void {
   const { messageId, requestContent } = item.expansionState;
-  if (requestContent && activeThreadId !== null && messageId !== null) {
+  if (
+    requestContent &&
+    item.model.lifecycle !== "in_progress" &&
+    activeThreadId !== null &&
+    messageId !== null
+  ) {
     onRequestMessageContent(activeThreadId, messageId);
   }
 }
@@ -985,6 +990,7 @@ export function TranscriptMessageContent({
     if (
       expanded &&
       requestContent &&
+      item.model.lifecycle !== "in_progress" &&
       activeThreadId !== null &&
       messageId !== null
     ) {
@@ -993,6 +999,7 @@ export function TranscriptMessageContent({
   }, [
     activeThreadId,
     expanded,
+    item.model.lifecycle,
     messageId,
     onRequestMessageContent,
     requestContent,
