@@ -14,6 +14,7 @@ import {
   getMemoryFactDetail,
   rememberMemoryFacts,
   searchMemoryFactsForObservability,
+  upsertMemoryFactEmbedding,
 } from "./store";
 import type { MemorySourceKind } from "./types";
 
@@ -22,6 +23,7 @@ export type PiMemoryToolOptions = {
   projectId: number;
   worktreePath: string;
   ownerUserId?: number | null | undefined;
+  embed?: ((text: string) => Promise<number[]>) | undefined;
   embeddingAvailable?: boolean;
 };
 
@@ -116,7 +118,8 @@ export function createPiMemoryTools(
         parameters: RememberParameters,
         promptSnippet: "Store provenance-grounded project memory",
         execute: async (_toolCallId, params) => {
-          const result = rememberMemoryFacts(initAppDatabase(), {
+          const db = initAppDatabase();
+          const result = rememberMemoryFacts(db, {
             projectId: options.projectId,
             worktreePath: options.worktreePath,
             originThreadId: options.threadId,
@@ -126,9 +129,31 @@ export function createPiMemoryTools(
             ...(params.metadata ? { metadata: params.metadata } : {}),
             facts: params.facts,
           });
+          const embeddingDiagnostics = {
+            attempted: false,
+            failed: 0,
+            succeeded: 0,
+          };
+          if (options.embed && result.accepted.length > 0) {
+            embeddingDiagnostics.attempted = true;
+            for (const fact of result.accepted) {
+              try {
+                const embedding = await options.embed(fact.statement);
+                upsertMemoryFactEmbedding(db, {
+                  embedding,
+                  factId: fact.id,
+                  projectId: options.projectId,
+                  worktreePath: options.worktreePath,
+                });
+                embeddingDiagnostics.succeeded += 1;
+              } catch {
+                embeddingDiagnostics.failed += 1;
+              }
+            }
+          }
           return textToolResult(
             `Stored evidence E${result.evidenceId}. Accepted ${result.accepted.length} fact(s), rejected ${result.rejected.length}.`,
-            result,
+            { ...result, embeddingDiagnostics },
           );
         },
       }),
@@ -142,6 +167,15 @@ export function createPiMemoryTools(
         parameters: RecallParameters,
         promptSnippet: "Recall provenance-grounded project memory",
         execute: async (_toolCallId, params) => {
+          let queryEmbedding: number[] | undefined;
+          let embeddingFailed = false;
+          if (options.embed) {
+            try {
+              queryEmbedding = await options.embed(params.query);
+            } catch {
+              embeddingFailed = true;
+            }
+          }
           const result = recallMemory(initAppDatabase(), {
             projectId: options.projectId,
             worktreePath: options.worktreePath,
@@ -161,9 +195,8 @@ export function createPiMemoryTools(
             ...(typeof params.includeEvidence === "boolean"
               ? { includeEvidence: params.includeEvidence }
               : {}),
-            ...(typeof options.embeddingAvailable === "boolean"
-              ? { embeddingAvailable: options.embeddingAvailable }
-              : {}),
+            ...(queryEmbedding ? { queryEmbedding } : {}),
+            embeddingAvailable: !!options.embed && !embeddingFailed,
           });
           return textToolResult(
             result.context || "No memory matched the query.",

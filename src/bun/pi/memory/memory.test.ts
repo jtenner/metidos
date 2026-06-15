@@ -13,6 +13,7 @@ import {
   listMemoryWriteEvents,
   rememberMemoryFacts,
   searchMemoryFactsForObservability,
+  upsertMemoryFactEmbedding,
 } from "./store";
 import { validateMemoryFact } from "./validation";
 
@@ -74,6 +75,16 @@ function setupMemoryDb(): Database {
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     erased_at TEXT
+  )`);
+  db.run(`CREATE TABLE memory_embeddings (
+    fact_id INTEGER PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    worktree_path TEXT NOT NULL,
+    embedding_json TEXT NOT NULL,
+    embedding_dimensions INTEGER NOT NULL,
+    model_key TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   )`);
   db.run(`CREATE TABLE memory_fact_evidence (
     fact_id INTEGER NOT NULL,
@@ -290,6 +301,53 @@ describe("memory store and recall", () => {
     );
     expect(result.diagnostics.embeddingAvailable).toBe(false);
     expect(listMemoryRecallEvents(db, { projectId: 1 })).toHaveLength(1);
+  });
+
+  it("uses optional embedding projection when query embeddings are available", () => {
+    const db = setupMemoryDb();
+    const first = rememberDecision(
+      db,
+      "The durable memory feature is inspired by Eywa provenance.",
+    );
+    const second = rememberMemoryFacts(db, {
+      projectId: 1,
+      worktreePath: "/repo",
+      originThreadId: 7,
+      sourceKind: "manual",
+      text: "Decision: Terminal sessions use PTY bridges.",
+      facts: [
+        {
+          statement: "Terminal sessions use PTY bridges.",
+          factType: "technical",
+          memoryKind: "canonical",
+          scopeEntity: "terminal",
+        },
+      ],
+    });
+    upsertMemoryFactEmbedding(db, {
+      embedding: [1, 0, 0],
+      factId: first.accepted[0]?.id ?? -1,
+      projectId: 1,
+      worktreePath: "/repo",
+    });
+    upsertMemoryFactEmbedding(db, {
+      embedding: [0, 1, 0],
+      factId: second.accepted[0]?.id ?? -1,
+      projectId: 1,
+      worktreePath: "/repo",
+    });
+
+    const result = recallMemory(db, {
+      projectId: 1,
+      worktreePath: "/repo",
+      query: "forest ancestor memory",
+      queryEmbedding: [1, 0, 0],
+      scope: "worktree",
+      embeddingAvailable: true,
+    });
+
+    expect(result.diagnostics.routesPlanned).toContain("vector");
+    expect(result.facts[0]?.id).toBe(first.accepted[0]?.id);
   });
 
   it("includes superseded facts only when requested or planned", () => {

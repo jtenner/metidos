@@ -50,7 +50,8 @@ function planRoutes(input: MemoryRecallInput): RouteName[] {
   if (/\bwhy\b|\bhow\b|what led to|support|evidence/u.test(query))
     routes.push("evidence");
   routes.push("entity");
-  if (input.embeddingAvailable) routes.push("vector");
+  if (input.embeddingAvailable && input.queryEmbedding?.length)
+    routes.push("vector");
   return [...new Set(routes)];
 }
 
@@ -80,6 +81,35 @@ function baseWhere(input: MemoryRecallInput): {
   if (!includeSuperseded(input)) where.push("mf.status = 'active'");
   else where.push("mf.status IN ('active','superseded')");
   return { where, bindings };
+}
+
+function cosineSimilarity(left: number[], right: number[]): number {
+  const length = Math.min(left.length, right.length);
+  if (length === 0) return 0;
+  let dot = 0;
+  let leftMagnitude = 0;
+  let rightMagnitude = 0;
+  for (let index = 0; index < length; index += 1) {
+    const leftValue = left[index] ?? 0;
+    const rightValue = right[index] ?? 0;
+    dot += leftValue * rightValue;
+    leftMagnitude += leftValue * leftValue;
+    rightMagnitude += rightValue * rightValue;
+  }
+  if (leftMagnitude === 0 || rightMagnitude === 0) return 0;
+  return dot / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
+}
+
+function parseEmbeddingJson(value: unknown): number[] {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is number => Number.isFinite(item))
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function queryRoute(
@@ -135,6 +165,23 @@ function queryRoute(
         `SELECT DISTINCT mf.* FROM memory_evidence_fts efts JOIN memory_fact_evidence mfe ON mfe.evidence_id = efts.rowid JOIN memory_facts mf ON mf.id = mfe.fact_id WHERE memory_evidence_fts MATCH ? AND ${where.join(" AND ")} LIMIT ?`,
       )
       .all(fts, ...bindings, limit);
+  } else if (route === "vector") {
+    if (!input.queryEmbedding || input.queryEmbedding.length === 0) return [];
+    rows = db
+      .query<any, any[]>(
+        `SELECT mf.*, me.embedding_json FROM memory_embeddings me JOIN memory_facts mf ON mf.id = me.fact_id WHERE ${where.join(" AND ")} LIMIT 500`,
+      )
+      .all(...bindings)
+      .map((row) => ({
+        ...row,
+        vector_score: cosineSimilarity(
+          input.queryEmbedding ?? [],
+          parseEmbeddingJson(row.embedding_json),
+        ),
+      }))
+      .filter((row) => row.vector_score > 0)
+      .sort((left, right) => right.vector_score - left.vector_score)
+      .slice(0, limit);
   }
   return rows.map((row, index) => ({
     factId: row.id,

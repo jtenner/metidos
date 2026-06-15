@@ -7,7 +7,7 @@ import type { Database, SQLQueryBindings } from "bun:sqlite";
 import { initCalendarSchema } from "./calendar/store";
 import { initPluginIngressMessageSchema } from "./plugin/ingress-store";
 
-export const LATEST_APP_SCHEMA_VERSION = 7;
+export const LATEST_APP_SCHEMA_VERSION = 8;
 
 function runStatement(
   database: Database,
@@ -37,6 +37,7 @@ export const APP_SCHEMA_TABLE_NAMES = [
   "cron_jobs",
   "external_ics_calendars",
   "external_ics_event_cache",
+  "memory_embeddings",
   "memory_evidence",
   "memory_evidence_fts",
   "memory_fact_evidence",
@@ -165,6 +166,7 @@ export const APP_SCHEMA_MIGRATION_REQUIRED_TABLES = [
   "plugin_ingress_route_configs",
   "plugin_ingress_rate_limit_markers",
   "plugin_notification_rate_limits",
+  "memory_embeddings",
   "memory_evidence",
   "memory_fact_evidence",
   "memory_facts",
@@ -1627,6 +1629,21 @@ export function migrateAppSchema(
   runStatement(
     db,
     `
+			CREATE TABLE IF NOT EXISTS memory_embeddings (
+				fact_id INTEGER PRIMARY KEY REFERENCES memory_facts(id) ON DELETE CASCADE,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				embedding_json TEXT NOT NULL,
+				embedding_dimensions INTEGER NOT NULL,
+				model_key TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
 			CREATE TABLE IF NOT EXISTS memory_fact_evidence (
 				fact_id INTEGER NOT NULL REFERENCES memory_facts(id) ON DELETE CASCADE,
 				evidence_id INTEGER NOT NULL REFERENCES memory_evidence(id) ON DELETE CASCADE,
@@ -1684,6 +1701,7 @@ export function migrateAppSchema(
     `CREATE INDEX IF NOT EXISTS idx_memory_signals_evidence_kind ON memory_signals(evidence_id, kind)`,
     `CREATE INDEX IF NOT EXISTS idx_memory_facts_scope_status ON memory_facts(project_id, worktree_path, status, updated_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_memory_facts_supersession ON memory_facts(supersedes_fact_id, superseded_by_fact_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_embeddings_scope ON memory_embeddings(project_id, worktree_path, updated_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_memory_recall_events_scope ON memory_recall_events(project_id, worktree_path, created_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_memory_write_events_scope ON memory_write_events(project_id, worktree_path, created_at DESC)`,
   ]) {

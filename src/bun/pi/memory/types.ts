@@ -108,6 +108,7 @@ export type MemoryRecallInput = {
   includeSuperseded?: boolean;
   includeEvidence?: boolean;
   embeddingAvailable?: boolean;
+  queryEmbedding?: number[];
 };
 
 export type MemoryRecallFact = {

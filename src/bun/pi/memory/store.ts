@@ -294,6 +294,37 @@ export function getMemoryEvidence(
   );
 }
 
+export function upsertMemoryFactEmbedding(
+  db: Database,
+  input: {
+    factId: number;
+    projectId: number;
+    worktreePath: string;
+    embedding: number[];
+    modelKey?: string | null;
+  },
+): void {
+  if (input.embedding.length === 0) {
+    return;
+  }
+  run(
+    db,
+    `INSERT INTO memory_embeddings (fact_id, project_id, worktree_path, embedding_json, embedding_dimensions, model_key, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+     ON CONFLICT(fact_id) DO UPDATE SET
+       embedding_json = excluded.embedding_json,
+       embedding_dimensions = excluded.embedding_dimensions,
+       model_key = excluded.model_key,
+       updated_at = excluded.updated_at`,
+    input.factId,
+    input.projectId,
+    input.worktreePath,
+    JSON.stringify(input.embedding),
+    input.embedding.length,
+    input.modelKey ?? null,
+  );
+}
+
 export function eraseMemory(
   db: Database,
   input: MemoryForgetInput,
@@ -331,6 +362,7 @@ export function eraseMemory(
       input.worktreePath,
     );
     run(db, `DELETE FROM memory_facts_fts WHERE rowid = ?`, factId);
+    run(db, `DELETE FROM memory_embeddings WHERE fact_id = ?`, factId);
   }
   for (const evidenceId of evidenceIds) {
     run(

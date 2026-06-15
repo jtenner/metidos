@@ -1245,6 +1245,16 @@ export async function runPiDelegatedTask(
         METIDOS_PERMISSION.memory,
       )
         ? createPiMemoryTools({
+            embed: options?.pluginSidecarManager
+              ? (query) =>
+                  options.pluginSidecarManager!.embedForThread({
+                    ownerUserId: childThread.ownerUserId,
+                    projectId: childThread.projectId,
+                    query,
+                    threadId: childThread.id,
+                    worktreePath: childThread.worktreePath,
+                  })
+              : undefined,
             embeddingAvailable: !!options?.pluginSidecarManager,
             ownerUserId: childThread.ownerUserId,
             projectId: childThread.projectId,
@@ -1595,6 +1605,16 @@ export async function createPiThreadRuntime(
       METIDOS_PERMISSION.memory,
     )
       ? createPiMemoryTools({
+          embed: options?.pluginSidecarManager
+            ? (query) =>
+                options.pluginSidecarManager!.embedForThread({
+                  ownerUserId: thread.ownerUserId,
+                  projectId: thread.projectId,
+                  query,
+                  threadId: thread.id,
+                  worktreePath: thread.worktreePath,
+                })
+            : undefined,
           embeddingAvailable: !!options?.pluginSidecarManager,
           ownerUserId: thread.ownerUserId,
           projectId: thread.projectId,
