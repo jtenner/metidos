@@ -5,6 +5,7 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MainviewPrimaryView } from "../thread-workspace-selection";
 import type {
   ProjectProcedures,
   RpcProject,
@@ -105,7 +106,7 @@ type UseWorktreeDiffParams = {
   /** Whether app is visible; hidden documents pause background polling. */
   isDocumentVisible: boolean;
   /** Active panel mode; diff effects only run in `diff` mode. */
-  primaryView: "chat" | "diff" | "cronjobs" | "calendar";
+  primaryView: MainviewPrimaryView;
   /** RPC procedures for fetching snapshot and file diffs. */
   procedures: ProjectProcedures;
   /** Selected worktree change that should render as the focused patch row. */

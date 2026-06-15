@@ -31,7 +31,10 @@ import {
 import { migrateChatComposerImageAttachmentKey } from "../controls/chat-composer-image-attachments";
 import type { ThreadAccessValue } from "../controls/thread-access-control";
 import { buildLoadedProjectWorktreesState } from "../project-worktree-refresh";
-import type { SelectedWorktreeThreadSyncPlan } from "../thread-workspace-selection";
+import type {
+  MainviewPrimaryView,
+  SelectedWorktreeThreadSyncPlan,
+} from "../thread-workspace-selection";
 import { deriveSelectedWorktreeThreadSyncPlan } from "../thread-workspace-selection-controller";
 import {
   awaitAbortableResult,
@@ -112,9 +115,7 @@ export type ThreadWorkspaceSelectionSetters = {
   setIsThreadLoading: Dispatch<SetStateAction<boolean>>;
   setMobileProjectListOpen: Dispatch<SetStateAction<boolean>>;
   setModelControlError: Dispatch<SetStateAction<string>>;
-  setPrimaryView: Dispatch<
-    SetStateAction<"chat" | "diff" | "cronjobs" | "calendar">
-  >;
+  setPrimaryView: Dispatch<SetStateAction<MainviewPrimaryView>>;
   setReasoningEffortControlError: Dispatch<SetStateAction<string>>;
   setSelectedProjectId: Dispatch<SetStateAction<number | null>>;
   setSelectedThreadId: Dispatch<SetStateAction<number | null>>;

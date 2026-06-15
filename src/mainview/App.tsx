@@ -202,6 +202,11 @@ const DiffWorkspace = lazy(async () => {
   return { default: module.DiffWorkspace };
 });
 
+const MemoryWorkspace = lazy(async () => {
+  const module = await import("./app/memory-workspace");
+  return { default: module.MemoryWorkspace };
+});
+
 const GitHistoryDiffModal = lazy(async () => {
   const module = await import("./app/git-history-diff-modal");
   return { default: module.GitHistoryDiffModal };
@@ -234,12 +239,14 @@ const PRIMARY_VIEW_TAB_IDS = {
     diff: "desktop-primary-view-tab-diff",
     cronjobs: "desktop-primary-view-tab-cronjobs",
     calendar: "desktop-primary-view-tab-calendar",
+    memory: "desktop-primary-view-tab-memory",
   },
   mobile: {
     chat: "mobile-primary-view-tab-chat",
     diff: "mobile-primary-view-tab-diff",
     cronjobs: "mobile-primary-view-tab-cronjobs",
     calendar: "mobile-primary-view-tab-calendar",
+    memory: "mobile-primary-view-tab-memory",
   },
 } satisfies Record<"desktop" | "mobile", Record<PrimaryView, string>>;
 
@@ -249,18 +256,20 @@ const PRIMARY_VIEW_PANEL_IDS = {
     diff: "desktop-primary-view-panel-diff",
     cronjobs: "desktop-primary-view-panel-cronjobs",
     calendar: "desktop-primary-view-panel-calendar",
+    memory: "desktop-primary-view-panel-memory",
   },
   mobile: {
     chat: "mobile-primary-view-panel-chat",
     diff: "mobile-primary-view-panel-diff",
     cronjobs: "mobile-primary-view-panel-cronjobs",
     calendar: "mobile-primary-view-panel-calendar",
+    memory: "mobile-primary-view-panel-memory",
   },
 } satisfies Record<"desktop" | "mobile", Record<PrimaryView, string>>;
 
 const PRIMARY_VIEW_TAB_ORDER = {
-  desktop: ["chat", "diff", "cronjobs", "calendar"],
-  mobile: ["diff", "cronjobs", "calendar", "chat"],
+  desktop: ["chat", "diff", "cronjobs", "calendar", "memory"],
+  mobile: ["diff", "cronjobs", "calendar", "memory", "chat"],
 } satisfies Record<"desktop" | "mobile", PrimaryView[]>;
 
 const THREAD_MESSAGE_CONTENT_RPC_TIMEOUT_MS = 60_000;
@@ -2334,10 +2343,6 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
       selectedProjectIdRef,
       selectedThreadIdRef,
       selectedWorktreePathRef,
-      setAvailablePluginAccessGroups,
-      setAvailableThreadPermissionDescriptors,
-      setHomeDirectory,
-      setSupportsTildePath,
     ],
   );
 
@@ -3609,6 +3614,25 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                 >
                   Calendar
                 </AppButton>
+                <AppButton
+                  unstyled
+                  type="button"
+                  id={PRIMARY_VIEW_TAB_IDS.desktop.memory}
+                  role="tab"
+                  aria-controls={PRIMARY_VIEW_PANEL_IDS.desktop.memory}
+                  aria-selected={primaryView === "memory"}
+                  tabIndex={primaryView === "memory" ? 0 : -1}
+                  className={`font-label text-xs uppercase tracking-[0.1em] pb-1 transition-colors duration-200 focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus-ring focus-visible:outline-offset-2 ${
+                    primaryView === "memory"
+                      ? "border-b-2 border-accent text-accent-strong"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                  onClick={() => {
+                    setPrimaryViewForNavigation("memory");
+                  }}
+                >
+                  Memory
+                </AppButton>
               </div>
             </nav>
           </div>
@@ -3929,6 +3953,18 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                   variant="desktop"
                 />
               </Suspense>
+            ) : primaryView === "memory" ? (
+              <Suspense
+                fallback={
+                  <WorkspaceLoadingFallback label="Loading memory..." />
+                }
+              >
+                <MemoryWorkspace
+                  procedures={procedures}
+                  selectedProjectId={selectedProjectId}
+                  selectedWorktreePath={selectedWorktreePath}
+                />
+              </Suspense>
             ) : (
               <div className="flex min-h-0 flex-1 px-6 py-6">
                 <Suspense
@@ -4161,7 +4197,9 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
           role="tabpanel"
           aria-labelledby={PRIMARY_VIEW_TAB_IDS.mobile[primaryView]}
           className={`mx-auto flex w-full max-w-2xl flex-1 min-h-0 flex-col gap-6 px-4 pt-14 pb-16 ${
-            primaryView === "diff" || primaryView === "calendar"
+            primaryView === "diff" ||
+            primaryView === "calendar" ||
+            primaryView === "memory"
               ? "app-scrollbar overflow-y-auto"
               : ""
           }`}
@@ -4283,6 +4321,21 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
                 variant="mobile"
               />
             </Suspense>
+          ) : primaryView === "memory" ? (
+            <Suspense
+              fallback={
+                <WorkspaceLoadingFallback
+                  label="Loading memory..."
+                  variant="mobile"
+                />
+              }
+            >
+              <MemoryWorkspace
+                procedures={procedures}
+                selectedProjectId={selectedProjectId}
+                selectedWorktreePath={selectedWorktreePath}
+              />
+            </Suspense>
           ) : (
             <div className="flex flex-col gap-4 pt-6">
               <Suspense
@@ -4335,7 +4388,7 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
           </div>
           <nav aria-label="Primary views">
             <div
-              className="grid h-16 grid-cols-4 items-center bg-bg-app"
+              className="grid h-16 grid-cols-5 items-center bg-bg-app"
               role="tablist"
               onKeyDown={(event) =>
                 handlePrimaryViewTabKeyDown(event, "mobile")
@@ -4385,6 +4438,21 @@ export default function App({ isAdmin, procedures }: AppProps): JSX.Element {
               >
                 {materialSymbol("schedule")}
                 <span className="mt-1 uppercase-label">Calendar</span>
+              </TabButton>
+              <TabButton
+                id={PRIMARY_VIEW_TAB_IDS.mobile.memory}
+                role="tab"
+                aria-controls={PRIMARY_VIEW_PANEL_IDS.mobile.memory}
+                aria-selected={primaryView === "memory"}
+                selected={primaryView === "memory"}
+                tabIndex={primaryView === "memory" ? 0 : -1}
+                onClick={() => {
+                  setMobileProjectListOpen(false);
+                  setPrimaryViewForNavigation("memory");
+                }}
+              >
+                {materialSymbol("description")}
+                <span className="mt-1 uppercase-label">Memory</span>
               </TabButton>
               <TabButton
                 id={PRIMARY_VIEW_TAB_IDS.mobile.chat}

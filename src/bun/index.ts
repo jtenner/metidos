@@ -230,6 +230,14 @@ import {
   updateTimezoneSettingsProcedure,
   updateUserRuntimeSettingsProcedure,
   warmProcedureStartupCaches,
+  eraseMemoryProcedure,
+  getMemoryEvidenceDetailProcedure,
+  getMemoryFactDetailProcedure,
+  getMemoryStatsProcedure,
+  listMemoryEvidenceProcedure,
+  listMemoryRecallEventsProcedure,
+  listMemoryWriteEventsProcedure,
+  searchMemoryFactsProcedure,
 } from "./project-procedures";
 import { requireLocalOperatorCapability } from "./project-procedures/local-operator";
 import { buildModelCatalog } from "./project-procedures/model-catalog";
@@ -744,6 +752,7 @@ const rpcHandlers = createBackendRpcHandlers({
   deletePluginIngressExternalBindingProcedure,
   deleteProjectProcedure,
   deleteThreadProcedure,
+  eraseMemory: eraseMemoryProcedure,
   discardEmptyThreadProcedure,
   dismissCalendarNotificationProcedure,
   dismissUserNotificationProcedure,
@@ -754,6 +763,9 @@ const rpcHandlers = createBackendRpcHandlers({
   getModelCatalogProcedure,
   getPluginInventoryProcedure,
   getPluginSettingsProcedure,
+  getMemoryEvidenceDetailProcedure,
+  getMemoryFactDetailProcedure,
+  getMemoryStatsProcedure,
   getPluginSidecarDiagnostics: (params) =>
     pluginSidecarManager?.getDiagnostics(params ?? undefined) ?? [],
   getPluginSecurityDiagnostics: () => ({
@@ -771,6 +783,9 @@ const rpcHandlers = createBackendRpcHandlers({
   listCalendarOccurrencesProcedure,
   listCronsProcedure,
   listDirectorySuggestionsProcedure,
+  listMemoryEvidenceProcedure,
+  listMemoryRecallEventsProcedure,
+  listMemoryWriteEventsProcedure,
   listPluginAccessGroupsProcedure,
   listPluginIngressExternalBindingsProcedure,
   listPluginIngressRouteConfigsProcedure,
@@ -819,6 +834,7 @@ const rpcHandlers = createBackendRpcHandlers({
     await manager.runPluginGc(directoryName);
   },
   runPluginLifecycleActionProcedure,
+  searchMemoryFactsProcedure,
   sendThreadMessageProcedure,
   setActiveWorktreeProcedure,
   setCalendarShareProcedure,
@@ -3159,6 +3175,15 @@ const rpcParamValidators: { [K in RpcMethodName]: RpcParamValidator } = {
   deletePluginIngressExternalBinding: objectParams({ id: "number" }),
   deleteProject: objectParams({ projectId: "number" }),
   deleteThread: objectParams({ threadId: "number" }),
+  eraseMemory: objectParams({
+    confirm: "string",
+    "evidenceIds?": "array",
+    "factIds?": "array",
+    projectId: "number",
+    "query?": "string",
+    "scope?": "string",
+    worktreePath: "string",
+  }),
   discardEmptyThread: objectParams({ threadId: "number" }),
   dismissCalendarNotification: objectParams({ deliveryId: "number" }),
   dismissUserNotification: objectParams({ deliveryId: "number" }),
@@ -3172,6 +3197,12 @@ const rpcParamValidators: { [K in RpcMethodName]: RpcParamValidator } = {
     "selectedThreadId?": "nullableNumber",
   }),
   getCalendarBootstrap: undefinedParams(),
+  getMemoryEvidenceDetail: objectParams({ evidenceId: "number" }),
+  getMemoryFactDetail: objectParams({ factId: "number" }),
+  getMemoryStats: optionalObjectParams({
+    "projectId?": "number",
+    "worktreePath?": "string",
+  }),
   getHomeDirectory: undefinedParams(),
   getModelCatalog: optionalObjectParams({
     "refresh?": "boolean",
@@ -3211,6 +3242,23 @@ const rpcParamValidators: { [K in RpcMethodName]: RpcParamValidator } = {
   }),
   listCrons: undefinedParams(),
   listDirectorySuggestions: objectParams({ query: "string" }),
+  listMemoryEvidence: optionalObjectParams({
+    "limit?": "number",
+    "offset?": "number",
+    "projectId?": "number",
+    "query?": "string",
+    "worktreePath?": "string",
+  }),
+  listMemoryRecallEvents: optionalObjectParams({
+    "limit?": "number",
+    "projectId?": "number",
+    "worktreePath?": "string",
+  }),
+  listMemoryWriteEvents: optionalObjectParams({
+    "limit?": "number",
+    "projectId?": "number",
+    "worktreePath?": "string",
+  }),
   listPluginAccessGroups: undefinedParams(),
   listPluginIngressSources: undefinedParams(),
   listPluginIngressExternalBindings: optionalObjectParams({
@@ -3287,6 +3335,18 @@ const rpcParamValidators: { [K in RpcMethodName]: RpcParamValidator } = {
     projectId: "number",
     reasoningEffort: "nullableString",
     worktreePath: "string",
+  }),
+  searchMemoryFacts: optionalObjectParams({
+    "factType?": "string",
+    "limit?": "number",
+    "memoryKind?": "string",
+    "offset?": "number",
+    "projectId?": "number",
+    "query?": "string",
+    "scopeEntity?": "string",
+    "sort?": "string",
+    "status?": "string",
+    "worktreePath?": "string",
   }),
   respondThreadExtensionUi: objectParams({
     response: "object",

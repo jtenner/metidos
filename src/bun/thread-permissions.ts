@@ -123,6 +123,14 @@ const METIDOS_NATIVE_PERMISSION_INPUTS: ThreadPermissionDescriptorInput[] = [
     providerId: METIDOS_PERMISSION_PROVIDER_ID,
   },
   {
+    accessId: "memory",
+    category: "data",
+    defaultEnabled: false,
+    description: "Project-scoped provenance-grounded long-term memory tools.",
+    providerDescription: METIDOS_NATIVE_PROVIDER_DESCRIPTION,
+    providerId: METIDOS_PERMISSION_PROVIDER_ID,
+  },
+  {
     accessId: "agents",
     category: "coordination",
     defaultEnabled: false,

@@ -7,7 +7,7 @@ import type { Database, SQLQueryBindings } from "bun:sqlite";
 import { initCalendarSchema } from "./calendar/store";
 import { initPluginIngressMessageSchema } from "./plugin/ingress-store";
 
-export const LATEST_APP_SCHEMA_VERSION = 6;
+export const LATEST_APP_SCHEMA_VERSION = 7;
 
 function runStatement(
   database: Database,
@@ -37,6 +37,14 @@ export const APP_SCHEMA_TABLE_NAMES = [
   "cron_jobs",
   "external_ics_calendars",
   "external_ics_event_cache",
+  "memory_evidence",
+  "memory_evidence_fts",
+  "memory_fact_evidence",
+  "memory_facts",
+  "memory_facts_fts",
+  "memory_recall_events",
+  "memory_signals",
+  "memory_write_events",
   "project_worktrees",
   "projects",
   "plugin_ingress_audit_events",
@@ -157,6 +165,12 @@ export const APP_SCHEMA_MIGRATION_REQUIRED_TABLES = [
   "plugin_ingress_route_configs",
   "plugin_ingress_rate_limit_markers",
   "plugin_notification_rate_limits",
+  "memory_evidence",
+  "memory_fact_evidence",
+  "memory_facts",
+  "memory_recall_events",
+  "memory_signals",
+  "memory_write_events",
   "project_worktrees",
   "terminal_settings",
 ] as const satisfies readonly AppSchemaTableName[];
@@ -1547,6 +1561,134 @@ export function migrateAppSchema(
   ensureThreadMessageColumn(db, "state", "state TEXT");
   ensureThreadMessageColumn(db, "payload_json", "payload_json TEXT");
   ensureThreadMessageColumn(db, "updated_at", "updated_at TEXT");
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_evidence (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				origin_thread_id INTEGER REFERENCES threads(id) ON DELETE SET NULL,
+				origin_message_id INTEGER REFERENCES thread_messages(id) ON DELETE SET NULL,
+				source_kind TEXT NOT NULL CHECK(source_kind IN ('user_message','assistant_message','tool','manual','system')),
+				source_role TEXT,
+				text TEXT NOT NULL,
+				text_sha256 TEXT NOT NULL,
+				metadata_json TEXT NOT NULL DEFAULT '{}',
+				captured_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				erased_at TEXT,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_signals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				evidence_id INTEGER NOT NULL REFERENCES memory_evidence(id) ON DELETE CASCADE,
+				kind TEXT NOT NULL,
+				value TEXT NOT NULL,
+				normalized_value TEXT,
+				start_offset INTEGER,
+				end_offset INTEGER,
+				confidence REAL NOT NULL DEFAULT 1.0,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_facts (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				origin_thread_id INTEGER REFERENCES threads(id) ON DELETE SET NULL,
+				statement TEXT NOT NULL,
+				fact_type TEXT NOT NULL,
+				memory_kind TEXT NOT NULL DEFAULT 'canonical' CHECK(memory_kind IN ('canonical','observation','technical')),
+				scope_entity TEXT,
+				status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','superseded','rejected','erased')),
+				mutable INTEGER NOT NULL DEFAULT 1,
+				confidence REAL NOT NULL DEFAULT 1.0,
+				validation_json TEXT NOT NULL DEFAULT '{}',
+				metadata_json TEXT NOT NULL DEFAULT '{}',
+				valid_from TEXT,
+				valid_until TEXT,
+				supersedes_fact_id INTEGER REFERENCES memory_facts(id) ON DELETE SET NULL,
+				superseded_by_fact_id INTEGER REFERENCES memory_facts(id) ON DELETE SET NULL,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+				erased_at TEXT
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_fact_evidence (
+				fact_id INTEGER NOT NULL REFERENCES memory_facts(id) ON DELETE CASCADE,
+				evidence_id INTEGER NOT NULL REFERENCES memory_evidence(id) ON DELETE CASCADE,
+				support_kind TEXT NOT NULL DEFAULT 'source',
+				excerpt TEXT,
+				PRIMARY KEY(fact_id, evidence_id)
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_recall_events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				thread_id INTEGER REFERENCES threads(id) ON DELETE SET NULL,
+				query TEXT NOT NULL,
+				answer_mode TEXT NOT NULL,
+				route_plan_json TEXT NOT NULL DEFAULT '{}',
+				result_fact_ids_json TEXT NOT NULL DEFAULT '[]',
+				result_count INTEGER NOT NULL DEFAULT 0,
+				latency_ms INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `
+			CREATE TABLE IF NOT EXISTS memory_write_events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				worktree_path TEXT NOT NULL,
+				thread_id INTEGER REFERENCES threads(id) ON DELETE SET NULL,
+				evidence_id INTEGER REFERENCES memory_evidence(id) ON DELETE SET NULL,
+				accepted_fact_ids_json TEXT NOT NULL DEFAULT '[]',
+				rejected_facts_json TEXT NOT NULL DEFAULT '[]',
+				signal_summary_json TEXT NOT NULL DEFAULT '{}',
+				latency_ms INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			);
+		`,
+  );
+  runStatement(
+    db,
+    `CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(statement, scope_entity, fact_type);`,
+  );
+  runStatement(
+    db,
+    `CREATE VIRTUAL TABLE IF NOT EXISTS memory_evidence_fts USING fts5(text);`,
+  );
+  for (const statement of [
+    `CREATE INDEX IF NOT EXISTS idx_memory_evidence_scope ON memory_evidence(project_id, worktree_path, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_signals_evidence_kind ON memory_signals(evidence_id, kind)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_facts_scope_status ON memory_facts(project_id, worktree_path, status, updated_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_facts_supersession ON memory_facts(supersedes_fact_id, superseded_by_fact_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_recall_events_scope ON memory_recall_events(project_id, worktree_path, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_memory_write_events_scope ON memory_write_events(project_id, worktree_path, created_at DESC)`,
+  ]) {
+    runStatement(db, statement);
+  }
   runStatement(
     db,
     `

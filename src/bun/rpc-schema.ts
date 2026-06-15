@@ -216,6 +216,55 @@ export type {
   RpcWorktreeFileContentPage,
 } from "./rpc-schema/project-worktree";
 
+export type RpcMemoryFactPreview = {
+  id: number;
+  projectId: number;
+  worktreePath: string;
+  originThreadId: number | null;
+  statement: string;
+  factType: string;
+  memoryKind: string;
+  scopeEntity: string | null;
+  status: string;
+  confidence: number;
+  createdAt: string;
+  updatedAt: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  erasedAt: string | null;
+  supersedesFactId: number | null;
+  supersededByFactId: number | null;
+  evidenceCount: number;
+  recallCount: number;
+};
+
+export type RpcMemoryEvidencePreview = {
+  id: number;
+  projectId: number;
+  worktreePath: string;
+  originThreadId: number | null;
+  originMessageId: number | null;
+  sourceKind: string;
+  sourceRole: string | null;
+  textPreview: string;
+  textSha256: string;
+  capturedAt: string;
+  createdAt: string;
+  erasedAt: string | null;
+};
+
+export type RpcMemoryStats = Record<string, unknown>;
+export type RpcMemoryFactDetail = Record<string, unknown> | null;
+export type RpcMemoryEvidenceDetail = Record<string, unknown> | null;
+export type RpcMemoryRecallEvent = Record<string, unknown>;
+export type RpcMemoryWriteEvent = Record<string, unknown>;
+export type RpcMemoryEraseResult = {
+  erasedFactIds: number[];
+  erasedEvidenceIds: number[];
+  factCount: number;
+  evidenceCount: number;
+};
+
 export type RpcClientLogSeverity = "debug" | "info" | "warn" | "error";
 
 export type RpcClientLogRequest = {
@@ -398,6 +447,71 @@ export type AppRPCSchema = {
     getAppBootstrap: {
       params: RpcAppBootstrapHint | undefined;
       response: RpcAppBootstrapResult;
+    };
+    searchMemoryFacts: {
+      params:
+        | {
+            projectId?: number;
+            worktreePath?: string;
+            query?: string;
+            status?: string;
+            factType?: string;
+            memoryKind?: string;
+            scopeEntity?: string;
+            sort?: string;
+            limit?: number;
+            offset?: number;
+          }
+        | undefined;
+      response: { facts: RpcMemoryFactPreview[]; limit: number };
+    };
+    getMemoryFactDetail: {
+      params: { factId: number };
+      response: RpcMemoryFactDetail;
+    };
+    getMemoryEvidenceDetail: {
+      params: { evidenceId: number };
+      response: RpcMemoryEvidenceDetail;
+    };
+    listMemoryEvidence: {
+      params:
+        | {
+            projectId?: number;
+            worktreePath?: string;
+            query?: string;
+            limit?: number;
+            offset?: number;
+          }
+        | undefined;
+      response: { evidence: RpcMemoryEvidencePreview[]; limit: number };
+    };
+    listMemoryRecallEvents: {
+      params:
+        | { projectId?: number; worktreePath?: string; limit?: number }
+        | undefined;
+      response: RpcMemoryRecallEvent[];
+    };
+    listMemoryWriteEvents: {
+      params:
+        | { projectId?: number; worktreePath?: string; limit?: number }
+        | undefined;
+      response: RpcMemoryWriteEvent[];
+    };
+    getMemoryStats: {
+      params: { projectId?: number; worktreePath?: string } | undefined;
+      response: RpcMemoryStats;
+    };
+    eraseMemory: {
+      params: {
+        projectId: number;
+        worktreePath: string;
+        factIds?: number[];
+        evidenceIds?: number[];
+        query?: string;
+        scope?: "project" | "worktree" | "thread";
+        confirm: string;
+      };
+      response: RpcMemoryEraseResult;
     };
     listProjects: {
       params:
@@ -951,6 +1065,38 @@ export interface ProjectProcedures {
   getAppBootstrap: RpcProcedureCall<
     AppRPCSchema["requests"]["getAppBootstrap"]["params"],
     AppRPCSchema["requests"]["getAppBootstrap"]["response"]
+  >;
+  searchMemoryFacts: RpcProcedureCall<
+    AppRPCSchema["requests"]["searchMemoryFacts"]["params"],
+    AppRPCSchema["requests"]["searchMemoryFacts"]["response"]
+  >;
+  getMemoryFactDetail: RpcProcedureCall<
+    AppRPCSchema["requests"]["getMemoryFactDetail"]["params"],
+    AppRPCSchema["requests"]["getMemoryFactDetail"]["response"]
+  >;
+  getMemoryEvidenceDetail: RpcProcedureCall<
+    AppRPCSchema["requests"]["getMemoryEvidenceDetail"]["params"],
+    AppRPCSchema["requests"]["getMemoryEvidenceDetail"]["response"]
+  >;
+  listMemoryEvidence: RpcProcedureCall<
+    AppRPCSchema["requests"]["listMemoryEvidence"]["params"],
+    AppRPCSchema["requests"]["listMemoryEvidence"]["response"]
+  >;
+  listMemoryRecallEvents: RpcProcedureCall<
+    AppRPCSchema["requests"]["listMemoryRecallEvents"]["params"],
+    AppRPCSchema["requests"]["listMemoryRecallEvents"]["response"]
+  >;
+  listMemoryWriteEvents: RpcProcedureCall<
+    AppRPCSchema["requests"]["listMemoryWriteEvents"]["params"],
+    AppRPCSchema["requests"]["listMemoryWriteEvents"]["response"]
+  >;
+  getMemoryStats: RpcProcedureCall<
+    AppRPCSchema["requests"]["getMemoryStats"]["params"],
+    AppRPCSchema["requests"]["getMemoryStats"]["response"]
+  >;
+  eraseMemory: RpcProcedureCall<
+    AppRPCSchema["requests"]["eraseMemory"]["params"],
+    AppRPCSchema["requests"]["eraseMemory"]["response"]
   >;
   listProjects: RpcProcedureCall<
     AppRPCSchema["requests"]["listProjects"]["params"],

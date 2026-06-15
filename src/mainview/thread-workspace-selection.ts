@@ -5,7 +5,12 @@
 
 import type { RpcProject, RpcThread } from "../bun/rpc-schema";
 
-export type MainviewPrimaryView = "chat" | "diff" | "cronjobs" | "calendar";
+export type MainviewPrimaryView =
+  | "chat"
+  | "diff"
+  | "cronjobs"
+  | "calendar"
+  | "memory";
 
 export type ContextFocusTarget =
   | {
@@ -238,8 +243,8 @@ function stateForContextFocusTarget(
  * Pinned-thread shortcuts always return the main workspace view to chat.
  */
 export function derivePrimaryViewForPinnedThreadOpen(
-  primaryView: "chat" | "diff" | "cronjobs" | "calendar",
-): "chat" | "diff" | "cronjobs" | "calendar" {
+  primaryView: MainviewPrimaryView,
+): MainviewPrimaryView {
   return primaryView === "chat" ? primaryView : "chat";
 }
 

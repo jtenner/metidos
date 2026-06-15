@@ -13,6 +13,7 @@ export const METIDOS_PERMISSION = {
   git: "metidos:git",
   github: "metidos:github",
   lancedb: "metidos:lancedb",
+  memory: "metidos:memory",
   notifications: "metidos:notifications",
   sqlite: "metidos:sqlite",
   threads: "metidos:threads",

@@ -63,6 +63,7 @@ import {
   createPiIngressReplyTools,
   type PiIngressReplyToolHost,
 } from "./ingress-reply-tool";
+import { createPiMemoryTools } from "./memory/tools";
 import { createPiMetidosTools, type PiMetidosToolHost } from "./metidos/tools";
 import {
   buildPiWebSearchPromptLine,
@@ -353,6 +354,11 @@ function buildPiRuntimeAppendSystemPrompt(
   if (hasPiThreadRuntimePermission(thread, METIDOS_PERMISSION.lancedb)) {
     customToolLines.push(
       "Project-scoped LanceDB vector tools are installed in this runtime: lancedb_upsert, lancedb_query, and lancedb_delete. lancedb_query embeds the query string with the configured Metidos embedding model.",
+    );
+  }
+  if (hasPiThreadRuntimePermission(thread, METIDOS_PERMISSION.memory)) {
+    customToolLines.push(
+      "Project-scoped provenance-grounded memory tools are installed: memory_recall, memory_remember, memory_inspect, and memory_forget. Use memory_recall before answering questions that depend on prior sessions, durable project decisions, user preferences, or long-running state. Use memory_remember only for durable facts/preferences/decisions with clear evidence. Do not store secrets unless the user explicitly asks.",
     );
   }
   if (hasPiThreadRuntimePermission(thread, METIDOS_PERMISSION.webServer)) {
@@ -1234,6 +1240,18 @@ export async function runPiDelegatedTask(
               );
             })()
           : [];
+      const memoryTools = hasPiThreadRuntimePermission(
+        childThread,
+        METIDOS_PERMISSION.memory,
+      )
+        ? createPiMemoryTools({
+            embeddingAvailable: !!options?.pluginSidecarManager,
+            ownerUserId: childThread.ownerUserId,
+            projectId: childThread.projectId,
+            threadId: childThread.id,
+            worktreePath: childThread.worktreePath,
+          })
+        : [];
       const ingressReplyTools = options?.ingressReplyToolHost
         ? createPiIngressReplyTools(
             { threadIdContext: childThread.id },
@@ -1268,6 +1286,7 @@ export async function runPiDelegatedTask(
         ...lancedbTools,
         ...webServerTools,
         ...metidosTools,
+        ...memoryTools,
         ...ingressReplyTools,
         ...pluginTools,
       ];
@@ -1571,6 +1590,18 @@ export async function createPiThreadRuntime(
             );
           })()
         : [];
+    const memoryTools = hasPiThreadRuntimePermission(
+      thread,
+      METIDOS_PERMISSION.memory,
+    )
+      ? createPiMemoryTools({
+          embeddingAvailable: !!options?.pluginSidecarManager,
+          ownerUserId: thread.ownerUserId,
+          projectId: thread.projectId,
+          threadId: thread.id,
+          worktreePath: thread.worktreePath,
+        })
+      : [];
     const agentsTools = hasPiThreadRuntimePermission(
       thread,
       METIDOS_PERMISSION.agents,
@@ -1614,6 +1645,7 @@ export async function createPiThreadRuntime(
       ...lancedbTools,
       ...webServerTools,
       ...metidosTools,
+      ...memoryTools,
       ...agentsTools,
       ...ingressReplyTools,
       ...pluginTools,

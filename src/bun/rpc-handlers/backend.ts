@@ -13,6 +13,10 @@ import {
   type ModelCatalogRpcHandlerDependencies,
 } from "./model-catalog";
 import {
+  createMemoryRpcHandlers,
+  type MemoryRpcHandlerDependencies,
+} from "./memory";
+import {
   createPluginAdminRpcHandlers,
   type PluginAdminRpcHandlerDependencies,
 } from "./plugin-admin";
@@ -36,6 +40,7 @@ import {
 export type BackendRpcHandlerDependencies = AppBootstrapRpcHandlerDependencies &
   CalendarRpcHandlerDependencies &
   CronRpcHandlerDependencies &
+  MemoryRpcHandlerDependencies &
   ModelCatalogRpcHandlerDependencies &
   PluginAdminRpcHandlerDependencies &
   SettingsRpcHandlerDependencies &
@@ -49,6 +54,7 @@ export function createBackendRpcHandlers(
   const handlers = {
     ...createWorkContextRpcHandlers(dependencies),
     ...createModelCatalogRpcHandlers(dependencies),
+    ...createMemoryRpcHandlers(dependencies),
     ...createPluginAdminRpcHandlers(dependencies),
     ...createAppBootstrapRpcHandlers(dependencies),
     ...createThreadRpcHandlers(dependencies),

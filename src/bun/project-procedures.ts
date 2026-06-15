@@ -52,6 +52,16 @@ import { createSubsystemLogger } from "./logging";
 import { createBoundMessageActivityStore } from "./message-activity-store";
 import type { PiMetidosToolHost } from "./pi/metidos/tools";
 import {
+  eraseMemory,
+  getMemoryEvidenceDetail,
+  getMemoryFactDetail,
+  getMemoryStats,
+  listMemoryEvidenceForObservability,
+  listMemoryRecallEvents,
+  listMemoryWriteEvents,
+  searchMemoryFactsForObservability,
+} from "./pi/memory/observability";
+import {
   buildPiPromptWithPluginInjections,
   createPiThreadRuntime,
   type PiThreadRuntime,
@@ -631,6 +641,74 @@ export async function logClientEventProcedure(
   context?: RpcRequestContext,
 ): Promise<AppRPCSchema["requests"]["logClientEvent"]["response"]> {
   return logClientEventWithDatabase(db, params, context);
+}
+
+function requireMemoryObservatoryAccess(context?: RpcRequestContext): void {
+  requireLocalOperatorCapability(context, "manage_app");
+}
+
+export async function searchMemoryFactsProcedure(
+  params?: AppRPCSchema["requests"]["searchMemoryFacts"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["searchMemoryFacts"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return searchMemoryFactsForObservability(db, params ?? {});
+}
+
+export async function getMemoryFactDetailProcedure(
+  params: AppRPCSchema["requests"]["getMemoryFactDetail"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["getMemoryFactDetail"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return getMemoryFactDetail(db, params.factId);
+}
+
+export async function getMemoryEvidenceDetailProcedure(
+  params: AppRPCSchema["requests"]["getMemoryEvidenceDetail"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["getMemoryEvidenceDetail"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return getMemoryEvidenceDetail(db, params.evidenceId);
+}
+
+export async function listMemoryEvidenceProcedure(
+  params?: AppRPCSchema["requests"]["listMemoryEvidence"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["listMemoryEvidence"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return listMemoryEvidenceForObservability(db, params ?? {});
+}
+
+export async function listMemoryRecallEventsProcedure(
+  params?: AppRPCSchema["requests"]["listMemoryRecallEvents"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["listMemoryRecallEvents"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return listMemoryRecallEvents(db, params ?? {});
+}
+
+export async function listMemoryWriteEventsProcedure(
+  params?: AppRPCSchema["requests"]["listMemoryWriteEvents"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["listMemoryWriteEvents"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return listMemoryWriteEvents(db, params ?? {});
+}
+
+export async function getMemoryStatsProcedure(
+  params?: AppRPCSchema["requests"]["getMemoryStats"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["getMemoryStats"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return getMemoryStats(db, params ?? {});
+}
+
+export async function eraseMemoryProcedure(
+  params: AppRPCSchema["requests"]["eraseMemory"]["params"],
+  context?: RpcRequestContext,
+): Promise<AppRPCSchema["requests"]["eraseMemory"]["response"]> {
+  requireMemoryObservatoryAccess(context);
+  return eraseMemory(db, params);
 }
 
 /**
